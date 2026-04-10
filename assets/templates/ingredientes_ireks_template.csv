@@ -1,0 +1,2 @@
+referencia,nombre,familia,subfamilia,marca,formato_envase,unidad_envase,cantidad_envase,precio_unidad,precio_kg,es_harina,es_liquido,es_grasa,es_mejorante,activo
+REF-123,Mejorante Pan Blanco,Mejorantes,Pan,IREKS,Saco,kg,25,39.5,1.58,no,no,no,si,si
