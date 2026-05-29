@@ -4,7 +4,8 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlmodel import Session, delete, or_, select
+from sqlalchemy import desc
+from sqlmodel import Session, col, delete, or_, select
 
 from app.models import Receta, RecetaLinea, RecetaVersion
 
@@ -16,45 +17,89 @@ class RecipeAggregate:
 
 
 class RecipeRepository:
-    def list(self, session: Session, term: str = "", cliente_id: int | None = None) -> list[Receta]:
-        stmt = select(Receta)
+    def list(
+        self,
+        session: Session,
+        term: str = "",
+        cliente_id: str | None = None,
+        es_base: bool | None = None,
+    ) -> list[Receta]:
+        stmt = select(Receta).distinct()
         if term.strip():
             like_term = f"%{term.strip()}%"
-            stmt = stmt.where(or_(Receta.nombre.like(like_term), Receta.codigo_receta.like(like_term)))
+            stmt = stmt.outerjoin(RecetaLinea, col(RecetaLinea.receta_id) == col(Receta.id)).where(
+                or_(
+                    col(Receta.nombre).like(like_term),
+                    col(Receta.codigo_receta).like(like_term),
+                    col(RecetaLinea.codigo_ingrediente).like(like_term),
+                    col(RecetaLinea.nombre_mostrado).like(like_term),
+                    col(RecetaLinea.familia).like(like_term),
+                    col(RecetaLinea.subfamilia).like(like_term),
+                )
+            )
         if cliente_id:
-            stmt = stmt.where(Receta.cliente_id == cliente_id)
-        stmt = stmt.order_by(Receta.updated_at.desc())
+            stmt = stmt.where(col(Receta.cliente_id) == cliente_id)
+        if es_base is not None:
+            stmt = stmt.where(col(Receta.es_base) == es_base)
+        stmt = stmt.order_by(desc(col(Receta.updated_at)))
         return list(session.exec(stmt))
 
     def get(self, session: Session, receta_id: int) -> RecipeAggregate | None:
         receta = session.get(Receta, receta_id)
         if not receta:
             return None
-        lineas = list(session.exec(select(RecetaLinea).where(RecetaLinea.receta_id == receta_id).order_by(RecetaLinea.orden)))
+        lineas = list(
+            session.exec(
+                select(RecetaLinea).where(col(RecetaLinea.receta_id) == receta_id).order_by(col(RecetaLinea.orden))
+            )
+        )
         return RecipeAggregate(receta=receta, lineas=lineas)
 
     def save(self, session: Session, receta: Receta, lineas: list[RecetaLinea]) -> RecipeAggregate:
-        receta.updated_at = datetime.utcnow()
-        if receta.id is None:
-            receta.created_at = datetime.utcnow()
-        session.add(receta)
-        session.commit()
-        session.refresh(receta)
+        now = datetime.utcnow()
+        payload = receta.model_dump(exclude={"id", "created_at", "updated_at"})
 
-        session.exec(delete(RecetaLinea).where(RecetaLinea.receta_id == receta.id))
-        for idx, linea in enumerate(lineas, start=1):
-            linea.id = None
-            linea.receta_id = receta.id
-            linea.orden = idx
-            session.add(linea)
+        target: Receta
+        if receta.id is not None:
+            existing = session.get(Receta, receta.id)
+            if existing is not None:
+                for key, value in payload.items():
+                    setattr(existing, key, value)
+                existing.updated_at = now
+                target = existing
+            else:
+                # Si llega un id no existente, crear nueva receta sin forzar PK.
+                target = Receta(**payload)
+                target.created_at = now
+                target.updated_at = now
+                session.add(target)
+        else:
+            target = Receta(**payload)
+            target.created_at = now
+            target.updated_at = now
+            session.add(target)
+
         session.commit()
-        return self.get(session, receta.id)  # type: ignore[arg-type]
+        session.refresh(target)
+
+        session.execute(delete(RecetaLinea).where(col(RecetaLinea.receta_id) == (target.id or 0)))
+        session.flush()
+        for idx, linea in enumerate(lineas, start=1):
+            line_payload = linea.model_dump(exclude={"id", "receta_id", "orden"})
+            new_line = RecetaLinea(
+                receta_id=target.id or 0,
+                orden=idx,
+                **line_payload,
+            )
+            session.add(new_line)
+        session.commit()
+        return self.get(session, target.id)  # type: ignore[arg-type]
 
     def delete(self, session: Session, receta_id: int) -> bool:
         receta = session.get(Receta, receta_id)
         if not receta:
             return False
-        session.exec(delete(RecetaLinea).where(RecetaLinea.receta_id == receta_id))
+        session.execute(delete(RecetaLinea).where(col(RecetaLinea.receta_id) == receta_id))
         session.delete(receta)
         session.commit()
         return True

@@ -16,7 +16,7 @@ class BaseRepository(Generic[ModelType]):
         stmt = select(self.model).order_by(getattr(self.model, "id"))
         return list(session.exec(stmt))
 
-    def get_by_id(self, session: Session, entity_id: int) -> Optional[ModelType]:
+    def get_by_id(self, session: Session, entity_id: object) -> Optional[ModelType]:
         return session.get(self.model, entity_id)
 
     def create(self, session: Session, entity: ModelType) -> ModelType:
@@ -33,7 +33,7 @@ class BaseRepository(Generic[ModelType]):
         session.refresh(entity)
         return entity
 
-    def delete(self, session: Session, entity_id: int) -> bool:
+    def delete(self, session: Session, entity_id: object) -> bool:
         entity = self.get_by_id(session, entity_id)
         if not entity:
             return False

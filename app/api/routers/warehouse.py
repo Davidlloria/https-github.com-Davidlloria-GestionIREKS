@@ -1,0 +1,83 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.api.deps import get_warehouse_inventory_service, get_warehouse_movement_service
+from app.schemas.warehouse import (
+    InventoryAdjustmentPayload,
+    InventoryDetailRead,
+    InventoryExportPayload,
+    InventoryHeaderRead,
+    WarehouseManualMovementCreate,
+    WarehouseMovementRead,
+    WarehouseStockRead,
+)
+from app.services.warehouse_inventory_service import WarehouseInventoryService
+from app.services.warehouse_movement_service import WarehouseMovementService
+
+
+router = APIRouter(prefix="/warehouse", tags=["warehouse"])
+
+
+@router.get("/stock", response_model=list[WarehouseStockRead])
+def list_stock(
+    almacen_id: str = "",
+    service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
+) -> list[WarehouseStockRead]:
+    return service.stock_summary_payload(almacen_id)
+
+
+@router.get("/movements", response_model=list[WarehouseMovementRead])
+def list_movements(
+    almacen_id: str = "",
+    service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
+) -> list[WarehouseMovementRead]:
+    return service.movement_payload_serializable(almacen_id)
+
+
+@router.post("/movements", response_model=WarehouseMovementRead, status_code=201)
+def create_manual_movement(
+    payload: WarehouseManualMovementCreate,
+    service: WarehouseMovementService = Depends(get_warehouse_movement_service),
+) -> WarehouseMovementRead:
+    try:
+        return service.create_manual_move_from_payload(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/inventory/history", response_model=list[InventoryHeaderRead])
+def list_inventory_history(
+    almacen_id: str = "",
+    limit: int = 50,
+    service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
+) -> list[InventoryHeaderRead]:
+    return service.history_payload(almacen_id, limit)
+
+
+@router.get("/inventory/export", response_model=InventoryExportPayload)
+def inventory_export_payload(
+    almacen_id: str = "",
+    selected_id: str = "",
+    service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
+) -> InventoryExportPayload:
+    return service.export_payload_serializable(almacen_id=almacen_id, selected_id=selected_id)
+
+
+@router.post("/inventory/adjustments", response_model=InventoryHeaderRead, status_code=201)
+def apply_inventory_adjustments(
+    payload: InventoryAdjustmentPayload,
+    service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
+) -> InventoryHeaderRead:
+    try:
+        return service.apply_adjustments_from_payload(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/inventory/{inventory_id}", response_model=list[InventoryDetailRead])
+def list_inventory_detail(
+    inventory_id: str,
+    service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
+) -> list[InventoryDetailRead]:
+    return service.history_detail_payload(inventory_id)
