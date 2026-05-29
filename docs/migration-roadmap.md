@@ -17,7 +17,7 @@ Revision local: 2026-05-29.
 - `orphan_contact_links = 0` tras backup y reparacion.
 - `data/*.db`, `data/*.json`, `data/backups/`, `data/exports/` y `runtime/`
   quedan ignorados para evitar subir datos reales, secretos o binarios pesados.
-- Validacion tras el bloque actual de Fase 2: `53 passed`, `npm run lint` y
+- Validacion tras el bloque actual de Fase 2: `55 passed`, `npm run lint` y
   `npm run build`.
 
 ## Arquitectura objetivo
@@ -79,6 +79,8 @@ app/models          Entidades ORM
 18. Normalizacion inicial de errores API con helper comun para respuestas
     `400` y `404`.
 19. Validacion de rutas locales en API para importaciones JSON/PDF y backups.
+20. Respuestas `409 Conflict` para borrados de clientes/contactos bloqueados
+    por dependencias.
 
 ## Progreso vivo
 
@@ -95,12 +97,15 @@ Fase 2 - Endurecer API.
   - historico de inventario limitado a `1..200`;
   - filtros de texto principales con longitud maxima.
 - Tests nuevos en `tests/test_api_query_validation.py`.
-- Helper comun `app/api/errors.py` para respuestas `400` y `404` coherentes.
+- Helper comun `app/api/errors.py` para respuestas `400`, `404` y `409`
+  coherentes.
 - Routers de clientes, contactos, ingredientes, pedidos, configuracion y
   almacen migrados al helper comun para errores previsibles.
 - Helper `app/api/paths.py` para validar rutas locales usadas por API.
 - Importaciones JSON/PDF y backup validan extension esperada, archivo existente
   en entradas y destino no-directorio en salidas.
+- Borrado de clientes y contactos devuelve `409 Conflict` cuando existen
+  contactos, recetas o asistentes asociados.
 
 ### Pendiente en Fase 2
 
@@ -108,8 +113,8 @@ Fase 2 - Endurecer API.
   fallo debe mapear a `400`, `404` o `409`.
 - Documentar la politica de rutas locales de API y decidir si React debe migrar
   importaciones a subida de archivos en vez de enviar rutas del servidor.
-- Revisar endpoints de borrado con dependencias para devolver errores
-  previsibles cuando haya bloqueos.
+- Extender la revision de `409 Conflict` a otros dominios si aparecen nuevas
+  dependencias bloqueantes.
 - Valorar paginacion real para listados grandes antes de ampliar React.
 - Documentar una forma comoda de arrancar API y frontend juntos.
 - Mantener gates verdes: `pytest`, `npm run lint`, `npm run build` e integridad

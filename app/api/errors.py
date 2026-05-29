@@ -13,3 +13,7 @@ def bad_request(value: Exception | str) -> HTTPException:
 
 def not_found(value: Exception | str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_detail(value))
+
+
+def conflict(value: Exception | str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_detail(value))

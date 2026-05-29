@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response, status
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_contact_service
-from app.api.errors import bad_request, not_found
+from app.api.errors import bad_request, conflict, not_found
 from app.schemas.contacts import (
     ContactCompanyOption,
     ContactCreate,
@@ -71,6 +72,13 @@ def delete_contact(
     contact_id: str,
     service: ContactService = Depends(get_contact_service),
 ) -> Response:
-    if not service.delete(contact_id):
+    blockers = service.delete_blockers(contact_id)
+    if blockers:
+        raise conflict(f"No se puede eliminar el contacto porque tiene dependencias: {', '.join(blockers)}.")
+    try:
+        deleted = service.delete(contact_id)
+    except IntegrityError as exc:
+        raise conflict("No se puede eliminar el contacto porque tiene dependencias.") from exc
+    if not deleted:
         raise not_found("Contacto no encontrado.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

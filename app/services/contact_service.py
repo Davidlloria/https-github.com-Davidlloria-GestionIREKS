@@ -112,6 +112,16 @@ class ContactService:
         with Session(engine) as session:
             return self.vm.delete(session, contacto_id)
 
+    def delete_blockers(self, contacto_id: str) -> list[str]:
+        with engine.begin() as conn:
+            asistentes = conn.exec_driver_sql(
+                "SELECT COUNT(*) FROM asistentes WHERE contacto_id = ?",
+                (contacto_id,),
+            ).scalar_one()
+        if int(asistentes or 0) <= 0:
+            return []
+        return [f"{int(asistentes)} asistente(s) en cursos"]
+
     def import_file(self, file_path: Path) -> tuple[int, list[str]]:
         schema = [
             {"name": "contacto_id", "label": "Contacto_ID"},

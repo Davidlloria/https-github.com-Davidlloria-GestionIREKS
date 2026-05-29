@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response, status
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_customer_service
-from app.api.errors import bad_request, not_found
+from app.api.errors import bad_request, conflict, not_found
 from app.schemas.customers import (
     CustomerCreate,
     CustomerDetail,
@@ -63,6 +64,13 @@ def delete_customer(
     customer_id: str,
     service: CustomerService = Depends(get_customer_service),
 ) -> Response:
-    if not service.delete(customer_id):
+    blockers = service.delete_blockers(customer_id)
+    if blockers:
+        raise conflict(f"No se puede eliminar el cliente porque tiene dependencias: {', '.join(blockers)}.")
+    try:
+        deleted = service.delete(customer_id)
+    except IntegrityError as exc:
+        raise conflict("No se puede eliminar el cliente porque tiene dependencias.") from exc
+    if not deleted:
         raise not_found("Cliente no encontrado.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

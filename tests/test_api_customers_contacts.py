@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from sqlmodel import SQLModel, create_engine
+from sqlmodel import SQLModel, Session, create_engine
 
 pytest.importorskip("fastapi")
 
@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 import app.services.contact_service as contact_service_module  # noqa: E402
 import app.services.customer_service as customer_service_module  # noqa: E402
 from app.api.main import create_app  # noqa: E402
+from app.models import Asistente, Curso  # noqa: E402
 
 
 @pytest.fixture()
@@ -101,3 +102,55 @@ def test_contacts_crud_endpoints_include_company_payload(api_client: TestClient)
     deleted = api_client.delete("/contacts/contact-1")
     assert deleted.status_code == 204
     assert api_client.get("/contacts/contact-1").status_code == 404
+
+
+def test_customer_delete_with_contact_returns_conflict(api_client: TestClient) -> None:
+    api_client.post(
+        "/customers",
+        json={
+            "cliente_id": "customer-1",
+            "cliente_nombre_comercial": "Cliente Demo",
+            "cliente_nombre_fiscal": "Cliente Demo SL",
+        },
+    )
+    api_client.post(
+        "/contacts",
+        json={
+            "contacto_id": "contact-1",
+            "cliente_id": "customer-1",
+            "nombre": "Ana",
+        },
+    )
+
+    response = api_client.delete("/customers/customer-1")
+
+    assert response.status_code == 409
+    assert "contacto" in response.json()["detail"]
+
+
+def test_contact_delete_with_course_attendance_returns_conflict(api_client: TestClient) -> None:
+    api_client.post(
+        "/customers",
+        json={
+            "cliente_id": "customer-1",
+            "cliente_nombre_comercial": "Cliente Demo",
+            "cliente_nombre_fiscal": "Cliente Demo SL",
+        },
+    )
+    api_client.post(
+        "/contacts",
+        json={
+            "contacto_id": "contact-1",
+            "cliente_id": "customer-1",
+            "nombre": "Ana",
+        },
+    )
+    with Session(contact_service_module.engine) as session:
+        session.add(Curso(curso_id="course-1", curso_nombre="Curso API"))
+        session.add(Asistente(curso_id="course-1", contacto_id="contact-1", cliente_id="customer-1"))
+        session.commit()
+
+    response = api_client.delete("/contacts/contact-1")
+
+    assert response.status_code == 409
+    assert "asistente" in response.json()["detail"]
