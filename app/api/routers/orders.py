@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.api.deps import get_order_document_import_service, get_order_query_service, get_order_service
 from app.schemas.orders import (
@@ -28,10 +29,10 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 
 @router.get("", response_model=list[OrderListItem])
 def list_orders(
-    year: str = "",
-    month_from: int = 0,
-    month_to: int = 0,
-    almacen_id: str = "",
+    year: Annotated[str, Query(max_length=4)] = "",
+    month_from: Annotated[int, Query(ge=0, le=12)] = 0,
+    month_to: Annotated[int, Query(ge=0, le=12)] = 0,
+    almacen_id: Annotated[str, Query(max_length=120)] = "",
     service: OrderQueryService = Depends(get_order_query_service),
 ) -> list[OrderListItem]:
     return service.list_order_payloads(

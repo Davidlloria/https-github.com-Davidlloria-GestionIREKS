@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from typing import Annotated, Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.api.deps import get_ingredient_ireks_service, get_ingredient_std_service
 from app.schemas.ingredients import (
@@ -23,16 +25,17 @@ from app.services.ingredient_std_service import IngredientStdService
 
 
 router = APIRouter(prefix="/ingredients", tags=["ingredients"])
+ActivityFilter = Literal["all", "active", "inactive"]
 
 
 @router.get("/ireks", response_model=IngredientIreksListPayload)
 def list_ireks_ingredients(
-    q: str = "",
-    familia_id: str = "",
-    subfamilia_id: str = "",
-    fabricante_id: str = "",
-    activity_filter: str = "all",
-    distributor_filter_id: str = "",
+    q: Annotated[str, Query(max_length=120)] = "",
+    familia_id: Annotated[str, Query(max_length=120)] = "",
+    subfamilia_id: Annotated[str, Query(max_length=120)] = "",
+    fabricante_id: Annotated[str, Query(max_length=120)] = "",
+    activity_filter: Annotated[ActivityFilter, Query()] = "all",
+    distributor_filter_id: Annotated[str, Query(max_length=120)] = "",
     service: IngredientIreksService = Depends(get_ingredient_ireks_service),
 ) -> IngredientIreksListPayload:
     return service.api_list_payload(
@@ -140,10 +143,10 @@ def delete_ireks_tarifa(
 
 @router.get("/std", response_model=list[IngredientStdRead])
 def list_std_ingredients(
-    q: str = "",
-    familia_id: str = "",
-    subfamilia_id: str = "",
-    activity_filter: str = "all",
+    q: Annotated[str, Query(max_length=120)] = "",
+    familia_id: Annotated[str, Query(max_length=120)] = "",
+    subfamilia_id: Annotated[str, Query(max_length=120)] = "",
+    activity_filter: Annotated[ActivityFilter, Query()] = "all",
     service: IngredientStdService = Depends(get_ingredient_std_service),
 ) -> list[IngredientStdRead]:
     return service.api_list_payload(

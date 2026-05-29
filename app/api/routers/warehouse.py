@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.deps import get_warehouse_inventory_service, get_warehouse_movement_service
 from app.schemas.warehouse import (
@@ -21,7 +23,7 @@ router = APIRouter(prefix="/warehouse", tags=["warehouse"])
 
 @router.get("/stock", response_model=list[WarehouseStockRead])
 def list_stock(
-    almacen_id: str = "",
+    almacen_id: Annotated[str, Query(max_length=120)] = "",
     service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
 ) -> list[WarehouseStockRead]:
     return service.stock_summary_payload(almacen_id)
@@ -29,7 +31,7 @@ def list_stock(
 
 @router.get("/movements", response_model=list[WarehouseMovementRead])
 def list_movements(
-    almacen_id: str = "",
+    almacen_id: Annotated[str, Query(max_length=120)] = "",
     service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
 ) -> list[WarehouseMovementRead]:
     return service.movement_payload_serializable(almacen_id)
@@ -48,8 +50,8 @@ def create_manual_movement(
 
 @router.get("/inventory/history", response_model=list[InventoryHeaderRead])
 def list_inventory_history(
-    almacen_id: str = "",
-    limit: int = 50,
+    almacen_id: Annotated[str, Query(max_length=120)] = "",
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
     service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
 ) -> list[InventoryHeaderRead]:
     return service.history_payload(almacen_id, limit)
@@ -57,8 +59,8 @@ def list_inventory_history(
 
 @router.get("/inventory/export", response_model=InventoryExportPayload)
 def inventory_export_payload(
-    almacen_id: str = "",
-    selected_id: str = "",
+    almacen_id: Annotated[str, Query(max_length=120)] = "",
+    selected_id: Annotated[str, Query(max_length=120)] = "",
     service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
 ) -> InventoryExportPayload:
     return service.export_payload_serializable(almacen_id=almacen_id, selected_id=selected_id)
