@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.api.deps import get_ingredient_ireks_service, get_ingredient_std_service
 from app.api.errors import bad_request, not_found
+from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.schemas.ingredients import (
     IngredientActiveUpdate,
     IngredientIreksCreate,
@@ -37,6 +38,8 @@ def list_ireks_ingredients(
     fabricante_id: Annotated[str, Query(max_length=120)] = "",
     activity_filter: Annotated[ActivityFilter, Query()] = "all",
     distributor_filter_id: Annotated[str, Query(max_length=120)] = "",
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: IngredientIreksService = Depends(get_ingredient_ireks_service),
 ) -> IngredientIreksListPayload:
     return service.api_list_payload(
@@ -46,6 +49,8 @@ def list_ireks_ingredients(
         fabricante_id=fabricante_id,
         activity_filter=activity_filter,
         distributor_filter_id=distributor_filter_id,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -148,6 +153,8 @@ def list_std_ingredients(
     familia_id: Annotated[str, Query(max_length=120)] = "",
     subfamilia_id: Annotated[str, Query(max_length=120)] = "",
     activity_filter: Annotated[ActivityFilter, Query()] = "all",
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: IngredientStdService = Depends(get_ingredient_std_service),
 ) -> list[IngredientStdRead]:
     return service.api_list_payload(
@@ -155,6 +162,8 @@ def list_std_ingredients(
         familia_id=familia_id,
         subfamilia_id=subfamilia_id,
         activity_filter=activity_filter,
+        limit=limit,
+        offset=offset,
     )
 
 

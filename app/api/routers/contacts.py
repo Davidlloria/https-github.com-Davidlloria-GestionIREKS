@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_contact_service
 from app.api.errors import bad_request, conflict, not_found
+from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.schemas.contacts import (
     ContactCompanyOption,
     ContactCreate,
@@ -20,10 +23,12 @@ router = APIRouter(prefix="/contacts", tags=["contacts"])
 
 @router.get("", response_model=list[ContactListItem])
 def list_contacts(
-    q: str = "",
+    q: Annotated[str, Query(max_length=120)] = "",
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: ContactService = Depends(get_contact_service),
 ) -> list[ContactListItem]:
-    return service.list_payload(q)
+    return service.list_payload(q, limit=limit, offset=offset)
 
 
 @router.get("/companies", response_model=list[ContactCompanyOption])

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_customer_service
 from app.api.errors import bad_request, conflict, not_found
+from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.schemas.customers import (
     CustomerCreate,
     CustomerDetail,
@@ -19,10 +22,12 @@ router = APIRouter(prefix="/customers", tags=["customers"])
 
 @router.get("", response_model=list[CustomerListItem])
 def list_customers(
-    q: str = "",
+    q: Annotated[str, Query(max_length=120)] = "",
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: CustomerService = Depends(get_customer_service),
 ) -> list[CustomerListItem]:
-    return service.list_payload(q)
+    return service.list_payload(q, limit=limit, offset=offset)
 
 
 @router.get("/{customer_id}", response_model=CustomerDetail)

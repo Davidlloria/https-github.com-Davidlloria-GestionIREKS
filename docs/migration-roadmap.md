@@ -17,7 +17,7 @@ Revision local: 2026-05-29.
 - `orphan_contact_links = 0` tras backup y reparacion.
 - `data/*.db`, `data/*.json`, `data/backups/`, `data/exports/` y `runtime/`
   quedan ignorados para evitar subir datos reales, secretos o binarios pesados.
-- Validacion tras el bloque actual de Fase 2: `55 passed`, `npm run lint` y
+- Validacion tras el bloque actual de Fase 2: `57 passed`, `npm run lint` y
   `npm run build`.
 
 ## Arquitectura objetivo
@@ -82,6 +82,8 @@ app/models          Entidades ORM
 20. Respuestas `409 Conflict` para borrados de clientes/contactos bloqueados
     por dependencias.
 21. README actualizado con politica de rutas locales y arranque API/frontend.
+22. Parametros `limit` y `offset` en listados grandes sin cambiar la forma de
+    respuesta existente.
 
 ## Progreso vivo
 
@@ -109,6 +111,9 @@ Fase 2 - Endurecer API.
   contactos, recetas o asistentes asociados.
 - README documenta que `source_path`, `file_path` y `destination_path` son
   rutas del servidor, y da comandos para arrancar API y frontend.
+- Listados principales aceptan paginacion compatible: clientes, contactos,
+  ingredientes IREKS/STD, pedidos, stock, movimientos e historico de
+  inventarios.
 
 ### Pendiente en Fase 2
 
@@ -118,7 +123,8 @@ Fase 2 - Endurecer API.
   enviar rutas del servidor.
 - Extender la revision de `409 Conflict` a otros dominios si aparecen nuevas
   dependencias bloqueantes.
-- Valorar paginacion real para listados grandes antes de ampliar React.
+- Evolucionar la paginacion hacia respuestas con metadatos (`total`, `limit`,
+  `offset`) cuando React necesite controles de pagina visibles.
 - Convertir el arranque API/frontend en script si el comando documentado se
   queda corto para uso diario.
 - Mantener gates verdes: `pytest`, `npm run lint`, `npm run build` e integridad

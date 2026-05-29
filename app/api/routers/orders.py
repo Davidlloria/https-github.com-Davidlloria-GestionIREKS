@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from app.api.deps import get_order_document_import_service, get_order_query_service, get_order_service
 from app.api.errors import bad_request, not_found
 from app.api.paths import input_file_path
+from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.schemas.orders import (
     OrderCreate,
     OrderDocumentImportPayload,
@@ -34,6 +35,8 @@ def list_orders(
     month_from: Annotated[int, Query(ge=0, le=12)] = 0,
     month_to: Annotated[int, Query(ge=0, le=12)] = 0,
     almacen_id: Annotated[str, Query(max_length=120)] = "",
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: OrderQueryService = Depends(get_order_query_service),
 ) -> list[OrderListItem]:
     return service.list_order_payloads(
@@ -41,6 +44,8 @@ def list_orders(
         month_from=month_from,
         month_to=month_to,
         almacen_filter=almacen_id,
+        limit=limit,
+        offset=offset,
     )
 
 

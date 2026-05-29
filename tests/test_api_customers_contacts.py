@@ -60,6 +60,24 @@ def test_customers_crud_endpoints(api_client: TestClient) -> None:
     assert api_client.get("/customers/customer-1").status_code == 404
 
 
+def test_customers_list_supports_limit_and_offset(api_client: TestClient) -> None:
+    for idx, name in enumerate(["Cliente A", "Cliente B", "Cliente C"], start=1):
+        created = api_client.post(
+            "/customers",
+            json={
+                "cliente_id": f"customer-{idx}",
+                "cliente_nombre_comercial": name,
+                "cliente_nombre_fiscal": f"{name} SL",
+            },
+        )
+        assert created.status_code == 201
+
+    response = api_client.get("/customers", params={"limit": 1, "offset": 1})
+
+    assert response.status_code == 200
+    assert [row["cliente_id"] for row in response.json()] == ["customer-2"]
+
+
 def test_contacts_crud_endpoints_include_company_payload(api_client: TestClient) -> None:
     api_client.post(
         "/customers",

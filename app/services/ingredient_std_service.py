@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlmodel import Session, select
 
 from app.core.database import engine
+from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
 from app.models import IngredienteStd, MateriaPrimaPrecio, MateriaPrimaValorNutricional, Proveedor
 from app.schemas.ingredients import (
     IngredientActiveUpdate,
@@ -32,6 +33,8 @@ class IngredientStdService:
         familia_id: str = "",
         subfamilia_id: str = "",
         activity_filter: str = "all",
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
     ) -> list[IngredientStdRead]:
         with Session(engine) as session:
             rows = self.vm.list(
@@ -41,7 +44,7 @@ class IngredientStdService:
                 subfamilia=subfamilia_id,
                 active_filter=activity_filter,
             )
-        return IngredientStdRead.list_from_entities(rows)
+        return IngredientStdRead.list_from_entities(page_items(rows, limit=limit, offset=offset))
 
     def api_detail_payload(self, articulo_id: str) -> IngredientStdRead | None:
         clean_articulo_id = str(articulo_id or "").strip()

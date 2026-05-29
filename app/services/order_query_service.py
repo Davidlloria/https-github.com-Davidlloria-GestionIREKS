@@ -7,6 +7,7 @@ from typing import Any, cast
 from sqlmodel import Session, select
 
 from app.core.database import engine
+from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
 from app.models import Albaran, AlbaranItem, Cliente, Fabricante, Familia, IngredienteIreks, Pedido, PedidoItem, PedidoPendiente, Subfamilia
 from app.schemas.orders import OrderItemRead, OrderListItem, OrderPendingRead, OrderRead
 
@@ -269,6 +270,8 @@ class OrderQueryService:
         month_from: int,
         month_to: int,
         almacen_filter: str,
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
     ) -> list[OrderListRow]:
         pedidos = self.list_raw_orders()
         with Session(engine) as session:
@@ -296,9 +299,10 @@ class OrderQueryService:
                 continue
             filtered.append(row)
 
-        totals_map = self.pedido_totals_kg([str(row.pedido_id or "") for row in filtered])
+        page = page_items(filtered, limit=limit, offset=offset)
+        totals_map = self.pedido_totals_kg([str(row.pedido_id or "") for row in page])
         out: list[OrderListRow] = []
-        for row in filtered:
+        for row in page:
             pedido_id = str(row.pedido_id or "")
             almacen_id = str(row.almacen_id or "")
             p_date = self.parse_date(row.pedido_fecha)
@@ -326,12 +330,16 @@ class OrderQueryService:
         month_from: int = 0,
         month_to: int = 0,
         almacen_filter: str = "",
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
     ) -> list[OrderListItem]:
         rows = self.list_order_rows(
             year_filter=year_filter,
             month_from=month_from,
             month_to=month_to,
             almacen_filter=almacen_filter,
+            limit=limit,
+            offset=offset,
         )
         return OrderListItem.list_from_entities(rows)
 

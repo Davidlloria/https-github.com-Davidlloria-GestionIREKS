@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import get_warehouse_inventory_service, get_warehouse_movement_service
 from app.api.errors import bad_request
+from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.schemas.warehouse import (
     InventoryAdjustmentPayload,
     InventoryDetailRead,
@@ -25,17 +26,21 @@ router = APIRouter(prefix="/warehouse", tags=["warehouse"])
 @router.get("/stock", response_model=list[WarehouseStockRead])
 def list_stock(
     almacen_id: Annotated[str, Query(max_length=120)] = "",
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
 ) -> list[WarehouseStockRead]:
-    return service.stock_summary_payload(almacen_id)
+    return service.stock_summary_payload(almacen_id, limit=limit, offset=offset)
 
 
 @router.get("/movements", response_model=list[WarehouseMovementRead])
 def list_movements(
     almacen_id: Annotated[str, Query(max_length=120)] = "",
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
 ) -> list[WarehouseMovementRead]:
-    return service.movement_payload_serializable(almacen_id)
+    return service.movement_payload_serializable(almacen_id, limit=limit, offset=offset)
 
 
 @router.post("/movements", response_model=WarehouseMovementRead, status_code=201)
@@ -53,9 +58,10 @@ def create_manual_movement(
 def list_inventory_history(
     almacen_id: Annotated[str, Query(max_length=120)] = "",
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
 ) -> list[InventoryHeaderRead]:
-    return service.history_payload(almacen_id, limit)
+    return service.history_payload(almacen_id, limit=limit, offset=offset)
 
 
 @router.get("/inventory/export", response_model=InventoryExportPayload)

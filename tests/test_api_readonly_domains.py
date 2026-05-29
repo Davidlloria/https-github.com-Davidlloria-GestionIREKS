@@ -91,6 +91,20 @@ def test_ingredients_readonly_endpoints(api_client: TestClient) -> None:
             )
         )
         session.add(
+            IngredienteIreks(
+                id=2,
+                almacen_id="alm-1",
+                fabricante_id="fab-1",
+                distribuidor_id="dist-1",
+                articulo_id="ireks-article-2",
+                articulo_referencia="IR-002",
+                articulo_referencia_corta="IR2",
+                articulo_descripcion="Zumo IREKS",
+                articulo_status_activo=True,
+                articulo_status_en_lista=True,
+            )
+        )
+        session.add(
             IngredienteStd(
                 articulo_id="std-article-1",
                 articulo_referencia_distribuidor="STD-001",
@@ -112,6 +126,11 @@ def test_ingredients_readonly_endpoints(api_client: TestClient) -> None:
     assert ireks_list.status_code == 200
     assert ireks_list.json()["rows"][0]["articulo_id"] == "ireks-article-1"
     assert ireks_list.json()["catalogs"]["fabricantes"][0]["name"] == "IREKS"
+
+    ireks_page = api_client.get("/ingredients/ireks", params={"limit": 1, "offset": 1})
+    assert ireks_page.status_code == 200
+    assert [row["articulo_id"] for row in ireks_page.json()["rows"]] == ["ireks-article-2"]
+    assert ireks_page.json()["catalogs"]["fabricantes"][0]["name"] == "IREKS"
 
     ireks_detail = api_client.get("/ingredients/ireks/1")
     assert ireks_detail.status_code == 200
@@ -138,6 +157,7 @@ def test_ingredients_readonly_endpoints(api_client: TestClient) -> None:
 def test_warehouse_readonly_endpoints(api_client: TestClient) -> None:
     with Session(warehouse_inventory_service_module.engine) as session:
         session.add(AlmacenStock(almacen_id="alm-1", articulo_id="article-1", cantidad_total=7.5))
+        session.add(AlmacenStock(almacen_id="alm-1", articulo_id="article-2", cantidad_total=3.0))
         session.add(
             AlmacenMovimiento(
                 almacen_id="alm-1",
@@ -145,6 +165,15 @@ def test_warehouse_readonly_endpoints(api_client: TestClient) -> None:
                 pedido_numero="P-1",
                 cantidad=7.5,
                 fecha_pedido=date(2026, 5, 20),
+            )
+        )
+        session.add(
+            AlmacenMovimiento(
+                almacen_id="alm-1",
+                articulo_id="article-2",
+                pedido_numero="P-2",
+                cantidad=3.0,
+                fecha_pedido=date(2026, 5, 22),
             )
         )
         session.add(
@@ -171,11 +200,19 @@ def test_warehouse_readonly_endpoints(api_client: TestClient) -> None:
 
     stock = api_client.get("/warehouse/stock", params={"almacen_id": "alm-1"})
     assert stock.status_code == 200
-    assert stock.json() == [{"almacen_id": "alm-1", "articulo_id": "article-1", "cantidad_total": 7.5}]
+    assert stock.json()[0] == {"almacen_id": "alm-1", "articulo_id": "article-1", "cantidad_total": 7.5}
+
+    stock_page = api_client.get("/warehouse/stock", params={"almacen_id": "alm-1", "limit": 1, "offset": 1})
+    assert stock_page.status_code == 200
+    assert stock_page.json() == [{"almacen_id": "alm-1", "articulo_id": "article-2", "cantidad_total": 3.0}]
 
     movements = api_client.get("/warehouse/movements", params={"almacen_id": "alm-1"})
     assert movements.status_code == 200
-    assert movements.json()[0]["pedido_numero"] == "P-1"
+    assert movements.json()[0]["pedido_numero"] == "P-2"
+
+    movements_page = api_client.get("/warehouse/movements", params={"almacen_id": "alm-1", "limit": 1, "offset": 1})
+    assert movements_page.status_code == 200
+    assert movements_page.json()[0]["pedido_numero"] == "P-1"
 
     history = api_client.get("/warehouse/inventory/history", params={"almacen_id": "alm-1"})
     assert history.status_code == 200
@@ -209,6 +246,15 @@ def test_orders_readonly_endpoints(api_client: TestClient) -> None:
             )
         )
         session.add(
+            Pedido(
+                pedido_id="order-2",
+                almacen_id="alm-1",
+                pedido_fecha=date(2026, 5, 21),
+                pedido_numero="PED-2",
+                pedido_estado="",
+            )
+        )
+        session.add(
             PedidoItem(
                 item_id="item-1",
                 pedido_id="order-1",
@@ -233,9 +279,14 @@ def test_orders_readonly_endpoints(api_client: TestClient) -> None:
 
     orders = api_client.get("/orders", params={"year": "2026", "almacen_id": "alm-1"})
     assert orders.status_code == 200
-    assert orders.json()[0]["pedido_id"] == "order-1"
+    assert orders.json()[0]["pedido_id"] == "order-2"
     assert orders.json()[0]["almacen_nombre"] == "Almacen Demo"
-    assert orders.json()[0]["total_kg"] == 20.0
+    assert orders.json()[0]["total_kg"] == 0.0
+
+    orders_page = api_client.get("/orders", params={"year": "2026", "almacen_id": "alm-1", "limit": 1, "offset": 1})
+    assert orders_page.status_code == 200
+    assert orders_page.json()[0]["pedido_id"] == "order-1"
+    assert orders_page.json()[0]["total_kg"] == 20.0
 
     detail = api_client.get("/orders/order-1")
     assert detail.status_code == 200

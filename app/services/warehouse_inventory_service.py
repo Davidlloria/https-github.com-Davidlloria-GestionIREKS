@@ -8,6 +8,7 @@ from datetime import date
 from sqlmodel import Session, select
 
 from app.core.database import engine
+from app.core.pagination import DEFAULT_PAGE_LIMIT
 from app.models import AlmacenMovimiento, AlmacenStock, IngredienteIreks, InventarioCabecera, InventarioDetalle
 from app.schemas.warehouse import (
     InventoryAdjustmentPayload,
@@ -43,24 +44,46 @@ class InventoryExportPayload:
 
 
 class WarehouseInventoryService:
-    def stock_summary_payload(self, almacen_id: str = "") -> list[WarehouseStockRead]:
+    def stock_summary_payload(
+        self,
+        almacen_id: str = "",
+        *,
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
+    ) -> list[WarehouseStockRead]:
         with Session(engine) as session:
             stmt = select(AlmacenStock)
             if almacen_id:
                 stmt = stmt.where(AlmacenStock.almacen_id == almacen_id)
-            rows = list(session.exec(stmt.order_by(AlmacenStock.almacen_id, AlmacenStock.articulo_id)))
+            rows = list(
+                session.exec(
+                    stmt.order_by(AlmacenStock.almacen_id, AlmacenStock.articulo_id).offset(offset).limit(limit)
+                )
+            )
         return WarehouseStockRead.list_from_entities(rows)
 
-    def stock_payload(self, almacen_id: str = "") -> InventoryStockPayload:
+    def stock_payload(
+        self,
+        almacen_id: str = "",
+        *,
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
+    ) -> InventoryStockPayload:
         with Session(engine) as session:
             stmt = select(AlmacenMovimiento)
             if almacen_id:
                 stmt = stmt.where(AlmacenMovimiento.almacen_id == almacen_id)
-            moves = list(session.exec(stmt))
+            moves = list(session.exec(stmt.order_by(_col(AlmacenMovimiento.id).desc()).offset(offset).limit(limit)))
             return InventoryStockPayload(moves=moves, items=self._items_for_records(session, moves))
 
-    def movement_payload_serializable(self, almacen_id: str = "") -> list[WarehouseMovementRead]:
-        return WarehouseMovementRead.list_from_entities(self.stock_payload(almacen_id).moves)
+    def movement_payload_serializable(
+        self,
+        almacen_id: str = "",
+        *,
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
+    ) -> list[WarehouseMovementRead]:
+        return WarehouseMovementRead.list_from_entities(self.stock_payload(almacen_id, limit=limit, offset=offset).moves)
 
     def apply_adjustments(self, *, pending: list[dict[str, Any]], almacen_id: str, contador: str, aprobador: str) -> int:
         return self._persist_adjustments(pending=pending, almacen_id=almacen_id, contador=contador, aprobador=aprobador).lineas
@@ -167,7 +190,7 @@ class WarehouseInventoryService:
             session.refresh(header)
             return InventoryHeaderRead.from_entity(header)
 
-    def history(self, almacen_id: str = "", limit: int = 50) -> list[InventarioCabecera]:
+    def history(self, almacen_id: str = "", limit: int = 50, offset: int = 0) -> list[InventarioCabecera]:
         with Session(engine) as session:
             stmt = select(InventarioCabecera)
             if almacen_id:
@@ -177,12 +200,12 @@ class WarehouseInventoryService:
                     stmt.order_by(
                         _col(InventarioCabecera.fecha).desc(),
                         _col(InventarioCabecera.inventario_id).desc(),
-                    )
+                    ).offset(offset).limit(limit)
                 )
-            )[:limit]
+            )
 
-    def history_payload(self, almacen_id: str = "", limit: int = 50) -> list[InventoryHeaderRead]:
-        return InventoryHeaderRead.list_from_entities(self.history(almacen_id, limit))
+    def history_payload(self, almacen_id: str = "", limit: int = 50, offset: int = 0) -> list[InventoryHeaderRead]:
+        return InventoryHeaderRead.list_from_entities(self.history(almacen_id, limit, offset))
 
     def history_detail(self, inventario_id: str) -> InventoryHistoryDetailPayload:
         with Session(engine) as session:

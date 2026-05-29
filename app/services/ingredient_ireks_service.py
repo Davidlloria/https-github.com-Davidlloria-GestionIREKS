@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from sqlmodel import Session, select
 
 from app.core.database import engine
+from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
 from sqlalchemy import text
 
 from app.models import (
@@ -91,6 +92,8 @@ class IngredientIreksService:
         fabricante_id: str = "",
         activity_filter: str = "all",
         distributor_filter_id: str = "",
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
     ) -> ApiIngredientIreksListPayload:
         payload = self.list_payload(
             search=search,
@@ -101,7 +104,7 @@ class IngredientIreksService:
             distributor_filter_id=distributor_filter_id,
         )
         return ApiIngredientIreksListPayload(
-            rows=IngredientIreksRead.list_from_entities(payload.rows),
+            rows=IngredientIreksRead.list_from_entities(page_items(payload.rows, limit=limit, offset=offset)),
             catalogs=self.api_catalogs_payload(payload.catalogs),
         )
 

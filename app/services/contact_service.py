@@ -7,6 +7,7 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.core.database import engine
+from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
 from app.models import Cliente, Contacto
 from app.schemas.contacts import (
     ContactCompanyOption,
@@ -69,9 +70,15 @@ class ContactService:
                 filtered.append(row)
         return filtered
 
-    def list_payload(self, term: str = "") -> list[ContactListItem]:
+    def list_payload(
+        self,
+        term: str = "",
+        *,
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
+    ) -> list[ContactListItem]:
         lookup = self.company_lookup()
-        rows = self.list(term, lookup.id_to_name)
+        rows = page_items(self.list(term, lookup.id_to_name), limit=limit, offset=offset)
         return [self._contact_list_item(row, lookup.id_to_name) for row in rows]
 
     def detail_payload(self, contacto_id: str) -> ContactDetail | None:
