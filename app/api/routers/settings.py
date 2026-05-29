@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import APIRouter, Depends
 
 from app.api.deps import get_api_settings_service, get_settings_import_service, get_settings_maintenance_service
 from app.api.errors import bad_request, not_found
+from app.api.paths import input_file_path, output_file_path
 from app.schemas.orders import OrderJsonImportResponse
 from app.schemas.settings import (
     ApiSettingsPayload,
@@ -76,10 +75,8 @@ def backup_database(
     payload: MaintenanceBackupRequest,
     service: SettingsMaintenanceService = Depends(get_settings_maintenance_service),
 ) -> MaintenanceResult:
-    destination_path = str(payload.destination_path or "").strip()
-    if not destination_path:
-        raise bad_request("Indica destination_path.")
-    destination = service.backup_database(Path(destination_path))
+    destination_path = output_file_path(payload.destination_path, field_name="destination_path", allowed_suffixes={".db"})
+    destination = service.backup_database(destination_path)
     return MaintenanceResult(
         ok=True,
         message="Copia de seguridad creada.",
@@ -125,8 +122,9 @@ def import_order_json(
     payload: DocumentImportRequest,
     service: SettingsImportService = Depends(get_settings_import_service),
 ) -> OrderJsonImportResponse:
+    source = input_file_path(payload.file_path, field_name="file_path", allowed_suffixes={".json"})
     try:
-        result = service.import_order_json(Path(payload.file_path), payload.almacen_id)
+        result = service.import_order_json(source, payload.almacen_id)
     except ValueError as exc:
         raise bad_request(exc) from exc
     return OrderJsonImportResponse.model_validate(result, from_attributes=True)

@@ -17,7 +17,7 @@ Revision local: 2026-05-29.
 - `orphan_contact_links = 0` tras backup y reparacion.
 - `data/*.db`, `data/*.json`, `data/backups/`, `data/exports/` y `runtime/`
   quedan ignorados para evitar subir datos reales, secretos o binarios pesados.
-- Validacion tras el bloque actual de Fase 2: `49 passed`, `npm run lint` y
+- Validacion tras el bloque actual de Fase 2: `53 passed`, `npm run lint` y
   `npm run build`.
 
 ## Arquitectura objetivo
@@ -78,6 +78,7 @@ app/models          Entidades ORM
     pedidos y almacen.
 18. Normalizacion inicial de errores API con helper comun para respuestas
     `400` y `404`.
+19. Validacion de rutas locales en API para importaciones JSON/PDF y backups.
 
 ## Progreso vivo
 
@@ -97,13 +98,16 @@ Fase 2 - Endurecer API.
 - Helper comun `app/api/errors.py` para respuestas `400` y `404` coherentes.
 - Routers de clientes, contactos, ingredientes, pedidos, configuracion y
   almacen migrados al helper comun para errores previsibles.
+- Helper `app/api/paths.py` para validar rutas locales usadas por API.
+- Importaciones JSON/PDF y backup validan extension esperada, archivo existente
+  en entradas y destino no-directorio en salidas.
 
 ### Pendiente en Fase 2
 
 - Completar la revision semantica de errores: decidir caso por caso si cada
   fallo debe mapear a `400`, `404` o `409`.
-- Endurecer endpoints que reciben rutas locales (`source_path`,
-  `destination_path`) para documentar y acotar su uso.
+- Documentar la politica de rutas locales de API y decidir si React debe migrar
+  importaciones a subida de archivos en vez de enviar rutas del servidor.
 - Revisar endpoints de borrado con dependencias para devolver errores
   previsibles cuando haya bloqueos.
 - Valorar paginacion real para listados grandes antes de ampliar React.
@@ -162,6 +166,8 @@ Objetivo: convertir FastAPI en una superficie estable para React sin romper la
 app de escritorio.
 
 - Revisar todos los routers para devolver errores HTTP coherentes.
+- Mantener validacion explicita en endpoints que reciben rutas locales o
+  ficheros.
 - Completar tests de endpoints criticos de escritura y borrado.
 - Asegurar que los routers no importan UI ni acceden a base de datos directa.
 - Alinear nombres de campos entre DTOs, servicios y frontend.

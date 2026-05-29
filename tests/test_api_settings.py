@@ -107,7 +107,7 @@ def test_settings_maintenance_endpoints_use_service_contracts() -> None:
     assert backup.json()["details"]["path"] == "data\\backup.db" or backup.json()["details"]["path"] == "data/backup.db"
 
 
-def test_settings_api_and_import_endpoints_use_service_contracts() -> None:
+def test_settings_api_and_import_endpoints_use_service_contracts(tmp_path: Path) -> None:
     app = create_app()
     fake_settings = FakeApiSettingsService()
     app.dependency_overrides[get_api_settings_service] = lambda: fake_settings
@@ -136,9 +136,12 @@ def test_settings_api_and_import_endpoints_use_service_contracts() -> None:
     assert warehouses.status_code == 200
     assert warehouses.json() == [{"almacen_id": "alm-1", "almacen_nombre": "Almacen API"}]
 
+    source = tmp_path / "pedido.json"
+    source.write_text("{}", encoding="utf-8")
+
     imported = client.post(
         "/settings/imports/orders-json",
-        json={"file_path": "pedido.json", "almacen_id": "alm-1", "document_type": "order_json"},
+        json={"file_path": str(source), "almacen_id": "alm-1", "document_type": "order_json"},
     )
     assert imported.status_code == 200
     assert imported.json()["pedido_id"] == "order-api"

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.api.deps import get_order_document_import_service, get_order_query_service, get_order_service
 from app.api.errors import bad_request, not_found
+from app.api.paths import input_file_path
 from app.schemas.orders import (
     OrderCreate,
     OrderDocumentImportPayload,
@@ -60,8 +60,9 @@ def import_order_json(
     payload: OrderJsonImportPayload,
     service: OrderService = Depends(get_order_service),
 ) -> OrderJsonImportResponse:
+    source = input_file_path(payload.source_path, field_name="source_path", allowed_suffixes={".json"})
     try:
-        result = service.import_order_json(Path(payload.source_path), payload.almacen_id)
+        result = service.import_order_json(source, payload.almacen_id)
     except ValueError as exc:
         raise bad_request(exc) from exc
     return OrderJsonImportResponse.model_validate(result, from_attributes=True)
@@ -73,8 +74,9 @@ def import_albaran_pdf(
     payload: OrderDocumentImportPayload,
     service: OrderDocumentImportService = Depends(get_order_document_import_service),
 ) -> OrderDocumentImportResponse:
+    source = input_file_path(payload.source_path, field_name="source_path", allowed_suffixes={".pdf"})
     try:
-        result = service.import_albaran_pdf(order_id, Path(payload.source_path))
+        result = service.import_albaran_pdf(order_id, source)
     except ValueError as exc:
         raise bad_request(exc) from exc
     return OrderDocumentImportResponse.model_validate(result, from_attributes=True)
@@ -86,8 +88,9 @@ def import_factura_pdf(
     payload: OrderDocumentImportPayload,
     service: OrderDocumentImportService = Depends(get_order_document_import_service),
 ) -> OrderDocumentImportResponse:
+    source = input_file_path(payload.source_path, field_name="source_path", allowed_suffixes={".pdf"})
     try:
-        result = service.import_factura_pdf(order_id, Path(payload.source_path))
+        result = service.import_factura_pdf(order_id, source)
     except ValueError as exc:
         raise bad_request(exc) from exc
     return OrderDocumentImportResponse.model_validate(result, from_attributes=True)
