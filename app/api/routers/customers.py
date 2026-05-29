@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response, status
 
 from app.api.deps import get_customer_service
+from app.api.errors import bad_request, not_found
 from app.schemas.customers import (
     CustomerCreate,
     CustomerDetail,
@@ -30,7 +31,7 @@ def get_customer(
 ) -> CustomerDetail:
     payload = service.detail_payload(customer_id)
     if payload is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado.")
+        raise not_found("Cliente no encontrado.")
     return payload
 
 
@@ -42,7 +43,7 @@ def create_customer(
     try:
         return service.create_from_payload(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
 
 
 @router.patch("/{customer_id}", response_model=CustomerDetail)
@@ -54,7 +55,7 @@ def update_customer(
     try:
         return service.update_from_payload(customer_id, payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise not_found(exc) from exc
 
 
 @router.delete("/{customer_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -63,5 +64,5 @@ def delete_customer(
     service: CustomerService = Depends(get_customer_service),
 ) -> Response:
     if not service.delete(customer_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado.")
+        raise not_found("Cliente no encontrado.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

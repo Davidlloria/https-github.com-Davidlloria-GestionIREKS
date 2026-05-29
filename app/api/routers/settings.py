@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 
 from app.api.deps import get_api_settings_service, get_settings_import_service, get_settings_maintenance_service
+from app.api.errors import bad_request, not_found
 from app.schemas.orders import OrderJsonImportResponse
 from app.schemas.settings import (
     ApiSettingsPayload,
@@ -77,7 +78,7 @@ def backup_database(
 ) -> MaintenanceResult:
     destination_path = str(payload.destination_path or "").strip()
     if not destination_path:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Indica destination_path.")
+        raise bad_request("Indica destination_path.")
     destination = service.backup_database(Path(destination_path))
     return MaintenanceResult(
         ok=True,
@@ -94,7 +95,7 @@ def get_api_settings(
     try:
         return ApiSettingsPayload.model_validate(service.provider_payload(provider))
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise not_found(exc) from exc
 
 
 @router.put("/api/{provider}", response_model=ApiSettingsPayload)
@@ -106,7 +107,7 @@ def save_api_settings(
     try:
         return ApiSettingsPayload.model_validate(service.save_provider(provider, payload.config))
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise not_found(exc) from exc
 
 
 @router.get("/imports/warehouses", response_model=list[WarehouseOption])
@@ -127,5 +128,5 @@ def import_order_json(
     try:
         result = service.import_order_json(Path(payload.file_path), payload.almacen_id)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
     return OrderJsonImportResponse.model_validate(result, from_attributes=True)

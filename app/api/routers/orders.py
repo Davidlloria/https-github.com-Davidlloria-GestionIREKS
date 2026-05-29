@@ -3,9 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.api.deps import get_order_document_import_service, get_order_query_service, get_order_service
+from app.api.errors import bad_request, not_found
 from app.schemas.orders import (
     OrderCreate,
     OrderDocumentImportPayload,
@@ -51,7 +52,7 @@ def create_order(
     try:
         return service.create_from_payload(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
 
 
 @router.post("/import/json", response_model=OrderJsonImportResponse)
@@ -62,7 +63,7 @@ def import_order_json(
     try:
         result = service.import_order_json(Path(payload.source_path), payload.almacen_id)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
     return OrderJsonImportResponse.model_validate(result, from_attributes=True)
 
 
@@ -75,7 +76,7 @@ def import_albaran_pdf(
     try:
         result = service.import_albaran_pdf(order_id, Path(payload.source_path))
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
     return OrderDocumentImportResponse.model_validate(result, from_attributes=True)
 
 
@@ -88,7 +89,7 @@ def import_factura_pdf(
     try:
         result = service.import_factura_pdf(order_id, Path(payload.source_path))
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
     return OrderDocumentImportResponse.model_validate(result, from_attributes=True)
 
 
@@ -101,7 +102,7 @@ def update_order(
     try:
         return service.update_from_payload(order_id, payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise not_found(exc) from exc
 
 
 @router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -110,7 +111,7 @@ def delete_order(
     service: OrderService = Depends(get_order_service),
 ) -> Response:
     if not service.delete_order_if_exists(order_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido no encontrado.")
+        raise not_found("Pedido no encontrado.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -121,7 +122,7 @@ def get_order(
 ) -> OrderRead:
     payload = service.detail_payload(order_id)
     if payload is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido no encontrado.")
+        raise not_found("Pedido no encontrado.")
     return payload
 
 
@@ -142,7 +143,7 @@ def create_order_item(
     try:
         return service.add_order_line_from_payload(order_id, payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise not_found(exc) from exc
 
 
 @router.patch("/items/{item_id}", response_model=OrderItemRead)
@@ -154,7 +155,7 @@ def update_order_item(
     try:
         return service.update_order_line_from_payload(item_id, payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise not_found(exc) from exc
 
 
 @router.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -163,7 +164,7 @@ def delete_order_item(
     service: OrderService = Depends(get_order_service),
 ) -> Response:
     if not service.delete_order_line_if_exists(item_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Linea de pedido no encontrada.")
+        raise not_found("Linea de pedido no encontrada.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

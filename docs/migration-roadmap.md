@@ -4,22 +4,21 @@
 
 Revision local: 2026-05-29.
 
+- Rama principal local sincronizada con `origin/main`.
+- PR inicial de migracion fusionado en GitHub: `Merge pull request #1`.
+- Rama activa para el siguiente bloque: `api-hardening`.
 - La aplicacion de escritorio sigue entrando por `run.py` y `app/main.py`.
-- `app/api` ya expone una API FastAPI con routers para clientes, contactos,
-  ingredientes, pedidos, almacen y configuracion.
-- `frontend` ya existe con React/Vite y consume la API para vistas de consulta
-  de clientes, ingredientes IREKS y almacen.
-- La base `data/gestion_ireks.db` existe y pasa `PRAGMA integrity_check`.
-- La base contiene datos reales: clientes, contactos, productos IREKS, materias
-  primas, pedidos, movimientos de almacen y datos de cursos.
-- Queda 1 enlace huerfano contacto-cliente detectado por mantenimiento.
-- La suite Python pasa: `46 passed`.
-- El build React pasa: `npm run build`.
-- El lint React no pasa todavia por `react-hooks/set-state-in-effect` en
-  `frontend/src/features/useAsyncResource.ts` y un warning menor en
-  `AppErrorBoundary`.
-- El arbol Git esta muy sucio: hay muchos cambios modificados y muchos ficheros
-  nuevos sin versionar. Esta es la prioridad operativa antes de seguir.
+- `app/api` expone FastAPI con routers para clientes, contactos, ingredientes,
+  pedidos, almacen y configuracion.
+- `frontend` existe con React/Vite y consume la API para vistas de consulta de
+  clientes, ingredientes IREKS y almacen.
+- La base `data/gestion_ireks.db` existe, pasa `PRAGMA integrity_check` y queda
+  fuera de Git.
+- `orphan_contact_links = 0` tras backup y reparacion.
+- `data/*.db`, `data/*.json`, `data/backups/`, `data/exports/` y `runtime/`
+  quedan ignorados para evitar subir datos reales, secretos o binarios pesados.
+- Validacion tras el bloque actual de Fase 2: `49 passed`, `npm run lint` y
+  `npm run build`.
 
 ## Arquitectura objetivo
 
@@ -72,10 +71,51 @@ app/models          Entidades ORM
 13. Frontend React/Vite inicial con estructura `api/`, `pages/`,
    `components/`, `features/` y `types/`.
 14. Pantallas React de consulta para clientes, ingredientes y almacen.
+15. Configuracion de Git, rama de migracion, PR inicial y fusion a `main`.
+16. Limpieza operativa de datos locales: backup, reparacion de huerfanos e
+    ignorado de datos/runtime locales.
+17. Primer endurecimiento API: validacion de query params en ingredientes,
+    pedidos y almacen.
+18. Normalizacion inicial de errores API con helper comun para respuestas
+    `400` y `404`.
+
+## Progreso vivo
+
+### Fase actual
+
+Fase 2 - Endurecer API.
+
+### Completado en Fase 2
+
+- Rama `api-hardening` creada desde `main` actualizado.
+- Query params endurecidos:
+  - `activity_filter` limitado a `all`, `active`, `inactive`;
+  - meses de pedidos limitados a `0..12`;
+  - historico de inventario limitado a `1..200`;
+  - filtros de texto principales con longitud maxima.
+- Tests nuevos en `tests/test_api_query_validation.py`.
+- Helper comun `app/api/errors.py` para respuestas `400` y `404` coherentes.
+- Routers de clientes, contactos, ingredientes, pedidos, configuracion y
+  almacen migrados al helper comun para errores previsibles.
+
+### Pendiente en Fase 2
+
+- Completar la revision semantica de errores: decidir caso por caso si cada
+  fallo debe mapear a `400`, `404` o `409`.
+- Endurecer endpoints que reciben rutas locales (`source_path`,
+  `destination_path`) para documentar y acotar su uso.
+- Revisar endpoints de borrado con dependencias para devolver errores
+  previsibles cuando haya bloqueos.
+- Valorar paginacion real para listados grandes antes de ampliar React.
+- Documentar una forma comoda de arrancar API y frontend juntos.
+- Mantener gates verdes: `pytest`, `npm run lint`, `npm run build` e integridad
+  de base de datos.
 
 ## Hoja de ruta
 
 ### Fase 0 - Estabilizar el punto de partida
+
+Estado: completada.
 
 Objetivo: dejar el trabajo actual versionado, reproducible y con comandos de
 validacion claros.
@@ -99,6 +139,8 @@ build React verde, lint React verde y README actualizado.
 
 ### Fase 1 - Sanear datos y mantenimiento
 
+Estado: completada operativamente; queda documentacion fina de politicas.
+
 Objetivo: que la base real pueda mantenerse desde desktop y API sin acciones
 manuales peligrosas.
 
@@ -113,6 +155,8 @@ Criterio de salida: integridad `ok`, `orphan_contact_links = 0`, backup probado
 y politica clara de versionado para `data/`.
 
 ### Fase 2 - Endurecer API
+
+Estado: en progreso.
 
 Objetivo: convertir FastAPI en una superficie estable para React sin romper la
 app de escritorio.
@@ -216,15 +260,12 @@ npm run build
 
 ## Git
 
-Si se sigue desarrollando, Git debe quedar activado antes de tocar mas codigo.
-El objetivo no es solo guardar cambios, sino poder aislar regresiones, revisar
-diferencias y volver a un punto conocido sin depender de copias manuales.
+Git ya esta activado y el remoto apunta al repositorio de GitHub. El flujo
+actual recomendado es:
 
-Primeras acciones recomendadas:
-
-1. Marcar el directorio como seguro para Git.
-2. Revisar `.gitignore` y decidir que hacer con `data/`, `runtime/`, exports y
-   configuraciones locales.
-3. Crear una rama de migracion.
-4. Hacer commits pequenos por area.
-5. No commitear claves, bases reales ni exports sensibles.
+1. Mantener `main` sincronizada con `origin/main`.
+2. Trabajar cada bloque en una rama corta, por ejemplo `api-hardening`.
+3. Hacer commits pequenos por area y ejecutar los gates antes de subir.
+4. Subir la rama a GitHub y abrir Pull Request para revisar/fusionar.
+5. No commitear claves, bases reales, backups, exports sensibles ni runtime
+   local.

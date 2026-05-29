@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.api.deps import get_ingredient_ireks_service, get_ingredient_std_service
+from app.api.errors import bad_request, not_found
 from app.schemas.ingredients import (
     IngredientActiveUpdate,
     IngredientIreksCreate,
@@ -56,7 +57,7 @@ def create_ireks_ingredient(
     try:
         return service.create_from_payload(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
 
 
 @router.get("/ireks/{row_id}", response_model=IngredientIreksRead)
@@ -66,7 +67,7 @@ def get_ireks_ingredient(
 ) -> IngredientIreksRead:
     payload = service.api_detail_payload(row_id)
     if payload is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingrediente IREKS no encontrado.")
+        raise not_found("Ingrediente IREKS no encontrado.")
     return payload
 
 
@@ -78,7 +79,7 @@ def update_ireks_ingredient(
 ) -> IngredientIreksRead:
     result = service.update_from_payload(row_id, payload)
     if result is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingrediente IREKS no encontrado.")
+        raise not_found("Ingrediente IREKS no encontrado.")
     return result
 
 
@@ -88,7 +89,7 @@ def delete_ireks_ingredient(
     service: IngredientIreksService = Depends(get_ingredient_ireks_service),
 ) -> Response:
     if not service.delete_if_exists(row_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingrediente IREKS no encontrado.")
+        raise not_found("Ingrediente IREKS no encontrado.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -116,7 +117,7 @@ def upsert_ireks_tarifa(
     try:
         return service.upsert_tarifa_from_payload(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
 
 
 @router.patch("/ireks/tarifas/{tarifa_id}", response_model=TarifaPrecioIreksRead)
@@ -127,7 +128,7 @@ def update_ireks_tarifa(
 ) -> TarifaPrecioIreksRead:
     result = service.update_tarifa_from_payload(tarifa_id, payload)
     if result is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tarifa no encontrada.")
+        raise not_found("Tarifa no encontrada.")
     return result
 
 
@@ -137,7 +138,7 @@ def delete_ireks_tarifa(
     service: IngredientIreksService = Depends(get_ingredient_ireks_service),
 ) -> Response:
     if not service.delete_tarifa_if_exists(tarifa_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tarifa no encontrada.")
+        raise not_found("Tarifa no encontrada.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -165,7 +166,7 @@ def create_std_ingredient(
     try:
         return service.create_from_payload(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
 
 
 @router.get("/std/{articulo_id}", response_model=IngredientStdRead)
@@ -175,7 +176,7 @@ def get_std_ingredient(
 ) -> IngredientStdRead:
     payload = service.api_detail_payload(articulo_id)
     if payload is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia prima no encontrada.")
+        raise not_found("Materia prima no encontrada.")
     return payload
 
 
@@ -187,7 +188,7 @@ def update_std_ingredient(
 ) -> IngredientStdRead:
     result = service.update_from_payload(articulo_id, payload)
     if result is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia prima no encontrada.")
+        raise not_found("Materia prima no encontrada.")
     return result
 
 
@@ -197,7 +198,7 @@ def delete_std_ingredient(
     service: IngredientStdService = Depends(get_ingredient_std_service),
 ) -> Response:
     if not service.delete_if_exists(articulo_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia prima no encontrada.")
+        raise not_found("Materia prima no encontrada.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -209,7 +210,7 @@ def update_std_active(
 ) -> IngredientStdRead:
     result = service.update_active_from_payload(articulo_id, payload)
     if result is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia prima no encontrada.")
+        raise not_found("Materia prima no encontrada.")
     return result
 
 

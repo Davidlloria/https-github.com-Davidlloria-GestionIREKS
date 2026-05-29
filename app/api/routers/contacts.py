@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response, status
 
 from app.api.deps import get_contact_service
+from app.api.errors import bad_request, not_found
 from app.schemas.contacts import (
     ContactCompanyOption,
     ContactCreate,
@@ -38,7 +39,7 @@ def get_contact(
 ) -> ContactDetail:
     payload = service.detail_payload(contact_id)
     if payload is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contacto no encontrado.")
+        raise not_found("Contacto no encontrado.")
     return payload
 
 
@@ -50,7 +51,7 @@ def create_contact(
     try:
         return service.create_from_payload(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
 
 
 @router.patch("/{contact_id}", response_model=ContactDetail)
@@ -62,7 +63,7 @@ def update_contact(
     try:
         return service.update_from_payload(contact_id, payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise not_found(exc) from exc
 
 
 @router.delete("/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -71,5 +72,5 @@ def delete_contact(
     service: ContactService = Depends(get_contact_service),
 ) -> Response:
     if not service.delete(contact_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contacto no encontrado.")
+        raise not_found("Contacto no encontrado.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

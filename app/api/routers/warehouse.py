@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import get_warehouse_inventory_service, get_warehouse_movement_service
+from app.api.errors import bad_request
 from app.schemas.warehouse import (
     InventoryAdjustmentPayload,
     InventoryDetailRead,
@@ -45,7 +46,7 @@ def create_manual_movement(
     try:
         return service.create_manual_move_from_payload(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
 
 
 @router.get("/inventory/history", response_model=list[InventoryHeaderRead])
@@ -74,7 +75,7 @@ def apply_inventory_adjustments(
     try:
         return service.apply_adjustments_from_payload(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
 
 
 @router.get("/inventory/{inventory_id}", response_model=list[InventoryDetailRead])
