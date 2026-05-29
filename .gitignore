@@ -10,6 +10,7 @@ env/
 
 # Test and tooling caches
 .pytest_cache/
+.pytest_tmp/
 .mypy_cache/
 .ruff_cache/
 .coverage
@@ -26,6 +27,7 @@ Thumbs.db
 
 # Runtime data
 data/*.db
+data/backups/
 
 # Build artifacts
 build/
