@@ -81,6 +81,7 @@ app/models          Entidades ORM
 19. Validacion de rutas locales en API para importaciones JSON/PDF y backups.
 20. Respuestas `409 Conflict` para borrados de clientes/contactos bloqueados
     por dependencias.
+21. README actualizado con politica de rutas locales y arranque API/frontend.
 
 ## Progreso vivo
 
@@ -106,17 +107,20 @@ Fase 2 - Endurecer API.
   en entradas y destino no-directorio en salidas.
 - Borrado de clientes y contactos devuelve `409 Conflict` cuando existen
   contactos, recetas o asistentes asociados.
+- README documenta que `source_path`, `file_path` y `destination_path` son
+  rutas del servidor, y da comandos para arrancar API y frontend.
 
 ### Pendiente en Fase 2
 
 - Completar la revision semantica de errores: decidir caso por caso si cada
   fallo debe mapear a `400`, `404` o `409`.
-- Documentar la politica de rutas locales de API y decidir si React debe migrar
-  importaciones a subida de archivos en vez de enviar rutas del servidor.
+- Decidir si React debe migrar importaciones a subida de archivos en vez de
+  enviar rutas del servidor.
 - Extender la revision de `409 Conflict` a otros dominios si aparecen nuevas
   dependencias bloqueantes.
 - Valorar paginacion real para listados grandes antes de ampliar React.
-- Documentar una forma comoda de arrancar API y frontend juntos.
+- Convertir el arranque API/frontend en script si el comando documentado se
+  queda corto para uso diario.
 - Mantener gates verdes: `pytest`, `npm run lint`, `npm run build` e integridad
   de base de datos.
 

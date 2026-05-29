@@ -69,6 +69,13 @@ npm run dev
 
 Por defecto el frontend consume la API en `http://127.0.0.1:8000`.
 
+Arranque conjunto en dos ventanas de PowerShell, desde la raiz del proyecto:
+
+```powershell
+Start-Process powershell -ArgumentList '-NoExit','-Command','python -m uvicorn app.api.main:app --reload --host 127.0.0.1 --port 8000'
+Start-Process powershell -ArgumentList '-NoExit','-Command','cd frontend; npm run dev'
+```
+
 ## Validacion
 
 Tests Python desde la raiz del proyecto:
@@ -117,6 +124,14 @@ python -c "from fastapi.testclient import TestClient; from app.api.main import a
 locales. Revisar siempre antes de versionar o compartir. No commitear claves,
 tokens, bases reales ni documentos sensibles.
 
+Los endpoints API que reciben `source_path`, `file_path` o `destination_path`
+usan rutas del sistema de archivos del servidor, no del navegador. Actualmente
+solo se aceptan importaciones `.json` y `.pdf`, y backups `.db`; los archivos de
+entrada deben existir y el destino de backup no puede ser un directorio.
+
+Para flujos React orientados a usuario final conviene migrar estas operaciones a
+subida de archivos en vez de enviar rutas locales del servidor.
+
 ## Git
 
 Si Git marca el repositorio como propiedad dudosa en Windows, ejecutar:
@@ -125,8 +140,9 @@ Si Git marca el repositorio como propiedad dudosa en Windows, ejecutar:
 git config --global --add safe.directory E:/IREKS/APP/GestionIREKS
 ```
 
-Usar una rama de trabajo para la migracion:
+El flujo actual es trabajar en ramas cortas desde `main` sincronizada, subirlas
+a GitHub y abrir Pull Request. La rama activa de endurecimiento API es:
 
 ```powershell
-git switch -c migration-ui-api-react
+git switch api-hardening
 ```
