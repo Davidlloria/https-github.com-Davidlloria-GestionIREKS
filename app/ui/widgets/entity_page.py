@@ -5,6 +5,7 @@ from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QFileDialog,
     QHBoxLayout,
@@ -29,10 +30,11 @@ class EntityPage(QWidget):
         schema: list[dict[str, Any]],
         list_fn: Callable[..., list[Any]],
         create_fn: Callable[[dict[str, Any]], Any],
-        update_fn: Callable[[int, dict[str, Any]], Any],
-        delete_fn: Callable[[int], bool],
+        update_fn: Callable[[Any, dict[str, Any]], Any],
+        delete_fn: Callable[[Any], bool],
         include_filters: bool = False,
         import_fn: Callable[[str], tuple[int, list[str]]] | None = None,
+        id_attr: str = "id",
     ) -> None:
         super().__init__()
         self.title = title
@@ -44,6 +46,7 @@ class EntityPage(QWidget):
         self.delete_fn = delete_fn
         self.include_filters = include_filters
         self.import_fn = import_fn
+        self.id_attr = id_attr
         self.rows: list[Any] = []
 
         self._build_ui()
@@ -53,7 +56,7 @@ class EntityPage(QWidget):
         layout = QVBoxLayout(self)
 
         header = QLabel(self.title)
-        header.setStyleSheet("font-size: 20px; font-weight: 600;")
+        header.setProperty("role", "pageTitle")
         layout.addWidget(header)
 
         toolbar = QHBoxLayout()
@@ -75,10 +78,15 @@ class EntityPage(QWidget):
             toolbar.addWidget(self.subfamilia_filter, 1)
 
         new_btn = QPushButton("Nuevo")
+        new_btn.setProperty("btnRole", "success")
         edit_btn = QPushButton("Editar")
+        edit_btn.setProperty("btnRole", "warning")
         del_btn = QPushButton("Eliminar")
+        del_btn.setProperty("btnRole", "danger")
         refresh_btn = QPushButton("Refrescar")
+        refresh_btn.setProperty("btnRole", "secondary")
         import_btn = QPushButton("Importar Excel/CSV")
+        import_btn.setProperty("btnRole", "secondary")
 
         new_btn.clicked.connect(self._new_entity)
         edit_btn.clicked.connect(self._edit_entity)
@@ -95,9 +103,9 @@ class EntityPage(QWidget):
         layout.addLayout(toolbar)
 
         self.table = QTableWidget(0, len(self.columns))
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SingleSelection)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setHorizontalHeaderLabels([label for _, label in self.columns])
         layout.addWidget(self.table)
@@ -157,7 +165,7 @@ class EntityPage(QWidget):
                 else:
                     text = str(value)
                 table_item = QTableWidgetItem(text)
-                table_item.setData(Qt.UserRole, getattr(item, "id", None))
+                table_item.setData(Qt.ItemDataRole.UserRole, getattr(item, self.id_attr, None))
                 self.table.setItem(row_idx, col_idx, table_item)
 
     def _selected_row(self) -> Any | None:
@@ -183,7 +191,7 @@ class EntityPage(QWidget):
         dialog = EntityDialog(f"Editar: {self.title}", self.schema, initial=initial, parent=self)
         if dialog.exec():
             payload = dialog.get_payload()
-            self.update_fn(row.id, payload)
+            self.update_fn(getattr(row, self.id_attr), payload)
             self.reload()
 
     def _delete_entity(self) -> None:
@@ -194,10 +202,10 @@ class EntityPage(QWidget):
         answer = QMessageBox.question(
             self,
             "Confirmar",
-            f"Eliminar registro {getattr(row, 'codigo', row.id)}?",
+            f"Eliminar registro {getattr(row, 'codigo', getattr(row, self.id_attr))}?",
         )
-        if answer == QMessageBox.Yes:
-            self.delete_fn(row.id)
+        if answer == QMessageBox.StandardButton.Yes:
+            self.delete_fn(getattr(row, self.id_attr))
             self.reload()
 
     def _import_entities(self) -> None:

@@ -11,9 +11,17 @@ from app.core.database import init_db
 from app.ui.main_window import MainWindow
 
 
+def _load_global_stylesheet(app: QApplication) -> None:
+    styles_path = Path(__file__).resolve().parents[1] / "assets" / "styles.qss"
+    if not styles_path.exists():
+        return
+    app.setStyleSheet(styles_path.read_text(encoding="utf-8"))
+
+
 def run() -> int:
     init_db()
     app = QApplication(sys.argv)
+    _load_global_stylesheet(app)
     window = MainWindow()
     window.show()
     return app.exec()

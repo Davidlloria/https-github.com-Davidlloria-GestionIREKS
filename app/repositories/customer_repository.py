@@ -1,4 +1,5 @@
-from sqlmodel import Session, or_, select
+from sqlalchemy import String, cast
+from sqlmodel import Session, col, or_, select
 
 from app.models import Cliente
 from app.repositories.base import BaseRepository
@@ -16,13 +17,35 @@ class CustomerRepository(BaseRepository[Cliente]):
             select(Cliente)
             .where(
                 or_(
-                    Cliente.codigo.like(like_term),
-                    Cliente.nombre_fiscal.like(like_term),
-                    Cliente.nombre_comercial.like(like_term),
-                    Cliente.contacto.like(like_term),
+                    cast(col(Cliente.cliente_codigo), String).like(like_term),
+                    col(Cliente.cliente_id).like(like_term),
+                    col(Cliente.cliente_nombre_fiscal).like(like_term),
+                    col(Cliente.cliente_nombre_comercial).like(like_term),
+                    col(Cliente.cliente_nombre_interno).like(like_term),
+                    col(Cliente.cliente_cif).like(like_term),
+                    col(Cliente.cliente_telefono).like(like_term),
+                    col(Cliente.cliente_email).like(like_term),
+                    col(Cliente.cliente_direccion).like(like_term),
+                    col(Cliente.cliente_tipo).like(like_term),
+                    col(Cliente.cliente_grupo).like(like_term),
                 )
             )
-            .order_by(Cliente.nombre_comercial)
+            .order_by(col(Cliente.cliente_nombre_comercial))
         )
         return list(session.exec(stmt))
+
+    def list_all(self, session: Session) -> list[Cliente]:
+        stmt = select(Cliente).order_by(col(Cliente.cliente_codigo), col(Cliente.cliente_nombre_comercial))
+        return list(session.exec(stmt))
+
+    def get_by_id(self, session: Session, entity_id: object) -> Cliente | None:
+        return session.get(Cliente, entity_id)
+
+    def delete(self, session: Session, entity_id: object) -> bool:
+        entity = self.get_by_id(session, entity_id)
+        if not entity:
+            return False
+        session.delete(entity)
+        session.commit()
+        return True
 

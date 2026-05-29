@@ -1,9 +1,12 @@
 from pathlib import Path
 import csv
+import json
 import unicodedata
-from typing import Any, Callable
+import warnings
+from typing import Any, Callable, cast
 
 from openpyxl import load_workbook
+from openpyxl.worksheet.worksheet import Worksheet
 
 class ImportService:
     def read_rows(self, file_path: Path) -> list[dict[str, Any]]:
@@ -12,6 +15,8 @@ class ImportService:
             return self._read_excel(file_path)
         if suffix == ".csv":
             return self._read_csv(file_path)
+        if suffix == ".json":
+            return self._read_json(file_path)
         raise ValueError(f"Formato no soportado: {suffix}")
 
     def import_with_schema(
@@ -30,15 +35,35 @@ class ImportService:
 
         for idx, row in enumerate(rows, start=2):
             try:
-                payload = self._build_payload(row, schema, aliases)
-                for req in required:
-                    if not payload.get(req):
-                        raise ValueError(f"Campo obligatorio vacio: {req}")
+                payload = self.build_payload(row=row, schema=schema, aliases=aliases)
+                self.validate_required_fields(payload, list(required))
                 create_fn(payload)
                 imported += 1
             except Exception as exc:
                 errors.append(f"Fila {idx}: {exc}")
         return imported, errors
+
+    def map_rows(
+        self,
+        file_path: Path,
+        schema: list[dict[str, Any]],
+        aliases: dict[str, list[str]] | None = None,
+    ) -> list[dict[str, Any]]:
+        rows = self.read_rows(file_path)
+        return [self.build_payload(row=row, schema=schema, aliases=aliases or {}) for row in rows]
+
+    def build_payload(
+        self,
+        row: dict[str, Any],
+        schema: list[dict[str, Any]],
+        aliases: dict[str, list[str]] | None = None,
+    ) -> dict[str, Any]:
+        return self._build_payload(row, schema, aliases or {})
+
+    def validate_required_fields(self, payload: dict[str, Any], required_fields: list[str]) -> None:
+        for req in required_fields:
+            if not payload.get(req):
+                raise ValueError(f"Campo obligatorio vacio: {req}")
 
     def _build_payload(
         self, row: dict[str, Any], schema: list[dict[str, Any]], aliases: dict[str, list[str]]
@@ -79,8 +104,14 @@ class ImportService:
         return str(raw_value).strip()
 
     def _read_excel(self, file_path: Path) -> list[dict[str, Any]]:
-        workbook = load_workbook(file_path, data_only=True)
-        sheet = workbook.active
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Workbook contains no default style, apply openpyxl's default",
+                category=UserWarning,
+            )
+            workbook = load_workbook(file_path, data_only=True)
+        sheet = cast(Worksheet, workbook.active)
         header_cells = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
         headers = [str(cell).strip() if cell is not None else "" for cell in header_cells]
         rows: list[dict[str, Any]] = []
@@ -95,11 +126,46 @@ class ImportService:
         for encoding in encodings:
             try:
                 with file_path.open("r", encoding=encoding, newline="") as fh:
-                    reader = csv.DictReader(fh)
+                    sample = fh.read(8192)
+                    fh.seek(0)
+                    delimiter = ","
+                    try:
+                        dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
+                        delimiter = str(getattr(dialect, "delimiter", ",") or ",")
+                    except Exception:
+                        delimiter = ";" if ";" in sample and "," not in sample.splitlines()[0] else ","
+                    reader = csv.DictReader(fh, delimiter=delimiter)
                     return [row for row in reader if any((v or "").strip() for v in row.values())]
             except UnicodeDecodeError:
                 continue
         raise ValueError("No se pudo leer el CSV con codificacion soportada.")
+
+    def _read_json(self, file_path: Path) -> list[dict[str, Any]]:
+        encodings = ["utf-8-sig", "latin-1"]
+        data: Any = None
+        for encoding in encodings:
+            try:
+                with file_path.open("r", encoding=encoding) as fh:
+                    data = json.load(fh)
+                break
+            except UnicodeDecodeError:
+                continue
+        if data is None:
+            raise ValueError("No se pudo leer el JSON con codificacion soportada.")
+        if isinstance(data, list):
+            rows = [row for row in data if isinstance(row, dict)]
+            if not rows:
+                raise ValueError("El JSON no contiene filas validas.")
+            return rows
+        if isinstance(data, dict):
+            for key in ("rows", "items", "data", "albaranes_items"):
+                candidate = data.get(key)
+                if isinstance(candidate, list):
+                    rows = [row for row in candidate if isinstance(row, dict)]
+                    if rows:
+                        return rows
+            return [data]
+        raise ValueError("Estructura JSON no soportada.")
 
     def _normalize_key(self, value: str) -> str:
         text = unicodedata.normalize("NFD", str(value))

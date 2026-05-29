@@ -27,7 +27,10 @@ Thumbs.db
 
 # Runtime data
 data/*.db
+data/*.json
 data/backups/
+data/exports/
+runtime/
 
 # Build artifacts
 build/
