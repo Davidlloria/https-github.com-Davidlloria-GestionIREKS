@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from reportlab.pdfgen import canvas
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import SQLModel, Session, create_engine, select
 
 import app.services.ingredient_ireks_service as ingredient_ireks_service_module
@@ -205,6 +206,40 @@ def test_ireks_product_crud_endpoints(api_client: TestClient) -> None:
     assert api_client.get(f"/ingredients/ireks/{row_id}").status_code == 404
 
 
+def test_ireks_product_delete_with_dependencies_returns_conflict(api_client: TestClient) -> None:
+    created = api_client.post(
+        "/ingredients/ireks",
+        json={
+            "almacen_id": "alm-1",
+            "fabricante_id": "fab-1",
+            "distribuidor_id": "dist-1",
+            "articulo_referencia": "IR-API-DEP-1",
+            "articulo_descripcion": "Producto IREKS con dependencias",
+            "articulo_status_activo": True,
+            "articulo_status_en_lista": True,
+        },
+    )
+    assert created.status_code == 201
+    row_id = created.json()["id"]
+    articulo_id = created.json()["articulo_id"]
+
+    with Session(order_service_module.engine) as session:
+        session.add(Pedido(pedido_id="order-ireks-del", almacen_id="alm-1", pedido_fecha=date(2026, 5, 30)))
+        session.add(
+            PedidoItem(
+                pedido_id="order-ireks-del",
+                pedido_item_fecha=date(2026, 5, 30),
+                articulo_id=articulo_id,
+                articulo_cantidad=1.0,
+            )
+        )
+        session.commit()
+
+    deleted = api_client.delete(f"/ingredients/ireks/{row_id}")
+    assert deleted.status_code == 409
+    assert "dependencias" in deleted.json()["detail"].lower()
+
+
 def test_std_product_crud_endpoints(api_client: TestClient) -> None:
     with Session(ingredient_std_service_module.engine) as session:
         session.add(Proveedor(proveedor_id="prov-api", proveedor_codigo=10, proveedor_nombre_comercial="Proveedor API"))
@@ -255,6 +290,44 @@ def test_std_product_crud_endpoints(api_client: TestClient) -> None:
     assert api_client.get(f"/ingredients/std/{articulo_id}").status_code == 404
 
 
+def test_std_product_delete_with_dependencies_returns_conflict(api_client: TestClient) -> None:
+    with Session(ingredient_std_service_module.engine) as session:
+        session.add(Proveedor(proveedor_id="prov-del", proveedor_codigo=11, proveedor_nombre_comercial="Proveedor DEL"))
+        session.commit()
+
+    created = api_client.post(
+        "/ingredients/std",
+        json={
+            "articulo_referencia_distribuidor": "STD-DEL-1",
+            "proveedor_id": "prov-del",
+            "articulo_descripcion": "Materia prima con dependencias",
+            "formato": "SACO",
+            "formato_cantidad": 25,
+            "formato_unidad": "kg",
+            "pvp_formato": 50.0,
+            "activo": True,
+        },
+    )
+    assert created.status_code == 201
+    articulo_id = created.json()["articulo_id"]
+
+    with Session(order_service_module.engine) as session:
+        session.add(Pedido(pedido_id="order-std-del", almacen_id="alm-1", pedido_fecha=date(2026, 5, 30)))
+        session.add(
+            PedidoItem(
+                pedido_id="order-std-del",
+                pedido_item_fecha=date(2026, 5, 30),
+                articulo_id=articulo_id,
+                articulo_cantidad=1.0,
+            )
+        )
+        session.commit()
+
+    deleted = api_client.delete(f"/ingredients/std/{articulo_id}")
+    assert deleted.status_code == 409
+    assert "dependencias" in deleted.json()["detail"].lower()
+
+
 def test_manual_warehouse_movement_write_endpoint(api_client: TestClient) -> None:
     created = api_client.post(
         "/warehouse/movements",
@@ -276,6 +349,37 @@ def test_manual_warehouse_movement_write_endpoint(api_client: TestClient) -> Non
     movements = api_client.get("/warehouse/movements", params={"almacen_id": "alm-1"})
     assert movements.status_code == 200
     assert movements.json()[0]["articulo_lote"] == "L-1"
+
+
+def test_manual_warehouse_movement_negative_stock_returns_conflict(api_client: TestClient) -> None:
+    seed = api_client.post(
+        "/warehouse/movements",
+        json={
+            "almacen_id": "alm-1",
+            "articulo_id": "article-1",
+            "cantidad": 1.0,
+            "mode": "in",
+            "fecha_pedido": "2026-05-29",
+            "articulo_lote": "L-NEG",
+            "pedido_albaran_numero": "MANUAL-SEED",
+        },
+    )
+    assert seed.status_code == 201
+
+    conflict_move = api_client.post(
+        "/warehouse/movements",
+        json={
+            "almacen_id": "alm-1",
+            "articulo_id": "article-1",
+            "cantidad": 2.0,
+            "mode": "out",
+            "fecha_pedido": "2026-05-29",
+            "articulo_lote": "L-NEG",
+            "pedido_albaran_numero": "MANUAL-OUT",
+        },
+    )
+    assert conflict_move.status_code == 409
+    assert "stock negativo" in conflict_move.json()["detail"].lower()
 
 
 def test_inventory_adjustment_write_endpoint(api_client: TestClient) -> None:
@@ -459,6 +563,35 @@ def test_order_albaran_pdf_import_endpoint(api_client: TestClient, tmp_path: Pat
     assert pedido.pedido_albaran_numero == "2026090075"
 
 
+def test_order_albaran_pdf_import_missing_order_returns_not_found(api_client: TestClient, tmp_path: Path) -> None:
+    source = tmp_path / "albaran-missing-order.pdf"
+    _write_pdf(
+        source,
+        [
+            "PACKING LIST",
+            "Numero:",
+            "2026090075",
+            "Fecha:",
+            "12/05/26",
+            "Cod.Art.",
+            "Descripcion",
+            "Kilos",
+            "Envases",
+            "D1749044",
+            "AROMA VAINILLA PRIMA",
+            "24,00",
+            "24",
+        ],
+    )
+
+    imported = api_client.post(
+        "/orders/order-missing/import/albaran-pdf",
+        json={"source_path": str(source)},
+    )
+    assert imported.status_code == 404
+    assert "no existe" in imported.json()["detail"].lower()
+
+
 def test_order_factura_pdf_import_endpoint(api_client: TestClient, tmp_path: Path) -> None:
     with Session(order_document_import_service_module.engine) as session:
         session.add(Pedido(pedido_id="order-factura", almacen_id="alm-1", pedido_fecha=date(2026, 5, 4)))
@@ -498,6 +631,18 @@ def test_order_factura_pdf_import_endpoint(api_client: TestClient, tmp_path: Pat
     assert items[0].precio_unitario == 10.83
     assert pedido is not None
     assert pedido.pedido_factura_numero == "60027"
+
+
+def test_order_factura_pdf_import_missing_order_returns_not_found(api_client: TestClient, tmp_path: Path) -> None:
+    source = tmp_path / "factura-missing-order.pdf"
+    _write_factura_layout_pdf(source)
+
+    imported = api_client.post(
+        "/orders/order-missing/import/factura-pdf",
+        json={"source_path": str(source)},
+    )
+    assert imported.status_code == 404
+    assert "no existe" in imported.json()["detail"].lower()
 
 
 def test_order_crud_and_line_write_endpoints(api_client: TestClient) -> None:
@@ -593,3 +738,21 @@ def test_order_crud_and_line_write_endpoints(api_client: TestClient) -> None:
     deleted_order = api_client.delete(f"/orders/{order_id}")
     assert deleted_order.status_code == 204
     assert api_client.get(f"/orders/{order_id}").status_code == 404
+
+
+def test_order_delete_maps_integrity_error_to_conflict(
+    api_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with Session(order_service_module.engine) as session:
+        session.add(Pedido(pedido_id="order-conflict", almacen_id="alm-1", pedido_fecha=date(2026, 5, 30)))
+        session.commit()
+
+    def _raise_integrity_error(self: object, pedido_id: str) -> bool:
+        raise IntegrityError("DELETE FROM pedidos", {}, Exception("fk"))
+
+    monkeypatch.setattr(order_service_module.OrderService, "delete_order_if_exists", _raise_integrity_error)
+
+    deleted = api_client.delete("/orders/order-conflict")
+    assert deleted.status_code == 409
+    assert "dependencias" in deleted.json()["detail"].lower()

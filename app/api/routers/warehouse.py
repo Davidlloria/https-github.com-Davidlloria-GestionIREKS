@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import get_warehouse_inventory_service, get_warehouse_movement_service
-from app.api.errors import bad_request
+from app.api.errors import bad_request, conflict
 from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.schemas.warehouse import (
     InventoryAdjustmentPayload,
@@ -17,7 +17,7 @@ from app.schemas.warehouse import (
     WarehouseStockRead,
 )
 from app.services.warehouse_inventory_service import WarehouseInventoryService
-from app.services.warehouse_movement_service import WarehouseMovementService
+from app.services.warehouse_movement_service import WarehouseMovementService, WarehouseStockConflictError
 
 
 router = APIRouter(prefix="/warehouse", tags=["warehouse"])
@@ -50,6 +50,8 @@ def create_manual_movement(
 ) -> WarehouseMovementRead:
     try:
         return service.create_manual_move_from_payload(payload)
+    except WarehouseStockConflictError as exc:
+        raise conflict(exc) from exc
     except ValueError as exc:
         raise bad_request(exc) from exc
 

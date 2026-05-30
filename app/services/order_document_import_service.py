@@ -32,6 +32,10 @@ class OrderDocumentImportResult:
     message: str = ""
 
 
+class OrderNotFoundError(ValueError):
+    """Raised when an order id referenced by document import does not exist."""
+
+
 class OrderDocumentImportService:
     def import_albaran_pdf(self, pedido_id: str, source: Path) -> OrderDocumentImportResult:
         header, rows = OrderDocumentParser.parse_albaran_pdf(source)
@@ -174,7 +178,7 @@ class OrderDocumentImportService:
         with Session(engine) as session:
             pedido = session.get(Pedido, pedido_id)
             if pedido is None:
-                raise ValueError("El pedido seleccionado ya no existe.")
+                raise OrderNotFoundError("El pedido seleccionado ya no existe.")
 
             preview_albaran_numero = str(preview_header.get("albaran_numero") or "").strip()
             existing_same_number = None
@@ -310,7 +314,7 @@ class OrderDocumentImportService:
         with Session(engine) as session:
             pedido = session.get(Pedido, pedido_id)
             if pedido is None:
-                raise ValueError("El pedido seleccionado ya no existe.")
+                raise OrderNotFoundError("El pedido seleccionado ya no existe.")
 
             preview_factura_numero = str(preview_header.get("factura_numero") or "").strip()
             existing_same_number = None

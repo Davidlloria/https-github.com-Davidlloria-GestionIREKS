@@ -14,7 +14,11 @@ from app.schemas.settings import (
     MaintenanceStatus,
 )
 from app.schemas.warehouse import WarehouseOption
-from app.services.api_settings_service import ApiSettingsService
+from app.services.api_settings_service import (
+    ApiSettingsService,
+    InvalidSettingsConfigError,
+    UnsupportedSettingsProviderError,
+)
 from app.services.settings_import_service import SettingsImportService
 from app.services.settings_maintenance_service import SettingsMaintenanceService
 
@@ -103,8 +107,14 @@ def save_api_settings(
 ) -> ApiSettingsPayload:
     try:
         return ApiSettingsPayload.model_validate(service.save_provider(provider, payload.config))
-    except ValueError as exc:
+    except InvalidSettingsConfigError as exc:
+        raise bad_request(exc) from exc
+    except UnsupportedSettingsProviderError as exc:
         raise not_found(exc) from exc
+    except ValueError as exc:
+        if "no soportado" in str(exc).lower():
+            raise not_found(exc) from exc
+        raise bad_request(exc) from exc
 
 
 @router.get("/imports/warehouses", response_model=list[WarehouseOption])

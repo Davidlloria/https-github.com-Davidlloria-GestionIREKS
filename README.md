@@ -72,8 +72,26 @@ Por defecto el frontend consume la API en `http://127.0.0.1:8000`.
 Arranque conjunto en dos ventanas de PowerShell, desde la raiz del proyecto:
 
 ```powershell
-Start-Process powershell -ArgumentList '-NoExit','-Command','python -m uvicorn app.api.main:app --reload --host 127.0.0.1 --port 8000'
-Start-Process powershell -ArgumentList '-NoExit','-Command','cd frontend; npm run dev'
+.\scripts\start-dev.ps1
+```
+
+Si necesitas autorecarga de API durante desarrollo:
+
+```powershell
+.\scripts\start-dev.ps1 -Reload
+```
+
+Detener API y frontend lanzados por el script:
+
+```powershell
+.\scripts\stop-dev.ps1
+```
+
+Si PowerShell bloquea scripts por politica de ejecucion, usar:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-dev.ps1 -Force
 ```
 
 ## Validacion

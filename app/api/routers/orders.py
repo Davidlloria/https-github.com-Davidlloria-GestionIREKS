@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_order_document_import_service, get_order_query_service, get_order_service
-from app.api.errors import bad_request, not_found
+from app.api.errors import bad_request, conflict, not_found
 from app.api.paths import input_file_path
 from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.schemas.orders import (
@@ -21,7 +22,7 @@ from app.schemas.orders import (
     OrderRead,
     OrderUpdate,
 )
-from app.services.order_document_import_service import OrderDocumentImportService
+from app.services.order_document_import_service import OrderDocumentImportService, OrderNotFoundError
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderService
 
@@ -82,6 +83,8 @@ def import_albaran_pdf(
     source = input_file_path(payload.source_path, field_name="source_path", allowed_suffixes={".pdf"})
     try:
         result = service.import_albaran_pdf(order_id, source)
+    except OrderNotFoundError as exc:
+        raise not_found(exc) from exc
     except ValueError as exc:
         raise bad_request(exc) from exc
     return OrderDocumentImportResponse.model_validate(result, from_attributes=True)
@@ -96,6 +99,8 @@ def import_factura_pdf(
     source = input_file_path(payload.source_path, field_name="source_path", allowed_suffixes={".pdf"})
     try:
         result = service.import_factura_pdf(order_id, source)
+    except OrderNotFoundError as exc:
+        raise not_found(exc) from exc
     except ValueError as exc:
         raise bad_request(exc) from exc
     return OrderDocumentImportResponse.model_validate(result, from_attributes=True)
@@ -118,8 +123,11 @@ def delete_order(
     order_id: str,
     service: OrderService = Depends(get_order_service),
 ) -> Response:
-    if not service.delete_order_if_exists(order_id):
-        raise not_found("Pedido no encontrado.")
+    try:
+        if not service.delete_order_if_exists(order_id):
+            raise not_found("Pedido no encontrado.")
+    except IntegrityError as exc:
+        raise conflict("No se puede eliminar el pedido porque tiene dependencias.") from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

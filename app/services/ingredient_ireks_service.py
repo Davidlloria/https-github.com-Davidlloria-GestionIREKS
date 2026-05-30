@@ -428,6 +428,58 @@ class IngredientIreksService:
             return False
         return self.delete_product(int(row_id))
 
+    def delete_blockers(self, row_id: int) -> list[str]:
+        clean_row_id = int(row_id or 0)
+        if clean_row_id <= 0:
+            return []
+        with Session(engine) as session:
+            row = session.get(IngredienteIreks, clean_row_id)
+        if row is None:
+            return []
+        articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+        if not articulo_id:
+            return []
+        return self._article_delete_blockers(articulo_id)
+
+    @staticmethod
+    def _article_delete_blockers(articulo_id: str) -> list[str]:
+        with engine.begin() as conn:
+            counts = {
+                "pedidos_items": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM pedidos_items WHERE articulo_id = ?",
+                    (articulo_id,),
+                ).scalar_one(),
+                "albaranes_items": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM albaranes_items WHERE articulo_id = ?",
+                    (articulo_id,),
+                ).scalar_one(),
+                "facturas_items": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM facturas_items WHERE articulo_id = ?",
+                    (articulo_id,),
+                ).scalar_one(),
+                "pedidos_pendientes": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM pedidos_pendientes WHERE articulo_id = ?",
+                    (articulo_id,),
+                ).scalar_one(),
+                "almacen_movimientos": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM almacen_movimientos WHERE articulo_id = ?",
+                    (articulo_id,),
+                ).scalar_one(),
+                "almacen_stock": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM almacen_stock WHERE articulo_id = ?",
+                    (articulo_id,),
+                ).scalar_one(),
+            }
+        labels = {
+            "pedidos_items": "linea(s) de pedido",
+            "albaranes_items": "linea(s) de albaran",
+            "facturas_items": "linea(s) de factura",
+            "pedidos_pendientes": "pendiente(s) de pedido",
+            "almacen_movimientos": "movimiento(s) de almacen",
+            "almacen_stock": "registro(s) de stock",
+        }
+        return [f"{int(count)} {labels[name]}" for name, count in counts.items() if int(count or 0) > 0]
+
     def upsert_distributor_reference(
         self,
         *,

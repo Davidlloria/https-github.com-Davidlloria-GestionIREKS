@@ -48,6 +48,8 @@ def create_customer(
 ) -> CustomerDetail:
     try:
         return service.create_from_payload(payload)
+    except IntegrityError as exc:
+        raise conflict("No se puede crear el cliente porque ya existe o entra en conflicto con datos unicos.") from exc
     except ValueError as exc:
         raise bad_request(exc) from exc
 
@@ -60,6 +62,8 @@ def update_customer(
 ) -> CustomerDetail:
     try:
         return service.update_from_payload(customer_id, payload)
+    except IntegrityError as exc:
+        raise conflict("No se puede actualizar el cliente porque entra en conflicto con datos unicos.") from exc
     except ValueError as exc:
         raise not_found(exc) from exc
 

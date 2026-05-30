@@ -9,6 +9,14 @@ from typing import Any
 from app.core.config import DATA_DIR
 
 
+class UnsupportedSettingsProviderError(ValueError):
+    """Provider key is not supported by API settings."""
+
+
+class InvalidSettingsConfigError(ValueError):
+    """Provider config payload contains invalid values."""
+
+
 class ApiSettingsService:
     CONFIG_PATH = DATA_DIR / "api_config.json"
     LEGACY_FDC_PATH = DATA_DIR / "fdc_config.json"
@@ -136,7 +144,7 @@ class ApiSettingsService:
             return self.get_orders_mail()
         if clean_provider == "warehouse":
             return self.get_warehouse()
-        raise ValueError("Proveedor de configuracion no soportado.")
+        raise UnsupportedSettingsProviderError("Proveedor de configuracion no soportado.")
 
     def save_provider(self, provider: str, config: dict[str, Any]) -> dict[str, Any]:
         clean_provider = str(provider or "").strip().lower()
@@ -163,11 +171,15 @@ class ApiSettingsService:
                 historico_dir=str(payload.get("historico_dir") or "").strip(),
             )
         elif clean_provider == "warehouse":
+            try:
+                threshold = float(payload.get("low_stock_threshold_units") or 1.0)
+            except (TypeError, ValueError) as exc:
+                raise InvalidSettingsConfigError("low_stock_threshold_units debe ser numerico.") from exc
             self.save_warehouse(
-                low_stock_threshold_units=float(payload.get("low_stock_threshold_units") or 1.0),
+                low_stock_threshold_units=threshold,
             )
         else:
-            raise ValueError("Proveedor de configuracion no soportado.")
+            raise UnsupportedSettingsProviderError("Proveedor de configuracion no soportado.")
         return self.provider_payload(clean_provider)
 
     def _migrate_legacy_if_present(self) -> dict[str, Any] | None:

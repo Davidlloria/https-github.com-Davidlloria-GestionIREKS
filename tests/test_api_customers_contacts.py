@@ -60,6 +60,28 @@ def test_customers_crud_endpoints(api_client: TestClient) -> None:
     assert api_client.get("/customers/customer-1").status_code == 404
 
 
+def test_customer_create_duplicate_id_returns_conflict(api_client: TestClient) -> None:
+    first = api_client.post(
+        "/customers",
+        json={
+            "cliente_id": "customer-dup",
+            "cliente_nombre_comercial": "Cliente Duplicado",
+            "cliente_nombre_fiscal": "Cliente Duplicado SL",
+        },
+    )
+    assert first.status_code == 201
+
+    second = api_client.post(
+        "/customers",
+        json={
+            "cliente_id": "customer-dup",
+            "cliente_nombre_comercial": "Cliente Duplicado 2",
+            "cliente_nombre_fiscal": "Cliente Duplicado 2 SL",
+        },
+    )
+    assert second.status_code == 409
+
+
 def test_customers_list_supports_limit_and_offset(api_client: TestClient) -> None:
     for idx, name in enumerate(["Cliente A", "Cliente B", "Cliente C"], start=1):
         created = api_client.post(
@@ -120,6 +142,74 @@ def test_contacts_crud_endpoints_include_company_payload(api_client: TestClient)
     deleted = api_client.delete("/contacts/contact-1")
     assert deleted.status_code == 204
     assert api_client.get("/contacts/contact-1").status_code == 404
+
+
+def test_contact_create_duplicate_id_returns_conflict(api_client: TestClient) -> None:
+    customer = api_client.post(
+        "/customers",
+        json={
+            "cliente_id": "customer-dup-contact",
+            "cliente_nombre_comercial": "Cliente Contacto",
+            "cliente_nombre_fiscal": "Cliente Contacto SL",
+        },
+    )
+    assert customer.status_code == 201
+
+    first = api_client.post(
+        "/contacts",
+        json={
+            "contacto_id": "contact-dup",
+            "cliente_id": "customer-dup-contact",
+            "nombre": "Ana",
+        },
+    )
+    assert first.status_code == 201
+
+    second = api_client.post(
+        "/contacts",
+        json={
+            "contacto_id": "contact-dup",
+            "cliente_id": "customer-dup-contact",
+            "nombre": "Luis",
+        },
+    )
+    assert second.status_code == 409
+
+
+def test_contact_create_with_unknown_customer_returns_bad_request(api_client: TestClient) -> None:
+    created = api_client.post(
+        "/contacts",
+        json={
+            "contacto_id": "contact-invalid-customer",
+            "cliente_id": "missing-customer",
+            "nombre": "Ana",
+        },
+    )
+    assert created.status_code == 400
+    assert "cliente" in created.json()["detail"].lower()
+
+
+def test_contact_update_with_unknown_customer_returns_bad_request(api_client: TestClient) -> None:
+    api_client.post(
+        "/customers",
+        json={
+            "cliente_id": "customer-1",
+            "cliente_nombre_comercial": "Cliente Demo",
+            "cliente_nombre_fiscal": "Cliente Demo SL",
+        },
+    )
+    api_client.post(
+        "/contacts",
+        json={
+            "contacto_id": "contact-1",
+            "cliente_id": "customer-1",
+            "nombre": "Ana",
+        },
+    )
+
+    updated = api_client.patch("/contacts/contact-1", json={"cliente_id": "missing-customer"})
+    assert updated.status_code == 400
+    assert "cliente" in updated.json()["detail"].lower()
 
 
 def test_customer_delete_with_contact_returns_conflict(api_client: TestClient) -> None:

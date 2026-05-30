@@ -11,13 +11,13 @@ Revision local: 2026-05-29.
 - `app/api` expone FastAPI con routers para clientes, contactos, ingredientes,
   pedidos, almacen y configuracion.
 - `frontend` existe con React/Vite y consume la API para vistas de consulta de
-  clientes, ingredientes IREKS y almacen.
+  clientes, contactos, ingredientes (IREKS/STD), pedidos y almacen.
 - La base `data/gestion_ireks.db` existe, pasa `PRAGMA integrity_check` y queda
   fuera de Git.
 - `orphan_contact_links = 0` tras backup y reparacion.
 - `data/*.db`, `data/*.json`, `data/backups/`, `data/exports/` y `runtime/`
   quedan ignorados para evitar subir datos reales, secretos o binarios pesados.
-- Validacion tras el bloque actual de Fase 2: `57 passed`, `npm run lint` y
+- Validacion tras el bloque actual de Fase 2: `68 passed`, `npm run lint` y
   `npm run build`.
 
 ## Arquitectura objetivo
@@ -84,12 +84,16 @@ app/models          Entidades ORM
 21. README actualizado con politica de rutas locales y arranque API/frontend.
 22. Parametros `limit` y `offset` en listados grandes sin cambiar la forma de
     respuesta existente.
+23. Scripts `start-dev.ps1` y `stop-dev.ps1` para arrancar/parar API y
+    frontend de forma reproducible.
+24. Respuestas `409 Conflict` extendidas a borrado de ingredientes IREKS/STD
+    con dependencias operativas.
 
 ## Progreso vivo
 
 ### Fase actual
 
-Fase 2 - Endurecer API.
+Fase 4 - Migrar escrituras a React.
 
 ### Completado en Fase 2
 
@@ -114,21 +118,84 @@ Fase 2 - Endurecer API.
 - Listados principales aceptan paginacion compatible: clientes, contactos,
   ingredientes IREKS/STD, pedidos, stock, movimientos e historico de
   inventarios.
+- Arranque/parada unificada documentada y soportada por scripts locales.
+- Borrado de ingredientes IREKS/STD devuelve `409 Conflict` cuando hay
+  referencias en pedidos, albaranes, facturas, pendientes o almacen.
+- Ajustes API de configuracion con mapeo semantico:
+  - `PUT /settings/api/{provider}` devuelve `404` para proveedor no soportado;
+  - devuelve `400` para configuracion invalida (por ejemplo, umbral de stock no numerico).
+- Tests de contrato de `settings` ampliados para validar el mapeo `400/404`.
+- `DELETE /orders/{order_id}` devuelve `409 Conflict` cuando una restriccion de
+  integridad impide eliminar el pedido.
+- `POST /warehouse/movements` devuelve `409 Conflict` cuando una salida manual
+  dejaria stock negativo para producto/lote.
+- Importaciones PDF de pedidos devuelven `404` cuando el `order_id` no existe:
+  - `POST /orders/{order_id}/import/albaran-pdf`
+  - `POST /orders/{order_id}/import/factura-pdf`
+- Tests de contrato ampliados para validar esos `404` en importaciones PDF.
+- Contactos endurecido frente a referencias invalidas de cliente:
+  - `POST /contacts` y `PATCH /contacts/{contact_id}` devuelven `400` cuando
+    `cliente_id` no existe.
+  - Validacion explicita en servicio para no depender de constraints del motor
+    de base de datos en entorno de pruebas.
+- Duplicados de clientes/contactos mapeados a `409 Conflict`:
+  - `POST /customers` devuelve `409` ante `cliente_id`/campos unicos en conflicto.
+  - `POST /contacts` devuelve `409` ante `contacto_id`/campos unicos en conflicto.
+  - `PATCH /customers/{customer_id}` y `PATCH /contacts/{contact_id}` devuelven
+    `409` para colisiones de unicidad.
 
 ### Pendiente en Fase 2
 
-- Completar la revision semantica de errores: decidir caso por caso si cada
-  fallo debe mapear a `400`, `404` o `409`.
+- Mantener la matriz semantica de errores de escritura (`400/404/409`) cuando
+  se incorporen nuevos endpoints o reglas de negocio.
 - Decidir si React debe migrar importaciones a subida de archivos en vez de
   enviar rutas del servidor.
 - Extender la revision de `409 Conflict` a otros dominios si aparecen nuevas
-  dependencias bloqueantes.
+  dependencias bloqueantes (por ejemplo tarifas/configuraciones con reglas de
+  negocio adicionales).
 - Evolucionar la paginacion hacia respuestas con metadatos (`total`, `limit`,
   `offset`) cuando React necesite controles de pagina visibles.
-- Convertir el arranque API/frontend en script si el comando documentado se
-  queda corto para uso diario.
+- Revisar si conviene empaquetar los scripts de arranque/parada en comandos npm
+  o task runner para equipos mixtos Windows/Linux.
 - Mantener gates verdes: `pytest`, `npm run lint`, `npm run build` e integridad
   de base de datos.
+
+### Completado en Fase 3
+
+- Nueva pantalla React de contactos en solo lectura:
+  - listado con busqueda por texto;
+  - filtro por empresa usando `/contacts/companies`;
+  - panel de detalle usando `/contacts/{contact_id}`.
+- Navegacion principal ampliada para incluir la vista `Contactos`.
+- Tipos y cliente API frontend extendidos para contratos de contactos.
+- Vista de clientes mejorada en solo lectura:
+  - seleccion de cliente desde listado;
+  - panel de detalle con datos fiscales/comerciales;
+  - tabla de contactos asociados del cliente seleccionado.
+- Vista de ingredientes ampliada en solo lectura:
+  - selector de modo `IREKS` / `STD`;
+  - listado y seleccion por fila en ambos modos;
+  - detalle IREKS con nutricion y tarifas;
+  - detalle STD con nutricion e historico de precios.
+- Nueva vista de pedidos en solo lectura:
+  - listado filtrable por año, rango de meses y almacen;
+  - seleccion de pedido con panel de detalle;
+  - tablas de lineas y pendientes del pedido seleccionado.
+- Nueva vista de configuracion en solo lectura:
+  - estado de base de datos y conteos por tabla;
+  - ejecucion manual de `integrity_check` desde React;
+  - lectura de proveedores API y almacenes para importacion.
+
+### Completado en Fase 4
+
+- Primer flujo de escritura en React (bajo riesgo):
+  - activar/desactivar materias primas STD desde la vista de ingredientes;
+  - usa `PATCH /ingredients/std/{articulo_id}/active`;
+  - refresca listado y detalle tras guardar, con feedback de exito/error.
+- Segundo flujo de escritura en React (bajo riesgo):
+  - activar/desactivar clientes desde la vista de clientes;
+  - usa `PATCH /customers/{customer_id}` con payload parcial `{ "activo": true|false }`;
+  - refresca listado y detalle tras guardar, con feedback de exito/error.
 
 ## Hoja de ruta
 

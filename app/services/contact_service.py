@@ -27,6 +27,10 @@ class ContactCompanyLookup:
     name_to_id: dict[str, str] = field(default_factory=dict)
 
 
+class ContactPayloadError(ValueError):
+    """Raised when contact payload contains invalid related data."""
+
+
 class ContactService:
     def __init__(self) -> None:
         self.vm = ContactViewModel()
@@ -103,6 +107,7 @@ class ContactService:
 
     def create_from_payload(self, payload: ContactCreate | dict) -> ContactDetail:
         data = self._payload_dict(payload, ContactCreate, exclude_none=True)
+        self._ensure_customer_exists(str(data.get("cliente_id") or "").strip())
         created = self.create(data)
         return self._contact_detail_from_entity(created)
 
@@ -112,6 +117,8 @@ class ContactService:
 
     def update_from_payload(self, contacto_id: str, payload: ContactUpdate | dict) -> ContactDetail:
         data = self._payload_dict(payload, ContactUpdate, exclude_none=True)
+        if "cliente_id" in data:
+            self._ensure_customer_exists(str(data.get("cliente_id") or "").strip())
         updated = self.update(contacto_id, data)
         return self._contact_detail_from_entity(updated)
 
@@ -222,3 +229,12 @@ class ContactService:
         lookup = self.company_lookup()
         item.cliente_nombre = lookup.id_to_name.get(str(row.cliente_id or ""), "")
         return item
+
+    @staticmethod
+    def _ensure_customer_exists(cliente_id: str) -> None:
+        clean_cliente_id = str(cliente_id or "").strip()
+        if not clean_cliente_id:
+            raise ContactPayloadError("El cliente indicado no existe o no es valido.")
+        with Session(engine) as session:
+            if session.get(Cliente, clean_cliente_id) is None:
+                raise ContactPayloadError("El cliente indicado no existe o no es valido.")

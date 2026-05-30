@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_ingredient_ireks_service, get_ingredient_std_service
-from app.api.errors import bad_request, not_found
+from app.api.errors import bad_request, conflict, not_found
 from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.schemas.ingredients import (
     IngredientActiveUpdate,
@@ -93,7 +94,14 @@ def delete_ireks_ingredient(
     row_id: int,
     service: IngredientIreksService = Depends(get_ingredient_ireks_service),
 ) -> Response:
-    if not service.delete_if_exists(row_id):
+    blockers = service.delete_blockers(row_id)
+    if blockers:
+        raise conflict(f"No se puede eliminar el ingrediente IREKS porque tiene dependencias: {', '.join(blockers)}.")
+    try:
+        deleted = service.delete_if_exists(row_id)
+    except IntegrityError as exc:
+        raise conflict("No se puede eliminar el ingrediente IREKS porque tiene dependencias.") from exc
+    if not deleted:
         raise not_found("Ingrediente IREKS no encontrado.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -206,7 +214,14 @@ def delete_std_ingredient(
     articulo_id: str,
     service: IngredientStdService = Depends(get_ingredient_std_service),
 ) -> Response:
-    if not service.delete_if_exists(articulo_id):
+    blockers = service.delete_blockers(articulo_id)
+    if blockers:
+        raise conflict(f"No se puede eliminar la materia prima porque tiene dependencias: {', '.join(blockers)}.")
+    try:
+        deleted = service.delete_if_exists(articulo_id)
+    except IntegrityError as exc:
+        raise conflict("No se puede eliminar la materia prima porque tiene dependencias.") from exc
+    if not deleted:
         raise not_found("Materia prima no encontrada.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

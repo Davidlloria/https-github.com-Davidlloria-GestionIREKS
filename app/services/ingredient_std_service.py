@@ -194,6 +194,47 @@ class IngredientStdService:
             session.commit()
             return True
 
+    def delete_blockers(self, articulo_id: str) -> list[str]:
+        clean_articulo_id = str(articulo_id or "").strip()
+        if not clean_articulo_id:
+            return []
+        with engine.begin() as conn:
+            counts = {
+                "pedidos_items": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM pedidos_items WHERE articulo_id = ?",
+                    (clean_articulo_id,),
+                ).scalar_one(),
+                "albaranes_items": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM albaranes_items WHERE articulo_id = ?",
+                    (clean_articulo_id,),
+                ).scalar_one(),
+                "facturas_items": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM facturas_items WHERE articulo_id = ?",
+                    (clean_articulo_id,),
+                ).scalar_one(),
+                "pedidos_pendientes": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM pedidos_pendientes WHERE articulo_id = ?",
+                    (clean_articulo_id,),
+                ).scalar_one(),
+                "almacen_movimientos": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM almacen_movimientos WHERE articulo_id = ?",
+                    (clean_articulo_id,),
+                ).scalar_one(),
+                "almacen_stock": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM almacen_stock WHERE articulo_id = ?",
+                    (clean_articulo_id,),
+                ).scalar_one(),
+            }
+        labels = {
+            "pedidos_items": "linea(s) de pedido",
+            "albaranes_items": "linea(s) de albaran",
+            "facturas_items": "linea(s) de factura",
+            "pedidos_pendientes": "pendiente(s) de pedido",
+            "almacen_movimientos": "movimiento(s) de almacen",
+            "almacen_stock": "registro(s) de stock",
+        }
+        return [f"{int(count)} {labels[name]}" for name, count in counts.items() if int(count or 0) > 0]
+
     def update_active(self, articulo_id: str, activo: bool) -> None:
         clean_articulo_id = str(articulo_id or "").strip()
         if not clean_articulo_id:

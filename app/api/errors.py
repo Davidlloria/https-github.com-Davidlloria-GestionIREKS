@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 
 
 def _detail(value: Exception | str) -> str:
@@ -17,3 +18,8 @@ def not_found(value: Exception | str) -> HTTPException:
 
 def conflict(value: Exception | str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_detail(value))
+
+
+def integrity_is_foreign_key(exc: IntegrityError) -> bool:
+    text = str(getattr(exc, "orig", exc) or "").lower()
+    return "foreign key" in text

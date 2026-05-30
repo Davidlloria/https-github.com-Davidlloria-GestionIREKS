@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_contact_service
-from app.api.errors import bad_request, conflict, not_found
+from app.api.errors import bad_request, conflict, integrity_is_foreign_key, not_found
 from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.schemas.contacts import (
     ContactCompanyOption,
@@ -15,7 +15,7 @@ from app.schemas.contacts import (
     ContactListItem,
     ContactUpdate,
 )
-from app.services.contact_service import ContactService
+from app.services.contact_service import ContactPayloadError, ContactService
 
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
@@ -56,6 +56,12 @@ def create_contact(
 ) -> ContactDetail:
     try:
         return service.create_from_payload(payload)
+    except ContactPayloadError as exc:
+        raise bad_request(exc) from exc
+    except IntegrityError as exc:
+        if integrity_is_foreign_key(exc):
+            raise bad_request("El cliente indicado no existe o no es valido.") from exc
+        raise conflict("No se puede crear el contacto porque ya existe o entra en conflicto con datos unicos.") from exc
     except ValueError as exc:
         raise bad_request(exc) from exc
 
@@ -68,6 +74,12 @@ def update_contact(
 ) -> ContactDetail:
     try:
         return service.update_from_payload(contact_id, payload)
+    except ContactPayloadError as exc:
+        raise bad_request(exc) from exc
+    except IntegrityError as exc:
+        if integrity_is_foreign_key(exc):
+            raise bad_request("El cliente indicado no existe o no es valido.") from exc
+        raise conflict("No se puede actualizar el contacto porque entra en conflicto con datos unicos.") from exc
     except ValueError as exc:
         raise not_found(exc) from exc
 
