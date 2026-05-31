@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QFrame,
     QHeaderView,
     QHBoxLayout,
-    QInputDialog,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -2265,26 +2264,6 @@ class SettingsPage(QWidget):
         else:
             QMessageBox.warning(self, outcome.title, outcome.message)
             self._append_log(outcome.log_message)
-
-    def _rebuild_igsa_warehouse_movements(self) -> None:
-        periodo, ok = QInputDialog.getText(
-            self,
-            "Regenerar salidas IGSA",
-            "Periodo (AAAA-MM). Deja vacío para todos:",
-        )
-        if not ok:
-            return
-        try:
-            outcome = self.settings_sales_import_service.rebuild_igsa_warehouse_movements(str(periodo or "").strip())
-        except Exception as exc:
-            QMessageBox.warning(self, "Regenerar salidas IGSA", str(exc))
-            return
-        if outcome.ok:
-            QMessageBox.information(self, outcome.title, outcome.message)
-        else:
-            QMessageBox.warning(self, outcome.title, outcome.message)
-        self._append_log(outcome.log_message)
-
     def _save_fdc_settings(self) -> None:
         key = self.fdc_api_key_input.text().strip() if hasattr(self, "fdc_api_key_input") else ""
         data_type = self.fdc_data_type_combo.currentText().strip() if hasattr(self, "fdc_data_type_combo") else "Foundation"

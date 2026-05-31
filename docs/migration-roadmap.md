@@ -407,6 +407,9 @@ Fase 5 - Reducir dependencia del desktop.
 - Limpieza puntual de importación legacy en `SettingsPage`:
   - eliminado `_import_igsa_sales_excel`, sin enlaces en la UI actual;
   - se mantiene el flujo activo de importación/previsualización por libro/PDF.
+- Limpieza puntual adicional en `SettingsPage`:
+  - eliminado `_rebuild_igsa_warehouse_movements`, sin enlaces en la UI actual;
+  - retirada también la dependencia `QInputDialog` asociada a ese flujo legacy.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;
