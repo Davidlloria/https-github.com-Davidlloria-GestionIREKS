@@ -94,11 +94,25 @@ Detener API y frontend lanzados por el script:
 .\scripts\stop-dev.ps1
 ```
 
+Backup de base de datos con nombre automatico (recomendado antes de tareas
+destructivas o mantenimientos):
+
+```powershell
+.\scripts\backup-db.ps1
+```
+
+Backup con etiqueta de contexto:
+
+```powershell
+.\scripts\backup-db.ps1 -Tag "pre-mantenimiento"
+```
+
 Si PowerShell bloquea scripts por politica de ejecucion, usar:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-dev.ps1 -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backup-db.ps1
 ```
 
 ## Validacion

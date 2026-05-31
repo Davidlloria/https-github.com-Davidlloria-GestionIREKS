@@ -419,6 +419,17 @@ Fase 5 - Reducir dependencia del desktop.
   - `app/ui/widgets/settings_page.py` delega integridad, reparacion de enlaces,
     optimize, clientes tecnicos y backup al nuevo servicio.
 
+### Completado en Fase 6
+
+- Backup automatico por script local:
+  - nuevo `scripts/backup-db.ps1` para generar copias de seguridad con
+    timestamp y etiqueta opcional usando `backup_database` (SQLite backup);
+  - salida por defecto en `data/backups/` para mantener el flujo operativo
+    fuera de Git.
+- Documentacion operativa de backup:
+  - `README.md` actualizado con comandos de backup normal, backup con `-Tag` y
+    variante con `ExecutionPolicy Bypass`.
+
 ## Hoja de ruta
 
 ### Fase 0 - Estabilizar el punto de partida
