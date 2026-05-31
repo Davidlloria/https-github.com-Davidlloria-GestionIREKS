@@ -401,6 +401,9 @@ Fase 5 - Reducir dependencia del desktop.
 - Limpieza de método no referenciado en `SettingsPage`:
   - eliminado `_load_igsa_pdf_import_almacen_combo`, sin uso en la UI actual;
   - se mantiene solo la carga activa de almacén para importación JSON de pedidos.
+- Limpieza adicional de métodos puente sin uso en `OrdersPage`:
+  - eliminados `_pedido_totals_kg`, `_repair_albaran_item_mappings` y `_show_import_selector`;
+  - el widget mantiene llamadas directas a servicios activos y reduce superficie legacy.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;

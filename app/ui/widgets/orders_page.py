@@ -1685,9 +1685,6 @@ class OrdersPage(QWidget):
         self.month_from_filter.blockSignals(False)
         self.month_to_filter.blockSignals(False)
 
-    def _pedido_totals_kg(self, pedido_ids: list[str]) -> dict[str, float]:
-        return self.order_query_service.pedido_totals_kg(pedido_ids)
-
     def _reload_pedido_items_table(self, pedido_id: str | None) -> None:
         self._loading_pedido_items_table = True
         header = self.pedido_items_table.horizontalHeader()
@@ -2133,9 +2130,6 @@ class OrdersPage(QWidget):
             QMessageBox.warning(self, "Albaran", str(exc))
             return
         self.reload()
-
-    def _repair_albaran_item_mappings(self, session: Any, pedido_id: str, albaran_id: str = "") -> None:
-        self.order_document_import_service.repair_albaran_item_mappings(session, pedido_id, albaran_id)
 
     def _reload_pendientes_table(self, pedido_id: str | None) -> None:
         self.pendientes_table.setRowCount(0)
@@ -2743,21 +2737,6 @@ class OrdersPage(QWidget):
         self.reload()
         self._select_by_id(outcome.pedido_id)
         QMessageBox.information(self, "Importacion completada", "\n".join(outcome.summary_lines))
-
-    def _show_import_selector(self) -> None:
-        dialog = QMessageBox(self)
-        dialog.setWindowTitle("Importar")
-        dialog.setText("Selecciona que deseas importar.")
-        btn_pedidos = dialog.addButton("Pedidos", QMessageBox.ButtonRole.AcceptRole)
-        btn_items = dialog.addButton("Items", QMessageBox.ButtonRole.ActionRole)
-        dialog.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
-        dialog.exec()
-        clicked = dialog.clickedButton()
-        if clicked == btn_pedidos:
-            self._import_orders()
-            return
-        if clicked == btn_items:
-            self._import_order_items()
 
     def _confirm_albaran_preview(self, header: dict[str, str], rows: list[dict[str, Any]]) -> bool:
         dialog = AlbaranPreviewDialog(header=header, items=rows, parent=self)
