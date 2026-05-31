@@ -314,6 +314,10 @@ Fase 4 - Migrar escrituras a React.
     - `app/ui` no importe `sqlmodel` ni `app.core.database`;
     - `app/services` no importe `PySide6`;
     - `app/api` no importe `app.ui`.
+- Gate unificado de validacion:
+  - nuevo script `scripts/validate-gates.ps1`;
+  - ejecuta `pytest` (incluyendo guardrails de arquitectura), `integrity_check`,
+    `npm run lint` y `npm run build`.
 
 ## Hoja de ruta
 
@@ -445,6 +449,10 @@ y validar la base siguiendo README.
 ## Comandos de validacion
 
 PowerShell, desde la raiz del proyecto:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-gates.ps1
+```
 
 ```powershell
 New-Item -ItemType Directory -Force .pytest_tmp

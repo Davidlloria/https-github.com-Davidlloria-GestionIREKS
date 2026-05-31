@@ -96,6 +96,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-dev.ps1 -Forc
 
 ## Validacion
 
+Gate completo recomendado (incluye tests Python, reglas de arquitectura,
+integridad de base de datos, lint y build frontend):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-gates.ps1
+```
+
 Tests Python desde la raiz del proyecto:
 
 ```powershell
@@ -124,6 +131,12 @@ Healthcheck de API:
 
 ```powershell
 python -c "from fastapi.testclient import TestClient; from app.api.main import app; c=TestClient(app); print(c.get('/health').status_code, c.get('/health').json())"
+```
+
+Reglas de arquitectura (incluidas en `pytest tests -q`):
+
+```powershell
+python -m pytest tests/test_architecture_boundaries.py -q
 ```
 
 ## Estado actual
