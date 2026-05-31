@@ -1635,18 +1635,6 @@ class OrdersPage(QWidget):
             return parsed
         return date.today()
 
-    def _parse_optional_date(self, value) -> date | None:
-        text = str(value or "").strip()
-        if not text:
-            return None
-        return self._try_parse_date(value)
-
-    def _parse_required_date(self, value, field_name: str) -> date:
-        parsed = self._try_parse_date(value)
-        if parsed is None:
-            raise ValueError(f"Formato de fecha invalido en {field_name}: {value}")
-        return parsed
-
     def _load_almacen_filter(self, _session: Any | None = None) -> None:
         current = str(self.almacen_filter.currentData() or "")
         options = self.order_query_service.warehouse_filter_options()
