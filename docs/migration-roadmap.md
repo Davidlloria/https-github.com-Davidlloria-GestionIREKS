@@ -353,6 +353,12 @@ Fase 5 - Reducir dependencia del desktop.
     archivos (`.xlsx/.xlsm/.csv`) y construir mensajes de resultado/incidencias;
   - `app/ui/widgets/orders_page.py` delega la importacion y mantiene solo
     recarga de datos y mensajeria visual.
+- Extraccion de importacion de albaranes/facturas desde `OrdersPage`:
+  - nueva capa `app/services/orders_documents_import_ui_service.py` para
+    preparar previsualizacion (PDF/Excel/CSV/JSON), enriquecer filas de factura
+    y mapear resultados de importacion (exito/incidencias/ya importado);
+  - `app/ui/widgets/orders_page.py` delega esta logica y mantiene confirmacion
+    de vista previa, recarga y mensajes de interfaz.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;
