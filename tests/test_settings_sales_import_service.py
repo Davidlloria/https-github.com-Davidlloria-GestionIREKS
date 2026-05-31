@@ -50,9 +50,20 @@ class _FakeSalesService:
         return _Result(ok=True, message="OK REBUILD", imported=11, incidencias=0)
 
 
+class _FakeSettingsImportService:
+    def __init__(self, cliente_id: str = "cliente-1") -> None:
+        self.cliente_id = cliente_id
+
+    def resolve_igsa_cliente_id(self) -> str:
+        return self.cliente_id
+
+
 def test_import_services_build_messages_and_logs(tmp_path: Path) -> None:
     fake = _FakeSalesService()
-    service = SettingsSalesImportService(sales_service=fake)  # type: ignore[arg-type]
+    service = SettingsSalesImportService(
+        sales_service=fake,  # type: ignore[arg-type]
+        settings_import_service=_FakeSettingsImportService(),
+    )
 
     json_file = tmp_path / "ventas.json"
     json_file.write_text("[]", encoding="utf-8")
@@ -69,12 +80,12 @@ def test_import_services_build_messages_and_logs(tmp_path: Path) -> None:
     assert "Registros: 3" in igsa.message
     assert "Importacion IGSA OK" in igsa.log_message
 
-    pdf = service.import_igsa_pdf_lines([{"row": 1}], "cliente-1")
+    pdf = service.import_igsa_pdf_lines([{"row": 1}])
     assert pdf.ok is False
     assert "Filas omitidas: 2" in pdf.message
     assert "Importacion PDF IGSA ERROR" in pdf.log_message
 
-    book = service.import_igsa_workbook_lines([{"row": 1}], "cliente-1", force_reimport=True)
+    book = service.import_igsa_workbook_lines([{"row": 1}], force_reimport=True)
     assert book.ok is True
     assert "Registros: 7" in book.message
     assert "Filas omitidas: 3" in book.message
@@ -96,7 +107,10 @@ def test_import_services_build_messages_and_logs(tmp_path: Path) -> None:
 
 def test_validations_raise_value_error(tmp_path: Path) -> None:
     fake = _FakeSalesService()
-    service = SettingsSalesImportService(sales_service=fake)  # type: ignore[arg-type]
+    service = SettingsSalesImportService(
+        sales_service=fake,  # type: ignore[arg-type]
+        settings_import_service=_FakeSettingsImportService(),
+    )
 
     invalid_file = tmp_path / "ventas.txt"
     invalid_file.write_text("x", encoding="utf-8")
@@ -116,18 +130,22 @@ def test_validations_raise_value_error(tmp_path: Path) -> None:
         raise AssertionError("Expected ValueError for missing file")
 
     try:
-        service.import_igsa_pdf_lines([], "cliente-1")
+        service.import_igsa_pdf_lines([])
     except ValueError as exc:
         assert "vista previa" in str(exc).lower()
     else:
         raise AssertionError("Expected ValueError for empty lines")
 
+    no_client = SettingsSalesImportService(
+        sales_service=fake,  # type: ignore[arg-type]
+        settings_import_service=_FakeSettingsImportService(cliente_id=""),
+    )
     try:
-        service.import_igsa_workbook_lines([{"row": 1}], "")
+        no_client.import_igsa_workbook_lines([{"row": 1}])
     except ValueError as exc:
         assert "cliente/distribuidor" in str(exc).lower()
     else:
-        raise AssertionError("Expected ValueError for empty cliente_id")
+        raise AssertionError("Expected ValueError for unresolved IGSA client")
 
     try:
         service.rebuild_igsa_warehouse_movements("04-2026")

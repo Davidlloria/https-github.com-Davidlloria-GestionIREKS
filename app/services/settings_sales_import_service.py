@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from app.services.sales_reconciliation_service import SalesReconciliationService
+from app.services.settings_import_service import SettingsImportService
 
 
 @dataclass
@@ -19,8 +20,13 @@ class SettingsSalesImportOutcome:
 
 
 class SettingsSalesImportService:
-    def __init__(self, sales_service: SalesReconciliationService | None = None) -> None:
+    def __init__(
+        self,
+        sales_service: SalesReconciliationService | None = None,
+        settings_import_service: SettingsImportService | None = None,
+    ) -> None:
         self.sales_service = sales_service or SalesReconciliationService()
+        self.settings_import_service = settings_import_service or SettingsImportService()
 
     def import_ireks_json(self, source: Path) -> SettingsSalesImportOutcome:
         clean_source = self._validate_source(source, allowed_suffixes={".json"})
@@ -56,9 +62,9 @@ class SettingsSalesImportService:
             incidencias=incidencias,
         )
 
-    def import_igsa_pdf_lines(self, lines: list[object], cliente_id: str) -> SettingsSalesImportOutcome:
+    def import_igsa_pdf_lines(self, lines: list[object]) -> SettingsSalesImportOutcome:
         clean_lines = self._validate_lines(lines)
-        clean_cliente_id = self._validate_cliente_id(cliente_id)
+        clean_cliente_id = self._resolve_igsa_cliente_id()
         result = self.sales_service.import_igsa_pdf_lines(clean_lines, cliente_id=clean_cliente_id)
         text, imported, incidencias = self._build_message(
             result=result,
@@ -77,12 +83,11 @@ class SettingsSalesImportService:
     def import_igsa_workbook_lines(
         self,
         lines: list[object],
-        cliente_id: str,
         *,
         force_reimport: bool = False,
     ) -> SettingsSalesImportOutcome:
         clean_lines = self._validate_lines(lines)
-        clean_cliente_id = self._validate_cliente_id(cliente_id)
+        clean_cliente_id = self._resolve_igsa_cliente_id()
         result = self.sales_service.import_igsa_workbook_lines(
             clean_lines,
             cliente_id=clean_cliente_id,
@@ -136,8 +141,8 @@ class SettingsSalesImportService:
             raise ValueError("Primero carga los datos y revisa la vista previa.")
         return clean_lines
 
-    def _validate_cliente_id(self, cliente_id: str) -> str:
-        clean_cliente_id = str(cliente_id or "").strip()
+    def _resolve_igsa_cliente_id(self) -> str:
+        clean_cliente_id = str(self.settings_import_service.resolve_igsa_cliente_id() or "").strip()
         if not clean_cliente_id:
             raise ValueError("No se encontro el cliente/distribuidor IGSA.")
         return clean_cliente_id

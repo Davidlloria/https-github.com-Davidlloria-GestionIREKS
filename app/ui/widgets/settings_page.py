@@ -1422,7 +1422,10 @@ class SettingsPage(QWidget):
         self.sales_service = SalesReconciliationService()
         self.settings_import_service = SettingsImportService()
         self.settings_orders_import_service = SettingsOrdersImportService(self.settings_import_service)
-        self.settings_sales_import_service = SettingsSalesImportService(self.sales_service)
+        self.settings_sales_import_service = SettingsSalesImportService(
+            self.sales_service,
+            self.settings_import_service,
+        )
         self.settings_sales_preview_service = SettingsSalesPreviewService(self.sales_service, self.settings_import_service)
         self.settings_maintenance_service = SettingsMaintenanceService()
         self.settings_maintenance_ui_service = SettingsMaintenanceUiService(self.settings_maintenance_service)
@@ -2126,7 +2129,6 @@ class SettingsPage(QWidget):
         try:
             outcome = self.settings_sales_import_service.import_igsa_pdf_lines(
                 lines=lines,
-                cliente_id=self._resolve_igsa_cliente_id(),
             )
         except Exception as exc:
             QMessageBox.warning(self, "Importacion PDF IGSA", str(exc))
@@ -2154,9 +2156,6 @@ class SettingsPage(QWidget):
         else:
             QMessageBox.warning(self, outcome.title, outcome.message)
         self._append_log(outcome.log_message)
-
-    def _resolve_igsa_cliente_id(self) -> str:
-        return self.settings_import_service.resolve_igsa_cliente_id()
 
     def _preview_igsa_sales_workbook(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(
@@ -2274,7 +2273,6 @@ class SettingsPage(QWidget):
         try:
             outcome = self.settings_sales_import_service.import_igsa_workbook_lines(
                 lines=lines,
-                cliente_id=self._resolve_igsa_cliente_id(),
                 force_reimport=force_reimport,
             )
         except Exception as exc:

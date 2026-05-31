@@ -364,6 +364,11 @@ Fase 5 - Reducir dependencia del desktop.
     precio y parseo duplicado) que ya no participan en flujos activos;
   - se reduce acoplamiento del widget con reglas de importacion y se acota su
     responsabilidad a interaccion visual.
+- Resolucion IGSA centralizada en servicio de importacion de ventas:
+  - `app/services/settings_sales_import_service.py` resuelve internamente el
+    cliente/distribuidor IGSA via `SettingsImportService`;
+  - `app/ui/widgets/settings_page.py` deja de pasar `cliente_id` manualmente y
+    reduce acoplamiento entre widget y reglas de negocio.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;
