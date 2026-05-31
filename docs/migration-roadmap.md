@@ -220,6 +220,11 @@ Fase 4 - Migrar escrituras a React.
   - marcar/desmarcar ingredientes IREKS en lista desde la vista `Ingredientes`;
   - usa `PATCH /ingredients/ireks/{row_id}` con `articulo_status_en_lista`;
   - refresca listado/detalle tras guardar, con feedback de exito/error.
+- Octavo flujo de escritura en React:
+  - guardar umbral de stock en configuracion (`warehouse.low_stock_threshold_units`);
+  - usa `PUT /settings/api/warehouse`;
+  - valida en frontend valor numerico >= 0;
+  - refresca datos de proveedor tras guardar, con feedback de exito/error.
 
 ## Hoja de ruta
 

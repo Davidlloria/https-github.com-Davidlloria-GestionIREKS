@@ -50,3 +50,16 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
   }
   return (await response.json()) as T
 }
+
+export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(buildUrl(path), {
+    method: 'PUT',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || `Error HTTP ${response.status}`)
+  }
+  return (await response.json()) as T
+}

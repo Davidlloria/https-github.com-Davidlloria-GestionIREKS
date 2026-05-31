@@ -4,6 +4,7 @@ import {
   getMaintenanceStatus,
   listImportWarehouses,
   runMaintenanceIntegrityCheck,
+  saveApiProviderSettings,
 } from '../api/settings'
 import { QueryState } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
@@ -36,6 +37,10 @@ export function SettingsPage() {
   const [integrityRun, setIntegrityRun] = useState<MaintenanceResult | null>(null)
   const [integrityLoading, setIntegrityLoading] = useState(false)
   const [integrityError, setIntegrityError] = useState('')
+  const [warehouseThresholdInput, setWarehouseThresholdInput] = useState('')
+  const [warehouseSaveLoading, setWarehouseSaveLoading] = useState(false)
+  const [warehouseSaveMessage, setWarehouseSaveMessage] = useState('')
+  const [warehouseSaveError, setWarehouseSaveError] = useState('')
 
   const maintenanceQuery = useAsyncResource(() => getMaintenanceStatus(), null, [])
   const providerQuery = useAsyncResource(async () => {
@@ -62,6 +67,22 @@ export function SettingsPage() {
     })
   }, [] as ProviderRow[], [])
   const importsQuery = useAsyncResource(() => listImportWarehouses(), [], [])
+
+  const warehouseProvider = useMemo(
+    () => providerQuery.data.find((row) => row.provider === 'warehouse' && row.status === 'ok') ?? null,
+    [providerQuery.data],
+  )
+
+  const effectiveThresholdInput = useMemo(() => {
+    if (warehouseThresholdInput) {
+      return warehouseThresholdInput
+    }
+    const rawValue = warehouseProvider?.config?.low_stock_threshold_units
+    if (rawValue === undefined || rawValue === null) {
+      return ''
+    }
+    return String(rawValue)
+  }, [warehouseProvider, warehouseThresholdInput])
 
   const totals = useMemo(() => {
     if (!maintenanceQuery.data) {
@@ -101,6 +122,31 @@ export function SettingsPage() {
       setIntegrityError(error instanceof Error ? error.message : 'Error al ejecutar integridad')
     } finally {
       setIntegrityLoading(false)
+    }
+  }
+
+  const saveWarehouseThreshold = async () => {
+    if (warehouseSaveLoading) {
+      return
+    }
+    const numeric = Number.parseFloat(effectiveThresholdInput.replace(',', '.'))
+    if (!Number.isFinite(numeric) || numeric < 0) {
+      setWarehouseSaveError('El umbral debe ser numerico y mayor o igual que 0.')
+      setWarehouseSaveMessage('')
+      return
+    }
+    setWarehouseSaveLoading(true)
+    setWarehouseSaveError('')
+    setWarehouseSaveMessage('')
+    try {
+      await saveApiProviderSettings('warehouse', { low_stock_threshold_units: numeric })
+      await providerQuery.reload()
+      setWarehouseThresholdInput(String(numeric))
+      setWarehouseSaveMessage('Umbral de stock guardado.')
+    } catch (error: unknown) {
+      setWarehouseSaveError(error instanceof Error ? error.message : 'No se pudo guardar el umbral de stock.')
+    } finally {
+      setWarehouseSaveLoading(false)
     }
   }
 
@@ -217,6 +263,29 @@ export function SettingsPage() {
               </table>
             </div>
           )}
+
+          <div className="related-block">
+            <h3>Umbral de stock (warehouse)</h3>
+            <div className="toolbar">
+              <input
+                className="input"
+                value={effectiveThresholdInput}
+                onChange={(event) => setWarehouseThresholdInput(event.target.value)}
+                placeholder="Ej: 5"
+                disabled={warehouseSaveLoading}
+              />
+              <button
+                type="button"
+                className="action-btn"
+                onClick={saveWarehouseThreshold}
+                disabled={warehouseSaveLoading}
+              >
+                {warehouseSaveLoading ? 'Guardando...' : 'Guardar umbral'}
+              </button>
+            </div>
+            {!!warehouseSaveMessage && <div className="state">{warehouseSaveMessage}</div>}
+            {!!warehouseSaveError && <div className="state">Error: {warehouseSaveError}</div>}
+          </div>
         </div>
 
         <div className="detail-panel">
