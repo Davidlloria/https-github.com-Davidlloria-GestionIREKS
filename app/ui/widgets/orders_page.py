@@ -57,6 +57,7 @@ from app.services.import_service import ImportService
 from app.services.order_document_import_service import OrderDocumentImportService
 from app.services.order_document_parser import OrderDocumentParser
 from app.services.order_export_service import OrderExportService
+from app.services.orders_json_import_ui_service import OrdersJsonImportUiService
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderLineInput, OrderService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
@@ -1099,6 +1100,7 @@ class OrdersPage(QWidget):
         self.order_export_service = OrderExportService()
         self.order_query_service = OrderQueryService()
         self.order_service = OrderService()
+        self.orders_json_import_ui_service = OrdersJsonImportUiService(self.order_service)
         self.orders_mail_settings = OrdersMailSettingsService()
         self.rows: list[PedidoListRow] = []
         self._is_loading_details = False
@@ -2813,38 +2815,26 @@ class OrdersPage(QWidget):
         self._import_orders_from_json(source)
 
     def _import_orders_from_json(self, source: Path) -> None:
-        almacen_id = str(self.almacen_filter.currentData() or "").strip()
-        if not almacen_id:
-            selected = self._selected_row()
-            almacen_id = str(getattr(selected, "almacen_id", "") or "").strip() if selected else ""
-        if not almacen_id:
-            QMessageBox.warning(
-                self,
-                "Pedidos",
-                "Selecciona un Cliente/Distribuidor en el filtro para importar pedidos JSON.",
+        selected = self._selected_row()
+        selected_almacen = str(getattr(selected, "almacen_id", "") or "").strip() if selected else ""
+        try:
+            almacen_id = self.orders_json_import_ui_service.resolve_almacen_id(
+                filter_almacen_id=str(self.almacen_filter.currentData() or "").strip(),
+                selected_almacen_id=selected_almacen,
             )
+        except Exception as exc:
+            QMessageBox.warning(self, "Pedidos", str(exc))
             return
 
         try:
-            result = self.order_service.import_order_json(source, almacen_id)
+            outcome = self.orders_json_import_ui_service.import_orders_json(source, almacen_id)
         except Exception as exc:
             QMessageBox.warning(self, "Pedidos", str(exc))
             return
 
         self.reload()
-        self._select_by_id(result.pedido_id)
-        unknown_unique = sorted(set(result.skipped_unknown))
-        unknown_preview = ", ".join(unknown_unique[:10])
-        unknown_extra = "" if len(unknown_unique) <= 10 else f" ... (+{len(unknown_unique) - 10})"
-        summary = [
-            "Pedido importado: (sin numero)",
-            f"Lineas importadas: {result.imported_items}",
-            f"Lineas con codigo inexistente: {len(result.skipped_unknown)}",
-            f"Lineas invalidas: {result.skipped_invalid}",
-        ]
-        if unknown_unique:
-            summary.append(f"Codigos no encontrados: {unknown_preview}{unknown_extra}")
-        QMessageBox.information(self, "Importacion completada", "\n".join(summary))
+        self._select_by_id(outcome.pedido_id)
+        QMessageBox.information(self, "Importacion completada", "\n".join(outcome.summary_lines))
 
     def _show_import_selector(self) -> None:
         dialog = QMessageBox(self)

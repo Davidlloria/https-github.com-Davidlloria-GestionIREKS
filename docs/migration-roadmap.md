@@ -343,6 +343,11 @@ Fase 5 - Reducir dependencia del desktop.
     archivos de entrada y preparar datos de vista previa (PDF y libro IGSA);
   - `app/ui/widgets/settings_page.py` delega parseo/preparacion y mantiene solo
     renderizado de dialogos/tabla.
+- Extraccion del flujo de importacion JSON de pedidos desde `OrdersPage`:
+  - nueva capa `app/services/orders_json_import_ui_service.py` para resolver
+    almacen, validar archivo JSON y construir el resumen de importacion;
+  - `app/ui/widgets/orders_page.py` delega la importacion y conserva solo
+    refresco/seleccion y feedback visual.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;

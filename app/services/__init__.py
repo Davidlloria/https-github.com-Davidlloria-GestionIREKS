@@ -23,6 +23,7 @@ from app.services.report_export_service import ReportExportService
 from app.services.order_document_parser import OrderDocumentParser
 from app.services.order_document_import_service import OrderDocumentImportResult, OrderDocumentImportService
 from app.services.order_export_service import OrderExportService
+from app.services.orders_json_import_ui_service import OrdersJsonImportOutcome, OrdersJsonImportUiService
 from app.services.order_query_service import OrderListRow, OrderQueryService, WarehouseFilterOption
 from app.services.order_service import OrderItemsImportResult, OrderJsonImportResult, OrderLineInput, OrderService
 from app.services.technician_service import TechnicianService
@@ -91,6 +92,8 @@ __all__ = [
     "OrderDocumentImportResult",
     "OrderDocumentImportService",
     "OrderExportService",
+    "OrdersJsonImportUiService",
+    "OrdersJsonImportOutcome",
     "OrderListRow",
     "OrderQueryService",
     "WarehouseFilterOption",
