@@ -1,4 +1,4 @@
-import { apiGet, apiPatch } from './http'
+import { apiDelete, apiGet, apiPatch } from './http'
 import type {
   IngredientIreksListPayload,
   IngredientIreksRead,
@@ -27,6 +27,10 @@ export function updateIreksIngredient(
   },
 ) {
   return apiPatch<IngredientIreksRead>(`/ingredients/ireks/${rowId}`, payload)
+}
+
+export function deleteIreksIngredient(rowId: number) {
+  return apiDelete(`/ingredients/ireks/${rowId}`)
 }
 
 export function getIreksNutrition(articuloId: string) {
@@ -69,4 +73,8 @@ export function updateStdIngredient(
   },
 ) {
   return apiPatch<IngredientStdRead>(`/ingredients/std/${articuloId}`, payload)
+}
+
+export function deleteStdIngredient(articuloId: string) {
+  return apiDelete(`/ingredients/std/${articuloId}`)
 }

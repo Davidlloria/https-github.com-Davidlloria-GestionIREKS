@@ -242,6 +242,10 @@ Fase 4 - Migrar escrituras a React.
   - usa `POST /orders/{order_id}/items`, `PATCH /orders/items/{item_id}` y `DELETE /orders/items/{item_id}`;
   - valida `articulo_id` y `articulo_cantidad > 0` en frontend;
   - refresca detalle del pedido tras cada cambio, con feedback de exito/error.
+- Decimotercer flujo de escritura en React:
+  - eliminar ingredientes STD e IREKS desde la vista `Ingredientes` con confirmacion;
+  - usa `DELETE /ingredients/std/{articulo_id}` y `DELETE /ingredients/ireks/{row_id}`;
+  - muestra errores de conflicto cuando hay dependencias y refresca listados tras borrar.
 
 ## Hoja de ruta
 

@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
+  deleteIreksIngredient,
+  deleteStdIngredient,
   getIreksIngredientDetail,
   getIreksNutrition,
   getStdIngredientDetail,
@@ -73,6 +75,9 @@ export function IngredientsPage() {
   const [ireksActiveLoading, setIreksActiveLoading] = useState(false)
   const [ireksActiveMessage, setIreksActiveMessage] = useState('')
   const [ireksActiveError, setIreksActiveError] = useState('')
+  const [ireksDeleteLoading, setIreksDeleteLoading] = useState(false)
+  const [ireksDeleteMessage, setIreksDeleteMessage] = useState('')
+  const [ireksDeleteError, setIreksDeleteError] = useState('')
   const [ireksListLoading, setIreksListLoading] = useState(false)
   const [ireksListMessage, setIreksListMessage] = useState('')
   const [ireksListError, setIreksListError] = useState('')
@@ -81,6 +86,9 @@ export function IngredientsPage() {
   const [stdEditLoading, setStdEditLoading] = useState(false)
   const [stdEditMessage, setStdEditMessage] = useState('')
   const [stdEditError, setStdEditError] = useState('')
+  const [stdDeleteLoading, setStdDeleteLoading] = useState(false)
+  const [stdDeleteMessage, setStdDeleteMessage] = useState('')
+  const [stdDeleteError, setStdDeleteError] = useState('')
 
   const ireksQuery = useAsyncResource(
     () => listIreksIngredients(search, activityFilter),
@@ -277,6 +285,60 @@ export function IngredientsPage() {
     }
   }
 
+  const removeIreks = async () => {
+    const detail = ireksDetailQuery.data.detail
+    if (!detail || detail.id === null || ireksDeleteLoading) {
+      return
+    }
+    const confirmed = window.confirm(
+      `Se eliminara el ingrediente IREKS ${detail.articulo_referencia || detail.articulo_id}. Esta accion no se puede deshacer.`,
+    )
+    if (!confirmed) {
+      return
+    }
+    setIreksDeleteLoading(true)
+    setIreksDeleteError('')
+    setIreksDeleteMessage('')
+    try {
+      await deleteIreksIngredient(detail.id)
+      setSelectedIreksCandidateId('')
+      await Promise.all([ireksQuery.reload(), ireksDetailQuery.reload()])
+      setIreksDeleteMessage('Ingrediente IREKS eliminado correctamente.')
+    } catch (error: unknown) {
+      setIreksDeleteError(error instanceof Error ? error.message : 'No se pudo eliminar el ingrediente IREKS.')
+    } finally {
+      setIreksDeleteLoading(false)
+    }
+  }
+
+  const removeStd = async () => {
+    const detail = stdDetailQuery.data.detail
+    if (!detail || stdDeleteLoading) {
+      return
+    }
+    const confirmed = window.confirm(
+      `Se eliminara la materia prima ${detail.articulo_referencia_distribuidor || detail.articulo_id}. Esta accion no se puede deshacer.`,
+    )
+    if (!confirmed) {
+      return
+    }
+    setStdDeleteLoading(true)
+    setStdDeleteError('')
+    setStdDeleteMessage('')
+    try {
+      await deleteStdIngredient(detail.articulo_id)
+      setSelectedStdCandidateId('')
+      setStdEditTargetId('')
+      setStdEditForm(EMPTY_STD_EDIT_FORM)
+      await Promise.all([stdQuery.reload(), stdDetailQuery.reload()])
+      setStdDeleteMessage('Materia prima STD eliminada correctamente.')
+    } catch (error: unknown) {
+      setStdDeleteError(error instanceof Error ? error.message : 'No se pudo eliminar la materia prima STD.')
+    } finally {
+      setStdDeleteLoading(false)
+    }
+  }
+
   return (
     <section className="page-grid">
       <div className="segmented">
@@ -406,7 +468,7 @@ export function IngredientsPage() {
                       <button
                         type="button"
                         className="action-btn"
-                        disabled={ireksActiveLoading || ireksListLoading}
+                        disabled={ireksActiveLoading || ireksListLoading || ireksDeleteLoading}
                         onClick={toggleIreksActive}
                       >
                         {ireksActiveLoading
@@ -423,7 +485,7 @@ export function IngredientsPage() {
                       <button
                         type="button"
                         className="action-btn"
-                        disabled={ireksListLoading || ireksActiveLoading}
+                        disabled={ireksListLoading || ireksActiveLoading || ireksDeleteLoading}
                         onClick={toggleIreksInList}
                       >
                         {ireksListLoading
@@ -434,6 +496,19 @@ export function IngredientsPage() {
                       </button>
                       {!!ireksListMessage && <div className="state">{ireksListMessage}</div>}
                       {!!ireksListError && <div className="state">Error: {ireksListError}</div>}
+                    </div>
+
+                    <div className="related-block">
+                      <button
+                        type="button"
+                        className="action-btn"
+                        disabled={ireksDeleteLoading || ireksListLoading || ireksActiveLoading}
+                        onClick={removeIreks}
+                      >
+                        {ireksDeleteLoading ? 'Eliminando...' : 'Eliminar IREKS'}
+                      </button>
+                      {!!ireksDeleteMessage && <div className="state">{ireksDeleteMessage}</div>}
+                      {!!ireksDeleteError && <div className="state">Error: {ireksDeleteError}</div>}
                     </div>
 
                     {!!ireksDetailQuery.data.nutrition && (
@@ -567,7 +642,7 @@ export function IngredientsPage() {
                       <button
                         type="button"
                         className="action-btn"
-                        disabled={stdActiveLoading || stdEditLoading}
+                        disabled={stdActiveLoading || stdEditLoading || stdDeleteLoading}
                         onClick={toggleStdActive}
                       >
                         {stdActiveLoading
@@ -631,13 +706,23 @@ export function IngredientsPage() {
                           type="button"
                           className="action-btn"
                           onClick={saveStdEdition}
-                          disabled={stdEditLoading || stdActiveLoading}
+                          disabled={stdEditLoading || stdActiveLoading || stdDeleteLoading}
                         >
                           {stdEditLoading ? 'Guardando...' : 'Guardar cambios STD'}
+                        </button>
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={removeStd}
+                          disabled={stdEditLoading || stdActiveLoading || stdDeleteLoading}
+                        >
+                          {stdDeleteLoading ? 'Eliminando...' : 'Eliminar STD'}
                         </button>
                       </div>
                       {!!stdEditMessage && <div className="state">{stdEditMessage}</div>}
                       {!!stdEditError && <div className="state">Error: {stdEditError}</div>}
+                      {!!stdDeleteMessage && <div className="state">{stdDeleteMessage}</div>}
+                      {!!stdDeleteError && <div className="state">Error: {stdDeleteError}</div>}
                     </div>
 
                     {!!stdDetailQuery.data.nutrition && (
