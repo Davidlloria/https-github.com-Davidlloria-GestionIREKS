@@ -214,6 +214,20 @@ export interface OrderPendingRead {
   fecha_registro: string | null
 }
 
+export interface OrderJsonImportResponse {
+  pedido_id: string
+  imported_items: number
+  skipped_unknown: string[]
+  skipped_invalid: number
+}
+
+export interface OrderDocumentImportResponse {
+  imported: number
+  errors: string[]
+  already_imported: boolean
+  message: string
+}
+
 export interface MaintenanceStatus {
   db_path: string
   legacy_db_path: string

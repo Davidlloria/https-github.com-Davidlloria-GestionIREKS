@@ -1,5 +1,12 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from './http'
-import type { OrderItemRead, OrderListItem, OrderPendingRead, OrderRead } from '../types/api'
+import type {
+  OrderDocumentImportResponse,
+  OrderItemRead,
+  OrderJsonImportResponse,
+  OrderListItem,
+  OrderPendingRead,
+  OrderRead,
+} from '../types/api'
 
 interface ListOrdersFilters {
   year?: string
@@ -65,4 +72,16 @@ export function updateOrderItem(itemId: string, payload: { articulo_id: string; 
 
 export function deleteOrderItem(itemId: string) {
   return apiDelete(`/orders/items/${itemId}`)
+}
+
+export function importOrderJson(payload: { almacen_id: string; source_path: string }) {
+  return apiPost<OrderJsonImportResponse>('/orders/import/json', payload)
+}
+
+export function importOrderAlbaranPdf(orderId: string, payload: { source_path: string }) {
+  return apiPost<OrderDocumentImportResponse>(`/orders/${orderId}/import/albaran-pdf`, payload)
+}
+
+export function importOrderFacturaPdf(orderId: string, payload: { source_path: string }) {
+  return apiPost<OrderDocumentImportResponse>(`/orders/${orderId}/import/factura-pdf`, payload)
 }

@@ -5,6 +5,9 @@ import {
   deleteOrder,
   deleteOrderItem,
   getOrderDetail,
+  importOrderAlbaranPdf,
+  importOrderFacturaPdf,
+  importOrderJson,
   listOrderItems,
   listOrderPending,
   listOrders,
@@ -71,6 +74,16 @@ export function OrdersPage() {
   const [headerSaveLoading, setHeaderSaveLoading] = useState(false)
   const [headerSaveMessage, setHeaderSaveMessage] = useState('')
   const [headerSaveError, setHeaderSaveError] = useState('')
+  const [importJsonAlmacenId, setImportJsonAlmacenId] = useState('')
+  const [importJsonSourcePath, setImportJsonSourcePath] = useState('')
+  const [importJsonLoading, setImportJsonLoading] = useState(false)
+  const [importJsonMessage, setImportJsonMessage] = useState('')
+  const [importJsonError, setImportJsonError] = useState('')
+  const [importPdfSourcePath, setImportPdfSourcePath] = useState('')
+  const [importPdfType, setImportPdfType] = useState<'albaran' | 'factura'>('albaran')
+  const [importPdfLoading, setImportPdfLoading] = useState(false)
+  const [importPdfMessage, setImportPdfMessage] = useState('')
+  const [importPdfError, setImportPdfError] = useState('')
 
   const ordersQuery = useAsyncResource(
     () =>
@@ -320,6 +333,69 @@ export function OrdersPage() {
     }
   }
 
+  const runJsonImport = async () => {
+    if (importJsonLoading) {
+      return
+    }
+    const almacen = importJsonAlmacenId.trim()
+    const sourcePath = importJsonSourcePath.trim()
+    if (!almacen) {
+      setImportJsonError('Debes indicar almacen_id para importar JSON.')
+      setImportJsonMessage('')
+      return
+    }
+    if (!sourcePath) {
+      setImportJsonError('Debes indicar la ruta del archivo JSON en el servidor.')
+      setImportJsonMessage('')
+      return
+    }
+    setImportJsonLoading(true)
+    setImportJsonError('')
+    setImportJsonMessage('')
+    try {
+      const result = await importOrderJson({ almacen_id: almacen, source_path: sourcePath })
+      await ordersQuery.reload()
+      if (result.pedido_id) {
+        setSelectedCandidateId(result.pedido_id)
+      }
+      setImportJsonMessage(
+        `Importacion JSON completada: ${result.imported_items} linea(s) importadas, ${result.skipped_invalid} invalida(s), ${result.skipped_unknown.length} desconocida(s).`,
+      )
+    } catch (error: unknown) {
+      setImportJsonError(error instanceof Error ? error.message : 'No se pudo importar el JSON de pedido.')
+    } finally {
+      setImportJsonLoading(false)
+    }
+  }
+
+  const runPdfImport = async () => {
+    if (!selectedOrder || importPdfLoading) {
+      return
+    }
+    const sourcePath = importPdfSourcePath.trim()
+    if (!sourcePath) {
+      setImportPdfError('Debes indicar la ruta del PDF en el servidor.')
+      setImportPdfMessage('')
+      return
+    }
+    setImportPdfLoading(true)
+    setImportPdfError('')
+    setImportPdfMessage('')
+    try {
+      const result = importPdfType === 'albaran'
+        ? await importOrderAlbaranPdf(selectedOrder.pedido_id, { source_path: sourcePath })
+        : await importOrderFacturaPdf(selectedOrder.pedido_id, { source_path: sourcePath })
+      await Promise.all([ordersQuery.reload(), detailQuery.reload()])
+      setImportPdfMessage(
+        `${importPdfType === 'albaran' ? 'Albaran' : 'Factura'} importado: ${result.imported} linea(s). ${result.message || ''}`.trim(),
+      )
+    } catch (error: unknown) {
+      setImportPdfError(error instanceof Error ? error.message : 'No se pudo importar el PDF.')
+    } finally {
+      setImportPdfLoading(false)
+    }
+  }
+
   return (
     <section className="page-grid">
       <div className="toolbar">
@@ -409,6 +485,76 @@ export function OrdersPage() {
         </div>
         {!!createMessage && <div className="state">{createMessage}</div>}
         {!!createError && <div className="state">Error: {createError}</div>}
+      </div>
+
+      <div className="detail-panel">
+        <h3>Importar pedidos</h3>
+        <div className="form-grid">
+          <label>
+            Almacen ID (JSON)
+            <input
+              className="input"
+              value={importJsonAlmacenId}
+              onChange={(event) => setImportJsonAlmacenId(event.target.value)}
+              placeholder="Ej: ALM-01"
+              disabled={importJsonLoading}
+            />
+          </label>
+          <label>
+            Ruta JSON en servidor
+            <input
+              className="input"
+              value={importJsonSourcePath}
+              onChange={(event) => setImportJsonSourcePath(event.target.value)}
+              placeholder="E:\\datos\\pedido.json"
+              disabled={importJsonLoading}
+            />
+          </label>
+        </div>
+        <div className="toolbar">
+          <button type="button" className="action-btn" onClick={runJsonImport} disabled={importJsonLoading}>
+            {importJsonLoading ? 'Importando JSON...' : 'Importar JSON'}
+          </button>
+        </div>
+        {!!importJsonMessage && <div className="state">{importJsonMessage}</div>}
+        {!!importJsonError && <div className="state">Error: {importJsonError}</div>}
+
+        <div className="form-grid">
+          <label>
+            Tipo PDF
+            <select
+              className="select"
+              value={importPdfType}
+              onChange={(event) => setImportPdfType(event.target.value === 'factura' ? 'factura' : 'albaran')}
+              disabled={importPdfLoading}
+            >
+              <option value="albaran">Albaran</option>
+              <option value="factura">Factura</option>
+            </select>
+          </label>
+          <label>
+            Ruta PDF en servidor (pedido seleccionado)
+            <input
+              className="input"
+              value={importPdfSourcePath}
+              onChange={(event) => setImportPdfSourcePath(event.target.value)}
+              placeholder="E:\\datos\\albaran.pdf"
+              disabled={importPdfLoading}
+            />
+          </label>
+        </div>
+        <div className="toolbar">
+          <button
+            type="button"
+            className="action-btn"
+            onClick={runPdfImport}
+            disabled={importPdfLoading || !selectedOrder}
+          >
+            {importPdfLoading ? 'Importando PDF...' : 'Importar PDF'}
+          </button>
+        </div>
+        {!!importPdfMessage && <div className="state">{importPdfMessage}</div>}
+        {!!importPdfError && <div className="state">Error: {importPdfError}</div>}
       </div>
 
       <QueryState

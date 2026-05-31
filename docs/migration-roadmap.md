@@ -270,6 +270,10 @@ Fase 4 - Migrar escrituras a React.
   - CRUD de tarifas IREKS desde la vista `Ingredientes`;
   - usa `POST /ingredients/ireks/tarifas`, `PATCH /ingredients/ireks/tarifas/{tarifa_id}` y `DELETE /ingredients/ireks/tarifas/{tarifa_id}`;
   - permite crear, editar y eliminar tarifas con feedback de exito/error.
+- Vigesimo flujo de escritura en React:
+  - importacion de pedidos JSON y documentos PDF desde la vista `Pedidos`;
+  - usa `POST /orders/import/json`, `POST /orders/{order_id}/import/albaran-pdf` y `POST /orders/{order_id}/import/factura-pdf`;
+  - valida rutas/almacen en frontend y refresca listados tras importar.
 
 ## Hoja de ruta
 
