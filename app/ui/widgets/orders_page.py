@@ -2858,68 +2858,12 @@ class OrdersPage(QWidget):
         if clicked == btn_items:
             self._import_order_items()
 
-    def _items_schema(self) -> list[dict]:
-        return [
-            {"name": "pedido_id", "label": "Pedido_ID"},
-            {"name": "articulo_id", "label": "Articulo_ID"},
-            {"name": "articulo_cantidad", "label": "Articulo_Cantidad"},
-        ]
-
-    def _albaran_items_schema(self) -> list[dict]:
-        return [
-            {"name": "albaran_numero", "label": "Albaran_Numero"},
-            {"name": "albaran_fecha", "label": "Albaran_Fecha"},
-            {"name": "pedido_numero", "label": "Nº Pedido"},
-            {"name": "articulo_codigo", "label": "Codigo articulo"},
-            {"name": "articulo_cantidad", "label": "Articulo_Cantidad"},
-            {"name": "articulo_kilos", "label": "Kilos"},
-            {"name": "articulo_lote", "label": "Articulo_Lote"},
-            {"name": "articulo_caducidad", "label": "Articulo_Caducidad"},
-        ]
-
-    def _factura_items_schema(self) -> list[dict]:
-        return [
-            {"name": "factura_numero", "label": "Factura_Numero"},
-            {"name": "factura_fecha", "label": "Factura_Fecha"},
-            {"name": "albaran_numero", "label": "Albaran_Numero"},
-            {"name": "factura_referencia", "label": "Referencia"},
-            {"name": "articulo_codigo", "label": "Codigo articulo"},
-            {"name": "articulo_descripcion", "label": "Descripcion"},
-            {"name": "articulo_cantidad", "label": "Uds"},
-            {"name": "articulo_envase", "label": "Env"},
-            {"name": "articulo_kilos", "label": "Kg/Lit"},
-            {"name": "articulo_lote", "label": "Articulo_Lote"},
-            {"name": "articulo_caducidad", "label": "Articulo_Caducidad"},
-            {"name": "precio_unitario", "label": "Precio"},
-            {"name": "dto_pct", "label": "Dto"},
-            {"name": "iva_pct", "label": "IVA"},
-            {"name": "total_linea", "label": "Total"},
-        ]
-
-    def _extract_pdf_field(self, text: str, patterns: list[str]) -> str:
-        for pattern in patterns:
-            match = re.search(pattern, text, flags=re.IGNORECASE)
-            if match:
-                return str(match.group(1) or "").strip()
-        return ""
-
     def _parse_albaran_pdf(self, file_path: Path) -> tuple[dict[str, str], list[dict[str, Any]]]:
         return OrderDocumentParser.parse_albaran_pdf(file_path)
 
     def _confirm_albaran_preview(self, header: dict[str, str], rows: list[dict[str, Any]]) -> bool:
         dialog = AlbaranPreviewDialog(header=header, items=rows, parent=self)
         return dialog.exec() == QDialog.DialogCode.Accepted
-
-    @staticmethod
-    def _normalize_invoice_number_token(value: str) -> str:
-        return OrderDocumentParser.normalize_invoice_number_token(value)
-
-    @staticmethod
-    def _parse_factura_ocr_article_line(text: str, header: dict[str, str], lote: str, caducidad: str) -> dict[str, Any] | None:
-        return OrderDocumentParser.parse_factura_ocr_article_line(text, header, lote, caducidad)
-
-    def _parse_factura_pdf(self, file_path: Path) -> tuple[dict[str, str], list[dict[str, Any]]]:
-        return OrderDocumentParser.parse_factura_pdf(file_path)
 
     def _confirm_factura_preview(self, header: dict[str, str], rows: list[dict[str, Any]]) -> bool:
         dialog = FacturaPreviewDialog(header=header, items=rows, parent=self)
@@ -3015,33 +2959,6 @@ class OrdersPage(QWidget):
             if not str(getattr(article, field_name, "") or "").strip():
                 return True
         return False
-
-    def _find_article_by_code(self, session: Any, codigo: str) -> IngredienteIreks | None:
-        return self.order_document_import_service.find_article_by_code(session, codigo)
-
-    def _resolve_factura_price(
-        self,
-        session: Any,
-        article: IngredienteIreks | None,
-        factura_fecha: date,
-        pdf_price: float,
-        *,
-        create_missing: bool = True,
-    ) -> float:
-        return self.order_document_import_service.resolve_factura_price(session, article, factura_fecha, pdf_price)
-
-    def _find_tarifa_price(self, session: Any, articulo_id: str, tarifa_ano: int, formato_kg: float) -> float:
-        return self.order_document_import_service.find_tarifa_price(session, articulo_id, tarifa_ano, formato_kg)
-
-    def _enrich_factura_rows_from_tarifa(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return self.order_document_import_service.enrich_factura_rows_from_tarifa(rows)
-
-    def _infer_factura_price_from_total(self, payload: dict[str, Any], kilos: float, dto: float) -> float:
-        return self.order_document_import_service.infer_factura_price_from_total(payload, kilos, dto)
-
-    @staticmethod
-    def _article_code_candidates(codigo: str) -> list[str]:
-        return OrderDocumentParser.article_code_candidates(codigo)
 
     def _import_order_items(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(

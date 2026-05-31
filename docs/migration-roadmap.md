@@ -359,6 +359,11 @@ Fase 5 - Reducir dependencia del desktop.
     y mapear resultados de importacion (exito/incidencias/ya importado);
   - `app/ui/widgets/orders_page.py` delega esta logica y mantiene confirmacion
     de vista previa, recarga y mensajes de interfaz.
+- Limpieza de deuda tecnica en `OrdersPage` tras la extraccion:
+  - eliminados helpers legacy sin uso (schemas/normalizadores/wrappers de
+    precio y parseo duplicado) que ya no participan en flujos activos;
+  - se reduce acoplamiento del widget con reglas de importacion y se acota su
+    responsabilidad a interaccion visual.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;
