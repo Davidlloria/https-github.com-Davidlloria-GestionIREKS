@@ -40,6 +40,7 @@ from app.services.settings_orders_import_service import SettingsOrdersImportServ
 from app.services.settings_import_service import SettingsImportService
 from app.services.settings_maintenance_service import SettingsMaintenanceService
 from app.services.settings_provider_service import SettingsProviderService
+from app.services.settings_sales_import_service import SettingsSalesImportService
 from app.ui.widgets.db_export_console_tab import DbExportConsoleTab
 from app.ui.widgets.db_import_console_tab import DbImportConsoleTab
 from app.ui.widgets.entity_dialog import EntityDialog
@@ -1419,6 +1420,7 @@ class SettingsPage(QWidget):
         self.sales_service = SalesReconciliationService()
         self.settings_import_service = SettingsImportService()
         self.settings_orders_import_service = SettingsOrdersImportService(self.settings_import_service)
+        self.settings_sales_import_service = SettingsSalesImportService(self.sales_service)
         self.settings_maintenance_service = SettingsMaintenanceService()
         self._igsa_pdf_preview_lines: list[object] = []
         self._igsa_book_preview_lines: list[object] = []
@@ -2150,44 +2152,37 @@ class SettingsPage(QWidget):
 
     def _import_igsa_sales_pdf_preview(self, close_dialog: QDialog | None = None) -> None:
         lines = self._igsa_pdf_preview_lines if isinstance(self._igsa_pdf_preview_lines, list) else []
-        if not lines:
-            QMessageBox.warning(self, "Importacion PDF IGSA", "Primero carga los PDFs y revisa la vista previa.")
+        try:
+            outcome = self.settings_sales_import_service.import_igsa_pdf_lines(
+                lines=lines,
+                cliente_id=self._resolve_igsa_cliente_id(),
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "Importacion PDF IGSA", str(exc))
             return
-        igsa_cliente_id = self._resolve_igsa_cliente_id()
-        if not igsa_cliente_id:
-            QMessageBox.warning(self, "Importacion PDF IGSA", "No se encontro el cliente/distribuidor IGSA.")
-            return
-        result = self.sales_service.import_igsa_pdf_lines(lines, cliente_id=igsa_cliente_id)
-        text = result.message
-        if getattr(result, "imported", 0):
-            text += f"\nRegistros: {int(result.imported)}"
-        if getattr(result, "incidencias", 0):
-            text += f"\nFilas omitidas: {int(result.incidencias)}"
-        if result.ok:
-            QMessageBox.information(self, "Importacion PDF IGSA", text)
-            self._append_log(f"Importacion PDF IGSA OK: {text.replace(chr(10), ' | ')}")
+        if outcome.ok:
+            QMessageBox.information(self, outcome.title, outcome.message)
+            self._append_log(outcome.log_message)
             if close_dialog is not None:
                 close_dialog.accept()
         else:
-            QMessageBox.warning(self, "Importacion PDF IGSA", text)
-            self._append_log(f"Importacion PDF IGSA ERROR: {text.replace(chr(10), ' | ')}")
+            QMessageBox.warning(self, outcome.title, outcome.message)
+            self._append_log(outcome.log_message)
 
     def _import_ireks_sales_json(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(self, "Seleccionar JSON IREKS", "", "JSON (*.json)")
         if not file_path:
             return
-        result = self.sales_service.import_ireks_json(Path(file_path))
-        text = result.message
-        if getattr(result, "imported", 0):
-            text += f"\nRegistros: {int(result.imported)}"
-        if getattr(result, "incidencias", 0):
-            text += f"\nFilas omitidas: {int(result.incidencias)}"
-        if result.ok:
-            QMessageBox.information(self, "Importacion ventas IREKS", text)
-            self._append_log(f"Importacion IREKS OK: {text.replace(chr(10), ' | ')}")
+        try:
+            outcome = self.settings_sales_import_service.import_ireks_json(Path(file_path))
+        except Exception as exc:
+            QMessageBox.warning(self, "Importacion ventas IREKS", str(exc))
+            return
+        if outcome.ok:
+            QMessageBox.information(self, outcome.title, outcome.message)
         else:
-            QMessageBox.warning(self, "Importacion ventas IREKS", text)
-            self._append_log(f"Importacion IREKS ERROR: {text.replace(chr(10), ' | ')}")
+            QMessageBox.warning(self, outcome.title, outcome.message)
+        self._append_log(outcome.log_message)
 
     def _resolve_igsa_cliente_id(self) -> str:
         return self.settings_import_service.resolve_igsa_cliente_id()
@@ -2310,33 +2305,25 @@ class SettingsPage(QWidget):
         force_reimport: bool = False,
     ) -> None:
         lines = self._igsa_book_preview_lines if isinstance(self._igsa_book_preview_lines, list) else []
-        if not lines:
-            QMessageBox.warning(self, "Importacion IGSA libro", "Primero carga el libro y revisa la vista previa.")
+        try:
+            outcome = self.settings_sales_import_service.import_igsa_workbook_lines(
+                lines=lines,
+                cliente_id=self._resolve_igsa_cliente_id(),
+                force_reimport=force_reimport,
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "Importacion IGSA libro", str(exc))
             return
-        igsa_cliente_id = self._resolve_igsa_cliente_id()
-        if not igsa_cliente_id:
-            QMessageBox.warning(self, "Importacion IGSA libro", "No se encontro el cliente/distribuidor IGSA.")
-            return
-        result = self.sales_service.import_igsa_workbook_lines(
-            lines,
-            cliente_id=igsa_cliente_id,
-            force_reimport=force_reimport,
-        )
-        text = result.message
-        if getattr(result, "imported", 0):
-            text += f"\nRegistros: {int(result.imported)}"
-        if getattr(result, "incidencias", 0):
-            text += f"\nFilas omitidas: {int(result.incidencias)}"
-        if result.ok:
-            wants_reimport = self._show_igsa_book_import_result_dialog(text)
-            self._append_log(f"Importacion IGSA libro OK: {text.replace(chr(10), ' | ')}")
+        if outcome.ok:
+            wants_reimport = self._show_igsa_book_import_result_dialog(outcome.message)
+            self._append_log(outcome.log_message)
             if close_dialog is not None:
                 close_dialog.accept()
             if wants_reimport:
                 self._import_igsa_sales_workbook_preview(force_reimport=True)
         else:
-            QMessageBox.warning(self, "Importacion IGSA libro", text)
-            self._append_log(f"Importacion IGSA libro ERROR: {text.replace(chr(10), ' | ')}")
+            QMessageBox.warning(self, outcome.title, outcome.message)
+            self._append_log(outcome.log_message)
 
     def _import_igsa_sales_excel(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(
@@ -2347,18 +2334,16 @@ class SettingsPage(QWidget):
         )
         if not file_path:
             return
-        result = self.sales_service.import_igsa_excel(Path(file_path))
-        text = result.message
-        if getattr(result, "imported", 0):
-            text += f"\nRegistros: {int(result.imported)}"
-        if getattr(result, "incidencias", 0):
-            text += f"\nFilas omitidas: {int(result.incidencias)}"
-        if result.ok:
-            QMessageBox.information(self, "Importacion ventas IGSA", text)
-            self._append_log(f"Importacion IGSA OK: {text.replace(chr(10), ' | ')}")
+        try:
+            outcome = self.settings_sales_import_service.import_igsa_excel(Path(file_path))
+        except Exception as exc:
+            QMessageBox.warning(self, "Importacion ventas IGSA", str(exc))
+            return
+        if outcome.ok:
+            QMessageBox.information(self, outcome.title, outcome.message)
         else:
-            QMessageBox.warning(self, "Importacion ventas IGSA", text)
-            self._append_log(f"Importacion IGSA ERROR: {text.replace(chr(10), ' | ')}")
+            QMessageBox.warning(self, outcome.title, outcome.message)
+        self._append_log(outcome.log_message)
 
     def _rebuild_igsa_warehouse_movements(self) -> None:
         periodo, ok = QInputDialog.getText(
@@ -2368,17 +2353,16 @@ class SettingsPage(QWidget):
         )
         if not ok:
             return
-        clean_periodo = str(periodo or "").strip()
-        result = self.sales_service.rebuild_igsa_warehouse_movements(clean_periodo)
-        text = result.message
-        if getattr(result, "imported", 0):
-            text += f"\nFilas procesadas: {int(result.imported)}"
-        if result.ok:
-            QMessageBox.information(self, "Regenerar salidas IGSA", text)
-            self._append_log(f"Regenerar IGSA OK: {text.replace(chr(10), ' | ')}")
+        try:
+            outcome = self.settings_sales_import_service.rebuild_igsa_warehouse_movements(str(periodo or "").strip())
+        except Exception as exc:
+            QMessageBox.warning(self, "Regenerar salidas IGSA", str(exc))
+            return
+        if outcome.ok:
+            QMessageBox.information(self, outcome.title, outcome.message)
         else:
-            QMessageBox.warning(self, "Regenerar salidas IGSA", text)
-            self._append_log(f"Regenerar IGSA ERROR: {text.replace(chr(10), ' | ')}")
+            QMessageBox.warning(self, outcome.title, outcome.message)
+        self._append_log(outcome.log_message)
 
     def _save_fdc_settings(self) -> None:
         key = self.fdc_api_key_input.text().strip() if hasattr(self, "fdc_api_key_input") else ""

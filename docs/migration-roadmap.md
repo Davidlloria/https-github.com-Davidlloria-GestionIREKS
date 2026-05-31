@@ -332,6 +332,12 @@ Fase 5 - Reducir dependencia del desktop.
     de entrada y generacion de resumen/log reutilizable;
   - `app/ui/widgets/settings_page.py` delega la importacion y solo muestra el
     resultado en interfaz.
+- Extraccion de flujos de importacion/reproceso de ventas IGSA/IREKS fuera de
+  UI desktop:
+  - nueva capa `app/services/settings_sales_import_service.py` para validar
+    entradas, ejecutar importaciones y formatear mensaje/log de resultados;
+  - `app/ui/widgets/settings_page.py` delega importacion IREKS JSON, IGSA Excel,
+    IGSA PDF, IGSA libro y regeneracion de salidas de almacen.
 
 ## Hoja de ruta
 
