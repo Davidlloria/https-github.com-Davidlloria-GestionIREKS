@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch } from './http'
+import { apiDelete, apiGet, apiPatch, apiPost } from './http'
 import type {
   IngredientIreksListPayload,
   IngredientIreksRead,
@@ -43,6 +43,32 @@ export function getIreksNutrition(articuloId: string) {
 
 export function listIreksTarifas(articuloId: string) {
   return apiGet<TarifaPrecioIreksRead[]>(`/ingredients/ireks/${articuloId}/tarifas`)
+}
+
+export function createIreksTarifa(payload: {
+  articulo_id: string
+  tarifa_ano: number
+  precio_fabricante: number
+  precio_distribuidor: number
+  descuento_pct: number
+}) {
+  return apiPost<TarifaPrecioIreksRead>('/ingredients/ireks/tarifas', payload)
+}
+
+export function updateIreksTarifa(
+  tarifaId: number,
+  payload: {
+    tarifa_ano: number
+    precio_fabricante: number
+    precio_distribuidor: number
+    descuento_pct: number
+  },
+) {
+  return apiPatch<TarifaPrecioIreksRead>(`/ingredients/ireks/tarifas/${tarifaId}`, payload)
+}
+
+export function deleteIreksTarifa(tarifaId: number) {
+  return apiDelete(`/ingredients/ireks/tarifas/${tarifaId}`)
 }
 
 export function listStdIngredients(search: string, activityFilter: string) {

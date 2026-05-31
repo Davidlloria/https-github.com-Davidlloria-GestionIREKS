@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
+  createIreksTarifa,
+  deleteIreksTarifa,
   deleteIreksIngredient,
   deleteStdIngredient,
   getIreksIngredientDetail,
@@ -11,6 +13,7 @@ import {
   listStdIngredients,
   listStdPrices,
   updateIreksIngredient,
+  updateIreksTarifa,
   updateStdActive,
   updateStdIngredient,
 } from '../api/ingredients'
@@ -52,6 +55,13 @@ interface IreksEditForm {
   categoria: string
 }
 
+interface IreksTarifaForm {
+  tarifa_ano: string
+  precio_fabricante: string
+  precio_distribuidor: string
+  descuento_pct: string
+}
+
 const EMPTY_IREKS_DETAIL: IreksDetailPayload = {
   detail: null,
   nutrition: null,
@@ -75,6 +85,13 @@ const EMPTY_IREKS_EDIT_FORM: IreksEditForm = {
   articulo_referencia_corta: '',
   articulo_descripcion: '',
   categoria: '',
+}
+
+const EMPTY_IREKS_TARIFA_FORM: IreksTarifaForm = {
+  tarifa_ano: '',
+  precio_fabricante: '',
+  precio_distribuidor: '',
+  descuento_pct: '',
 }
 
 export function IngredientsPage() {
@@ -108,6 +125,11 @@ export function IngredientsPage() {
   const [ireksEditLoading, setIreksEditLoading] = useState(false)
   const [ireksEditMessage, setIreksEditMessage] = useState('')
   const [ireksEditError, setIreksEditError] = useState('')
+  const [selectedIreksTarifaId, setSelectedIreksTarifaId] = useState<number | null>(null)
+  const [ireksTarifaForm, setIreksTarifaForm] = useState<IreksTarifaForm>(EMPTY_IREKS_TARIFA_FORM)
+  const [ireksTarifaLoading, setIreksTarifaLoading] = useState(false)
+  const [ireksTarifaMessage, setIreksTarifaMessage] = useState('')
+  const [ireksTarifaError, setIreksTarifaError] = useState('')
 
   const ireksQuery = useAsyncResource(
     () => listIreksIngredients(search, activityFilter),
@@ -207,6 +229,14 @@ export function IngredientsPage() {
     }
     return ireksEditForm
   }, [ireksDetailQuery.data.detail, ireksEditForm, ireksEditTargetId])
+
+  const selectedIreksTarifa = useMemo(
+    () =>
+      ireksDetailQuery.data.tarifas.find(
+        (tarifa) => tarifa.id !== null && tarifa.id === selectedIreksTarifaId,
+      ) ?? null,
+    [ireksDetailQuery.data.tarifas, selectedIreksTarifaId],
+  )
 
   const formatWeight = (value: unknown) => {
     const numeric = Number(value)
@@ -407,6 +437,99 @@ export function IngredientsPage() {
       setIreksEditError(error instanceof Error ? error.message : 'No se pudo actualizar el ingrediente IREKS.')
     } finally {
       setIreksEditLoading(false)
+    }
+  }
+
+  const resetIreksTarifaForm = () => {
+    setSelectedIreksTarifaId(null)
+    setIreksTarifaForm(EMPTY_IREKS_TARIFA_FORM)
+  }
+
+  const onSelectIreksTarifa = (tarifa: TarifaPrecioIreksRead) => {
+    setSelectedIreksTarifaId(tarifa.id ?? null)
+    setIreksTarifaForm({
+      tarifa_ano: String(tarifa.tarifa_ano ?? ''),
+      precio_fabricante: String(tarifa.precio_fabricante ?? 0),
+      precio_distribuidor: String(tarifa.precio_distribuidor ?? 0),
+      descuento_pct: String(tarifa.descuento_pct ?? 0),
+    })
+    setIreksTarifaMessage('')
+    setIreksTarifaError('')
+  }
+
+  const saveIreksTarifa = async () => {
+    const detail = ireksDetailQuery.data.detail
+    if (!detail || ireksTarifaLoading) {
+      return
+    }
+    const year = Number.parseInt(ireksTarifaForm.tarifa_ano, 10)
+    const fabricante = Number.parseFloat(ireksTarifaForm.precio_fabricante.replace(',', '.'))
+    const distribuidor = Number.parseFloat(ireksTarifaForm.precio_distribuidor.replace(',', '.'))
+    const descuento = Number.parseFloat(ireksTarifaForm.descuento_pct.replace(',', '.'))
+
+    if (!Number.isFinite(year) || year <= 0) {
+      setIreksTarifaError('El ano de tarifa debe ser numerico y mayor que 0.')
+      setIreksTarifaMessage('')
+      return
+    }
+    if (!Number.isFinite(fabricante) || !Number.isFinite(distribuidor) || !Number.isFinite(descuento)) {
+      setIreksTarifaError('Precios y descuento deben ser valores numericos validos.')
+      setIreksTarifaMessage('')
+      return
+    }
+
+    setIreksTarifaLoading(true)
+    setIreksTarifaError('')
+    setIreksTarifaMessage('')
+    try {
+      const payload = {
+        tarifa_ano: year,
+        precio_fabricante: fabricante,
+        precio_distribuidor: distribuidor,
+        descuento_pct: descuento,
+      }
+      const saved = selectedIreksTarifa && selectedIreksTarifa.id !== null
+        ? await updateIreksTarifa(selectedIreksTarifa.id, payload)
+        : await createIreksTarifa({
+          articulo_id: detail.articulo_id,
+          ...payload,
+        })
+      await ireksDetailQuery.reload()
+      setSelectedIreksTarifaId(saved.id ?? null)
+      setIreksTarifaForm({
+        tarifa_ano: String(saved.tarifa_ano ?? ''),
+        precio_fabricante: String(saved.precio_fabricante ?? 0),
+        precio_distribuidor: String(saved.precio_distribuidor ?? 0),
+        descuento_pct: String(saved.descuento_pct ?? 0),
+      })
+      setIreksTarifaMessage(selectedIreksTarifa ? 'Tarifa actualizada.' : 'Tarifa creada.')
+    } catch (error: unknown) {
+      setIreksTarifaError(error instanceof Error ? error.message : 'No se pudo guardar la tarifa IREKS.')
+    } finally {
+      setIreksTarifaLoading(false)
+    }
+  }
+
+  const removeIreksTarifa = async () => {
+    if (!selectedIreksTarifa || selectedIreksTarifa.id === null || ireksTarifaLoading) {
+      return
+    }
+    const confirmed = window.confirm('Se eliminara la tarifa seleccionada. Esta accion no se puede deshacer.')
+    if (!confirmed) {
+      return
+    }
+    setIreksTarifaLoading(true)
+    setIreksTarifaError('')
+    setIreksTarifaMessage('')
+    try {
+      await deleteIreksTarifa(selectedIreksTarifa.id)
+      await ireksDetailQuery.reload()
+      resetIreksTarifaForm()
+      setIreksTarifaMessage('Tarifa eliminada.')
+    } catch (error: unknown) {
+      setIreksTarifaError(error instanceof Error ? error.message : 'No se pudo eliminar la tarifa IREKS.')
+    } finally {
+      setIreksTarifaLoading(false)
     }
   }
 
@@ -693,7 +816,11 @@ export function IngredientsPage() {
                             </thead>
                             <tbody>
                               {ireksDetailQuery.data.tarifas.slice(0, 8).map((tarifa) => (
-                                <tr key={tarifa.id ?? `${tarifa.articulo_id}-${tarifa.tarifa_ano}`}>
+                                <tr
+                                  key={tarifa.id ?? `${tarifa.articulo_id}-${tarifa.tarifa_ano}`}
+                                  className={tarifa.id !== null && tarifa.id === selectedIreksTarifaId ? 'row-selected' : ''}
+                                  onClick={() => onSelectIreksTarifa(tarifa)}
+                                >
                                   <td>{tarifa.tarifa_ano}</td>
                                   <td>{formatWeight(tarifa.precio_fabricante)}</td>
                                   <td>{formatWeight(tarifa.precio_distribuidor)}</td>
@@ -704,6 +831,81 @@ export function IngredientsPage() {
                           </table>
                         </div>
                       )}
+                      <div className="form-grid">
+                        <label>
+                          Ano
+                          <input
+                            className="input"
+                            value={ireksTarifaForm.tarifa_ano}
+                            onChange={(event) =>
+                              setIreksTarifaForm((prev) => ({ ...prev, tarifa_ano: event.target.value }))
+                            }
+                            disabled={ireksTarifaLoading}
+                            placeholder="Ej: 2026"
+                          />
+                        </label>
+                        <label>
+                          Precio fabricante
+                          <input
+                            className="input"
+                            value={ireksTarifaForm.precio_fabricante}
+                            onChange={(event) =>
+                              setIreksTarifaForm((prev) => ({ ...prev, precio_fabricante: event.target.value }))
+                            }
+                            disabled={ireksTarifaLoading}
+                          />
+                        </label>
+                        <label>
+                          Precio distribuidor
+                          <input
+                            className="input"
+                            value={ireksTarifaForm.precio_distribuidor}
+                            onChange={(event) =>
+                              setIreksTarifaForm((prev) => ({ ...prev, precio_distribuidor: event.target.value }))
+                            }
+                            disabled={ireksTarifaLoading}
+                          />
+                        </label>
+                        <label>
+                          Descuento %
+                          <input
+                            className="input"
+                            value={ireksTarifaForm.descuento_pct}
+                            onChange={(event) =>
+                              setIreksTarifaForm((prev) => ({ ...prev, descuento_pct: event.target.value }))
+                            }
+                            disabled={ireksTarifaLoading}
+                          />
+                        </label>
+                      </div>
+                      <div className="toolbar">
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={saveIreksTarifa}
+                          disabled={ireksTarifaLoading}
+                        >
+                          {ireksTarifaLoading ? 'Guardando...' : selectedIreksTarifa ? 'Actualizar tarifa' : 'Crear tarifa'}
+                        </button>
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={removeIreksTarifa}
+                          disabled={ireksTarifaLoading || !selectedIreksTarifa || selectedIreksTarifa.id === null}
+                        >
+                          {ireksTarifaLoading ? 'Eliminando...' : 'Eliminar tarifa'}
+                        </button>
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={resetIreksTarifaForm}
+                          disabled={ireksTarifaLoading}
+                        >
+                          Limpiar
+                        </button>
+                      </div>
+                      {!!ireksTarifaMessage && <div className="state">{ireksTarifaMessage}</div>}
+                      {!!ireksTarifaError && <div className="state">Error: {ireksTarifaError}</div>}
                     </div>
                   </>
                 )}

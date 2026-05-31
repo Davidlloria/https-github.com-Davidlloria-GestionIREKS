@@ -266,6 +266,10 @@ Fase 4 - Migrar escrituras a React.
   - editar campos de cabecera IREKS desde la vista `Ingredientes`;
   - usa `PATCH /ingredients/ireks/{row_id}`;
   - permite actualizar referencia, referencia corta, descripcion y categoria.
+- Decimonoveno flujo de escritura en React:
+  - CRUD de tarifas IREKS desde la vista `Ingredientes`;
+  - usa `POST /ingredients/ireks/tarifas`, `PATCH /ingredients/ireks/tarifas/{tarifa_id}` y `DELETE /ingredients/ireks/tarifas/{tarifa_id}`;
+  - permite crear, editar y eliminar tarifas con feedback de exito/error.
 
 ## Hoja de ruta
 
