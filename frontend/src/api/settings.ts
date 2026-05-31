@@ -1,5 +1,11 @@
 import { apiGet, apiPost, apiPut } from './http'
-import type { ApiSettingsPayload, MaintenanceResult, MaintenanceStatus, WarehouseOption } from '../types/api'
+import type {
+  ApiSettingsPayload,
+  MaintenanceResult,
+  MaintenanceStatus,
+  OrderJsonImportResponse,
+  WarehouseOption,
+} from '../types/api'
 
 export function getMaintenanceStatus() {
   return apiGet<MaintenanceStatus>('/settings/maintenance/status')
@@ -41,4 +47,8 @@ export function saveApiProviderSettings(provider: string, config: Record<string,
 
 export function listImportWarehouses() {
   return apiGet<WarehouseOption[]>('/settings/imports/warehouses')
+}
+
+export function importOrdersJsonFromSettings(payload: { almacen_id: string; file_path: string }) {
+  return apiPost<OrderJsonImportResponse>('/settings/imports/orders-json', payload)
 }

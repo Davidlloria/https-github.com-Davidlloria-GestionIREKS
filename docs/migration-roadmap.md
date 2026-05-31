@@ -296,6 +296,11 @@ Fase 4 - Migrar escrituras a React.
   - usa `POST /ingredients/ireks`;
   - valida en frontend `almacen_id`, referencia y descripcion obligatorios, y campos numericos de envase/transporte no negativos;
   - refresca listado y detalle, dejando seleccionado el ingrediente recien creado.
+- Vigesimoquinto flujo de escritura en React:
+  - importacion de pedidos JSON desde la vista `Configuracion`;
+  - usa `POST /settings/imports/orders-json`;
+  - valida en frontend almacen y `file_path` con extension `.json`;
+  - muestra resumen de importacion (`imported_items`, `skipped_invalid`, `skipped_unknown`).
 
 ## Hoja de ruta
 

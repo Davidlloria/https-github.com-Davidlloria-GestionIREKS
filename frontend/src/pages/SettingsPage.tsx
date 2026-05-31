@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   getApiProviderSettings,
   getMaintenanceStatus,
+  importOrdersJsonFromSettings,
   listImportWarehouses,
   runMaintenanceBackup,
   runMaintenanceCreateMissingContactClients,
@@ -13,7 +14,7 @@ import {
 import { QueryState } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
 import { useAsyncResource } from '../features/useAsyncResource'
-import type { ApiSettingsPayload, MaintenanceResult } from '../types/api'
+import type { ApiSettingsPayload, MaintenanceResult, OrderJsonImportResponse } from '../types/api'
 
 interface ProviderRow {
   provider: string
@@ -54,6 +55,12 @@ export function SettingsPage() {
   const [maintenanceActionMessage, setMaintenanceActionMessage] = useState('')
   const [maintenanceActionError, setMaintenanceActionError] = useState('')
   const [backupDestinationPath, setBackupDestinationPath] = useState('')
+  const [importWarehouseId, setImportWarehouseId] = useState('')
+  const [importFilePath, setImportFilePath] = useState('')
+  const [importOrdersLoading, setImportOrdersLoading] = useState(false)
+  const [importOrdersMessage, setImportOrdersMessage] = useState('')
+  const [importOrdersError, setImportOrdersError] = useState('')
+  const [importOrdersResult, setImportOrdersResult] = useState<OrderJsonImportResponse | null>(null)
 
   const maintenanceQuery = useAsyncResource(() => getMaintenanceStatus(), null, [])
   const providerQuery = useAsyncResource(async () => {
@@ -248,6 +255,52 @@ export function SettingsPage() {
       () => runMaintenanceBackup(destination),
       'Backup completado',
     )
+  }
+
+  const effectiveImportWarehouseId = useMemo(() => {
+    if (importWarehouseId) {
+      return importWarehouseId
+    }
+    return importsQuery.data[0]?.almacen_id ?? ''
+  }, [importWarehouseId, importsQuery.data])
+
+  const runOrdersJsonImport = async () => {
+    if (importOrdersLoading) {
+      return
+    }
+    const almacenId = effectiveImportWarehouseId.trim()
+    const filePath = importFilePath.trim()
+    if (!almacenId) {
+      setImportOrdersError('Debes seleccionar un almacen.')
+      setImportOrdersMessage('')
+      return
+    }
+    if (!filePath) {
+      setImportOrdersError('Debes indicar file_path del JSON de pedido.')
+      setImportOrdersMessage('')
+      return
+    }
+    if (!filePath.toLowerCase().endsWith('.json')) {
+      setImportOrdersError('El fichero debe tener extension .json')
+      setImportOrdersMessage('')
+      return
+    }
+    setImportOrdersLoading(true)
+    setImportOrdersError('')
+    setImportOrdersMessage('')
+    setImportOrdersResult(null)
+    try {
+      const result = await importOrdersJsonFromSettings({
+        almacen_id: almacenId,
+        file_path: filePath,
+      })
+      setImportOrdersResult(result)
+      setImportOrdersMessage(`Importacion JSON completada para ${almacenId}.`)
+    } catch (error: unknown) {
+      setImportOrdersError(error instanceof Error ? error.message : 'No se pudo importar el JSON de pedidos.')
+    } finally {
+      setImportOrdersLoading(false)
+    }
   }
 
   return (
@@ -494,24 +547,74 @@ export function SettingsPage() {
             emptyMessage="No hay almacenes disponibles para importacion."
           />
           {!!importsQuery.data.length && (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Almacen ID</th>
-                    <th>Nombre</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {importsQuery.data.map((row) => (
-                    <tr key={row.almacen_id}>
-                      <td>{row.almacen_id}</td>
-                      <td>{row.almacen_nombre || '-'}</td>
+            <>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Almacen ID</th>
+                      <th>Nombre</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {importsQuery.data.map((row) => (
+                      <tr key={row.almacen_id}>
+                        <td>{row.almacen_id}</td>
+                        <td>{row.almacen_nombre || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="related-block">
+                <h3>Importar pedidos JSON (settings)</h3>
+                <div className="form-grid">
+                  <label>
+                    Almacen
+                    <select
+                      className="select"
+                      value={effectiveImportWarehouseId}
+                      onChange={(event) => setImportWarehouseId(event.target.value)}
+                      disabled={importOrdersLoading}
+                    >
+                      {importsQuery.data.map((row) => (
+                        <option key={row.almacen_id} value={row.almacen_id}>
+                          {row.almacen_id} - {row.almacen_nombre || 'Sin nombre'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Ruta JSON (file_path)
+                    <input
+                      className="input"
+                      value={importFilePath}
+                      onChange={(event) => setImportFilePath(event.target.value)}
+                      placeholder="E:\\ruta\\pedido.json"
+                      disabled={importOrdersLoading}
+                    />
+                  </label>
+                </div>
+                <div className="toolbar">
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={runOrdersJsonImport}
+                    disabled={importOrdersLoading}
+                  >
+                    {importOrdersLoading ? 'Importando...' : 'Importar JSON'}
+                  </button>
+                </div>
+                {!!importOrdersMessage && <div className="state">{importOrdersMessage}</div>}
+                {!!importOrdersError && <div className="state">Error: {importOrdersError}</div>}
+                {!!importOrdersResult && (
+                  <div className="state">
+                    Importados: {importOrdersResult.imported_items} | Omitidos invalidos: {importOrdersResult.skipped_invalid} | Desconocidos:{' '}
+                    {(importOrdersResult.skipped_unknown || []).join(', ') || '-'}
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>
