@@ -391,6 +391,10 @@ Fase 5 - Reducir dependencia del desktop.
 - Limpieza incremental de helpers muertos en `OrdersPage`:
   - eliminado wrapper `_parse_albaran_pdf` (se usa parser directo);
   - eliminados auxiliares `_parse_decimal_es*` sin referencias activas.
+- Limpieza de utilidades de fecha/export sin uso en `OrdersPage`:
+  - eliminados helpers no referenciados de resolucion de almacen/mes/semana;
+  - eliminada capa wrapper `_build_order_workbook`, usando llamada directa al
+    servicio de exportacion.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;

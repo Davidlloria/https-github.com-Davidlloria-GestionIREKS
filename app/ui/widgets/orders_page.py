@@ -8,7 +8,6 @@ import re
 import tempfile
 from typing import Any, cast
 
-from openpyxl import Workbook
 from PySide6.QtCore import QDate, QTimer, Qt
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
@@ -1648,18 +1647,6 @@ class OrdersPage(QWidget):
             raise ValueError(f"Formato de fecha invalido en {field_name}: {value}")
         return parsed
 
-    def _resolve_almacen_id(self, _session: Any, raw_value: str) -> str:
-        return self.order_query_service.resolve_warehouse_id(raw_value)
-
-    def _year_from_date(self, value: date) -> int:
-        return int(value.year)
-
-    def _month_from_date(self, value: date) -> int:
-        return int(value.month)
-
-    def _week_from_date(self, value: date) -> int:
-        return int(value.isocalendar()[1])
-
     def _load_almacen_filter(self, _session: Any | None = None) -> None:
         current = str(self.almacen_filter.currentData() or "")
         options = self.order_query_service.warehouse_filter_options()
@@ -1679,7 +1666,7 @@ class OrdersPage(QWidget):
         default_from = 1
         default_to = 12
 
-        years = sorted({self._year_from_date(self._parse_date(row.pedido_fecha)) for row in pedidos}, reverse=True)
+        years = sorted({int(self._parse_date(row.pedido_fecha).year) for row in pedidos}, reverse=True)
         if default_year not in {str(y) for y in years}:
             years = sorted({*years, int(default_year)}, reverse=True)
         self.year_filter.blockSignals(True)
@@ -2538,7 +2525,7 @@ class OrdersPage(QWidget):
 
     def _export_order_to_excel(self, pedido_id: str) -> None:
         try:
-            wb, default_base_name = self._build_order_workbook(pedido_id)
+            wb, default_base_name = self.order_export_service.build_order_workbook(pedido_id)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Pedidos", f"No se pudo preparar la exportación.\n{exc}")
             return
@@ -2588,7 +2575,7 @@ class OrdersPage(QWidget):
             return
         send_direct = clicked == send_btn
         try:
-            wb, default_base_name = self._build_order_workbook(selected.pedido_id)
+            wb, default_base_name = self.order_export_service.build_order_workbook(selected.pedido_id)
             excel_path = self.order_export_service.save_order_excel_history(selected.pedido_id, wb, default_base_name)
             preview = self.order_export_service.build_order_mail_preview(
                 pedido_id=selected.pedido_id,
@@ -2647,7 +2634,7 @@ class OrdersPage(QWidget):
             QMessageBox.warning(self, "Pedidos", "Selecciona un pedido para imprimir.")
             return
         try:
-            wb, base_name = self._build_order_workbook(selected.pedido_id)
+            wb, base_name = self.order_export_service.build_order_workbook(selected.pedido_id)
             safe_name = "".join(ch for ch in base_name if ch not in '<>:"/\\|?*').strip() or "pedido"
             tmp_path = Path(tempfile.gettempdir()) / f"{safe_name}.xlsx"
             wb.save(tmp_path)
@@ -2720,9 +2707,6 @@ class OrdersPage(QWidget):
             "subject": str(subject_input.text() or "").strip(),
             "body": body_input.toPlainText(),
         }
-
-    def _build_order_workbook(self, pedido_id: str) -> tuple[Workbook, str]:
-        return self.order_export_service.build_order_workbook(pedido_id)
 
     def _delete_order(self) -> None:
         row = self._selected_row()
