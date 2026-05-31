@@ -307,6 +307,14 @@ Fase 4 - Migrar escrituras a React.
   - valida JSON en frontend y exige objeto de configuracion;
   - refresca listado de proveedores tras guardar.
 
+### Completado en Fase 5
+
+- Guardrails de arquitectura automatizados en tests:
+  - `tests/test_architecture_boundaries.py` valida que:
+    - `app/ui` no importe `sqlmodel` ni `app.core.database`;
+    - `app/services` no importe `PySide6`;
+    - `app/api` no importe `app.ui`.
+
 ## Hoja de ruta
 
 ### Fase 0 - Estabilizar el punto de partida
