@@ -24,6 +24,10 @@ export function updateIreksIngredient(
   payload: {
     articulo_status_activo?: boolean
     articulo_status_en_lista?: boolean
+    articulo_referencia?: string
+    articulo_referencia_corta?: string
+    articulo_descripcion?: string
+    categoria?: string
   },
 ) {
   return apiPatch<IngredientIreksRead>(`/ingredients/ireks/${rowId}`, payload)

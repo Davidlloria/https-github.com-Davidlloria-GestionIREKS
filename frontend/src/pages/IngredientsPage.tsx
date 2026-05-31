@@ -45,6 +45,13 @@ interface StdEditForm {
   pvp_unidad_medida: string
 }
 
+interface IreksEditForm {
+  articulo_referencia: string
+  articulo_referencia_corta: string
+  articulo_descripcion: string
+  categoria: string
+}
+
 const EMPTY_IREKS_DETAIL: IreksDetailPayload = {
   detail: null,
   nutrition: null,
@@ -61,6 +68,13 @@ const EMPTY_STD_EDIT_FORM: StdEditForm = {
   articulo_descripcion: '',
   pvp_formato: '',
   pvp_unidad_medida: '',
+}
+
+const EMPTY_IREKS_EDIT_FORM: IreksEditForm = {
+  articulo_referencia: '',
+  articulo_referencia_corta: '',
+  articulo_descripcion: '',
+  categoria: '',
 }
 
 export function IngredientsPage() {
@@ -89,6 +103,11 @@ export function IngredientsPage() {
   const [stdDeleteLoading, setStdDeleteLoading] = useState(false)
   const [stdDeleteMessage, setStdDeleteMessage] = useState('')
   const [stdDeleteError, setStdDeleteError] = useState('')
+  const [ireksEditForm, setIreksEditForm] = useState<IreksEditForm>(EMPTY_IREKS_EDIT_FORM)
+  const [ireksEditTargetId, setIreksEditTargetId] = useState('')
+  const [ireksEditLoading, setIreksEditLoading] = useState(false)
+  const [ireksEditMessage, setIreksEditMessage] = useState('')
+  const [ireksEditError, setIreksEditError] = useState('')
 
   const ireksQuery = useAsyncResource(
     () => listIreksIngredients(search, activityFilter),
@@ -172,6 +191,22 @@ export function IngredientsPage() {
     }
     return stdEditForm
   }, [stdDetailQuery.data.detail, stdEditForm, stdEditTargetId])
+
+  const currentIreksEditForm = useMemo(() => {
+    const detail = ireksDetailQuery.data.detail
+    if (!detail) {
+      return EMPTY_IREKS_EDIT_FORM
+    }
+    if (ireksEditTargetId !== detail.articulo_id) {
+      return {
+        articulo_referencia: detail.articulo_referencia || '',
+        articulo_referencia_corta: detail.articulo_referencia_corta || '',
+        articulo_descripcion: detail.articulo_descripcion || '',
+        categoria: detail.categoria || '',
+      }
+    }
+    return ireksEditForm
+  }, [ireksDetailQuery.data.detail, ireksEditForm, ireksEditTargetId])
 
   const formatWeight = (value: unknown) => {
     const numeric = Number(value)
@@ -339,6 +374,42 @@ export function IngredientsPage() {
     }
   }
 
+  const saveIreksEdition = async () => {
+    const detail = ireksDetailQuery.data.detail
+    if (!detail || detail.id === null || ireksEditLoading) {
+      return
+    }
+    if (!currentIreksEditForm.articulo_descripcion.trim()) {
+      setIreksEditError('La descripcion es obligatoria.')
+      setIreksEditMessage('')
+      return
+    }
+    setIreksEditLoading(true)
+    setIreksEditError('')
+    setIreksEditMessage('')
+    try {
+      const updated = await updateIreksIngredient(detail.id, {
+        articulo_referencia: currentIreksEditForm.articulo_referencia.trim(),
+        articulo_referencia_corta: currentIreksEditForm.articulo_referencia_corta.trim(),
+        articulo_descripcion: currentIreksEditForm.articulo_descripcion.trim(),
+        categoria: currentIreksEditForm.categoria.trim(),
+      })
+      await Promise.all([ireksQuery.reload(), ireksDetailQuery.reload()])
+      setIreksEditTargetId(updated.articulo_id)
+      setIreksEditForm({
+        articulo_referencia: updated.articulo_referencia || '',
+        articulo_referencia_corta: updated.articulo_referencia_corta || '',
+        articulo_descripcion: updated.articulo_descripcion || '',
+        categoria: updated.categoria || '',
+      })
+      setIreksEditMessage('Ingrediente IREKS actualizado.')
+    } catch (error: unknown) {
+      setIreksEditError(error instanceof Error ? error.message : 'No se pudo actualizar el ingrediente IREKS.')
+    } finally {
+      setIreksEditLoading(false)
+    }
+  }
+
   return (
     <section className="page-grid">
       <div className="segmented">
@@ -411,7 +482,16 @@ export function IngredientsPage() {
                       <tr
                         key={`${row.id ?? row.articulo_id}`}
                         className={row.articulo_id === selectedIreks?.articulo_id ? 'row-selected' : ''}
-                        onClick={() => setSelectedIreksCandidateId(row.articulo_id)}
+                        onClick={() => {
+                          setSelectedIreksCandidateId(row.articulo_id)
+                          setIreksEditTargetId(row.articulo_id)
+                          setIreksEditForm({
+                            articulo_referencia: row.articulo_referencia || '',
+                            articulo_referencia_corta: row.articulo_referencia_corta || '',
+                            articulo_descripcion: row.articulo_descripcion || '',
+                            categoria: row.categoria || '',
+                          })
+                        }}
                       >
                         <td>{row.articulo_referencia || '-'}</td>
                         <td>{row.articulo_descripcion || '-'}</td>
@@ -465,10 +545,84 @@ export function IngredientsPage() {
                     </dl>
 
                     <div className="related-block">
+                      <h3>Edicion rapida IREKS</h3>
+                      <div className="form-grid">
+                        <label>
+                          Referencia
+                          <input
+                            className="input"
+                            value={currentIreksEditForm.articulo_referencia}
+                            onChange={(event) => {
+                              if (ireksDetailQuery.data.detail) {
+                                setIreksEditTargetId(ireksDetailQuery.data.detail.articulo_id)
+                              }
+                              setIreksEditForm((prev) => ({ ...prev, articulo_referencia: event.target.value }))
+                            }}
+                            disabled={ireksEditLoading || ireksActiveLoading || ireksListLoading || ireksDeleteLoading}
+                          />
+                        </label>
+                        <label>
+                          Referencia corta
+                          <input
+                            className="input"
+                            value={currentIreksEditForm.articulo_referencia_corta}
+                            onChange={(event) => {
+                              if (ireksDetailQuery.data.detail) {
+                                setIreksEditTargetId(ireksDetailQuery.data.detail.articulo_id)
+                              }
+                              setIreksEditForm((prev) => ({ ...prev, articulo_referencia_corta: event.target.value }))
+                            }}
+                            disabled={ireksEditLoading || ireksActiveLoading || ireksListLoading || ireksDeleteLoading}
+                          />
+                        </label>
+                        <label>
+                          Descripcion
+                          <input
+                            className="input"
+                            value={currentIreksEditForm.articulo_descripcion}
+                            onChange={(event) => {
+                              if (ireksDetailQuery.data.detail) {
+                                setIreksEditTargetId(ireksDetailQuery.data.detail.articulo_id)
+                              }
+                              setIreksEditForm((prev) => ({ ...prev, articulo_descripcion: event.target.value }))
+                            }}
+                            disabled={ireksEditLoading || ireksActiveLoading || ireksListLoading || ireksDeleteLoading}
+                          />
+                        </label>
+                        <label>
+                          Categoria
+                          <input
+                            className="input"
+                            value={currentIreksEditForm.categoria}
+                            onChange={(event) => {
+                              if (ireksDetailQuery.data.detail) {
+                                setIreksEditTargetId(ireksDetailQuery.data.detail.articulo_id)
+                              }
+                              setIreksEditForm((prev) => ({ ...prev, categoria: event.target.value }))
+                            }}
+                            disabled={ireksEditLoading || ireksActiveLoading || ireksListLoading || ireksDeleteLoading}
+                          />
+                        </label>
+                      </div>
+                      <div className="toolbar">
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={saveIreksEdition}
+                          disabled={ireksEditLoading || ireksActiveLoading || ireksListLoading || ireksDeleteLoading}
+                        >
+                          {ireksEditLoading ? 'Guardando...' : 'Guardar cambios IREKS'}
+                        </button>
+                      </div>
+                      {!!ireksEditMessage && <div className="state">{ireksEditMessage}</div>}
+                      {!!ireksEditError && <div className="state">Error: {ireksEditError}</div>}
+                    </div>
+
+                    <div className="related-block">
                       <button
                         type="button"
                         className="action-btn"
-                        disabled={ireksActiveLoading || ireksListLoading || ireksDeleteLoading}
+                        disabled={ireksActiveLoading || ireksListLoading || ireksDeleteLoading || ireksEditLoading}
                         onClick={toggleIreksActive}
                       >
                         {ireksActiveLoading
@@ -485,7 +639,7 @@ export function IngredientsPage() {
                       <button
                         type="button"
                         className="action-btn"
-                        disabled={ireksListLoading || ireksActiveLoading || ireksDeleteLoading}
+                        disabled={ireksListLoading || ireksActiveLoading || ireksDeleteLoading || ireksEditLoading}
                         onClick={toggleIreksInList}
                       >
                         {ireksListLoading
@@ -502,7 +656,7 @@ export function IngredientsPage() {
                       <button
                         type="button"
                         className="action-btn"
-                        disabled={ireksDeleteLoading || ireksListLoading || ireksActiveLoading}
+                        disabled={ireksDeleteLoading || ireksListLoading || ireksActiveLoading || ireksEditLoading}
                         onClick={removeIreks}
                       >
                         {ireksDeleteLoading ? 'Eliminando...' : 'Eliminar IREKS'}

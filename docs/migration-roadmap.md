@@ -262,6 +262,10 @@ Fase 4 - Migrar escrituras a React.
   - guardar configuracion `orders_mail` desde la vista `Configuracion`;
   - usa `PUT /settings/api/orders_mail`;
   - valida formato basico de email destino y refresca proveedor tras guardar.
+- Decimoctavo flujo de escritura en React:
+  - editar campos de cabecera IREKS desde la vista `Ingredientes`;
+  - usa `PATCH /ingredients/ireks/{row_id}`;
+  - permite actualizar referencia, referencia corta, descripcion y categoria.
 
 ## Hoja de ruta
 
