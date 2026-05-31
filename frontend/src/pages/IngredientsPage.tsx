@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
+  createStdIngredient,
   createIreksTarifa,
   deleteIreksTarifa,
   deleteIreksIngredient,
@@ -48,6 +49,18 @@ interface StdEditForm {
   pvp_unidad_medida: string
 }
 
+interface StdCreateForm {
+  articulo_referencia_distribuidor: string
+  proveedor_id: string
+  articulo_descripcion: string
+  categoria: string
+  formato: string
+  formato_cantidad: string
+  formato_unidad: string
+  pvp_formato: string
+  activo: boolean
+}
+
 interface IreksEditForm {
   articulo_referencia: string
   articulo_referencia_corta: string
@@ -78,6 +91,18 @@ const EMPTY_STD_EDIT_FORM: StdEditForm = {
   articulo_descripcion: '',
   pvp_formato: '',
   pvp_unidad_medida: '',
+}
+
+const EMPTY_STD_CREATE_FORM: StdCreateForm = {
+  articulo_referencia_distribuidor: '',
+  proveedor_id: '',
+  articulo_descripcion: '',
+  categoria: '',
+  formato: 'SACO',
+  formato_cantidad: '25',
+  formato_unidad: 'kg',
+  pvp_formato: '',
+  activo: true,
 }
 
 const EMPTY_IREKS_EDIT_FORM: IreksEditForm = {
@@ -120,6 +145,10 @@ export function IngredientsPage() {
   const [stdDeleteLoading, setStdDeleteLoading] = useState(false)
   const [stdDeleteMessage, setStdDeleteMessage] = useState('')
   const [stdDeleteError, setStdDeleteError] = useState('')
+  const [stdCreateForm, setStdCreateForm] = useState<StdCreateForm>(EMPTY_STD_CREATE_FORM)
+  const [stdCreateLoading, setStdCreateLoading] = useState(false)
+  const [stdCreateMessage, setStdCreateMessage] = useState('')
+  const [stdCreateError, setStdCreateError] = useState('')
   const [ireksEditForm, setIreksEditForm] = useState<IreksEditForm>(EMPTY_IREKS_EDIT_FORM)
   const [ireksEditTargetId, setIreksEditTargetId] = useState('')
   const [ireksEditLoading, setIreksEditLoading] = useState(false)
@@ -241,6 +270,80 @@ export function IngredientsPage() {
   const formatWeight = (value: unknown) => {
     const numeric = Number(value)
     return Number.isFinite(numeric) ? numeric.toFixed(2) : '0.00'
+  }
+
+  const saveStdCreate = async () => {
+    if (stdCreateLoading) {
+      return
+    }
+    const referencia = stdCreateForm.articulo_referencia_distribuidor.trim()
+    const proveedorId = stdCreateForm.proveedor_id.trim()
+    const descripcion = stdCreateForm.articulo_descripcion.trim()
+    const formato = stdCreateForm.formato.trim()
+    const formatoUnidad = stdCreateForm.formato_unidad.trim() || 'kg'
+    const categoria = stdCreateForm.categoria.trim()
+    const formatoCantidad = Number.parseFloat(stdCreateForm.formato_cantidad.replace(',', '.'))
+    const pvpFormato = Number.parseFloat(stdCreateForm.pvp_formato.replace(',', '.'))
+
+    if (!referencia) {
+      setStdCreateError('La referencia de distribuidor es obligatoria.')
+      setStdCreateMessage('')
+      return
+    }
+    if (!proveedorId) {
+      setStdCreateError('El proveedor/distribuidor es obligatorio.')
+      setStdCreateMessage('')
+      return
+    }
+    if (!descripcion) {
+      setStdCreateError('La descripcion es obligatoria.')
+      setStdCreateMessage('')
+      return
+    }
+    if (!Number.isFinite(formatoCantidad) || formatoCantidad <= 0) {
+      setStdCreateError('La cantidad de formato debe ser numerica y mayor que 0.')
+      setStdCreateMessage('')
+      return
+    }
+    if (!Number.isFinite(pvpFormato) || pvpFormato < 0) {
+      setStdCreateError('El PVP formato debe ser numerico y mayor o igual que 0.')
+      setStdCreateMessage('')
+      return
+    }
+
+    setStdCreateLoading(true)
+    setStdCreateError('')
+    setStdCreateMessage('')
+    try {
+      const created = await createStdIngredient({
+        articulo_referencia_distribuidor: referencia,
+        proveedor_id: proveedorId,
+        distribuidor_id: proveedorId,
+        articulo_descripcion: descripcion,
+        categoria,
+        formato,
+        formato_cantidad: formatoCantidad,
+        formato_unidad: formatoUnidad,
+        pvp_formato: pvpFormato,
+        pvp_unidad_medida: formatoCantidad > 0 ? pvpFormato / formatoCantidad : 0,
+        activo: stdCreateForm.activo,
+      })
+      setSelectedStdCandidateId(created.articulo_id)
+      setStdEditTargetId(created.articulo_id)
+      setStdEditForm({
+        articulo_descripcion: created.articulo_descripcion || '',
+        pvp_formato: String(created.pvp_formato ?? 0),
+        pvp_unidad_medida: String(created.pvp_unidad_medida ?? 0),
+      })
+      setStdCreateForm(EMPTY_STD_CREATE_FORM)
+      await stdQuery.reload()
+      await stdDetailQuery.reload()
+      setStdCreateMessage(`Materia prima STD creada (${created.articulo_id}).`)
+    } catch (error: unknown) {
+      setStdCreateError(error instanceof Error ? error.message : 'No se pudo crear la materia prima STD.')
+    } finally {
+      setStdCreateLoading(false)
+    }
   }
 
   const toggleStdActive = async () => {
@@ -917,6 +1020,115 @@ export function IngredientsPage() {
 
       {mode === 'std' && (
         <>
+          <div className="related-block">
+            <h3>Alta de materia prima STD</h3>
+            <div className="form-grid">
+              <label>
+                Referencia distribuidor
+                <input
+                  className="input"
+                  value={stdCreateForm.articulo_referencia_distribuidor}
+                  onChange={(event) =>
+                    setStdCreateForm((prev) => ({ ...prev, articulo_referencia_distribuidor: event.target.value }))
+                  }
+                  disabled={stdCreateLoading}
+                />
+              </label>
+              <label>
+                Proveedor/Distribuidor ID
+                <input
+                  className="input"
+                  value={stdCreateForm.proveedor_id}
+                  onChange={(event) =>
+                    setStdCreateForm((prev) => ({ ...prev, proveedor_id: event.target.value }))
+                  }
+                  disabled={stdCreateLoading}
+                />
+              </label>
+              <label>
+                Descripcion
+                <input
+                  className="input"
+                  value={stdCreateForm.articulo_descripcion}
+                  onChange={(event) =>
+                    setStdCreateForm((prev) => ({ ...prev, articulo_descripcion: event.target.value }))
+                  }
+                  disabled={stdCreateLoading}
+                />
+              </label>
+              <label>
+                Categoria
+                <input
+                  className="input"
+                  value={stdCreateForm.categoria}
+                  onChange={(event) => setStdCreateForm((prev) => ({ ...prev, categoria: event.target.value }))}
+                  disabled={stdCreateLoading}
+                />
+              </label>
+              <label>
+                Formato
+                <input
+                  className="input"
+                  value={stdCreateForm.formato}
+                  onChange={(event) => setStdCreateForm((prev) => ({ ...prev, formato: event.target.value }))}
+                  disabled={stdCreateLoading}
+                />
+              </label>
+              <label>
+                Cantidad formato
+                <input
+                  className="input"
+                  value={stdCreateForm.formato_cantidad}
+                  onChange={(event) =>
+                    setStdCreateForm((prev) => ({ ...prev, formato_cantidad: event.target.value }))
+                  }
+                  disabled={stdCreateLoading}
+                />
+              </label>
+              <label>
+                Unidad formato
+                <input
+                  className="input"
+                  value={stdCreateForm.formato_unidad}
+                  onChange={(event) =>
+                    setStdCreateForm((prev) => ({ ...prev, formato_unidad: event.target.value }))
+                  }
+                  disabled={stdCreateLoading}
+                />
+              </label>
+              <label>
+                PVP formato
+                <input
+                  className="input"
+                  value={stdCreateForm.pvp_formato}
+                  onChange={(event) => setStdCreateForm((prev) => ({ ...prev, pvp_formato: event.target.value }))}
+                  disabled={stdCreateLoading}
+                />
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={stdCreateForm.activo}
+                  onChange={(event) => setStdCreateForm((prev) => ({ ...prev, activo: event.target.checked }))}
+                  disabled={stdCreateLoading}
+                />{' '}
+                Activo
+              </label>
+            </div>
+            <div className="toolbar">
+              <button
+                type="button"
+                className="action-btn"
+                onClick={saveStdCreate}
+                disabled={stdCreateLoading}
+              >
+                {stdCreateLoading ? 'Creando...' : 'Crear STD'}
+              </button>
+            </div>
+            {!!stdCreateMessage && <div className="state">{stdCreateMessage}</div>}
+            {!!stdCreateError && <div className="state">Error: {stdCreateError}</div>}
+          </div>
+
           <QueryState
             loading={stdQuery.loading}
             error={stdQuery.error}

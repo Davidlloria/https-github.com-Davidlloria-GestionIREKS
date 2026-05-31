@@ -78,6 +78,26 @@ export function listStdIngredients(search: string, activityFilter: string) {
   })
 }
 
+export function createStdIngredient(payload: {
+  articulo_id?: string
+  articulo_referencia_distribuidor: string
+  proveedor_id: string
+  distribuidor_id?: string
+  articulo_descripcion: string
+  articulo_grupo_id?: string
+  articulo_familia_id?: string
+  articulo_subfamilia_id?: string
+  categoria?: string
+  formato?: string
+  formato_cantidad?: number
+  formato_unidad?: string
+  pvp_formato?: number
+  pvp_unidad_medida?: number
+  activo?: boolean
+}) {
+  return apiPost<IngredientStdRead>('/ingredients/std', payload)
+}
+
 export function getStdIngredientDetail(articuloId: string) {
   return apiGet<IngredientStdRead>(`/ingredients/std/${articuloId}`)
 }

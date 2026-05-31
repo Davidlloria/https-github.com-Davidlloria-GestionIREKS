@@ -286,6 +286,11 @@ Fase 4 - Migrar escrituras a React.
     `POST /settings/maintenance/optimize` y
     `POST /settings/maintenance/backup`;
   - valida ruta de backup en frontend y refresca estado de mantenimiento tras cada accion.
+- Vigesimotercer flujo de escritura en React:
+  - alta de materias primas STD desde la vista `Ingredientes`;
+  - usa `POST /ingredients/std`;
+  - valida en frontend referencia/proveedor/descripcion obligatorios, cantidad de formato mayor que 0 y PVP formato numerico no negativo;
+  - refresca listado y detalle, dejando seleccionada la materia prima recien creada.
 
 ## Hoja de ruta
 
