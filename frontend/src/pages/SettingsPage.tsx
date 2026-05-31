@@ -41,6 +41,11 @@ export function SettingsPage() {
   const [warehouseSaveLoading, setWarehouseSaveLoading] = useState(false)
   const [warehouseSaveMessage, setWarehouseSaveMessage] = useState('')
   const [warehouseSaveError, setWarehouseSaveError] = useState('')
+  const [ordersMailDestinoInput, setOrdersMailDestinoInput] = useState('')
+  const [ordersMailHistoricoInput, setOrdersMailHistoricoInput] = useState('')
+  const [ordersMailSaveLoading, setOrdersMailSaveLoading] = useState(false)
+  const [ordersMailSaveMessage, setOrdersMailSaveMessage] = useState('')
+  const [ordersMailSaveError, setOrdersMailSaveError] = useState('')
 
   const maintenanceQuery = useAsyncResource(() => getMaintenanceStatus(), null, [])
   const providerQuery = useAsyncResource(async () => {
@@ -72,6 +77,10 @@ export function SettingsPage() {
     () => providerQuery.data.find((row) => row.provider === 'warehouse' && row.status === 'ok') ?? null,
     [providerQuery.data],
   )
+  const ordersMailProvider = useMemo(
+    () => providerQuery.data.find((row) => row.provider === 'orders_mail' && row.status === 'ok') ?? null,
+    [providerQuery.data],
+  )
 
   const effectiveThresholdInput = useMemo(() => {
     if (warehouseThresholdInput) {
@@ -83,6 +92,28 @@ export function SettingsPage() {
     }
     return String(rawValue)
   }, [warehouseProvider, warehouseThresholdInput])
+
+  const effectiveOrdersMailDestinoInput = useMemo(() => {
+    if (ordersMailDestinoInput) {
+      return ordersMailDestinoInput
+    }
+    const rawValue = ordersMailProvider?.config?.destino_email
+    if (rawValue === undefined || rawValue === null) {
+      return ''
+    }
+    return String(rawValue)
+  }, [ordersMailDestinoInput, ordersMailProvider])
+
+  const effectiveOrdersMailHistoricoInput = useMemo(() => {
+    if (ordersMailHistoricoInput) {
+      return ordersMailHistoricoInput
+    }
+    const rawValue = ordersMailProvider?.config?.historico_dir
+    if (rawValue === undefined || rawValue === null) {
+      return ''
+    }
+    return String(rawValue)
+  }, [ordersMailHistoricoInput, ordersMailProvider])
 
   const totals = useMemo(() => {
     if (!maintenanceQuery.data) {
@@ -147,6 +178,36 @@ export function SettingsPage() {
       setWarehouseSaveError(error instanceof Error ? error.message : 'No se pudo guardar el umbral de stock.')
     } finally {
       setWarehouseSaveLoading(false)
+    }
+  }
+
+  const saveOrdersMailSettings = async () => {
+    if (ordersMailSaveLoading) {
+      return
+    }
+    const destino = effectiveOrdersMailDestinoInput.trim()
+    const historicoDir = effectiveOrdersMailHistoricoInput.trim()
+    if (destino && !destino.includes('@')) {
+      setOrdersMailSaveError('El email destino no tiene un formato valido.')
+      setOrdersMailSaveMessage('')
+      return
+    }
+    setOrdersMailSaveLoading(true)
+    setOrdersMailSaveError('')
+    setOrdersMailSaveMessage('')
+    try {
+      await saveApiProviderSettings('orders_mail', {
+        destino_email: destino,
+        historico_dir: historicoDir,
+      })
+      await providerQuery.reload()
+      setOrdersMailDestinoInput(destino)
+      setOrdersMailHistoricoInput(historicoDir)
+      setOrdersMailSaveMessage('Configuracion de pedidos por email guardada.')
+    } catch (error: unknown) {
+      setOrdersMailSaveError(error instanceof Error ? error.message : 'No se pudo guardar la configuracion de pedidos por email.')
+    } finally {
+      setOrdersMailSaveLoading(false)
     }
   }
 
@@ -285,6 +346,44 @@ export function SettingsPage() {
             </div>
             {!!warehouseSaveMessage && <div className="state">{warehouseSaveMessage}</div>}
             {!!warehouseSaveError && <div className="state">Error: {warehouseSaveError}</div>}
+          </div>
+
+          <div className="related-block">
+            <h3>Pedidos por email (orders_mail)</h3>
+            <div className="form-grid">
+              <label>
+                Email destino
+                <input
+                  className="input"
+                  value={effectiveOrdersMailDestinoInput}
+                  onChange={(event) => setOrdersMailDestinoInput(event.target.value)}
+                  placeholder="destino@empresa.com"
+                  disabled={ordersMailSaveLoading}
+                />
+              </label>
+              <label>
+                Directorio historico
+                <input
+                  className="input"
+                  value={effectiveOrdersMailHistoricoInput}
+                  onChange={(event) => setOrdersMailHistoricoInput(event.target.value)}
+                  placeholder="E:\\pedidos\\historico"
+                  disabled={ordersMailSaveLoading}
+                />
+              </label>
+            </div>
+            <div className="toolbar">
+              <button
+                type="button"
+                className="action-btn"
+                onClick={saveOrdersMailSettings}
+                disabled={ordersMailSaveLoading}
+              >
+                {ordersMailSaveLoading ? 'Guardando...' : 'Guardar orders_mail'}
+              </button>
+            </div>
+            {!!ordersMailSaveMessage && <div className="state">{ordersMailSaveMessage}</div>}
+            {!!ordersMailSaveError && <div className="state">Error: {ordersMailSaveError}</div>}
           </div>
         </div>
 

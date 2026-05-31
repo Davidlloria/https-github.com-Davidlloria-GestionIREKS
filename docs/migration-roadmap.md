@@ -258,6 +258,10 @@ Fase 4 - Migrar escrituras a React.
   - crear y editar clientes desde la vista `Clientes`;
   - usa `POST /customers` y `PATCH /customers/{customer_id}`;
   - valida nombre comercial obligatorio y muestra feedback de exito/error.
+- Decimoseptimo flujo de escritura en React:
+  - guardar configuracion `orders_mail` desde la vista `Configuracion`;
+  - usa `PUT /settings/api/orders_mail`;
+  - valida formato basico de email destino y refresca proveedor tras guardar.
 
 ## Hoja de ruta
 
