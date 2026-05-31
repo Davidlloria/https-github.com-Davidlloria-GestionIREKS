@@ -266,6 +266,24 @@ tbody tr:hover {
   color: var(--text);
 }
 
+.form-grid {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.form-grid label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.form-grid .input,
+.form-grid .select {
+  min-width: 100%;
+}
+
 .mini-grid {
   display: grid;
   gap: 6px;

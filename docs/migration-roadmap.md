@@ -196,6 +196,11 @@ Fase 4 - Migrar escrituras a React.
   - activar/desactivar clientes desde la vista de clientes;
   - usa `PATCH /customers/{customer_id}` con payload parcial `{ "activo": true|false }`;
   - refresca listado y detalle tras guardar, con feedback de exito/error.
+- Tercer flujo de escritura en React:
+  - crear y editar contactos desde la vista `Contactos`;
+  - usa `POST /contacts` y `PATCH /contacts/{contact_id}`;
+  - valida en frontend empresa obligatoria y al menos nombre o apellidos;
+  - refresca listado/detalle y muestra feedback de guardado o error.
 
 ## Hoja de ruta
 
