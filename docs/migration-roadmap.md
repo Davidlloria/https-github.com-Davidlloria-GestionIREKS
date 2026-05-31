@@ -369,6 +369,11 @@ Fase 5 - Reducir dependencia del desktop.
     cliente/distribuidor IGSA via `SettingsImportService`;
   - `app/ui/widgets/settings_page.py` deja de pasar `cliente_id` manualmente y
     reduce acoplamiento entre widget y reglas de negocio.
+- Carga inicial de proveedores API/correo movida a servicio:
+  - `app/services/settings_provider_service.py` incorpora metodos `load_*`
+    para FDC, FatSecret, OpenAI y Outlook;
+  - `app/ui/widgets/settings_page.py` deja de leer settings directamente y usa
+    solo `SettingsProviderService` como punto de acceso.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;

@@ -30,10 +30,6 @@ from PySide6.QtWidgets import (
 
 from app.core.config import DATA_DIR
 from app.models import CodigoPostal, Isla, Localidad, Municipio, Provincia
-from app.services.fdc_settings_service import FdcSettingsService
-from app.services.fatsecret_settings_service import FatSecretSettingsService
-from app.services.openai_settings_service import OpenAISettingsService
-from app.services.orders_mail_settings_service import OrdersMailSettingsService
 from app.services.address_catalog_service import AddressCatalogService
 from app.services.sales_reconciliation_service import SalesReconciliationService
 from app.services.settings_orders_import_service import SettingsOrdersImportService
@@ -1409,16 +1405,7 @@ class LocalidadesTab(QWidget):
 class SettingsPage(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.fdc_settings = FdcSettingsService()
-        self.fatsecret_settings = FatSecretSettingsService()
-        self.openai_settings = OpenAISettingsService()
-        self.orders_mail_settings = OrdersMailSettingsService()
-        self.settings_provider_service = SettingsProviderService(
-            fdc_settings=self.fdc_settings,
-            fatsecret_settings=self.fatsecret_settings,
-            openai_settings=self.openai_settings,
-            orders_mail_settings=self.orders_mail_settings,
-        )
+        self.settings_provider_service = SettingsProviderService()
         self.sales_service = SalesReconciliationService()
         self.settings_import_service = SettingsImportService()
         self.settings_orders_import_service = SettingsOrdersImportService(self.settings_import_service)
@@ -1468,7 +1455,7 @@ class SettingsPage(QWidget):
         self.fdc_api_key_input = QLineEdit()
         self.fdc_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.fdc_api_key_input.setPlaceholderText("Introduce API key de USDA/Data.gov")
-        loaded = self.fdc_settings.load()
+        loaded = self.settings_provider_service.load_fdc()
         self.fdc_api_key_input.setText(str(loaded.get("api_key") or ""))
         self.fdc_data_type_combo = QComboBox()
         self.fdc_data_type_combo.addItems(["Foundation", "Branded", "Survey (FNDDS)", "SR Legacy"])
@@ -1506,7 +1493,7 @@ class SettingsPage(QWidget):
         fat_title = QLabel("Configuracion API FatSecret")
         fat_title.setProperty("role", "sectionTitle")
         fat_layout.addWidget(fat_title)
-        fat_loaded = self.fatsecret_settings.load()
+        fat_loaded = self.settings_provider_service.load_fatsecret()
 
         fat_form = QFormLayout()
         self.fatsecret_client_id_input = QLineEdit()
@@ -1549,7 +1536,7 @@ class SettingsPage(QWidget):
         openai_title = QLabel("Configuracion API OpenAI")
         openai_title.setProperty("role", "sectionTitle")
         openai_layout.addWidget(openai_title)
-        oa_loaded = self.openai_settings.load()
+        oa_loaded = self.settings_provider_service.load_openai()
 
         openai_form = QFormLayout()
         self.openai_api_key_input = QLineEdit()
@@ -1673,7 +1660,7 @@ class SettingsPage(QWidget):
         orders_mail_title.setProperty("role", "sectionTitle")
         orders_mail_layout.addWidget(orders_mail_title)
 
-        orders_loaded = self.orders_mail_settings.load()
+        orders_loaded = self.settings_provider_service.load_orders_mail()
         orders_form = QFormLayout()
         self.orders_mail_destino_input = QLineEdit()
         self.orders_mail_destino_input.setPlaceholderText("destino@empresa.com")

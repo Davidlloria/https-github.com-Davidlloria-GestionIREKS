@@ -9,6 +9,9 @@ class _FakeFdcSettings:
     def __init__(self) -> None:
         self.saved: tuple[str, str] | None = None
 
+    def load(self) -> dict:
+        return {"api_key": "k1", "data_type": "Foundation"}
+
     def save(self, api_key: str, data_type: str | None = None) -> Path:
         self.saved = (api_key, str(data_type or ""))
         return Path("data/api_config.json")
@@ -17,6 +20,9 @@ class _FakeFdcSettings:
 class _FakeFatsecretSettings:
     def __init__(self) -> None:
         self.saved: tuple[str, str, str] | None = None
+
+    def load(self) -> dict:
+        return {"client_id": "id", "client_secret": "sec", "scope": "basic"}
 
     def save(self, client_id: str, client_secret: str, scope: str | None = None) -> Path:
         self.saved = (client_id, client_secret, str(scope or ""))
@@ -27,6 +33,9 @@ class _FakeOpenaiSettings:
     def __init__(self) -> None:
         self.saved: tuple[str, bool] | None = None
 
+    def load(self) -> dict:
+        return {"api_key": "ok", "use_ai_translation": True}
+
     def save(self, api_key: str, use_ai_translation: bool) -> Path:
         self.saved = (api_key, bool(use_ai_translation))
         return Path("data/api_config.json")
@@ -35,6 +44,9 @@ class _FakeOpenaiSettings:
 class _FakeOrdersMailSettings:
     def __init__(self) -> None:
         self.saved: tuple[str, str] | None = None
+
+    def load(self) -> dict:
+        return {"destino_email": "destino@empresa.com", "historico_dir": "data/historico"}
 
     def save(self, destino_email: str, historico_dir: str) -> Path:
         self.saved = (destino_email, historico_dir)
@@ -115,3 +127,16 @@ def test_orders_mail_requires_destination_email() -> None:
     assert result.ok is False
     assert "obligatorio" in result.message.lower()
 
+
+def test_load_operations_delegate_to_underlying_settings_services() -> None:
+    service = SettingsProviderService(
+        fdc_settings=_FakeFdcSettings(),
+        fatsecret_settings=_FakeFatsecretSettings(),
+        openai_settings=_FakeOpenaiSettings(),
+        orders_mail_settings=_FakeOrdersMailSettings(),
+    )
+
+    assert service.load_fdc().get("api_key") == "k1"
+    assert service.load_fatsecret().get("client_id") == "id"
+    assert service.load_openai().get("api_key") == "ok"
+    assert service.load_orders_mail().get("destino_email") == "destino@empresa.com"

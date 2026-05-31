@@ -40,6 +40,22 @@ class SettingsProviderService:
         self.fatsecret_client_factory = fatsecret_client_factory
         self.openai_translation_factory = openai_translation_factory
 
+    def load_fdc(self) -> dict[str, Any]:
+        data = self.fdc_settings.load()
+        return dict(data) if isinstance(data, dict) else {}
+
+    def load_fatsecret(self) -> dict[str, Any]:
+        data = self.fatsecret_settings.load()
+        return dict(data) if isinstance(data, dict) else {}
+
+    def load_openai(self) -> dict[str, Any]:
+        data = self.openai_settings.load()
+        return dict(data) if isinstance(data, dict) else {}
+
+    def load_orders_mail(self) -> dict[str, Any]:
+        data = self.orders_mail_settings.load()
+        return dict(data) if isinstance(data, dict) else {}
+
     def save_fdc(self, api_key: str, data_type: str) -> SettingsProviderResult:
         path = self.fdc_settings.save(api_key, data_type=data_type)
         return SettingsProviderResult(ok=True, message="Configuracion de FoodData Central guardada.", path=path)
@@ -85,4 +101,3 @@ class SettingsProviderService:
             Path(historico).mkdir(parents=True, exist_ok=True)
         path = self.orders_mail_settings.save(destino_email=destino, historico_dir=historico)
         return SettingsProviderResult(ok=True, message="Configuracion de pedidos Outlook guardada.", path=path)
-
