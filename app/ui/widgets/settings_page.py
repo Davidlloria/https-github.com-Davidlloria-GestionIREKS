@@ -42,6 +42,7 @@ from app.services.settings_maintenance_service import SettingsMaintenanceService
 from app.services.settings_maintenance_ui_service import SettingsMaintenanceUiService
 from app.services.settings_provider_service import SettingsProviderService
 from app.services.settings_sales_import_service import SettingsSalesImportService
+from app.services.settings_sales_preview_service import SettingsSalesPreviewService
 from app.ui.widgets.db_export_console_tab import DbExportConsoleTab
 from app.ui.widgets.db_import_console_tab import DbImportConsoleTab
 from app.ui.widgets.entity_dialog import EntityDialog
@@ -1422,6 +1423,7 @@ class SettingsPage(QWidget):
         self.settings_import_service = SettingsImportService()
         self.settings_orders_import_service = SettingsOrdersImportService(self.settings_import_service)
         self.settings_sales_import_service = SettingsSalesImportService(self.sales_service)
+        self.settings_sales_preview_service = SettingsSalesPreviewService(self.sales_service, self.settings_import_service)
         self.settings_maintenance_service = SettingsMaintenanceService()
         self.settings_maintenance_ui_service = SettingsMaintenanceUiService(self.settings_maintenance_service)
         self._igsa_pdf_preview_lines: list[object] = []
@@ -2030,13 +2032,13 @@ class SettingsPage(QWidget):
         )
         if not file_paths:
             return
-        lines, errors = self.sales_service.parse_igsa_pdf_files([Path(path) for path in file_paths])
-        if not lines:
-            detail = "\n".join(errors[:10]) if errors else "No se pudieron extraer lineas."
-            QMessageBox.warning(self, "Vista previa PDF IGSA", detail)
+        try:
+            outcome = self.settings_sales_preview_service.preview_igsa_pdf_files([Path(path) for path in file_paths])
+        except Exception as exc:
+            QMessageBox.warning(self, "Vista previa PDF IGSA", str(exc))
             return
-        self._igsa_pdf_preview_lines = list(lines)
-        self._show_igsa_pdf_preview_dialog(lines, errors)
+        self._igsa_pdf_preview_lines = list(outcome.lines)
+        self._show_igsa_pdf_preview_dialog(outcome.lines, outcome.errors)
 
     def _show_igsa_pdf_preview_dialog(self, lines: list[object], errors: list[str]) -> None:
         dialog = QDialog(self)
@@ -2165,18 +2167,13 @@ class SettingsPage(QWidget):
         )
         if not file_path:
             return
-        lines, errors = self.sales_service.parse_igsa_workbook_by_sheets(Path(file_path))
-        if not lines:
-            detail = "\n".join(errors[:20]) if errors else "No se pudieron extraer lineas."
-            QMessageBox.warning(self, "Vista previa IGSA libro", detail)
+        try:
+            outcome = self.settings_sales_preview_service.preview_igsa_workbook(Path(file_path))
+        except Exception as exc:
+            QMessageBox.warning(self, "Vista previa IGSA libro", str(exc))
             return
-        igsa_cliente_id = self._resolve_igsa_cliente_id()
-        if not igsa_cliente_id:
-            QMessageBox.warning(self, "Vista previa IGSA libro", "No se encontro el cliente/distribuidor IGSA.")
-            return
-        preview_rows, preview_errors = self.sales_service.build_igsa_workbook_preview(lines, igsa_cliente_id)
-        self._igsa_book_preview_lines = list(lines)
-        self._show_igsa_workbook_preview_dialog(preview_rows, errors + preview_errors)
+        self._igsa_book_preview_lines = list(outcome.raw_lines)
+        self._show_igsa_workbook_preview_dialog(outcome.preview_rows, outcome.errors)
 
     def _show_igsa_workbook_preview_dialog(self, lines: list[dict[str, object]], errors: list[str]) -> None:
         dialog = QDialog(self)

@@ -42,6 +42,11 @@ from app.services.settings_maintenance_ui_service import (
 from app.services.settings_orders_import_service import SettingsOrdersImportService, SettingsOrdersImportOutcome
 from app.services.settings_provider_service import SettingsProviderResult, SettingsProviderService
 from app.services.settings_sales_import_service import SettingsSalesImportOutcome, SettingsSalesImportService
+from app.services.settings_sales_preview_service import (
+    SettingsSalesPdfPreviewOutcome,
+    SettingsSalesPreviewService,
+    SettingsSalesWorkbookPreviewOutcome,
+)
 from app.services.warehouse_catalog_service import WarehouseCatalogService
 from app.services.warehouse_inventory_service import WarehouseInventoryService
 from app.services.warehouse_movement_service import WarehouseMovementService
@@ -113,6 +118,9 @@ __all__ = [
     "SettingsProviderResult",
     "SettingsSalesImportService",
     "SettingsSalesImportOutcome",
+    "SettingsSalesPreviewService",
+    "SettingsSalesPdfPreviewOutcome",
+    "SettingsSalesWorkbookPreviewOutcome",
     "WarehouseCatalogService",
     "WarehouseInventoryService",
     "WarehouseMovementService",
