@@ -1984,13 +1984,6 @@ class SettingsPage(QWidget):
         for option in self.settings_import_service.warehouse_filter_options():
             self.orders_import_almacen_combo.addItem(option.label, option.value)
 
-    def _load_igsa_pdf_import_almacen_combo(self) -> None:
-        if not hasattr(self, "igsa_pdf_import_almacen_combo"):
-            return
-        self.igsa_pdf_import_almacen_combo.clear()
-        for option in self.settings_import_service.warehouse_filter_options():
-            self.igsa_pdf_import_almacen_combo.addItem(option.label, option.value)
-
     def _import_orders_json_from_settings(self) -> None:
         almacen_id = str(self.orders_import_almacen_combo.currentData() or "").strip()
         file_path, _ = QFileDialog.getOpenFileName(

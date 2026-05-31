@@ -398,6 +398,9 @@ Fase 5 - Reducir dependencia del desktop.
 - Limpieza menor de parseo en `OrdersPage`:
   - eliminados métodos sin uso `_parse_optional_date` y `_parse_required_date`,
     dejando un único camino de parseo de fecha (`_parse_date`/`_try_parse_date`).
+- Limpieza de método no referenciado en `SettingsPage`:
+  - eliminado `_load_igsa_pdf_import_almacen_combo`, sin uso en la UI actual;
+  - se mantiene solo la carga activa de almacén para importación JSON de pedidos.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;
