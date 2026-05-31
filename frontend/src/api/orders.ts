@@ -43,6 +43,18 @@ export function createOrder(payload: {
   return apiPost<OrderRead>('/orders', payload)
 }
 
+export function updateOrder(
+  orderId: string,
+  payload: {
+    pedido_fecha: string
+    pedido_numero: string
+    lines: Array<{ articulo_id: string; uds: number }>
+    submit_mode: string
+  },
+) {
+  return apiPatch<OrderRead>(`/orders/${orderId}`, payload)
+}
+
 export function createOrderItem(orderId: string, payload: { articulo_id: string; articulo_cantidad: number }) {
   return apiPost<OrderItemRead>(`/orders/${orderId}/items`, payload)
 }

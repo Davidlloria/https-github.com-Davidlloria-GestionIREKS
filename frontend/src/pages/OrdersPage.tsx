@@ -8,6 +8,7 @@ import {
   listOrderItems,
   listOrderPending,
   listOrders,
+  updateOrder,
   updateOrderItem,
 } from '../api/orders'
 import { QueryState } from '../components/QueryState'
@@ -63,6 +64,13 @@ export function OrdersPage() {
   const [createLoading, setCreateLoading] = useState(false)
   const [createMessage, setCreateMessage] = useState('')
   const [createError, setCreateError] = useState('')
+  const [headerTargetOrderId, setHeaderTargetOrderId] = useState('')
+  const [headerPedidoFecha, setHeaderPedidoFecha] = useState('')
+  const [headerPedidoNumero, setHeaderPedidoNumero] = useState('')
+  const [headerSubmitMode, setHeaderSubmitMode] = useState<'normal' | 'pendiente'>('normal')
+  const [headerSaveLoading, setHeaderSaveLoading] = useState(false)
+  const [headerSaveMessage, setHeaderSaveMessage] = useState('')
+  const [headerSaveError, setHeaderSaveError] = useState('')
 
   const ordersQuery = useAsyncResource(
     () =>
@@ -114,6 +122,29 @@ export function OrdersPage() {
     [detailQuery.data.items, selectedOrderItemId],
   )
 
+  const effectiveHeaderValues = useMemo(() => {
+    const detail = detailQuery.data.detail
+    if (!detail) {
+      return {
+        pedidoFecha: '',
+        pedidoNumero: '',
+        submitMode: 'normal' as const,
+      }
+    }
+    if (headerTargetOrderId !== detail.pedido_id) {
+      return {
+        pedidoFecha: detail.pedido_fecha || '',
+        pedidoNumero: detail.pedido_numero || '',
+        submitMode: detail.pedido_estado === 'P' ? ('pendiente' as const) : ('normal' as const),
+      }
+    }
+    return {
+      pedidoFecha: headerPedidoFecha,
+      pedidoNumero: headerPedidoNumero,
+      submitMode: headerSubmitMode,
+    }
+  }, [detailQuery.data.detail, headerPedidoFecha, headerPedidoNumero, headerSubmitMode, headerTargetOrderId])
+
   const deleteSelectedOrder = async () => {
     if (!selectedOrder || deleteLoading) {
       return
@@ -136,6 +167,43 @@ export function OrdersPage() {
       setDeleteError(error instanceof Error ? error.message : 'No se pudo eliminar el pedido.')
     } finally {
       setDeleteLoading(false)
+    }
+  }
+
+  const saveOrderHeader = async () => {
+    const detail = detailQuery.data.detail
+    if (!detail || headerSaveLoading) {
+      return
+    }
+    if (!effectiveHeaderValues.pedidoFecha) {
+      setHeaderSaveError('La fecha del pedido es obligatoria.')
+      setHeaderSaveMessage('')
+      return
+    }
+    const lines = detailQuery.data.items.map((item) => ({
+      articulo_id: item.articulo_id,
+      uds: safeNumber(item.articulo_cantidad),
+    }))
+    setHeaderSaveLoading(true)
+    setHeaderSaveError('')
+    setHeaderSaveMessage('')
+    try {
+      const updated = await updateOrder(detail.pedido_id, {
+        pedido_fecha: effectiveHeaderValues.pedidoFecha,
+        pedido_numero: effectiveHeaderValues.pedidoNumero.trim(),
+        lines,
+        submit_mode: effectiveHeaderValues.submitMode === 'pendiente' ? 'pendiente' : '',
+      })
+      setHeaderTargetOrderId(updated.pedido_id)
+      setHeaderPedidoFecha(updated.pedido_fecha || '')
+      setHeaderPedidoNumero(updated.pedido_numero || '')
+      setHeaderSubmitMode(updated.pedido_estado === 'P' ? 'pendiente' : 'normal')
+      await Promise.all([ordersQuery.reload(), detailQuery.reload()])
+      setHeaderSaveMessage('Cabecera de pedido actualizada correctamente.')
+    } catch (error: unknown) {
+      setHeaderSaveError(error instanceof Error ? error.message : 'No se pudo actualizar la cabecera del pedido.')
+    } finally {
+      setHeaderSaveLoading(false)
     }
   }
 
@@ -239,6 +307,10 @@ export function OrdersPage() {
       })
       await ordersQuery.reload()
       setSelectedCandidateId(created.pedido_id)
+      setHeaderTargetOrderId(created.pedido_id)
+      setHeaderPedidoFecha(created.pedido_fecha || '')
+      setHeaderPedidoNumero(created.pedido_numero || '')
+      setHeaderSubmitMode(created.pedido_estado === 'P' ? 'pendiente' : 'normal')
       setCreateMessage('Pedido creado correctamente.')
       setCreatePedidoNumero('')
     } catch (error: unknown) {
@@ -368,6 +440,10 @@ export function OrdersPage() {
                     onClick={() => {
                       setSelectedCandidateId(row.pedido_id)
                       resetOrderItemForm()
+                      setHeaderTargetOrderId(row.pedido_id)
+                      setHeaderPedidoFecha(row.pedido_fecha || '')
+                      setHeaderPedidoNumero(row.pedido_numero || '')
+                      setHeaderSubmitMode(row.pedido_estado === 'P' ? 'pendiente' : 'normal')
                     }}
                   >
                     <td>{row.pedido_fecha}</td>
@@ -418,6 +494,70 @@ export function OrdersPage() {
                     <dd>{detailQuery.data.detail.pedido_ref || '-'}</dd>
                   </div>
                 </dl>
+
+                <div className="related-block">
+                  <h3>Editar cabecera</h3>
+                  <div className="form-grid">
+                    <label>
+                      Fecha pedido
+                      <input
+                        type="date"
+                        className="input"
+                        value={effectiveHeaderValues.pedidoFecha}
+                        onChange={(event) => {
+                          if (detailQuery.data.detail) {
+                            setHeaderTargetOrderId(detailQuery.data.detail.pedido_id)
+                          }
+                          setHeaderPedidoFecha(event.target.value)
+                        }}
+                        disabled={headerSaveLoading}
+                      />
+                    </label>
+                    <label>
+                      Numero pedido
+                      <input
+                        className="input"
+                        value={effectiveHeaderValues.pedidoNumero}
+                        onChange={(event) => {
+                          if (detailQuery.data.detail) {
+                            setHeaderTargetOrderId(detailQuery.data.detail.pedido_id)
+                          }
+                          setHeaderPedidoNumero(event.target.value)
+                        }}
+                        disabled={headerSaveLoading}
+                      />
+                    </label>
+                    <label>
+                      Modo
+                      <select
+                        className="select"
+                        value={effectiveHeaderValues.submitMode}
+                        onChange={(event) => {
+                          if (detailQuery.data.detail) {
+                            setHeaderTargetOrderId(detailQuery.data.detail.pedido_id)
+                          }
+                          setHeaderSubmitMode(event.target.value === 'pendiente' ? 'pendiente' : 'normal')
+                        }}
+                        disabled={headerSaveLoading}
+                      >
+                        <option value="normal">Normal</option>
+                        <option value="pendiente">Pendiente</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="toolbar">
+                    <button
+                      type="button"
+                      className="action-btn"
+                      onClick={saveOrderHeader}
+                      disabled={headerSaveLoading}
+                    >
+                      {headerSaveLoading ? 'Guardando...' : 'Guardar cabecera'}
+                    </button>
+                  </div>
+                  {!!headerSaveMessage && <div className="state">{headerSaveMessage}</div>}
+                  {!!headerSaveError && <div className="state">Error: {headerSaveError}</div>}
+                </div>
 
                 <div className="related-block">
                   <button

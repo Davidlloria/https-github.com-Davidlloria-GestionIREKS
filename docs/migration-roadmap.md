@@ -250,6 +250,10 @@ Fase 4 - Migrar escrituras a React.
   - crear pedidos desde la vista `Pedidos` con formulario basico;
   - usa `POST /orders` con `almacen_id`, `pedido_fecha`, `pedido_numero` y estado inicial;
   - valida campos obligatorios y refresca el listado tras crear.
+- Decimoquinto flujo de escritura en React:
+  - editar cabecera de pedido desde la vista `Pedidos` (fecha, numero y modo pendiente/normal);
+  - usa `PATCH /orders/{order_id}` preservando lineas existentes;
+  - refresca listado/detalle tras guardar, con feedback de exito/error.
 
 ## Hoja de ruta
 
