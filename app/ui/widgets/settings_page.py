@@ -36,6 +36,7 @@ from app.services.openai_settings_service import OpenAISettingsService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
 from app.services.address_catalog_service import AddressCatalogService
 from app.services.sales_reconciliation_service import SalesReconciliationService
+from app.services.settings_orders_import_service import SettingsOrdersImportService
 from app.services.settings_import_service import SettingsImportService
 from app.services.settings_maintenance_service import SettingsMaintenanceService
 from app.services.settings_provider_service import SettingsProviderService
@@ -1417,6 +1418,7 @@ class SettingsPage(QWidget):
         )
         self.sales_service = SalesReconciliationService()
         self.settings_import_service = SettingsImportService()
+        self.settings_orders_import_service = SettingsOrdersImportService(self.settings_import_service)
         self.settings_maintenance_service = SettingsMaintenanceService()
         self._igsa_pdf_preview_lines: list[object] = []
         self._igsa_book_preview_lines: list[object] = []
@@ -2031,9 +2033,6 @@ class SettingsPage(QWidget):
 
     def _import_orders_json_from_settings(self) -> None:
         almacen_id = str(self.orders_import_almacen_combo.currentData() or "").strip()
-        if not almacen_id:
-            QMessageBox.warning(self, "Importacion pedidos", "Selecciona un Cliente/Distribuidor.")
-            return
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Seleccionar archivo de pedidos",
@@ -2044,23 +2043,12 @@ class SettingsPage(QWidget):
             return
         source = Path(file_path)
         try:
-            result = self.settings_import_service.import_order_json(source, almacen_id)
+            outcome = self.settings_orders_import_service.import_orders_json(source, almacen_id)
         except Exception as exc:
             QMessageBox.warning(self, "Importacion pedidos", str(exc))
             return
-        unknown_unique = sorted(set(result.skipped_unknown))
-        unknown_preview = ", ".join(unknown_unique[:10])
-        unknown_extra = "" if len(unknown_unique) <= 10 else f" ... (+{len(unknown_unique) - 10})"
-        summary = [
-            "Pedido importado: (sin numero)",
-            f"Lineas importadas: {result.imported_items}",
-            f"Lineas con codigo inexistente: {len(result.skipped_unknown)}",
-            f"Lineas invalidas: {result.skipped_invalid}",
-        ]
-        if unknown_unique:
-            summary.append(f"Codigos no encontrados: {unknown_preview}{unknown_extra}")
-        self._append_log(f"Importacion pedidos OK: {source.name} | lineas={result.imported_items}")
-        QMessageBox.information(self, "Importacion pedidos", "\n".join(summary))
+        self._append_log(outcome.log_message)
+        QMessageBox.information(self, "Importacion pedidos", "\n".join(outcome.summary_lines))
 
     def _preview_igsa_sales_pdf(self) -> None:
         file_paths, _ = QFileDialog.getOpenFileNames(

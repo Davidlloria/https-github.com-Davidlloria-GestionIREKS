@@ -34,6 +34,8 @@ from app.services.provider_service import ProviderService
 from app.services.recipe_service import RecipeService
 from app.services.settings_import_service import SettingsImportService
 from app.services.settings_maintenance_service import SettingsMaintenanceService
+from app.services.settings_orders_import_service import SettingsOrdersImportService, SettingsOrdersImportOutcome
+from app.services.settings_provider_service import SettingsProviderResult, SettingsProviderService
 from app.services.warehouse_catalog_service import WarehouseCatalogService
 from app.services.warehouse_inventory_service import WarehouseInventoryService
 from app.services.warehouse_movement_service import WarehouseMovementService
@@ -96,6 +98,10 @@ __all__ = [
     "RecipeService",
     "SettingsImportService",
     "SettingsMaintenanceService",
+    "SettingsOrdersImportService",
+    "SettingsOrdersImportOutcome",
+    "SettingsProviderService",
+    "SettingsProviderResult",
     "WarehouseCatalogService",
     "WarehouseInventoryService",
     "WarehouseMovementService",

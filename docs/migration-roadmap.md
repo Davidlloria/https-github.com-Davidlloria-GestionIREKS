@@ -327,6 +327,11 @@ Fase 5 - Reducir dependencia del desktop.
     FDC, FatSecret, OpenAI y pedidos por Outlook;
   - `app/ui/widgets/settings_page.py` delega esas operaciones al servicio y
     mantiene solo interaccion de interfaz/mensajes.
+- Extraccion del flujo de importacion JSON de pedidos fuera de UI desktop:
+  - nueva capa `app/services/settings_orders_import_service.py` con validacion
+    de entrada y generacion de resumen/log reutilizable;
+  - `app/ui/widgets/settings_page.py` delega la importacion y solo muestra el
+    resultado en interfaz.
 
 ## Hoja de ruta
 
