@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from './http'
+import { apiDelete, apiGet, apiPatch, apiPost } from './http'
 import type { ContactCompanyOption, ContactDetail, ContactListItem } from '../types/api'
 
 export async function listContacts(search = ''): Promise<ContactListItem[]> {
@@ -38,4 +38,8 @@ export async function updateContact(
   },
 ): Promise<ContactDetail> {
   return apiPatch<ContactDetail>(`/contacts/${contactId}`, payload)
+}
+
+export async function deleteContact(contactId: string): Promise<void> {
+  return apiDelete(`/contacts/${contactId}`)
 }

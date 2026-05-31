@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { createContact, getContactDetail, listContactCompanies, listContacts, updateContact } from '../api/contacts'
+import { createContact, deleteContact, getContactDetail, listContactCompanies, listContacts, updateContact } from '../api/contacts'
 import { QueryState } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
 import { useAsyncResource } from '../features/useAsyncResource'
@@ -48,6 +48,9 @@ export function ContactsPage() {
   const [saveLoading, setSaveLoading] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
   const [saveError, setSaveError] = useState('')
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteMessage, setDeleteMessage] = useState('')
+  const [deleteError, setDeleteError] = useState('')
 
   const contactsQuery = useAsyncResource(() => listContacts(search), [], [search])
   const companiesQuery = useAsyncResource(() => listContactCompanies(), [], [])
@@ -179,6 +182,31 @@ export function ContactsPage() {
       setSaveError(error instanceof Error ? error.message : 'No se pudo guardar el contacto.')
     } finally {
       setSaveLoading(false)
+    }
+  }
+
+  const deleteSelectedContact = async () => {
+    if (!selectedContactId || deleteLoading) {
+      return
+    }
+    const target = filteredContacts.find((row) => row.contacto_id === selectedContactId)
+    const targetName = target ? fullName(target) || target.contacto_id : selectedContactId
+    const confirmed = window.confirm(`Se eliminara el contacto ${targetName}. Esta accion no se puede deshacer.`)
+    if (!confirmed) {
+      return
+    }
+    setDeleteLoading(true)
+    setDeleteError('')
+    setDeleteMessage('')
+    try {
+      await deleteContact(selectedContactId)
+      setSelectedCandidateId('')
+      await Promise.all([contactsQuery.reload(), companiesQuery.reload()])
+      setDeleteMessage('Contacto eliminado correctamente.')
+    } catch (error: unknown) {
+      setDeleteError(error instanceof Error ? error.message : 'No se pudo eliminar el contacto.')
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
@@ -314,9 +342,17 @@ export function ContactsPage() {
                   type="button"
                   className="action-btn"
                   onClick={beginEdit}
-                  disabled={saveLoading || !detailQuery.data}
+                  disabled={saveLoading || deleteLoading || !detailQuery.data}
                 >
                   Editar seleccionado
+                </button>
+                <button
+                  type="button"
+                  className="action-btn"
+                  onClick={deleteSelectedContact}
+                  disabled={saveLoading || deleteLoading || !selectedContactId}
+                >
+                  {deleteLoading ? 'Eliminando...' : 'Eliminar seleccionado'}
                 </button>
               </div>
 
@@ -400,6 +436,8 @@ export function ContactsPage() {
               </div>
               {!!saveMessage && <div className="state">{saveMessage}</div>}
               {!!saveError && <div className="state">Error: {saveError}</div>}
+              {!!deleteMessage && <div className="state">{deleteMessage}</div>}
+              {!!deleteError && <div className="state">Error: {deleteError}</div>}
             </div>
           </aside>
         </div>

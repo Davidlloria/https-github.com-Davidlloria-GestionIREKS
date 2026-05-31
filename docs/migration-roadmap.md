@@ -233,6 +233,10 @@ Fase 4 - Migrar escrituras a React.
   - eliminar clientes desde la vista `Clientes` con confirmacion;
   - usa `DELETE /customers/{customer_id}`;
   - muestra errores de conflicto cuando hay dependencias y refresca listados tras borrar.
+- Undecimo flujo de escritura en React:
+  - eliminar contactos desde la vista `Contactos` con confirmacion;
+  - usa `DELETE /contacts/{contact_id}`;
+  - muestra errores de conflicto cuando hay dependencias y refresca listados tras borrar.
 
 ## Hoja de ruta
 
