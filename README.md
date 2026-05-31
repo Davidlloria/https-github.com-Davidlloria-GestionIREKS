@@ -160,6 +160,10 @@ Reglas de arquitectura (incluidas en `pytest tests -q`):
 python -m pytest tests/test_architecture_boundaries.py -q
 ```
 
+Checklist de release (operativa de entrega):
+
+- `docs/release-checklist.md`
+
 ## Estado actual
 
 - Desktop PySide6 operativo como cliente principal legacy.

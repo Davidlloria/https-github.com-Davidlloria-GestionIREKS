@@ -429,6 +429,9 @@ Fase 5 - Reducir dependencia del desktop.
 - Documentacion operativa de backup:
   - `README.md` actualizado con comandos de backup normal, backup con `-Tag` y
     variante con `ExecutionPolicy Bypass`.
+- Checklist de entrega versionable:
+  - nuevo `docs/release-checklist.md` con pasos de pre-release, gates,
+    smoke tests y evidencias minimas para PR/release.
 
 ## Hoja de ruta
 
