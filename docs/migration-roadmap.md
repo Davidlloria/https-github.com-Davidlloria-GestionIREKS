@@ -93,7 +93,7 @@ app/models          Entidades ORM
 
 ### Fase actual
 
-Fase 4 - Migrar escrituras a React.
+Fase 5 - Reducir dependencia del desktop.
 
 ### Completado en Fase 2
 
