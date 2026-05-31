@@ -388,6 +388,9 @@ Fase 5 - Reducir dependencia del desktop.
     no referenciadas, manteniendo llamadas directas al servicio en flujos vivos;
   - reducido ruido del widget y superficie de mantenimiento sin cambiar
     comportamiento funcional.
+- Limpieza incremental de helpers muertos en `OrdersPage`:
+  - eliminado wrapper `_parse_albaran_pdf` (se usa parser directo);
+  - eliminados auxiliares `_parse_decimal_es*` sin referencias activas.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;

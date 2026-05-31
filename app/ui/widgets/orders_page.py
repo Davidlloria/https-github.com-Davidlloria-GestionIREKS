@@ -2787,9 +2787,6 @@ class OrdersPage(QWidget):
         if clicked == btn_items:
             self._import_order_items()
 
-    def _parse_albaran_pdf(self, file_path: Path) -> tuple[dict[str, str], list[dict[str, Any]]]:
-        return OrderDocumentParser.parse_albaran_pdf(file_path)
-
     def _confirm_albaran_preview(self, header: dict[str, str], rows: list[dict[str, Any]]) -> bool:
         dialog = AlbaranPreviewDialog(header=header, items=rows, parent=self)
         return dialog.exec() == QDialog.DialogCode.Accepted
@@ -2864,13 +2861,6 @@ class OrdersPage(QWidget):
         except Exception:
             return default
 
-    def _parse_decimal_es(self, value, default: float = 0.0) -> float:
-        return OrdersPage._parse_decimal_es_static(value, default)
-
-    @staticmethod
-    def _parse_decimal_es_static(value, default: float = 0.0) -> float:
-        return OrderDocumentParser.parse_decimal_es(value, default)
-
     @staticmethod
     def _format_number_es_static(value: float, decimals: int = 2, suffix: str = "") -> str:
         return OrderDocumentParser.format_number_es(value, decimals, suffix)
@@ -2928,7 +2918,7 @@ class OrdersPage(QWidget):
         try:
             preview = self.orders_documents_import_ui_service.prepare_albaran_preview(
                 Path(file_path),
-                parse_pdf=self._parse_albaran_pdf,
+                parse_pdf=OrderDocumentParser.parse_albaran_pdf,
             )
         except Exception as exc:
             QMessageBox.warning(self, "Pedidos", f"No se pudo leer el albarán: {exc}")
