@@ -1,4 +1,4 @@
-import { apiDelete, apiGet } from './http'
+import { apiDelete, apiGet, apiPatch, apiPost } from './http'
 import type { OrderItemRead, OrderListItem, OrderPendingRead, OrderRead } from '../types/api'
 
 interface ListOrdersFilters {
@@ -31,4 +31,16 @@ export function listOrderPending(orderId: string) {
 
 export function deleteOrder(orderId: string) {
   return apiDelete(`/orders/${orderId}`)
+}
+
+export function createOrderItem(orderId: string, payload: { articulo_id: string; articulo_cantidad: number }) {
+  return apiPost<OrderItemRead>(`/orders/${orderId}/items`, payload)
+}
+
+export function updateOrderItem(itemId: string, payload: { articulo_id: string; articulo_cantidad: number }) {
+  return apiPatch<OrderItemRead>(`/orders/items/${itemId}`, payload)
+}
+
+export function deleteOrderItem(itemId: string) {
+  return apiDelete(`/orders/items/${itemId}`)
 }

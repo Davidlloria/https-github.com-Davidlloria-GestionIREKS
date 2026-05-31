@@ -1,5 +1,14 @@
 import { useCallback, useMemo, useState } from 'react'
-import { deleteOrder, getOrderDetail, listOrderItems, listOrderPending, listOrders } from '../api/orders'
+import {
+  createOrderItem,
+  deleteOrder,
+  deleteOrderItem,
+  getOrderDetail,
+  listOrderItems,
+  listOrderPending,
+  listOrders,
+  updateOrderItem,
+} from '../api/orders'
 import { QueryState } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
 import { useAsyncResource } from '../features/useAsyncResource'
@@ -28,9 +37,16 @@ export function OrdersPage() {
   const [monthTo, setMonthTo] = useState('')
   const [almacenId, setAlmacenId] = useState('')
   const [selectedCandidateId, setSelectedCandidateId] = useState('')
+  const [selectedOrderItemId, setSelectedOrderItemId] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteMessage, setDeleteMessage] = useState('')
   const [deleteError, setDeleteError] = useState('')
+  const [lineArticuloId, setLineArticuloId] = useState('')
+  const [lineCantidad, setLineCantidad] = useState('')
+  const [lineSaveLoading, setLineSaveLoading] = useState(false)
+  const [lineDeleteLoading, setLineDeleteLoading] = useState(false)
+  const [lineMessage, setLineMessage] = useState('')
+  const [lineError, setLineError] = useState('')
 
   const ordersQuery = useAsyncResource(
     () =>
@@ -77,6 +93,11 @@ export function OrdersPage() {
     }
   }, [ordersQuery.data])
 
+  const selectedOrderItem = useMemo(
+    () => detailQuery.data.items.find((item) => item.item_id === selectedOrderItemId) ?? null,
+    [detailQuery.data.items, selectedOrderItemId],
+  )
+
   const deleteSelectedOrder = async () => {
     if (!selectedOrder || deleteLoading) {
       return
@@ -99,6 +120,79 @@ export function OrdersPage() {
       setDeleteError(error instanceof Error ? error.message : 'No se pudo eliminar el pedido.')
     } finally {
       setDeleteLoading(false)
+    }
+  }
+
+  const onSelectOrderItem = (item: OrderItemRead) => {
+    setSelectedOrderItemId(item.item_id)
+    setLineArticuloId(item.articulo_id || '')
+    setLineCantidad(String(item.articulo_cantidad ?? 0))
+    setLineMessage('')
+    setLineError('')
+  }
+
+  const resetOrderItemForm = () => {
+    setSelectedOrderItemId('')
+    setLineArticuloId('')
+    setLineCantidad('')
+  }
+
+  const saveOrderItem = async () => {
+    if (!selectedOrder || lineSaveLoading || lineDeleteLoading) {
+      return
+    }
+    const articuloId = lineArticuloId.trim()
+    const cantidad = Number.parseFloat(lineCantidad.replace(',', '.'))
+    if (!articuloId) {
+      setLineError('Debes indicar articulo_id.')
+      setLineMessage('')
+      return
+    }
+    if (!Number.isFinite(cantidad) || cantidad <= 0) {
+      setLineError('La cantidad debe ser un numero mayor que 0.')
+      setLineMessage('')
+      return
+    }
+    setLineSaveLoading(true)
+    setLineMessage('')
+    setLineError('')
+    try {
+      const payload = { articulo_id: articuloId, articulo_cantidad: cantidad }
+      const saved = selectedOrderItem
+        ? await updateOrderItem(selectedOrderItem.item_id, payload)
+        : await createOrderItem(selectedOrder.pedido_id, payload)
+      setSelectedOrderItemId(saved.item_id)
+      setLineArticuloId(saved.articulo_id)
+      setLineCantidad(String(saved.articulo_cantidad))
+      await detailQuery.reload()
+      setLineMessage(selectedOrderItem ? 'Linea actualizada correctamente.' : 'Linea creada correctamente.')
+    } catch (error: unknown) {
+      setLineError(error instanceof Error ? error.message : 'No se pudo guardar la linea de pedido.')
+    } finally {
+      setLineSaveLoading(false)
+    }
+  }
+
+  const deleteSelectedOrderItem = async () => {
+    if (!selectedOrderItem || lineDeleteLoading || lineSaveLoading) {
+      return
+    }
+    const confirmed = window.confirm('Se eliminara la linea seleccionada del pedido. Esta accion no se puede deshacer.')
+    if (!confirmed) {
+      return
+    }
+    setLineDeleteLoading(true)
+    setLineMessage('')
+    setLineError('')
+    try {
+      await deleteOrderItem(selectedOrderItem.item_id)
+      resetOrderItemForm()
+      await detailQuery.reload()
+      setLineMessage('Linea eliminada correctamente.')
+    } catch (error: unknown) {
+      setLineError(error instanceof Error ? error.message : 'No se pudo eliminar la linea de pedido.')
+    } finally {
+      setLineDeleteLoading(false)
     }
   }
 
@@ -164,7 +258,10 @@ export function OrdersPage() {
                   <tr
                     key={row.pedido_id}
                     className={row.pedido_id === selectedOrder?.pedido_id ? 'row-selected' : ''}
-                    onClick={() => setSelectedCandidateId(row.pedido_id)}
+                    onClick={() => {
+                      setSelectedCandidateId(row.pedido_id)
+                      resetOrderItemForm()
+                    }}
                   >
                     <td>{row.pedido_fecha}</td>
                     <td>{row.almacen_nombre || row.almacen_id}</td>
@@ -243,7 +340,11 @@ export function OrdersPage() {
                         </thead>
                         <tbody>
                           {detailQuery.data.items.slice(0, 12).map((item) => (
-                            <tr key={item.item_id}>
+                            <tr
+                              key={item.item_id}
+                              className={item.item_id === selectedOrderItemId ? 'row-selected' : ''}
+                              onClick={() => onSelectOrderItem(item)}
+                            >
                               <td>{item.articulo_id}</td>
                               <td>{safeNumber(item.articulo_cantidad).toFixed(2)}</td>
                               <td>{item.pedido_item_fecha}</td>
@@ -253,6 +354,56 @@ export function OrdersPage() {
                       </table>
                     </div>
                   )}
+                  <div className="form-grid">
+                    <label>
+                      Articulo ID
+                      <input
+                        className="input"
+                        value={lineArticuloId}
+                        onChange={(event) => setLineArticuloId(event.target.value)}
+                        disabled={lineSaveLoading || lineDeleteLoading}
+                        placeholder="Ej: 000123"
+                      />
+                    </label>
+                    <label>
+                      Cantidad
+                      <input
+                        className="input"
+                        value={lineCantidad}
+                        onChange={(event) => setLineCantidad(event.target.value)}
+                        disabled={lineSaveLoading || lineDeleteLoading}
+                        placeholder="Ej: 25.5"
+                      />
+                    </label>
+                  </div>
+                  <div className="toolbar">
+                    <button
+                      type="button"
+                      className="action-btn"
+                      onClick={saveOrderItem}
+                      disabled={lineSaveLoading || lineDeleteLoading}
+                    >
+                      {lineSaveLoading ? 'Guardando...' : selectedOrderItem ? 'Actualizar linea' : 'Crear linea'}
+                    </button>
+                    <button
+                      type="button"
+                      className="action-btn"
+                      onClick={deleteSelectedOrderItem}
+                      disabled={lineSaveLoading || lineDeleteLoading || !selectedOrderItem}
+                    >
+                      {lineDeleteLoading ? 'Eliminando...' : 'Eliminar linea'}
+                    </button>
+                    <button
+                      type="button"
+                      className="action-btn"
+                      onClick={resetOrderItemForm}
+                      disabled={lineSaveLoading || lineDeleteLoading}
+                    >
+                      Limpiar seleccion
+                    </button>
+                  </div>
+                  {!!lineMessage && <div className="state">{lineMessage}</div>}
+                  {!!lineError && <div className="state">Error: {lineError}</div>}
                 </div>
 
                 <div className="related-block">
