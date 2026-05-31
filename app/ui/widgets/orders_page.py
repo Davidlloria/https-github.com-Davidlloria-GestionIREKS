@@ -55,8 +55,6 @@ from app.services.order_document_import_service import OrderDocumentImportServic
 from app.services.order_document_parser import OrderDocumentParser
 from app.services.order_export_service import OrderExportService
 from app.services.orders_documents_import_ui_service import OrdersDocumentsImportUiService
-from app.services.orders_items_import_ui_service import OrdersItemsImportUiService
-from app.services.orders_json_import_ui_service import OrdersJsonImportUiService
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderLineInput, OrderService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
@@ -1101,8 +1099,6 @@ class OrdersPage(QWidget):
         self.orders_documents_import_ui_service = OrdersDocumentsImportUiService(
             order_document_import_service=self.order_document_import_service,
         )
-        self.orders_json_import_ui_service = OrdersJsonImportUiService(self.order_service)
-        self.orders_items_import_ui_service = OrdersItemsImportUiService(self.order_service)
         self.orders_mail_settings = OrdersMailSettingsService()
         self.rows: list[PedidoListRow] = []
         self._is_loading_details = False
@@ -2704,40 +2700,6 @@ class OrdersPage(QWidget):
             QMessageBox.warning(self, "Pedidos", f"No se pudo eliminar.\n{exc}")
         self.reload()
 
-    def _import_orders(self) -> None:
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Seleccionar archivo",
-            "",
-            "Archivos JSON (*.json)",
-        )
-        if not file_path:
-            return
-        source = Path(file_path)
-        self._import_orders_from_json(source)
-
-    def _import_orders_from_json(self, source: Path) -> None:
-        selected = self._selected_row()
-        selected_almacen = str(getattr(selected, "almacen_id", "") or "").strip() if selected else ""
-        try:
-            almacen_id = self.orders_json_import_ui_service.resolve_almacen_id(
-                filter_almacen_id=str(self.almacen_filter.currentData() or "").strip(),
-                selected_almacen_id=selected_almacen,
-            )
-        except Exception as exc:
-            QMessageBox.warning(self, "Pedidos", str(exc))
-            return
-
-        try:
-            outcome = self.orders_json_import_ui_service.import_orders_json(source, almacen_id)
-        except Exception as exc:
-            QMessageBox.warning(self, "Pedidos", str(exc))
-            return
-
-        self.reload()
-        self._select_by_id(outcome.pedido_id)
-        QMessageBox.information(self, "Importacion completada", "\n".join(outcome.summary_lines))
-
     def _confirm_albaran_preview(self, header: dict[str, str], rows: list[dict[str, Any]]) -> bool:
         dialog = AlbaranPreviewDialog(header=header, items=rows, parent=self)
         return dialog.exec() == QDialog.DialogCode.Accepted
@@ -2829,27 +2791,6 @@ class OrdersPage(QWidget):
             if not str(getattr(article, field_name, "") or "").strip():
                 return True
         return False
-
-    def _import_order_items(self) -> None:
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Seleccionar archivo",
-            "",
-            "Archivos de datos (*.xlsx *.xlsm *.csv)",
-        )
-        if not file_path:
-            return
-
-        try:
-            outcome = self.orders_items_import_ui_service.import_order_items_file(Path(file_path))
-        except Exception as exc:
-            QMessageBox.warning(self, "Pedidos", str(exc))
-            return
-        self.reload()
-        if not outcome.ok:
-            QMessageBox.warning(self, outcome.title, outcome.message)
-            return
-        QMessageBox.information(self, outcome.title, outcome.message)
 
     def _import_albaran_for_selected_order(self) -> None:
         row = self._selected_row()

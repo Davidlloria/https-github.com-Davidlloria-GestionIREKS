@@ -410,6 +410,9 @@ Fase 5 - Reducir dependencia del desktop.
 - Limpieza puntual adicional en `SettingsPage`:
   - eliminado `_rebuild_igsa_warehouse_movements`, sin enlaces en la UI actual;
   - retirada también la dependencia `QInputDialog` asociada a ese flujo legacy.
+- Limpieza adicional de importadores legacy en `OrdersPage`:
+  - eliminados `_import_orders`, `_import_orders_from_json` y `_import_order_items`, sin enlaces activos en la UI;
+  - retiradas las dependencias `OrdersJsonImportUiService` y `OrdersItemsImportUiService` del widget.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;
