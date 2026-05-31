@@ -61,6 +61,12 @@ export function SettingsPage() {
   const [importOrdersMessage, setImportOrdersMessage] = useState('')
   const [importOrdersError, setImportOrdersError] = useState('')
   const [importOrdersResult, setImportOrdersResult] = useState<OrderJsonImportResponse | null>(null)
+  const [providerEditName, setProviderEditName] = useState<string>('fdc')
+  const [providerEditDraft, setProviderEditDraft] = useState('')
+  const [providerEditDirty, setProviderEditDirty] = useState(false)
+  const [providerEditLoading, setProviderEditLoading] = useState(false)
+  const [providerEditMessage, setProviderEditMessage] = useState('')
+  const [providerEditError, setProviderEditError] = useState('')
 
   const maintenanceQuery = useAsyncResource(() => getMaintenanceStatus(), null, [])
   const providerQuery = useAsyncResource(async () => {
@@ -96,6 +102,19 @@ export function SettingsPage() {
     () => providerQuery.data.find((row) => row.provider === 'orders_mail' && row.status === 'ok') ?? null,
     [providerQuery.data],
   )
+  const providerEditRow = useMemo(
+    () => providerQuery.data.find((row) => row.provider === providerEditName) ?? null,
+    [providerEditName, providerQuery.data],
+  )
+  const providerEditText = useMemo(() => {
+    if (providerEditDirty) {
+      return providerEditDraft
+    }
+    if (!providerEditRow || providerEditRow.status !== 'ok') {
+      return '{}'
+    }
+    return JSON.stringify(providerEditRow.config ?? {}, null, 2)
+  }, [providerEditDirty, providerEditDraft, providerEditRow])
 
   const effectiveThresholdInput = useMemo(() => {
     if (warehouseThresholdInput) {
@@ -303,6 +322,44 @@ export function SettingsPage() {
     }
   }
 
+  const saveProviderJsonConfig = async () => {
+    if (providerEditLoading) {
+      return
+    }
+    if (!providerEditRow || providerEditRow.status !== 'ok') {
+      setProviderEditError('Selecciona un proveedor cargado correctamente.')
+      setProviderEditMessage('')
+      return
+    }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(providerEditText || '{}')
+    } catch {
+      setProviderEditError('El JSON no es valido.')
+      setProviderEditMessage('')
+      return
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      setProviderEditError('La configuracion debe ser un objeto JSON.')
+      setProviderEditMessage('')
+      return
+    }
+    setProviderEditLoading(true)
+    setProviderEditError('')
+    setProviderEditMessage('')
+    try {
+      await saveApiProviderSettings(providerEditRow.provider, parsed as Record<string, unknown>)
+      await providerQuery.reload()
+      setProviderEditDirty(false)
+      setProviderEditDraft(JSON.stringify(parsed, null, 2))
+      setProviderEditMessage(`Configuracion guardada para ${providerEditRow.provider}.`)
+    } catch (error: unknown) {
+      setProviderEditError(error instanceof Error ? error.message : 'No se pudo guardar la configuracion del proveedor.')
+    } finally {
+      setProviderEditLoading(false)
+    }
+  }
+
   return (
     <section className="page-grid">
       <div className="cards">
@@ -475,6 +532,59 @@ export function SettingsPage() {
               </table>
             </div>
           )}
+
+          <div className="related-block">
+            <h3>Configuracion JSON de proveedor</h3>
+            <div className="form-grid">
+              <label>
+                Proveedor
+                <select
+                  className="select"
+                  value={providerEditName}
+                  onChange={(event) => {
+                    setProviderEditName(event.target.value)
+                    setProviderEditDraft('')
+                    setProviderEditDirty(false)
+                    setProviderEditMessage('')
+                    setProviderEditError('')
+                  }}
+                  disabled={providerEditLoading}
+                >
+                  {providerQuery.data.map((row) => (
+                    <option key={row.provider} value={row.provider}>
+                      {row.provider}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Config (JSON)
+                <textarea
+                  className="input"
+                  value={providerEditText}
+                  onChange={(event) => {
+                    setProviderEditDraft(event.target.value)
+                    setProviderEditDirty(true)
+                  }}
+                  disabled={providerEditLoading}
+                  rows={10}
+                  style={{ minWidth: '100%', fontFamily: 'Consolas, monospace' }}
+                />
+              </label>
+            </div>
+            <div className="toolbar">
+              <button
+                type="button"
+                className="action-btn"
+                onClick={saveProviderJsonConfig}
+                disabled={providerEditLoading}
+              >
+                {providerEditLoading ? 'Guardando...' : 'Guardar JSON proveedor'}
+              </button>
+            </div>
+            {!!providerEditMessage && <div className="state">{providerEditMessage}</div>}
+            {!!providerEditError && <div className="state">Error: {providerEditError}</div>}
+          </div>
 
           <div className="related-block">
             <h3>Umbral de stock (warehouse)</h3>

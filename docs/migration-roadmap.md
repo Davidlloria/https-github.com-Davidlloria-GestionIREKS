@@ -301,6 +301,11 @@ Fase 4 - Migrar escrituras a React.
   - usa `POST /settings/imports/orders-json`;
   - valida en frontend almacen y `file_path` con extension `.json`;
   - muestra resumen de importacion (`imported_items`, `skipped_invalid`, `skipped_unknown`).
+- Vigesimosexto flujo de escritura en React:
+  - edicion generica de configuracion por proveedor API desde `Configuracion`;
+  - usa `PUT /settings/api/{provider}`;
+  - valida JSON en frontend y exige objeto de configuracion;
+  - refresca listado de proveedores tras guardar.
 
 ## Hoja de ruta
 
