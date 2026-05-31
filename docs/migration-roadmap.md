@@ -254,6 +254,10 @@ Fase 4 - Migrar escrituras a React.
   - editar cabecera de pedido desde la vista `Pedidos` (fecha, numero y modo pendiente/normal);
   - usa `PATCH /orders/{order_id}` preservando lineas existentes;
   - refresca listado/detalle tras guardar, con feedback de exito/error.
+- Decimosexto flujo de escritura en React:
+  - crear y editar clientes desde la vista `Clientes`;
+  - usa `POST /customers` y `PATCH /customers/{customer_id}`;
+  - valida nombre comercial obligatorio y muestra feedback de exito/error.
 
 ## Hoja de ruta
 

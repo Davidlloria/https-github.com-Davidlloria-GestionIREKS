@@ -1,10 +1,60 @@
 import { useCallback, useMemo, useState } from 'react'
 import { listContacts } from '../api/contacts'
-import { deleteCustomer, getCustomerDetail, listCustomers, updateCustomerActive } from '../api/customers'
+import {
+  createCustomer,
+  deleteCustomer,
+  getCustomerDetail,
+  listCustomers,
+  updateCustomer,
+  updateCustomerActive,
+} from '../api/customers'
 import { QueryState } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
 import { useAsyncResource } from '../features/useAsyncResource'
 import type { ContactListItem, CustomerDetail } from '../types/api'
+
+type CustomerFormMode = 'new' | 'edit'
+
+interface CustomerFormState {
+  cliente_id: string
+  cliente_nombre_comercial: string
+  cliente_nombre_fiscal: string
+  cliente_cif: string
+  cliente_email: string
+  cliente_telefono: string
+  cliente_tipo: string
+  cliente_grupo: string
+  cliente_prospeccion: boolean
+  activo: boolean
+}
+
+const EMPTY_CUSTOMER_FORM: CustomerFormState = {
+  cliente_id: '',
+  cliente_nombre_comercial: '',
+  cliente_nombre_fiscal: '',
+  cliente_cif: '',
+  cliente_email: '',
+  cliente_telefono: '',
+  cliente_tipo: '',
+  cliente_grupo: '',
+  cliente_prospeccion: false,
+  activo: true,
+}
+
+function formFromDetail(detail: CustomerDetail): CustomerFormState {
+  return {
+    cliente_id: detail.cliente_id || '',
+    cliente_nombre_comercial: detail.cliente_nombre_comercial || '',
+    cliente_nombre_fiscal: detail.cliente_nombre_fiscal || '',
+    cliente_cif: detail.cliente_cif || '',
+    cliente_email: detail.cliente_email || '',
+    cliente_telefono: detail.cliente_telefono || '',
+    cliente_tipo: detail.cliente_tipo || '',
+    cliente_grupo: detail.cliente_grupo || '',
+    cliente_prospeccion: Boolean(detail.cliente_prospeccion),
+    activo: Boolean(detail.activo),
+  }
+}
 
 export function CustomersPage() {
   const [search, setSearch] = useState('')
@@ -15,6 +65,11 @@ export function CustomersPage() {
   const [customerDeleteLoading, setCustomerDeleteLoading] = useState(false)
   const [customerDeleteMessage, setCustomerDeleteMessage] = useState('')
   const [customerDeleteError, setCustomerDeleteError] = useState('')
+  const [customerFormMode, setCustomerFormMode] = useState<CustomerFormMode>('edit')
+  const [customerForm, setCustomerForm] = useState<CustomerFormState>(EMPTY_CUSTOMER_FORM)
+  const [customerSaveLoading, setCustomerSaveLoading] = useState(false)
+  const [customerSaveMessage, setCustomerSaveMessage] = useState('')
+  const [customerSaveError, setCustomerSaveError] = useState('')
 
   const query = useAsyncResource(() => listCustomers(search), [], [search])
   const contactsQuery = useAsyncResource(() => listContacts(''), [], [])
@@ -59,6 +114,16 @@ export function CustomersPage() {
       .sort((a, b) => `${a.apellidos} ${a.nombre}`.localeCompare(`${b.apellidos} ${b.nombre}`))
   }, [contactsQuery.data, selectedCustomerId])
 
+  const effectiveCustomerForm = useMemo(() => {
+    if (customerFormMode === 'new') {
+      return customerForm
+    }
+    if (detailQuery.data) {
+      return formFromDetail(detailQuery.data)
+    }
+    return customerForm
+  }, [customerForm, customerFormMode, detailQuery.data])
+
   const toggleCustomerActive = async () => {
     if (!detailQuery.data || customerActiveLoading) {
       return
@@ -100,6 +165,90 @@ export function CustomersPage() {
       setCustomerDeleteError(error instanceof Error ? error.message : 'No se pudo eliminar el cliente.')
     } finally {
       setCustomerDeleteLoading(false)
+    }
+  }
+
+  const beginCreateCustomer = () => {
+    setCustomerFormMode('new')
+    setCustomerForm(EMPTY_CUSTOMER_FORM)
+    setCustomerSaveMessage('')
+    setCustomerSaveError('')
+  }
+
+  const beginEditCustomer = () => {
+    if (!detailQuery.data) {
+      return
+    }
+    setCustomerFormMode('edit')
+    setCustomerForm(formFromDetail(detailQuery.data))
+    setCustomerSaveMessage('')
+    setCustomerSaveError('')
+  }
+
+  const onCustomerFieldChange = <K extends keyof CustomerFormState>(field: K, value: CustomerFormState[K]) => {
+    setCustomerForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const saveCustomerForm = async () => {
+    if (customerSaveLoading) {
+      return
+    }
+    const payload = {
+      cliente_id: effectiveCustomerForm.cliente_id.trim(),
+      cliente_nombre_comercial: effectiveCustomerForm.cliente_nombre_comercial.trim(),
+      cliente_nombre_fiscal: effectiveCustomerForm.cliente_nombre_fiscal.trim(),
+      cliente_cif: effectiveCustomerForm.cliente_cif.trim(),
+      cliente_email: effectiveCustomerForm.cliente_email.trim(),
+      cliente_telefono: effectiveCustomerForm.cliente_telefono.trim(),
+      cliente_tipo: effectiveCustomerForm.cliente_tipo.trim(),
+      cliente_grupo: effectiveCustomerForm.cliente_grupo.trim(),
+      cliente_prospeccion: Boolean(effectiveCustomerForm.cliente_prospeccion),
+      activo: Boolean(effectiveCustomerForm.activo),
+    }
+    if (!payload.cliente_nombre_comercial) {
+      setCustomerSaveError('El nombre comercial es obligatorio.')
+      setCustomerSaveMessage('')
+      return
+    }
+    if (customerFormMode === 'edit' && !selectedCustomerId) {
+      setCustomerSaveError('No hay cliente seleccionado para editar.')
+      setCustomerSaveMessage('')
+      return
+    }
+
+    setCustomerSaveLoading(true)
+    setCustomerSaveError('')
+    setCustomerSaveMessage('')
+    try {
+      if (customerFormMode === 'new') {
+        const created = await createCustomer({
+          ...payload,
+          cliente_id: payload.cliente_id || undefined,
+        })
+        setSelectedCandidateId(created.cliente_id)
+        setCustomerFormMode('edit')
+        setCustomerForm(formFromDetail(created))
+        setCustomerSaveMessage('Cliente creado correctamente.')
+      } else {
+        const updated = await updateCustomer(selectedCustomerId, {
+          cliente_nombre_comercial: payload.cliente_nombre_comercial,
+          cliente_nombre_fiscal: payload.cliente_nombre_fiscal,
+          cliente_cif: payload.cliente_cif,
+          cliente_email: payload.cliente_email,
+          cliente_telefono: payload.cliente_telefono,
+          cliente_tipo: payload.cliente_tipo,
+          cliente_grupo: payload.cliente_grupo,
+          cliente_prospeccion: payload.cliente_prospeccion,
+          activo: payload.activo,
+        })
+        setCustomerForm(formFromDetail(updated))
+        setCustomerSaveMessage('Cliente actualizado correctamente.')
+      }
+      await Promise.all([query.reload(), detailQuery.reload()])
+    } catch (error: unknown) {
+      setCustomerSaveError(error instanceof Error ? error.message : 'No se pudo guardar el cliente.')
+    } finally {
+      setCustomerSaveLoading(false)
     }
   }
 
@@ -233,6 +382,140 @@ export function CustomersPage() {
                       </button>
                       {!!customerDeleteMessage && <div className="state">{customerDeleteMessage}</div>}
                       {!!customerDeleteError && <div className="state">Error: {customerDeleteError}</div>}
+                    </div>
+
+                    <div className="related-block">
+                      <h3>{customerFormMode === 'new' ? 'Nuevo cliente' : 'Editar cliente'}</h3>
+                      <div className="toolbar">
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={beginCreateCustomer}
+                          disabled={customerSaveLoading}
+                        >
+                          Nuevo
+                        </button>
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={beginEditCustomer}
+                          disabled={customerSaveLoading || !detailQuery.data}
+                        >
+                          Editar seleccionado
+                        </button>
+                      </div>
+                      <div className="form-grid">
+                        <label>
+                          Cliente ID (solo alta)
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_id}
+                            onChange={(event) => onCustomerFieldChange('cliente_id', event.target.value)}
+                            disabled={customerSaveLoading || customerFormMode !== 'new'}
+                          />
+                        </label>
+                        <label>
+                          Nombre comercial
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_nombre_comercial}
+                            onChange={(event) => onCustomerFieldChange('cliente_nombre_comercial', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          Nombre fiscal
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_nombre_fiscal}
+                            onChange={(event) => onCustomerFieldChange('cliente_nombre_fiscal', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          CIF
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_cif}
+                            onChange={(event) => onCustomerFieldChange('cliente_cif', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          Email
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_email}
+                            onChange={(event) => onCustomerFieldChange('cliente_email', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          Telefono
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_telefono}
+                            onChange={(event) => onCustomerFieldChange('cliente_telefono', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          Tipo
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_tipo}
+                            onChange={(event) => onCustomerFieldChange('cliente_tipo', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          Grupo
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_grupo}
+                            onChange={(event) => onCustomerFieldChange('cliente_grupo', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          Prospeccion
+                          <select
+                            className="select"
+                            value={effectiveCustomerForm.cliente_prospeccion ? 'si' : 'no'}
+                            onChange={(event) =>
+                              onCustomerFieldChange('cliente_prospeccion', event.target.value === 'si')
+                            }
+                            disabled={customerSaveLoading}
+                          >
+                            <option value="no">No</option>
+                            <option value="si">Si</option>
+                          </select>
+                        </label>
+                        <label>
+                          Activo
+                          <select
+                            className="select"
+                            value={effectiveCustomerForm.activo ? 'si' : 'no'}
+                            onChange={(event) => onCustomerFieldChange('activo', event.target.value === 'si')}
+                            disabled={customerSaveLoading}
+                          >
+                            <option value="si">Si</option>
+                            <option value="no">No</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div className="toolbar">
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={saveCustomerForm}
+                          disabled={customerSaveLoading}
+                        >
+                          {customerSaveLoading ? 'Guardando...' : 'Guardar cliente'}
+                        </button>
+                      </div>
+                      {!!customerSaveMessage && <div className="state">{customerSaveMessage}</div>}
+                      {!!customerSaveError && <div className="state">Error: {customerSaveError}</div>}
                     </div>
 
                     <div className="related-block">
