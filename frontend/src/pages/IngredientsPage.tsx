@@ -8,7 +8,9 @@ import {
   listIreksTarifas,
   listStdIngredients,
   listStdPrices,
+  updateIreksIngredient,
   updateStdActive,
+  updateStdIngredient,
 } from '../api/ingredients'
 import { QueryState } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
@@ -35,6 +37,12 @@ interface StdDetailPayload {
   prices: MateriaPrimaPrecioRead[]
 }
 
+interface StdEditForm {
+  articulo_descripcion: string
+  pvp_formato: string
+  pvp_unidad_medida: string
+}
+
 const EMPTY_IREKS_DETAIL: IreksDetailPayload = {
   detail: null,
   nutrition: null,
@@ -47,6 +55,12 @@ const EMPTY_STD_DETAIL: StdDetailPayload = {
   prices: [],
 }
 
+const EMPTY_STD_EDIT_FORM: StdEditForm = {
+  articulo_descripcion: '',
+  pvp_formato: '',
+  pvp_unidad_medida: '',
+}
+
 export function IngredientsPage() {
   const [mode, setMode] = useState<IngredientMode>('ireks')
   const [search, setSearch] = useState('')
@@ -56,6 +70,14 @@ export function IngredientsPage() {
   const [stdActiveLoading, setStdActiveLoading] = useState(false)
   const [stdActiveMessage, setStdActiveMessage] = useState('')
   const [stdActiveError, setStdActiveError] = useState('')
+  const [ireksActiveLoading, setIreksActiveLoading] = useState(false)
+  const [ireksActiveMessage, setIreksActiveMessage] = useState('')
+  const [ireksActiveError, setIreksActiveError] = useState('')
+  const [stdEditForm, setStdEditForm] = useState<StdEditForm>(EMPTY_STD_EDIT_FORM)
+  const [stdEditTargetId, setStdEditTargetId] = useState('')
+  const [stdEditLoading, setStdEditLoading] = useState(false)
+  const [stdEditMessage, setStdEditMessage] = useState('')
+  const [stdEditError, setStdEditError] = useState('')
 
   const ireksQuery = useAsyncResource(
     () => listIreksIngredients(search, activityFilter),
@@ -125,6 +147,21 @@ export function IngredientsPage() {
     }
   }, [ireksQuery.data, stdQuery.data])
 
+  const currentStdEditForm = useMemo(() => {
+    const detail = stdDetailQuery.data.detail
+    if (!detail) {
+      return EMPTY_STD_EDIT_FORM
+    }
+    if (stdEditTargetId !== detail.articulo_id) {
+      return {
+        articulo_descripcion: detail.articulo_descripcion || '',
+        pvp_formato: String(detail.pvp_formato ?? 0),
+        pvp_unidad_medida: String(detail.pvp_unidad_medida ?? 0),
+      }
+    }
+    return stdEditForm
+  }, [stdDetailQuery.data.detail, stdEditForm, stdEditTargetId])
+
   const formatWeight = (value: unknown) => {
     const numeric = Number(value)
     return Number.isFinite(numeric) ? numeric.toFixed(2) : '0.00'
@@ -147,6 +184,73 @@ export function IngredientsPage() {
       setStdActiveError(error instanceof Error ? error.message : 'No se pudo actualizar el estado de la materia prima.')
     } finally {
       setStdActiveLoading(false)
+    }
+  }
+
+  const saveStdEdition = async () => {
+    const detail = stdDetailQuery.data.detail
+    if (!detail || stdEditLoading) {
+      return
+    }
+    const pvpFormato = Number.parseFloat(currentStdEditForm.pvp_formato.replace(',', '.'))
+    const pvpUnidad = Number.parseFloat(currentStdEditForm.pvp_unidad_medida.replace(',', '.'))
+    if (!currentStdEditForm.articulo_descripcion.trim()) {
+      setStdEditError('La descripcion es obligatoria.')
+      setStdEditMessage('')
+      return
+    }
+    if (!Number.isFinite(pvpFormato) || pvpFormato < 0) {
+      setStdEditError('PVP formato debe ser un numero mayor o igual que 0.')
+      setStdEditMessage('')
+      return
+    }
+    if (!Number.isFinite(pvpUnidad) || pvpUnidad < 0) {
+      setStdEditError('PVP unidad de medida debe ser un numero mayor o igual que 0.')
+      setStdEditMessage('')
+      return
+    }
+
+    setStdEditLoading(true)
+    setStdEditError('')
+    setStdEditMessage('')
+    try {
+      const updated = await updateStdIngredient(detail.articulo_id, {
+        articulo_descripcion: currentStdEditForm.articulo_descripcion.trim(),
+        pvp_formato: pvpFormato,
+        pvp_unidad_medida: pvpUnidad,
+      })
+      await Promise.all([stdQuery.reload(), stdDetailQuery.reload()])
+      setStdEditTargetId(updated.articulo_id)
+      setStdEditForm({
+        articulo_descripcion: updated.articulo_descripcion || '',
+        pvp_formato: String(updated.pvp_formato ?? 0),
+        pvp_unidad_medida: String(updated.pvp_unidad_medida ?? 0),
+      })
+      setStdEditMessage('Materia prima STD actualizada.')
+    } catch (error: unknown) {
+      setStdEditError(error instanceof Error ? error.message : 'No se pudo actualizar la materia prima STD.')
+    } finally {
+      setStdEditLoading(false)
+    }
+  }
+
+  const toggleIreksActive = async () => {
+    const detail = ireksDetailQuery.data.detail
+    if (!detail || detail.id === null || ireksActiveLoading) {
+      return
+    }
+    const nextActive = !detail.articulo_status_activo
+    setIreksActiveLoading(true)
+    setIreksActiveError('')
+    setIreksActiveMessage('')
+    try {
+      await updateIreksIngredient(detail.id, { articulo_status_activo: nextActive })
+      await Promise.all([ireksQuery.reload(), ireksDetailQuery.reload()])
+      setIreksActiveMessage(nextActive ? 'Ingrediente IREKS activado.' : 'Ingrediente IREKS desactivado.')
+    } catch (error: unknown) {
+      setIreksActiveError(error instanceof Error ? error.message : 'No se pudo actualizar el estado IREKS.')
+    } finally {
+      setIreksActiveLoading(false)
     }
   }
 
@@ -275,6 +379,23 @@ export function IngredientsPage() {
                       </div>
                     </dl>
 
+                    <div className="related-block">
+                      <button
+                        type="button"
+                        className="action-btn"
+                        disabled={ireksActiveLoading}
+                        onClick={toggleIreksActive}
+                      >
+                        {ireksActiveLoading
+                          ? 'Guardando...'
+                          : ireksDetailQuery.data.detail.articulo_status_activo
+                            ? 'Desactivar IREKS'
+                            : 'Activar IREKS'}
+                      </button>
+                      {!!ireksActiveMessage && <div className="state">{ireksActiveMessage}</div>}
+                      {!!ireksActiveError && <div className="state">Error: {ireksActiveError}</div>}
+                    </div>
+
                     {!!ireksDetailQuery.data.nutrition && (
                       <div className="related-block">
                         <h3>Nutricion</h3>
@@ -351,7 +472,15 @@ export function IngredientsPage() {
                       <tr
                         key={row.articulo_id}
                         className={row.articulo_id === selectedStd?.articulo_id ? 'row-selected' : ''}
-                        onClick={() => setSelectedStdCandidateId(row.articulo_id)}
+                        onClick={() => {
+                          setSelectedStdCandidateId(row.articulo_id)
+                          setStdEditTargetId(row.articulo_id)
+                          setStdEditForm({
+                            articulo_descripcion: row.articulo_descripcion || '',
+                            pvp_formato: String(row.pvp_formato ?? 0),
+                            pvp_unidad_medida: String(row.pvp_unidad_medida ?? 0),
+                          })
+                        }}
                       >
                         <td>{row.articulo_referencia_distribuidor || '-'}</td>
                         <td>{row.articulo_descripcion || '-'}</td>
@@ -398,7 +527,7 @@ export function IngredientsPage() {
                       <button
                         type="button"
                         className="action-btn"
-                        disabled={stdActiveLoading}
+                        disabled={stdActiveLoading || stdEditLoading}
                         onClick={toggleStdActive}
                       >
                         {stdActiveLoading
@@ -409,6 +538,66 @@ export function IngredientsPage() {
                       </button>
                       {!!stdActiveMessage && <div className="state">{stdActiveMessage}</div>}
                       {!!stdActiveError && <div className="state">Error: {stdActiveError}</div>}
+                    </div>
+
+                    <div className="related-block">
+                      <h3>Edicion rapida STD</h3>
+                      <div className="form-grid">
+                        <label>
+                          Descripcion
+                          <input
+                            className="input"
+                            value={currentStdEditForm.articulo_descripcion}
+                            onChange={(event) => {
+                              if (stdDetailQuery.data.detail) {
+                                setStdEditTargetId(stdDetailQuery.data.detail.articulo_id)
+                              }
+                              setStdEditForm((prev) => ({ ...prev, articulo_descripcion: event.target.value }))
+                            }}
+                            disabled={stdEditLoading || stdActiveLoading}
+                          />
+                        </label>
+                        <label>
+                          PVP formato
+                          <input
+                            className="input"
+                            value={currentStdEditForm.pvp_formato}
+                            onChange={(event) => {
+                              if (stdDetailQuery.data.detail) {
+                                setStdEditTargetId(stdDetailQuery.data.detail.articulo_id)
+                              }
+                              setStdEditForm((prev) => ({ ...prev, pvp_formato: event.target.value }))
+                            }}
+                            disabled={stdEditLoading || stdActiveLoading}
+                          />
+                        </label>
+                        <label>
+                          PVP unidad medida
+                          <input
+                            className="input"
+                            value={currentStdEditForm.pvp_unidad_medida}
+                            onChange={(event) => {
+                              if (stdDetailQuery.data.detail) {
+                                setStdEditTargetId(stdDetailQuery.data.detail.articulo_id)
+                              }
+                              setStdEditForm((prev) => ({ ...prev, pvp_unidad_medida: event.target.value }))
+                            }}
+                            disabled={stdEditLoading || stdActiveLoading}
+                          />
+                        </label>
+                      </div>
+                      <div className="toolbar">
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={saveStdEdition}
+                          disabled={stdEditLoading || stdActiveLoading}
+                        >
+                          {stdEditLoading ? 'Guardando...' : 'Guardar cambios STD'}
+                        </button>
+                      </div>
+                      {!!stdEditMessage && <div className="state">{stdEditMessage}</div>}
+                      {!!stdEditError && <div className="state">Error: {stdEditError}</div>}
                     </div>
 
                     {!!stdDetailQuery.data.nutrition && (

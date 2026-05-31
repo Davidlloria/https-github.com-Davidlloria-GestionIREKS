@@ -201,6 +201,21 @@ Fase 4 - Migrar escrituras a React.
   - usa `POST /contacts` y `PATCH /contacts/{contact_id}`;
   - valida en frontend empresa obligatoria y al menos nombre o apellidos;
   - refresca listado/detalle y muestra feedback de guardado o error.
+- Cuarto flujo de escritura en React:
+  - registro de movimientos manuales de almacen desde la vista `Almacen`;
+  - usa `POST /warehouse/movements` con modo `in`/`out`;
+  - valida en frontend `almacen_id`, `articulo_id`, `cantidad > 0` y fecha;
+  - refresca stock y movimientos tras guardar, con feedback de exito/error.
+- Quinto flujo de escritura en React:
+  - edicion parcial de materias primas STD desde la vista `Ingredientes`;
+  - usa `PATCH /ingredients/std/{articulo_id}`;
+  - permite actualizar descripcion y precios (`pvp_formato`, `pvp_unidad_medida`);
+  - valida descripcion obligatoria y precios numericos no negativos;
+  - refresca listado/detalle tras guardar, con feedback de exito/error.
+- Sexto flujo de escritura en React:
+  - activar/desactivar ingredientes IREKS desde la vista `Ingredientes`;
+  - usa `PATCH /ingredients/ireks/{row_id}` con `articulo_status_activo`;
+  - refresca listado/detalle tras guardar, con feedback de exito/error.
 
 ## Hoja de ruta
 

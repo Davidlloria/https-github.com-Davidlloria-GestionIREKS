@@ -154,6 +154,16 @@ export interface WarehouseMovementRead {
   albaran_item_id: string
 }
 
+export interface WarehouseManualMovementCreate {
+  almacen_id: string
+  articulo_id: string
+  cantidad: number
+  mode: 'in' | 'out'
+  fecha_pedido: string
+  articulo_lote: string
+  pedido_albaran_numero: string
+}
+
 export interface InventoryHeaderRead {
   inventario_id: string
   almacen_id: string

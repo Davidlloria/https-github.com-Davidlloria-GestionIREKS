@@ -19,6 +19,16 @@ export function getIreksIngredientDetail(rowId: number) {
   return apiGet<IngredientIreksRead>(`/ingredients/ireks/${rowId}`)
 }
 
+export function updateIreksIngredient(
+  rowId: number,
+  payload: {
+    articulo_status_activo?: boolean
+    articulo_status_en_lista?: boolean
+  },
+) {
+  return apiPatch<IngredientIreksRead>(`/ingredients/ireks/${rowId}`, payload)
+}
+
 export function getIreksNutrition(articuloId: string) {
   return apiGet<NutritionValues | null>(`/ingredients/ireks/${articuloId}/nutrition`)
 }
@@ -48,4 +58,15 @@ export function listStdPrices(articuloId: string) {
 
 export function updateStdActive(articuloId: string, activo: boolean) {
   return apiPatch<IngredientStdRead>(`/ingredients/std/${articuloId}/active`, { activo })
+}
+
+export function updateStdIngredient(
+  articuloId: string,
+  payload: {
+    articulo_descripcion?: string
+    pvp_formato?: number
+    pvp_unidad_medida?: number
+  },
+) {
+  return apiPatch<IngredientStdRead>(`/ingredients/std/${articuloId}`, payload)
 }
