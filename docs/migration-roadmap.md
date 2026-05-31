@@ -374,6 +374,11 @@ Fase 5 - Reducir dependencia del desktop.
     para FDC, FatSecret, OpenAI y Outlook;
   - `app/ui/widgets/settings_page.py` deja de leer settings directamente y usa
     solo `SettingsProviderService` como punto de acceso.
+- Simplificacion adicional de dependencias en `SettingsPage`:
+  - eliminado el acoplamiento directo a `SalesReconciliationService` y
+    `SettingsMaintenanceService`;
+  - `SettingsPage` instancia y usa solo servicios de capa UI (`SettingsSales*`
+    y `SettingsMaintenanceUiService`) junto con `SettingsProviderService`.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;

@@ -31,10 +31,8 @@ from PySide6.QtWidgets import (
 from app.core.config import DATA_DIR
 from app.models import CodigoPostal, Isla, Localidad, Municipio, Provincia
 from app.services.address_catalog_service import AddressCatalogService
-from app.services.sales_reconciliation_service import SalesReconciliationService
 from app.services.settings_orders_import_service import SettingsOrdersImportService
 from app.services.settings_import_service import SettingsImportService
-from app.services.settings_maintenance_service import SettingsMaintenanceService
 from app.services.settings_maintenance_ui_service import SettingsMaintenanceUiService
 from app.services.settings_provider_service import SettingsProviderService
 from app.services.settings_sales_import_service import SettingsSalesImportService
@@ -1406,16 +1404,15 @@ class SettingsPage(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.settings_provider_service = SettingsProviderService()
-        self.sales_service = SalesReconciliationService()
         self.settings_import_service = SettingsImportService()
         self.settings_orders_import_service = SettingsOrdersImportService(self.settings_import_service)
         self.settings_sales_import_service = SettingsSalesImportService(
-            self.sales_service,
-            self.settings_import_service,
+            settings_import_service=self.settings_import_service,
         )
-        self.settings_sales_preview_service = SettingsSalesPreviewService(self.sales_service, self.settings_import_service)
-        self.settings_maintenance_service = SettingsMaintenanceService()
-        self.settings_maintenance_ui_service = SettingsMaintenanceUiService(self.settings_maintenance_service)
+        self.settings_sales_preview_service = SettingsSalesPreviewService(
+            settings_import_service=self.settings_import_service,
+        )
+        self.settings_maintenance_ui_service = SettingsMaintenanceUiService()
         self._igsa_pdf_preview_lines: list[object] = []
         self._igsa_book_preview_lines: list[object] = []
         self._build_ui()
