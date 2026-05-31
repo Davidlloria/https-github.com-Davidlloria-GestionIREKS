@@ -404,6 +404,9 @@ Fase 5 - Reducir dependencia del desktop.
 - Limpieza adicional de métodos puente sin uso en `OrdersPage`:
   - eliminados `_pedido_totals_kg`, `_repair_albaran_item_mappings` y `_show_import_selector`;
   - el widget mantiene llamadas directas a servicios activos y reduce superficie legacy.
+- Limpieza puntual de importación legacy en `SettingsPage`:
+  - eliminado `_import_igsa_sales_excel`, sin enlaces en la UI actual;
+  - se mantiene el flujo activo de importación/previsualización por libro/PDF.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;

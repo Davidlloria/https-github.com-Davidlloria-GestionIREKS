@@ -2266,26 +2266,6 @@ class SettingsPage(QWidget):
             QMessageBox.warning(self, outcome.title, outcome.message)
             self._append_log(outcome.log_message)
 
-    def _import_igsa_sales_excel(self) -> None:
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Seleccionar Excel IGSA",
-            "",
-            "Excel (*.xlsx *.xlsm)",
-        )
-        if not file_path:
-            return
-        try:
-            outcome = self.settings_sales_import_service.import_igsa_excel(Path(file_path))
-        except Exception as exc:
-            QMessageBox.warning(self, "Importacion ventas IGSA", str(exc))
-            return
-        if outcome.ok:
-            QMessageBox.information(self, outcome.title, outcome.message)
-        else:
-            QMessageBox.warning(self, outcome.title, outcome.message)
-        self._append_log(outcome.log_message)
-
     def _rebuild_igsa_warehouse_movements(self) -> None:
         periodo, ok = QInputDialog.getText(
             self,
