@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { listContacts } from '../api/contacts'
-import { getCustomerDetail, listCustomers, updateCustomerActive } from '../api/customers'
+import { deleteCustomer, getCustomerDetail, listCustomers, updateCustomerActive } from '../api/customers'
 import { QueryState } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
 import { useAsyncResource } from '../features/useAsyncResource'
@@ -12,6 +12,9 @@ export function CustomersPage() {
   const [customerActiveLoading, setCustomerActiveLoading] = useState(false)
   const [customerActiveMessage, setCustomerActiveMessage] = useState('')
   const [customerActiveError, setCustomerActiveError] = useState('')
+  const [customerDeleteLoading, setCustomerDeleteLoading] = useState(false)
+  const [customerDeleteMessage, setCustomerDeleteMessage] = useState('')
+  const [customerDeleteError, setCustomerDeleteError] = useState('')
 
   const query = useAsyncResource(() => listCustomers(search), [], [search])
   const contactsQuery = useAsyncResource(() => listContacts(''), [], [])
@@ -72,6 +75,31 @@ export function CustomersPage() {
       setCustomerActiveError(error instanceof Error ? error.message : 'No se pudo actualizar el estado del cliente.')
     } finally {
       setCustomerActiveLoading(false)
+    }
+  }
+
+  const deleteSelectedCustomer = async () => {
+    if (!detailQuery.data || customerDeleteLoading) {
+      return
+    }
+    const confirmed = window.confirm(
+      `Se eliminara el cliente ${detailQuery.data.cliente_nombre_comercial || detailQuery.data.cliente_id}. Esta accion no se puede deshacer.`,
+    )
+    if (!confirmed) {
+      return
+    }
+    setCustomerDeleteLoading(true)
+    setCustomerDeleteError('')
+    setCustomerDeleteMessage('')
+    try {
+      await deleteCustomer(detailQuery.data.cliente_id)
+      setSelectedCandidateId('')
+      await Promise.all([query.reload(), contactsQuery.reload()])
+      setCustomerDeleteMessage('Cliente eliminado correctamente.')
+    } catch (error: unknown) {
+      setCustomerDeleteError(error instanceof Error ? error.message : 'No se pudo eliminar el cliente.')
+    } finally {
+      setCustomerDeleteLoading(false)
     }
   }
 
@@ -181,7 +209,7 @@ export function CustomersPage() {
                       <button
                         type="button"
                         className="action-btn"
-                        disabled={customerActiveLoading}
+                        disabled={customerActiveLoading || customerDeleteLoading}
                         onClick={toggleCustomerActive}
                       >
                         {customerActiveLoading
@@ -192,6 +220,19 @@ export function CustomersPage() {
                       </button>
                       {!!customerActiveMessage && <div className="state">{customerActiveMessage}</div>}
                       {!!customerActiveError && <div className="state">Error: {customerActiveError}</div>}
+                    </div>
+
+                    <div className="related-block">
+                      <button
+                        type="button"
+                        className="action-btn"
+                        disabled={customerDeleteLoading || customerActiveLoading}
+                        onClick={deleteSelectedCustomer}
+                      >
+                        {customerDeleteLoading ? 'Eliminando...' : 'Eliminar cliente'}
+                      </button>
+                      {!!customerDeleteMessage && <div className="state">{customerDeleteMessage}</div>}
+                      {!!customerDeleteError && <div className="state">Error: {customerDeleteError}</div>}
                     </div>
 
                     <div className="related-block">

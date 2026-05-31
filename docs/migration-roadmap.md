@@ -229,6 +229,10 @@ Fase 4 - Migrar escrituras a React.
   - eliminar pedidos desde la vista `Pedidos` con confirmacion;
   - usa `DELETE /orders/{order_id}`;
   - refresca el listado tras borrar y muestra feedback de exito/error.
+- Decimo flujo de escritura en React:
+  - eliminar clientes desde la vista `Clientes` con confirmacion;
+  - usa `DELETE /customers/{customer_id}`;
+  - muestra errores de conflicto cuando hay dependencias y refresca listados tras borrar.
 
 ## Hoja de ruta
 

@@ -1,4 +1,4 @@
-import { apiGet, apiPatch } from './http'
+import { apiDelete, apiGet, apiPatch } from './http'
 import type { CustomerDetail, CustomerListItem } from '../types/api'
 
 export function listCustomers(search: string) {
@@ -11,4 +11,8 @@ export function getCustomerDetail(customerId: string) {
 
 export function updateCustomerActive(customerId: string, active: boolean) {
   return apiPatch<CustomerDetail>(`/customers/${customerId}`, { activo: active })
+}
+
+export function deleteCustomer(customerId: string) {
+  return apiDelete(`/customers/${customerId}`)
 }
