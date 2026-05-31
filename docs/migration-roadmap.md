@@ -291,6 +291,11 @@ Fase 4 - Migrar escrituras a React.
   - usa `POST /ingredients/std`;
   - valida en frontend referencia/proveedor/descripcion obligatorios, cantidad de formato mayor que 0 y PVP formato numerico no negativo;
   - refresca listado y detalle, dejando seleccionada la materia prima recien creada.
+- Vigesimocuarto flujo de escritura en React:
+  - alta de ingredientes IREKS desde la vista `Ingredientes`;
+  - usa `POST /ingredients/ireks`;
+  - valida en frontend `almacen_id`, referencia y descripcion obligatorios, y campos numericos de envase/transporte no negativos;
+  - refresca listado y detalle, dejando seleccionado el ingrediente recien creado.
 
 ## Hoja de ruta
 

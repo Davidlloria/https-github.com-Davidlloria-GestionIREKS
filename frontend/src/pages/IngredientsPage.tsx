@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
+  createIreksIngredient,
   createStdIngredient,
   createIreksTarifa,
   deleteIreksTarifa,
@@ -68,6 +69,25 @@ interface IreksEditForm {
   categoria: string
 }
 
+interface IreksCreateForm {
+  almacen_id: string
+  fabricante_id: string
+  distribuidor_id: string
+  articulo_referencia: string
+  articulo_referencia_corta: string
+  articulo_descripcion: string
+  categoria: string
+  articulo_familia_id: string
+  articulo_subfamilia_id: string
+  articulo_envase_id: string
+  articulo_envase_cantidad: string
+  articulo_envase_peso: string
+  transporte_cajas_por_capa: string
+  transporte_capas_por_pallet: string
+  articulo_status_activo: boolean
+  articulo_status_en_lista: boolean
+}
+
 interface IreksTarifaForm {
   tarifa_ano: string
   precio_fabricante: string
@@ -112,6 +132,25 @@ const EMPTY_IREKS_EDIT_FORM: IreksEditForm = {
   categoria: '',
 }
 
+const EMPTY_IREKS_CREATE_FORM: IreksCreateForm = {
+  almacen_id: '',
+  fabricante_id: '',
+  distribuidor_id: '',
+  articulo_referencia: '',
+  articulo_referencia_corta: '',
+  articulo_descripcion: '',
+  categoria: '',
+  articulo_familia_id: '',
+  articulo_subfamilia_id: '',
+  articulo_envase_id: '',
+  articulo_envase_cantidad: '1',
+  articulo_envase_peso: '1',
+  transporte_cajas_por_capa: '0',
+  transporte_capas_por_pallet: '0',
+  articulo_status_activo: true,
+  articulo_status_en_lista: true,
+}
+
 const EMPTY_IREKS_TARIFA_FORM: IreksTarifaForm = {
   tarifa_ano: '',
   precio_fabricante: '',
@@ -137,6 +176,10 @@ export function IngredientsPage() {
   const [ireksListLoading, setIreksListLoading] = useState(false)
   const [ireksListMessage, setIreksListMessage] = useState('')
   const [ireksListError, setIreksListError] = useState('')
+  const [ireksCreateForm, setIreksCreateForm] = useState<IreksCreateForm>(EMPTY_IREKS_CREATE_FORM)
+  const [ireksCreateLoading, setIreksCreateLoading] = useState(false)
+  const [ireksCreateMessage, setIreksCreateMessage] = useState('')
+  const [ireksCreateError, setIreksCreateError] = useState('')
   const [stdEditForm, setStdEditForm] = useState<StdEditForm>(EMPTY_STD_EDIT_FORM)
   const [stdEditTargetId, setStdEditTargetId] = useState('')
   const [stdEditLoading, setStdEditLoading] = useState(false)
@@ -343,6 +386,105 @@ export function IngredientsPage() {
       setStdCreateError(error instanceof Error ? error.message : 'No se pudo crear la materia prima STD.')
     } finally {
       setStdCreateLoading(false)
+    }
+  }
+
+  const saveIreksCreate = async () => {
+    if (ireksCreateLoading) {
+      return
+    }
+    const almacenId = ireksCreateForm.almacen_id.trim()
+    const referencia = ireksCreateForm.articulo_referencia.trim()
+    const referenciaCorta = ireksCreateForm.articulo_referencia_corta.trim()
+    const descripcion = ireksCreateForm.articulo_descripcion.trim()
+    const categoria = ireksCreateForm.categoria.trim()
+    const fabricanteId = ireksCreateForm.fabricante_id.trim()
+    const distribuidorId = ireksCreateForm.distribuidor_id.trim()
+    const articuloEnvaseId = ireksCreateForm.articulo_envase_id.trim()
+    const articuloFamiliaId = ireksCreateForm.articulo_familia_id.trim()
+    const articuloSubfamiliaId = ireksCreateForm.articulo_subfamilia_id.trim()
+    const envaseCantidad = Number.parseFloat(ireksCreateForm.articulo_envase_cantidad.replace(',', '.'))
+    const envasePeso = Number.parseFloat(ireksCreateForm.articulo_envase_peso.replace(',', '.'))
+    const cajasPorCapa = Number.parseFloat(ireksCreateForm.transporte_cajas_por_capa.replace(',', '.'))
+    const capasPorPallet = Number.parseFloat(ireksCreateForm.transporte_capas_por_pallet.replace(',', '.'))
+
+    if (!almacenId) {
+      setIreksCreateError('El almacen_id es obligatorio.')
+      setIreksCreateMessage('')
+      return
+    }
+    if (!referencia) {
+      setIreksCreateError('La referencia es obligatoria.')
+      setIreksCreateMessage('')
+      return
+    }
+    if (!descripcion) {
+      setIreksCreateError('La descripcion es obligatoria.')
+      setIreksCreateMessage('')
+      return
+    }
+    if (!Number.isFinite(envaseCantidad) || envaseCantidad < 0) {
+      setIreksCreateError('La cantidad de envase debe ser numerica y mayor o igual que 0.')
+      setIreksCreateMessage('')
+      return
+    }
+    if (!Number.isFinite(envasePeso) || envasePeso < 0) {
+      setIreksCreateError('El peso de envase debe ser numerico y mayor o igual que 0.')
+      setIreksCreateMessage('')
+      return
+    }
+    if (!Number.isFinite(cajasPorCapa) || cajasPorCapa < 0 || !Number.isFinite(capasPorPallet) || capasPorPallet < 0) {
+      setIreksCreateError('Los datos de transporte deben ser numericos y mayor o igual que 0.')
+      setIreksCreateMessage('')
+      return
+    }
+
+    setIreksCreateLoading(true)
+    setIreksCreateError('')
+    setIreksCreateMessage('')
+    try {
+      const created = await createIreksIngredient({
+        almacen_id: almacenId,
+        fabricante_id: fabricanteId,
+        distribuidor_id: distribuidorId,
+        articulo_referencia: referencia,
+        articulo_referencia_corta: referenciaCorta,
+        articulo_descripcion: descripcion,
+        categoria,
+        articulo_familia_id: articuloFamiliaId,
+        articulo_subfamilia_id: articuloSubfamiliaId,
+        articulo_envase_id: articuloEnvaseId,
+        articulo_envase_cantidad: envaseCantidad,
+        articulo_envase_peso: envasePeso,
+        transporte_cajas_por_capa: cajasPorCapa,
+        transporte_capas_por_pallet: capasPorPallet,
+        articulo_status_activo: ireksCreateForm.articulo_status_activo,
+        articulo_status_en_lista: ireksCreateForm.articulo_status_en_lista,
+      })
+      setSelectedIreksCandidateId(created.articulo_id)
+      setIreksEditTargetId(created.articulo_id)
+      setIreksEditForm({
+        articulo_referencia: created.articulo_referencia || '',
+        articulo_referencia_corta: created.articulo_referencia_corta || '',
+        articulo_descripcion: created.articulo_descripcion || '',
+        categoria: created.categoria || '',
+      })
+      setIreksCreateForm((prev) => ({
+        ...EMPTY_IREKS_CREATE_FORM,
+        almacen_id: prev.almacen_id,
+        fabricante_id: prev.fabricante_id,
+        distribuidor_id: prev.distribuidor_id,
+        articulo_familia_id: prev.articulo_familia_id,
+        articulo_subfamilia_id: prev.articulo_subfamilia_id,
+        articulo_envase_id: prev.articulo_envase_id,
+      }))
+      await ireksQuery.reload()
+      await ireksDetailQuery.reload()
+      setIreksCreateMessage(`Ingrediente IREKS creado (id ${created.id ?? '-'}).`)
+    } catch (error: unknown) {
+      setIreksCreateError(error instanceof Error ? error.message : 'No se pudo crear el ingrediente IREKS.')
+    } finally {
+      setIreksCreateLoading(false)
     }
   }
 
@@ -682,6 +824,225 @@ export function IngredientsPage() {
 
       {mode === 'ireks' && (
         <>
+          <div className="related-block">
+            <h3>Alta de ingrediente IREKS</h3>
+            <div className="form-grid">
+              <label>
+                Almacen ID
+                <input
+                  className="input"
+                  value={ireksCreateForm.almacen_id}
+                  onChange={(event) => setIreksCreateForm((prev) => ({ ...prev, almacen_id: event.target.value }))}
+                  disabled={ireksCreateLoading}
+                />
+              </label>
+              <label>
+                Referencia
+                <input
+                  className="input"
+                  value={ireksCreateForm.articulo_referencia}
+                  onChange={(event) =>
+                    setIreksCreateForm((prev) => ({ ...prev, articulo_referencia: event.target.value }))
+                  }
+                  disabled={ireksCreateLoading}
+                />
+              </label>
+              <label>
+                Referencia corta
+                <input
+                  className="input"
+                  value={ireksCreateForm.articulo_referencia_corta}
+                  onChange={(event) =>
+                    setIreksCreateForm((prev) => ({ ...prev, articulo_referencia_corta: event.target.value }))
+                  }
+                  disabled={ireksCreateLoading}
+                />
+              </label>
+              <label>
+                Descripcion
+                <input
+                  className="input"
+                  value={ireksCreateForm.articulo_descripcion}
+                  onChange={(event) =>
+                    setIreksCreateForm((prev) => ({ ...prev, articulo_descripcion: event.target.value }))
+                  }
+                  disabled={ireksCreateLoading}
+                />
+              </label>
+              <label>
+                Categoria
+                <input
+                  className="input"
+                  value={ireksCreateForm.categoria}
+                  onChange={(event) => setIreksCreateForm((prev) => ({ ...prev, categoria: event.target.value }))}
+                  disabled={ireksCreateLoading}
+                />
+              </label>
+              <label>
+                Fabricante
+                <select
+                  className="select"
+                  value={ireksCreateForm.fabricante_id}
+                  onChange={(event) => setIreksCreateForm((prev) => ({ ...prev, fabricante_id: event.target.value }))}
+                  disabled={ireksCreateLoading}
+                >
+                  <option value="">(sin fabricante)</option>
+                  {ireksQuery.data.catalogs.fabricantes.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name || option.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Distribuidor
+                <select
+                  className="select"
+                  value={ireksCreateForm.distribuidor_id}
+                  onChange={(event) => setIreksCreateForm((prev) => ({ ...prev, distribuidor_id: event.target.value }))}
+                  disabled={ireksCreateLoading}
+                >
+                  <option value="">(sin distribuidor)</option>
+                  {ireksQuery.data.catalogs.distribuidores.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name || option.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Familia
+                <select
+                  className="select"
+                  value={ireksCreateForm.articulo_familia_id}
+                  onChange={(event) =>
+                    setIreksCreateForm((prev) => ({ ...prev, articulo_familia_id: event.target.value }))
+                  }
+                  disabled={ireksCreateLoading}
+                >
+                  <option value="">(sin familia)</option>
+                  {ireksQuery.data.catalogs.familias.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name || option.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Subfamilia
+                <select
+                  className="select"
+                  value={ireksCreateForm.articulo_subfamilia_id}
+                  onChange={(event) =>
+                    setIreksCreateForm((prev) => ({ ...prev, articulo_subfamilia_id: event.target.value }))
+                  }
+                  disabled={ireksCreateLoading}
+                >
+                  <option value="">(sin subfamilia)</option>
+                  {ireksQuery.data.catalogs.subfamilias.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name || option.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Envase
+                <select
+                  className="select"
+                  value={ireksCreateForm.articulo_envase_id}
+                  onChange={(event) => setIreksCreateForm((prev) => ({ ...prev, articulo_envase_id: event.target.value }))}
+                  disabled={ireksCreateLoading}
+                >
+                  <option value="">(sin envase)</option>
+                  {ireksQuery.data.catalogs.envases.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name || option.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Cantidad envase
+                <input
+                  className="input"
+                  value={ireksCreateForm.articulo_envase_cantidad}
+                  onChange={(event) =>
+                    setIreksCreateForm((prev) => ({ ...prev, articulo_envase_cantidad: event.target.value }))
+                  }
+                  disabled={ireksCreateLoading}
+                />
+              </label>
+              <label>
+                Peso envase
+                <input
+                  className="input"
+                  value={ireksCreateForm.articulo_envase_peso}
+                  onChange={(event) =>
+                    setIreksCreateForm((prev) => ({ ...prev, articulo_envase_peso: event.target.value }))
+                  }
+                  disabled={ireksCreateLoading}
+                />
+              </label>
+              <label>
+                Cajas por capa
+                <input
+                  className="input"
+                  value={ireksCreateForm.transporte_cajas_por_capa}
+                  onChange={(event) =>
+                    setIreksCreateForm((prev) => ({ ...prev, transporte_cajas_por_capa: event.target.value }))
+                  }
+                  disabled={ireksCreateLoading}
+                />
+              </label>
+              <label>
+                Capas por pallet
+                <input
+                  className="input"
+                  value={ireksCreateForm.transporte_capas_por_pallet}
+                  onChange={(event) =>
+                    setIreksCreateForm((prev) => ({ ...prev, transporte_capas_por_pallet: event.target.value }))
+                  }
+                  disabled={ireksCreateLoading}
+                />
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={ireksCreateForm.articulo_status_activo}
+                  onChange={(event) =>
+                    setIreksCreateForm((prev) => ({ ...prev, articulo_status_activo: event.target.checked }))
+                  }
+                  disabled={ireksCreateLoading}
+                />{' '}
+                Activo
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={ireksCreateForm.articulo_status_en_lista}
+                  onChange={(event) =>
+                    setIreksCreateForm((prev) => ({ ...prev, articulo_status_en_lista: event.target.checked }))
+                  }
+                  disabled={ireksCreateLoading}
+                />{' '}
+                En lista
+              </label>
+            </div>
+            <div className="toolbar">
+              <button
+                type="button"
+                className="action-btn"
+                onClick={saveIreksCreate}
+                disabled={ireksCreateLoading}
+              >
+                {ireksCreateLoading ? 'Creando...' : 'Crear IREKS'}
+              </button>
+            </div>
+            {!!ireksCreateMessage && <div className="state">{ireksCreateMessage}</div>}
+            {!!ireksCreateError && <div className="state">Error: {ireksCreateError}</div>}
+          </div>
+
           <QueryState
             loading={ireksQuery.loading}
             error={ireksQuery.error}

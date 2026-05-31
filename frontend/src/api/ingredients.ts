@@ -19,6 +19,33 @@ export function getIreksIngredientDetail(rowId: number) {
   return apiGet<IngredientIreksRead>(`/ingredients/ireks/${rowId}`)
 }
 
+export function createIreksIngredient(payload: {
+  almacen_id: string
+  fabricante_id?: string
+  distribuidor_id?: string
+  articulo_id?: string
+  articulo_referencia?: string
+  articulo_referencia_corta?: string
+  articulo_descripcion: string
+  articulo_envase_id?: string
+  articulo_contenido_unidad?: string
+  articulo_envase_cantidad?: number
+  articulo_envase_peso?: number
+  articulo_envase_unidad_medida?: string
+  transporte_pallet_tipo?: string
+  transporte_cajas_por_capa?: number
+  transporte_capas_por_pallet?: number
+  transporte_observaciones?: string
+  articulo_familia_id?: string
+  articulo_grupo_id?: string
+  articulo_subfamilia_id?: string
+  categoria?: string
+  articulo_status_activo?: boolean
+  articulo_status_en_lista?: boolean
+}) {
+  return apiPost<IngredientIreksRead>('/ingredients/ireks', payload)
+}
+
 export function updateIreksIngredient(
   rowId: number,
   payload: {
