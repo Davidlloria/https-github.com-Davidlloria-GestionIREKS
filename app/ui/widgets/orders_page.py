@@ -53,7 +53,6 @@ from app.models import (
     PedidoPendiente,
     Subfamilia,
 )
-from app.services.import_service import ImportService
 from app.services.order_document_import_service import OrderDocumentImportService
 from app.services.order_document_parser import OrderDocumentParser
 from app.services.order_export_service import OrderExportService
@@ -1097,14 +1096,12 @@ class NewPedidoDialog(QDialog):
 class OrdersPage(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.import_service = ImportService()
         self.order_document_import_service = OrderDocumentImportService()
         self.order_export_service = OrderExportService()
         self.order_query_service = OrderQueryService()
         self.order_service = OrderService()
         self.orders_documents_import_ui_service = OrdersDocumentsImportUiService(
-            self.import_service,
-            self.order_document_import_service,
+            order_document_import_service=self.order_document_import_service,
         )
         self.orders_json_import_ui_service = OrdersJsonImportUiService(self.order_service)
         self.orders_items_import_ui_service = OrdersItemsImportUiService(self.order_service)

@@ -379,6 +379,10 @@ Fase 5 - Reducir dependencia del desktop.
     `SettingsMaintenanceService`;
   - `SettingsPage` instancia y usa solo servicios de capa UI (`SettingsSales*`
     y `SettingsMaintenanceUiService`) junto con `SettingsProviderService`.
+- Limpieza adicional de dependencias en `OrdersPage`:
+  - eliminado `ImportService` como dependencia directa del widget;
+  - `OrdersPage` mantiene el flujo via `OrdersDocumentsImportUiService`, que
+    encapsula el mapeo/preparacion de importaciones documentales.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;
