@@ -175,6 +175,23 @@ export interface InventoryHeaderRead {
   ajustes: number
 }
 
+export interface InventoryAdjustmentInput {
+  articulo_id: string
+  articulo_lote: string
+  articulo_caducidad: string | null
+  teorico_uds: number
+  conteo_uds: number
+  diferencia_uds: number
+  kg_ajuste: number
+}
+
+export interface InventoryAdjustmentPayload {
+  almacen_id: string
+  contador: string
+  aprobador: string
+  adjustments: InventoryAdjustmentInput[]
+}
+
 export interface OrderRead {
   pedido_id: string
   almacen_id: string

@@ -274,6 +274,11 @@ Fase 4 - Migrar escrituras a React.
   - importacion de pedidos JSON y documentos PDF desde la vista `Pedidos`;
   - usa `POST /orders/import/json`, `POST /orders/{order_id}/import/albaran-pdf` y `POST /orders/{order_id}/import/factura-pdf`;
   - valida rutas/almacen en frontend y refresca listados tras importar.
+- Vigesimoprimer flujo de escritura en React:
+  - aplicar ajustes de inventario desde la vista `Almacen`;
+  - usa `POST /warehouse/inventory/adjustments`;
+  - valida campos obligatorios y numericos en frontend;
+  - refresca stock/movimientos/historico tras aplicar ajustes.
 
 ## Hoja de ruta
 

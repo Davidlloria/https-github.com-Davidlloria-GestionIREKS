@@ -1,5 +1,6 @@
 import { apiGet, apiPost } from './http'
 import type {
+  InventoryAdjustmentPayload,
   InventoryHeaderRead,
   WarehouseManualMovementCreate,
   WarehouseMovementRead,
@@ -23,4 +24,8 @@ export function listInventoryHistory(almacenId: string) {
 
 export function createManualMovement(payload: WarehouseManualMovementCreate) {
   return apiPost<WarehouseMovementRead>('/warehouse/movements', payload)
+}
+
+export function applyInventoryAdjustments(payload: InventoryAdjustmentPayload) {
+  return apiPost<InventoryHeaderRead>('/warehouse/inventory/adjustments', payload)
 }
