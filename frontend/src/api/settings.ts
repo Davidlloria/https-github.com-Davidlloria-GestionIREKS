@@ -9,6 +9,24 @@ export function runMaintenanceIntegrityCheck() {
   return apiPost<MaintenanceResult>('/settings/maintenance/integrity-check')
 }
 
+export function runMaintenanceRepairContactLinks() {
+  return apiPost<MaintenanceResult>('/settings/maintenance/repair-contact-links')
+}
+
+export function runMaintenanceCreateMissingContactClients() {
+  return apiPost<MaintenanceResult>('/settings/maintenance/create-missing-contact-clients')
+}
+
+export function runMaintenanceOptimize() {
+  return apiPost<MaintenanceResult>('/settings/maintenance/optimize')
+}
+
+export function runMaintenanceBackup(destinationPath: string) {
+  return apiPost<MaintenanceResult>('/settings/maintenance/backup', {
+    destination_path: destinationPath,
+  })
+}
+
 export function getApiProviderSettings(provider: string) {
   return apiGet<ApiSettingsPayload>(`/settings/api/${provider}`)
 }

@@ -3,7 +3,11 @@ import {
   getApiProviderSettings,
   getMaintenanceStatus,
   listImportWarehouses,
+  runMaintenanceBackup,
+  runMaintenanceCreateMissingContactClients,
   runMaintenanceIntegrityCheck,
+  runMaintenanceOptimize,
+  runMaintenanceRepairContactLinks,
   saveApiProviderSettings,
 } from '../api/settings'
 import { QueryState } from '../components/QueryState'
@@ -46,6 +50,10 @@ export function SettingsPage() {
   const [ordersMailSaveLoading, setOrdersMailSaveLoading] = useState(false)
   const [ordersMailSaveMessage, setOrdersMailSaveMessage] = useState('')
   const [ordersMailSaveError, setOrdersMailSaveError] = useState('')
+  const [maintenanceActionLoading, setMaintenanceActionLoading] = useState(false)
+  const [maintenanceActionMessage, setMaintenanceActionMessage] = useState('')
+  const [maintenanceActionError, setMaintenanceActionError] = useState('')
+  const [backupDestinationPath, setBackupDestinationPath] = useState('')
 
   const maintenanceQuery = useAsyncResource(() => getMaintenanceStatus(), null, [])
   const providerQuery = useAsyncResource(async () => {
@@ -156,6 +164,24 @@ export function SettingsPage() {
     }
   }
 
+  const runMaintenanceAction = async (action: () => Promise<MaintenanceResult>, successPrefix: string) => {
+    if (maintenanceActionLoading) {
+      return
+    }
+    setMaintenanceActionLoading(true)
+    setMaintenanceActionError('')
+    setMaintenanceActionMessage('')
+    try {
+      const result = await action()
+      await maintenanceQuery.reload()
+      setMaintenanceActionMessage(`${successPrefix}: ${result.message || 'OK'}`)
+    } catch (error: unknown) {
+      setMaintenanceActionError(error instanceof Error ? error.message : 'Error ejecutando accion de mantenimiento.')
+    } finally {
+      setMaintenanceActionLoading(false)
+    }
+  }
+
   const saveWarehouseThreshold = async () => {
     if (warehouseSaveLoading) {
       return
@@ -211,6 +237,19 @@ export function SettingsPage() {
     }
   }
 
+  const runBackup = async () => {
+    const destination = backupDestinationPath.trim()
+    if (!destination) {
+      setMaintenanceActionError('Debes indicar destination_path para el backup.')
+      setMaintenanceActionMessage('')
+      return
+    }
+    await runMaintenanceAction(
+      () => runMaintenanceBackup(destination),
+      'Backup completado',
+    )
+  }
+
   return (
     <section className="page-grid">
       <div className="cards">
@@ -260,6 +299,65 @@ export function SettingsPage() {
                   {integrityRun.message} ({integrityRun.ok ? 'OK' : 'Con incidencias'})
                 </div>
               )}
+            </div>
+
+            <div className="related-block">
+              <h3>Mantenimiento</h3>
+              <div className="toolbar">
+                <button
+                  type="button"
+                  className="action-btn"
+                  onClick={() => runMaintenanceAction(runMaintenanceRepairContactLinks, 'Revision de enlaces')}
+                  disabled={maintenanceActionLoading}
+                >
+                  {maintenanceActionLoading ? 'Ejecutando...' : 'Reparar enlaces'}
+                </button>
+                <button
+                  type="button"
+                  className="action-btn"
+                  onClick={() =>
+                    runMaintenanceAction(
+                      runMaintenanceCreateMissingContactClients,
+                      'Creacion de clientes faltantes',
+                    )
+                  }
+                  disabled={maintenanceActionLoading}
+                >
+                  {maintenanceActionLoading ? 'Ejecutando...' : 'Crear clientes faltantes'}
+                </button>
+                <button
+                  type="button"
+                  className="action-btn"
+                  onClick={() => runMaintenanceAction(runMaintenanceOptimize, 'Optimizacion')}
+                  disabled={maintenanceActionLoading}
+                >
+                  {maintenanceActionLoading ? 'Ejecutando...' : 'Optimizar BD'}
+                </button>
+              </div>
+              <div className="form-grid">
+                <label>
+                  Ruta backup (.db)
+                  <input
+                    className="input"
+                    value={backupDestinationPath}
+                    onChange={(event) => setBackupDestinationPath(event.target.value)}
+                    placeholder="E:\\IREKS\\APP\\GestionIREKS\\data\\backups\\backup_manual.db"
+                    disabled={maintenanceActionLoading}
+                  />
+                </label>
+              </div>
+              <div className="toolbar">
+                <button
+                  type="button"
+                  className="action-btn"
+                  onClick={runBackup}
+                  disabled={maintenanceActionLoading}
+                >
+                  {maintenanceActionLoading ? 'Ejecutando...' : 'Crear backup'}
+                </button>
+              </div>
+              {!!maintenanceActionMessage && <div className="state">{maintenanceActionMessage}</div>}
+              {!!maintenanceActionError && <div className="state">Error: {maintenanceActionError}</div>}
             </div>
           </div>
 

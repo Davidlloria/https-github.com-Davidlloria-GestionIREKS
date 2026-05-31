@@ -279,6 +279,13 @@ Fase 4 - Migrar escrituras a React.
   - usa `POST /warehouse/inventory/adjustments`;
   - valida campos obligatorios y numericos en frontend;
   - refresca stock/movimientos/historico tras aplicar ajustes.
+- Vigesimosegundo flujo de escritura en React:
+  - ejecutar mantenimiento desde la vista `Configuracion`;
+  - usa `POST /settings/maintenance/repair-contact-links`,
+    `POST /settings/maintenance/create-missing-contact-clients`,
+    `POST /settings/maintenance/optimize` y
+    `POST /settings/maintenance/backup`;
+  - valida ruta de backup en frontend y refresca estado de mantenimiento tras cada accion.
 
 ## Hoja de ruta
 
