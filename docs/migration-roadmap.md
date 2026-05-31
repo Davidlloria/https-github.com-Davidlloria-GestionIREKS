@@ -246,6 +246,10 @@ Fase 4 - Migrar escrituras a React.
   - eliminar ingredientes STD e IREKS desde la vista `Ingredientes` con confirmacion;
   - usa `DELETE /ingredients/std/{articulo_id}` y `DELETE /ingredients/ireks/{row_id}`;
   - muestra errores de conflicto cuando hay dependencias y refresca listados tras borrar.
+- Decimocuarto flujo de escritura en React:
+  - crear pedidos desde la vista `Pedidos` con formulario basico;
+  - usa `POST /orders` con `almacen_id`, `pedido_fecha`, `pedido_numero` y estado inicial;
+  - valida campos obligatorios y refresca el listado tras crear.
 
 ## Hoja de ruta
 

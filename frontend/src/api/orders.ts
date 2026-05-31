@@ -33,6 +33,16 @@ export function deleteOrder(orderId: string) {
   return apiDelete(`/orders/${orderId}`)
 }
 
+export function createOrder(payload: {
+  almacen_id: string
+  pedido_fecha: string
+  pedido_numero: string
+  lines: Array<{ articulo_id: string; uds: number }>
+  is_pending: boolean
+}) {
+  return apiPost<OrderRead>('/orders', payload)
+}
+
 export function createOrderItem(orderId: string, payload: { articulo_id: string; articulo_cantidad: number }) {
   return apiPost<OrderItemRead>(`/orders/${orderId}/items`, payload)
 }

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
+  createOrder,
   createOrderItem,
   deleteOrder,
   deleteOrderItem,
@@ -26,6 +27,14 @@ const EMPTY_ORDER_DETAIL: OrderDetailPayload = {
   pending: [],
 }
 
+function todayIsoDate() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = `${now.getMonth() + 1}`.padStart(2, '0')
+  const day = `${now.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function safeNumber(value: unknown) {
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric : 0
@@ -47,6 +56,13 @@ export function OrdersPage() {
   const [lineDeleteLoading, setLineDeleteLoading] = useState(false)
   const [lineMessage, setLineMessage] = useState('')
   const [lineError, setLineError] = useState('')
+  const [createAlmacenId, setCreateAlmacenId] = useState('')
+  const [createPedidoFecha, setCreatePedidoFecha] = useState(todayIsoDate())
+  const [createPedidoNumero, setCreatePedidoNumero] = useState('')
+  const [createPending, setCreatePending] = useState(false)
+  const [createLoading, setCreateLoading] = useState(false)
+  const [createMessage, setCreateMessage] = useState('')
+  const [createError, setCreateError] = useState('')
 
   const ordersQuery = useAsyncResource(
     () =>
@@ -196,6 +212,42 @@ export function OrdersPage() {
     }
   }
 
+  const createNewOrder = async () => {
+    if (createLoading) {
+      return
+    }
+    if (!createAlmacenId.trim()) {
+      setCreateError('Debes indicar almacen_id para crear el pedido.')
+      setCreateMessage('')
+      return
+    }
+    if (!createPedidoFecha) {
+      setCreateError('Debes indicar la fecha del pedido.')
+      setCreateMessage('')
+      return
+    }
+    setCreateLoading(true)
+    setCreateError('')
+    setCreateMessage('')
+    try {
+      const created = await createOrder({
+        almacen_id: createAlmacenId.trim(),
+        pedido_fecha: createPedidoFecha,
+        pedido_numero: createPedidoNumero.trim(),
+        lines: [],
+        is_pending: createPending,
+      })
+      await ordersQuery.reload()
+      setSelectedCandidateId(created.pedido_id)
+      setCreateMessage('Pedido creado correctamente.')
+      setCreatePedidoNumero('')
+    } catch (error: unknown) {
+      setCreateError(error instanceof Error ? error.message : 'No se pudo crear el pedido.')
+    } finally {
+      setCreateLoading(false)
+    }
+  }
+
   return (
     <section className="page-grid">
       <div className="toolbar">
@@ -230,6 +282,61 @@ export function OrdersPage() {
         <StatCard label="Con albaran" value={totals.withAlbaran} />
         <StatCard label="Con factura" value={totals.withFactura} />
         <StatCard label="Total kg (listado)" value={totals.totalKg} />
+      </div>
+
+      <div className="detail-panel">
+        <h3>Crear pedido</h3>
+        <div className="form-grid">
+          <label>
+            Almacen ID
+            <input
+              className="input"
+              value={createAlmacenId}
+              onChange={(event) => setCreateAlmacenId(event.target.value)}
+              placeholder="Ej: ALM-01"
+              disabled={createLoading}
+            />
+          </label>
+          <label>
+            Fecha pedido
+            <input
+              type="date"
+              className="input"
+              value={createPedidoFecha}
+              onChange={(event) => setCreatePedidoFecha(event.target.value)}
+              disabled={createLoading}
+            />
+          </label>
+          <label>
+            Numero pedido
+            <input
+              className="input"
+              value={createPedidoNumero}
+              onChange={(event) => setCreatePedidoNumero(event.target.value)}
+              placeholder="Opcional"
+              disabled={createLoading}
+            />
+          </label>
+          <label>
+            Estado inicial
+            <select
+              className="select"
+              value={createPending ? 'pendiente' : 'normal'}
+              onChange={(event) => setCreatePending(event.target.value === 'pendiente')}
+              disabled={createLoading}
+            >
+              <option value="normal">Normal</option>
+              <option value="pendiente">Pendiente</option>
+            </select>
+          </label>
+        </div>
+        <div className="toolbar">
+          <button type="button" className="action-btn" onClick={createNewOrder} disabled={createLoading}>
+            {createLoading ? 'Creando...' : 'Crear pedido'}
+          </button>
+        </div>
+        {!!createMessage && <div className="state">{createMessage}</div>}
+        {!!createError && <div className="state">Error: {createError}</div>}
       </div>
 
       <QueryState
