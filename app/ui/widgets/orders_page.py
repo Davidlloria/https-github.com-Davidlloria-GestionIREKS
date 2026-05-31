@@ -42,7 +42,6 @@ from PySide6.QtWidgets import (
 from app.models import (
     Albaran,
     AlbaranItem,
-    Cliente,
     Factura,
     FacturaItem,
     Fabricante,
@@ -2660,47 +2659,6 @@ class OrdersPage(QWidget):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Pedidos", f"No se pudo imprimir.\n{exc}")
 
-    def _cliente_export_code(self, cliente: Cliente | None) -> str:
-        return self.order_export_service.cliente_export_code(cliente)
-
-    def _build_export_base_name(self, pedido_fecha: date, cliente: Cliente | None) -> str:
-        return self.order_export_service.build_export_base_name(pedido_fecha, cliente)
-
-    def _sanitize_filename(self, value: str) -> str:
-        return self.order_export_service.sanitize_filename(value)
-
-    def _pedido_history_dir(self, pedido_fecha: date) -> Path:
-        return self.order_export_service.pedido_history_dir(pedido_fecha)
-
-    def _next_history_version(self, folder: Path, base_name: str) -> int:
-        return self.order_export_service.next_history_version(folder, base_name)
-
-    def _save_order_excel_history(self, pedido_id: str, wb: Workbook, default_base_name: str) -> Path:
-        return self.order_export_service.save_order_excel_history(pedido_id, wb, default_base_name)
-
-    def _open_outlook_mail_with_attachment(
-        self,
-        pedido_id: str,
-        pedido_numero: str,
-        attachment_path: Path,
-        destino_email: str,
-        send_direct: bool,
-        subject: str,
-        body: str,
-    ) -> dict[str, str]:
-        return self.order_export_service.open_outlook_mail_with_attachment(
-            pedido_id=pedido_id,
-            pedido_numero=pedido_numero,
-            attachment_path=attachment_path,
-            destino_email=destino_email,
-            send_direct=send_direct,
-            subject=subject,
-            body=body,
-        )
-
-    def _build_order_mail_preview(self, pedido_id: str, pedido_numero: str, destino_email: str) -> dict[str, str]:
-        return self.order_export_service.build_order_mail_preview(pedido_id, pedido_numero, destino_email)
-
     def _show_mail_preview_dialog(
         self,
         *,
@@ -2763,34 +2721,8 @@ class OrdersPage(QWidget):
             "body": body_input.toPlainText(),
         }
 
-    def _log_order_mail_event(
-        self,
-        *,
-        pedido_id: str,
-        pedido_numero: str,
-        destino_email: str,
-        asunto: str,
-        adjunto_path: str,
-        modo_envio: str,
-        estado: str,
-        error_detalle: str,
-    ) -> None:
-        self.order_export_service.log_order_mail_event(
-            pedido_id=pedido_id,
-            pedido_numero=pedido_numero,
-            destino_email=destino_email,
-            asunto=asunto,
-            adjunto_path=adjunto_path,
-            modo_envio=modo_envio,
-            estado=estado,
-            error_detalle=error_detalle,
-        )
-
     def _build_order_workbook(self, pedido_id: str) -> tuple[Workbook, str]:
         return self.order_export_service.build_order_workbook(pedido_id)
-
-    def _insert_order_logos(self, ws) -> None:
-        self.order_export_service.insert_order_logos(ws)
 
     def _delete_order(self) -> None:
         row = self._selected_row()
@@ -3061,10 +2993,5 @@ class OrdersPage(QWidget):
             QMessageBox.information(self, outcome.title, outcome.message)
             return
         QMessageBox.warning(self, outcome.title, outcome.message)
-
-    def _rebuild_order_pendientes(self, session: Any, pedido_id: str, albaran_id: str) -> None:
-        self.order_document_import_service.rebuild_order_pendientes(session, pedido_id, albaran_id)
-
-
 
 
