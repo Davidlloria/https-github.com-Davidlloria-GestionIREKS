@@ -9,6 +9,8 @@ PEDIDOS_HISTORICO_DIR = DATA_DIR / "exports" / "pedidos_historico"
 PEDIDOS_EMAIL_DESTINO = ""
 
 # UI flags
-# Activa la página de Clientes basada en QML.
+# Activa la pagina de Clientes basada en QML (experimental).
+# Recomendado mantener en False y habilitar solo por entorno en pruebas:
+#   USE_QML_CUSTOMERS=1
 USE_QML_CUSTOMERS = False
 

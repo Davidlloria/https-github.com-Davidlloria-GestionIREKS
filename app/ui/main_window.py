@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.core.config import USE_QML_CUSTOMERS
+from app.core.feature_flags import use_qml_customers_enabled
 from app.ui.widgets.contacts_page import ContactsPage
 from app.ui.widgets.courses_page import CoursesPage
 from app.ui.widgets.customers_page import CustomersPage
@@ -89,11 +90,10 @@ class MainWindow(QMainWindow):
         self._add_page("Configuracion", SettingsPage())
 
     def _build_customers_page(self) -> QWidget:
-        env_raw = os.getenv("USE_QML_CUSTOMERS")
-        if env_raw is None:
-            use_qml = bool(USE_QML_CUSTOMERS)
-        else:
-            use_qml = str(env_raw).strip().lower() in {"1", "true", "yes", "on"}
+        use_qml = use_qml_customers_enabled(
+            os.getenv("USE_QML_CUSTOMERS"),
+            default_flag=bool(USE_QML_CUSTOMERS),
+        )
         if not use_qml or CustomersQmlPage is None:
             return CustomersPage()
         try:

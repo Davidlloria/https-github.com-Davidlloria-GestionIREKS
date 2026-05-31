@@ -318,6 +318,10 @@ Fase 4 - Migrar escrituras a React.
   - nuevo script `scripts/validate-gates.ps1`;
   - ejecuta `pytest` (incluyendo guardrails de arquitectura), `integrity_check`,
     `npm run lint` y `npm run build`.
+- Decision sobre `USE_QML_CUSTOMERS`:
+  - se mantiene como flag experimental desactivado por defecto;
+  - la resolucion del flag se centraliza en `app/core/feature_flags.py`;
+  - se documenta su activacion explicita por entorno para pruebas locales.
 
 ## Hoja de ruta
 

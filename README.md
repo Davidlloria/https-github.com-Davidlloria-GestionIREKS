@@ -54,6 +54,13 @@ Aplicacion de escritorio:
 python run.py
 ```
 
+Para activar experimentalmente la pagina de clientes en QML:
+
+```powershell
+$env:USE_QML_CUSTOMERS="1"
+python run.py
+```
+
 API FastAPI:
 
 ```powershell
