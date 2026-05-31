@@ -216,6 +216,10 @@ Fase 4 - Migrar escrituras a React.
   - activar/desactivar ingredientes IREKS desde la vista `Ingredientes`;
   - usa `PATCH /ingredients/ireks/{row_id}` con `articulo_status_activo`;
   - refresca listado/detalle tras guardar, con feedback de exito/error.
+- Septimo flujo de escritura en React:
+  - marcar/desmarcar ingredientes IREKS en lista desde la vista `Ingredientes`;
+  - usa `PATCH /ingredients/ireks/{row_id}` con `articulo_status_en_lista`;
+  - refresca listado/detalle tras guardar, con feedback de exito/error.
 
 ## Hoja de ruta
 

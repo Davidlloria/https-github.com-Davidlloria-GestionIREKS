@@ -73,6 +73,9 @@ export function IngredientsPage() {
   const [ireksActiveLoading, setIreksActiveLoading] = useState(false)
   const [ireksActiveMessage, setIreksActiveMessage] = useState('')
   const [ireksActiveError, setIreksActiveError] = useState('')
+  const [ireksListLoading, setIreksListLoading] = useState(false)
+  const [ireksListMessage, setIreksListMessage] = useState('')
+  const [ireksListError, setIreksListError] = useState('')
   const [stdEditForm, setStdEditForm] = useState<StdEditForm>(EMPTY_STD_EDIT_FORM)
   const [stdEditTargetId, setStdEditTargetId] = useState('')
   const [stdEditLoading, setStdEditLoading] = useState(false)
@@ -254,6 +257,26 @@ export function IngredientsPage() {
     }
   }
 
+  const toggleIreksInList = async () => {
+    const detail = ireksDetailQuery.data.detail
+    if (!detail || detail.id === null || ireksListLoading) {
+      return
+    }
+    const nextInList = !detail.articulo_status_en_lista
+    setIreksListLoading(true)
+    setIreksListError('')
+    setIreksListMessage('')
+    try {
+      await updateIreksIngredient(detail.id, { articulo_status_en_lista: nextInList })
+      await Promise.all([ireksQuery.reload(), ireksDetailQuery.reload()])
+      setIreksListMessage(nextInList ? 'Ingrediente IREKS marcado en lista.' : 'Ingrediente IREKS marcado fuera de lista.')
+    } catch (error: unknown) {
+      setIreksListError(error instanceof Error ? error.message : 'No se pudo actualizar el estado en lista.')
+    } finally {
+      setIreksListLoading(false)
+    }
+  }
+
   return (
     <section className="page-grid">
       <div className="segmented">
@@ -383,7 +406,7 @@ export function IngredientsPage() {
                       <button
                         type="button"
                         className="action-btn"
-                        disabled={ireksActiveLoading}
+                        disabled={ireksActiveLoading || ireksListLoading}
                         onClick={toggleIreksActive}
                       >
                         {ireksActiveLoading
@@ -394,6 +417,23 @@ export function IngredientsPage() {
                       </button>
                       {!!ireksActiveMessage && <div className="state">{ireksActiveMessage}</div>}
                       {!!ireksActiveError && <div className="state">Error: {ireksActiveError}</div>}
+                    </div>
+
+                    <div className="related-block">
+                      <button
+                        type="button"
+                        className="action-btn"
+                        disabled={ireksListLoading || ireksActiveLoading}
+                        onClick={toggleIreksInList}
+                      >
+                        {ireksListLoading
+                          ? 'Guardando...'
+                          : ireksDetailQuery.data.detail.articulo_status_en_lista
+                            ? 'Marcar fuera de lista'
+                            : 'Marcar en lista'}
+                      </button>
+                      {!!ireksListMessage && <div className="state">{ireksListMessage}</div>}
+                      {!!ireksListError && <div className="state">Error: {ireksListError}</div>}
                     </div>
 
                     {!!ireksDetailQuery.data.nutrition && (
