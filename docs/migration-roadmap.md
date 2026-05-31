@@ -348,6 +348,11 @@ Fase 5 - Reducir dependencia del desktop.
     almacen, validar archivo JSON y construir el resumen de importacion;
   - `app/ui/widgets/orders_page.py` delega la importacion y conserva solo
     refresco/seleccion y feedback visual.
+- Extraccion del flujo de importacion de items de pedido desde `OrdersPage`:
+  - nueva capa `app/services/orders_items_import_ui_service.py` para validar
+    archivos (`.xlsx/.xlsm/.csv`) y construir mensajes de resultado/incidencias;
+  - `app/ui/widgets/orders_page.py` delega la importacion y mantiene solo
+    recarga de datos y mensajeria visual.
 - Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
   - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
     resumen de estado, mapear resultados y centralizar mensajes/logs;

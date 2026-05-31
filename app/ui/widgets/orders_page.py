@@ -57,6 +57,7 @@ from app.services.import_service import ImportService
 from app.services.order_document_import_service import OrderDocumentImportService
 from app.services.order_document_parser import OrderDocumentParser
 from app.services.order_export_service import OrderExportService
+from app.services.orders_items_import_ui_service import OrdersItemsImportUiService
 from app.services.orders_json_import_ui_service import OrdersJsonImportUiService
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderLineInput, OrderService
@@ -1101,6 +1102,7 @@ class OrdersPage(QWidget):
         self.order_query_service = OrderQueryService()
         self.order_service = OrderService()
         self.orders_json_import_ui_service = OrdersJsonImportUiService(self.order_service)
+        self.orders_items_import_ui_service = OrdersItemsImportUiService(self.order_service)
         self.orders_mail_settings = OrdersMailSettingsService()
         self.rows: list[PedidoListRow] = []
         self._is_loading_details = False
@@ -3046,18 +3048,16 @@ class OrdersPage(QWidget):
         if not file_path:
             return
 
-        result = self.order_service.import_order_items_file(Path(file_path))
-        self.reload()
-        if result.errors:
-            preview = "\n".join(result.errors[:8])
-            extra = "" if len(result.errors) <= 8 else f"\n... y {len(result.errors) - 8} errores mas."
-            QMessageBox.warning(
-                self,
-                "Importacion completada con incidencias",
-                f"Registros importados: {result.imported}\nErrores: {len(result.errors)}\n\n{preview}{extra}",
-            )
+        try:
+            outcome = self.orders_items_import_ui_service.import_order_items_file(Path(file_path))
+        except Exception as exc:
+            QMessageBox.warning(self, "Pedidos", str(exc))
             return
-        QMessageBox.information(self, "Importacion completada", f"Items importados: {result.imported}")
+        self.reload()
+        if not outcome.ok:
+            QMessageBox.warning(self, outcome.title, outcome.message)
+            return
+        QMessageBox.information(self, outcome.title, outcome.message)
 
     def _import_albaran_for_selected_order(self) -> None:
         row = self._selected_row()
