@@ -1,4 +1,4 @@
-import { apiGet } from './http'
+import { apiDelete, apiGet } from './http'
 import type { OrderItemRead, OrderListItem, OrderPendingRead, OrderRead } from '../types/api'
 
 interface ListOrdersFilters {
@@ -27,4 +27,8 @@ export function listOrderItems(orderId: string) {
 
 export function listOrderPending(orderId: string) {
   return apiGet<OrderPendingRead[]>(`/orders/${orderId}/pending`)
+}
+
+export function deleteOrder(orderId: string) {
+  return apiDelete(`/orders/${orderId}`)
 }

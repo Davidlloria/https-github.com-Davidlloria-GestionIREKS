@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { getOrderDetail, listOrderItems, listOrderPending, listOrders } from '../api/orders'
+import { deleteOrder, getOrderDetail, listOrderItems, listOrderPending, listOrders } from '../api/orders'
 import { QueryState } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
 import { useAsyncResource } from '../features/useAsyncResource'
@@ -28,6 +28,9 @@ export function OrdersPage() {
   const [monthTo, setMonthTo] = useState('')
   const [almacenId, setAlmacenId] = useState('')
   const [selectedCandidateId, setSelectedCandidateId] = useState('')
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteMessage, setDeleteMessage] = useState('')
+  const [deleteError, setDeleteError] = useState('')
 
   const ordersQuery = useAsyncResource(
     () =>
@@ -73,6 +76,31 @@ export function OrdersPage() {
       totalKg: totalKg.toFixed(2),
     }
   }, [ordersQuery.data])
+
+  const deleteSelectedOrder = async () => {
+    if (!selectedOrder || deleteLoading) {
+      return
+    }
+    const confirmed = window.confirm(
+      `Se eliminara el pedido ${selectedOrder.pedido_numero || selectedOrder.pedido_id}. Esta accion no se puede deshacer.`,
+    )
+    if (!confirmed) {
+      return
+    }
+    setDeleteLoading(true)
+    setDeleteMessage('')
+    setDeleteError('')
+    try {
+      await deleteOrder(selectedOrder.pedido_id)
+      setSelectedCandidateId('')
+      await ordersQuery.reload()
+      setDeleteMessage('Pedido eliminado correctamente.')
+    } catch (error: unknown) {
+      setDeleteError(error instanceof Error ? error.message : 'No se pudo eliminar el pedido.')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
 
   return (
     <section className="page-grid">
@@ -186,6 +214,19 @@ export function OrdersPage() {
                     <dd>{detailQuery.data.detail.pedido_ref || '-'}</dd>
                   </div>
                 </dl>
+
+                <div className="related-block">
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={deleteSelectedOrder}
+                    disabled={deleteLoading}
+                  >
+                    {deleteLoading ? 'Eliminando...' : 'Eliminar pedido'}
+                  </button>
+                  {!!deleteMessage && <div className="state">{deleteMessage}</div>}
+                  {!!deleteError && <div className="state">Error: {deleteError}</div>}
+                </div>
 
                 <div className="related-block">
                   <h3>Lineas de pedido</h3>

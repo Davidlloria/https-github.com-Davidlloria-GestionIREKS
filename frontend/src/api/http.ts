@@ -63,3 +63,14 @@ export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
   }
   return (await response.json()) as T
 }
+
+export async function apiDelete(path: string): Promise<void> {
+  const response = await fetch(buildUrl(path), {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+  })
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || `Error HTTP ${response.status}`)
+  }
+}

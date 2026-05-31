@@ -225,6 +225,10 @@ Fase 4 - Migrar escrituras a React.
   - usa `PUT /settings/api/warehouse`;
   - valida en frontend valor numerico >= 0;
   - refresca datos de proveedor tras guardar, con feedback de exito/error.
+- Noveno flujo de escritura en React:
+  - eliminar pedidos desde la vista `Pedidos` con confirmacion;
+  - usa `DELETE /orders/{order_id}`;
+  - refresca el listado tras borrar y muestra feedback de exito/error.
 
 ## Hoja de ruta
 
