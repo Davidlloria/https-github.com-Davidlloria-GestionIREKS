@@ -322,6 +322,11 @@ Fase 5 - Reducir dependencia del desktop.
   - se mantiene como flag experimental desactivado por defecto;
   - la resolucion del flag se centraliza en `app/core/feature_flags.py`;
   - se documenta su activacion explicita por entorno para pruebas locales.
+- Extraccion de logica de configuracion API/correo fuera de UI desktop:
+  - nueva capa `app/services/settings_provider_service.py` para guardar/probar
+    FDC, FatSecret, OpenAI y pedidos por Outlook;
+  - `app/ui/widgets/settings_page.py` delega esas operaciones al servicio y
+    mantiene solo interaccion de interfaz/mensajes.
 
 ## Hoja de ruta
 

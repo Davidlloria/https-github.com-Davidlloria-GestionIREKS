@@ -30,17 +30,15 @@ from PySide6.QtWidgets import (
 
 from app.core.config import DATA_DIR
 from app.models import CodigoPostal, Isla, Localidad, Municipio, Provincia
-from app.services.fdc_nutrition_service import FdcNutritionService
 from app.services.fdc_settings_service import FdcSettingsService
-from app.services.fatsecret_client import FatSecretClient
 from app.services.fatsecret_settings_service import FatSecretSettingsService
 from app.services.openai_settings_service import OpenAISettingsService
-from app.services.openai_translation_service import OpenAITranslationService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
 from app.services.address_catalog_service import AddressCatalogService
 from app.services.sales_reconciliation_service import SalesReconciliationService
 from app.services.settings_import_service import SettingsImportService
 from app.services.settings_maintenance_service import SettingsMaintenanceService
+from app.services.settings_provider_service import SettingsProviderService
 from app.ui.widgets.db_export_console_tab import DbExportConsoleTab
 from app.ui.widgets.db_import_console_tab import DbImportConsoleTab
 from app.ui.widgets.entity_dialog import EntityDialog
@@ -1411,6 +1409,12 @@ class SettingsPage(QWidget):
         self.fatsecret_settings = FatSecretSettingsService()
         self.openai_settings = OpenAISettingsService()
         self.orders_mail_settings = OrdersMailSettingsService()
+        self.settings_provider_service = SettingsProviderService(
+            fdc_settings=self.fdc_settings,
+            fatsecret_settings=self.fatsecret_settings,
+            openai_settings=self.openai_settings,
+            orders_mail_settings=self.orders_mail_settings,
+        )
         self.sales_service = SalesReconciliationService()
         self.settings_import_service = SettingsImportService()
         self.settings_maintenance_service = SettingsMaintenanceService()
@@ -2392,11 +2396,8 @@ class SettingsPage(QWidget):
         key = self.fdc_api_key_input.text().strip() if hasattr(self, "fdc_api_key_input") else ""
         data_type = self.fdc_data_type_combo.currentText().strip() if hasattr(self, "fdc_data_type_combo") else "Foundation"
         try:
-            path = self.fdc_settings.save(
-                key,
-                data_type=data_type,
-            )
-            QMessageBox.information(self, "FoodData Central", f"Configuracion guardada en:\n{path}")
+            result = self.settings_provider_service.save_fdc(key, data_type)
+            QMessageBox.information(self, "FoodData Central", f"{result.message}\n{result.path}")
         except Exception as exc:
             QMessageBox.warning(self, "FoodData Central", f"No se pudo guardar la configuracion.\n{exc}")
 
@@ -2404,14 +2405,9 @@ class SettingsPage(QWidget):
         key = self.fdc_api_key_input.text().strip() if hasattr(self, "fdc_api_key_input") else ""
         data_type = self.fdc_data_type_combo.currentText().strip() if hasattr(self, "fdc_data_type_combo") else "Foundation"
         try:
-            self.fdc_settings.save(
-                key,
-                data_type=data_type,
-            )
-            service = FdcNutritionService(api_key=key)
-            result = service.fetch_for_query("olive oil")
+            result = self.settings_provider_service.test_fdc(key, data_type)
             if result.ok:
-                QMessageBox.information(self, "FoodData Central", "Conexion OK y respuesta valida.")
+                QMessageBox.information(self, "FoodData Central", result.message)
             else:
                 QMessageBox.warning(self, "FoodData Central", result.message)
         except Exception as exc:
@@ -2424,8 +2420,8 @@ class SettingsPage(QWidget):
         )
         scope = self.fatsecret_scope_input.text().strip() if hasattr(self, "fatsecret_scope_input") else "basic"
         try:
-            path = self.fatsecret_settings.save(client_id, client_secret, scope=scope)
-            QMessageBox.information(self, "FatSecret", f"Configuracion guardada en:\n{path}")
+            result = self.settings_provider_service.save_fatsecret(client_id, client_secret, scope)
+            QMessageBox.information(self, "FatSecret", f"{result.message}\n{result.path}")
         except Exception as exc:
             QMessageBox.warning(self, "FatSecret", f"No se pudo guardar la configuracion.\n{exc}")
 
@@ -2436,14 +2432,8 @@ class SettingsPage(QWidget):
         )
         scope = self.fatsecret_scope_input.text().strip() if hasattr(self, "fatsecret_scope_input") else "basic"
         try:
-            self.fatsecret_settings.save(client_id, client_secret, scope=scope)
-            client = FatSecretClient(client_id=client_id, client_secret=client_secret, scope=scope)
-            rows = client.search_food("olive oil", page=0, max_results=1, region="ES")
-            QMessageBox.information(
-                self,
-                "FatSecret",
-                "Conexion OK y respuesta valida." if isinstance(rows, list) else "Conexion OK.",
-            )
+            result = self.settings_provider_service.test_fatsecret(client_id, client_secret, scope)
+            QMessageBox.information(self, "FatSecret", result.message)
         except Exception as exc:
             QMessageBox.warning(self, "FatSecret", f"Error de conexion.\n{exc}")
 
@@ -2451,8 +2441,8 @@ class SettingsPage(QWidget):
         api_key = self.openai_api_key_input.text().strip() if hasattr(self, "openai_api_key_input") else ""
         use_ai = self.use_ai_translation_check.isChecked() if hasattr(self, "use_ai_translation_check") else False
         try:
-            path = self.openai_settings.save(api_key=api_key, use_ai_translation=use_ai)
-            QMessageBox.information(self, "OpenAI", f"Configuracion guardada en:\n{path}")
+            result = self.settings_provider_service.save_openai(api_key=api_key, use_ai_translation=use_ai)
+            QMessageBox.information(self, "OpenAI", f"{result.message}\n{result.path}")
         except Exception as exc:
             QMessageBox.warning(self, "OpenAI", f"No se pudo guardar la configuracion.\n{exc}")
 
@@ -2460,11 +2450,9 @@ class SettingsPage(QWidget):
         api_key = self.openai_api_key_input.text().strip() if hasattr(self, "openai_api_key_input") else ""
         use_ai = self.use_ai_translation_check.isChecked() if hasattr(self, "use_ai_translation_check") else False
         try:
-            self.openai_settings.save(api_key=api_key, use_ai_translation=use_ai)
-            service = OpenAITranslationService(api_key=api_key)
-            result = service.translate_es_to_en("aceite de oliva")
+            result = self.settings_provider_service.test_openai(api_key=api_key, use_ai_translation=use_ai)
             if result.ok:
-                QMessageBox.information(self, "OpenAI", "Conexion OK y respuesta valida.")
+                QMessageBox.information(self, "OpenAI", result.message)
             else:
                 QMessageBox.warning(self, "OpenAI", result.message or "No se obtuvo respuesta valida.")
         except Exception as exc:
@@ -2483,18 +2471,12 @@ class SettingsPage(QWidget):
     def _save_orders_mail_settings(self) -> None:
         destino = self.orders_mail_destino_input.text().strip() if hasattr(self, "orders_mail_destino_input") else ""
         historico = self.orders_historico_dir_input.text().strip() if hasattr(self, "orders_historico_dir_input") else ""
-        if not destino:
-            QMessageBox.warning(self, "Pedidos Outlook", "El email destino fijo es obligatorio.")
-            return
-        if historico:
-            try:
-                Path(historico).mkdir(parents=True, exist_ok=True)
-            except Exception as exc:
-                QMessageBox.warning(self, "Pedidos Outlook", f"No se pudo crear/validar la ruta de historico.\n{exc}")
-                return
         try:
-            path = self.orders_mail_settings.save(destino_email=destino, historico_dir=historico)
-            QMessageBox.information(self, "Pedidos Outlook", f"Configuracion guardada en:\n{path}")
+            result = self.settings_provider_service.save_orders_mail(destino_email=destino, historico_dir=historico)
+            if result.ok:
+                QMessageBox.information(self, "Pedidos Outlook", f"{result.message}\n{result.path}")
+            else:
+                QMessageBox.warning(self, "Pedidos Outlook", result.message)
         except Exception as exc:
             QMessageBox.warning(self, "Pedidos Outlook", f"No se pudo guardar la configuracion.\n{exc}")
 
