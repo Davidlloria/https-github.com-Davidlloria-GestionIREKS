@@ -34,6 +34,11 @@ from app.services.provider_service import ProviderService
 from app.services.recipe_service import RecipeService
 from app.services.settings_import_service import SettingsImportService
 from app.services.settings_maintenance_service import SettingsMaintenanceService
+from app.services.settings_maintenance_ui_service import (
+    SettingsMaintenanceOutcome,
+    SettingsMaintenanceStatusView,
+    SettingsMaintenanceUiService,
+)
 from app.services.settings_orders_import_service import SettingsOrdersImportService, SettingsOrdersImportOutcome
 from app.services.settings_provider_service import SettingsProviderResult, SettingsProviderService
 from app.services.settings_sales_import_service import SettingsSalesImportOutcome, SettingsSalesImportService
@@ -99,6 +104,9 @@ __all__ = [
     "RecipeService",
     "SettingsImportService",
     "SettingsMaintenanceService",
+    "SettingsMaintenanceUiService",
+    "SettingsMaintenanceStatusView",
+    "SettingsMaintenanceOutcome",
     "SettingsOrdersImportService",
     "SettingsOrdersImportOutcome",
     "SettingsProviderService",

@@ -39,6 +39,7 @@ from app.services.sales_reconciliation_service import SalesReconciliationService
 from app.services.settings_orders_import_service import SettingsOrdersImportService
 from app.services.settings_import_service import SettingsImportService
 from app.services.settings_maintenance_service import SettingsMaintenanceService
+from app.services.settings_maintenance_ui_service import SettingsMaintenanceUiService
 from app.services.settings_provider_service import SettingsProviderService
 from app.services.settings_sales_import_service import SettingsSalesImportService
 from app.ui.widgets.db_export_console_tab import DbExportConsoleTab
@@ -1422,6 +1423,7 @@ class SettingsPage(QWidget):
         self.settings_orders_import_service = SettingsOrdersImportService(self.settings_import_service)
         self.settings_sales_import_service = SettingsSalesImportService(self.sales_service)
         self.settings_maintenance_service = SettingsMaintenanceService()
+        self.settings_maintenance_ui_service = SettingsMaintenanceUiService(self.settings_maintenance_service)
         self._igsa_pdf_preview_lines: list[object] = []
         self._igsa_book_preview_lines: list[object] = []
         self._build_ui()
@@ -1895,65 +1897,32 @@ class SettingsPage(QWidget):
         return panel
 
     def _refresh_status(self) -> None:
-        status = self.settings_maintenance_service.database_status()
-        db_path = status["db_path"]
-        size_mb = float(status["db_size_bytes"]) / (1024 * 1024)
-        counts = status["counts"]
-        self.db_path_label.setText(f"DB activa: {db_path}")
-        self.db_size_label.setText(f"Tamano: {size_mb:.2f} MB")
-        self.db_rows_label.setText(
-            (
-                "Registros: "
-                f"clientes={counts.get('clientes', 0)} | "
-                f"contactos={counts.get('contactos', 0)} | "
-                f"provincias={counts.get('provincias', 0)} | "
-                f"islas={counts.get('islas', 0)} | "
-                f"municipios={counts.get('municipios', 0)} | "
-                f"codigos_postales={counts.get('codigos_postales', 0)} | "
-                f"localidades={counts.get('localidades', 0)}"
-            )
-        )
-        self.orphans_label.setText(
-            f"Contactos sin cliente vinculado: {status.get('orphan_contact_links', 0)}"
-        )
-        self.legacy_label.setText(
-            f"DB legacy detectada: {'si' if status['legacy_exists'] else 'no'} ({status['legacy_db_path']})"
-        )
-        self._append_log("Estado de base de datos actualizado.")
+        status = self.settings_maintenance_ui_service.build_status_view()
+        self.db_path_label.setText(status.db_path_label)
+        self.db_size_label.setText(status.db_size_label)
+        self.db_rows_label.setText(status.db_rows_label)
+        self.orphans_label.setText(status.orphans_label)
+        self.legacy_label.setText(status.legacy_label)
+        self._append_log(status.log_message)
 
     def _run_integrity_check(self) -> None:
         try:
-            result = self.settings_maintenance_service.run_integrity_check()
-            ok = all(line.lower() == "ok" for line in result)
-            self._append_log(f"Chequeo de integridad: {'OK' if ok else 'INCIDENCIAS'} -> {', '.join(result)}")
-            if ok:
-                QMessageBox.information(self, "Integridad DB", "PRAGMA integrity_check: OK")
+            outcome = self.settings_maintenance_ui_service.run_integrity_check()
+            self._append_log(outcome.log_message)
+            if outcome.ok:
+                QMessageBox.information(self, outcome.title, outcome.message)
             else:
-                QMessageBox.warning(self, "Integridad DB", "\n".join(result))
+                QMessageBox.warning(self, outcome.title, outcome.message)
         except Exception as exc:
             QMessageBox.critical(self, "Integridad DB", f"No se pudo ejecutar el chequeo: {exc}")
             self._append_log(f"ERROR integridad: {exc}")
 
     def _repair_links(self) -> None:
         try:
-            result = self.settings_maintenance_service.repair_contact_links()
-            self._append_log(
-                "Reparacion de enlaces completada: "
-                f"actualizados={result['updated_links']}, "
-                f"huerfanos_antes={result['orphans_before']}, "
-                f"huerfanos_despues={result['orphans_after']}"
-            )
+            outcome = self.settings_maintenance_ui_service.repair_contact_links()
+            self._append_log(outcome.log_message)
             self._refresh_status()
-            QMessageBox.information(
-                self,
-                "Reparacion completada",
-                (
-                    "Enlaces actualizados: "
-                    f"{result['updated_links']}\n"
-                    f"Huerfanos antes: {result['orphans_before']}\n"
-                    f"Huerfanos despues: {result['orphans_after']}"
-                ),
-            )
+            QMessageBox.information(self, outcome.title, outcome.message)
         except Exception as exc:
             QMessageBox.critical(self, "Reparar enlaces", f"No se pudo reparar enlaces: {exc}")
             self._append_log(f"ERROR reparar enlaces: {exc}")
@@ -1967,10 +1936,10 @@ class SettingsPage(QWidget):
         if answer != QMessageBox.StandardButton.Yes:
             return
         try:
-            self.settings_maintenance_service.optimize_database()
-            self._append_log("Optimizacion completada (PRAGMA optimize + ANALYZE + VACUUM).")
+            outcome = self.settings_maintenance_ui_service.optimize_database()
+            self._append_log(outcome.log_message)
             self._refresh_status()
-            QMessageBox.information(self, "Optimizar DB", "Optimizacion completada.")
+            QMessageBox.information(self, outcome.title, outcome.message)
         except Exception as exc:
             QMessageBox.critical(self, "Optimizar DB", f"No se pudo optimizar: {exc}")
             self._append_log(f"ERROR optimizar DB: {exc}")
@@ -1988,10 +1957,10 @@ class SettingsPage(QWidget):
         if answer != QMessageBox.StandardButton.Yes:
             return
         try:
-            created = self.settings_maintenance_service.create_missing_clients_for_contact_links()
-            self._append_log(f"Clientes tecnicos creados: {created}")
+            outcome = self.settings_maintenance_ui_service.create_missing_clients()
+            self._append_log(outcome.log_message)
             self._refresh_status()
-            QMessageBox.information(self, "Clientes faltantes", f"Clientes creados: {created}")
+            QMessageBox.information(self, outcome.title, outcome.message)
         except Exception as exc:
             QMessageBox.critical(self, "Clientes faltantes", f"No se pudo completar la operacion: {exc}")
             self._append_log(f"ERROR crear clientes faltantes: {exc}")
@@ -2008,9 +1977,9 @@ class SettingsPage(QWidget):
         if not file_path:
             return
         try:
-            saved_path = self.settings_maintenance_service.backup_database(Path(file_path))
-            self._append_log(f"Backup generado: {saved_path}")
-            QMessageBox.information(self, "Backup DB", f"Backup creado en:\n{saved_path}")
+            outcome = self.settings_maintenance_ui_service.backup_database(Path(file_path))
+            self._append_log(outcome.log_message)
+            QMessageBox.information(self, outcome.title, outcome.message)
         except Exception as exc:
             QMessageBox.critical(self, "Backup DB", f"No se pudo crear backup: {exc}")
             self._append_log(f"ERROR backup DB: {exc}")

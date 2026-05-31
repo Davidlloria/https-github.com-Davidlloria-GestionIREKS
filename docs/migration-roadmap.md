@@ -338,6 +338,11 @@ Fase 5 - Reducir dependencia del desktop.
     entradas, ejecutar importaciones y formatear mensaje/log de resultados;
   - `app/ui/widgets/settings_page.py` delega importacion IREKS JSON, IGSA Excel,
     IGSA PDF, IGSA libro y regeneracion de salidas de almacen.
+- Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
+  - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
+    resumen de estado, mapear resultados y centralizar mensajes/logs;
+  - `app/ui/widgets/settings_page.py` delega integridad, reparacion de enlaces,
+    optimize, clientes tecnicos y backup al nuevo servicio.
 
 ## Hoja de ruta
 
