@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Generic, Optional, TypeVar
 
 from sqlmodel import Session, SQLModel, select
@@ -27,7 +27,7 @@ class BaseRepository(Generic[ModelType]):
 
     def update(self, session: Session, entity: ModelType) -> ModelType:
         if hasattr(entity, "updated_at"):
-            setattr(entity, "updated_at", datetime.utcnow())
+            setattr(entity, "updated_at", datetime.now(UTC))
         session.add(entity)
         session.commit()
         session.refresh(entity)
