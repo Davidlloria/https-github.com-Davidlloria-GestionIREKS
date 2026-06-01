@@ -432,6 +432,23 @@ Fase 5 - Reducir dependencia del desktop.
 - Checklist de entrega versionable:
   - nuevo `docs/release-checklist.md` con pasos de pre-release, gates,
     smoke tests y evidencias minimas para PR/release.
+- Documentacion de entorno local:
+  - nuevo `docs/local-environment.md` con instalacion Python/Node,
+    configuracion local, variables de entorno y validacion;
+  - `README.md` enlaza la guia y recomienda `venv` + `npm ci`.
+- Politica de runtime/Tesseract documentada:
+  - Tesseract no se versiona en Git;
+  - se aceptan instalacion del sistema, `TESSERACT_CMD` o copia portable en
+    `runtime/tesseract/Tesseract-OCR/`;
+  - checklist de release verifica disponibilidad de OCR cuando aplique.
+- Proteccion de configuraciones locales:
+  - `.env` y `frontend/.env` quedan ignorados por Git;
+  - plantillas sin secretos en `.env.example` y `frontend/.env.example`.
+- Chequeo automatizado de entorno local:
+  - nuevo `scripts/check-local-env.ps1` para validar prerequisitos de arranque
+    (Python, Node/npm, archivos base y OCR opcional);
+  - `README.md`, `docs/local-environment.md` y checklist de release incorporan
+    su ejecucion como paso previo al gate completo.
 
 ## Hoja de ruta
 

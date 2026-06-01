@@ -9,9 +9,12 @@ Responsable:
 ## 1) Preparacion de entorno
 
 - [ ] Rama objetivo sincronizada con `origin/main`.
+- [ ] Revisado `docs/local-environment.md` para la maquina objetivo.
+- [ ] Chequeo de entorno ejecutado: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-env.ps1`.
 - [ ] Dependencias Python instaladas: `python -m pip install -r requirements.txt`.
-- [ ] Dependencias frontend instaladas: `cd frontend && npm install`.
+- [ ] Dependencias frontend instaladas: `cd frontend && npm ci`.
 - [ ] Carpeta local de backups disponible (`data/backups/`).
+- [ ] Tesseract disponible si la entrega requiere OCR (`TESSERACT_CMD`, instalacion del sistema o `runtime/tesseract/Tesseract-OCR/`).
 
 ## 2) Backup previo obligatorio
 
@@ -42,7 +45,7 @@ Responsable:
 - [ ] `git status` limpio.
 - [ ] Commits agrupados por bloque (backend/frontend/docs/scripts).
 - [ ] PR creada en GitHub con resumen tecnico y evidencia de gates.
-- [ ] No se incluyen datos sensibles: `data/*.db`, `data/backups/`, `runtime/`, exports reales, claves o tokens.
+- [ ] No se incluyen datos sensibles: `.env`, `frontend/.env`, `data/*.db`, `data/backups/`, `runtime/`, exports reales, claves o tokens.
 
 ## 6) Evidencias (rellenar)
 

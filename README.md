@@ -36,6 +36,9 @@ una arquitectura con servicios reutilizables, API FastAPI y frontend React.
 Desde la raiz del proyecto:
 
 ```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
@@ -43,8 +46,11 @@ Para el frontend:
 
 ```powershell
 cd frontend
-npm install
+npm ci
 ```
+
+La guia completa de entorno local, variables y runtime esta en
+`docs/local-environment.md`.
 
 ## Ejecucion
 
@@ -117,6 +123,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backup-db.ps1
 
 ## Validacion
 
+Chequeo rapido de prerequisitos locales (Python/Node/npm y OCR opcional):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-env.ps1
+```
+
+Si la entrega requiere OCR (albaranes/facturas), forzar validacion de Tesseract:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-env.ps1 -RequireTesseract
+```
+
 Gate completo recomendado (incluye tests Python, reglas de arquitectura,
 integridad de base de datos, lint y build frontend):
 
@@ -164,6 +182,11 @@ Checklist de release (operativa de entrega):
 
 - `docs/release-checklist.md`
 
+Entorno local y runtime:
+
+- `docs/local-environment.md`
+- `scripts/check-local-env.ps1`
+
 ## Estado actual
 
 - Desktop PySide6 operativo como cliente principal legacy.
@@ -179,6 +202,13 @@ Checklist de release (operativa de entrega):
 `data/` puede contener base de datos real, exports, PDFs y configuraciones
 locales. Revisar siempre antes de versionar o compartir. No commitear claves,
 tokens, bases reales ni documentos sensibles.
+
+Los overrides `.env` de la raiz y `frontend/.env` quedan ignorados por Git. Hay
+plantillas sin secretos en `.env.example` y `frontend/.env.example`.
+
+Tesseract se trata como runtime local: no se versionan sus binarios. Puede
+usarse una instalacion del sistema, `TESSERACT_CMD` o una copia portable en
+`runtime/tesseract/Tesseract-OCR/`.
 
 Los endpoints API que reciben `source_path`, `file_path` o `destination_path`
 usan rutas del sistema de archivos del servidor, no del navegador. Actualmente
