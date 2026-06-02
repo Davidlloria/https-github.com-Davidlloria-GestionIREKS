@@ -47,6 +47,22 @@ from app.services.recipe_service import RecipeService
 from app.viewmodels import IngredientChoice
 
 
+def _normalize_process_name(value: str | None) -> str:
+    text = str(value or "").strip()
+    return text if text else "Masa final"
+
+
+def _unique_process_names(values: list[str]) -> list[str]:
+    names: list[str] = []
+    for value in values:
+        name = _normalize_process_name(value)
+        if name not in names:
+            names.append(name)
+    if "Masa final" not in names:
+        names.insert(0, "Masa final")
+    return names
+
+
 class IngredientSearchDialog(QDialog):
     def __init__(self, service: RecipeService, source_processes: list[str] | None = None, parent=None) -> None:
         super().__init__(parent)
@@ -486,7 +502,7 @@ class RecipeTechnicalDialog(QDialog):
         self.lines: list[tuple[RecetaLinea, str, str]] = []
         self._display_indices: list[int] = []
         self.process_names = self._collect_process_names(self.all_lines)
-        self.current_process = self._normalize_process_name(initial_process)
+        self.current_process = _normalize_process_name(initial_process)
         if self.current_process not in self.process_names:
             self.current_process = self.process_names[0] if self.process_names else "Masa final"
         self.peso_pieza_g = float(peso_pieza_g or 0.0)
@@ -622,7 +638,7 @@ class RecipeTechnicalDialog(QDialog):
     def _collect_process_names(self, lines: list[tuple[RecetaLinea, str, str]]) -> list[str]:
         names: list[str] = []
         for line, _cantidad_text, _unidad_text in lines:
-            name = self._normalize_process_name(getattr(line, "proceso_nombre", ""))
+            name = _normalize_process_name(getattr(line, "proceso_nombre", ""))
             if name not in names:
                 names.append(name)
         if "Masa final" in names:
@@ -634,7 +650,7 @@ class RecipeTechnicalDialog(QDialog):
     def _on_process_changed(self) -> None:
         self._persist_current_process_panel_values()
         self._persist_visible_line_edits()
-        self.current_process = self._normalize_process_name(self.process_combo.currentText())
+        self.current_process = _normalize_process_name(self.process_combo.currentText())
         self._load_process_panel_values()
         self._apply_process_filter()
 
@@ -647,7 +663,7 @@ class RecipeTechnicalDialog(QDialog):
         self.lines = []
         self._display_indices = []
         for idx, (line, cantidad_text, unidad_text) in enumerate(self.all_lines):
-            proc = self._normalize_process_name(getattr(line, "proceso_nombre", ""))
+            proc = _normalize_process_name(getattr(line, "proceso_nombre", ""))
             if proc != self.current_process:
                 continue
             self._display_indices.append(idx)
@@ -673,7 +689,7 @@ class RecipeTechnicalDialog(QDialog):
         return f"proceso::{process_name}::{field}"
 
     def _persist_current_process_panel_values(self) -> None:
-        process = self._normalize_process_name(self.current_process)
+        process = _normalize_process_name(self.current_process)
         sc_values = {
             "peso_pieza": self.sc_peso_pieza.text().strip(),
             "costes_fijos": self.sc_costes_fijos.text().strip(),
@@ -714,7 +730,7 @@ class RecipeTechnicalDialog(QDialog):
             self.elaboracion_data[self._process_key(process, key)] = value
 
     def _load_process_panel_values(self) -> None:
-        process = self._normalize_process_name(self.current_process)
+        process = _normalize_process_name(self.current_process)
 
         def sc_val(key: str, default: str = "") -> str:
             return str(
@@ -2623,33 +2639,16 @@ class RecipesPage(QWidget):
             return {}
         return {str(k): str(v) for k, v in payload.items()}
 
-    def _normalize_process_name(self, value: str | None) -> str:
-        text = str(value or "").strip()
-        return text if text else "Masa final"
-
     def _available_process_names(self) -> list[str]:
-        names: list[str] = []
-        for name in self.recipe_process_names:
-            n = self._normalize_process_name(name)
-            if n not in names:
-                names.append(n)
-        if "Masa final" not in names:
-            names.insert(0, "Masa final")
-        return names
+        return _unique_process_names(self.recipe_process_names)
 
     def _current_active_process(self) -> str:
-        return self._normalize_process_name(self.active_process_combo.currentText() if hasattr(self, "active_process_combo") else "")
+        return _normalize_process_name(self.active_process_combo.currentText() if hasattr(self, "active_process_combo") else "")
 
     def _refresh_process_controls(self, process_names: list[str] | None = None, preserve_active: bool = True) -> None:
         if process_names is None:
             process_names = self.recipe_process_names
-        cleaned: list[str] = []
-        for raw in process_names:
-            name = self._normalize_process_name(raw)
-            if name not in cleaned:
-                cleaned.append(name)
-        if "Masa final" not in cleaned:
-            cleaned.insert(0, "Masa final")
+        cleaned = _unique_process_names(process_names)
         self.recipe_process_names = cleaned
         if not hasattr(self, "active_process_combo"):
             return
@@ -2675,14 +2674,14 @@ class RecipesPage(QWidget):
             if not has_content:
                 self.lines_table.setRowHidden(row, False)
                 continue
-            proc = self._normalize_process_name(getattr(line, "proceso_nombre", ""))
+            proc = _normalize_process_name(getattr(line, "proceso_nombre", ""))
             self.lines_table.setRowHidden(row, proc != active)
 
     def _add_process(self) -> None:
         raw, ok = QInputDialog.getText(self, "Nuevo proceso", "Nombre del proceso")
         if not ok:
             return
-        name = self._normalize_process_name(raw)
+        name = _normalize_process_name(raw)
         if name in self.recipe_process_names:
             self.active_process_combo.setCurrentText(name)
             return
@@ -2711,7 +2710,7 @@ class RecipesPage(QWidget):
             )
             if not ok:
                 return
-            replacement = self._normalize_process_name(replacement)
+            replacement = _normalize_process_name(replacement)
         self.recipe_process_names = [x for x in self.recipe_process_names if x != target]
         for row in range(self.lines_table.rowCount()):
             if self._cell_text(row, self.COL_PROCESO) == target:
@@ -2791,7 +2790,7 @@ class RecipesPage(QWidget):
             self.recipe_elaboracion_data = self._json_to_dict(receta.parametros_elaboracion_json)
             self._load_images_gallery(self.recipe_elaboracion_data)
             self._proceso_rich_html = str(self.recipe_elaboracion_data.get(self.PROCESO_RICH_HTML_KEY, "") or "").strip()
-            line_processes = [self._normalize_process_name(getattr(line, "proceso_nombre", "") or "Masa final") for line in aggregate.lineas]
+            line_processes = [_normalize_process_name(getattr(line, "proceso_nombre", "") or "Masa final") for line in aggregate.lineas]
             self._refresh_process_controls(line_processes or ["Masa final"], preserve_active=False)
             self._render_lines(aggregate.lineas)
             self._update_summary(receta, aggregate.lineas)
@@ -3024,7 +3023,7 @@ class RecipesPage(QWidget):
         has_content = has_ingredient or bool((linea.notas or "").strip()) or float(linea.cantidad_base_g or 0.0) > 0
         prev_unit = self._cell_text(row, self.COL_UNIDAD).lower() if row < self.lines_table.rowCount() else ""
         unit_text = prev_unit if prev_unit in {"g", "kg", "l", "ml"} else "g"
-        process_text = self._normalize_process_name(getattr(linea, "proceso_nombre", "") or self._current_active_process())
+        process_text = _normalize_process_name(getattr(linea, "proceso_nombre", "") or self._current_active_process())
         values = [
             linea.nombre_mostrado or "",
             linea.notas or "",
@@ -3066,7 +3065,7 @@ class RecipesPage(QWidget):
         linea.nombre_mostrado = self._cell_text(row, self.COL_INGREDIENTE)
         linea.notas = self._cell_text(row, self.COL_NOTA)
         linea.cantidad_base_g = self._quantity_as_grams(row)
-        linea.proceso_nombre = self._normalize_process_name(self._cell_text(row, self.COL_PROCESO) or self._current_active_process())
+        linea.proceso_nombre = _normalize_process_name(self._cell_text(row, self.COL_PROCESO) or self._current_active_process())
         linea.proceso_origen_nombre = str(getattr(linea, "proceso_origen_nombre", "") or "").strip()
         if linea.tipo_linea == "proceso":
             qty_origin = float(getattr(linea, "cantidad_origen_g", 0.0) or 0.0)
@@ -3142,7 +3141,7 @@ class RecipesPage(QWidget):
         for row in range(self.lines_table.rowCount()):
             line = self._line_from_row(row)
             if line.nombre_mostrado or line.notas or line.cantidad_base_g:
-                line.proceso_nombre = self._normalize_process_name(line.proceso_nombre)
+                line.proceso_nombre = _normalize_process_name(line.proceso_nombre)
                 lines.append(line)
         line_processes = [line.proceso_nombre for line in lines]
         self._refresh_process_controls(line_processes or self.recipe_process_names)
@@ -3216,7 +3215,7 @@ class RecipesPage(QWidget):
             traceback.print_exc()
 
     def _render_lines(self, lineas: list[RecetaLinea]) -> None:
-        line_processes = [self._normalize_process_name(getattr(linea, "proceso_nombre", "") or "Masa final") for linea in lineas]
+        line_processes = [_normalize_process_name(getattr(linea, "proceso_nombre", "") or "Masa final") for linea in lineas]
         self._refresh_process_controls(line_processes or self.recipe_process_names)
         self.lines_table.setRowCount(0)
         for idx, linea in enumerate(lineas):
@@ -3233,10 +3232,10 @@ class RecipesPage(QWidget):
 
     def _update_summary(self, receta: Receta, lineas: list[RecetaLinea] | None = None) -> None:
         if lineas:
-            process_names = [self._normalize_process_name(getattr(linea, "proceso_nombre", "")) for linea in lineas]
+            process_names = [_normalize_process_name(getattr(linea, "proceso_nombre", "")) for linea in lineas]
             principal = "Masa final" if "Masa final" in process_names else (process_names[0] if process_names else "Masa final")
             principal_lines = [
-                linea for linea in lineas if self._normalize_process_name(getattr(linea, "proceso_nombre", "")) == principal
+                linea for linea in lineas if _normalize_process_name(getattr(linea, "proceso_nombre", "")) == principal
             ]
             total_harinas = sum(float(getattr(l, "cantidad_base_g", 0.0) or 0.0) for l in principal_lines if bool(getattr(l, "es_harina", False)))
             total_liquidos = sum(float(getattr(l, "cantidad_base_g", 0.0) or 0.0) for l in principal_lines if bool(getattr(l, "es_liquido", False)))

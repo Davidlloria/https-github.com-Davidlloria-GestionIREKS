@@ -433,6 +433,9 @@ Fase 5 - Reducir dependencia del desktop.
   - extraida la deteccion de columnas y la construccion del mapa de conteos a
     helpers puros reutilizables;
   - `InventariosTab` mantiene el mismo flujo visual de importacion.
+- Refactor de nombres de proceso en `recipes_page.py`:
+  - extraida la normalizacion y deduplicacion de procesos a helpers de modulo;
+  - la pantalla mantiene el mismo orden funcional y el contrato de `Masa final`.
 - Limpieza incremental de helpers muertos en `OrdersPage`:
   - eliminado wrapper `_parse_albaran_pdf` (se usa parser directo);
   - eliminados auxiliares `_parse_decimal_es*` sin referencias activas.
