@@ -439,6 +439,10 @@ Fase 5 - Reducir dependencia del desktop.
 - Refactor de galeria de imagenes en `recipes_page.py`:
   - extraida la serializacion y lectura ordenada de la galeria a helpers de modulo;
   - la UI conserva el mismo formato de guardado y la marca de imagen principal.
+- Refactor de payloads JSON en `recipes_page.py`:
+  - extraida la conversion segura de cadenas JSON a diccionarios planos a un
+    helper de modulo;
+  - la carga de datos de receta mantiene el mismo contrato tolerante a errores.
 - Limpieza incremental de helpers muertos en `OrdersPage`:
   - eliminado wrapper `_parse_albaran_pdf` (se usa parser directo);
   - eliminados auxiliares `_parse_decimal_es*` sin referencias activas.

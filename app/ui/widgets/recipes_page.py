@@ -96,6 +96,19 @@ def _load_recipe_image_gallery(raw_value: str) -> list[dict[str, object]]:
     return result
 
 
+def _json_to_string_dict(raw_value: str) -> dict[str, str]:
+    text = (raw_value or "").strip()
+    if not text:
+        return {}
+    try:
+        payload = json.loads(text)
+    except Exception:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return {str(k): str(v) for k, v in payload.items()}
+
+
 class IngredientSearchDialog(QDialog):
     def __init__(self, service: RecipeService, source_processes: list[str] | None = None, parent=None) -> None:
         super().__init__(parent)
@@ -2640,18 +2653,6 @@ class RecipesPage(QWidget):
         self._reload_recipe_list()
         self._update_inline_customer_name()
 
-    def _json_to_dict(self, raw_value: str) -> dict[str, str]:
-        text = (raw_value or "").strip()
-        if not text:
-            return {}
-        try:
-            payload = json.loads(text)
-        except Exception:
-            return {}
-        if not isinstance(payload, dict):
-            return {}
-        return {str(k): str(v) for k, v in payload.items()}
-
     def _available_process_names(self) -> list[str]:
         return _unique_process_names(self.recipe_process_names)
 
@@ -2799,8 +2800,8 @@ class RecipesPage(QWidget):
             self.merma_spin.setValue(receta.merma_pct)
             self.observaciones_input.setPlainText(receta.observaciones)
             self.proceso_input.setPlainText(receta.proceso)
-            self.recipe_escandallo_data = self._json_to_dict(receta.escandallo_detalle_json)
-            self.recipe_elaboracion_data = self._json_to_dict(receta.parametros_elaboracion_json)
+            self.recipe_escandallo_data = _json_to_string_dict(receta.escandallo_detalle_json)
+            self.recipe_elaboracion_data = _json_to_string_dict(receta.parametros_elaboracion_json)
             self._load_images_gallery(self.recipe_elaboracion_data)
             self._proceso_rich_html = str(self.recipe_elaboracion_data.get(self.PROCESO_RICH_HTML_KEY, "") or "").strip()
             line_processes = [_normalize_process_name(getattr(line, "proceso_nombre", "") or "Masa final") for line in aggregate.lineas]
