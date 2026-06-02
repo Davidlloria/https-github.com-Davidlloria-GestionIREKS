@@ -436,6 +436,9 @@ Fase 5 - Reducir dependencia del desktop.
 - Refactor de nombres de proceso en `recipes_page.py`:
   - extraida la normalizacion y deduplicacion de procesos a helpers de modulo;
   - la pantalla mantiene el mismo orden funcional y el contrato de `Masa final`.
+- Refactor de galeria de imagenes en `recipes_page.py`:
+  - extraida la serializacion y lectura ordenada de la galeria a helpers de modulo;
+  - la UI conserva el mismo formato de guardado y la marca de imagen principal.
 - Limpieza incremental de helpers muertos en `OrdersPage`:
   - eliminado wrapper `_parse_albaran_pdf` (se usa parser directo);
   - eliminados auxiliares `_parse_decimal_es*` sin referencias activas.

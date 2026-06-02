@@ -63,6 +63,39 @@ def _unique_process_names(values: list[str]) -> list[str]:
     return names
 
 
+def _collect_recipe_image_gallery(items: list[tuple[str, bool]]) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for idx, (path, is_main) in enumerate(items):
+        clean_path = str(path or "").strip()
+        if not clean_path:
+            continue
+        rows.append({"path": clean_path, "is_main": bool(is_main), "order": idx})
+    return rows
+
+
+def _load_recipe_image_gallery(raw_value: str) -> list[dict[str, object]]:
+    text = (raw_value or "").strip()
+    if not text:
+        return []
+    try:
+        data = json.loads(text)
+    except Exception:
+        return []
+    if not isinstance(data, list):
+        return []
+    ordered_rows = sorted(
+        [row for row in data if isinstance(row, dict)],
+        key=lambda row: int(row.get("order", 0) or 0),
+    )
+    result: list[dict[str, object]] = []
+    for row in ordered_rows:
+        path = str(row.get("path") or "").strip()
+        if not path:
+            continue
+        result.append({"path": path, "is_main": bool(row.get("is_main", False))})
+    return result
+
+
 class IngredientSearchDialog(QDialog):
     def __init__(self, service: RecipeService, source_processes: list[str] | None = None, parent=None) -> None:
         super().__init__(parent)
@@ -2292,42 +2325,22 @@ class RecipesPage(QWidget):
     def _collect_images_gallery(self) -> list[dict[str, object]]:
         if not hasattr(self, "images_list"):
             return []
-        rows: list[dict[str, object]] = []
+        payload: list[tuple[str, bool]] = []
         for idx in range(self.images_list.count()):
             item = self.images_list.item(idx)
             path = str(item.data(Qt.ItemDataRole.UserRole) or "").strip()
             if not path:
                 continue
-            rows.append(
-                {
-                    "path": path,
-                    "is_main": bool(item.data(Qt.ItemDataRole.UserRole + 1)),
-                    "order": idx,
-                }
-            )
-        return rows
+            payload.append((path, bool(item.data(Qt.ItemDataRole.UserRole + 1))))
+        return _collect_recipe_image_gallery(payload)
 
     def _load_images_gallery(self, payload: dict[str, str]) -> None:
         if not hasattr(self, "images_list"):
             return
         self.images_list.clear()
-        raw = str(payload.get(self.IMAGES_GALLERY_KEY, "") or "").strip()
-        if not raw:
-            return
-        try:
-            data = json.loads(raw)
-        except Exception:
-            return
-        if not isinstance(data, list):
-            return
-        ordered_rows = sorted(
-            [row for row in data if isinstance(row, dict)],
-            key=lambda row: int(row.get("order", 0) or 0),
-        )
-        for row in ordered_rows:
+        rows = _load_recipe_image_gallery(str(payload.get(self.IMAGES_GALLERY_KEY, "") or ""))
+        for row in rows:
             path = str(row.get("path") or "").strip()
-            if not path:
-                continue
             self._add_recipe_image_item(path)
             if self.images_list.count() > 0:
                 item = self.images_list.item(self.images_list.count() - 1)
