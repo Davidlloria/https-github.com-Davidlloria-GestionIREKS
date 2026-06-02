@@ -2542,7 +2542,7 @@ class OrdersPage(QWidget):
         mode_dialog = QMessageBox(self)
         mode_dialog.setIcon(QMessageBox.Icon.Question)
         mode_dialog.setWindowTitle("Enviar pedido")
-        mode_dialog.setText("Selecciona modo de envío para Outlook:")
+        mode_dialog.setText("Selecciona modo de env?o para Outlook:")
         draft_btn = mode_dialog.addButton("Preparar borrador", QMessageBox.ButtonRole.AcceptRole)
         send_btn = mode_dialog.addButton("Enviar directo", QMessageBox.ButtonRole.ActionRole)
         cancel_btn = mode_dialog.addButton(QMessageBox.StandardButton.Cancel)
@@ -2553,54 +2553,34 @@ class OrdersPage(QWidget):
             return
         send_direct = clicked == send_btn
         try:
-            wb, default_base_name = self.order_export_service.build_order_workbook(selected.pedido_id)
-            excel_path = self.order_export_service.save_order_excel_history(selected.pedido_id, wb, default_base_name)
-            preview = self.order_export_service.build_order_mail_preview(
+            preparation = self.order_export_service.prepare_order_mail_attachment(
                 pedido_id=selected.pedido_id,
                 pedido_numero=selected.pedido_numero,
                 destino_email=destino_email,
             )
+            preview = preparation.preview
             edited = self._show_mail_preview_dialog(
                 to_email=str(preview.get("to_email") or ""),
                 subject=str(preview.get("subject") or ""),
                 body=str(preview.get("body") or ""),
-                attachment_path=excel_path,
+                attachment_path=preparation.attachment_path,
                 send_direct=send_direct,
             )
             if edited is None:
                 return
-            outcome = self.order_export_service.open_outlook_mail_with_attachment(
+            self.order_export_service.send_order_mail(
                 pedido_id=selected.pedido_id,
                 pedido_numero=selected.pedido_numero,
-                attachment_path=excel_path,
+                attachment_path=preparation.attachment_path,
                 destino_email=str(edited.get("to_email") or "").strip(),
                 send_direct=send_direct,
                 subject=str(edited.get("subject") or "").strip(),
                 body=str(edited.get("body") or ""),
             )
-            self.order_export_service.log_order_mail_event(
-                pedido_id=selected.pedido_id,
-                pedido_numero=selected.pedido_numero,
-                destino_email=str(edited.get("to_email") or "").strip(),
-                asunto=str(outcome.get("subject") or "").strip(),
-                adjunto_path=str(excel_path),
-                modo_envio="send" if send_direct else "draft",
-                estado="ENVIADO" if send_direct else "BORRADOR",
-                error_detalle="",
-            )
         except Exception as exc:  # noqa: BLE001
-            self.order_export_service.log_order_mail_event(
-                pedido_id=selected.pedido_id,
-                pedido_numero=selected.pedido_numero,
-                destino_email=locals().get("edited", {}).get("to_email", destino_email),
-                asunto="",
-                adjunto_path=str(locals().get("excel_path", "")),
-                modo_envio="send" if locals().get("send_direct", False) else "draft",
-                estado="ERROR",
-                error_detalle=str(exc),
-            )
             QMessageBox.warning(self, "Pedidos", f"No se pudo preparar el email.\n{exc}")
             return
+        excel_path = str(preparation.attachment_path)
         if send_direct:
             QMessageBox.information(self, "Pedidos", f"Correo enviado desde Outlook.\nAdjunto: {excel_path}")
         else:
