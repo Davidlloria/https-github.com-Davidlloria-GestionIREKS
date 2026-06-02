@@ -2,7 +2,7 @@
 
 ## Estado verificado
 
-Revision local: 2026-05-29.
+Revision local: 2026-06-02.
 
 - Rama principal local sincronizada con `origin/main`.
 - PR inicial de migracion fusionado en GitHub: `Merge pull request #1`.
@@ -17,7 +17,7 @@ Revision local: 2026-05-29.
 - `orphan_contact_links = 0` tras backup y reparacion.
 - `data/*.db`, `data/*.json`, `data/backups/`, `data/exports/` y `runtime/`
   quedan ignorados para evitar subir datos reales, secretos o binarios pesados.
-- Validacion tras el bloque actual de Fase 2: `68 passed`, `npm run lint` y
+- Validacion conocida en la ultima revision: `68 passed`, `npm run lint` y
   `npm run build`.
 
 ## Arquitectura objetivo
@@ -455,6 +455,11 @@ Fase 5 - Reducir dependencia del desktop.
     resumen de estado, mapear resultados y centralizar mensajes/logs;
   - `app/ui/widgets/settings_page.py` delega integridad, reparacion de enlaces,
     optimize, clientes tecnicos y backup al nuevo servicio.
+- Ajuste de compatibilidad en ContactsPage:
+  - la llamada a ContactsService.list pasa company_id_to_name por argumento
+    nombrado;
+  - se reduce la dependencia del orden posicional y se deja la interfaz mas
+    explicita.
 
 ### Completado en Fase 6
 
@@ -478,6 +483,10 @@ Fase 5 - Reducir dependencia del desktop.
   - se aceptan instalacion del sistema, `TESSERACT_CMD` o copia portable en
     `runtime/tesseract/Tesseract-OCR/`;
   - checklist de release verifica disponibilidad de OCR cuando aplique.
+- Wrappers Windows de arranque y parada:
+  - nuevos `run-desktop.bat`, `start-dev.bat` y `stop-dev.bat` como accesos
+    directos para usuarios que prefieren doble clic en Windows;
+  - reutilizan los scripts PowerShell existentes y no introducen logica nueva.
 - Proteccion de configuraciones locales:
   - `.env` y `frontend/.env` quedan ignorados por Git;
   - plantillas sin secretos en `.env.example` y `frontend/.env.example`.

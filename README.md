@@ -100,6 +100,14 @@ Detener API y frontend lanzados por el script:
 .\scripts\stop-dev.ps1
 ```
 
+Arranque rapido en Windows con doble clic:
+
+```powershell
+run-desktop.bat
+start-dev.bat
+stop-dev.bat
+```
+
 Backup de base de datos con nombre automatico (recomendado antes de tareas
 destructivas o mantenimientos):
 

@@ -259,7 +259,7 @@ class ContactsPage(QWidget):
         return self.company_name_to_id.get(text, self.company_name_to_id.get(text.lower(), ""))
 
     def _list(self, term: str) -> list:
-        return self.service.list(term, self.company_id_to_name)
+        return self.service.list(term, company_id_to_name=self.company_id_to_name)
 
     def _create(self, payload: dict) -> None:
         self.service.create(payload)
