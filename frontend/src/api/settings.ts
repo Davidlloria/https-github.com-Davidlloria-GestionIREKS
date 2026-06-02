@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from './http'
+import { apiGet, apiPost, apiPostForm, apiPut } from './http'
 import type {
   ApiSettingsPayload,
   MaintenanceResult,
@@ -51,4 +51,11 @@ export function listImportWarehouses() {
 
 export function importOrdersJsonFromSettings(payload: { almacen_id: string; file_path: string }) {
   return apiPost<OrderJsonImportResponse>('/settings/imports/orders-json', payload)
+}
+
+export function importOrdersJsonUploadFromSettings(payload: { almacen_id: string; file: File }) {
+  const form = new FormData()
+  form.append('almacen_id', payload.almacen_id)
+  form.append('file', payload.file)
+  return apiPostForm<OrderJsonImportResponse>('/settings/imports/orders-json/upload', form)
 }

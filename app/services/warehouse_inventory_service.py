@@ -5,6 +5,7 @@ from typing import Any, cast
 from uuid import uuid4
 from datetime import date
 
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.core.database import engine
@@ -14,8 +15,11 @@ from app.schemas.warehouse import (
     InventoryAdjustmentPayload,
     InventoryDetailRead,
     InventoryExportPayload as ApiInventoryExportPayload,
+    InventoryHistoryListResponse,
     InventoryHeaderRead,
+    WarehouseMovementListResponse,
     WarehouseMovementRead,
+    WarehouseStockListResponse,
     WarehouseStockRead,
 )
 
@@ -50,17 +54,26 @@ class WarehouseInventoryService:
         *,
         limit: int = DEFAULT_PAGE_LIMIT,
         offset: int = 0,
-    ) -> list[WarehouseStockRead]:
+    ) -> WarehouseStockListResponse:
         with Session(engine) as session:
             stmt = select(AlmacenStock)
+            count_stmt = select(func.count()).select_from(AlmacenStock)
             if almacen_id:
                 stmt = stmt.where(AlmacenStock.almacen_id == almacen_id)
+                count_stmt = count_stmt.where(AlmacenStock.almacen_id == almacen_id)
+            total_raw = session.exec(count_stmt).one()
+            total = int(total_raw[0] if isinstance(total_raw, tuple) else total_raw)
             rows = list(
                 session.exec(
                     stmt.order_by(AlmacenStock.almacen_id, AlmacenStock.articulo_id).offset(offset).limit(limit)
                 )
             )
-        return WarehouseStockRead.list_from_entities(rows)
+        return WarehouseStockListResponse(
+            items=WarehouseStockRead.list_from_entities(rows),
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
 
     def stock_payload(
         self,
@@ -82,8 +95,20 @@ class WarehouseInventoryService:
         *,
         limit: int = DEFAULT_PAGE_LIMIT,
         offset: int = 0,
-    ) -> list[WarehouseMovementRead]:
-        return WarehouseMovementRead.list_from_entities(self.stock_payload(almacen_id, limit=limit, offset=offset).moves)
+    ) -> WarehouseMovementListResponse:
+        with Session(engine) as session:
+            count_stmt = select(func.count()).select_from(AlmacenMovimiento)
+            if almacen_id:
+                count_stmt = count_stmt.where(AlmacenMovimiento.almacen_id == almacen_id)
+            total_raw = session.exec(count_stmt).one()
+            total = int(total_raw[0] if isinstance(total_raw, tuple) else total_raw)
+        payload = self.stock_payload(almacen_id, limit=limit, offset=offset)
+        return WarehouseMovementListResponse(
+            items=WarehouseMovementRead.list_from_entities(payload.moves),
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
 
     def apply_adjustments(self, *, pending: list[dict[str, Any]], almacen_id: str, contador: str, aprobador: str) -> int:
         return self._persist_adjustments(pending=pending, almacen_id=almacen_id, contador=contador, aprobador=aprobador).lineas
@@ -204,8 +229,19 @@ class WarehouseInventoryService:
                 )
             )
 
-    def history_payload(self, almacen_id: str = "", limit: int = 50, offset: int = 0) -> list[InventoryHeaderRead]:
-        return InventoryHeaderRead.list_from_entities(self.history(almacen_id, limit, offset))
+    def history_payload(self, almacen_id: str = "", limit: int = 50, offset: int = 0) -> InventoryHistoryListResponse:
+        with Session(engine) as session:
+            count_stmt = select(func.count()).select_from(InventarioCabecera)
+            if almacen_id:
+                count_stmt = count_stmt.where(InventarioCabecera.almacen_id == almacen_id)
+            total_raw = session.exec(count_stmt).one()
+            total = int(total_raw[0] if isinstance(total_raw, tuple) else total_raw)
+        return InventoryHistoryListResponse(
+            items=InventoryHeaderRead.list_from_entities(self.history(almacen_id, limit, offset)),
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
 
     def history_detail(self, inventario_id: str) -> InventoryHistoryDetailPayload:
         with Session(engine) as session:

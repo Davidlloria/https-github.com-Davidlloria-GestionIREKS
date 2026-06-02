@@ -11,9 +11,12 @@ from app.schemas.warehouse import (
     InventoryAdjustmentPayload,
     InventoryDetailRead,
     InventoryExportPayload,
+    InventoryHistoryListResponse,
     InventoryHeaderRead,
     WarehouseManualMovementCreate,
+    WarehouseMovementListResponse,
     WarehouseMovementRead,
+    WarehouseStockListResponse,
     WarehouseStockRead,
 )
 from app.services.warehouse_inventory_service import WarehouseInventoryService
@@ -23,23 +26,23 @@ from app.services.warehouse_movement_service import WarehouseMovementService, Wa
 router = APIRouter(prefix="/warehouse", tags=["warehouse"])
 
 
-@router.get("/stock", response_model=list[WarehouseStockRead])
+@router.get("/stock", response_model=WarehouseStockListResponse)
 def list_stock(
     almacen_id: Annotated[str, Query(max_length=120)] = "",
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
     offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
-) -> list[WarehouseStockRead]:
+) -> WarehouseStockListResponse:
     return service.stock_summary_payload(almacen_id, limit=limit, offset=offset)
 
 
-@router.get("/movements", response_model=list[WarehouseMovementRead])
+@router.get("/movements", response_model=WarehouseMovementListResponse)
 def list_movements(
     almacen_id: Annotated[str, Query(max_length=120)] = "",
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
     offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
-) -> list[WarehouseMovementRead]:
+) -> WarehouseMovementListResponse:
     return service.movement_payload_serializable(almacen_id, limit=limit, offset=offset)
 
 
@@ -56,13 +59,13 @@ def create_manual_movement(
         raise bad_request(exc) from exc
 
 
-@router.get("/inventory/history", response_model=list[InventoryHeaderRead])
+@router.get("/inventory/history", response_model=InventoryHistoryListResponse)
 def list_inventory_history(
     almacen_id: Annotated[str, Query(max_length=120)] = "",
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: WarehouseInventoryService = Depends(get_warehouse_inventory_service),
-) -> list[InventoryHeaderRead]:
+) -> InventoryHistoryListResponse:
     return service.history_payload(almacen_id, limit=limit, offset=offset)
 
 

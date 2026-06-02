@@ -5,9 +5,9 @@ import {
   deleteOrder,
   deleteOrderItem,
   getOrderDetail,
-  importOrderAlbaranPdf,
-  importOrderFacturaPdf,
-  importOrderJson,
+  importOrderAlbaranPdfUpload,
+  importOrderFacturaPdfUpload,
+  importOrderJsonUpload,
   listOrderItems,
   listOrderPending,
   listOrders,
@@ -31,6 +31,8 @@ const EMPTY_ORDER_DETAIL: OrderDetailPayload = {
   pending: [],
 }
 
+const PAGE_SIZE = 50
+
 function todayIsoDate() {
   const now = new Date()
   const year = now.getFullYear()
@@ -49,6 +51,7 @@ export function OrdersPage() {
   const [monthFrom, setMonthFrom] = useState('')
   const [monthTo, setMonthTo] = useState('')
   const [almacenId, setAlmacenId] = useState('')
+  const [pageIndex, setPageIndex] = useState(0)
   const [selectedCandidateId, setSelectedCandidateId] = useState('')
   const [selectedOrderItemId, setSelectedOrderItemId] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -75,16 +78,17 @@ export function OrdersPage() {
   const [headerSaveMessage, setHeaderSaveMessage] = useState('')
   const [headerSaveError, setHeaderSaveError] = useState('')
   const [importJsonAlmacenId, setImportJsonAlmacenId] = useState('')
-  const [importJsonSourcePath, setImportJsonSourcePath] = useState('')
+  const [importJsonFile, setImportJsonFile] = useState<File | null>(null)
   const [importJsonLoading, setImportJsonLoading] = useState(false)
   const [importJsonMessage, setImportJsonMessage] = useState('')
   const [importJsonError, setImportJsonError] = useState('')
-  const [importPdfSourcePath, setImportPdfSourcePath] = useState('')
+  const [importPdfFile, setImportPdfFile] = useState<File | null>(null)
   const [importPdfType, setImportPdfType] = useState<'albaran' | 'factura'>('albaran')
   const [importPdfLoading, setImportPdfLoading] = useState(false)
   const [importPdfMessage, setImportPdfMessage] = useState('')
   const [importPdfError, setImportPdfError] = useState('')
 
+  const offset = pageIndex * PAGE_SIZE
   const ordersQuery = useAsyncResource(
     () =>
       listOrders({
@@ -92,18 +96,21 @@ export function OrdersPage() {
         monthFrom: monthFrom ? Number(monthFrom) : undefined,
         monthTo: monthTo ? Number(monthTo) : undefined,
         almacenId,
+        limit: PAGE_SIZE,
+        offset,
       }),
-    [],
-    [year, monthFrom, monthTo, almacenId],
+    { items: [], total: 0, limit: PAGE_SIZE, offset: 0 },
+    [year, monthFrom, monthTo, almacenId, offset],
   )
+  const orderRows = ordersQuery.data.items
 
   const selectedOrder = useMemo(() => {
-    if (!ordersQuery.data.length) {
+    if (!orderRows.length) {
       return null as OrderListItem | null
     }
-    const explicit = ordersQuery.data.find((row) => row.pedido_id === selectedCandidateId)
-    return explicit ?? ordersQuery.data[0]
-  }, [ordersQuery.data, selectedCandidateId])
+    const explicit = orderRows.find((row) => row.pedido_id === selectedCandidateId)
+    return explicit ?? orderRows[0]
+  }, [orderRows, selectedCandidateId])
 
   const loadSelectedOrder = useCallback(() => {
     if (!selectedOrder) {
@@ -111,24 +118,29 @@ export function OrdersPage() {
     }
     return Promise.all([
       getOrderDetail(selectedOrder.pedido_id),
-      listOrderItems(selectedOrder.pedido_id),
-      listOrderPending(selectedOrder.pedido_id),
-    ]).then(([detail, items, pending]) => ({ detail, items, pending }))
+      listOrderItems(selectedOrder.pedido_id, 500, 0),
+      listOrderPending(selectedOrder.pedido_id, 500, 0),
+    ]).then(([detail, items, pending]) => ({ detail, items: items.items, pending: pending.items }))
   }, [selectedOrder])
 
   const detailQuery = useAsyncResource(loadSelectedOrder, EMPTY_ORDER_DETAIL, [loadSelectedOrder, selectedOrder?.pedido_id])
 
   const totals = useMemo(() => {
-    const withAlbaran = ordersQuery.data.filter((row) => !!row.pedido_albaran_numero).length
-    const withFactura = ordersQuery.data.filter((row) => !!row.pedido_factura_numero).length
-    const totalKg = ordersQuery.data.reduce((acc, row) => acc + safeNumber(row.total_kg), 0)
+    const withAlbaran = orderRows.filter((row) => !!row.pedido_albaran_numero).length
+    const withFactura = orderRows.filter((row) => !!row.pedido_factura_numero).length
+    const totalKg = orderRows.reduce((acc, row) => acc + safeNumber(row.total_kg), 0)
     return {
-      total: ordersQuery.data.length,
+      total: ordersQuery.data.total,
       withAlbaran,
       withFactura,
       totalKg: totalKg.toFixed(2),
     }
-  }, [ordersQuery.data])
+  }, [orderRows, ordersQuery.data.total])
+
+  const hasPreviousPage = pageIndex > 0
+  const hasNextPage = offset + orderRows.length < ordersQuery.data.total
+  const currentPage = pageIndex + 1
+  const totalPages = Math.max(1, Math.ceil(ordersQuery.data.total / PAGE_SIZE))
 
   const selectedOrderItem = useMemo(
     () => detailQuery.data.items.find((item) => item.item_id === selectedOrderItemId) ?? null,
@@ -338,14 +350,18 @@ export function OrdersPage() {
       return
     }
     const almacen = importJsonAlmacenId.trim()
-    const sourcePath = importJsonSourcePath.trim()
     if (!almacen) {
       setImportJsonError('Debes indicar almacen_id para importar JSON.')
       setImportJsonMessage('')
       return
     }
-    if (!sourcePath) {
-      setImportJsonError('Debes indicar la ruta del archivo JSON en el servidor.')
+    if (!importJsonFile) {
+      setImportJsonError('Debes seleccionar un archivo JSON.')
+      setImportJsonMessage('')
+      return
+    }
+    if (!importJsonFile.name.toLowerCase().endsWith('.json')) {
+      setImportJsonError('El archivo debe tener extension .json.')
       setImportJsonMessage('')
       return
     }
@@ -353,11 +369,12 @@ export function OrdersPage() {
     setImportJsonError('')
     setImportJsonMessage('')
     try {
-      const result = await importOrderJson({ almacen_id: almacen, source_path: sourcePath })
+      const result = await importOrderJsonUpload({ almacen_id: almacen, file: importJsonFile })
       await ordersQuery.reload()
       if (result.pedido_id) {
         setSelectedCandidateId(result.pedido_id)
       }
+      setImportJsonFile(null)
       setImportJsonMessage(
         `Importacion JSON completada: ${result.imported_items} linea(s) importadas, ${result.skipped_invalid} invalida(s), ${result.skipped_unknown.length} desconocida(s).`,
       )
@@ -372,9 +389,13 @@ export function OrdersPage() {
     if (!selectedOrder || importPdfLoading) {
       return
     }
-    const sourcePath = importPdfSourcePath.trim()
-    if (!sourcePath) {
-      setImportPdfError('Debes indicar la ruta del PDF en el servidor.')
+    if (!importPdfFile) {
+      setImportPdfError('Debes seleccionar un archivo PDF.')
+      setImportPdfMessage('')
+      return
+    }
+    if (!importPdfFile.name.toLowerCase().endsWith('.pdf')) {
+      setImportPdfError('El archivo debe tener extension .pdf.')
       setImportPdfMessage('')
       return
     }
@@ -383,9 +404,10 @@ export function OrdersPage() {
     setImportPdfMessage('')
     try {
       const result = importPdfType === 'albaran'
-        ? await importOrderAlbaranPdf(selectedOrder.pedido_id, { source_path: sourcePath })
-        : await importOrderFacturaPdf(selectedOrder.pedido_id, { source_path: sourcePath })
+        ? await importOrderAlbaranPdfUpload(selectedOrder.pedido_id, { file: importPdfFile })
+        : await importOrderFacturaPdfUpload(selectedOrder.pedido_id, { file: importPdfFile })
       await Promise.all([ordersQuery.reload(), detailQuery.reload()])
+      setImportPdfFile(null)
       setImportPdfMessage(
         `${importPdfType === 'albaran' ? 'Albaran' : 'Factura'} importado: ${result.imported} linea(s). ${result.message || ''}`.trim(),
       )
@@ -402,27 +424,48 @@ export function OrdersPage() {
         <input
           className="input"
           value={year}
-          onChange={(event) => setYear(event.target.value)}
+          onChange={(event) => {
+            setYear(event.target.value)
+            setPageIndex(0)
+          }}
           placeholder="Ano (ej: 2026)"
         />
         <input
           className="input"
           value={monthFrom}
-          onChange={(event) => setMonthFrom(event.target.value)}
+          onChange={(event) => {
+            setMonthFrom(event.target.value)
+            setPageIndex(0)
+          }}
           placeholder="Mes desde (1-12)"
         />
         <input
           className="input"
           value={monthTo}
-          onChange={(event) => setMonthTo(event.target.value)}
+          onChange={(event) => {
+            setMonthTo(event.target.value)
+            setPageIndex(0)
+          }}
           placeholder="Mes hasta (1-12)"
         />
         <input
           className="input"
           value={almacenId}
-          onChange={(event) => setAlmacenId(event.target.value)}
+          onChange={(event) => {
+            setAlmacenId(event.target.value)
+            setPageIndex(0)
+          }}
           placeholder="Filtrar por almacen_id"
         />
+        <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
+          Anterior
+        </button>
+        <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
+          Siguiente
+        </button>
+        <span className="state">
+          Pagina {currentPage} de {totalPages}
+        </span>
       </div>
 
       <div className="cards">
@@ -501,12 +544,12 @@ export function OrdersPage() {
             />
           </label>
           <label>
-            Ruta JSON en servidor
+            Archivo JSON
             <input
+              type="file"
               className="input"
-              value={importJsonSourcePath}
-              onChange={(event) => setImportJsonSourcePath(event.target.value)}
-              placeholder="E:\\datos\\pedido.json"
+              accept=".json,application/json"
+              onChange={(event) => setImportJsonFile(event.target.files?.[0] ?? null)}
               disabled={importJsonLoading}
             />
           </label>
@@ -533,12 +576,12 @@ export function OrdersPage() {
             </select>
           </label>
           <label>
-            Ruta PDF en servidor (pedido seleccionado)
+            Archivo PDF (pedido seleccionado)
             <input
+              type="file"
               className="input"
-              value={importPdfSourcePath}
-              onChange={(event) => setImportPdfSourcePath(event.target.value)}
-              placeholder="E:\\datos\\albaran.pdf"
+              accept=".pdf,application/pdf"
+              onChange={(event) => setImportPdfFile(event.target.files?.[0] ?? null)}
               disabled={importPdfLoading}
             />
           </label>
@@ -560,11 +603,11 @@ export function OrdersPage() {
       <QueryState
         loading={ordersQuery.loading}
         error={ordersQuery.error}
-        empty={!ordersQuery.data.length}
+        empty={!orderRows.length}
         emptyMessage="No hay pedidos para los filtros actuales."
       />
 
-      {!!ordersQuery.data.length && (
+      {!!orderRows.length && (
         <div className="split-panel">
           <div className="table-wrap">
             <table>
@@ -579,7 +622,7 @@ export function OrdersPage() {
                 </tr>
               </thead>
               <tbody>
-                {ordersQuery.data.map((row) => (
+                {orderRows.map((row) => (
                   <tr
                     key={row.pedido_id}
                     className={row.pedido_id === selectedOrder?.pedido_id ? 'row-selected' : ''}

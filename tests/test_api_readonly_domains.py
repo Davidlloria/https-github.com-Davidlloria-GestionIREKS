@@ -124,12 +124,16 @@ def test_ingredients_readonly_endpoints(api_client: TestClient) -> None:
 
     ireks_list = api_client.get("/ingredients/ireks", params={"q": "Mejorante"})
     assert ireks_list.status_code == 200
-    assert ireks_list.json()["rows"][0]["articulo_id"] == "ireks-article-1"
+    assert ireks_list.json()["items"][0]["articulo_id"] == "ireks-article-1"
+    assert ireks_list.json()["total"] == 1
     assert ireks_list.json()["catalogs"]["fabricantes"][0]["name"] == "IREKS"
 
     ireks_page = api_client.get("/ingredients/ireks", params={"limit": 1, "offset": 1})
     assert ireks_page.status_code == 200
-    assert [row["articulo_id"] for row in ireks_page.json()["rows"]] == ["ireks-article-2"]
+    assert [row["articulo_id"] for row in ireks_page.json()["items"]] == ["ireks-article-2"]
+    assert ireks_page.json()["total"] == 2
+    assert ireks_page.json()["limit"] == 1
+    assert ireks_page.json()["offset"] == 1
     assert ireks_page.json()["catalogs"]["fabricantes"][0]["name"] == "IREKS"
 
     ireks_detail = api_client.get("/ingredients/ireks/1")
@@ -146,8 +150,9 @@ def test_ingredients_readonly_endpoints(api_client: TestClient) -> None:
 
     std_list = api_client.get("/ingredients/std", params={"q": "Harina"})
     assert std_list.status_code == 200
-    assert std_list.json()[0]["articulo_id"] == "std-article-1"
-    assert std_list.json()[0]["distribuidor_nombre"] == "Proveedor Demo"
+    assert std_list.json()["items"][0]["articulo_id"] == "std-article-1"
+    assert std_list.json()["items"][0]["distribuidor_nombre"] == "Proveedor Demo"
+    assert std_list.json()["total"] == 1
 
     std_prices = api_client.get("/ingredients/std/std-article-1/prices")
     assert std_prices.status_code == 200
@@ -200,23 +205,28 @@ def test_warehouse_readonly_endpoints(api_client: TestClient) -> None:
 
     stock = api_client.get("/warehouse/stock", params={"almacen_id": "alm-1"})
     assert stock.status_code == 200
-    assert stock.json()[0] == {"almacen_id": "alm-1", "articulo_id": "article-1", "cantidad_total": 7.5}
+    assert stock.json()["items"][0] == {"almacen_id": "alm-1", "articulo_id": "article-1", "cantidad_total": 7.5}
+    assert stock.json()["total"] == 2
 
     stock_page = api_client.get("/warehouse/stock", params={"almacen_id": "alm-1", "limit": 1, "offset": 1})
     assert stock_page.status_code == 200
-    assert stock_page.json() == [{"almacen_id": "alm-1", "articulo_id": "article-2", "cantidad_total": 3.0}]
+    assert stock_page.json()["items"] == [{"almacen_id": "alm-1", "articulo_id": "article-2", "cantidad_total": 3.0}]
+    assert stock_page.json()["limit"] == 1
+    assert stock_page.json()["offset"] == 1
 
     movements = api_client.get("/warehouse/movements", params={"almacen_id": "alm-1"})
     assert movements.status_code == 200
-    assert movements.json()[0]["pedido_numero"] == "P-2"
+    assert movements.json()["items"][0]["pedido_numero"] == "P-2"
+    assert movements.json()["total"] == 2
 
     movements_page = api_client.get("/warehouse/movements", params={"almacen_id": "alm-1", "limit": 1, "offset": 1})
     assert movements_page.status_code == 200
-    assert movements_page.json()[0]["pedido_numero"] == "P-1"
+    assert movements_page.json()["items"][0]["pedido_numero"] == "P-1"
 
     history = api_client.get("/warehouse/inventory/history", params={"almacen_id": "alm-1"})
     assert history.status_code == 200
-    assert history.json()[0]["inventario_id"] == "inv-1"
+    assert history.json()["items"][0]["inventario_id"] == "inv-1"
+    assert history.json()["total"] == 1
 
     detail = api_client.get("/warehouse/inventory/inv-1")
     assert detail.status_code == 200
@@ -279,14 +289,15 @@ def test_orders_readonly_endpoints(api_client: TestClient) -> None:
 
     orders = api_client.get("/orders", params={"year": "2026", "almacen_id": "alm-1"})
     assert orders.status_code == 200
-    assert orders.json()[0]["pedido_id"] == "order-2"
-    assert orders.json()[0]["almacen_nombre"] == "Almacen Demo"
-    assert orders.json()[0]["total_kg"] == 0.0
+    assert orders.json()["items"][0]["pedido_id"] == "order-2"
+    assert orders.json()["items"][0]["almacen_nombre"] == "Almacen Demo"
+    assert orders.json()["items"][0]["total_kg"] == 0.0
+    assert orders.json()["total"] == 2
 
     orders_page = api_client.get("/orders", params={"year": "2026", "almacen_id": "alm-1", "limit": 1, "offset": 1})
     assert orders_page.status_code == 200
-    assert orders_page.json()[0]["pedido_id"] == "order-1"
-    assert orders_page.json()[0]["total_kg"] == 20.0
+    assert orders_page.json()["items"][0]["pedido_id"] == "order-1"
+    assert orders_page.json()["items"][0]["total_kg"] == 20.0
 
     detail = api_client.get("/orders/order-1")
     assert detail.status_code == 200
@@ -294,8 +305,10 @@ def test_orders_readonly_endpoints(api_client: TestClient) -> None:
 
     items = api_client.get("/orders/order-1/items")
     assert items.status_code == 200
-    assert items.json()[0]["item_id"] == "item-1"
+    assert items.json()["items"][0]["item_id"] == "item-1"
+    assert items.json()["total"] == 1
 
     pending = api_client.get("/orders/order-1/pending")
     assert pending.status_code == 200
-    assert pending.json()[0]["cantidad_pendiente"] == 1.0
+    assert pending.json()["items"][0]["cantidad_pendiente"] == 1.0
+    assert pending.json()["total"] == 1

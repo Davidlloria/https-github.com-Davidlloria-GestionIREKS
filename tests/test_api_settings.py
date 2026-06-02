@@ -158,6 +158,15 @@ def test_settings_api_and_import_endpoints_use_service_contracts(tmp_path: Path)
     assert imported.json()["pedido_id"] == "order-api"
     assert imported.json()["imported_items"] == 2
 
+    imported_upload = client.post(
+        "/settings/imports/orders-json/upload",
+        data={"almacen_id": "alm-1"},
+        files={"file": ("pedido.json", b"{}", "application/json")},
+    )
+    assert imported_upload.status_code == 200
+    assert imported_upload.json()["pedido_id"] == "order-api"
+    assert imported_upload.json()["imported_items"] == 2
+
 
 def test_settings_save_api_settings_maps_invalid_config_and_unknown_provider() -> None:
     app = create_app()

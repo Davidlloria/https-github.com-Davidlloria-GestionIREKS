@@ -12,7 +12,7 @@ from app.schemas.contacts import (
     ContactCompanyOption,
     ContactCreate,
     ContactDetail,
-    ContactListItem,
+    ContactListResponse,
     ContactUpdate,
 )
 from app.services.contact_service import ContactPayloadError, ContactService
@@ -21,14 +21,15 @@ from app.services.contact_service import ContactPayloadError, ContactService
 router = APIRouter(prefix="/contacts", tags=["contacts"])
 
 
-@router.get("", response_model=list[ContactListItem])
+@router.get("", response_model=ContactListResponse)
 def list_contacts(
     q: Annotated[str, Query(max_length=120)] = "",
+    cliente_id: Annotated[str, Query(max_length=64)] = "",
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
     offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: ContactService = Depends(get_contact_service),
-) -> list[ContactListItem]:
-    return service.list_payload(q, limit=limit, offset=offset)
+) -> ContactListResponse:
+    return service.list_payload(q, company_id=cliente_id, limit=limit, offset=offset)
 
 
 @router.get("/companies", response_model=list[ContactCompanyOption])

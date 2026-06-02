@@ -1,10 +1,11 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from './http'
+import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm } from './http'
 import type {
   OrderDocumentImportResponse,
   OrderItemRead,
   OrderJsonImportResponse,
   OrderListItem,
   OrderPendingRead,
+  PaginatedList,
   OrderRead,
 } from '../types/api'
 
@@ -13,14 +14,18 @@ interface ListOrdersFilters {
   monthFrom?: number
   monthTo?: number
   almacenId?: string
+  limit?: number
+  offset?: number
 }
 
 export function listOrders(filters: ListOrdersFilters) {
-  return apiGet<OrderListItem[]>('/orders', {
+  return apiGet<PaginatedList<OrderListItem>>('/orders', {
     year: filters.year,
     month_from: filters.monthFrom,
     month_to: filters.monthTo,
     almacen_id: filters.almacenId,
+    limit: filters.limit,
+    offset: filters.offset,
   })
 }
 
@@ -28,12 +33,12 @@ export function getOrderDetail(orderId: string) {
   return apiGet<OrderRead>(`/orders/${orderId}`)
 }
 
-export function listOrderItems(orderId: string) {
-  return apiGet<OrderItemRead[]>(`/orders/${orderId}/items`)
+export function listOrderItems(orderId: string, limit?: number, offset?: number) {
+  return apiGet<PaginatedList<OrderItemRead>>(`/orders/${orderId}/items`, { limit, offset })
 }
 
-export function listOrderPending(orderId: string) {
-  return apiGet<OrderPendingRead[]>(`/orders/${orderId}/pending`)
+export function listOrderPending(orderId: string, limit?: number, offset?: number) {
+  return apiGet<PaginatedList<OrderPendingRead>>(`/orders/${orderId}/pending`, { limit, offset })
 }
 
 export function deleteOrder(orderId: string) {
@@ -78,10 +83,29 @@ export function importOrderJson(payload: { almacen_id: string; source_path: stri
   return apiPost<OrderJsonImportResponse>('/orders/import/json', payload)
 }
 
+export function importOrderJsonUpload(payload: { almacen_id: string; file: File }) {
+  const form = new FormData()
+  form.append('almacen_id', payload.almacen_id)
+  form.append('file', payload.file)
+  return apiPostForm<OrderJsonImportResponse>('/orders/import/json/upload', form)
+}
+
 export function importOrderAlbaranPdf(orderId: string, payload: { source_path: string }) {
   return apiPost<OrderDocumentImportResponse>(`/orders/${orderId}/import/albaran-pdf`, payload)
 }
 
+export function importOrderAlbaranPdfUpload(orderId: string, payload: { file: File }) {
+  const form = new FormData()
+  form.append('file', payload.file)
+  return apiPostForm<OrderDocumentImportResponse>(`/orders/${orderId}/import/albaran-pdf/upload`, form)
+}
+
 export function importOrderFacturaPdf(orderId: string, payload: { source_path: string }) {
   return apiPost<OrderDocumentImportResponse>(`/orders/${orderId}/import/factura-pdf`, payload)
+}
+
+export function importOrderFacturaPdfUpload(orderId: string, payload: { file: File }) {
+  const form = new FormData()
+  form.append('file', payload.file)
+  return apiPostForm<OrderDocumentImportResponse>(`/orders/${orderId}/import/factura-pdf/upload`, form)
 }

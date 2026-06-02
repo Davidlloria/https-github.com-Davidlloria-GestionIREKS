@@ -41,6 +41,8 @@ const EMPTY_CUSTOMER_FORM: CustomerFormState = {
   activo: true,
 }
 
+const PAGE_SIZE = 50
+
 function formFromDetail(detail: CustomerDetail): CustomerFormState {
   return {
     cliente_id: detail.cliente_id || '',
@@ -58,6 +60,7 @@ function formFromDetail(detail: CustomerDetail): CustomerFormState {
 
 export function CustomersPage() {
   const [search, setSearch] = useState('')
+  const [pageIndex, setPageIndex] = useState(0)
   const [selectedCandidateId, setSelectedCandidateId] = useState('')
   const [customerActiveLoading, setCustomerActiveLoading] = useState(false)
   const [customerActiveMessage, setCustomerActiveMessage] = useState('')
@@ -71,18 +74,28 @@ export function CustomersPage() {
   const [customerSaveMessage, setCustomerSaveMessage] = useState('')
   const [customerSaveError, setCustomerSaveError] = useState('')
 
-  const query = useAsyncResource(() => listCustomers(search), [], [search])
-  const contactsQuery = useAsyncResource(() => listContacts(''), [], [])
+  const offset = pageIndex * PAGE_SIZE
+  const query = useAsyncResource(
+    () => listCustomers(search, PAGE_SIZE, offset),
+    { items: [], total: 0, limit: PAGE_SIZE, offset: 0 },
+    [search, offset],
+  )
+  const contactsQuery = useAsyncResource(
+    () => listContacts('', '', 5000, 0),
+    { items: [], total: 0, limit: 5000, offset: 0 },
+    [],
+  )
+  const customerRows = query.data.items
 
   const selectedCustomerId = useMemo(() => {
-    if (!query.data.length) {
+    if (!customerRows.length) {
       return ''
     }
-    if (selectedCandidateId && query.data.some((row) => row.cliente_id === selectedCandidateId)) {
+    if (selectedCandidateId && customerRows.some((row) => row.cliente_id === selectedCandidateId)) {
       return selectedCandidateId
     }
-    return query.data[0].cliente_id
-  }, [query.data, selectedCandidateId])
+    return customerRows[0].cliente_id
+  }, [customerRows, selectedCandidateId])
 
   const fetchDetail = useCallback(() => {
     if (!selectedCustomerId) {
@@ -94,25 +107,30 @@ export function CustomersPage() {
   const detailQuery = useAsyncResource(fetchDetail, null as CustomerDetail | null, [fetchDetail, selectedCustomerId])
 
   const totals = useMemo(() => {
-    const active = query.data.filter((row) => row.activo).length
-    const prospects = query.data.filter((row) => row.cliente_prospeccion).length
-    const withEmail = query.data.filter((row) => !!row.cliente_email).length
+    const active = customerRows.filter((row) => row.activo).length
+    const prospects = customerRows.filter((row) => row.cliente_prospeccion).length
+    const withEmail = customerRows.filter((row) => !!row.cliente_email).length
     return {
-      total: query.data.length,
+      total: query.data.total,
       active,
       prospects,
       withEmail,
     }
-  }, [query.data])
+  }, [customerRows, query.data.total])
 
   const customerContacts = useMemo(() => {
     if (!selectedCustomerId) {
       return [] as ContactListItem[]
     }
-    return contactsQuery.data
+    return contactsQuery.data.items
       .filter((row) => row.cliente_id === selectedCustomerId)
       .sort((a, b) => `${a.apellidos} ${a.nombre}`.localeCompare(`${b.apellidos} ${b.nombre}`))
-  }, [contactsQuery.data, selectedCustomerId])
+  }, [contactsQuery.data.items, selectedCustomerId])
+
+  const hasPreviousPage = pageIndex > 0
+  const hasNextPage = offset + customerRows.length < query.data.total
+  const currentPage = pageIndex + 1
+  const totalPages = Math.max(1, Math.ceil(query.data.total / PAGE_SIZE))
 
   const effectiveCustomerForm = useMemo(() => {
     if (customerFormMode === 'new') {
@@ -258,9 +276,21 @@ export function CustomersPage() {
         <input
           className="input"
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            setSearch(event.target.value)
+            setPageIndex(0)
+          }}
           placeholder="Buscar cliente por nombre, telefono, email o CIF"
         />
+        <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
+          Anterior
+        </button>
+        <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
+          Siguiente
+        </button>
+        <span className="state">
+          Pagina {currentPage} de {totalPages}
+        </span>
       </div>
 
       <div className="cards">
@@ -273,11 +303,11 @@ export function CustomersPage() {
       <QueryState
         loading={query.loading}
         error={query.error}
-        empty={!query.data.length}
+        empty={!customerRows.length}
         emptyMessage="No hay clientes para los filtros actuales."
       />
 
-      {!!query.data.length && (
+      {!!customerRows.length && (
         <div className="split-panel">
           <div className="table-wrap">
             <table>
@@ -292,7 +322,7 @@ export function CustomersPage() {
                 </tr>
               </thead>
               <tbody>
-                {query.data.map((customer) => (
+                {customerRows.map((customer) => (
                   <tr
                     key={customer.cliente_id}
                     className={customer.cliente_id === selectedCustomerId ? 'row-selected' : ''}

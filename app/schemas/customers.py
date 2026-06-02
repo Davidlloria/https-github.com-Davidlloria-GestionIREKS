@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlmodel import Field
 
-from .base import AppSchema
+from .base import AppSchema, PaginatedResponse
 
 
 class CustomerBase(AppSchema):
@@ -33,6 +33,10 @@ class CustomerListItem(CustomerBase):
 
 class CustomerDetail(CustomerListItem):
     pass
+
+
+class CustomerListResponse(PaginatedResponse):
+    items: list[CustomerListItem] = Field(default_factory=list)
 
 
 class CustomerCreate(CustomerBase):
@@ -84,5 +88,6 @@ __all__ = [
     "CustomerCreate",
     "CustomerDetail",
     "CustomerListItem",
+    "CustomerListResponse",
     "CustomerUpdate",
 ]

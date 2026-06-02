@@ -4,7 +4,7 @@ from datetime import date
 
 from sqlmodel import Field
 
-from .base import AppSchema
+from .base import AppSchema, PaginatedResponse
 
 
 class WarehouseOption(AppSchema):
@@ -42,6 +42,10 @@ class WarehouseStockRead(AppSchema):
     cantidad_total: float = 0.0
 
 
+class WarehouseStockListResponse(PaginatedResponse):
+    items: list[WarehouseStockRead] = Field(default_factory=list)
+
+
 class InventoryHeaderRead(AppSchema):
     inventario_id: str
     almacen_id: str = ""
@@ -51,6 +55,10 @@ class InventoryHeaderRead(AppSchema):
     estado: str = ""
     lineas: int = 0
     ajustes: int = 0
+
+
+class InventoryHistoryListResponse(PaginatedResponse):
+    items: list[InventoryHeaderRead] = Field(default_factory=list)
 
 
 class InventoryDetailRead(AppSchema):
@@ -88,14 +96,21 @@ class InventoryExportPayload(AppSchema):
     details: list[InventoryDetailRead] = Field(default_factory=list)
 
 
+class WarehouseMovementListResponse(PaginatedResponse):
+    items: list[WarehouseMovementRead] = Field(default_factory=list)
+
+
 __all__ = [
     "InventoryAdjustmentInput",
     "InventoryAdjustmentPayload",
     "InventoryDetailRead",
     "InventoryExportPayload",
+    "InventoryHistoryListResponse",
     "InventoryHeaderRead",
+    "WarehouseMovementListResponse",
     "WarehouseMovementRead",
     "WarehouseManualMovementCreate",
     "WarehouseOption",
+    "WarehouseStockListResponse",
     "WarehouseStockRead",
 ]

@@ -27,6 +27,8 @@ const EMPTY_FORM: ContactFormState = {
   email: '',
 }
 
+const PAGE_SIZE = 50
+
 function formFromDetail(detail: ContactDetail): ContactFormState {
   return {
     cliente_id: detail.cliente_id || '',
@@ -42,6 +44,7 @@ function formFromDetail(detail: ContactDetail): ContactFormState {
 export function ContactsPage() {
   const [search, setSearch] = useState('')
   const [companyFilter, setCompanyFilter] = useState('')
+  const [pageIndex, setPageIndex] = useState(0)
   const [selectedCandidateId, setSelectedCandidateId] = useState('')
   const [formMode, setFormMode] = useState<ContactFormMode>('edit')
   const [form, setForm] = useState<ContactFormState>(EMPTY_FORM)
@@ -52,25 +55,24 @@ export function ContactsPage() {
   const [deleteMessage, setDeleteMessage] = useState('')
   const [deleteError, setDeleteError] = useState('')
 
-  const contactsQuery = useAsyncResource(() => listContacts(search), [], [search])
+  const offset = pageIndex * PAGE_SIZE
+  const contactsQuery = useAsyncResource(
+    () => listContacts(search, companyFilter, PAGE_SIZE, offset),
+    { items: [], total: 0, limit: PAGE_SIZE, offset: 0 },
+    [search, companyFilter, offset],
+  )
   const companiesQuery = useAsyncResource(() => listContactCompanies(), [], [])
-
-  const filteredContacts = useMemo(() => {
-    if (!companyFilter) {
-      return contactsQuery.data
-    }
-    return contactsQuery.data.filter((row) => row.cliente_id === companyFilter)
-  }, [companyFilter, contactsQuery.data])
+  const contactRows = contactsQuery.data.items
 
   const selectedContactId = useMemo(() => {
-    if (!filteredContacts.length) {
+    if (!contactRows.length) {
       return ''
     }
-    if (selectedCandidateId && filteredContacts.some((row) => row.contacto_id === selectedCandidateId)) {
+    if (selectedCandidateId && contactRows.some((row) => row.contacto_id === selectedCandidateId)) {
       return selectedCandidateId
     }
-    return filteredContacts[0].contacto_id
-  }, [filteredContacts, selectedCandidateId])
+    return contactRows[0].contacto_id
+  }, [contactRows, selectedCandidateId])
 
   const loadSelectedDetail = useCallback(() => {
     if (!selectedContactId) {
@@ -92,16 +94,21 @@ export function ContactsPage() {
   }, [detailQuery.data, form, formMode])
 
   const totals = useMemo(() => {
-    const withEmail = filteredContacts.filter((row) => !!row.email).length
-    const withPhone = filteredContacts.filter((row) => !!row.telefono).length
-    const uniqueCompanies = new Set(filteredContacts.map((row) => row.cliente_id).filter(Boolean)).size
+    const withEmail = contactRows.filter((row) => !!row.email).length
+    const withPhone = contactRows.filter((row) => !!row.telefono).length
+    const uniqueCompanies = new Set(contactRows.map((row) => row.cliente_id).filter(Boolean)).size
     return {
-      total: filteredContacts.length,
+      total: contactsQuery.data.total,
       withEmail,
       withPhone,
       uniqueCompanies,
     }
-  }, [filteredContacts])
+  }, [contactRows, contactsQuery.data.total])
+
+  const hasPreviousPage = pageIndex > 0
+  const hasNextPage = offset + contactRows.length < contactsQuery.data.total
+  const currentPage = pageIndex + 1
+  const totalPages = Math.max(1, Math.ceil(contactsQuery.data.total / PAGE_SIZE))
 
   const fullName = (row: ContactListItem) => `${row.nombre || ''} ${row.apellidos || ''}`.trim()
 
@@ -189,7 +196,7 @@ export function ContactsPage() {
     if (!selectedContactId || deleteLoading) {
       return
     }
-    const target = filteredContacts.find((row) => row.contacto_id === selectedContactId)
+    const target = contactRows.find((row) => row.contacto_id === selectedContactId)
     const targetName = target ? fullName(target) || target.contacto_id : selectedContactId
     const confirmed = window.confirm(`Se eliminara el contacto ${targetName}. Esta accion no se puede deshacer.`)
     if (!confirmed) {
@@ -216,13 +223,19 @@ export function ContactsPage() {
         <input
           className="input"
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            setSearch(event.target.value)
+            setPageIndex(0)
+          }}
           placeholder="Buscar por nombre, apellido, cargo, email o empresa"
         />
         <select
           className="select"
           value={companyFilter}
-          onChange={(event) => setCompanyFilter(event.target.value)}
+          onChange={(event) => {
+            setCompanyFilter(event.target.value)
+            setPageIndex(0)
+          }}
         >
           <option value="">Todas las empresas</option>
           {companiesQuery.data.map((company) => (
@@ -231,6 +244,15 @@ export function ContactsPage() {
             </option>
           ))}
         </select>
+        <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
+          Anterior
+        </button>
+        <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
+          Siguiente
+        </button>
+        <span className="state">
+          Pagina {currentPage} de {totalPages}
+        </span>
       </div>
 
       <div className="cards">
@@ -243,11 +265,11 @@ export function ContactsPage() {
       <QueryState
         loading={contactsQuery.loading}
         error={contactsQuery.error}
-        empty={!filteredContacts.length}
+        empty={!contactRows.length}
         emptyMessage="No hay contactos para los filtros actuales."
       />
 
-      {!!filteredContacts.length && (
+      {!!contactRows.length && (
         <div className="split-panel">
           <div className="table-wrap">
             <table>
@@ -261,7 +283,7 @@ export function ContactsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredContacts.map((row) => (
+                {contactRows.map((row) => (
                   <tr
                     key={row.contacto_id}
                     className={row.contacto_id === selectedContactId ? 'row-selected' : ''}

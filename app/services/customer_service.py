@@ -14,6 +14,7 @@ from app.schemas.customers import (
     CustomerCreate,
     CustomerDetail,
     CustomerListItem,
+    CustomerListResponse,
     CustomerUpdate,
 )
 from app.services.import_service import ImportService
@@ -100,8 +101,15 @@ class CustomerService:
         *,
         limit: int = DEFAULT_PAGE_LIMIT,
         offset: int = 0,
-    ) -> list[CustomerListItem]:
-        return CustomerListItem.list_from_entities(page_items(self.list(term), limit=limit, offset=offset))
+    ) -> CustomerListResponse:
+        rows = self.list(term)
+        page_rows = page_items(rows, limit=limit, offset=offset)
+        return CustomerListResponse(
+            items=CustomerListItem.list_from_entities(page_rows),
+            total=len(rows),
+            limit=limit,
+            offset=offset,
+        )
 
     def detail_payload(self, customer_id: str) -> CustomerDetail | None:
         with Session(engine) as session:

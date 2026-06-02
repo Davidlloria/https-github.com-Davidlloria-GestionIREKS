@@ -1,8 +1,8 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from './http'
-import type { CustomerDetail, CustomerListItem } from '../types/api'
+import type { CustomerDetail, CustomerListItem, PaginatedList } from '../types/api'
 
-export function listCustomers(search: string) {
-  return apiGet<CustomerListItem[]>('/customers', { q: search })
+export function listCustomers(search: string, limit?: number, offset?: number) {
+  return apiGet<PaginatedList<CustomerListItem>>('/customers', { q: search, limit, offset })
 }
 
 export function getCustomerDetail(customerId: string) {

@@ -158,10 +158,14 @@ const EMPTY_IREKS_TARIFA_FORM: IreksTarifaForm = {
   descuento_pct: '',
 }
 
+const PAGE_SIZE = 50
+
 export function IngredientsPage() {
   const [mode, setMode] = useState<IngredientMode>('ireks')
   const [search, setSearch] = useState('')
   const [activityFilter, setActivityFilter] = useState('all')
+  const [ireksPageIndex, setIreksPageIndex] = useState(0)
+  const [stdPageIndex, setStdPageIndex] = useState(0)
   const [selectedIreksCandidateId, setSelectedIreksCandidateId] = useState('')
   const [selectedStdCandidateId, setSelectedStdCandidateId] = useState('')
   const [stdActiveLoading, setStdActiveLoading] = useState(false)
@@ -203,32 +207,38 @@ export function IngredientsPage() {
   const [ireksTarifaMessage, setIreksTarifaMessage] = useState('')
   const [ireksTarifaError, setIreksTarifaError] = useState('')
 
+  const ireksOffset = ireksPageIndex * PAGE_SIZE
+  const stdOffset = stdPageIndex * PAGE_SIZE
+
   const ireksQuery = useAsyncResource(
-    () => listIreksIngredients(search, activityFilter),
-    { rows: [], catalogs: { distribuidores: [], fabricantes: [], familias: [], subfamilias: [], envases: [] } },
-    [search, activityFilter],
+    () => listIreksIngredients(search, activityFilter, PAGE_SIZE, ireksOffset),
+    { items: [], total: 0, limit: PAGE_SIZE, offset: 0, catalogs: { distribuidores: [], fabricantes: [], familias: [], subfamilias: [], envases: [] } },
+    [search, activityFilter, ireksOffset],
   )
   const stdQuery = useAsyncResource(
-    () => listStdIngredients(search, activityFilter),
-    [],
-    [search, activityFilter],
+    () => listStdIngredients(search, activityFilter, PAGE_SIZE, stdOffset),
+    { items: [], total: 0, limit: PAGE_SIZE, offset: 0 },
+    [search, activityFilter, stdOffset],
   )
 
+  const ireksRows = ireksQuery.data.items
+  const stdRows = stdQuery.data.items
+
   const selectedIreks = useMemo(() => {
-    if (!ireksQuery.data.rows.length) {
+    if (!ireksRows.length) {
       return null as IngredientIreksRead | null
     }
-    const explicit = ireksQuery.data.rows.find((row) => row.articulo_id === selectedIreksCandidateId)
-    return explicit ?? ireksQuery.data.rows[0]
-  }, [ireksQuery.data.rows, selectedIreksCandidateId])
+    const explicit = ireksRows.find((row) => row.articulo_id === selectedIreksCandidateId)
+    return explicit ?? ireksRows[0]
+  }, [ireksRows, selectedIreksCandidateId])
 
   const selectedStd = useMemo(() => {
-    if (!stdQuery.data.length) {
+    if (!stdRows.length) {
       return null as IngredientStdRead | null
     }
-    const explicit = stdQuery.data.find((row) => row.articulo_id === selectedStdCandidateId)
-    return explicit ?? stdQuery.data[0]
-  }, [stdQuery.data, selectedStdCandidateId])
+    const explicit = stdRows.find((row) => row.articulo_id === selectedStdCandidateId)
+    return explicit ?? stdRows[0]
+  }, [stdRows, selectedStdCandidateId])
 
   const loadIreksDetail = useCallback(() => {
     if (!selectedIreks || selectedIreks.id === null) {
@@ -259,17 +269,24 @@ export function IngredientsPage() {
   const stdDetailQuery = useAsyncResource(loadStdDetail, EMPTY_STD_DETAIL, [loadStdDetail, selectedStd?.articulo_id])
 
   const totals = useMemo(() => {
-    const ireksActive = ireksQuery.data.rows.filter((row) => row.articulo_status_activo).length
-    const ireksInList = ireksQuery.data.rows.filter((row) => row.articulo_status_en_lista).length
-    const stdActive = stdQuery.data.filter((row) => row.activo).length
+    const ireksActive = ireksRows.filter((row) => row.articulo_status_activo).length
+    const ireksInList = ireksRows.filter((row) => row.articulo_status_en_lista).length
+    const stdActive = stdRows.filter((row) => row.activo).length
     return {
-      ireksTotal: ireksQuery.data.rows.length,
+      ireksTotal: ireksQuery.data.total,
       ireksActive,
       ireksInList,
-      stdTotal: stdQuery.data.length,
+      stdTotal: stdQuery.data.total,
       stdActive,
     }
-  }, [ireksQuery.data, stdQuery.data])
+  }, [ireksRows, stdRows, ireksQuery.data.total, stdQuery.data.total])
+
+  const hasPreviousPage = mode === 'ireks' ? ireksPageIndex > 0 : stdPageIndex > 0
+  const hasNextPage = mode === 'ireks'
+    ? ireksOffset + ireksRows.length < ireksQuery.data.total
+    : stdOffset + stdRows.length < stdQuery.data.total
+  const currentPage = mode === 'ireks' ? ireksPageIndex + 1 : stdPageIndex + 1
+  const totalPages = Math.max(1, Math.ceil((mode === 'ireks' ? ireksQuery.data.total : stdQuery.data.total) / PAGE_SIZE))
 
   const currentStdEditForm = useMemo(() => {
     const detail = stdDetailQuery.data.detail
@@ -801,18 +818,57 @@ export function IngredientsPage() {
         <input
           className="input"
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            setSearch(event.target.value)
+            setIreksPageIndex(0)
+            setStdPageIndex(0)
+          }}
           placeholder={mode === 'ireks' ? 'Buscar por referencia, descripcion o almacen' : 'Buscar por referencia o descripcion de materia prima'}
         />
         <select
           className="select"
           value={activityFilter}
-          onChange={(event) => setActivityFilter(event.target.value)}
+          onChange={(event) => {
+            setActivityFilter(event.target.value)
+            setIreksPageIndex(0)
+            setStdPageIndex(0)
+          }}
         >
           <option value="all">Todos</option>
           <option value="active">Activos</option>
           <option value="inactive">Inactivos</option>
         </select>
+        <button
+          type="button"
+          className="action-btn"
+          disabled={!hasPreviousPage}
+          onClick={() => {
+            if (mode === 'ireks') {
+              setIreksPageIndex((prev) => Math.max(0, prev - 1))
+            } else {
+              setStdPageIndex((prev) => Math.max(0, prev - 1))
+            }
+          }}
+        >
+          Anterior
+        </button>
+        <button
+          type="button"
+          className="action-btn"
+          disabled={!hasNextPage}
+          onClick={() => {
+            if (mode === 'ireks') {
+              setIreksPageIndex((prev) => prev + 1)
+            } else {
+              setStdPageIndex((prev) => prev + 1)
+            }
+          }}
+        >
+          Siguiente
+        </button>
+        <span className="state">
+          Pagina {currentPage} de {totalPages}
+        </span>
       </div>
 
       <div className="cards">
@@ -1046,11 +1102,11 @@ export function IngredientsPage() {
           <QueryState
             loading={ireksQuery.loading}
             error={ireksQuery.error}
-            empty={!ireksQuery.data.rows.length}
+            empty={!ireksQuery.data.items.length}
             emptyMessage="No hay ingredientes IREKS para los filtros actuales."
           />
 
-          {!!ireksQuery.data.rows.length && (
+          {!!ireksQuery.data.items.length && (
             <div className="split-panel">
               <div className="table-wrap">
                 <table>
@@ -1065,7 +1121,7 @@ export function IngredientsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {ireksQuery.data.rows.map((row) => (
+                    {ireksQuery.data.items.map((row) => (
                       <tr
                         key={`${row.id ?? row.articulo_id}`}
                         className={row.articulo_id === selectedIreks?.articulo_id ? 'row-selected' : ''}
@@ -1493,11 +1549,11 @@ export function IngredientsPage() {
           <QueryState
             loading={stdQuery.loading}
             error={stdQuery.error}
-            empty={!stdQuery.data.length}
+            empty={!stdQuery.data.items.length}
             emptyMessage="No hay materias primas STD para los filtros actuales."
           />
 
-          {!!stdQuery.data.length && (
+          {!!stdQuery.data.items.length && (
             <div className="split-panel">
               <div className="table-wrap">
                 <table>
@@ -1512,7 +1568,7 @@ export function IngredientsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {stdQuery.data.map((row) => (
+                    {stdQuery.data.items.map((row) => (
                       <tr
                         key={row.articulo_id}
                         className={row.articulo_id === selectedStd?.articulo_id ? 'row-selected' : ''}

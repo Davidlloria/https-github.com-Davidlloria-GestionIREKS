@@ -348,7 +348,7 @@ def test_manual_warehouse_movement_write_endpoint(api_client: TestClient) -> Non
 
     movements = api_client.get("/warehouse/movements", params={"almacen_id": "alm-1"})
     assert movements.status_code == 200
-    assert movements.json()[0]["articulo_lote"] == "L-1"
+    assert movements.json()["items"][0]["articulo_lote"] == "L-1"
 
 
 def test_manual_warehouse_movement_negative_stock_returns_conflict(api_client: TestClient) -> None:
@@ -482,6 +482,30 @@ def test_order_json_import_endpoint(api_client: TestClient, tmp_path: Path) -> N
     assert rows[0].articulo_id == "article-1"
     assert rows[0].articulo_cantidad == 3.0
 
+    uploaded = api_client.post(
+        "/orders/import/json/upload",
+        data={"almacen_id": "alm-1"},
+        files={
+            "file": (
+                "pedido_upload.json",
+                json.dumps(
+                    {
+                        "Fecha": "30/05/26",
+                        "Albaran": "ALB-2",
+                        "Lineas": [{"Codigo": "IR-001", "Cantidad": "1"}],
+                    }
+                ).encode("utf-8"),
+                "application/json",
+            )
+        },
+    )
+    assert uploaded.status_code == 200
+    assert uploaded.json()["imported_items"] == 1
+
+    with Session(order_service_module.engine) as session:
+        rows = list(session.exec(select(PedidoItem).order_by(PedidoItem.item_id)))
+    assert len(rows) == 2
+
 
 def test_order_albaran_pdf_import_endpoint(api_client: TestClient, tmp_path: Path) -> None:
     with Session(order_document_import_service_module.engine) as session:
@@ -562,6 +586,12 @@ def test_order_albaran_pdf_import_endpoint(api_client: TestClient, tmp_path: Pat
     assert pedido is not None
     assert pedido.pedido_albaran_numero == "2026090075"
 
+    uploaded = api_client.post(
+        "/orders/order-albaran/import/albaran-pdf/upload",
+        files={"file": ("albaran_upload.pdf", source.read_bytes(), "application/pdf")},
+    )
+    assert uploaded.status_code == 200
+
 
 def test_order_albaran_pdf_import_missing_order_returns_not_found(api_client: TestClient, tmp_path: Path) -> None:
     source = tmp_path / "albaran-missing-order.pdf"
@@ -632,6 +662,12 @@ def test_order_factura_pdf_import_endpoint(api_client: TestClient, tmp_path: Pat
     assert pedido is not None
     assert pedido.pedido_factura_numero == "60027"
 
+    uploaded = api_client.post(
+        "/orders/order-factura/import/factura-pdf/upload",
+        files={"file": ("factura_upload.pdf", source.read_bytes(), "application/pdf")},
+    )
+    assert uploaded.status_code == 200
+
 
 def test_order_factura_pdf_import_missing_order_returns_not_found(api_client: TestClient, tmp_path: Path) -> None:
     source = tmp_path / "factura-missing-order.pdf"
@@ -688,13 +724,13 @@ def test_order_crud_and_line_write_endpoints(api_client: TestClient) -> None:
 
     listed = api_client.get("/orders", params={"year": "2026", "almacen_id": "alm-1"})
     assert listed.status_code == 200
-    assert listed.json()[0]["pedido_id"] == order_id
-    assert listed.json()[0]["total_kg"] == 20.0
+    assert listed.json()["items"][0]["pedido_id"] == order_id
+    assert listed.json()["items"][0]["total_kg"] == 20.0
 
     items = api_client.get(f"/orders/{order_id}/items")
     assert items.status_code == 200
-    assert len(items.json()) == 1
-    first_item_id = items.json()[0]["item_id"]
+    assert len(items.json()["items"]) == 1
+    first_item_id = items.json()["items"][0]["item_id"]
 
     updated = api_client.patch(
         f"/orders/{order_id}",
@@ -711,9 +747,9 @@ def test_order_crud_and_line_write_endpoints(api_client: TestClient) -> None:
 
     replaced_items = api_client.get(f"/orders/{order_id}/items")
     assert replaced_items.status_code == 200
-    assert len(replaced_items.json()) == 1
-    assert replaced_items.json()[0]["item_id"] != first_item_id
-    assert replaced_items.json()[0]["articulo_cantidad"] == 3.5
+    assert len(replaced_items.json()["items"]) == 1
+    assert replaced_items.json()["items"][0]["item_id"] != first_item_id
+    assert replaced_items.json()["items"][0]["articulo_cantidad"] == 3.5
 
     added_line = api_client.post(
         f"/orders/{order_id}/items",

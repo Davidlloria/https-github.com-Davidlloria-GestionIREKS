@@ -143,18 +143,55 @@ Fase 5 - Reducir dependencia del desktop.
   - `POST /contacts` devuelve `409` ante `contacto_id`/campos unicos en conflicto.
   - `PATCH /customers/{customer_id}` y `PATCH /contacts/{contact_id}` devuelven
     `409` para colisiones de unicidad.
+- Primera evolucion de paginacion con metadatos en dominios de clientes/contactos:
+  - `GET /customers` y `GET /contacts` devuelven contrato paginado
+    `{ items, total, limit, offset }`;
+  - `GET /contacts` incorpora filtro opcional por `cliente_id` en servidor;
+  - React (`Clientes` y `Contactos`) consume el contrato nuevo y expone
+    navegacion de pagina (`Anterior`/`Siguiente`) usando `limit/offset`.
+- Segunda evolucion de paginacion con metadatos en pedidos/almacen:
+  - `GET /orders`, `GET /warehouse/stock`, `GET /warehouse/movements` y
+    `GET /warehouse/inventory/history` devuelven contrato paginado
+    `{ items, total, limit, offset }`;
+  - React (`Pedidos` y `Almacen`) consume el contrato nuevo; `Pedidos` incorpora
+    navegacion de pagina visible (`Anterior`/`Siguiente`) sobre `limit/offset`;
+  - tests de contrato/read-only/write ajustados al formato paginado.
+- Tercera evolucion de paginacion con metadatos en ingredientes:
+  - `GET /ingredients/ireks` y `GET /ingredients/std` devuelven contrato
+    paginado `{ items, total, limit, offset }`;
+  - `GET /ingredients/ireks` mantiene `catalogs` junto al bloque paginado;
+  - React (`Ingredientes`) consume el nuevo contrato para IREKS y STD;
+  - tests read-only ajustados al formato paginado.
+- Cuarta evolucion de paginacion con metadatos en detalle de pedidos:
+  - `GET /orders/{order_id}/items` y `GET /orders/{order_id}/pending`
+    devuelven contrato paginado `{ items, total, limit, offset }`;
+  - React (`Pedidos`) adapta carga de detalle consumiendo `items` del
+    contrato paginado;
+  - tests read-only/write y validacion de query params actualizados.
+- Importaciones por subida de archivo en API/React:
+  - nuevos endpoints multipart para pedidos:
+    - `POST /orders/import/json/upload`
+    - `POST /orders/{order_id}/import/albaran-pdf/upload`
+    - `POST /orders/{order_id}/import/factura-pdf/upload`
+  - nuevo endpoint multipart en configuracion:
+    - `POST /settings/imports/orders-json/upload`
+  - React (`Pedidos` y `Configuracion`) migra de rutas locales del servidor a
+    seleccion de archivos (`input type=file`) para importaciones JSON/PDF;
+  - se mantienen endpoints legacy por ruta (`source_path`/`file_path`) para
+    compatibilidad temporal.
 
 ### Pendiente en Fase 2
 
 - Mantener la matriz semantica de errores de escritura (`400/404/409`) cuando
   se incorporen nuevos endpoints o reglas de negocio.
-- Decidir si React debe migrar importaciones a subida de archivos en vez de
-  enviar rutas del servidor.
+- Planificar retirada gradual de endpoints legacy por ruta (`source_path` /
+  `file_path`) tras confirmar adopcion de endpoints upload en clientes activos.
 - Extender la revision de `409 Conflict` a otros dominios si aparecen nuevas
   dependencias bloqueantes (por ejemplo tarifas/configuraciones con reglas de
   negocio adicionales).
 - Evolucionar la paginacion hacia respuestas con metadatos (`total`, `limit`,
-  `offset`) cuando React necesite controles de pagina visibles.
+  `offset`) en cualquier listado grande nuevo o legacy que se incorpore en la API
+  para conservar un contrato uniforme.
 - Revisar si conviene empaquetar los scripts de arranque/parada en comandos npm
   o task runner para equipos mixtos Windows/Linux.
 - Mantener gates verdes: `pytest`, `npm run lint`, `npm run build` e integridad

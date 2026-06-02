@@ -38,6 +38,19 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   return (await response.json()) as T
 }
 
+export async function apiPostForm<T>(path: string, body: FormData): Promise<T> {
+  const response = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+    body,
+  })
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || `Error HTTP ${response.status}`)
+  }
+  return (await response.json()) as T
+}
+
 export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(buildUrl(path), {
     method: 'PATCH',

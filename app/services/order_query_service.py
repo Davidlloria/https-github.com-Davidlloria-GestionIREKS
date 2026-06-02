@@ -9,7 +9,15 @@ from sqlmodel import Session, select
 from app.core.database import engine
 from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
 from app.models import Albaran, AlbaranItem, Cliente, Fabricante, Familia, IngredienteIreks, Pedido, PedidoItem, PedidoPendiente, Subfamilia
-from app.schemas.orders import OrderItemRead, OrderListItem, OrderPendingRead, OrderRead
+from app.schemas.orders import (
+    OrderItemListResponse,
+    OrderItemRead,
+    OrderListItem,
+    OrderListResponse,
+    OrderPendingListResponse,
+    OrderPendingRead,
+    OrderRead,
+)
 
 
 @dataclass
@@ -172,9 +180,21 @@ class OrderQueryService:
         }
         return rows, pending_article_ids
 
-    def list_order_items_payload(self, pedido_id: str) -> list[OrderItemRead]:
+    def list_order_items_payload(
+        self,
+        pedido_id: str,
+        *,
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
+    ) -> OrderItemListResponse:
         rows, _pending_article_ids = self.list_order_items(pedido_id)
-        return OrderItemRead.list_from_entities([item for item, _article in rows])
+        items = [item for item, _article in rows]
+        return OrderItemListResponse(
+            items=OrderItemRead.list_from_entities(page_items(items, limit=limit, offset=offset)),
+            total=len(items),
+            limit=limit,
+            offset=offset,
+        )
 
     def list_albaranes(self, pedido_id: str) -> list[Albaran]:
         clean_pedido_id = str(pedido_id or "").strip()
@@ -238,9 +258,20 @@ class OrderQueryService:
             )
         return rows, articles
 
-    def list_pendientes_payload(self, pedido_id: str) -> list[OrderPendingRead]:
+    def list_pendientes_payload(
+        self,
+        pedido_id: str,
+        *,
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
+    ) -> OrderPendingListResponse:
         rows, _articles = self.list_pendientes(pedido_id)
-        return OrderPendingRead.list_from_entities(rows)
+        return OrderPendingListResponse(
+            items=OrderPendingRead.list_from_entities(page_items(rows, limit=limit, offset=offset)),
+            total=len(rows),
+            limit=limit,
+            offset=offset,
+        )
 
     def warehouse_filter_options(self) -> list[WarehouseFilterOption]:
         with Session(engine) as session:
@@ -283,21 +314,13 @@ class OrderQueryService:
             for row in clientes
         }
 
-        if month_from and month_to and month_from > month_to:
-            month_from, month_to = month_to, month_from
-
-        filtered: list[Pedido] = []
-        for row in pedidos:
-            p_date = self.parse_date(row.pedido_fecha)
-            if year_filter and str(p_date.year) != year_filter:
-                continue
-            if month_from and p_date.month < month_from:
-                continue
-            if month_to and p_date.month > month_to:
-                continue
-            if almacen_filter and str(row.almacen_id or "").strip() != almacen_filter:
-                continue
-            filtered.append(row)
+        filtered = self._filter_orders(
+            pedidos,
+            year_filter=year_filter,
+            month_from=month_from,
+            month_to=month_to,
+            almacen_filter=almacen_filter,
+        )
 
         page = page_items(filtered, limit=limit, offset=offset)
         totals_map = self.pedido_totals_kg([str(row.pedido_id or "") for row in page])
@@ -332,7 +355,14 @@ class OrderQueryService:
         almacen_filter: str = "",
         limit: int = DEFAULT_PAGE_LIMIT,
         offset: int = 0,
-    ) -> list[OrderListItem]:
+    ) -> OrderListResponse:
+        filtered = self._filter_orders(
+            self.list_raw_orders(),
+            year_filter=year_filter,
+            month_from=month_from,
+            month_to=month_to,
+            almacen_filter=almacen_filter,
+        )
         rows = self.list_order_rows(
             year_filter=year_filter,
             month_from=month_from,
@@ -341,7 +371,38 @@ class OrderQueryService:
             limit=limit,
             offset=offset,
         )
-        return OrderListItem.list_from_entities(rows)
+        return OrderListResponse(
+            items=OrderListItem.list_from_entities(rows),
+            total=len(filtered),
+            limit=limit,
+            offset=offset,
+        )
+
+    def _filter_orders(
+        self,
+        pedidos: list[Pedido],
+        *,
+        year_filter: str,
+        month_from: int,
+        month_to: int,
+        almacen_filter: str,
+    ) -> list[Pedido]:
+        if month_from and month_to and month_from > month_to:
+            month_from, month_to = month_to, month_from
+
+        filtered: list[Pedido] = []
+        for row in pedidos:
+            p_date = self.parse_date(row.pedido_fecha)
+            if year_filter and str(p_date.year) != year_filter:
+                continue
+            if month_from and p_date.month < month_from:
+                continue
+            if month_to and p_date.month > month_to:
+                continue
+            if almacen_filter and str(row.almacen_id or "").strip() != almacen_filter:
+                continue
+            filtered.append(row)
+        return filtered
 
     def pedido_totals_kg(self, pedido_ids: list[str]) -> dict[str, float]:
         if not pedido_ids:

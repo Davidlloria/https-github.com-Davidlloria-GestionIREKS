@@ -41,7 +41,9 @@ def test_customers_crud_endpoints(api_client: TestClient) -> None:
 
     listed = api_client.get("/customers", params={"q": "Norte"})
     assert listed.status_code == 200
-    assert [row["cliente_id"] for row in listed.json()] == ["customer-1"]
+    assert [row["cliente_id"] for row in listed.json()["items"]] == ["customer-1"]
+    assert listed.json()["total"] == 1
+    assert listed.json()["offset"] == 0
 
     updated = api_client.patch(
         "/customers/customer-1",
@@ -97,7 +99,10 @@ def test_customers_list_supports_limit_and_offset(api_client: TestClient) -> Non
     response = api_client.get("/customers", params={"limit": 1, "offset": 1})
 
     assert response.status_code == 200
-    assert [row["cliente_id"] for row in response.json()] == ["customer-2"]
+    assert [row["cliente_id"] for row in response.json()["items"]] == ["customer-2"]
+    assert response.json()["total"] == 3
+    assert response.json()["limit"] == 1
+    assert response.json()["offset"] == 1
 
 
 def test_contacts_crud_endpoints_include_company_payload(api_client: TestClient) -> None:
@@ -131,8 +136,9 @@ def test_contacts_crud_endpoints_include_company_payload(api_client: TestClient)
 
     listed = api_client.get("/contacts", params={"q": "Cliente"})
     assert listed.status_code == 200
-    assert listed.json()[0]["contacto_id"] == "contact-1"
-    assert listed.json()[0]["cliente_nombre"] == "Cliente Demo"
+    assert listed.json()["items"][0]["contacto_id"] == "contact-1"
+    assert listed.json()["items"][0]["cliente_nombre"] == "Cliente Demo"
+    assert listed.json()["total"] == 1
 
     updated = api_client.patch("/contacts/contact-1", json={"cargo": "Compras"})
     assert updated.status_code == 200
@@ -142,6 +148,39 @@ def test_contacts_crud_endpoints_include_company_payload(api_client: TestClient)
     deleted = api_client.delete("/contacts/contact-1")
     assert deleted.status_code == 204
     assert api_client.get("/contacts/contact-1").status_code == 404
+
+
+def test_contacts_list_supports_company_limit_and_offset(api_client: TestClient) -> None:
+    for idx in (1, 2):
+        created_customer = api_client.post(
+            "/customers",
+            json={
+                "cliente_id": f"customer-{idx}",
+                "cliente_nombre_comercial": f"Cliente {idx}",
+                "cliente_nombre_fiscal": f"Cliente {idx} SL",
+            },
+        )
+        assert created_customer.status_code == 201
+
+    for idx, customer_id in enumerate(("customer-1", "customer-1", "customer-2"), start=1):
+        created_contact = api_client.post(
+            "/contacts",
+            json={
+                "contacto_id": f"contact-{idx}",
+                "contacto_codigo": idx,
+                "cliente_id": customer_id,
+                "nombre": f"Nombre {idx}",
+            },
+        )
+        assert created_contact.status_code == 201
+
+    response = api_client.get("/contacts", params={"cliente_id": "customer-1", "limit": 1, "offset": 1})
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 2
+    assert response.json()["limit"] == 1
+    assert response.json()["offset"] == 1
+    assert [row["contacto_id"] for row in response.json()["items"]] == ["contact-2"]
 
 
 def test_contact_create_duplicate_id_returns_conflict(api_client: TestClient) -> None:

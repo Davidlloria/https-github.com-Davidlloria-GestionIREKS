@@ -2,23 +2,26 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_order_document_import_service, get_order_query_service, get_order_service
 from app.api.errors import bad_request, conflict, not_found
 from app.api.paths import input_file_path
 from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
+from app.api.uploads import upload_to_temp_file_path
 from app.schemas.orders import (
     OrderCreate,
     OrderDocumentImportPayload,
     OrderDocumentImportResponse,
+    OrderItemListResponse,
     OrderItemRead,
     OrderJsonImportPayload,
     OrderJsonImportResponse,
     OrderLineWrite,
-    OrderListItem,
+    OrderListResponse,
     OrderPendingRead,
+    OrderPendingListResponse,
     OrderRead,
     OrderUpdate,
 )
@@ -30,7 +33,7 @@ from app.services.order_service import OrderService
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
-@router.get("", response_model=list[OrderListItem])
+@router.get("", response_model=OrderListResponse)
 def list_orders(
     year: Annotated[str, Query(max_length=4)] = "",
     month_from: Annotated[int, Query(ge=0, le=12)] = 0,
@@ -39,7 +42,7 @@ def list_orders(
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
     offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: OrderQueryService = Depends(get_order_query_service),
-) -> list[OrderListItem]:
+) -> OrderListResponse:
     return service.list_order_payloads(
         year_filter=year,
         month_from=month_from,
@@ -74,6 +77,22 @@ def import_order_json(
     return OrderJsonImportResponse.model_validate(result, from_attributes=True)
 
 
+@router.post("/import/json/upload", response_model=OrderJsonImportResponse)
+async def import_order_json_upload(
+    almacen_id: Annotated[str, Form(max_length=120)],
+    file: UploadFile = File(...),
+    service: OrderService = Depends(get_order_service),
+) -> OrderJsonImportResponse:
+    source = await upload_to_temp_file_path(file, field_name="file", allowed_suffixes={".json"})
+    try:
+        result = service.import_order_json(source, almacen_id)
+    except ValueError as exc:
+        raise bad_request(exc) from exc
+    finally:
+        source.unlink(missing_ok=True)
+    return OrderJsonImportResponse.model_validate(result, from_attributes=True)
+
+
 @router.post("/{order_id}/import/albaran-pdf", response_model=OrderDocumentImportResponse)
 def import_albaran_pdf(
     order_id: str,
@@ -90,6 +109,24 @@ def import_albaran_pdf(
     return OrderDocumentImportResponse.model_validate(result, from_attributes=True)
 
 
+@router.post("/{order_id}/import/albaran-pdf/upload", response_model=OrderDocumentImportResponse)
+async def import_albaran_pdf_upload(
+    order_id: str,
+    file: UploadFile = File(...),
+    service: OrderDocumentImportService = Depends(get_order_document_import_service),
+) -> OrderDocumentImportResponse:
+    source = await upload_to_temp_file_path(file, field_name="file", allowed_suffixes={".pdf"})
+    try:
+        result = service.import_albaran_pdf(order_id, source)
+    except OrderNotFoundError as exc:
+        raise not_found(exc) from exc
+    except ValueError as exc:
+        raise bad_request(exc) from exc
+    finally:
+        source.unlink(missing_ok=True)
+    return OrderDocumentImportResponse.model_validate(result, from_attributes=True)
+
+
 @router.post("/{order_id}/import/factura-pdf", response_model=OrderDocumentImportResponse)
 def import_factura_pdf(
     order_id: str,
@@ -103,6 +140,24 @@ def import_factura_pdf(
         raise not_found(exc) from exc
     except ValueError as exc:
         raise bad_request(exc) from exc
+    return OrderDocumentImportResponse.model_validate(result, from_attributes=True)
+
+
+@router.post("/{order_id}/import/factura-pdf/upload", response_model=OrderDocumentImportResponse)
+async def import_factura_pdf_upload(
+    order_id: str,
+    file: UploadFile = File(...),
+    service: OrderDocumentImportService = Depends(get_order_document_import_service),
+) -> OrderDocumentImportResponse:
+    source = await upload_to_temp_file_path(file, field_name="file", allowed_suffixes={".pdf"})
+    try:
+        result = service.import_factura_pdf(order_id, source)
+    except OrderNotFoundError as exc:
+        raise not_found(exc) from exc
+    except ValueError as exc:
+        raise bad_request(exc) from exc
+    finally:
+        source.unlink(missing_ok=True)
     return OrderDocumentImportResponse.model_validate(result, from_attributes=True)
 
 
@@ -142,12 +197,14 @@ def get_order(
     return payload
 
 
-@router.get("/{order_id}/items", response_model=list[OrderItemRead])
+@router.get("/{order_id}/items", response_model=OrderItemListResponse)
 def list_order_items(
     order_id: str,
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: OrderQueryService = Depends(get_order_query_service),
-) -> list[OrderItemRead]:
-    return service.list_order_items_payload(order_id)
+) -> OrderItemListResponse:
+    return service.list_order_items_payload(order_id, limit=limit, offset=offset)
 
 
 @router.post("/{order_id}/items", response_model=OrderItemRead, status_code=status.HTTP_201_CREATED)
@@ -184,9 +241,11 @@ def delete_order_item(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/{order_id}/pending", response_model=list[OrderPendingRead])
+@router.get("/{order_id}/pending", response_model=OrderPendingListResponse)
 def list_order_pending(
     order_id: str,
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: OrderQueryService = Depends(get_order_query_service),
-) -> list[OrderPendingRead]:
-    return service.list_pendientes_payload(order_id)
+) -> OrderPendingListResponse:
+    return service.list_pendientes_payload(order_id, limit=limit, offset=offset)

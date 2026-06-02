@@ -14,6 +14,7 @@ from app.schemas.contacts import (
     ContactCreate,
     ContactDetail,
     ContactListItem,
+    ContactListResponse,
     ContactUpdate,
 )
 from app.services.import_service import ImportService
@@ -59,10 +60,18 @@ class ContactService:
             for cliente_id, name in sorted(lookup.id_to_name.items(), key=lambda item: item[1].lower())
         ]
 
-    def list(self, term: str = "", company_id_to_name: dict[str, str] | None = None) -> list[Contacto]:
+    def list(
+        self,
+        term: str = "",
+        company_id: str = "",
+        company_id_to_name: dict[str, str] | None = None,
+    ) -> list[Contacto]:
         company_id_to_name = company_id_to_name or {}
         with Session(engine) as session:
             rows = self.vm.list(session, "")
+        clean_company_id = (company_id or "").strip()
+        if clean_company_id:
+            rows = [row for row in rows if str(row.cliente_id or "").strip() == clean_company_id]
         text = (term or "").strip().lower()
         if not text:
             return rows
@@ -78,12 +87,19 @@ class ContactService:
         self,
         term: str = "",
         *,
+        company_id: str = "",
         limit: int = DEFAULT_PAGE_LIMIT,
         offset: int = 0,
-    ) -> list[ContactListItem]:
+    ) -> ContactListResponse:
         lookup = self.company_lookup()
-        rows = page_items(self.list(term, lookup.id_to_name), limit=limit, offset=offset)
-        return [self._contact_list_item(row, lookup.id_to_name) for row in rows]
+        rows = self.list(term, company_id, lookup.id_to_name)
+        page_rows = page_items(rows, limit=limit, offset=offset)
+        return ContactListResponse(
+            items=[self._contact_list_item(row, lookup.id_to_name) for row in page_rows],
+            total=len(rows),
+            limit=limit,
+            offset=offset,
+        )
 
     def detail_payload(self, contacto_id: str) -> ContactDetail | None:
         with Session(engine) as session:

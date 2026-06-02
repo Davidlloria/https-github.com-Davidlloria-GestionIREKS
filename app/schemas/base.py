@@ -22,3 +22,9 @@ class AppSchema(SQLModel):
 
     def to_payload(self, *, exclude_none: bool = False) -> dict[str, Any]:
         return self.model_dump(mode="json", exclude_none=exclude_none)
+
+
+class PaginatedResponse(AppSchema):
+    total: int = 0
+    limit: int = 0
+    offset: int = 0

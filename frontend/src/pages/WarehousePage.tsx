@@ -6,21 +6,22 @@ import { useAsyncResource } from '../features/useAsyncResource'
 import type {
   InventoryAdjustmentPayload,
   InventoryHeaderRead,
+  PaginatedList,
   WarehouseManualMovementCreate,
   WarehouseMovementRead,
   WarehouseStockRead,
 } from '../types/api'
 
 interface WarehousePayload {
-  stock: WarehouseStockRead[]
-  movements: WarehouseMovementRead[]
-  history: InventoryHeaderRead[]
+  stock: PaginatedList<WarehouseStockRead>
+  movements: PaginatedList<WarehouseMovementRead>
+  history: PaginatedList<InventoryHeaderRead>
 }
 
 const EMPTY_PAYLOAD: WarehousePayload = {
-  stock: [],
-  movements: [],
-  history: [],
+  stock: { items: [], total: 0, limit: 0, offset: 0 },
+  movements: { items: [], total: 0, limit: 0, offset: 0 },
+  history: { items: [], total: 0, limit: 0, offset: 0 },
 }
 
 interface ManualMovementForm {
@@ -101,11 +102,11 @@ export function WarehousePage() {
   const query = useAsyncResource(fetchPayload, EMPTY_PAYLOAD, [fetchPayload])
 
   const totals = useMemo(() => {
-    const totalKg = query.data.stock.reduce((acc, row) => acc + safeNumber(row.cantidad_total), 0)
+    const totalKg = query.data.stock.items.reduce((acc, row) => acc + safeNumber(row.cantidad_total), 0)
     return {
-      stockRows: query.data.stock.length,
-      movements: query.data.movements.length,
-      inventoryChecks: query.data.history.length,
+      stockRows: query.data.stock.total,
+      movements: query.data.movements.total,
+      inventoryChecks: query.data.history.total,
       totalKg: totalKg.toFixed(2),
     }
   }, [query.data])
@@ -459,11 +460,11 @@ export function WarehousePage() {
       <QueryState
         loading={query.loading}
         error={query.error}
-        empty={!query.data.stock.length}
+        empty={!query.data.stock.items.length}
         emptyMessage="No hay stock para el almacen indicado."
       />
 
-      {!!query.data.stock.length && (
+      {!!query.data.stock.items.length && (
         <div className="table-wrap">
           <table>
             <thead>
@@ -474,7 +475,7 @@ export function WarehousePage() {
               </tr>
             </thead>
             <tbody>
-              {query.data.stock.map((row) => (
+              {query.data.stock.items.map((row) => (
                 <tr key={`${row.almacen_id}-${row.articulo_id}`}>
                   <td>{row.almacen_id}</td>
                   <td>{row.articulo_id}</td>
@@ -486,7 +487,7 @@ export function WarehousePage() {
         </div>
       )}
 
-      {!!query.data.movements.length && (
+      {!!query.data.movements.items.length && (
         <div className="table-wrap">
           <table>
             <thead>
@@ -500,7 +501,7 @@ export function WarehousePage() {
               </tr>
             </thead>
             <tbody>
-              {query.data.movements.slice(0, 12).map((row) => (
+              {query.data.movements.items.slice(0, 12).map((row) => (
                 <tr key={`${row.id ?? row.albaran_item_id}-${row.articulo_id}`}>
                   <td>{row.fecha_pedido}</td>
                   <td>{row.almacen_id}</td>
@@ -515,7 +516,7 @@ export function WarehousePage() {
         </div>
       )}
 
-      {!!query.data.history.length && (
+      {!!query.data.history.items.length && (
         <div className="table-wrap">
           <table>
             <thead>
@@ -529,7 +530,7 @@ export function WarehousePage() {
               </tr>
             </thead>
             <tbody>
-              {query.data.history.slice(0, 12).map((row) => (
+              {query.data.history.items.slice(0, 12).map((row) => (
                 <tr key={row.inventario_id}>
                   <td>{row.inventario_id}</td>
                   <td>{row.almacen_id || '-'}</td>

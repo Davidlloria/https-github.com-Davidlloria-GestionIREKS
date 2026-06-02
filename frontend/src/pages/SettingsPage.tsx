@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   getApiProviderSettings,
   getMaintenanceStatus,
-  importOrdersJsonFromSettings,
+  importOrdersJsonUploadFromSettings,
   listImportWarehouses,
   runMaintenanceBackup,
   runMaintenanceCreateMissingContactClients,
@@ -56,7 +56,7 @@ export function SettingsPage() {
   const [maintenanceActionError, setMaintenanceActionError] = useState('')
   const [backupDestinationPath, setBackupDestinationPath] = useState('')
   const [importWarehouseId, setImportWarehouseId] = useState('')
-  const [importFilePath, setImportFilePath] = useState('')
+  const [importOrdersFile, setImportOrdersFile] = useState<File | null>(null)
   const [importOrdersLoading, setImportOrdersLoading] = useState(false)
   const [importOrdersMessage, setImportOrdersMessage] = useState('')
   const [importOrdersError, setImportOrdersError] = useState('')
@@ -288,19 +288,18 @@ export function SettingsPage() {
       return
     }
     const almacenId = effectiveImportWarehouseId.trim()
-    const filePath = importFilePath.trim()
     if (!almacenId) {
       setImportOrdersError('Debes seleccionar un almacen.')
       setImportOrdersMessage('')
       return
     }
-    if (!filePath) {
-      setImportOrdersError('Debes indicar file_path del JSON de pedido.')
+    if (!importOrdersFile) {
+      setImportOrdersError('Debes seleccionar un archivo JSON de pedido.')
       setImportOrdersMessage('')
       return
     }
-    if (!filePath.toLowerCase().endsWith('.json')) {
-      setImportOrdersError('El fichero debe tener extension .json')
+    if (!importOrdersFile.name.toLowerCase().endsWith('.json')) {
+      setImportOrdersError('El fichero debe tener extension .json.')
       setImportOrdersMessage('')
       return
     }
@@ -309,11 +308,12 @@ export function SettingsPage() {
     setImportOrdersMessage('')
     setImportOrdersResult(null)
     try {
-      const result = await importOrdersJsonFromSettings({
+      const result = await importOrdersJsonUploadFromSettings({
         almacen_id: almacenId,
-        file_path: filePath,
+        file: importOrdersFile,
       })
       setImportOrdersResult(result)
+      setImportOrdersFile(null)
       setImportOrdersMessage(`Importacion JSON completada para ${almacenId}.`)
     } catch (error: unknown) {
       setImportOrdersError(error instanceof Error ? error.message : 'No se pudo importar el JSON de pedidos.')
@@ -695,12 +695,12 @@ export function SettingsPage() {
                     </select>
                   </label>
                   <label>
-                    Ruta JSON (file_path)
+                    Archivo JSON
                     <input
+                      type="file"
                       className="input"
-                      value={importFilePath}
-                      onChange={(event) => setImportFilePath(event.target.value)}
-                      placeholder="E:\\ruta\\pedido.json"
+                      accept=".json,application/json"
+                      onChange={(event) => setImportOrdersFile(event.target.files?.[0] ?? null)}
                       disabled={importOrdersLoading}
                     />
                   </label>

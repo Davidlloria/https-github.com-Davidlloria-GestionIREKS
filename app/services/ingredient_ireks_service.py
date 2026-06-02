@@ -104,8 +104,11 @@ class IngredientIreksService:
             distributor_filter_id=distributor_filter_id,
         )
         return ApiIngredientIreksListPayload(
-            rows=IngredientIreksRead.list_from_entities(page_items(payload.rows, limit=limit, offset=offset)),
+            items=IngredientIreksRead.list_from_entities(page_items(payload.rows, limit=limit, offset=offset)),
             catalogs=self.api_catalogs_payload(payload.catalogs),
+            total=len(payload.rows),
+            limit=limit,
+            offset=offset,
         )
 
     def api_detail_payload(self, row_id: int) -> IngredientIreksRead | None:

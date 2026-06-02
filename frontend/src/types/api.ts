@@ -1,3 +1,10 @@
+export interface PaginatedList<T> {
+  items: T[]
+  total: number
+  limit: number
+  offset: number
+}
+
 export interface CustomerListItem {
   cliente_id: string
   cliente_codigo: number
@@ -78,7 +85,10 @@ export interface IngredientIreksRead {
 }
 
 export interface IngredientIreksListPayload {
-  rows: IngredientIreksRead[]
+  items: IngredientIreksRead[]
+  total: number
+  limit: number
+  offset: number
   catalogs: {
     distribuidores: Array<{ id: string; name: string }>
     fabricantes: Array<{ id: string; name: string }>

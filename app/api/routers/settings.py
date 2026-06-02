@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.api.deps import get_api_settings_service, get_settings_import_service, get_settings_maintenance_service
 from app.api.errors import bad_request, not_found
 from app.api.paths import input_file_path, output_file_path
+from app.api.uploads import upload_to_temp_file_path
 from app.schemas.orders import OrderJsonImportResponse
 from app.schemas.settings import (
     ApiSettingsPayload,
@@ -137,4 +140,20 @@ def import_order_json(
         result = service.import_order_json(source, payload.almacen_id)
     except ValueError as exc:
         raise bad_request(exc) from exc
+    return OrderJsonImportResponse.model_validate(result, from_attributes=True)
+
+
+@router.post("/imports/orders-json/upload", response_model=OrderJsonImportResponse)
+async def import_order_json_upload(
+    almacen_id: Annotated[str, Form(max_length=120)],
+    file: UploadFile = File(...),
+    service: SettingsImportService = Depends(get_settings_import_service),
+) -> OrderJsonImportResponse:
+    source = await upload_to_temp_file_path(file, field_name="file", allowed_suffixes={".json"})
+    try:
+        result = service.import_order_json(source, almacen_id)
+    except ValueError as exc:
+        raise bad_request(exc) from exc
+    finally:
+        source.unlink(missing_ok=True)
     return OrderJsonImportResponse.model_validate(result, from_attributes=True)

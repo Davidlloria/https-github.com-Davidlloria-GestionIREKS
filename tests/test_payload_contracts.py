@@ -6,8 +6,8 @@ from sqlmodel import SQLModel, Session, create_engine
 import app.services.contact_service as contact_service_module
 import app.services.customer_service as customer_service_module
 from app.models import Cliente
-from app.schemas.contacts import ContactCreate, ContactDetail, ContactListItem, ContactUpdate
-from app.schemas.customers import CustomerCreate, CustomerDetail, CustomerListItem, CustomerUpdate
+from app.schemas.contacts import ContactCreate, ContactDetail, ContactListItem, ContactListResponse, ContactUpdate
+from app.schemas.customers import CustomerCreate, CustomerDetail, CustomerListItem, CustomerListResponse, CustomerUpdate
 from app.services.contact_service import ContactService
 from app.services.customer_service import CustomerService
 
@@ -42,8 +42,10 @@ def test_customer_service_exposes_serializable_payloads(isolated_engine) -> None
     assert created.to_payload()["cliente_nombre_comercial"] == "Panaderia Norte"
 
     rows = service.list_payload("Norte")
-    assert [type(row) for row in rows] == [CustomerListItem]
-    assert rows[0].cliente_id == "customer-1"
+    assert isinstance(rows, CustomerListResponse)
+    assert [type(row) for row in rows.items] == [CustomerListItem]
+    assert rows.items[0].cliente_id == "customer-1"
+    assert rows.total == 1
 
     updated = service.update_from_payload(
         "customer-1",
@@ -83,9 +85,11 @@ def test_contact_service_exposes_company_names_and_json_dates(isolated_engine) -
     assert isinstance(created.to_payload()["created_at"], str)
 
     rows = service.list_payload("Cliente")
-    assert [type(row) for row in rows] == [ContactListItem]
-    assert rows[0].contacto_id == "contact-1"
-    assert rows[0].cliente_nombre == "Cliente Demo"
+    assert isinstance(rows, ContactListResponse)
+    assert [type(row) for row in rows.items] == [ContactListItem]
+    assert rows.items[0].contacto_id == "contact-1"
+    assert rows.items[0].cliente_nombre == "Cliente Demo"
+    assert rows.total == 1
 
     updated = service.update_from_payload("contact-1", ContactUpdate(cargo="Compras"))
     assert updated.cargo == "Compras"

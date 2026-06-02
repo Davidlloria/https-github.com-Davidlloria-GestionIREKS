@@ -11,6 +11,7 @@ from app.models import IngredienteStd, MateriaPrimaPrecio, MateriaPrimaValorNutr
 from app.schemas.ingredients import (
     IngredientActiveUpdate,
     IngredientStdCreate,
+    IngredientStdListResponse,
     IngredientStdRead,
     IngredientStdUpdate,
     MateriaPrimaPrecioRead,
@@ -35,7 +36,7 @@ class IngredientStdService:
         activity_filter: str = "all",
         limit: int = DEFAULT_PAGE_LIMIT,
         offset: int = 0,
-    ) -> list[IngredientStdRead]:
+    ) -> IngredientStdListResponse:
         with Session(engine) as session:
             rows = self.vm.list(
                 session,
@@ -44,7 +45,12 @@ class IngredientStdService:
                 subfamilia=subfamilia_id,
                 active_filter=activity_filter,
             )
-        return IngredientStdRead.list_from_entities(page_items(rows, limit=limit, offset=offset))
+        return IngredientStdListResponse(
+            items=IngredientStdRead.list_from_entities(page_items(rows, limit=limit, offset=offset)),
+            total=len(rows),
+            limit=limit,
+            offset=offset,
+        )
 
     def api_detail_payload(self, articulo_id: str) -> IngredientStdRead | None:
         clean_articulo_id = str(articulo_id or "").strip()

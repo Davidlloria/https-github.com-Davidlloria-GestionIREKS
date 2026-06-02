@@ -11,7 +11,7 @@ from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFS
 from app.schemas.customers import (
     CustomerCreate,
     CustomerDetail,
-    CustomerListItem,
+    CustomerListResponse,
     CustomerUpdate,
 )
 from app.services.customer_service import CustomerService
@@ -20,13 +20,13 @@ from app.services.customer_service import CustomerService
 router = APIRouter(prefix="/customers", tags=["customers"])
 
 
-@router.get("", response_model=list[CustomerListItem])
+@router.get("", response_model=CustomerListResponse)
 def list_customers(
     q: Annotated[str, Query(max_length=120)] = "",
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
     offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: CustomerService = Depends(get_customer_service),
-) -> list[CustomerListItem]:
+) -> CustomerListResponse:
     return service.list_payload(q, limit=limit, offset=offset)
 
 

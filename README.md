@@ -215,8 +215,12 @@ usan rutas del sistema de archivos del servidor, no del navegador. Actualmente
 solo se aceptan importaciones `.json` y `.pdf`, y backups `.db`; los archivos de
 entrada deben existir y el destino de backup no puede ser un directorio.
 
-Para flujos React orientados a usuario final conviene migrar estas operaciones a
-subida de archivos en vez de enviar rutas locales del servidor.
+Ademas, para pedidos/configuracion existen endpoints multipart de subida:
+`/orders/import/json/upload`,
+`/orders/{order_id}/import/albaran-pdf/upload`,
+`/orders/{order_id}/import/factura-pdf/upload` y
+`/settings/imports/orders-json/upload`.
+La UI React usa estos endpoints upload por defecto.
 
 ## Git
 

@@ -15,6 +15,7 @@ from app.schemas.ingredients import (
     IngredientIreksRead,
     IngredientIreksUpdate,
     IngredientStdCreate,
+    IngredientStdListResponse,
     IngredientStdRead,
     IngredientStdUpdate,
     MateriaPrimaPrecioRead,
@@ -155,7 +156,7 @@ def delete_ireks_tarifa(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/std", response_model=list[IngredientStdRead])
+@router.get("/std", response_model=IngredientStdListResponse)
 def list_std_ingredients(
     q: Annotated[str, Query(max_length=120)] = "",
     familia_id: Annotated[str, Query(max_length=120)] = "",
@@ -164,7 +165,7 @@ def list_std_ingredients(
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
     offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: IngredientStdService = Depends(get_ingredient_std_service),
-) -> list[IngredientStdRead]:
+) -> IngredientStdListResponse:
     return service.api_list_payload(
         search=q,
         familia_id=familia_id,

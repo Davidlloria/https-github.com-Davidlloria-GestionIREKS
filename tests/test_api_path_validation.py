@@ -47,6 +47,27 @@ def test_order_pdf_import_rejects_unexpected_extension(tmp_path: Path) -> None:
     assert response.json()["detail"] == "source_path debe usar extension: .pdf."
 
 
+def test_order_json_upload_rejects_unexpected_extension() -> None:
+    response = _client().post(
+        "/orders/import/json/upload",
+        data={"almacen_id": "alm-1"},
+        files={"file": ("pedido.txt", b"{}", "text/plain")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "file debe usar extension: .json."
+
+
+def test_order_pdf_upload_rejects_unexpected_extension() -> None:
+    response = _client().post(
+        "/orders/order-1/import/albaran-pdf/upload",
+        files={"file": ("albaran.json", b"{}", "application/json")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "file debe usar extension: .pdf."
+
+
 def test_backup_rejects_directory_destination(tmp_path: Path) -> None:
     destination = tmp_path / "backup.db"
     destination.mkdir()

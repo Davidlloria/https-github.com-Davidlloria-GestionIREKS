@@ -1,8 +1,8 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from './http'
-import type { ContactCompanyOption, ContactDetail, ContactListItem } from '../types/api'
+import type { ContactCompanyOption, ContactDetail, ContactListItem, PaginatedList } from '../types/api'
 
-export async function listContacts(search = ''): Promise<ContactListItem[]> {
-  return apiGet<ContactListItem[]>('/contacts', { q: search })
+export async function listContacts(search = '', companyId = '', limit?: number, offset?: number): Promise<PaginatedList<ContactListItem>> {
+  return apiGet<PaginatedList<ContactListItem>>('/contacts', { q: search, cliente_id: companyId, limit, offset })
 }
 
 export async function listContactCompanies(): Promise<ContactCompanyOption[]> {

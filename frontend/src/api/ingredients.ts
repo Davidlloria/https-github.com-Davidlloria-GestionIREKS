@@ -5,13 +5,16 @@ import type {
   IngredientStdRead,
   MateriaPrimaPrecioRead,
   NutritionValues,
+  PaginatedList,
   TarifaPrecioIreksRead,
 } from '../types/api'
 
-export function listIreksIngredients(search: string, activityFilter: string) {
+export function listIreksIngredients(search: string, activityFilter: string, limit?: number, offset?: number) {
   return apiGet<IngredientIreksListPayload>('/ingredients/ireks', {
     q: search,
     activity_filter: activityFilter,
+    limit,
+    offset,
   })
 }
 
@@ -98,10 +101,12 @@ export function deleteIreksTarifa(tarifaId: number) {
   return apiDelete(`/ingredients/ireks/tarifas/${tarifaId}`)
 }
 
-export function listStdIngredients(search: string, activityFilter: string) {
-  return apiGet<IngredientStdRead[]>('/ingredients/std', {
+export function listStdIngredients(search: string, activityFilter: string, limit?: number, offset?: number) {
+  return apiGet<PaginatedList<IngredientStdRead>>('/ingredients/std', {
     q: search,
     activity_filter: activityFilter,
+    limit,
+    offset,
   })
 }
 
