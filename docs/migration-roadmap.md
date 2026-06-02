@@ -425,6 +425,14 @@ Fase 5 - Reducir dependencia del desktop.
     no referenciadas, manteniendo llamadas directas al servicio en flujos vivos;
   - reducido ruido del widget y superficie de mantenimiento sin cambiar
     comportamiento funcional.
+- Refactor de importaciones de documentos en `OrdersPage`:
+  - unificado el flujo comun de importacion de albaran y factura en un helper
+    privado para reducir duplicacion;
+  - se mantienen los mismos mensajes, confirmaciones y rutas de servicio.
+- Refactor de plantilla de inventario en `warehouse_page.py`:
+  - extraida la deteccion de columnas y la construccion del mapa de conteos a
+    helpers puros reutilizables;
+  - `InventariosTab` mantiene el mismo flujo visual de importacion.
 - Limpieza incremental de helpers muertos en `OrdersPage`:
   - eliminado wrapper `_parse_albaran_pdf` (se usa parser directo);
   - eliminados auxiliares `_parse_decimal_es*` sin referencias activas.

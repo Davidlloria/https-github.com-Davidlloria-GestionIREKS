@@ -68,6 +68,30 @@ class SortableTableWidgetItem(QTableWidgetItem):
         return super().__lt__(other)
 
 
+def _count_template_column_indexes(header: list[str]) -> tuple[int, int, int]:
+    idx_id = header.index("articulo_id") if "articulo_id" in header else -1
+    idx_lote = header.index("lote") if "lote" in header else -1
+    idx_conteo = header.index("conteo_uds") if "conteo_uds" in header else -1
+    return idx_id, idx_lote, idx_conteo
+
+
+def _count_template_mapping(
+    rows: list[tuple[object, ...]],
+    idx_id: int,
+    idx_lote: int,
+    idx_conteo: int,
+) -> dict[tuple[str, str], str]:
+    mapping: dict[tuple[str, str], str] = {}
+    for row in rows:
+        art_id = str(row[idx_id] or "").strip()
+        lote = str(row[idx_lote] or "").strip()
+        conteo_raw = str(row[idx_conteo] or "").strip()
+        if not art_id or conteo_raw == "":
+            continue
+        mapping[(art_id, lote)] = conteo_raw
+    return mapping
+
+
 class OtrasReferenciasTab(QWidget):
     def __init__(self) -> None:
         super().__init__()
@@ -2136,21 +2160,12 @@ class InventariosTab(QWidget):
             QMessageBox.warning(self, "Inventarios", "El archivo no contiene datos.")
             return
         header = [str(x or "").strip().lower() for x in rows[0]]
-        idx_id = header.index("articulo_id") if "articulo_id" in header else -1
-        idx_lote = header.index("lote") if "lote" in header else -1
-        idx_conteo = header.index("conteo_uds") if "conteo_uds" in header else -1
+        idx_id, idx_lote, idx_conteo = _count_template_column_indexes(header)
         if idx_id < 0 or idx_lote < 0 or idx_conteo < 0:
             QMessageBox.warning(self, "Inventarios", "Faltan columnas requeridas: articulo_id, lote, conteo_uds.")
             return
 
-        mapping: dict[tuple[str, str], str] = {}
-        for row in rows[1:]:
-            art_id = str(row[idx_id] or "").strip()
-            lote = str(row[idx_lote] or "").strip()
-            conteo_raw = str(row[idx_conteo] or "").strip()
-            if not art_id or conteo_raw == "":
-                continue
-            mapping[(art_id, lote)] = conteo_raw
+        mapping = _count_template_mapping(rows[1:], idx_id, idx_lote, idx_conteo)
 
         loaded = 0
         self.table.blockSignals(True)

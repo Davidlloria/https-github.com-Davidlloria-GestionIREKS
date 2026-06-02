@@ -6,7 +6,7 @@ from datetime import date, datetime
 from pathlib import Path
 import re
 import tempfile
-from typing import Any, cast
+from typing import Any, Callable, cast
 
 from PySide6.QtCore import QDate, QTimer, Qt
 from PySide6.QtGui import QBrush, QColor, QFont
@@ -2793,56 +2793,54 @@ class OrdersPage(QWidget):
         return False
 
     def _import_albaran_for_selected_order(self) -> None:
-        row = self._selected_row()
-        if row is None:
-            QMessageBox.warning(self, "Pedidos", "Selecciona un pedido para importar su albaran.")
-            return
-
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Seleccionar albaran",
-            "",
-            "Archivos de datos (*.pdf *.json *.xlsx *.xlsm *.csv)",
-        )
-        if not file_path:
-            return
-
-        try:
-            preview = self.orders_documents_import_ui_service.prepare_albaran_preview(
-                Path(file_path),
+        self._import_document_for_selected_order(
+            dialog_title="Seleccionar albaran",
+            warning_prefix="albaran",
+            preview_loader=lambda source: self.orders_documents_import_ui_service.prepare_albaran_preview(
+                source,
                 parse_pdf=OrderDocumentParser.parse_albaran_pdf,
-            )
-        except Exception as exc:
-            QMessageBox.warning(self, "Pedidos", f"No se pudo leer el albarán: {exc}")
-            return
-
-        if not self._confirm_albaran_preview(preview.header, preview.rows):
-            return
-
-        try:
-            outcome = self.orders_documents_import_ui_service.import_albaran(
-                pedido_id=row.pedido_id,
-                header=preview.header,
-                rows=preview.rows,
-            )
-        except Exception as exc:
-            QMessageBox.warning(self, "Pedidos", str(exc))
-            return
-        self.reload()
-        if outcome.ok:
-            QMessageBox.information(self, outcome.title, outcome.message)
-            return
-        QMessageBox.warning(self, outcome.title, outcome.message)
+            ),
+            importer=lambda pedido_id, header, rows: self.orders_documents_import_ui_service.import_albaran(
+                pedido_id=pedido_id,
+                header=header,
+                rows=rows,
+            ),
+            confirm_preview=self._confirm_albaran_preview,
+        )
 
     def _import_factura_for_selected_order(self) -> None:
+        self._import_document_for_selected_order(
+            dialog_title="Seleccionar factura",
+            warning_prefix="factura",
+            preview_loader=lambda source: self.orders_documents_import_ui_service.prepare_factura_preview(
+                source,
+                parse_pdf=self._read_factura_pdf_with_progress,
+            ),
+            importer=lambda pedido_id, header, rows: self.orders_documents_import_ui_service.import_factura(
+                pedido_id=pedido_id,
+                header=header,
+                rows=rows,
+            ),
+            confirm_preview=self._confirm_factura_preview,
+        )
+
+    def _import_document_for_selected_order(
+        self,
+        *,
+        dialog_title: str,
+        warning_prefix: str,
+        preview_loader: Callable[[Path], OrdersDocumentPreviewData],
+        importer: Callable[[str, dict[str, str], list[dict[str, Any]]], OrdersDocumentImportOutcome],
+        confirm_preview: Callable[[dict[str, str], list[dict[str, Any]]], bool],
+    ) -> None:
         row = self._selected_row()
         if row is None:
-            QMessageBox.warning(self, "Pedidos", "Selecciona un pedido para importar su factura.")
+            QMessageBox.warning(self, "Pedidos", f"Selecciona un pedido para importar su {warning_prefix}.")
             return
 
         file_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Seleccionar factura",
+            dialog_title,
             "",
             "Archivos de datos (*.pdf *.json *.xlsx *.xlsm *.csv)",
         )
@@ -2850,23 +2848,16 @@ class OrdersPage(QWidget):
             return
 
         try:
-            preview = self.orders_documents_import_ui_service.prepare_factura_preview(
-                Path(file_path),
-                parse_pdf=self._read_factura_pdf_with_progress,
-            )
+            preview = preview_loader(Path(file_path))
         except Exception as exc:
-            QMessageBox.warning(self, "Pedidos", f"No se pudo leer la factura: {exc}")
+            QMessageBox.warning(self, "Pedidos", f"No se pudo leer la {warning_prefix}: {exc}")
             return
 
-        if not self._confirm_factura_preview(preview.header, preview.rows):
+        if not confirm_preview(preview.header, preview.rows):
             return
 
         try:
-            outcome = self.orders_documents_import_ui_service.import_factura(
-                pedido_id=row.pedido_id,
-                header=preview.header,
-                rows=preview.rows,
-            )
+            outcome = importer(row.pedido_id, preview.header, preview.rows)
         except Exception as exc:
             QMessageBox.warning(self, "Pedidos", str(exc))
             return
@@ -2875,5 +2866,3 @@ class OrdersPage(QWidget):
             QMessageBox.information(self, outcome.title, outcome.message)
             return
         QMessageBox.warning(self, outcome.title, outcome.message)
-
-
