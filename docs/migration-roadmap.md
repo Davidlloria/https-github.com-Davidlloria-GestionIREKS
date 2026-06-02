@@ -1,645 +1,210 @@
-# Roadmap de migracion UI / servicios / API
+﻿# Roadmap de migracion UI / servicios / API
 
-## Estado verificado
+## Estado ejecutivo
 
-Revision local: 2026-06-02.
+- Fase actual: Fase 5 - Reducir dependencia del desktop.
+- Objetivo actual: mantener PySide6 estable mientras se extrae la logica que
+  aun vive en widgets grandes y se consolida la paridad en React/FastAPI.
+- Estado general de la migracion: avanzado. La API y React ya cubren lectura y
+  varios flujos de escritura en dominios clave, pero el desktop sigue reteniendo
+  orquestacion pesada, integraciones de archivos y dependencias locales.
+- Proximo foco tecnico: seguir sacando logica residual de `orders_page.py`,
+  `settings_page.py`, `ingredients_page.py` y `warehouse_page.py` hacia capas
+  de servicio o helpers puros.
+- Proximo foco tecnico: reducir dependencia de desktop sobre Outlook, OCR,
+  dialogos de archivo/impresion y rutas locales del servidor.
+- Proximo foco tecnico: mantener gates y trazabilidad documental; cada avance
+  pequeno debe quedar reflejado en la roadmap y en el historial.
+- Ultimo avance validado: se extraio al servicio la preparacion del adjunto
+  y la orquestacion comun del flujo de correo de pedidos por Outlook.
+- Cobertura de caracterizacion ampliada: se validan la preparacion del
+  adjunto, la version del historico, el contrato de resultado y el manejo de
+  errores previsibles del flujo Outlook sin depender de la UI PySide6.
+- Cosas que no se deben hacer ahora: no añadir funcionalidad nueva, no crear
+  endpoints nuevos, no crear pantallas React nuevas, no hacer refactors
+  funcionales grandes, no meter nueva logica de negocio en widgets.
 
-- Rama principal local sincronizada con `origin/main`.
-- PR inicial de migracion fusionado en GitHub: `Merge pull request #1`.
-- Rama activa para el siguiente bloque: `api-hardening`.
-- La aplicacion de escritorio sigue entrando por `run.py` y `app/main.py`.
-- `app/api` expone FastAPI con routers para clientes, contactos, ingredientes,
-  pedidos, almacen y configuracion.
-- `frontend` existe con React/Vite y consume la API para vistas de consulta de
-  clientes, contactos, ingredientes (IREKS/STD), pedidos y almacen.
-- La base `data/gestion_ireks.db` existe, pasa `PRAGMA integrity_check` y queda
-  fuera de Git.
-- `orphan_contact_links = 0` tras backup y reparacion.
-- `data/*.db`, `data/*.json`, `data/backups/`, `data/exports/` y `runtime/`
-  quedan ignorados para evitar subir datos reales, secretos o binarios pesados.
-- Validacion conocida en la ultima revision: `68 passed`, `npm run lint` y
-  `npm run build`.
+## Completado en Fase 5
 
-## Arquitectura objetivo
+- Flujo de correo de pedidos por Outlook extraido fuera del widget:
+  - `app/services/order_export_service.py` ahora concentra la preparacion del
+    adjunto del pedido (`prepare_order_mail_attachment`) y la orquestacion del
+    envio/log de Outlook (`send_order_mail`);
+  - `app/ui/widgets/orders_page.py` queda centrado en seleccion, confirmacion,
+    previsualizacion y mensajes visibles;
+  - se mantienen los mismos textos al usuario y el mismo contrato visible.
+- Flujo de backup de base de datos en configuracion simplificado:
+  - `app/services/settings_maintenance_ui_service.py` ahora genera la ruta por
+    defecto del backup con una unica funcion reutilizable;
+  - `app/ui/widgets/settings_page.py` delega esa construccion y conserva solo
+    el dialogo de guardado, la llamada al servicio y los mensajes visibles;
+  - se mantiene el mismo patron de nombre `gestion_ireks_backup_YYYYMMDD_HHMMSS.db`;
+  - la cabecera de mantenimiento reutiliza la metadata del servicio para
+    botones y placeholder del log.
+- Flujo de configuracion de pedidos Outlook simplificado:
+  - `app/services/settings_provider_service.py` expone `load_orders_mail_view()`
+    para normalizar los valores iniciales del formulario;
+  - `app/ui/widgets/settings_page.py` usa un objeto tipado para rellenar los
+    campos y conserva el guardado en servicio sin cambiar mensajes;
+  - la tarjeta de `Pedidos Outlook` reutiliza ahora la metadata del servicio
+    para textos, placeholders, botones e info visible.
+- Flujo de configuracion API centralizado:
+  - `app/services/settings_provider_service.py` expone `build_ui_view()` para
+    agrupar titulos y textos comunes de FDC, FatSecret y OpenAI;
+  - `app/ui/widgets/settings_page.py` usa esa metadata para construir la
+    tarjeta de configuracion API sin hardcodear literales repetidos;
+  - la tarjeta API reutiliza ahora metadata del servicio para labels, botones,
+    placeholders y opciones del combo FDC.
+- Flujo de importacion de pedidos JSON desde configuracion simplificado:
+  - `app/services/settings_orders_import_service.py` expone
+    `build_orders_import_view()` para concentrar las opciones de almacenes;
+  - `app/ui/widgets/settings_page.py` usa ese objeto de vista para poblar el
+    combo de importacion y mantiene intacto el dialogo de archivo;
+  - el bloque de pedidos JSON reutiliza la metadata del servicio para el texto
+    de la seccion, la etiqueta del selector y el boton de importacion.
+- Flujo de importacion de ventas IREKS simplificado:
+  - `app/services/settings_sales_import_service.py` expone `build_import_view()`
+    para centralizar el titulo y filtro del dialogo de seleccion;
+  - `app/ui/widgets/settings_page.py` usa esa vista para abrir el selector sin
+    hardcodear el texto en la UI;
+  - el bloque de ventas IREKS reutiliza la metadata del servicio para el texto
+    de la seccion y el boton de importacion.
+- Flujo de vista previa IGSA simplificado:
+  - `app/services/settings_sales_preview_service.py` expone `build_preview_view()`
+    para centralizar titulos y filtros de seleccion;
+  - `app/ui/widgets/settings_page.py` usa esa vista para abrir PDFs y libros
+    IGSA sin repetir literales de dialogo;
+  - el dialogo de resultado de importacion de libro IGSA reutiliza ahora la
+    metadata del servicio para titulos y botones;
+  - el preview PDF IGSA reutiliza la metadata del servicio para los botones de
+    importacion y cierre;
+  - los mensajes de error visibles del flujo IGSA reutilizan titulos
+    centralizados en el servicio.
+- Caracterizacion ampliada del flujo:
+  - tests de preparacion, versionado del historico, contrato del servicio y
+    errores previsibles de Outlook sin UI PySide6.
 
-```text
-React / FastAPI / desktop UI
-        |
-        v
-app/services        Casos de uso y transacciones
-        |
-        v
-app/viewmodels      Adaptacion legacy mientras se migra
-        |
-        v
-app/repositories    Persistencia SQLModel
-        |
-        v
-app/models          Entidades ORM
-```
+## Deuda tecnica priorizada
 
-## Reglas de arquitectura
+### P1
 
-- No importar `Session`, `select`, `engine` ni `app.core.database` desde
-  `app/ui`.
-- No importar `PySide6` desde `app/services`.
-- No reutilizar widgets ni viewmodels nuevos desde routers FastAPI.
-- Crear metodos de servicio por caso de uso, no por evento visual.
-- Mantener validaciones, normalizacion y transacciones en servicios.
-- Dejar en UI solo formato visual, seleccion de filas, dialogos y mensajes.
-- Toda respuesta API debe salir mediante DTOs de `app/schemas`, no mediante ORM.
-- Cada endpoint de escritura debe tener al menos un test de contrato o de flujo.
+- `app/ui/widgets/orders_page.py`: flujo de pedidos, importaciones, exportacion
+  y envio por Outlook siguen concentrando orquestacion sensible.
+- `app/ui/widgets/settings_page.py`: configuracion, importaciones, preview,
+  mantenimiento y backup siguen mezclando UI con decisiones de proceso.
+- `app/ui/widgets/ingredients_page.py`: pantalla grande con dialogos,
+  exportacion, impresion y logica de edicion que todavia es costosa de mover.
+- `app/services/order_document_parser.py`: OCR, Tesseract y recuperacion por
+  sidecar siguen siendo un punto de riesgo por dependencia de runtime local.
+- Retirada gradual de endpoints legacy por `source_path` / `file_path` tras
+  confirmar adopcion completa de los endpoints upload.
 
-## Bloques completados
+### P2
 
-1. Extraccion de logica de entidades simples a servicios.
-2. Extraccion de pedidos, documentos, almacen, recetas e ingredientes IREKS/STD.
-3. Separacion de operaciones de mantenimiento de base de datos usadas por
-   configuracion.
-4. Limpieza del bridge QML de clientes para que consuma `CustomerService`.
-5. Creacion inicial de contratos DTO en `app/schemas` para clientes, contactos,
-   ingredientes, pedidos, almacen, recetas y configuracion.
-6. Adaptacion de `CustomerService` y `ContactService` con metodos
-   serializables, manteniendo compatibilidad con desktop.
-7. Creacion de `app/api` con FastAPI, dependencias de servicios y routers.
-8. Tests de API con `TestClient` para CRUD basico y contratos de payload.
-9. Routers de consulta y escritura para clientes, contactos, ingredientes,
-   almacen, pedidos y configuracion.
-10. Importacion JSON/PDF de pedidos desde API reutilizando servicios.
-11. Endpoint de ajustes aprobados de inventario.
-12. CRUD completo de productos IREKS/STD en API.
-13. Frontend React/Vite inicial con estructura `api/`, `pages/`,
-   `components/`, `features/` y `types/`.
-14. Pantallas React de consulta para clientes, ingredientes y almacen.
-15. Configuracion de Git, rama de migracion, PR inicial y fusion a `main`.
-16. Limpieza operativa de datos locales: backup, reparacion de huerfanos e
-    ignorado de datos/runtime locales.
-17. Primer endurecimiento API: validacion de query params en ingredientes,
-    pedidos y almacen.
-18. Normalizacion inicial de errores API con helper comun para respuestas
-    `400` y `404`.
-19. Validacion de rutas locales en API para importaciones JSON/PDF y backups.
-20. Respuestas `409 Conflict` para borrados de clientes/contactos bloqueados
-    por dependencias.
-21. README actualizado con politica de rutas locales y arranque API/frontend.
-22. Parametros `limit` y `offset` en listados grandes sin cambiar la forma de
-    respuesta existente.
-23. Scripts `start-dev.ps1` y `stop-dev.ps1` para arrancar/parar API y
-    frontend de forma reproducible.
-24. Respuestas `409 Conflict` extendidas a borrado de ingredientes IREKS/STD
-    con dependencias operativas.
+- `app/ui/widgets/warehouse_page.py`: plantilla de inventario, conteos y
+  exportaciones siguen teniendo logica de soporte que conviene aislar mas.
+- `app/ui/widgets/customers_page.py`: exportacion/impresion y mantenimiento de
+  cliente siguen acoplados a UI.
+- `app/ui/widgets/courses_page.py`: importacion, exportacion e impresion siguen
+  muy dependientes de Qt.
+- `app/services/sales_reconciliation_service.py`: contiene bastante logica de
+  parseo e importacion y merece extraccion incremental si vuelve a crecer.
 
-## Progreso vivo
+### P3
 
-### Fase actual
+- Limpieza de helpers legacy y wrappers sin uso en widgets ya saneados.
+- Unificar nomenclatura y criterios de validacion en documentacion de API.
+- Consolidar scripts locales de arranque, parada, validacion y backup.
+- Revisar flags o compatibilidad heredada solo cuando ya no aporten valor.
 
-Fase 5 - Reducir dependencia del desktop.
+## Mapa de riesgo actual
 
-### Completado en Fase 2
+### Archivos mas grandes del codigo propio
 
-- Rama `api-hardening` creada desde `main` actualizado.
-- Query params endurecidos:
-  - `activity_filter` limitado a `all`, `active`, `inactive`;
-  - meses de pedidos limitados a `0..12`;
-  - historico de inventario limitado a `1..200`;
-  - filtros de texto principales con longitud maxima.
-- Tests nuevos en `tests/test_api_query_validation.py`.
-- Helper comun `app/api/errors.py` para respuestas `400`, `404` y `409`
-  coherentes.
-- Routers de clientes, contactos, ingredientes, pedidos, configuracion y
-  almacen migrados al helper comun para errores previsibles.
-- Helper `app/api/paths.py` para validar rutas locales usadas por API.
-- Importaciones JSON/PDF y backup validan extension esperada, archivo existente
-  en entradas y destino no-directorio en salidas.
-- Borrado de clientes y contactos devuelve `409 Conflict` cuando existen
-  contactos, recetas o asistentes asociados.
-- README documenta que `source_path`, `file_path` y `destination_path` son
-  rutas del servidor, y da comandos para arrancar API y frontend.
-- Listados principales aceptan paginacion compatible: clientes, contactos,
-  ingredientes IREKS/STD, pedidos, stock, movimientos e historico de
-  inventarios.
-- Arranque/parada unificada documentada y soportada por scripts locales.
-- Borrado de ingredientes IREKS/STD devuelve `409 Conflict` cuando hay
-  referencias en pedidos, albaranes, facturas, pendientes o almacen.
-- Ajustes API de configuracion con mapeo semantico:
-  - `PUT /settings/api/{provider}` devuelve `404` para proveedor no soportado;
-  - devuelve `400` para configuracion invalida (por ejemplo, umbral de stock no numerico).
-- Tests de contrato de `settings` ampliados para validar el mapeo `400/404`.
-- `DELETE /orders/{order_id}` devuelve `409 Conflict` cuando una restriccion de
-  integridad impide eliminar el pedido.
-- `POST /warehouse/movements` devuelve `409 Conflict` cuando una salida manual
-  dejaria stock negativo para producto/lote.
-- Importaciones PDF de pedidos devuelven `404` cuando el `order_id` no existe:
-  - `POST /orders/{order_id}/import/albaran-pdf`
-  - `POST /orders/{order_id}/import/factura-pdf`
-- Tests de contrato ampliados para validar esos `404` en importaciones PDF.
-- Contactos endurecido frente a referencias invalidas de cliente:
-  - `POST /contacts` y `PATCH /contacts/{contact_id}` devuelven `400` cuando
-    `cliente_id` no existe.
-  - Validacion explicita en servicio para no depender de constraints del motor
-    de base de datos en entorno de pruebas.
-- Duplicados de clientes/contactos mapeados a `409 Conflict`:
-  - `POST /customers` devuelve `409` ante `cliente_id`/campos unicos en conflicto.
-  - `POST /contacts` devuelve `409` ante `contacto_id`/campos unicos en conflicto.
-  - `PATCH /customers/{customer_id}` y `PATCH /contacts/{contact_id}` devuelven
-    `409` para colisiones de unicidad.
-- Primera evolucion de paginacion con metadatos en dominios de clientes/contactos:
-  - `GET /customers` y `GET /contacts` devuelven contrato paginado
-    `{ items, total, limit, offset }`;
-  - `GET /contacts` incorpora filtro opcional por `cliente_id` en servidor;
-  - React (`Clientes` y `Contactos`) consume el contrato nuevo y expone
-    navegacion de pagina (`Anterior`/`Siguiente`) usando `limit/offset`.
-- Segunda evolucion de paginacion con metadatos en pedidos/almacen:
-  - `GET /orders`, `GET /warehouse/stock`, `GET /warehouse/movements` y
-    `GET /warehouse/inventory/history` devuelven contrato paginado
-    `{ items, total, limit, offset }`;
-  - React (`Pedidos` y `Almacen`) consume el contrato nuevo; `Pedidos` incorpora
-    navegacion de pagina visible (`Anterior`/`Siguiente`) sobre `limit/offset`;
-  - tests de contrato/read-only/write ajustados al formato paginado.
-- Tercera evolucion de paginacion con metadatos en ingredientes:
-  - `GET /ingredients/ireks` y `GET /ingredients/std` devuelven contrato
-    paginado `{ items, total, limit, offset }`;
-  - `GET /ingredients/ireks` mantiene `catalogs` junto al bloque paginado;
-  - React (`Ingredientes`) consume el nuevo contrato para IREKS y STD;
-  - tests read-only ajustados al formato paginado.
-- Cuarta evolucion de paginacion con metadatos en detalle de pedidos:
-  - `GET /orders/{order_id}/items` y `GET /orders/{order_id}/pending`
-    devuelven contrato paginado `{ items, total, limit, offset }`;
-  - React (`Pedidos`) adapta carga de detalle consumiendo `items` del
-    contrato paginado;
-  - tests read-only/write y validacion de query params actualizados.
-- Importaciones por subida de archivo en API/React:
-  - nuevos endpoints multipart para pedidos:
-    - `POST /orders/import/json/upload`
-    - `POST /orders/{order_id}/import/albaran-pdf/upload`
-    - `POST /orders/{order_id}/import/factura-pdf/upload`
-  - nuevo endpoint multipart en configuracion:
-    - `POST /settings/imports/orders-json/upload`
-  - React (`Pedidos` y `Configuracion`) migra de rutas locales del servidor a
-    seleccion de archivos (`input type=file`) para importaciones JSON/PDF;
-  - se mantienen endpoints legacy por ruta (`source_path`/`file_path`) para
-    compatibilidad temporal.
+- `app/ui/widgets/ingredients_page.py` - 206.2 KB
+- `app/ui/widgets/recipes_page.py` - 159.9 KB
+- `app/ui/widgets/orders_page.py` - 135.9 KB
+- `app/ui/widgets/warehouse_page.py` - 129.5 KB
+- `app/ui/widgets/settings_page.py` - 103.3 KB
+- `app/ui/widgets/customers_page.py` - 90.6 KB
+- `app/services/sales_reconciliation_service.py` - 90.7 KB
+- `app/ui/widgets/courses_page.py` - 61.9 KB
+- `app/ui/widgets/sales_page.py` - 50.6 KB
 
-### Pendiente en Fase 2
+### Widgets PySide6 con logica aun sensible
 
-- Mantener la matriz semantica de errores de escritura (`400/404/409`) cuando
-  se incorporen nuevos endpoints o reglas de negocio.
-- Planificar retirada gradual de endpoints legacy por ruta (`source_path` /
-  `file_path`) tras confirmar adopcion de endpoints upload en clientes activos.
-- Extender la revision de `409 Conflict` a otros dominios si aparecen nuevas
-  dependencias bloqueantes (por ejemplo tarifas/configuraciones con reglas de
-  negocio adicionales).
-- Evolucionar la paginacion hacia respuestas con metadatos (`total`, `limit`,
-  `offset`) en cualquier listado grande nuevo o legacy que se incorpore en la API
-  para conservar un contrato uniforme.
-- Revisar si conviene empaquetar los scripts de arranque/parada en comandos npm
-  o task runner para equipos mixtos Windows/Linux.
-- Mantener gates verdes: `pytest`, `npm run lint`, `npm run build` e integridad
-  de base de datos.
+- `app/ui/widgets/orders_page.py`: importacion de pedidos y documentos,
+  resumenes, exportacion y envio por Outlook.
+- `app/ui/widgets/settings_page.py`: preview de importaciones, backup,
+  mantenimiento, configuracion de proveedores y flujos con rutas locales.
+- `app/ui/widgets/ingredients_page.py`: edicion, importacion, impresion,
+  exportacion y dialogos de soporte dentro de una unica pantalla muy grande.
+- `app/ui/widgets/recipes_page.py`: normalizacion de datos, versionado,
+  galerias de imagenes y helpers de carga/guardado.
+- `app/ui/widgets/warehouse_page.py`: plantillas de inventario, conteos,
+  exportaciones y apoyo a catalogos.
+- `app/ui/widgets/customers_page.py`: exportacion, impresion e importacion de
+  clientes siguen viviendo en la capa de UI.
+- `app/ui/widgets/courses_page.py`: importacion, exportacion e impresion
+  mantienen bastante logica de escritorio.
 
-### Completado en Fase 3
+### Acceso directo a base de datos desde UI
 
-- Nueva pantalla React de contactos en solo lectura:
-  - listado con busqueda por texto;
-  - filtro por empresa usando `/contacts/companies`;
-  - panel de detalle usando `/contacts/{contact_id}`.
-- Navegacion principal ampliada para incluir la vista `Contactos`.
-- Tipos y cliente API frontend extendidos para contratos de contactos.
-- Vista de clientes mejorada en solo lectura:
-  - seleccion de cliente desde listado;
-  - panel de detalle con datos fiscales/comerciales;
-  - tabla de contactos asociados del cliente seleccionado.
-- Vista de ingredientes ampliada en solo lectura:
-  - selector de modo `IREKS` / `STD`;
-  - listado y seleccion por fila en ambos modos;
-  - detalle IREKS con nutricion y tarifas;
-  - detalle STD con nutricion e historico de precios.
-- Nueva vista de pedidos en solo lectura:
-  - listado filtrable por año, rango de meses y almacen;
-  - seleccion de pedido con panel de detalle;
-  - tablas de lineas y pendientes del pedido seleccionado.
-- Nueva vista de configuracion en solo lectura:
-  - estado de base de datos y conteos por tabla;
-  - ejecucion manual de `integrity_check` desde React;
-  - lectura de proveedores API y almacenes para importacion.
+- No se detectaron imports directos de `Session`, `select`, `engine` ni
+  `app.core.database` desde `app/ui/widgets` en el barrido actual.
+- Esto es una buena señal: el riesgo hoy esta mas en orquestacion y en
+  dependencias desktop que en acceso directo a la base desde la UI.
 
-### Completado en Fase 4
+### Dependencias desktop dificiles de migrar
 
-- Primer flujo de escritura en React (bajo riesgo):
-  - activar/desactivar materias primas STD desde la vista de ingredientes;
-  - usa `PATCH /ingredients/std/{articulo_id}/active`;
-  - refresca listado y detalle tras guardar, con feedback de exito/error.
-- Segundo flujo de escritura en React (bajo riesgo):
-  - activar/desactivar clientes desde la vista de clientes;
-  - usa `PATCH /customers/{customer_id}` con payload parcial `{ "activo": true|false }`;
-  - refresca listado y detalle tras guardar, con feedback de exito/error.
-- Tercer flujo de escritura en React:
-  - crear y editar contactos desde la vista `Contactos`;
-  - usa `POST /contacts` y `PATCH /contacts/{contact_id}`;
-  - valida en frontend empresa obligatoria y al menos nombre o apellidos;
-  - refresca listado/detalle y muestra feedback de guardado o error.
-- Cuarto flujo de escritura en React:
-  - registro de movimientos manuales de almacen desde la vista `Almacen`;
-  - usa `POST /warehouse/movements` con modo `in`/`out`;
-  - valida en frontend `almacen_id`, `articulo_id`, `cantidad > 0` y fecha;
-  - refresca stock y movimientos tras guardar, con feedback de exito/error.
-- Quinto flujo de escritura en React:
-  - edicion parcial de materias primas STD desde la vista `Ingredientes`;
-  - usa `PATCH /ingredients/std/{articulo_id}`;
-  - permite actualizar descripcion y precios (`pvp_formato`, `pvp_unidad_medida`);
-  - valida descripcion obligatoria y precios numericos no negativos;
-  - refresca listado/detalle tras guardar, con feedback de exito/error.
-- Sexto flujo de escritura en React:
-  - activar/desactivar ingredientes IREKS desde la vista `Ingredientes`;
-  - usa `PATCH /ingredients/ireks/{row_id}` con `articulo_status_activo`;
-  - refresca listado/detalle tras guardar, con feedback de exito/error.
-- Septimo flujo de escritura en React:
-  - marcar/desmarcar ingredientes IREKS en lista desde la vista `Ingredientes`;
-  - usa `PATCH /ingredients/ireks/{row_id}` con `articulo_status_en_lista`;
-  - refresca listado/detalle tras guardar, con feedback de exito/error.
-- Octavo flujo de escritura en React:
-  - guardar umbral de stock en configuracion (`warehouse.low_stock_threshold_units`);
-  - usa `PUT /settings/api/warehouse`;
-  - valida en frontend valor numerico >= 0;
-  - refresca datos de proveedor tras guardar, con feedback de exito/error.
-- Noveno flujo de escritura en React:
-  - eliminar pedidos desde la vista `Pedidos` con confirmacion;
-  - usa `DELETE /orders/{order_id}`;
-  - refresca el listado tras borrar y muestra feedback de exito/error.
-- Decimo flujo de escritura en React:
-  - eliminar clientes desde la vista `Clientes` con confirmacion;
-  - usa `DELETE /customers/{customer_id}`;
-  - muestra errores de conflicto cuando hay dependencias y refresca listados tras borrar.
-- Undecimo flujo de escritura en React:
-  - eliminar contactos desde la vista `Contactos` con confirmacion;
-  - usa `DELETE /contacts/{contact_id}`;
-  - muestra errores de conflicto cuando hay dependencias y refresca listados tras borrar.
-- Duodecimo flujo de escritura en React:
-  - CRUD de lineas de pedido desde la vista `Pedidos` (crear, editar, eliminar);
-  - usa `POST /orders/{order_id}/items`, `PATCH /orders/items/{item_id}` y `DELETE /orders/items/{item_id}`;
-  - valida `articulo_id` y `articulo_cantidad > 0` en frontend;
-  - refresca detalle del pedido tras cada cambio, con feedback de exito/error.
-- Decimotercer flujo de escritura en React:
-  - eliminar ingredientes STD e IREKS desde la vista `Ingredientes` con confirmacion;
-  - usa `DELETE /ingredients/std/{articulo_id}` y `DELETE /ingredients/ireks/{row_id}`;
-  - muestra errores de conflicto cuando hay dependencias y refresca listados tras borrar.
-- Decimocuarto flujo de escritura en React:
-  - crear pedidos desde la vista `Pedidos` con formulario basico;
-  - usa `POST /orders` con `almacen_id`, `pedido_fecha`, `pedido_numero` y estado inicial;
-  - valida campos obligatorios y refresca el listado tras crear.
-- Decimoquinto flujo de escritura en React:
-  - editar cabecera de pedido desde la vista `Pedidos` (fecha, numero y modo pendiente/normal);
-  - usa `PATCH /orders/{order_id}` preservando lineas existentes;
-  - refresca listado/detalle tras guardar, con feedback de exito/error.
-- Decimosexto flujo de escritura en React:
-  - crear y editar clientes desde la vista `Clientes`;
-  - usa `POST /customers` y `PATCH /customers/{customer_id}`;
-  - valida nombre comercial obligatorio y muestra feedback de exito/error.
-- Decimoseptimo flujo de escritura en React:
-  - guardar configuracion `orders_mail` desde la vista `Configuracion`;
-  - usa `PUT /settings/api/orders_mail`;
-  - valida formato basico de email destino y refresca proveedor tras guardar.
-- Decimoctavo flujo de escritura en React:
-  - editar campos de cabecera IREKS desde la vista `Ingredientes`;
-  - usa `PATCH /ingredients/ireks/{row_id}`;
-  - permite actualizar referencia, referencia corta, descripcion y categoria.
-- Decimonoveno flujo de escritura en React:
-  - CRUD de tarifas IREKS desde la vista `Ingredientes`;
-  - usa `POST /ingredients/ireks/tarifas`, `PATCH /ingredients/ireks/tarifas/{tarifa_id}` y `DELETE /ingredients/ireks/tarifas/{tarifa_id}`;
-  - permite crear, editar y eliminar tarifas con feedback de exito/error.
-- Vigesimo flujo de escritura en React:
-  - importacion de pedidos JSON y documentos PDF desde la vista `Pedidos`;
-  - usa `POST /orders/import/json`, `POST /orders/{order_id}/import/albaran-pdf` y `POST /orders/{order_id}/import/factura-pdf`;
-  - valida rutas/almacen en frontend y refresca listados tras importar.
-- Vigesimoprimer flujo de escritura en React:
-  - aplicar ajustes de inventario desde la vista `Almacen`;
-  - usa `POST /warehouse/inventory/adjustments`;
-  - valida campos obligatorios y numericos en frontend;
-  - refresca stock/movimientos/historico tras aplicar ajustes.
-- Vigesimosegundo flujo de escritura en React:
-  - ejecutar mantenimiento desde la vista `Configuracion`;
-  - usa `POST /settings/maintenance/repair-contact-links`,
-    `POST /settings/maintenance/create-missing-contact-clients`,
-    `POST /settings/maintenance/optimize` y
-    `POST /settings/maintenance/backup`;
-  - valida ruta de backup en frontend y refresca estado de mantenimiento tras cada accion.
-- Vigesimotercer flujo de escritura en React:
-  - alta de materias primas STD desde la vista `Ingredientes`;
-  - usa `POST /ingredients/std`;
-  - valida en frontend referencia/proveedor/descripcion obligatorios, cantidad de formato mayor que 0 y PVP formato numerico no negativo;
-  - refresca listado y detalle, dejando seleccionada la materia prima recien creada.
-- Vigesimocuarto flujo de escritura en React:
-  - alta de ingredientes IREKS desde la vista `Ingredientes`;
-  - usa `POST /ingredients/ireks`;
-  - valida en frontend `almacen_id`, referencia y descripcion obligatorios, y campos numericos de envase/transporte no negativos;
-  - refresca listado y detalle, dejando seleccionado el ingrediente recien creado.
-- Vigesimoquinto flujo de escritura en React:
-  - importacion de pedidos JSON desde la vista `Configuracion`;
-  - usa `POST /settings/imports/orders-json`;
-  - valida en frontend almacen y `file_path` con extension `.json`;
-  - muestra resumen de importacion (`imported_items`, `skipped_invalid`, `skipped_unknown`).
-- Vigesimosexto flujo de escritura en React:
-  - edicion generica de configuracion por proveedor API desde `Configuracion`;
-  - usa `PUT /settings/api/{provider}`;
-  - valida JSON en frontend y exige objeto de configuracion;
-  - refresca listado de proveedores tras guardar.
+- Outlook: `app/ui/widgets/orders_page.py` y `app/services/order_export_service.py`
+  siguen dependiendo de la integracion de correo de escritorio.
+- OCR / Tesseract: `app/services/order_document_parser.py` configura y usa
+  `pytesseract`, rutas locales y fallback de runtime.
+- Dialogos Qt: `QFileDialog`, `QInputDialog`, `QPrintDialog` y `QPrinter`
+  siguen presentes en `orders_page.py`, `customers_page.py`, `ingredients_page.py`,
+  `courses_page.py`, `settings_page.py`, `warehouse_page.py` y otras vistas.
+- Rutas locales del servidor: los flujos legacy con `source_path`, `file_path`
+  y `destination_path` todavia existen para compatibilidad temporal.
+- Dependencias de archivos y previsualizacion local: Excel, PDF, JSON y
+  sidecars siguen siendo parte del flujo real en varios widgets.
 
-### Completado en Fase 5
+### Areas con paridad razonable en React/FastAPI
 
-- Guardrails de arquitectura automatizados en tests:
-  - `tests/test_architecture_boundaries.py` valida que:
-    - `app/ui` no importe `sqlmodel` ni `app.core.database`;
-    - `app/services` no importe `PySide6`;
-    - `app/api` no importe `app.ui`.
-- Gate unificado de validacion:
-  - nuevo script `scripts/validate-gates.ps1`;
-  - ejecuta `pytest` (incluyendo guardrails de arquitectura), `integrity_check`,
-    `npm run lint` y `npm run build`.
-- Decision sobre `USE_QML_CUSTOMERS`:
-  - se mantiene como flag experimental desactivado por defecto;
-  - la resolucion del flag se centraliza en `app/core/feature_flags.py`;
-  - se documenta su activacion explicita por entorno para pruebas locales.
-- Extraccion de logica de configuracion API/correo fuera de UI desktop:
-  - nueva capa `app/services/settings_provider_service.py` para guardar/probar
-    FDC, FatSecret, OpenAI y pedidos por Outlook;
-  - `app/ui/widgets/settings_page.py` delega esas operaciones al servicio y
-    mantiene solo interaccion de interfaz/mensajes.
-- Extraccion del flujo de importacion JSON de pedidos fuera de UI desktop:
-  - nueva capa `app/services/settings_orders_import_service.py` con validacion
-    de entrada y generacion de resumen/log reutilizable;
-  - `app/ui/widgets/settings_page.py` delega la importacion y solo muestra el
-    resultado en interfaz.
-- Extraccion de flujos de importacion/reproceso de ventas IGSA/IREKS fuera de
-  UI desktop:
-  - nueva capa `app/services/settings_sales_import_service.py` para validar
-    entradas, ejecutar importaciones y formatear mensaje/log de resultados;
-  - `app/ui/widgets/settings_page.py` delega importacion IREKS JSON, IGSA Excel,
-    IGSA PDF, IGSA libro y regeneracion de salidas de almacen.
-- Extraccion de previsualizaciones IGSA fuera de UI desktop:
-  - nueva capa `app/services/settings_sales_preview_service.py` para validar
-    archivos de entrada y preparar datos de vista previa (PDF y libro IGSA);
-  - `app/ui/widgets/settings_page.py` delega parseo/preparacion y mantiene solo
-    renderizado de dialogos/tabla.
-- Extraccion del flujo de importacion JSON de pedidos desde `OrdersPage`:
-  - nueva capa `app/services/orders_json_import_ui_service.py` para resolver
-    almacen, validar archivo JSON y construir el resumen de importacion;
-  - `app/ui/widgets/orders_page.py` delega la importacion y conserva solo
-    refresco/seleccion y feedback visual.
-- Extraccion del flujo de importacion de items de pedido desde `OrdersPage`:
-  - nueva capa `app/services/orders_items_import_ui_service.py` para validar
-    archivos (`.xlsx/.xlsm/.csv`) y construir mensajes de resultado/incidencias;
-  - `app/ui/widgets/orders_page.py` delega la importacion y mantiene solo
-    recarga de datos y mensajeria visual.
-- Extraccion de importacion de albaranes/facturas desde `OrdersPage`:
-  - nueva capa `app/services/orders_documents_import_ui_service.py` para
-    preparar previsualizacion (PDF/Excel/CSV/JSON), enriquecer filas de factura
-    y mapear resultados de importacion (exito/incidencias/ya importado);
-  - `app/ui/widgets/orders_page.py` delega esta logica y mantiene confirmacion
-    de vista previa, recarga y mensajes de interfaz.
-- Limpieza de deuda tecnica en `OrdersPage` tras la extraccion:
-  - eliminados helpers legacy sin uso (schemas/normalizadores/wrappers de
-    precio y parseo duplicado) que ya no participan en flujos activos;
-  - se reduce acoplamiento del widget con reglas de importacion y se acota su
-    responsabilidad a interaccion visual.
-- Resolucion IGSA centralizada en servicio de importacion de ventas:
-  - `app/services/settings_sales_import_service.py` resuelve internamente el
-    cliente/distribuidor IGSA via `SettingsImportService`;
-  - `app/ui/widgets/settings_page.py` deja de pasar `cliente_id` manualmente y
-    reduce acoplamiento entre widget y reglas de negocio.
-- Carga inicial de proveedores API/correo movida a servicio:
-  - `app/services/settings_provider_service.py` incorpora metodos `load_*`
-    para FDC, FatSecret, OpenAI y Outlook;
-  - `app/ui/widgets/settings_page.py` deja de leer settings directamente y usa
-    solo `SettingsProviderService` como punto de acceso.
-- Simplificacion adicional de dependencias en `SettingsPage`:
-  - eliminado el acoplamiento directo a `SalesReconciliationService` y
-    `SettingsMaintenanceService`;
-  - `SettingsPage` instancia y usa solo servicios de capa UI (`SettingsSales*`
-    y `SettingsMaintenanceUiService`) junto con `SettingsProviderService`.
-- Limpieza adicional de dependencias en `OrdersPage`:
-  - eliminado `ImportService` como dependencia directa del widget;
-  - `OrdersPage` mantiene el flujo via `OrdersDocumentsImportUiService`, que
-    encapsula el mapeo/preparacion de importaciones documentales.
-- Limpieza de wrappers legacy sin uso en `OrdersPage`:
-  - eliminados métodos puente redundantes de exportacion/correo y utilidades
-    no referenciadas, manteniendo llamadas directas al servicio en flujos vivos;
-  - reducido ruido del widget y superficie de mantenimiento sin cambiar
-    comportamiento funcional.
-- Refactor de importaciones de documentos en `OrdersPage`:
-  - unificado el flujo comun de importacion de albaran y factura en un helper
-    privado para reducir duplicacion;
-  - se mantienen los mismos mensajes, confirmaciones y rutas de servicio.
-- Refactor de plantilla de inventario en `warehouse_page.py`:
-  - extraida la deteccion de columnas y la construccion del mapa de conteos a
-    helpers puros reutilizables;
-  - `InventariosTab` mantiene el mismo flujo visual de importacion.
-- Refactor de nombres de proceso en `recipes_page.py`:
-  - extraida la normalizacion y deduplicacion de procesos a helpers de modulo;
-  - la pantalla mantiene el mismo orden funcional y el contrato de `Masa final`.
-- Refactor de galeria de imagenes en `recipes_page.py`:
-  - extraida la serializacion y lectura ordenada de la galeria a helpers de modulo;
-  - la UI conserva el mismo formato de guardado y la marca de imagen principal.
-- Refactor de payloads JSON en `recipes_page.py`:
-  - extraida la conversion segura de cadenas JSON a diccionarios planos a un
-    helper de modulo;
-  - la carga de datos de receta mantiene el mismo contrato tolerante a errores.
-- Limpieza incremental de helpers muertos en `OrdersPage`:
-  - eliminado wrapper `_parse_albaran_pdf` (se usa parser directo);
-  - eliminados auxiliares `_parse_decimal_es*` sin referencias activas.
-- Limpieza de utilidades de fecha/export sin uso en `OrdersPage`:
-  - eliminados helpers no referenciados de resolucion de almacen/mes/semana;
-  - eliminada capa wrapper `_build_order_workbook`, usando llamada directa al
-    servicio de exportacion.
-- Limpieza menor de parseo en `OrdersPage`:
-  - eliminados métodos sin uso `_parse_optional_date` y `_parse_required_date`,
-    dejando un único camino de parseo de fecha (`_parse_date`/`_try_parse_date`).
-- Limpieza de método no referenciado en `SettingsPage`:
-  - eliminado `_load_igsa_pdf_import_almacen_combo`, sin uso en la UI actual;
-  - se mantiene solo la carga activa de almacén para importación JSON de pedidos.
-- Limpieza adicional de métodos puente sin uso en `OrdersPage`:
-  - eliminados `_pedido_totals_kg`, `_repair_albaran_item_mappings` y `_show_import_selector`;
-  - el widget mantiene llamadas directas a servicios activos y reduce superficie legacy.
-- Limpieza puntual de importación legacy en `SettingsPage`:
-  - eliminado `_import_igsa_sales_excel`, sin enlaces en la UI actual;
-  - se mantiene el flujo activo de importación/previsualización por libro/PDF.
-- Limpieza puntual adicional en `SettingsPage`:
-  - eliminado `_rebuild_igsa_warehouse_movements`, sin enlaces en la UI actual;
-  - retirada también la dependencia `QInputDialog` asociada a ese flujo legacy.
-- Limpieza adicional de importadores legacy en `OrdersPage`:
-  - eliminados `_import_orders`, `_import_orders_from_json` y `_import_order_items`, sin enlaces activos en la UI;
-  - retiradas las dependencias `OrdersJsonImportUiService` y `OrdersItemsImportUiService` del widget.
-- Extraccion de flujos de mantenimiento de base de datos fuera de UI desktop:
-  - nueva capa `app/services/settings_maintenance_ui_service.py` para construir
-    resumen de estado, mapear resultados y centralizar mensajes/logs;
-  - `app/ui/widgets/settings_page.py` delega integridad, reparacion de enlaces,
-    optimize, clientes tecnicos y backup al nuevo servicio.
-- Ajuste de compatibilidad en ContactsPage:
-  - la llamada a ContactsService.list pasa company_id_to_name por argumento
-    nombrado;
-  - se reduce la dependencia del orden posicional y se deja la interfaz mas
-    explicita.
+- Clientes: listado, detalle, CRUD, activacion y contactos asociados.
+- Contactos: listado, detalle, CRUD y filtro por empresa.
+- Ingredientes: IREKS/STD, nutricion, tarifas, alta, edicion y borrado.
+- Pedidos: listado, detalle, lineas, pendientes, CRUD, importacion y borrado.
+- Almacen: stock, movimientos, historico, ajustes y exportaciones basicas.
+- Configuracion: estado de base, integridad, backups, importaciones y ajustes de API.
+- API: validaciones, errores `400/404/409`, paginacion en listados grandes y
+  contratos de escritura ya bastante estabilizados.
 
-### Completado en Fase 6
+## Siguiente refactor recomendado
 
-- Backup automatico por script local:
-  - nuevo `scripts/backup-db.ps1` para generar copias de seguridad con
-    timestamp y etiqueta opcional usando `backup_database` (SQLite backup);
-  - salida por defecto en `data/backups/` para mantener el flujo operativo
-    fuera de Git.
-- Documentacion operativa de backup:
-  - `README.md` actualizado con comandos de backup normal, backup con `-Tag` y
-    variante con `ExecutionPolicy Bypass`.
-- Checklist de entrega versionable:
-  - nuevo `docs/release-checklist.md` con pasos de pre-release, gates,
-    smoke tests y evidencias minimas para PR/release.
-- Documentacion de entorno local:
-  - nuevo `docs/local-environment.md` con instalacion Python/Node,
-    configuracion local, variables de entorno y validacion;
-  - `README.md` enlaza la guia y recomienda `venv` + `npm ci`.
-- Politica de runtime/Tesseract documentada:
-  - Tesseract no se versiona en Git;
-  - se aceptan instalacion del sistema, `TESSERACT_CMD` o copia portable en
-    `runtime/tesseract/Tesseract-OCR/`;
-  - checklist de release verifica disponibilidad de OCR cuando aplique.
-- Wrappers Windows de arranque y parada:
-  - nuevos `run-desktop.bat`, `start-dev.bat` y `stop-dev.bat` como accesos
-    directos para usuarios que prefieren doble clic en Windows;
-  - reutilizan los scripts PowerShell existentes y no introducen logica nueva.
-- Proteccion de configuraciones locales:
-  - `.env` y `frontend/.env` quedan ignorados por Git;
-  - plantillas sin secretos en `.env.example` y `frontend/.env.example`.
-- Chequeo automatizado de entorno local:
-  - nuevo `scripts/check-local-env.ps1` para validar prerequisitos de arranque
-    (Python, Node/npm, archivos base y OCR opcional);
-  - `README.md`, `docs/local-environment.md` y checklist de release incorporan
-    su ejecucion como paso previo al gate completo.
+- Objetivo concreto: aislar la metadata textual restante del tab de inventarios
+  en `app/ui/widgets/warehouse_page.py` para que la UI conserve solo la
+  estructura visual y las acciones.
+- Archivos a tocar: `app/ui/widgets/warehouse_page.py` y
+  `tests/test_warehouse_count_template_helpers.py`.
+- Motivo: el tab ya tiene un `view` local; el siguiente borde pequeño es
+  terminar de mover los labels y botones visibles del historial de inventarios.
+- Riesgo: bajo. Es un cambio de metadata visible, sin tocar la lógica de stock
+  ni los ajustes.
+- Tests que deben ejecutarse: `tests/test_warehouse_count_template_helpers.py`
+  y `tests/test_architecture_boundaries.py`.
+- Validacion manual esperada: abrir `Almacen` -> `Inventarios` y comprobar que
+  el encabezado del historial y el boton de exportacion siguen iguales.
 
-## Hoja de ruta
+## Proximos pasos
 
-### Fase 0 - Estabilizar el punto de partida
-
-Estado: completada.
-
-Objetivo: dejar el trabajo actual versionado, reproducible y con comandos de
-validacion claros.
-
-- Activar Git para este directorio con `safe.directory`.
-- Revisar `.gitignore` antes de hacer `git add`, especialmente `data/`,
-  `runtime/`, exports, PDFs, configuraciones con claves y bases de datos.
-- Crear una rama de trabajo para la migracion.
-- Separar commits por bloques: backend/API, frontend, datos/assets, tests y
-  documentacion.
-- Actualizar README con comandos para escritorio, API, frontend y tests.
-- Corregir el lint de React hasta que `npm run lint` pase.
-- Mantener como gate minimo:
-  - `python -m pytest tests -q`
-  - `npm run build`
-  - `npm run lint`
-  - `python -c "from app.core.database import run_integrity_check; print(run_integrity_check())"`
-
-Criterio de salida: arbol Git sin cambios accidentales, tests Python verdes,
-build React verde, lint React verde y README actualizado.
-
-### Fase 1 - Sanear datos y mantenimiento
-
-Estado: completada operativamente; queda documentacion fina de politicas.
-
-Objetivo: que la base real pueda mantenerse desde desktop y API sin acciones
-manuales peligrosas.
-
-- Hacer backup antes de cualquier reparacion.
-- Resolver el enlace huerfano contacto-cliente mediante mantenimiento.
-- Revisar si `data/*.json` contiene secretos antes de versionar o compartir.
-- Decidir que datos son fixtures, que datos son runtime local y que datos deben
-  quedar fuera de Git.
-- Documentar el flujo de backup, integridad, reparacion y optimizacion.
-
-Criterio de salida: integridad `ok`, `orphan_contact_links = 0`, backup probado
-y politica clara de versionado para `data/`.
-
-### Fase 2 - Endurecer API
-
-Estado: en progreso.
-
-Objetivo: convertir FastAPI en una superficie estable para React sin romper la
-app de escritorio.
-
-- Revisar todos los routers para devolver errores HTTP coherentes.
-- Mantener validacion explicita en endpoints que reciben rutas locales o
-  ficheros.
-- Completar tests de endpoints criticos de escritura y borrado.
-- Asegurar que los routers no importan UI ni acceden a base de datos directa.
-- Alinear nombres de campos entre DTOs, servicios y frontend.
-- Preparar script o instruccion oficial para levantar API:
-  `python -m uvicorn app.api.main:app --reload --host 127.0.0.1 --port 8000`.
-- Valorar paginacion o limites en listados grandes antes de cargar mas pantallas
-  React.
-
-Criterio de salida: contratos API estables, tests de escritura suficientes y
-documentacion de arranque de API.
-
-### Fase 3 - Completar React de solo lectura
-
-Objetivo: cubrir las consultas principales en navegador sin tocar aun flujos de
-edicion complejos.
-
-- Clientes: listado, busqueda, detalle y contactos asociados.
-- Contactos: listado, detalle y filtro por empresa.
-- Ingredientes: IREKS, STD, nutricion, tarifas y referencias de distribuidor.
-- Almacen: stock, movimientos, historico de inventarios y exportacion.
-- Pedidos: listado, detalle, lineas, pendientes, albaranes y facturas.
-- Configuracion: estado de base, integridad, proveedores API y utilidades de
-  importacion.
-
-Criterio de salida: React cubre los mismos listados prioritarios que desktop,
-sin edicion, con estados de carga, error y vacio consistentes.
-
-### Fase 4 - Migrar escrituras a React
-
-Objetivo: empezar a operar desde React con flujos pequenos, reversibles y bien
-probados.
-
-- Empezar por acciones de bajo riesgo: activar/desactivar, filtros guardados,
-  tarifas, movimientos manuales y ajustes con confirmacion.
-- Despues migrar CRUD de clientes/contactos.
-- Despues migrar CRUD de ingredientes IREKS/STD.
-- Finalmente migrar pedidos, importaciones PDF/JSON e inventarios.
-- Cada pantalla de escritura debe tener validacion frontend, validacion backend,
-  feedback de error y test de API.
-
-Criterio de salida: cada flujo migrado puede usarse en React sin depender de la
-pantalla equivalente de escritorio.
-
-### Fase 5 - Reducir dependencia del desktop
-
-Objetivo: dejar PySide6 como cliente legacy o administrativo mientras React
-asume los flujos principales.
-
-- Mantener desktop estable mientras React alcanza paridad funcional.
-- Evitar nuevas reglas de negocio en widgets PySide6.
-- Extraer logica residual de widgets grandes hacia servicios.
-- Revisar `USE_QML_CUSTOMERS` y decidir si QML queda como experimento, bridge
-  temporal o se elimina.
-- Priorizar refactors solo cuando desbloqueen migracion o reduzcan riesgo real.
-
-Criterio de salida: nuevas funcionalidades se implementan en servicios/API y
-React, no en widgets de escritorio.
-
-### Fase 6 - Preparacion de entrega
-
-Objetivo: preparar una forma reproducible de instalar, ejecutar y actualizar la
-aplicacion.
-
-- Definir instalacion Python y Node.
-- Definir si Tesseract empaquetado en `runtime/` se versiona, se descarga o se
-  documenta como requisito.
-- Preparar backup automatico antes de migraciones destructivas.
-- Documentar variables/configuraciones locales.
-- Crear checklist de release: tests, build, lint, integridad DB, backup, smoke
-  test API y smoke test UI.
-
-Criterio de salida: otra maquina puede clonar, instalar, arrancar API/frontend
-y validar la base siguiendo README.
+1. Tomar este roadmap como referencia operativa unica para la migracion.
+2. Atacar el siguiente bloque pequeno de labels de estado de mantenimiento en
+   `settings_page.py` sin introducir comportamiento nuevo.
+3. Mantener el historial detallado en `docs/migration-history.md`.
+4. Seguir cerrando deuda tecnica solo cuando reduzca riesgo o desbloquee la
+   migracion.
+5. Actualizar este documento despues de cada bloque pequeno validado.
 
 ## Comandos de validacion
 
@@ -667,14 +232,3 @@ npm run lint
 npm run build
 ```
 
-## Git
-
-Git ya esta activado y el remoto apunta al repositorio de GitHub. El flujo
-actual recomendado es:
-
-1. Mantener `main` sincronizada con `origin/main`.
-2. Trabajar cada bloque en una rama corta, por ejemplo `api-hardening`.
-3. Hacer commits pequenos por area y ejecutar los gates antes de subir.
-4. Subir la rama a GitHub y abrir Pull Request para revisar/fusionar.
-5. No commitear claves, bases reales, backups, exports sensibles ni runtime
-   local.

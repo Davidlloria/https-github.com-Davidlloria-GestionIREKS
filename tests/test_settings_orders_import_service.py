@@ -39,6 +39,24 @@ def test_import_orders_json_builds_summary_and_log(tmp_path: Path) -> None:
     assert fake.calls == [(source, "alm-1")]
 
 
+def test_build_orders_import_view_provides_warehouse_options() -> None:
+    class _FakeSettingsImportServiceWithOptions(_FakeSettingsImportService):
+        def warehouse_filter_options(self):  # noqa: ANN201
+            return [
+                type("O", (), {"label": "Cliente A", "value": "a"})(),
+                type("O", (), {"label": "Cliente B", "value": "b"})(),
+            ]
+
+    service = SettingsOrdersImportService(settings_import_service=_FakeSettingsImportServiceWithOptions())
+    view = service.build_orders_import_view()
+
+    assert view.section_info_label == "Importacion de pedidos (JSON)"
+    assert view.selector_label == "Cliente/Distribuidor"
+    assert view.import_button_label == "Importar pedidos"
+    assert [option.label for option in view.warehouse_options] == ["Cliente A", "Cliente B"]
+    assert [option.value for option in view.warehouse_options] == ["a", "b"]
+
+
 def test_import_orders_json_validates_inputs(tmp_path: Path) -> None:
     fake = _FakeSettingsImportService()
     service = SettingsOrdersImportService(settings_import_service=fake)
@@ -68,4 +86,3 @@ def test_import_orders_json_validates_inputs(tmp_path: Path) -> None:
         assert "selecciona" in str(exc).lower()
     else:
         raise AssertionError("Expected ValueError for empty almacen_id")
-

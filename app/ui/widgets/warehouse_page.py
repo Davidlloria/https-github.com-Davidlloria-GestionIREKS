@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, cast as tcast
@@ -90,6 +91,26 @@ def _count_template_mapping(
             continue
         mapping[(art_id, lote)] = conteo_raw
     return mapping
+
+
+@dataclass(frozen=True)
+class InventoryTabView:
+    intro_text: str = "Conteo físico por producto/lote. Edita 'Conteo Uds' y pulsa Aplicar ajustes."
+    export_template_button_label: str = "Exportar plantilla"
+    import_count_button_label: str = "Importar conteo"
+    refresh_button_label: str = "Refrescar"
+    prepare_adjustments_button_label: str = "Preparar ajustes"
+    apply_adjustments_button_label: str = "Aprobar y aplicar"
+    search_label: str = "Buscar"
+    search_placeholder: str = "Producto, ref o lote..."
+    counter_label: str = "Contador"
+    counter_placeholder: str = "Usuario que realiza conteo"
+    approver_label: str = "Aprobador"
+    approver_placeholder: str = "Usuario que aprueba ajuste"
+    pending_label: str = "Pendientes: 0"
+    history_title: str = "Historial de inventarios"
+    export_history_button_label: str = "Exportar historial"
+    log_placeholder: str = "Registro de acciones de mantenimiento..."
 
 
 class OtrasReferenciasTab(QWidget):
@@ -1667,6 +1688,7 @@ class InventariosTab(QWidget):
         self._almacen_id = ""
         self._pending_ajustes: list[dict[str, Any]] = []
         self.inventory_service = WarehouseInventoryService()
+        self.view = InventoryTabView()
         self._build_ui()
         self.reload()
 
@@ -1679,21 +1701,21 @@ class InventariosTab(QWidget):
         historial_layout = QVBoxLayout(historial_tab)
 
         top = QHBoxLayout()
-        top.addWidget(QLabel("Conteo f?sico por producto/lote. Edita 'Conteo Uds' y pulsa Aplicar ajustes."))
+        top.addWidget(QLabel(self.view.intro_text))
         top.addStretch(1)
-        export_btn = QPushButton("Exportar plantilla")
+        export_btn = QPushButton(self.view.export_template_button_label)
         export_btn.setProperty("btnRole", "secondary")
         export_btn.clicked.connect(self._export_count_template)
-        import_btn = QPushButton("Importar conteo")
+        import_btn = QPushButton(self.view.import_count_button_label)
         import_btn.setProperty("btnRole", "secondary")
         import_btn.clicked.connect(self._import_count_template)
-        refresh_btn = QPushButton("Refrescar")
+        refresh_btn = QPushButton(self.view.refresh_button_label)
         refresh_btn.setProperty("btnRole", "secondary")
         refresh_btn.clicked.connect(self.reload)
-        prepare_btn = QPushButton("Preparar ajustes")
+        prepare_btn = QPushButton(self.view.prepare_adjustments_button_label)
         prepare_btn.setProperty("btnRole", "warning")
         prepare_btn.clicked.connect(self._prepare_adjustments)
-        apply_btn = QPushButton("Aprobar y aplicar")
+        apply_btn = QPushButton(self.view.apply_adjustments_button_label)
         apply_btn.setProperty("btnRole", "warning")
         apply_btn.clicked.connect(self._apply_adjustments)
         top.addWidget(export_btn)
@@ -1704,20 +1726,20 @@ class InventariosTab(QWidget):
         conteo_layout.addLayout(top)
 
         approval = QHBoxLayout()
-        approval.addWidget(QLabel("Buscar"))
+        approval.addWidget(QLabel(self.view.search_label))
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Producto, ref o lote...")
+        self.search_input.setPlaceholderText(self.view.search_placeholder)
         self.search_input.textChanged.connect(self.reload)
         approval.addWidget(self.search_input)
-        approval.addWidget(QLabel("Contador"))
+        approval.addWidget(QLabel(self.view.counter_label))
         self.counter_input = QLineEdit()
-        self.counter_input.setPlaceholderText("Usuario que realiza conteo")
+        self.counter_input.setPlaceholderText(self.view.counter_placeholder)
         approval.addWidget(self.counter_input)
-        approval.addWidget(QLabel("Aprobador"))
+        approval.addWidget(QLabel(self.view.approver_label))
         self.approver_input = QLineEdit()
-        self.approver_input.setPlaceholderText("Usuario que aprueba ajuste")
+        self.approver_input.setPlaceholderText(self.view.approver_placeholder)
         approval.addWidget(self.approver_input)
-        self.pending_label = QLabel("Pendientes: 0")
+        self.pending_label = QLabel(self.view.pending_label)
         approval.addWidget(self.pending_label)
         approval.addStretch(1)
         conteo_layout.addLayout(approval)
@@ -1750,11 +1772,11 @@ class InventariosTab(QWidget):
         conteo_layout.addWidget(self.table, 1)
 
         history_top = QHBoxLayout()
-        history_label = QLabel("Historial de inventarios")
+        history_label = QLabel(self.view.history_title)
         history_label.setProperty("role", "sectionTitle")
         history_top.addWidget(history_label)
         history_top.addStretch(1)
-        export_history_btn = QPushButton("Exportar historial")
+        export_history_btn = QPushButton(self.view.export_history_button_label)
         export_history_btn.setProperty("btnRole", "secondary")
         export_history_btn.clicked.connect(self._export_history_excel)
         history_top.addWidget(export_history_btn)
@@ -1910,7 +1932,7 @@ class InventariosTab(QWidget):
             aprobador=aprobador,
         )
         self._pending_ajustes = []
-        self.pending_label.setText("Pendientes: 0")
+        self.pending_label.setText(self.view.pending_label)
         QMessageBox.information(self, "Inventarios", f"Ajustes aplicados: {applied}")
         self.reload()
 

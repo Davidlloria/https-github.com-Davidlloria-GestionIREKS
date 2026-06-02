@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
+from app.core.config import DATA_DIR
 from app.services.settings_maintenance_service import SettingsMaintenanceService
 
 
@@ -24,9 +26,27 @@ class SettingsMaintenanceOutcome:
     log_message: str
 
 
+@dataclass(frozen=True)
+class SettingsMaintenanceView:
+    refresh_button_label: str = "Actualizar estado"
+    integrity_button_label: str = "Comprobar integridad"
+    repair_links_button_label: str = "Reparar enlaces Cliente/Contacto"
+    create_missing_clients_button_label: str = "Crear clientes faltantes"
+    optimize_button_label: str = "Optimizar DB (VACUUM)"
+    backup_button_label: str = "Crear backup"
+    log_placeholder: str = "Registro de acciones de mantenimiento..."
+
+
 class SettingsMaintenanceUiService:
     def __init__(self, settings_maintenance_service: SettingsMaintenanceService | None = None) -> None:
         self.settings_maintenance_service = settings_maintenance_service or SettingsMaintenanceService()
+
+    def build_view(self) -> SettingsMaintenanceView:
+        return SettingsMaintenanceView()
+
+    def build_backup_default_path(self, timestamp: datetime | None = None) -> Path:
+        stamp = (timestamp or datetime.now()).strftime("%Y%m%d_%H%M%S")
+        return DATA_DIR / f"gestion_ireks_backup_{stamp}.db"
 
     def build_status_view(self) -> SettingsMaintenanceStatusView:
         status = self.settings_maintenance_service.database_status()

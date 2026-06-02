@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 from app.services.settings_maintenance_ui_service import SettingsMaintenanceUiService
@@ -79,6 +80,19 @@ def test_build_status_view_and_outcomes(tmp_path: Path) -> None:
     assert backup.ok is True
     assert str(destination) in backup.message
     assert fake.backup_calls == [destination]
+
+    default_path = service.build_backup_default_path(datetime(2026, 5, 2, 13, 14, 15))
+    assert default_path.name == "gestion_ireks_backup_20260502_131415.db"
+    assert default_path.parent.name == "data"
+
+    view = service.build_view()
+    assert view.refresh_button_label == "Actualizar estado"
+    assert view.integrity_button_label == "Comprobar integridad"
+    assert view.repair_links_button_label == "Reparar enlaces Cliente/Contacto"
+    assert view.create_missing_clients_button_label == "Crear clientes faltantes"
+    assert view.optimize_button_label == "Optimizar DB (VACUUM)"
+    assert view.backup_button_label == "Crear backup"
+    assert view.log_placeholder == "Registro de acciones de mantenimiento..."
 
 
 def test_integrity_outcome_with_incidencias() -> None:

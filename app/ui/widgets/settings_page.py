@@ -1436,6 +1436,7 @@ class SettingsPage(QWidget):
     def _build_api_tab(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
+        provider_view = self.settings_provider_service.build_ui_view()
 
         fdc_card = QFrame()
         fdc_card.setObjectName("card")
@@ -1443,30 +1444,30 @@ class SettingsPage(QWidget):
         fdc_layout.setContentsMargins(10, 10, 10, 10)
         fdc_layout.setSpacing(8)
 
-        fdc_title = QLabel("Configuracion API FoodData Central")
+        fdc_title = QLabel(provider_view.fdc_title)
         fdc_title.setProperty("role", "sectionTitle")
         fdc_layout.addWidget(fdc_title)
 
         form = QFormLayout()
         self.fdc_api_key_input = QLineEdit()
         self.fdc_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.fdc_api_key_input.setPlaceholderText("Introduce API key de USDA/Data.gov")
+        self.fdc_api_key_input.setPlaceholderText(provider_view.fdc_placeholder)
         loaded = self.settings_provider_service.load_fdc()
         self.fdc_api_key_input.setText(str(loaded.get("api_key") or ""))
         self.fdc_data_type_combo = QComboBox()
-        self.fdc_data_type_combo.addItems(["Foundation", "Branded", "Survey (FNDDS)", "SR Legacy"])
+        self.fdc_data_type_combo.addItems(list(provider_view.fdc_data_type_options))
         current_data_type = str(loaded.get("data_type") or "Foundation")
         idx = self.fdc_data_type_combo.findText(current_data_type)
         if idx >= 0:
             self.fdc_data_type_combo.setCurrentIndex(idx)
-        form.addRow("API key", self.fdc_api_key_input)
-        form.addRow("Tipo de datos", self.fdc_data_type_combo)
+        form.addRow(provider_view.fdc_api_key_label, self.fdc_api_key_input)
+        form.addRow(provider_view.fdc_data_type_label, self.fdc_data_type_combo)
         fdc_layout.addLayout(form)
 
         actions = QHBoxLayout()
-        self.fdc_save_btn = QPushButton("Guardar")
+        self.fdc_save_btn = QPushButton(provider_view.save_button_label)
         self.fdc_save_btn.setProperty("btnRole", "success")
-        self.fdc_test_btn = QPushButton("Probar conexion")
+        self.fdc_test_btn = QPushButton(provider_view.test_button_label)
         self.fdc_test_btn.setProperty("btnRole", "secondary")
         self.fdc_save_btn.clicked.connect(self._save_fdc_settings)
         self.fdc_test_btn.clicked.connect(self._test_fdc_connection)
@@ -1475,7 +1476,7 @@ class SettingsPage(QWidget):
         actions.addStretch(1)
         fdc_layout.addLayout(actions)
 
-        self.fdc_info_label = QLabel("Las claves se guardan en data/api_config.json (secretos cifrados)")
+        self.fdc_info_label = QLabel(provider_view.secret_info_label)
         self.fdc_info_label.setWordWrap(True)
         fdc_layout.addWidget(self.fdc_info_label)
         layout.addWidget(fdc_card)
@@ -1486,31 +1487,31 @@ class SettingsPage(QWidget):
         fat_layout.setContentsMargins(10, 10, 10, 10)
         fat_layout.setSpacing(8)
 
-        fat_title = QLabel("Configuracion API FatSecret")
+        fat_title = QLabel(provider_view.fatsecret_title)
         fat_title.setProperty("role", "sectionTitle")
         fat_layout.addWidget(fat_title)
         fat_loaded = self.settings_provider_service.load_fatsecret()
 
         fat_form = QFormLayout()
         self.fatsecret_client_id_input = QLineEdit()
-        self.fatsecret_client_id_input.setPlaceholderText("FATSECRET_CLIENT_ID")
+        self.fatsecret_client_id_input.setPlaceholderText(provider_view.fatsecret_client_id_placeholder)
         self.fatsecret_client_id_input.setText(str(fat_loaded.get("client_id") or ""))
         self.fatsecret_client_secret_input = QLineEdit()
         self.fatsecret_client_secret_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.fatsecret_client_secret_input.setPlaceholderText("FATSECRET_CLIENT_SECRET")
+        self.fatsecret_client_secret_input.setPlaceholderText(provider_view.fatsecret_client_secret_placeholder)
         self.fatsecret_client_secret_input.setText(str(fat_loaded.get("client_secret") or ""))
         self.fatsecret_scope_input = QLineEdit()
-        self.fatsecret_scope_input.setPlaceholderText("basic (o: basic barcode)")
+        self.fatsecret_scope_input.setPlaceholderText(provider_view.fatsecret_scope_placeholder)
         self.fatsecret_scope_input.setText(str(fat_loaded.get("scope") or "basic"))
-        fat_form.addRow("Client ID", self.fatsecret_client_id_input)
-        fat_form.addRow("Client Secret", self.fatsecret_client_secret_input)
-        fat_form.addRow("Scope", self.fatsecret_scope_input)
+        fat_form.addRow(provider_view.fatsecret_client_id_label, self.fatsecret_client_id_input)
+        fat_form.addRow(provider_view.fatsecret_client_secret_label, self.fatsecret_client_secret_input)
+        fat_form.addRow(provider_view.fatsecret_scope_label, self.fatsecret_scope_input)
         fat_layout.addLayout(fat_form)
 
         fat_actions = QHBoxLayout()
-        self.fatsecret_save_btn = QPushButton("Guardar")
+        self.fatsecret_save_btn = QPushButton(provider_view.save_button_label)
         self.fatsecret_save_btn.setProperty("btnRole", "success")
-        self.fatsecret_test_btn = QPushButton("Probar conexion")
+        self.fatsecret_test_btn = QPushButton(provider_view.test_button_label)
         self.fatsecret_test_btn.setProperty("btnRole", "secondary")
         self.fatsecret_save_btn.clicked.connect(self._save_fatsecret_settings)
         self.fatsecret_test_btn.clicked.connect(self._test_fatsecret_connection)
@@ -1519,7 +1520,7 @@ class SettingsPage(QWidget):
         fat_actions.addStretch(1)
         fat_layout.addLayout(fat_actions)
 
-        fat_info = QLabel("Las claves se guardan en data/api_config.json (secretos cifrados)")
+        fat_info = QLabel(provider_view.secret_info_label)
         fat_info.setWordWrap(True)
         fat_layout.addWidget(fat_info)
         layout.addWidget(fat_card)
@@ -1529,7 +1530,7 @@ class SettingsPage(QWidget):
         openai_layout = QVBoxLayout(openai_card)
         openai_layout.setContentsMargins(10, 10, 10, 10)
         openai_layout.setSpacing(8)
-        openai_title = QLabel("Configuracion API OpenAI")
+        openai_title = QLabel(provider_view.openai_title)
         openai_title.setProperty("role", "sectionTitle")
         openai_layout.addWidget(openai_title)
         oa_loaded = self.settings_provider_service.load_openai()
@@ -1537,18 +1538,18 @@ class SettingsPage(QWidget):
         openai_form = QFormLayout()
         self.openai_api_key_input = QLineEdit()
         self.openai_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.openai_api_key_input.setPlaceholderText("OPENAI_API_KEY")
+        self.openai_api_key_input.setPlaceholderText(provider_view.openai_placeholder)
         self.openai_api_key_input.setText(str(oa_loaded.get("api_key") or ""))
-        openai_form.addRow("API key", self.openai_api_key_input)
+        openai_form.addRow(provider_view.openai_api_key_label, self.openai_api_key_input)
         openai_layout.addLayout(openai_form)
-        self.use_ai_translation_check = QCheckBox("Usar traduccion IA (ES->EN) en busquedas FDC")
+        self.use_ai_translation_check = QCheckBox(provider_view.openai_ai_translation_label)
         self.use_ai_translation_check.setChecked(bool(oa_loaded.get("use_ai_translation", False)))
         openai_layout.addWidget(self.use_ai_translation_check)
 
         openai_actions = QHBoxLayout()
-        self.openai_save_btn = QPushButton("Guardar")
+        self.openai_save_btn = QPushButton(provider_view.save_button_label)
         self.openai_save_btn.setProperty("btnRole", "success")
-        self.openai_test_btn = QPushButton("Probar conexion")
+        self.openai_test_btn = QPushButton(provider_view.test_button_label)
         self.openai_test_btn.setProperty("btnRole", "secondary")
         self.openai_save_btn.clicked.connect(self._save_openai_settings)
         self.openai_test_btn.clicked.connect(self._test_openai_connection)
@@ -1557,7 +1558,7 @@ class SettingsPage(QWidget):
         openai_actions.addStretch(1)
         openai_layout.addLayout(openai_actions)
 
-        openai_info = QLabel("Las claves se guardan en data/api_config.json (secretos cifrados)")
+        openai_info = QLabel(provider_view.secret_info_label)
         openai_info.setWordWrap(True)
         openai_layout.addWidget(openai_info)
         layout.addWidget(openai_card)
@@ -1568,6 +1569,7 @@ class SettingsPage(QWidget):
     def _build_db_maintenance_tab(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
+        maintenance_view = self.settings_maintenance_ui_service.build_view()
 
         status_card = QFrame()
         status_card.setObjectName("card")
@@ -1585,17 +1587,17 @@ class SettingsPage(QWidget):
         layout.addWidget(status_card)
 
         actions_row = QHBoxLayout()
-        self.refresh_btn = QPushButton("Actualizar estado")
+        self.refresh_btn = QPushButton(maintenance_view.refresh_button_label)
         self.refresh_btn.setProperty("btnRole", "secondary")
-        self.integrity_btn = QPushButton("Comprobar integridad")
+        self.integrity_btn = QPushButton(maintenance_view.integrity_button_label)
         self.integrity_btn.setProperty("btnRole", "warning")
-        self.repair_links_btn = QPushButton("Reparar enlaces Cliente/Contacto")
+        self.repair_links_btn = QPushButton(maintenance_view.repair_links_button_label)
         self.repair_links_btn.setProperty("btnRole", "warning")
-        self.create_missing_clients_btn = QPushButton("Crear clientes faltantes")
+        self.create_missing_clients_btn = QPushButton(maintenance_view.create_missing_clients_button_label)
         self.create_missing_clients_btn.setProperty("btnRole", "danger")
-        self.optimize_btn = QPushButton("Optimizar DB (VACUUM)")
+        self.optimize_btn = QPushButton(maintenance_view.optimize_button_label)
         self.optimize_btn.setProperty("btnRole", "warning")
-        self.backup_btn = QPushButton("Crear backup")
+        self.backup_btn = QPushButton(maintenance_view.backup_button_label)
         self.backup_btn.setProperty("btnRole", "success")
 
         self.refresh_btn.clicked.connect(self._refresh_status)
@@ -1619,7 +1621,7 @@ class SettingsPage(QWidget):
 
         self.log_box = QTextEdit()
         self.log_box.setReadOnly(True)
-        self.log_box.setPlaceholderText("Registro de acciones de mantenimiento...")
+        self.log_box.setPlaceholderText(maintenance_view.log_placeholder)
         layout.addWidget(self.log_box, 1)
         return panel
 
@@ -1652,23 +1654,23 @@ class SettingsPage(QWidget):
         orders_mail_layout = QVBoxLayout(orders_mail_card)
         orders_mail_layout.setContentsMargins(10, 10, 10, 10)
         orders_mail_layout.setSpacing(8)
-        orders_mail_title = QLabel("Configuracion envio pedidos por Outlook")
+        orders_loaded = self.settings_provider_service.load_orders_mail_view()
+        orders_mail_title = QLabel(orders_loaded.title)
         orders_mail_title.setProperty("role", "sectionTitle")
         orders_mail_layout.addWidget(orders_mail_title)
 
-        orders_loaded = self.settings_provider_service.load_orders_mail()
         orders_form = QFormLayout()
         self.orders_mail_destino_input = QLineEdit()
-        self.orders_mail_destino_input.setPlaceholderText("destino@empresa.com")
-        self.orders_mail_destino_input.setText(str(orders_loaded.get("destino_email") or ""))
+        self.orders_mail_destino_input.setPlaceholderText(orders_loaded.destino_placeholder)
+        self.orders_mail_destino_input.setText(orders_loaded.destino_email)
         orders_form.addRow("Email destino fijo", self.orders_mail_destino_input)
 
         self.orders_historico_dir_input = QLineEdit()
-        self.orders_historico_dir_input.setPlaceholderText(r"E:\...\pedidos_historico")
-        self.orders_historico_dir_input.setText(str(orders_loaded.get("historico_dir") or ""))
+        self.orders_historico_dir_input.setPlaceholderText(orders_loaded.historico_placeholder)
+        self.orders_historico_dir_input.setText(orders_loaded.historico_dir)
         historico_row = QHBoxLayout()
         historico_row.addWidget(self.orders_historico_dir_input, 1)
-        self.orders_historico_dir_btn = QPushButton("Examinar")
+        self.orders_historico_dir_btn = QPushButton(orders_loaded.selector_button_label)
         self.orders_historico_dir_btn.setProperty("btnRole", "secondary")
         self.orders_historico_dir_btn.clicked.connect(self._pick_orders_historico_dir)
         historico_row.addWidget(self.orders_historico_dir_btn)
@@ -1678,14 +1680,14 @@ class SettingsPage(QWidget):
         orders_mail_layout.addLayout(orders_form)
 
         orders_actions = QHBoxLayout()
-        self.orders_mail_save_btn = QPushButton("Guardar")
+        self.orders_mail_save_btn = QPushButton(orders_loaded.save_button_label)
         self.orders_mail_save_btn.setProperty("btnRole", "success")
         self.orders_mail_save_btn.clicked.connect(self._save_orders_mail_settings)
         orders_actions.addWidget(self.orders_mail_save_btn)
         orders_actions.addStretch(1)
         orders_mail_layout.addLayout(orders_actions)
 
-        orders_info = QLabel("Estos parametros se guardan en data/api_config.json.")
+        orders_info = QLabel(orders_loaded.info_label)
         orders_info.setWordWrap(True)
         orders_mail_layout.addWidget(orders_info)
         layout.addWidget(orders_mail_card)
@@ -1749,34 +1751,36 @@ class SettingsPage(QWidget):
         }
 
         if section_name == "Pedidos":
+            orders_import_view = self.settings_orders_import_service.build_orders_import_view()
             card_orders = QFrame()
             card_orders.setObjectName("card")
             card_orders_layout = QHBoxLayout(card_orders)
             card_orders_layout.setContentsMargins(10, 10, 10, 10)
             card_orders_layout.setSpacing(8)
-            info_orders = QLabel("Importacion de pedidos (JSON)")
+            info_orders = QLabel(orders_import_view.section_info_label)
             info_orders.setWordWrap(True)
             self.orders_import_almacen_combo = QComboBox()
             self.orders_import_almacen_combo.setMinimumWidth(260)
-            import_orders_btn = QPushButton("Importar pedidos")
+            import_orders_btn = QPushButton(orders_import_view.import_button_label)
             import_orders_btn.setProperty("btnRole", "secondary")
             import_orders_btn.clicked.connect(self._import_orders_json_from_settings)
             card_orders_layout.addWidget(info_orders, 1)
-            card_orders_layout.addWidget(QLabel("Cliente/Distribuidor"))
+            card_orders_layout.addWidget(QLabel(orders_import_view.selector_label))
             card_orders_layout.addWidget(self.orders_import_almacen_combo)
             card_orders_layout.addWidget(import_orders_btn)
             layout.addWidget(card_orders)
             self._load_orders_import_almacen_combo()
 
         elif section_name == "Ventas":
+            sales_import_view = self.settings_sales_import_service.build_import_view()
             card = QFrame()
             card.setObjectName("card")
             card_layout = QHBoxLayout(card)
             card_layout.setContentsMargins(10, 10, 10, 10)
             card_layout.setSpacing(8)
-            info = QLabel("Importacion de ventas IREKS (JSON)")
+            info = QLabel(sales_import_view.section_info_label)
             info.setWordWrap(True)
-            import_btn = QPushButton("Importar IREKS")
+            import_btn = QPushButton(sales_import_view.import_button_label)
             import_btn.setProperty("btnRole", "secondary")
             import_btn.clicked.connect(self._import_ireks_sales_json)
             card_layout.addWidget(info, 1)
@@ -1954,8 +1958,7 @@ class SettingsPage(QWidget):
             self._append_log(f"ERROR crear clientes faltantes: {exc}")
 
     def _backup_db(self) -> None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_path = DATA_DIR / f"gestion_ireks_backup_{timestamp}.db"
+        default_path = self.settings_maintenance_ui_service.build_backup_default_path()
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Guardar backup de base de datos",
@@ -1980,7 +1983,8 @@ class SettingsPage(QWidget):
         if not hasattr(self, "orders_import_almacen_combo"):
             return
         self.orders_import_almacen_combo.clear()
-        for option in self.settings_import_service.warehouse_filter_options():
+        orders_import_view = self.settings_orders_import_service.build_orders_import_view()
+        for option in orders_import_view.warehouse_options:
             self.orders_import_almacen_combo.addItem(option.label, option.value)
 
     def _import_orders_json_from_settings(self) -> None:
@@ -2003,25 +2007,22 @@ class SettingsPage(QWidget):
         QMessageBox.information(self, "Importacion pedidos", "\n".join(outcome.summary_lines))
 
     def _preview_igsa_sales_pdf(self) -> None:
-        file_paths, _ = QFileDialog.getOpenFileNames(
-            self,
-            "Seleccionar PDFs IGSA",
-            "",
-            "PDF (*.pdf)",
-        )
+        preview_view = self.settings_sales_preview_service.build_preview_view()
+        file_paths, _ = QFileDialog.getOpenFileNames(self, preview_view.pdf_title, "", preview_view.pdf_filter)
         if not file_paths:
             return
         try:
             outcome = self.settings_sales_preview_service.preview_igsa_pdf_files([Path(path) for path in file_paths])
         except Exception as exc:
-            QMessageBox.warning(self, "Vista previa PDF IGSA", str(exc))
+            QMessageBox.warning(self, preview_view.pdf_preview_error_title, str(exc))
             return
         self._igsa_pdf_preview_lines = list(outcome.lines)
         self._show_igsa_pdf_preview_dialog(outcome.lines, outcome.errors)
 
     def _show_igsa_pdf_preview_dialog(self, lines: list[object], errors: list[str]) -> None:
+        preview_view = self.settings_sales_preview_service.build_preview_view()
         dialog = QDialog(self)
-        dialog.setWindowTitle("Vista previa temporal - PDF IGSA")
+        dialog.setWindowTitle(preview_view.pdf_preview_title)
         dialog.resize(1080, 760)
         root = QVBoxLayout(dialog)
         info = QLabel(
@@ -2089,11 +2090,11 @@ class SettingsPage(QWidget):
         root.addWidget(table, 1)
         actions = QHBoxLayout()
         actions.addStretch(1)
-        import_btn = QPushButton("Importar datos")
+        import_btn = QPushButton(preview_view.pdf_import_button_label)
         import_btn.setProperty("btnRole", "success")
         import_btn.clicked.connect(lambda: self._import_igsa_sales_pdf_preview(close_dialog=dialog))
         actions.addWidget(import_btn)
-        close_btn = QPushButton("Cerrar")
+        close_btn = QPushButton(preview_view.pdf_close_button_label)
         close_btn.setProperty("btnRole", "secondary")
         close_btn.clicked.connect(dialog.accept)
         actions.addWidget(close_btn)
@@ -2107,7 +2108,8 @@ class SettingsPage(QWidget):
                 lines=lines,
             )
         except Exception as exc:
-            QMessageBox.warning(self, "Importacion PDF IGSA", str(exc))
+            preview_view = self.settings_sales_preview_service.build_preview_view()
+            QMessageBox.warning(self, preview_view.pdf_import_error_title, str(exc))
             return
         if outcome.ok:
             QMessageBox.information(self, outcome.title, outcome.message)
@@ -2119,7 +2121,8 @@ class SettingsPage(QWidget):
             self._append_log(outcome.log_message)
 
     def _import_ireks_sales_json(self) -> None:
-        file_path, _ = QFileDialog.getOpenFileName(self, "Seleccionar JSON IREKS", "", "JSON (*.json)")
+        import_view = self.settings_sales_import_service.build_import_view()
+        file_path, _ = QFileDialog.getOpenFileName(self, import_view.ireks_json_title, "", import_view.ireks_json_filter)
         if not file_path:
             return
         try:
@@ -2134,25 +2137,27 @@ class SettingsPage(QWidget):
         self._append_log(outcome.log_message)
 
     def _preview_igsa_sales_workbook(self) -> None:
+        preview_view = self.settings_sales_preview_service.build_preview_view()
         file_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Seleccionar libro IGSA",
+            preview_view.workbook_title,
             "",
-            "Excel (*.xlsx *.xlsm)",
+            preview_view.workbook_filter,
         )
         if not file_path:
             return
         try:
             outcome = self.settings_sales_preview_service.preview_igsa_workbook(Path(file_path))
         except Exception as exc:
-            QMessageBox.warning(self, "Vista previa IGSA libro", str(exc))
+            QMessageBox.warning(self, preview_view.workbook_preview_error_title, str(exc))
             return
         self._igsa_book_preview_lines = list(outcome.raw_lines)
         self._show_igsa_workbook_preview_dialog(outcome.preview_rows, outcome.errors)
 
     def _show_igsa_workbook_preview_dialog(self, lines: list[dict[str, object]], errors: list[str]) -> None:
+        preview_view = self.settings_sales_preview_service.build_preview_view()
         dialog = QDialog(self)
-        dialog.setWindowTitle("Vista previa - Libro IGSA")
+        dialog.setWindowTitle(preview_view.workbook_preview_title)
         dialog.resize(1180, 760)
         root = QVBoxLayout(dialog)
         info = QLabel(
@@ -2207,11 +2212,11 @@ class SettingsPage(QWidget):
         root.addWidget(table, 1)
         actions = QHBoxLayout()
         actions.addStretch(1)
-        import_btn = QPushButton("Importar datos")
+        import_btn = QPushButton(preview_view.workbook_import_button_label)
         import_btn.setProperty("btnRole", "success")
         import_btn.clicked.connect(lambda: self._import_igsa_sales_workbook_preview(close_dialog=dialog))
         actions.addWidget(import_btn)
-        close_btn = QPushButton("Cerrar")
+        close_btn = QPushButton(preview_view.workbook_close_button_label)
         close_btn.setProperty("btnRole", "secondary")
         close_btn.clicked.connect(dialog.accept)
         actions.addWidget(close_btn)
@@ -2219,8 +2224,9 @@ class SettingsPage(QWidget):
         dialog.exec()
 
     def _show_igsa_book_import_result_dialog(self, text: str) -> bool:
+        preview_view = self.settings_sales_preview_service.build_preview_view()
         dialog = QDialog(self)
-        dialog.setWindowTitle("Importacion IGSA libro")
+        dialog.setWindowTitle(preview_view.workbook_import_result_title)
         dialog.resize(620, 220)
         layout = QVBoxLayout(dialog)
         label = QLabel(text)
@@ -2228,9 +2234,9 @@ class SettingsPage(QWidget):
         layout.addWidget(label, 1)
         actions = QHBoxLayout()
         actions.addStretch(1)
-        reimport_btn = QPushButton("Reimportar")
+        reimport_btn = QPushButton(preview_view.workbook_reimport_button_label)
         reimport_btn.setProperty("btnRole", "warning")
-        close_btn = QPushButton("Cerrar")
+        close_btn = QPushButton(preview_view.workbook_close_button_label)
         close_btn.setProperty("btnRole", "secondary")
         actions.addWidget(reimport_btn)
         actions.addWidget(close_btn)
@@ -2252,7 +2258,8 @@ class SettingsPage(QWidget):
                 force_reimport=force_reimport,
             )
         except Exception as exc:
-            QMessageBox.warning(self, "Importacion IGSA libro", str(exc))
+            preview_view = self.settings_sales_preview_service.build_preview_view()
+            QMessageBox.warning(self, preview_view.workbook_import_error_title, str(exc))
             return
         if outcome.ok:
             wants_reimport = self._show_igsa_book_import_result_dialog(outcome.message)

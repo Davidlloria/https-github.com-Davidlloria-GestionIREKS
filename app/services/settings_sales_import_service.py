@@ -9,6 +9,14 @@ from app.services.sales_reconciliation_service import SalesReconciliationService
 from app.services.settings_import_service import SettingsImportService
 
 
+@dataclass(frozen=True)
+class SettingsSalesImportView:
+    section_info_label: str = "Importacion de ventas IREKS (JSON)"
+    ireks_json_title: str = "Seleccionar JSON IREKS"
+    ireks_json_filter: str = "JSON (*.json)"
+    import_button_label: str = "Importar IREKS"
+
+
 @dataclass
 class SettingsSalesImportOutcome:
     ok: bool
@@ -27,6 +35,9 @@ class SettingsSalesImportService:
     ) -> None:
         self.sales_service = sales_service or SalesReconciliationService()
         self.settings_import_service = settings_import_service or SettingsImportService()
+
+    def build_import_view(self) -> SettingsSalesImportView:
+        return SettingsSalesImportView()
 
     def import_ireks_json(self, source: Path) -> SettingsSalesImportOutcome:
         clean_source = self._validate_source(source, allowed_suffixes={".json"})

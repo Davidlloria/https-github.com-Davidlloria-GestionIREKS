@@ -20,6 +20,41 @@ class SettingsProviderResult:
     path: Path | None = None
 
 
+@dataclass(frozen=True)
+class OrdersMailSettingsView:
+    title: str
+    destino_email: str
+    historico_dir: str
+    destino_placeholder: str = "destino@empresa.com"
+    historico_placeholder: str = r"E:\...\pedidos_historico"
+    selector_button_label: str = "Examinar"
+    save_button_label: str = "Guardar"
+    info_label: str = "Estos parametros se guardan en data/api_config.json."
+
+
+@dataclass(frozen=True)
+class SettingsProviderView:
+    fdc_title: str = "Configuracion API FoodData Central"
+    fatsecret_title: str = "Configuracion API FatSecret"
+    openai_title: str = "Configuracion API OpenAI"
+    secret_info_label: str = "Las claves se guardan en data/api_config.json (secretos cifrados)"
+    save_button_label: str = "Guardar"
+    test_button_label: str = "Probar conexion"
+    fdc_placeholder: str = "Introduce API key de USDA/Data.gov"
+    fdc_api_key_label: str = "API key"
+    fdc_data_type_label: str = "Tipo de datos"
+    fdc_data_type_options: tuple[str, ...] = ("Foundation", "Branded", "Survey (FNDDS)", "SR Legacy")
+    fatsecret_client_id_placeholder: str = "FATSECRET_CLIENT_ID"
+    fatsecret_client_secret_placeholder: str = "FATSECRET_CLIENT_SECRET"
+    fatsecret_scope_placeholder: str = "basic (o: basic barcode)"
+    fatsecret_client_id_label: str = "Client ID"
+    fatsecret_client_secret_label: str = "Client Secret"
+    fatsecret_scope_label: str = "Scope"
+    openai_placeholder: str = "OPENAI_API_KEY"
+    openai_api_key_label: str = "API key"
+    openai_ai_translation_label: str = "Usar traduccion IA (ES->EN) en busquedas FDC"
+
+
 class SettingsProviderService:
     def __init__(
         self,
@@ -55,6 +90,17 @@ class SettingsProviderService:
     def load_orders_mail(self) -> dict[str, Any]:
         data = self.orders_mail_settings.load()
         return dict(data) if isinstance(data, dict) else {}
+
+    def load_orders_mail_view(self) -> OrdersMailSettingsView:
+        data = self.load_orders_mail()
+        return OrdersMailSettingsView(
+            title="Configuracion envio pedidos por Outlook",
+            destino_email=str(data.get("destino_email") or ""),
+            historico_dir=str(data.get("historico_dir") or ""),
+        )
+
+    def build_ui_view(self) -> SettingsProviderView:
+        return SettingsProviderView()
 
     def save_fdc(self, api_key: str, data_type: str) -> SettingsProviderResult:
         path = self.fdc_settings.save(api_key, data_type=data_type)

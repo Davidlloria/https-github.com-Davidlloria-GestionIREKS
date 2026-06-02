@@ -4,6 +4,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.services.settings_import_service import SettingsImportService
+from app.services.order_query_service import WarehouseFilterOption
+
+
+@dataclass(frozen=True)
+class SettingsOrdersImportView:
+    section_info_label: str = "Importacion de pedidos (JSON)"
+    selector_label: str = "Cliente/Distribuidor"
+    import_button_label: str = "Importar pedidos"
+    warehouse_options: list[WarehouseFilterOption] = field(default_factory=list)
 
 
 @dataclass
@@ -20,6 +29,9 @@ class SettingsOrdersImportOutcome:
 class SettingsOrdersImportService:
     def __init__(self, settings_import_service: SettingsImportService | None = None) -> None:
         self.settings_import_service = settings_import_service or SettingsImportService()
+
+    def build_orders_import_view(self) -> SettingsOrdersImportView:
+        return SettingsOrdersImportView(warehouse_options=list(self.settings_import_service.warehouse_filter_options()))
 
     def import_orders_json(self, source: Path, almacen_id: str) -> SettingsOrdersImportOutcome:
         clean_almacen_id = str(almacen_id or "").strip()
@@ -53,4 +65,3 @@ class SettingsOrdersImportService:
             skipped_unknown_count=len(result.skipped_unknown or []),
             skipped_invalid=int(result.skipped_invalid or 0),
         )
-

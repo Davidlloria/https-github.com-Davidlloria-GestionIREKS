@@ -105,6 +105,19 @@ def test_import_services_build_messages_and_logs(tmp_path: Path) -> None:
     ]
 
 
+def test_build_import_view_provides_ireks_dialog_metadata() -> None:
+    service = SettingsSalesImportService(
+        sales_service=_FakeSalesService(),  # type: ignore[arg-type]
+        settings_import_service=_FakeSettingsImportService(),
+    )
+
+    view = service.build_import_view()
+    assert view.section_info_label == "Importacion de ventas IREKS (JSON)"
+    assert view.ireks_json_title == "Seleccionar JSON IREKS"
+    assert view.ireks_json_filter == "JSON (*.json)"
+    assert view.import_button_label == "Importar IREKS"
+
+
 def test_validations_raise_value_error(tmp_path: Path) -> None:
     fake = _FakeSalesService()
     service = SettingsSalesImportService(

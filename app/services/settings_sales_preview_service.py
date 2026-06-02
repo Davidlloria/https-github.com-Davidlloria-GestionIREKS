@@ -7,6 +7,26 @@ from app.services.sales_reconciliation_service import SalesReconciliationService
 from app.services.settings_import_service import SettingsImportService
 
 
+@dataclass(frozen=True)
+class SettingsSalesPreviewView:
+    pdf_title: str = "Seleccionar PDFs IGSA"
+    pdf_filter: str = "PDF (*.pdf)"
+    workbook_title: str = "Seleccionar libro IGSA"
+    workbook_filter: str = "Excel (*.xlsx *.xlsm)"
+    pdf_preview_title: str = "Vista previa temporal - PDF IGSA"
+    pdf_preview_error_title: str = "Vista previa PDF IGSA"
+    pdf_import_button_label: str = "Importar datos"
+    pdf_close_button_label: str = "Cerrar"
+    pdf_import_error_title: str = "Importacion PDF IGSA"
+    workbook_preview_title: str = "Vista previa - Libro IGSA"
+    workbook_preview_error_title: str = "Vista previa IGSA libro"
+    workbook_import_result_title: str = "Importacion IGSA libro"
+    workbook_import_button_label: str = "Importar datos"
+    workbook_reimport_button_label: str = "Reimportar"
+    workbook_close_button_label: str = "Cerrar"
+    workbook_import_error_title: str = "Importacion IGSA libro"
+
+
 @dataclass
 class SettingsSalesPdfPreviewOutcome:
     lines: list[object] = field(default_factory=list)
@@ -28,6 +48,9 @@ class SettingsSalesPreviewService:
     ) -> None:
         self.sales_service = sales_service or SalesReconciliationService()
         self.settings_import_service = settings_import_service or SettingsImportService()
+
+    def build_preview_view(self) -> SettingsSalesPreviewView:
+        return SettingsSalesPreviewView()
 
     def preview_igsa_pdf_files(self, file_paths: list[Path]) -> SettingsSalesPdfPreviewOutcome:
         clean_paths = self._validate_paths(file_paths, allowed_suffixes={".pdf"})
