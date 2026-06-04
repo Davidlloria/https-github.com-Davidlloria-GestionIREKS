@@ -495,6 +495,17 @@ Fase 5 - Reducir dependencia del desktop.
     tests\test_order_export_mail_preparation.py
     tests\test_architecture_boundaries.py -q`;
     `python -m pytest tests -q`.
+- Refactor de edicion de pedido en `OrdersPage`:
+  - extraida la carga del pedido editable y la coordinacion del guardado hacia
+    `app/services/order_edit_flow_service.py`;
+  - `OrdersPage` conserva el `NewPedidoDialog`, los mensajes visibles, el
+    `reload`, la reseleccion y la presentacion de detalles;
+  - se mantiene el mismo comportamiento visible de validacion, guardado y
+    mensajes de error;
+  - archivos afectados: `app/services/order_edit_flow_service.py`,
+    `app/ui/widgets/orders_page.py`, `tests/test_order_edit_flow_service.py`;
+  - tests ejecutados: `python -m pytest tests\test_order_edit_flow_service.py
+    tests\test_architecture_boundaries.py -q`.
 - Refactor de plantilla de inventario en `warehouse_page.py`:
   - extraida la deteccion de columnas y la construccion del mapa de conteos a
     helpers puros reutilizables;

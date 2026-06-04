@@ -54,6 +54,13 @@
   - `app/ui/widgets/orders_page.py` queda centrado en seleccion, confirmacion,
     previsualizacion y mensajes visibles;
   - se mantienen los mismos textos al usuario y el mismo contrato visible.
+- Flujo de edicion de pedido en `OrdersPage` coordinado fuera del widget:
+  - `app/services/order_edit_flow_service.py` concentra la carga del pedido,
+    la resolucion de cantidades por articulo y el guardado de la edicion;
+  - `app/ui/widgets/orders_page.py` conserva el `NewPedidoDialog`, los
+    mensajes visibles, el `reload` y la reseleccion del pedido;
+  - se mantienen los mismos textos visibles y el mismo comportamiento de
+    guardado, validacion y refresco.
 - Flujo de backup de base de datos en configuracion simplificado:
   - `app/services/settings_maintenance_ui_service.py` ahora genera la ruta por
     defecto del backup con una unica funcion reutilizable;

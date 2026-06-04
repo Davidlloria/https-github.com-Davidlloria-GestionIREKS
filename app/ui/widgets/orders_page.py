@@ -54,6 +54,7 @@ from app.models import (
 from app.services.order_document_import_service import OrderDocumentImportService
 from app.services.order_document_parser import OrderDocumentParser
 from app.services.order_export_service import OrderExportService
+from app.services.order_edit_flow_service import OrderEditFlowService
 from app.services.order_mail_flow_service import OrderMailFlowService
 from app.services.orders_documents_import_ui_service import (
     OrdersDocumentImportFlowError,
@@ -1101,6 +1102,10 @@ class OrdersPage(QWidget):
         self.order_mail_flow_service = OrderMailFlowService(order_export_service=self.order_export_service)
         self.order_query_service = OrderQueryService()
         self.order_service = OrderService()
+        self.order_edit_flow_service = OrderEditFlowService(
+            order_query_service=self.order_query_service,
+            order_service=self.order_service,
+        )
         self.orders_documents_import_ui_service = OrdersDocumentsImportUiService(
             order_document_import_service=self.order_document_import_service,
         )
@@ -2464,7 +2469,18 @@ class OrdersPage(QWidget):
             QMessageBox.warning(self, "Pedidos", "Selecciona un pedido para editar.")
             return
         try:
-            pedido, qty_by_articulo = self.order_query_service.get_order_edit_payload(selected.pedido_id)
+            context = self.order_edit_flow_service.build_edit_context(selected.pedido_id)
+            if context.status == "not_found":
+                QMessageBox.warning(self, "Pedidos", f"No se pudo editar.\n{context.message}")
+                return
+            if context.status == "error":
+                QMessageBox.warning(self, "Pedidos", f"No se pudo editar.\n{context.message}")
+                return
+            pedido = context.pedido
+            if pedido is None:
+                QMessageBox.warning(self, "Pedidos", "No se pudo editar.\nPedido no encontrado.")
+                return
+            qty_by_articulo = dict(context.qty_by_articulo)
 
             dialog = NewPedidoDialog(
                 almacen_id=str(pedido.almacen_id or "").strip(),
@@ -2479,20 +2495,26 @@ class OrdersPage(QWidget):
             if not dialog.exec():
                 return
             lines = dialog.selected_lines()
-            if not lines:
-                QMessageBox.warning(self, "Pedidos", "No hay líneas para consignar.")
-                return
             submit_mode = dialog.submit_mode()
             pedido_fecha = dialog.pedido_fecha()
             pedido_numero = dialog.pedido_numero()
 
-            self.order_service.update_order(
-                pedido_id=selected.pedido_id,
-                pedido_fecha=pedido_fecha,
-                pedido_numero=pedido_numero,
-                lines=[OrderLineInput(line.articulo_id, float(line.uds)) for line in lines],
-                submit_mode=submit_mode,
+            result = self.order_edit_flow_service.submit_edit(
+                selected.pedido_id,
+                pedido_fecha,
+                pedido_numero,
+                lines,
+                submit_mode,
             )
+            if result.status == "empty_lines":
+                QMessageBox.warning(self, "Pedidos", "No hay líneas para consignar.")
+                return
+            if result.status == "not_found":
+                QMessageBox.warning(self, "Pedidos", f"No se pudo editar.\n{result.message}")
+                return
+            if result.status == "error":
+                QMessageBox.warning(self, "Pedidos", f"No se pudo editar.\n{result.message}")
+                return
             self.reload()
             self._select_by_id(selected.pedido_id)
             self._show_selected_details()
