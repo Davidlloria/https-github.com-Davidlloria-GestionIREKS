@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 from sqlmodel import Field
 
-from .base import AppSchema
+from .base import AppSchema, PaginatedResponse
 
 
 class OrderLinePayload(AppSchema):
@@ -37,6 +37,10 @@ class OrderListItem(OrderRead):
     total_kg: float = 0.0
 
 
+class OrderListResponse(PaginatedResponse):
+    items: list[OrderListItem] = Field(default_factory=list)
+
+
 class OrderCreate(AppSchema):
     almacen_id: str
     pedido_fecha: date
@@ -60,6 +64,10 @@ class OrderItemRead(AppSchema):
     pedido_item_fecha: date
     articulo_id: str
     articulo_cantidad: float = 0.0
+
+
+class OrderItemListResponse(PaginatedResponse):
+    items: list[OrderItemRead] = Field(default_factory=list)
 
 
 class AlbaranRead(AppSchema):
@@ -129,6 +137,10 @@ class OrderPendingRead(AppSchema):
     fecha_registro: datetime | None = None
 
 
+class OrderPendingListResponse(PaginatedResponse):
+    items: list[OrderPendingRead] = Field(default_factory=list)
+
+
 class OrderJsonImportPayload(AppSchema):
     almacen_id: str
     source_path: str
@@ -167,13 +179,16 @@ __all__ = [
     "OrderDocumentImportPayload",
     "OrderDocumentImportResponse",
     "OrderItemRead",
+    "OrderItemListResponse",
     "OrderItemsImportResponse",
     "OrderJsonImportPayload",
     "OrderJsonImportResponse",
     "OrderLinePayload",
     "OrderLineWrite",
     "OrderListItem",
+    "OrderListResponse",
     "OrderPendingRead",
+    "OrderPendingListResponse",
     "OrderRead",
     "OrderUpdate",
 ]

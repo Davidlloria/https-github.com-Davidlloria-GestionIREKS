@@ -6,10 +6,12 @@ from sqlalchemy import text
 from sqlmodel import Session, select
 
 from app.core.database import engine
+from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
 from app.models import IngredienteStd, MateriaPrimaPrecio, MateriaPrimaValorNutricional, Proveedor
 from app.schemas.ingredients import (
     IngredientActiveUpdate,
     IngredientStdCreate,
+    IngredientStdListResponse,
     IngredientStdRead,
     IngredientStdUpdate,
     MateriaPrimaPrecioRead,
@@ -32,7 +34,9 @@ class IngredientStdService:
         familia_id: str = "",
         subfamilia_id: str = "",
         activity_filter: str = "all",
-    ) -> list[IngredientStdRead]:
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
+    ) -> IngredientStdListResponse:
         with Session(engine) as session:
             rows = self.vm.list(
                 session,
@@ -41,7 +45,12 @@ class IngredientStdService:
                 subfamilia=subfamilia_id,
                 active_filter=activity_filter,
             )
-        return IngredientStdRead.list_from_entities(rows)
+        return IngredientStdListResponse(
+            items=IngredientStdRead.list_from_entities(page_items(rows, limit=limit, offset=offset)),
+            total=len(rows),
+            limit=limit,
+            offset=offset,
+        )
 
     def api_detail_payload(self, articulo_id: str) -> IngredientStdRead | None:
         clean_articulo_id = str(articulo_id or "").strip()
@@ -190,6 +199,47 @@ class IngredientStdService:
             session.delete(row)
             session.commit()
             return True
+
+    def delete_blockers(self, articulo_id: str) -> list[str]:
+        clean_articulo_id = str(articulo_id or "").strip()
+        if not clean_articulo_id:
+            return []
+        with engine.begin() as conn:
+            counts = {
+                "pedidos_items": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM pedidos_items WHERE articulo_id = ?",
+                    (clean_articulo_id,),
+                ).scalar_one(),
+                "albaranes_items": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM albaranes_items WHERE articulo_id = ?",
+                    (clean_articulo_id,),
+                ).scalar_one(),
+                "facturas_items": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM facturas_items WHERE articulo_id = ?",
+                    (clean_articulo_id,),
+                ).scalar_one(),
+                "pedidos_pendientes": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM pedidos_pendientes WHERE articulo_id = ?",
+                    (clean_articulo_id,),
+                ).scalar_one(),
+                "almacen_movimientos": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM almacen_movimientos WHERE articulo_id = ?",
+                    (clean_articulo_id,),
+                ).scalar_one(),
+                "almacen_stock": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM almacen_stock WHERE articulo_id = ?",
+                    (clean_articulo_id,),
+                ).scalar_one(),
+            }
+        labels = {
+            "pedidos_items": "linea(s) de pedido",
+            "albaranes_items": "linea(s) de albaran",
+            "facturas_items": "linea(s) de factura",
+            "pedidos_pendientes": "pendiente(s) de pedido",
+            "almacen_movimientos": "movimiento(s) de almacen",
+            "almacen_stock": "registro(s) de stock",
+        }
+        return [f"{int(count)} {labels[name]}" for name, count in counts.items() if int(count or 0) > 0]
 
     def update_active(self, articulo_id: str, activo: bool) -> None:
         clean_articulo_id = str(articulo_id or "").strip()

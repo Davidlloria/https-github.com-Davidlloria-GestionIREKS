@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from .base import AppSchema
+from sqlmodel import Field
+
+from .base import AppSchema, PaginatedResponse
 
 
 class ContactBase(AppSchema):
@@ -24,6 +26,10 @@ class ContactListItem(ContactBase):
 class ContactDetail(ContactListItem):
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+class ContactListResponse(PaginatedResponse):
+    items: list[ContactListItem] = Field(default_factory=list)
 
 
 class ContactCreate(ContactBase):
@@ -53,5 +59,6 @@ __all__ = [
     "ContactCreate",
     "ContactDetail",
     "ContactListItem",
+    "ContactListResponse",
     "ContactUpdate",
 ]

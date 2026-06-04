@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.api.deps import get_api_settings_service, get_settings_import_service, get_settings_maintenance_service
+from app.api.errors import bad_request, not_found
+from app.api.paths import input_file_path, output_file_path
+from app.api.uploads import upload_to_temp_file_path
 from app.schemas.orders import OrderJsonImportResponse
 from app.schemas.settings import (
     ApiSettingsPayload,
@@ -14,7 +17,11 @@ from app.schemas.settings import (
     MaintenanceStatus,
 )
 from app.schemas.warehouse import WarehouseOption
-from app.services.api_settings_service import ApiSettingsService
+from app.services.api_settings_service import (
+    ApiSettingsService,
+    InvalidSettingsConfigError,
+    UnsupportedSettingsProviderError,
+)
 from app.services.settings_import_service import SettingsImportService
 from app.services.settings_maintenance_service import SettingsMaintenanceService
 
@@ -75,10 +82,8 @@ def backup_database(
     payload: MaintenanceBackupRequest,
     service: SettingsMaintenanceService = Depends(get_settings_maintenance_service),
 ) -> MaintenanceResult:
-    destination_path = str(payload.destination_path or "").strip()
-    if not destination_path:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Indica destination_path.")
-    destination = service.backup_database(Path(destination_path))
+    destination_path = output_file_path(payload.destination_path, field_name="destination_path", allowed_suffixes={".db"})
+    destination = service.backup_database(destination_path)
     return MaintenanceResult(
         ok=True,
         message="Copia de seguridad creada.",
@@ -94,7 +99,7 @@ def get_api_settings(
     try:
         return ApiSettingsPayload.model_validate(service.provider_payload(provider))
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise not_found(exc) from exc
 
 
 @router.put("/api/{provider}", response_model=ApiSettingsPayload)
@@ -105,8 +110,14 @@ def save_api_settings(
 ) -> ApiSettingsPayload:
     try:
         return ApiSettingsPayload.model_validate(service.save_provider(provider, payload.config))
+    except InvalidSettingsConfigError as exc:
+        raise bad_request(exc) from exc
+    except UnsupportedSettingsProviderError as exc:
+        raise not_found(exc) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        if "no soportado" in str(exc).lower():
+            raise not_found(exc) from exc
+        raise bad_request(exc) from exc
 
 
 @router.get("/imports/warehouses", response_model=list[WarehouseOption])
@@ -124,8 +135,25 @@ def import_order_json(
     payload: DocumentImportRequest,
     service: SettingsImportService = Depends(get_settings_import_service),
 ) -> OrderJsonImportResponse:
+    source = input_file_path(payload.file_path, field_name="file_path", allowed_suffixes={".json"})
     try:
-        result = service.import_order_json(Path(payload.file_path), payload.almacen_id)
+        result = service.import_order_json(source, payload.almacen_id)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
+    return OrderJsonImportResponse.model_validate(result, from_attributes=True)
+
+
+@router.post("/imports/orders-json/upload", response_model=OrderJsonImportResponse)
+async def import_order_json_upload(
+    almacen_id: Annotated[str, Form(max_length=120)],
+    file: UploadFile = File(...),
+    service: SettingsImportService = Depends(get_settings_import_service),
+) -> OrderJsonImportResponse:
+    source = await upload_to_temp_file_path(file, field_name="file", allowed_suffixes={".json"})
+    try:
+        result = service.import_order_json(source, almacen_id)
+    except ValueError as exc:
+        raise bad_request(exc) from exc
+    finally:
+        source.unlink(missing_ok=True)
     return OrderJsonImportResponse.model_validate(result, from_attributes=True)

@@ -6,9 +6,8 @@ from datetime import date, datetime
 from pathlib import Path
 import re
 import tempfile
-from typing import Any, cast
+from typing import Any, Callable, cast
 
-from openpyxl import Workbook
 from PySide6.QtCore import QDate, QTimer, Qt
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
@@ -42,7 +41,6 @@ from PySide6.QtWidgets import (
 from app.models import (
     Albaran,
     AlbaranItem,
-    Cliente,
     Factura,
     FacturaItem,
     Fabricante,
@@ -53,10 +51,15 @@ from app.models import (
     PedidoPendiente,
     Subfamilia,
 )
-from app.services.import_service import ImportService
 from app.services.order_document_import_service import OrderDocumentImportService
 from app.services.order_document_parser import OrderDocumentParser
 from app.services.order_export_service import OrderExportService
+from app.services.order_edit_flow_service import OrderEditFlowService
+from app.services.order_mail_flow_service import OrderMailFlowService
+from app.services.orders_documents_import_ui_service import (
+    OrdersDocumentImportFlowError,
+    OrdersDocumentsImportUiService,
+)
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderLineInput, OrderService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
@@ -1094,11 +1097,18 @@ class NewPedidoDialog(QDialog):
 class OrdersPage(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.import_service = ImportService()
         self.order_document_import_service = OrderDocumentImportService()
         self.order_export_service = OrderExportService()
+        self.order_mail_flow_service = OrderMailFlowService(order_export_service=self.order_export_service)
         self.order_query_service = OrderQueryService()
         self.order_service = OrderService()
+        self.order_edit_flow_service = OrderEditFlowService(
+            order_query_service=self.order_query_service,
+            order_service=self.order_service,
+        )
+        self.orders_documents_import_ui_service = OrdersDocumentsImportUiService(
+            order_document_import_service=self.order_document_import_service,
+        )
         self.orders_mail_settings = OrdersMailSettingsService()
         self.rows: list[PedidoListRow] = []
         self._is_loading_details = False
@@ -1631,30 +1641,6 @@ class OrdersPage(QWidget):
             return parsed
         return date.today()
 
-    def _parse_optional_date(self, value) -> date | None:
-        text = str(value or "").strip()
-        if not text:
-            return None
-        return self._try_parse_date(value)
-
-    def _parse_required_date(self, value, field_name: str) -> date:
-        parsed = self._try_parse_date(value)
-        if parsed is None:
-            raise ValueError(f"Formato de fecha invalido en {field_name}: {value}")
-        return parsed
-
-    def _resolve_almacen_id(self, _session: Any, raw_value: str) -> str:
-        return self.order_query_service.resolve_warehouse_id(raw_value)
-
-    def _year_from_date(self, value: date) -> int:
-        return int(value.year)
-
-    def _month_from_date(self, value: date) -> int:
-        return int(value.month)
-
-    def _week_from_date(self, value: date) -> int:
-        return int(value.isocalendar()[1])
-
     def _load_almacen_filter(self, _session: Any | None = None) -> None:
         current = str(self.almacen_filter.currentData() or "")
         options = self.order_query_service.warehouse_filter_options()
@@ -1674,7 +1660,7 @@ class OrdersPage(QWidget):
         default_from = 1
         default_to = 12
 
-        years = sorted({self._year_from_date(self._parse_date(row.pedido_fecha)) for row in pedidos}, reverse=True)
+        years = sorted({int(self._parse_date(row.pedido_fecha).year) for row in pedidos}, reverse=True)
         if default_year not in {str(y) for y in years}:
             years = sorted({*years, int(default_year)}, reverse=True)
         self.year_filter.blockSignals(True)
@@ -1704,9 +1690,6 @@ class OrdersPage(QWidget):
         self.month_to_filter.setCurrentIndex(idx if idx >= 0 else 0)
         self.month_from_filter.blockSignals(False)
         self.month_to_filter.blockSignals(False)
-
-    def _pedido_totals_kg(self, pedido_ids: list[str]) -> dict[str, float]:
-        return self.order_query_service.pedido_totals_kg(pedido_ids)
 
     def _reload_pedido_items_table(self, pedido_id: str | None) -> None:
         self._loading_pedido_items_table = True
@@ -2154,9 +2137,6 @@ class OrdersPage(QWidget):
             return
         self.reload()
 
-    def _repair_albaran_item_mappings(self, session: Any, pedido_id: str, albaran_id: str = "") -> None:
-        self.order_document_import_service.repair_albaran_item_mappings(session, pedido_id, albaran_id)
-
     def _reload_pendientes_table(self, pedido_id: str | None) -> None:
         self.pendientes_table.setRowCount(0)
         if not pedido_id:
@@ -2489,7 +2469,18 @@ class OrdersPage(QWidget):
             QMessageBox.warning(self, "Pedidos", "Selecciona un pedido para editar.")
             return
         try:
-            pedido, qty_by_articulo = self.order_query_service.get_order_edit_payload(selected.pedido_id)
+            context = self.order_edit_flow_service.build_edit_context(selected.pedido_id)
+            if context.status == "not_found":
+                QMessageBox.warning(self, "Pedidos", f"No se pudo editar.\n{context.message}")
+                return
+            if context.status == "error":
+                QMessageBox.warning(self, "Pedidos", f"No se pudo editar.\n{context.message}")
+                return
+            pedido = context.pedido
+            if pedido is None:
+                QMessageBox.warning(self, "Pedidos", "No se pudo editar.\nPedido no encontrado.")
+                return
+            qty_by_articulo = dict(context.qty_by_articulo)
 
             dialog = NewPedidoDialog(
                 almacen_id=str(pedido.almacen_id or "").strip(),
@@ -2504,20 +2495,26 @@ class OrdersPage(QWidget):
             if not dialog.exec():
                 return
             lines = dialog.selected_lines()
-            if not lines:
-                QMessageBox.warning(self, "Pedidos", "No hay líneas para consignar.")
-                return
             submit_mode = dialog.submit_mode()
             pedido_fecha = dialog.pedido_fecha()
             pedido_numero = dialog.pedido_numero()
 
-            self.order_service.update_order(
-                pedido_id=selected.pedido_id,
-                pedido_fecha=pedido_fecha,
-                pedido_numero=pedido_numero,
-                lines=[OrderLineInput(line.articulo_id, float(line.uds)) for line in lines],
-                submit_mode=submit_mode,
+            result = self.order_edit_flow_service.submit_edit(
+                selected.pedido_id,
+                pedido_fecha,
+                pedido_numero,
+                lines,
+                submit_mode,
             )
+            if result.status == "empty_lines":
+                QMessageBox.warning(self, "Pedidos", "No hay líneas para consignar.")
+                return
+            if result.status == "not_found":
+                QMessageBox.warning(self, "Pedidos", f"No se pudo editar.\n{result.message}")
+                return
+            if result.status == "error":
+                QMessageBox.warning(self, "Pedidos", f"No se pudo editar.\n{result.message}")
+                return
             self.reload()
             self._select_by_id(selected.pedido_id)
             self._show_selected_details()
@@ -2533,7 +2530,7 @@ class OrdersPage(QWidget):
 
     def _export_order_to_excel(self, pedido_id: str) -> None:
         try:
-            wb, default_base_name = self._build_order_workbook(pedido_id)
+            wb, default_base_name = self.order_export_service.build_order_workbook(pedido_id)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Pedidos", f"No se pudo preparar la exportación.\n{exc}")
             return
@@ -2572,7 +2569,7 @@ class OrdersPage(QWidget):
         mode_dialog = QMessageBox(self)
         mode_dialog.setIcon(QMessageBox.Icon.Question)
         mode_dialog.setWindowTitle("Enviar pedido")
-        mode_dialog.setText("Selecciona modo de envío para Outlook:")
+        mode_dialog.setText("Selecciona modo de env?o para Outlook:")
         draft_btn = mode_dialog.addButton("Preparar borrador", QMessageBox.ButtonRole.AcceptRole)
         send_btn = mode_dialog.addButton("Enviar directo", QMessageBox.ButtonRole.ActionRole)
         cancel_btn = mode_dialog.addButton(QMessageBox.StandardButton.Cancel)
@@ -2583,54 +2580,36 @@ class OrdersPage(QWidget):
             return
         send_direct = clicked == send_btn
         try:
-            wb, default_base_name = self._build_order_workbook(selected.pedido_id)
-            excel_path = self.order_export_service.save_order_excel_history(selected.pedido_id, wb, default_base_name)
-            preview = self.order_export_service.build_order_mail_preview(
+            preparation = self.order_mail_flow_service.prepare_mail(
                 pedido_id=selected.pedido_id,
                 pedido_numero=selected.pedido_numero,
                 destino_email=destino_email,
             )
+            if preparation.status == "error":
+                QMessageBox.warning(self, "Pedidos", preparation.message)
+                return
+            preview = preparation.preview
             edited = self._show_mail_preview_dialog(
                 to_email=str(preview.get("to_email") or ""),
                 subject=str(preview.get("subject") or ""),
                 body=str(preview.get("body") or ""),
-                attachment_path=excel_path,
+                attachment_path=preparation.attachment_path or Path(),
                 send_direct=send_direct,
             )
-            if edited is None:
+            result = self.order_mail_flow_service.send_prepared_mail(
+                preparation,
+                edited,
+                send_direct=send_direct,
+            )
+            if result.status == "cancelled":
                 return
-            outcome = self.order_export_service.open_outlook_mail_with_attachment(
-                pedido_id=selected.pedido_id,
-                pedido_numero=selected.pedido_numero,
-                attachment_path=excel_path,
-                destino_email=str(edited.get("to_email") or "").strip(),
-                send_direct=send_direct,
-                subject=str(edited.get("subject") or "").strip(),
-                body=str(edited.get("body") or ""),
-            )
-            self.order_export_service.log_order_mail_event(
-                pedido_id=selected.pedido_id,
-                pedido_numero=selected.pedido_numero,
-                destino_email=str(edited.get("to_email") or "").strip(),
-                asunto=str(outcome.get("subject") or "").strip(),
-                adjunto_path=str(excel_path),
-                modo_envio="send" if send_direct else "draft",
-                estado="ENVIADO" if send_direct else "BORRADOR",
-                error_detalle="",
-            )
+            if result.status == "error":
+                QMessageBox.warning(self, "Pedidos", result.message)
+                return
         except Exception as exc:  # noqa: BLE001
-            self.order_export_service.log_order_mail_event(
-                pedido_id=selected.pedido_id,
-                pedido_numero=selected.pedido_numero,
-                destino_email=locals().get("edited", {}).get("to_email", destino_email),
-                asunto="",
-                adjunto_path=str(locals().get("excel_path", "")),
-                modo_envio="send" if locals().get("send_direct", False) else "draft",
-                estado="ERROR",
-                error_detalle=str(exc),
-            )
             QMessageBox.warning(self, "Pedidos", f"No se pudo preparar el email.\n{exc}")
             return
+        excel_path = str(preparation.attachment_path or "")
         if send_direct:
             QMessageBox.information(self, "Pedidos", f"Correo enviado desde Outlook.\nAdjunto: {excel_path}")
         else:
@@ -2642,7 +2621,7 @@ class OrdersPage(QWidget):
             QMessageBox.warning(self, "Pedidos", "Selecciona un pedido para imprimir.")
             return
         try:
-            wb, base_name = self._build_order_workbook(selected.pedido_id)
+            wb, base_name = self.order_export_service.build_order_workbook(selected.pedido_id)
             safe_name = "".join(ch for ch in base_name if ch not in '<>:"/\\|?*').strip() or "pedido"
             tmp_path = Path(tempfile.gettempdir()) / f"{safe_name}.xlsx"
             wb.save(tmp_path)
@@ -2653,47 +2632,6 @@ class OrdersPage(QWidget):
             QMessageBox.information(self, "Pedidos", f"Enviado a impresión.\n{tmp_path}")
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Pedidos", f"No se pudo imprimir.\n{exc}")
-
-    def _cliente_export_code(self, cliente: Cliente | None) -> str:
-        return self.order_export_service.cliente_export_code(cliente)
-
-    def _build_export_base_name(self, pedido_fecha: date, cliente: Cliente | None) -> str:
-        return self.order_export_service.build_export_base_name(pedido_fecha, cliente)
-
-    def _sanitize_filename(self, value: str) -> str:
-        return self.order_export_service.sanitize_filename(value)
-
-    def _pedido_history_dir(self, pedido_fecha: date) -> Path:
-        return self.order_export_service.pedido_history_dir(pedido_fecha)
-
-    def _next_history_version(self, folder: Path, base_name: str) -> int:
-        return self.order_export_service.next_history_version(folder, base_name)
-
-    def _save_order_excel_history(self, pedido_id: str, wb: Workbook, default_base_name: str) -> Path:
-        return self.order_export_service.save_order_excel_history(pedido_id, wb, default_base_name)
-
-    def _open_outlook_mail_with_attachment(
-        self,
-        pedido_id: str,
-        pedido_numero: str,
-        attachment_path: Path,
-        destino_email: str,
-        send_direct: bool,
-        subject: str,
-        body: str,
-    ) -> dict[str, str]:
-        return self.order_export_service.open_outlook_mail_with_attachment(
-            pedido_id=pedido_id,
-            pedido_numero=pedido_numero,
-            attachment_path=attachment_path,
-            destino_email=destino_email,
-            send_direct=send_direct,
-            subject=subject,
-            body=body,
-        )
-
-    def _build_order_mail_preview(self, pedido_id: str, pedido_numero: str, destino_email: str) -> dict[str, str]:
-        return self.order_export_service.build_order_mail_preview(pedido_id, pedido_numero, destino_email)
 
     def _show_mail_preview_dialog(
         self,
@@ -2757,35 +2695,6 @@ class OrdersPage(QWidget):
             "body": body_input.toPlainText(),
         }
 
-    def _log_order_mail_event(
-        self,
-        *,
-        pedido_id: str,
-        pedido_numero: str,
-        destino_email: str,
-        asunto: str,
-        adjunto_path: str,
-        modo_envio: str,
-        estado: str,
-        error_detalle: str,
-    ) -> None:
-        self.order_export_service.log_order_mail_event(
-            pedido_id=pedido_id,
-            pedido_numero=pedido_numero,
-            destino_email=destino_email,
-            asunto=asunto,
-            adjunto_path=adjunto_path,
-            modo_envio=modo_envio,
-            estado=estado,
-            error_detalle=error_detalle,
-        )
-
-    def _build_order_workbook(self, pedido_id: str) -> tuple[Workbook, str]:
-        return self.order_export_service.build_order_workbook(pedido_id)
-
-    def _insert_order_logos(self, ws) -> None:
-        self.order_export_service.insert_order_logos(ws)
-
     def _delete_order(self) -> None:
         row = self._selected_row()
         if row is None:
@@ -2800,129 +2709,9 @@ class OrdersPage(QWidget):
             QMessageBox.warning(self, "Pedidos", f"No se pudo eliminar.\n{exc}")
         self.reload()
 
-    def _import_orders(self) -> None:
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Seleccionar archivo",
-            "",
-            "Archivos JSON (*.json)",
-        )
-        if not file_path:
-            return
-        source = Path(file_path)
-        self._import_orders_from_json(source)
-
-    def _import_orders_from_json(self, source: Path) -> None:
-        almacen_id = str(self.almacen_filter.currentData() or "").strip()
-        if not almacen_id:
-            selected = self._selected_row()
-            almacen_id = str(getattr(selected, "almacen_id", "") or "").strip() if selected else ""
-        if not almacen_id:
-            QMessageBox.warning(
-                self,
-                "Pedidos",
-                "Selecciona un Cliente/Distribuidor en el filtro para importar pedidos JSON.",
-            )
-            return
-
-        try:
-            result = self.order_service.import_order_json(source, almacen_id)
-        except Exception as exc:
-            QMessageBox.warning(self, "Pedidos", str(exc))
-            return
-
-        self.reload()
-        self._select_by_id(result.pedido_id)
-        unknown_unique = sorted(set(result.skipped_unknown))
-        unknown_preview = ", ".join(unknown_unique[:10])
-        unknown_extra = "" if len(unknown_unique) <= 10 else f" ... (+{len(unknown_unique) - 10})"
-        summary = [
-            "Pedido importado: (sin numero)",
-            f"Lineas importadas: {result.imported_items}",
-            f"Lineas con codigo inexistente: {len(result.skipped_unknown)}",
-            f"Lineas invalidas: {result.skipped_invalid}",
-        ]
-        if unknown_unique:
-            summary.append(f"Codigos no encontrados: {unknown_preview}{unknown_extra}")
-        QMessageBox.information(self, "Importacion completada", "\n".join(summary))
-
-    def _show_import_selector(self) -> None:
-        dialog = QMessageBox(self)
-        dialog.setWindowTitle("Importar")
-        dialog.setText("Selecciona que deseas importar.")
-        btn_pedidos = dialog.addButton("Pedidos", QMessageBox.ButtonRole.AcceptRole)
-        btn_items = dialog.addButton("Items", QMessageBox.ButtonRole.ActionRole)
-        dialog.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
-        dialog.exec()
-        clicked = dialog.clickedButton()
-        if clicked == btn_pedidos:
-            self._import_orders()
-            return
-        if clicked == btn_items:
-            self._import_order_items()
-
-    def _items_schema(self) -> list[dict]:
-        return [
-            {"name": "pedido_id", "label": "Pedido_ID"},
-            {"name": "articulo_id", "label": "Articulo_ID"},
-            {"name": "articulo_cantidad", "label": "Articulo_Cantidad"},
-        ]
-
-    def _albaran_items_schema(self) -> list[dict]:
-        return [
-            {"name": "albaran_numero", "label": "Albaran_Numero"},
-            {"name": "albaran_fecha", "label": "Albaran_Fecha"},
-            {"name": "pedido_numero", "label": "Nº Pedido"},
-            {"name": "articulo_codigo", "label": "Codigo articulo"},
-            {"name": "articulo_cantidad", "label": "Articulo_Cantidad"},
-            {"name": "articulo_kilos", "label": "Kilos"},
-            {"name": "articulo_lote", "label": "Articulo_Lote"},
-            {"name": "articulo_caducidad", "label": "Articulo_Caducidad"},
-        ]
-
-    def _factura_items_schema(self) -> list[dict]:
-        return [
-            {"name": "factura_numero", "label": "Factura_Numero"},
-            {"name": "factura_fecha", "label": "Factura_Fecha"},
-            {"name": "albaran_numero", "label": "Albaran_Numero"},
-            {"name": "factura_referencia", "label": "Referencia"},
-            {"name": "articulo_codigo", "label": "Codigo articulo"},
-            {"name": "articulo_descripcion", "label": "Descripcion"},
-            {"name": "articulo_cantidad", "label": "Uds"},
-            {"name": "articulo_envase", "label": "Env"},
-            {"name": "articulo_kilos", "label": "Kg/Lit"},
-            {"name": "articulo_lote", "label": "Articulo_Lote"},
-            {"name": "articulo_caducidad", "label": "Articulo_Caducidad"},
-            {"name": "precio_unitario", "label": "Precio"},
-            {"name": "dto_pct", "label": "Dto"},
-            {"name": "iva_pct", "label": "IVA"},
-            {"name": "total_linea", "label": "Total"},
-        ]
-
-    def _extract_pdf_field(self, text: str, patterns: list[str]) -> str:
-        for pattern in patterns:
-            match = re.search(pattern, text, flags=re.IGNORECASE)
-            if match:
-                return str(match.group(1) or "").strip()
-        return ""
-
-    def _parse_albaran_pdf(self, file_path: Path) -> tuple[dict[str, str], list[dict[str, Any]]]:
-        return OrderDocumentParser.parse_albaran_pdf(file_path)
-
     def _confirm_albaran_preview(self, header: dict[str, str], rows: list[dict[str, Any]]) -> bool:
         dialog = AlbaranPreviewDialog(header=header, items=rows, parent=self)
         return dialog.exec() == QDialog.DialogCode.Accepted
-
-    @staticmethod
-    def _normalize_invoice_number_token(value: str) -> str:
-        return OrderDocumentParser.normalize_invoice_number_token(value)
-
-    @staticmethod
-    def _parse_factura_ocr_article_line(text: str, header: dict[str, str], lote: str, caducidad: str) -> dict[str, Any] | None:
-        return OrderDocumentParser.parse_factura_ocr_article_line(text, header, lote, caducidad)
-
-    def _parse_factura_pdf(self, file_path: Path) -> tuple[dict[str, str], list[dict[str, Any]]]:
-        return OrderDocumentParser.parse_factura_pdf(file_path)
 
     def _confirm_factura_preview(self, header: dict[str, str], rows: list[dict[str, Any]]) -> bool:
         dialog = FacturaPreviewDialog(header=header, items=rows, parent=self)
@@ -2994,13 +2783,6 @@ class OrdersPage(QWidget):
         except Exception:
             return default
 
-    def _parse_decimal_es(self, value, default: float = 0.0) -> float:
-        return OrdersPage._parse_decimal_es_static(value, default)
-
-    @staticmethod
-    def _parse_decimal_es_static(value, default: float = 0.0) -> float:
-        return OrderDocumentParser.parse_decimal_es(value, default)
-
     @staticmethod
     def _format_number_es_static(value: float, decimals: int = 2, suffix: str = "") -> str:
         return OrderDocumentParser.format_number_es(value, decimals, suffix)
@@ -3019,225 +2801,79 @@ class OrdersPage(QWidget):
                 return True
         return False
 
-    def _find_article_by_code(self, session: Any, codigo: str) -> IngredienteIreks | None:
-        return self.order_document_import_service.find_article_by_code(session, codigo)
-
-    def _resolve_factura_price(
-        self,
-        session: Any,
-        article: IngredienteIreks | None,
-        factura_fecha: date,
-        pdf_price: float,
-        *,
-        create_missing: bool = True,
-    ) -> float:
-        return self.order_document_import_service.resolve_factura_price(session, article, factura_fecha, pdf_price)
-
-    def _find_tarifa_price(self, session: Any, articulo_id: str, tarifa_ano: int, formato_kg: float) -> float:
-        return self.order_document_import_service.find_tarifa_price(session, articulo_id, tarifa_ano, formato_kg)
-
-    def _enrich_factura_rows_from_tarifa(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return self.order_document_import_service.enrich_factura_rows_from_tarifa(rows)
-
-    def _infer_factura_price_from_total(self, payload: dict[str, Any], kilos: float, dto: float) -> float:
-        return self.order_document_import_service.infer_factura_price_from_total(payload, kilos, dto)
-
-    @staticmethod
-    def _article_code_candidates(codigo: str) -> list[str]:
-        return OrderDocumentParser.article_code_candidates(codigo)
-
-    def _import_order_items(self) -> None:
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Seleccionar archivo",
-            "",
-            "Archivos de datos (*.xlsx *.xlsm *.csv)",
-        )
-        if not file_path:
-            return
-
-        result = self.order_service.import_order_items_file(Path(file_path))
-        self.reload()
-        if result.errors:
-            preview = "\n".join(result.errors[:8])
-            extra = "" if len(result.errors) <= 8 else f"\n... y {len(result.errors) - 8} errores mas."
-            QMessageBox.warning(
-                self,
-                "Importacion completada con incidencias",
-                f"Registros importados: {result.imported}\nErrores: {len(result.errors)}\n\n{preview}{extra}",
-            )
-            return
-        QMessageBox.information(self, "Importacion completada", f"Items importados: {result.imported}")
-
     def _import_albaran_for_selected_order(self) -> None:
-        row = self._selected_row()
-        if row is None:
-            QMessageBox.warning(self, "Pedidos", "Selecciona un pedido para importar su albaran.")
-            return
-
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Seleccionar albaran",
-            "",
-            "Archivos de datos (*.pdf *.json *.xlsx *.xlsm *.csv)",
+        self._import_document_for_selected_order(
+            dialog_title="Seleccionar albaran",
+            warning_prefix="albaran",
+            preview_loader=lambda source: self.orders_documents_import_ui_service.prepare_albaran_preview(
+                source,
+                parse_pdf=OrderDocumentParser.parse_albaran_pdf,
+            ),
+            importer=lambda pedido_id, header, rows: self.orders_documents_import_ui_service.import_albaran(
+                pedido_id=pedido_id,
+                header=header,
+                rows=rows,
+            ),
+            confirm_preview=self._confirm_albaran_preview,
         )
-        if not file_path:
-            return
-
-        file_path_obj = Path(file_path)
-        aliases = {
-            "albaran_numero": ["numero", "albaran", "numero_albaran", "pedido_albaran_numero"],
-            "albaran_fecha": ["fecha_packing", "fecha", "fecha_albaran", "pedido_fecha", "fecha_pedido"],
-            "pedido_numero": ["nº_pedido", "n_pedido", "numero_pedido", "pedido_numero"],
-            "articulo_codigo": ["codigo_articulo", "articuloid", "id_articulo", "articulo_id", "cod", "codigo"],
-            "articulo_cantidad": [
-                "envases",
-                "cantidad",
-                "uds",
-                "unidades",
-                "qty",
-                "articulo_cantidad",
-            ],
-            "articulo_kilos": ["kilos", "kg"],
-            "articulo_lote": ["lote", "articulo_lote"],
-            "articulo_caducidad": ["caduca", "caducidad", "articulo_caducidad", "fecha_caducidad"],
-        }
-        try:
-            if file_path_obj.suffix.lower() == ".pdf":
-                preview_header, mapped_rows = self._parse_albaran_pdf(file_path_obj)
-            else:
-                mapped_rows = self.import_service.map_rows(
-                    file_path=file_path_obj,
-                    schema=self._albaran_items_schema(),
-                    aliases=aliases,
-                )
-                first = mapped_rows[0] if mapped_rows else {}
-                preview_header = {
-                    "albaran_numero": str(first.get("albaran_numero") or "").strip(),
-                    "albaran_fecha": str(first.get("albaran_fecha") or "").strip(),
-                    "fecha_pedido": "",
-                    "pedido_numero": str(first.get("pedido_numero") or "").strip(),
-                }
-        except Exception as exc:
-            QMessageBox.warning(self, "Pedidos", f"No se pudo leer el albarán: {exc}")
-            return
-
-        if not mapped_rows:
-            QMessageBox.warning(self, "Pedidos", "El archivo no contiene líneas para importar.")
-            return
-        if not self._confirm_albaran_preview(preview_header, mapped_rows):
-            return
-
-        try:
-            result = self.order_document_import_service.import_albaran(row.pedido_id, preview_header, mapped_rows)
-        except Exception as exc:
-            QMessageBox.warning(self, "Pedidos", str(exc))
-            return
-        self.reload()
-        if result.already_imported:
-            QMessageBox.information(self, "Albaran ya importado", result.message)
-            return
-        imported = result.imported
-        errors = result.errors
-        if errors:
-            preview = "\n".join(errors[:8])
-            extra = "" if len(errors) <= 8 else f"\n... y {len(errors) - 8} errores mas."
-            QMessageBox.warning(
-                self,
-                "Importacion completada con incidencias",
-                f"Registros importados: {imported}\nErrores: {len(errors)}\n\n{preview}{extra}",
-            )
-            return
-        QMessageBox.information(self, "Importacion completada", f"Lineas de albaran importadas: {imported}")
 
     def _import_factura_for_selected_order(self) -> None:
+        self._import_document_for_selected_order(
+            dialog_title="Seleccionar factura",
+            warning_prefix="factura",
+            preview_loader=lambda source: self.orders_documents_import_ui_service.prepare_factura_preview(
+                source,
+                parse_pdf=self._read_factura_pdf_with_progress,
+            ),
+            importer=lambda pedido_id, header, rows: self.orders_documents_import_ui_service.import_factura(
+                pedido_id=pedido_id,
+                header=header,
+                rows=rows,
+            ),
+            confirm_preview=self._confirm_factura_preview,
+        )
+
+    def _import_document_for_selected_order(
+        self,
+        *,
+        dialog_title: str,
+        warning_prefix: str,
+        preview_loader: Callable[[Path], OrdersDocumentPreviewData],
+        importer: Callable[[str, dict[str, str], list[dict[str, Any]]], OrdersDocumentImportOutcome],
+        confirm_preview: Callable[[dict[str, str], list[dict[str, Any]]], bool],
+    ) -> None:
         row = self._selected_row()
         if row is None:
-            QMessageBox.warning(self, "Pedidos", "Selecciona un pedido para importar su factura.")
+            QMessageBox.warning(self, "Pedidos", f"Selecciona un pedido para importar su {warning_prefix}.")
             return
 
         file_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Seleccionar factura",
+            dialog_title,
             "",
             "Archivos de datos (*.pdf *.json *.xlsx *.xlsm *.csv)",
         )
         if not file_path:
             return
 
-        file_path_obj = Path(file_path)
-        aliases = {
-            "factura_numero": ["numero", "factura", "numero_factura", "pedido_factura_numero"],
-            "factura_fecha": ["fecha", "fecha_factura", "pedido_fecha", "fecha_pedido"],
-            "albaran_numero": ["albaran", "numero_albaran", "pedido_albaran_numero"],
-            "factura_referencia": ["referencia", "ref"],
-            "articulo_codigo": ["codigo_articulo", "articuloid", "id_articulo", "articulo_id", "cod", "codigo"],
-            "articulo_descripcion": ["descripcion", "nombre", "articulo_descripcion"],
-            "articulo_cantidad": ["uds", "cantidad", "unidades", "qty", "articulo_cantidad"],
-            "articulo_envase": ["env", "envase", "articulo_envase"],
-            "articulo_kilos": ["kilos", "kg", "kg_lit", "articulo_kilos"],
-            "articulo_lote": ["lote", "articulo_lote"],
-            "articulo_caducidad": ["caduca", "caducidad", "articulo_caducidad", "fecha_caducidad"],
-            "precio_unitario": ["precio", "precio_unitario"],
-            "dto_pct": ["dto", "descuento", "descuento_pct"],
-            "iva_pct": ["iva", "iva_pct"],
-            "total_linea": ["total", "importe", "total_linea"],
-        }
         try:
-            if file_path_obj.suffix.lower() == ".pdf":
-                preview_header, mapped_rows = self._read_factura_pdf_with_progress(file_path_obj)
+            outcome = self.orders_documents_import_ui_service.run_import_document_flow(
+                Path(file_path),
+                preview_loader=preview_loader,
+                confirm_preview=confirm_preview,
+                importer=lambda header, rows: importer(row.pedido_id, header, rows),
+            )
+        except OrdersDocumentImportFlowError as exc:
+            if exc.stage == "read":
+                QMessageBox.warning(self, "Pedidos", f"No se pudo leer la {warning_prefix}: {exc}")
             else:
-                mapped_rows = self.import_service.map_rows(
-                    file_path=file_path_obj,
-                    schema=self._factura_items_schema(),
-                    aliases=aliases,
-                )
-                first = mapped_rows[0] if mapped_rows else {}
-                preview_header = {
-                    "factura_numero": str(first.get("factura_numero") or "").strip(),
-                    "factura_fecha": str(first.get("factura_fecha") or "").strip(),
-                    "albaran_numero": str(first.get("albaran_numero") or "").strip(),
-                    "factura_referencia": str(first.get("factura_referencia") or "").strip(),
-                    "total_kilos": "",
-                    "importe_neto": "",
-                    "total_factura": "",
-                }
-        except Exception as exc:
-            QMessageBox.warning(self, "Pedidos", f"No se pudo leer la factura: {exc}")
+                QMessageBox.warning(self, "Pedidos", str(exc))
             return
 
-        if not mapped_rows:
-            QMessageBox.warning(self, "Pedidos", "El archivo no contiene líneas para importar.")
-            return
-        mapped_rows = self.order_document_import_service.enrich_factura_rows_from_tarifa(mapped_rows)
-        if not self._confirm_factura_preview(preview_header, mapped_rows):
-            return
-
-        try:
-            result = self.order_document_import_service.import_factura(row.pedido_id, preview_header, mapped_rows)
-        except Exception as exc:
-            QMessageBox.warning(self, "Pedidos", str(exc))
+        if outcome is None:
             return
         self.reload()
-        if result.already_imported:
-            QMessageBox.information(self, "Factura ya importada", result.message)
+        if outcome.ok:
+            QMessageBox.information(self, outcome.title, outcome.message)
             return
-        imported = result.imported
-        errors = result.errors
-        if errors:
-            preview = "\n".join(errors[:8])
-            extra = "" if len(errors) <= 8 else f"\n... y {len(errors) - 8} errores mas."
-            QMessageBox.warning(
-                self,
-                "Importacion completada con incidencias",
-                f"Registros importados: {imported}\nErrores: {len(errors)}\n\n{preview}{extra}",
-            )
-            return
-        QMessageBox.information(self, "Importacion completada", f"Lineas de factura importadas: {imported}")
-
-    def _rebuild_order_pendientes(self, session: Any, pedido_id: str, albaran_id: str) -> None:
-        self.order_document_import_service.rebuild_order_pendientes(session, pedido_id, albaran_id)
-
-
-
-
+        QMessageBox.warning(self, outcome.title, outcome.message)

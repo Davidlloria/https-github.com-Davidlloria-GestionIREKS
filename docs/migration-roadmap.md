@@ -1,200 +1,306 @@
-# Roadmap de migracion UI / servicios / API
+﻿# Roadmap de migracion UI / servicios / API
 
-## Estado verificado
+## Estado ejecutivo
 
-Revision local: 2026-05-29.
+- Fase actual: Fase 5 - Reducir dependencia del desktop.
+- Objetivo actual: mantener PySide6 estable mientras se extrae la logica que
+  aun vive en widgets grandes y se consolida la paridad en React/FastAPI.
+- Estado general de la migracion: avanzado. La API y React ya cubren lectura y
+  varios flujos de escritura en dominios clave, pero el desktop sigue reteniendo
+  orquestacion pesada, integraciones de archivos y dependencias locales.
+- Proximo foco tecnico: seguir sacando logica residual de `orders_page.py`,
+  `settings_page.py`, `ingredients_page.py` y `warehouse_page.py` hacia capas
+  de servicio o helpers puros.
+- Proximo foco tecnico: reducir dependencia de desktop sobre OCR, dialogos de
+  archivo/impresion y rutas locales del servidor.
+- Proximo foco tecnico: mantener gates y trazabilidad documental; cada avance
+  pequeno debe quedar reflejado en la roadmap y en el historial.
+- Ultimo avance validado: se extraio al servicio la preparacion del adjunto
+  y la orquestacion comun del flujo de correo de pedidos por Outlook.
+- Ultimo avance validado: se extrajo el coordinador no visual de Outlook hacia
+  `app/services/order_mail_flow_service.py`, dejando en `orders_page.py` la
+  seleccion de modo, el preview y los mensajes visibles.
+- Ultimo avance validado: se extrajo la orquestacion comun de importacion
+  documental de pedidos hacia `app/services/orders_documents_import_ui_service.py`,
+  dejando en `orders_page.py` solo la seleccion de archivo, la confirmacion de
+  vista previa y los mensajes de interfaz.
+- Ultimo avance validado: se extrajo el coordinador de flujo IGSA de preview e
+  importacion hacia `app/services/settings_sales_import_flow_ui_service.py`,
+  dejando en `app/ui/widgets/settings_page.py` solo el renderizado de dialogos
+  y los mensajes de interfaz.
+- Ultimo avance validado: se extrajo la orquestacion no visual del flujo
+  FatSecret por texto hacia `app/services/ingredient_fatsecret_nutrition_flow_service.py`,
+  dejando en `app/ui/widgets/ingredients_page.py` la seleccion de modo, los
+  dialogos Qt, los mensajes visibles y la aplicacion final de valores.
+- Ultimo avance validado: se extrajo la rama barcode del flujo FatSecret hacia
+  `app/services/ingredient_fatsecret_nutrition_flow_service.py`, dejando en
+  `app/ui/widgets/ingredients_page.py` la seleccion de codigo de barras, los
+  dialogos Qt, los mensajes visibles y la aplicacion final de valores.
+- Ultimo avance validado: se extrajo la orquestacion no visual del guardado de
+  movimientos manuales de almacen hacia
+  `app/services/warehouse_manual_move_flow_service.py`, dejando en
+  `app/ui/widgets/warehouse_page.py` el dialogo manual, los mensajes visibles y
+  el refresco de pantalla.
+- Ultimo avance validado: se extrajo la orquestacion no visual del flujo
+  ChatGPT nutricion hacia `app/services/ingredient_chatgpt_nutrition_flow_service.py`,
+  dejando en `app/ui/widgets/ingredients_page.py` el dialogo de consulta, los
+  mensajes visibles y la aplicacion final de valores.
+- Cobertura de caracterizacion ampliada: se validan la preparacion del
+  adjunto, la version del historico, el contrato de resultado y el manejo de
+  errores previsibles del flujo Outlook sin depender de la UI PySide6.
+- Cosas que no se deben hacer ahora: no añadir funcionalidad nueva, no crear
+  endpoints nuevos, no crear pantallas React nuevas, no hacer refactors
+  funcionales grandes, no meter nueva logica de negocio en widgets.
 
-- La aplicacion de escritorio sigue entrando por `run.py` y `app/main.py`.
-- `app/api` ya expone una API FastAPI con routers para clientes, contactos,
-  ingredientes, pedidos, almacen y configuracion.
-- `frontend` ya existe con React/Vite y consume la API para vistas de consulta
-  de clientes, ingredientes IREKS y almacen.
-- La base `data/gestion_ireks.db` existe y pasa `PRAGMA integrity_check`.
-- La base contiene datos reales: clientes, contactos, productos IREKS, materias
-  primas, pedidos, movimientos de almacen y datos de cursos.
-- Queda 1 enlace huerfano contacto-cliente detectado por mantenimiento.
-- La suite Python pasa: `46 passed`.
-- El build React pasa: `npm run build`.
-- El lint React no pasa todavia por `react-hooks/set-state-in-effect` en
-  `frontend/src/features/useAsyncResource.ts` y un warning menor en
-  `AppErrorBoundary`.
-- El arbol Git esta muy sucio: hay muchos cambios modificados y muchos ficheros
-  nuevos sin versionar. Esta es la prioridad operativa antes de seguir.
+## Completado en Fase 5
 
-## Arquitectura objetivo
+- Flujo de correo de pedidos por Outlook extraido fuera del widget:
+  - `app/services/order_export_service.py` ahora concentra la preparacion del
+    adjunto del pedido (`prepare_order_mail_attachment`) y la orquestacion del
+    envio/log de Outlook (`send_order_mail`);
+  - `app/services/order_mail_flow_service.py` concentra la coordinacion no
+    visual de preparacion, preview y envio con estados estructurados;
+  - `app/ui/widgets/orders_page.py` queda centrado en seleccion, confirmacion,
+    previsualizacion y mensajes visibles;
+  - se mantienen los mismos textos al usuario y el mismo contrato visible.
+- Flujo de edicion de pedido en `OrdersPage` coordinado fuera del widget:
+  - `app/services/order_edit_flow_service.py` concentra la carga del pedido,
+    la resolucion de cantidades por articulo y el guardado de la edicion;
+  - `app/ui/widgets/orders_page.py` conserva el `NewPedidoDialog`, los
+    mensajes visibles, el `reload` y la reseleccion del pedido;
+  - se mantienen los mismos textos visibles y el mismo comportamiento de
+    guardado, validacion y refresco.
+- Flujo de guardado de movimientos manuales en `warehouse_page.py` coordinado
+  fuera del widget:
+  - `app/services/warehouse_manual_move_flow_service.py` concentra la
+    validacion de payload, el calculo de stock y la coordinacion del guardado;
+  - `app/ui/widgets/warehouse_page.py` conserva `ManualMovementDialog`, los
+    mensajes visibles, la seleccion de movimiento y el refresco de pantalla;
+  - se mantienen los mismos textos visibles, validaciones y comportamiento de
+    guardado manual.
+- Flujo ChatGPT de nutricion en `ingredients_page.py` coordinado fuera del
+  widget:
+  - `app/services/ingredient_chatgpt_nutrition_flow_service.py` concentra la
+    validacion de consulta, la llamada al servicio OpenAI y la normalizacion
+    del resultado;
+  - `app/ui/widgets/ingredients_page.py` conserva `QInputDialog`, los mensajes
+    visibles y `_apply_nutrition_values`;
+  - se mantienen los mismos textos visibles y el mismo comportamiento de
+    aplicacion de valores nutricionales.
+- Flujo de backup de base de datos en configuracion simplificado:
+  - `app/services/settings_maintenance_ui_service.py` ahora genera la ruta por
+    defecto del backup con una unica funcion reutilizable;
+  - `app/ui/widgets/settings_page.py` delega esa construccion y conserva solo
+    el dialogo de guardado, la llamada al servicio y los mensajes visibles;
+  - se mantiene el mismo patron de nombre `gestion_ireks_backup_YYYYMMDD_HHMMSS.db`;
+  - la cabecera de mantenimiento reutiliza la metadata del servicio para
+    botones y placeholder del log.
+- Flujo de configuracion de pedidos Outlook simplificado:
+  - `app/services/settings_provider_service.py` expone `load_orders_mail_view()`
+    para normalizar los valores iniciales del formulario;
+  - `app/ui/widgets/settings_page.py` usa un objeto tipado para rellenar los
+    campos y conserva el guardado en servicio sin cambiar mensajes;
+  - la tarjeta de `Pedidos Outlook` reutiliza ahora la metadata del servicio
+    para textos, placeholders, botones e info visible.
+- Flujo de configuracion API centralizado:
+  - `app/services/settings_provider_service.py` expone `build_ui_view()` para
+    agrupar titulos y textos comunes de FDC, FatSecret y OpenAI;
+  - `app/ui/widgets/settings_page.py` usa esa metadata para construir la
+    tarjeta de configuracion API sin hardcodear literales repetidos;
+  - la tarjeta API reutiliza ahora metadata del servicio para labels, botones,
+    placeholders y opciones del combo FDC.
+- Flujo de importacion de pedidos JSON desde configuracion simplificado:
+  - `app/services/settings_orders_import_service.py` expone
+    `build_orders_import_view()` para concentrar las opciones de almacenes;
+  - `app/ui/widgets/settings_page.py` usa ese objeto de vista para poblar el
+    combo de importacion y mantiene intacto el dialogo de archivo;
+  - el bloque de pedidos JSON reutiliza la metadata del servicio para el texto
+    de la seccion, la etiqueta del selector y el boton de importacion.
+- Flujo de importacion de ventas IREKS simplificado:
+  - `app/services/settings_sales_import_service.py` expone `build_import_view()`
+    para centralizar el titulo y filtro del dialogo de seleccion;
+  - `app/ui/widgets/settings_page.py` usa esa vista para abrir el selector sin
+    hardcodear el texto en la UI;
+  - el bloque de ventas IREKS reutiliza la metadata del servicio para el texto
+    de la seccion y el boton de importacion.
+- Flujo de vista previa IGSA simplificado:
+  - `app/services/settings_sales_preview_service.py` expone `build_preview_view()`
+    para centralizar titulos y filtros de seleccion;
+  - `app/ui/widgets/settings_page.py` usa esa vista para abrir PDFs y libros
+    IGSA sin repetir literales de dialogo;
+  - el dialogo de resultado de importacion de libro IGSA reutiliza ahora la
+    metadata del servicio para titulos y botones;
+  - el preview PDF IGSA reutiliza la metadata del servicio para los botones de
+    importacion y cierre;
+  - los mensajes de error visibles del flujo IGSA reutilizan titulos
+    centralizados en el servicio.
+- Flujo IGSA de previsualizacion e importacion coordinado fuera de UI desktop:
+  - `app/services/settings_sales_import_flow_ui_service.py` concentra la
+    secuencia comun de confirmacion, importacion y reimportacion del workbook;
+  - `app/ui/widgets/settings_page.py` sigue abriendo los dialogos Qt y ahora
+    delega la decision de reimportacion y la secuencia de importacion al
+    coordinador;
+  - se mantiene el mismo comportamiento visible, los mismos mensajes y el
+    mismo parseo/importacion real.
+- Candidatos de nutricion IREKS/STD normalizados fuera del widget:
+  - `app/services/ingredient_nutrition_query_service.py` concentra la
+    normalizacion de queries y la generacion pura de candidatos FDC y
+    FatSecret;
+  - `app/ui/widgets/ingredients_page.py` conserva los dialogos Qt y la
+    aplicacion final de valores, pero ya no construye los candidatos a mano;
+  - se mantienen los mismos mapeos ES/EN, el mismo orden de candidatos y la
+    misma deduplicacion visible.
+- Flujo FDC de nutricion extraido fuera de UI desktop:
+  - `app/services/ingredient_fdc_nutrition_flow_service.py` concentra la
+    orquestacion no visual del flujo FDC y el mapeo de seleccion;
+  - `app/ui/widgets/ingredients_page.py` conserva los dialogos Qt, mensajes y
+    aplicacion final de valores;
+  - se mantienen los mismos textos visibles y el mismo orden de candidatos.
+- Flujo FatSecret de nutricion por texto extraido fuera de UI desktop:
+  - `app/services/ingredient_fatsecret_nutrition_flow_service.py` concentra la
+    orquestacion no visual del flujo FatSecret por texto, la busqueda de
+    alimentos, la seleccion de alimento y la conversion de raciones a valores;
+  - `app/ui/widgets/ingredients_page.py` conserva los dialogos Qt, los mensajes
+    visibles y la aplicacion final de valores;
+  - se mantienen los mismos textos visibles, la misma formula de sal y el
+    mismo formato visible de labels.
+- Caracterizacion ampliada del flujo:
+  - tests de preparacion, versionado del historico, contrato del servicio y
+    errores previsibles de Outlook sin UI PySide6.
 
-```text
-React / FastAPI / desktop UI
-        |
-        v
-app/services        Casos de uso y transacciones
-        |
-        v
-app/viewmodels      Adaptacion legacy mientras se migra
-        |
-        v
-app/repositories    Persistencia SQLModel
-        |
-        v
-app/models          Entidades ORM
-```
+## Deuda tecnica priorizada
 
-## Reglas de arquitectura
+### P1
 
-- No importar `Session`, `select`, `engine` ni `app.core.database` desde
-  `app/ui`.
-- No importar `PySide6` desde `app/services`.
-- No reutilizar widgets ni viewmodels nuevos desde routers FastAPI.
-- Crear metodos de servicio por caso de uso, no por evento visual.
-- Mantener validaciones, normalizacion y transacciones en servicios.
-- Dejar en UI solo formato visual, seleccion de filas, dialogos y mensajes.
-- Toda respuesta API debe salir mediante DTOs de `app/schemas`, no mediante ORM.
-- Cada endpoint de escritura debe tener al menos un test de contrato o de flujo.
+- `app/ui/widgets/orders_page.py`: flujo de pedidos, importaciones, exportacion
+  y envio por Outlook siguen concentrando orquestacion sensible.
+- `app/ui/widgets/settings_page.py`: configuracion, importaciones, preview,
+  mantenimiento y backup siguen mezclando UI con decisiones de proceso.
+- `app/ui/widgets/ingredients_page.py`: pantalla grande con dialogos,
+  exportacion, impresion y logica de edicion que todavia es costosa de mover.
+- `app/services/order_document_parser.py`: OCR, Tesseract y recuperacion por
+  sidecar siguen siendo un punto de riesgo por dependencia de runtime local.
+- Retirada gradual de endpoints legacy por `source_path` / `file_path` tras
+  confirmar adopcion completa de los endpoints upload.
 
-## Bloques completados
+### P2
 
-1. Extraccion de logica de entidades simples a servicios.
-2. Extraccion de pedidos, documentos, almacen, recetas e ingredientes IREKS/STD.
-3. Separacion de operaciones de mantenimiento de base de datos usadas por
-   configuracion.
-4. Limpieza del bridge QML de clientes para que consuma `CustomerService`.
-5. Creacion inicial de contratos DTO en `app/schemas` para clientes, contactos,
-   ingredientes, pedidos, almacen, recetas y configuracion.
-6. Adaptacion de `CustomerService` y `ContactService` con metodos
-   serializables, manteniendo compatibilidad con desktop.
-7. Creacion de `app/api` con FastAPI, dependencias de servicios y routers.
-8. Tests de API con `TestClient` para CRUD basico y contratos de payload.
-9. Routers de consulta y escritura para clientes, contactos, ingredientes,
-   almacen, pedidos y configuracion.
-10. Importacion JSON/PDF de pedidos desde API reutilizando servicios.
-11. Endpoint de ajustes aprobados de inventario.
-12. CRUD completo de productos IREKS/STD en API.
-13. Frontend React/Vite inicial con estructura `api/`, `pages/`,
-   `components/`, `features/` y `types/`.
-14. Pantallas React de consulta para clientes, ingredientes y almacen.
+- `app/ui/widgets/warehouse_page.py`: plantilla de inventario, ajustes y
+  exportaciones siguen teniendo logica de soporte que conviene aislar mas.
+- `app/ui/widgets/customers_page.py`: exportacion/impresion y mantenimiento de
+  cliente siguen acoplados a UI.
+- `app/ui/widgets/courses_page.py`: importacion, exportacion e impresion siguen
+  muy dependientes de Qt.
+- `app/services/sales_reconciliation_service.py`: contiene bastante logica de
+  parseo e importacion y merece extraccion incremental si vuelve a crecer.
 
-## Hoja de ruta
+### P3
 
-### Fase 0 - Estabilizar el punto de partida
+- Limpieza de helpers legacy y wrappers sin uso en widgets ya saneados.
+- Unificar nomenclatura y criterios de validacion en documentacion de API.
+- Consolidar scripts locales de arranque, parada, validacion y backup.
+- Revisar flags o compatibilidad heredada solo cuando ya no aporten valor.
 
-Objetivo: dejar el trabajo actual versionado, reproducible y con comandos de
-validacion claros.
+## Mapa de riesgo actual
 
-- Activar Git para este directorio con `safe.directory`.
-- Revisar `.gitignore` antes de hacer `git add`, especialmente `data/`,
-  `runtime/`, exports, PDFs, configuraciones con claves y bases de datos.
-- Crear una rama de trabajo para la migracion.
-- Separar commits por bloques: backend/API, frontend, datos/assets, tests y
-  documentacion.
-- Actualizar README con comandos para escritorio, API, frontend y tests.
-- Corregir el lint de React hasta que `npm run lint` pase.
-- Mantener como gate minimo:
-  - `python -m pytest tests -q`
-  - `npm run build`
-  - `npm run lint`
-  - `python -c "from app.core.database import run_integrity_check; print(run_integrity_check())"`
+### Archivos mas grandes del codigo propio
 
-Criterio de salida: arbol Git sin cambios accidentales, tests Python verdes,
-build React verde, lint React verde y README actualizado.
+- `app/ui/widgets/ingredients_page.py` - 206.2 KB
+- `app/ui/widgets/recipes_page.py` - 159.9 KB
+- `app/ui/widgets/orders_page.py` - 135.9 KB
+- `app/ui/widgets/warehouse_page.py` - 129.5 KB
+- `app/ui/widgets/settings_page.py` - 103.3 KB
+- `app/ui/widgets/customers_page.py` - 90.6 KB
+- `app/services/sales_reconciliation_service.py` - 90.7 KB
+- `app/ui/widgets/courses_page.py` - 61.9 KB
+- `app/ui/widgets/sales_page.py` - 50.6 KB
 
-### Fase 1 - Sanear datos y mantenimiento
+### Widgets PySide6 con logica aun sensible
 
-Objetivo: que la base real pueda mantenerse desde desktop y API sin acciones
-manuales peligrosas.
+- `app/ui/widgets/orders_page.py`: importacion de pedidos y documentos,
+  resumenes, exportacion y envio por Outlook.
+- `app/ui/widgets/settings_page.py`: preview de importaciones, backup,
+  mantenimiento, configuracion de proveedores y flujos con rutas locales.
+- `app/ui/widgets/ingredients_page.py`: edicion, importacion, impresion,
+  exportacion y dialogos de soporte dentro de una unica pantalla muy grande.
+- `app/ui/widgets/recipes_page.py`: normalizacion de datos, versionado,
+  galerias de imagenes y helpers de carga/guardado.
+- `app/ui/widgets/warehouse_page.py`: plantillas de inventario, conteos,
+  exportaciones y apoyo a catalogos.
+- `app/ui/widgets/customers_page.py`: exportacion, impresion e importacion de
+  clientes siguen viviendo en la capa de UI.
+- `app/ui/widgets/courses_page.py`: importacion, exportacion e impresion
+  mantienen bastante logica de escritorio.
 
-- Hacer backup antes de cualquier reparacion.
-- Resolver el enlace huerfano contacto-cliente mediante mantenimiento.
-- Revisar si `data/*.json` contiene secretos antes de versionar o compartir.
-- Decidir que datos son fixtures, que datos son runtime local y que datos deben
-  quedar fuera de Git.
-- Documentar el flujo de backup, integridad, reparacion y optimizacion.
+### Acceso directo a base de datos desde UI
 
-Criterio de salida: integridad `ok`, `orphan_contact_links = 0`, backup probado
-y politica clara de versionado para `data/`.
+- No se detectaron imports directos de `Session`, `select`, `engine` ni
+  `app.core.database` desde `app/ui/widgets` en el barrido actual.
+- Esto es una buena señal: el riesgo hoy esta mas en orquestacion y en
+  dependencias desktop que en acceso directo a la base desde la UI.
 
-### Fase 2 - Endurecer API
+### Dependencias desktop dificiles de migrar
 
-Objetivo: convertir FastAPI en una superficie estable para React sin romper la
-app de escritorio.
+- Outlook: `app/ui/widgets/orders_page.py` y `app/services/order_export_service.py`
+  siguen dependiendo de la integracion de correo de escritorio.
+- OCR / Tesseract: `app/services/order_document_parser.py` configura y usa
+  `pytesseract`, rutas locales y fallback de runtime.
+- Dialogos Qt: `QFileDialog`, `QInputDialog`, `QPrintDialog` y `QPrinter`
+  siguen presentes en `orders_page.py`, `customers_page.py`, `ingredients_page.py`,
+  `courses_page.py`, `settings_page.py`, `warehouse_page.py` y otras vistas.
+- Rutas locales del servidor: los flujos legacy con `source_path`, `file_path`
+  y `destination_path` todavia existen para compatibilidad temporal.
+- Dependencias de archivos y previsualizacion local: Excel, PDF, JSON y
+  sidecars siguen siendo parte del flujo real en varios widgets.
 
-- Revisar todos los routers para devolver errores HTTP coherentes.
-- Completar tests de endpoints criticos de escritura y borrado.
-- Asegurar que los routers no importan UI ni acceden a base de datos directa.
-- Alinear nombres de campos entre DTOs, servicios y frontend.
-- Preparar script o instruccion oficial para levantar API:
-  `python -m uvicorn app.api.main:app --reload --host 127.0.0.1 --port 8000`.
-- Valorar paginacion o limites en listados grandes antes de cargar mas pantallas
-  React.
+### Areas con paridad razonable en React/FastAPI
 
-Criterio de salida: contratos API estables, tests de escritura suficientes y
-documentacion de arranque de API.
+- Clientes: listado, detalle, CRUD, activacion y contactos asociados.
+- Contactos: listado, detalle, CRUD y filtro por empresa.
+- Ingredientes: IREKS/STD, nutricion, tarifas, alta, edicion y borrado.
+- Pedidos: listado, detalle, lineas, pendientes, CRUD, importacion y borrado.
+- Almacen: stock, movimientos, historico, ajustes y exportaciones basicas.
+- Configuracion: estado de base, integridad, backups, importaciones y ajustes de API.
+- API: validaciones, errores `400/404/409`, paginacion en listados grandes y
+  contratos de escritura ya bastante estabilizados.
 
-### Fase 3 - Completar React de solo lectura
+## Siguiente refactor recomendado
 
-Objetivo: cubrir las consultas principales en navegador sin tocar aun flujos de
-edicion complejos.
+- Objetivo concreto: extraer la orquestacion de reportes e impresion en
+  `ingredients_page.py` para dejar el widget como fachada de dialogo y salida
+  visual.
+- Archivos a tocar: `app/ui/widgets/ingredients_page.py`, un nuevo servicio o
+  coordinador pequeno para reportes/impresion y un test pequeno de
+  caracterizacion del flujo.
+- Motivo: ChatGPT ya quedo completo; el siguiente borde de alto retorno en
+  `ingredients_page.py` es reportes/impresion, que sigue siendo mas costoso que
+  un simple dialogo de consulta.
+- Riesgo: medio. Es un cambio de coordinacion y mensajes, con varias rutas de
+  exportacion pero sin tocar el calculo nutricional ni la edicion de recetas.
+- Tests que deben ejecutarse: `tests/test_architecture_boundaries.py` y los
+  nuevos tests del coordinador de reportes/impresion cuando se creen.
+- Validacion manual esperada: abrir `Ingredientes` y comprobar que los
+  reportes y la impresion siguen ofreciendo el mismo dialogo y la misma
+  salida visual.
 
-- Clientes: listado, busqueda, detalle y contactos asociados.
-- Contactos: listado, detalle y filtro por empresa.
-- Ingredientes: IREKS, STD, nutricion, tarifas y referencias de distribuidor.
-- Almacen: stock, movimientos, historico de inventarios y exportacion.
-- Pedidos: listado, detalle, lineas, pendientes, albaranes y facturas.
-- Configuracion: estado de base, integridad, proveedores API y utilidades de
-  importacion.
+## Proximos pasos
 
-Criterio de salida: React cubre los mismos listados prioritarios que desktop,
-sin edicion, con estados de carga, error y vacio consistentes.
-
-### Fase 4 - Migrar escrituras a React
-
-Objetivo: empezar a operar desde React con flujos pequenos, reversibles y bien
-probados.
-
-- Empezar por acciones de bajo riesgo: activar/desactivar, filtros guardados,
-  tarifas, movimientos manuales y ajustes con confirmacion.
-- Despues migrar CRUD de clientes/contactos.
-- Despues migrar CRUD de ingredientes IREKS/STD.
-- Finalmente migrar pedidos, importaciones PDF/JSON e inventarios.
-- Cada pantalla de escritura debe tener validacion frontend, validacion backend,
-  feedback de error y test de API.
-
-Criterio de salida: cada flujo migrado puede usarse en React sin depender de la
-pantalla equivalente de escritorio.
-
-### Fase 5 - Reducir dependencia del desktop
-
-Objetivo: dejar PySide6 como cliente legacy o administrativo mientras React
-asume los flujos principales.
-
-- Mantener desktop estable mientras React alcanza paridad funcional.
-- Evitar nuevas reglas de negocio en widgets PySide6.
-- Extraer logica residual de widgets grandes hacia servicios.
-- Revisar `USE_QML_CUSTOMERS` y decidir si QML queda como experimento, bridge
-  temporal o se elimina.
-- Priorizar refactors solo cuando desbloqueen migracion o reduzcan riesgo real.
-
-Criterio de salida: nuevas funcionalidades se implementan en servicios/API y
-React, no en widgets de escritorio.
-
-### Fase 6 - Preparacion de entrega
-
-Objetivo: preparar una forma reproducible de instalar, ejecutar y actualizar la
-aplicacion.
-
-- Definir instalacion Python y Node.
-- Definir si Tesseract empaquetado en `runtime/` se versiona, se descarga o se
-  documenta como requisito.
-- Preparar backup automatico antes de migraciones destructivas.
-- Documentar variables/configuraciones locales.
-- Crear checklist de release: tests, build, lint, integridad DB, backup, smoke
-  test API y smoke test UI.
-
-Criterio de salida: otra maquina puede clonar, instalar, arrancar API/frontend
-y validar la base siguiendo README.
+1. Tomar este roadmap como referencia operativa unica para la migracion.
+2. Atacar el siguiente bloque pequeno de labels de estado de mantenimiento en
+   `ingredients_page.py` reportes/impresion sin introducir comportamiento
+   nuevo.
+3. Mantener el historial detallado en `docs/migration-history.md`.
+4. Seguir cerrando deuda tecnica solo cuando reduzca riesgo o desbloquee la
+   migracion.
+5. Actualizar este documento despues de cada bloque pequeno validado.
 
 ## Comandos de validacion
 
 PowerShell, desde la raiz del proyecto:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-gates.ps1
+```
 
 ```powershell
 New-Item -ItemType Directory -Force .pytest_tmp
@@ -214,17 +320,3 @@ npm run lint
 npm run build
 ```
 
-## Git
-
-Si se sigue desarrollando, Git debe quedar activado antes de tocar mas codigo.
-El objetivo no es solo guardar cambios, sino poder aislar regresiones, revisar
-diferencias y volver a un punto conocido sin depender de copias manuales.
-
-Primeras acciones recomendadas:
-
-1. Marcar el directorio como seguro para Git.
-2. Revisar `.gitignore` y decidir que hacer con `data/`, `runtime/`, exports y
-   configuraciones locales.
-3. Crear una rama de migracion.
-4. Hacer commits pequenos por area.
-5. No commitear claves, bases reales ni exports sensibles.

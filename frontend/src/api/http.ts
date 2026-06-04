@@ -24,3 +24,66 @@ export async function apiGet<T>(path: string, params?: Record<string, string | n
   }
   return (await response.json()) as T
 }
+
+export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || `Error HTTP ${response.status}`)
+  }
+  return (await response.json()) as T
+}
+
+export async function apiPostForm<T>(path: string, body: FormData): Promise<T> {
+  const response = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+    body,
+  })
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || `Error HTTP ${response.status}`)
+  }
+  return (await response.json()) as T
+}
+
+export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(buildUrl(path), {
+    method: 'PATCH',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || `Error HTTP ${response.status}`)
+  }
+  return (await response.json()) as T
+}
+
+export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(buildUrl(path), {
+    method: 'PUT',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || `Error HTTP ${response.status}`)
+  }
+  return (await response.json()) as T
+}
+
+export async function apiDelete(path: string): Promise<void> {
+  const response = await fetch(buildUrl(path), {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+  })
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || `Error HTTP ${response.status}`)
+  }
+}

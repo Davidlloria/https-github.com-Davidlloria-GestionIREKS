@@ -36,6 +36,9 @@ una arquitectura con servicios reutilizables, API FastAPI y frontend React.
 Desde la raiz del proyecto:
 
 ```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
@@ -43,14 +46,24 @@ Para el frontend:
 
 ```powershell
 cd frontend
-npm install
+npm ci
 ```
+
+La guia completa de entorno local, variables y runtime esta en
+`docs/local-environment.md`.
 
 ## Ejecucion
 
 Aplicacion de escritorio:
 
 ```powershell
+python run.py
+```
+
+Para activar experimentalmente la pagina de clientes en QML:
+
+```powershell
+$env:USE_QML_CUSTOMERS="1"
 python run.py
 ```
 
@@ -69,7 +82,73 @@ npm run dev
 
 Por defecto el frontend consume la API en `http://127.0.0.1:8000`.
 
+Arranque conjunto en dos ventanas de PowerShell, desde la raiz del proyecto:
+
+```powershell
+.\scripts\start-dev.ps1
+```
+
+Si necesitas autorecarga de API durante desarrollo:
+
+```powershell
+.\scripts\start-dev.ps1 -Reload
+```
+
+Detener API y frontend lanzados por el script:
+
+```powershell
+.\scripts\stop-dev.ps1
+```
+
+Arranque rapido en Windows con doble clic:
+
+```powershell
+run-desktop.bat
+start-dev.bat
+stop-dev.bat
+```
+
+Backup de base de datos con nombre automatico (recomendado antes de tareas
+destructivas o mantenimientos):
+
+```powershell
+.\scripts\backup-db.ps1
+```
+
+Backup con etiqueta de contexto:
+
+```powershell
+.\scripts\backup-db.ps1 -Tag "pre-mantenimiento"
+```
+
+Si PowerShell bloquea scripts por politica de ejecucion, usar:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-dev.ps1 -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backup-db.ps1
+```
+
 ## Validacion
+
+Chequeo rapido de prerequisitos locales (Python/Node/npm y OCR opcional):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-env.ps1
+```
+
+Si la entrega requiere OCR (albaranes/facturas), forzar validacion de Tesseract:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-env.ps1 -RequireTesseract
+```
+
+Gate completo recomendado (incluye tests Python, reglas de arquitectura,
+integridad de base de datos, lint y build frontend):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-gates.ps1
+```
 
 Tests Python desde la raiz del proyecto:
 
@@ -101,6 +180,21 @@ Healthcheck de API:
 python -c "from fastapi.testclient import TestClient; from app.api.main import app; c=TestClient(app); print(c.get('/health').status_code, c.get('/health').json())"
 ```
 
+Reglas de arquitectura (incluidas en `pytest tests -q`):
+
+```powershell
+python -m pytest tests/test_architecture_boundaries.py -q
+```
+
+Checklist de release (operativa de entrega):
+
+- `docs/release-checklist.md`
+
+Entorno local y runtime:
+
+- `docs/local-environment.md`
+- `scripts/check-local-env.ps1`
+
 ## Estado actual
 
 - Desktop PySide6 operativo como cliente principal legacy.
@@ -117,6 +211,25 @@ python -c "from fastapi.testclient import TestClient; from app.api.main import a
 locales. Revisar siempre antes de versionar o compartir. No commitear claves,
 tokens, bases reales ni documentos sensibles.
 
+Los overrides `.env` de la raiz y `frontend/.env` quedan ignorados por Git. Hay
+plantillas sin secretos en `.env.example` y `frontend/.env.example`.
+
+Tesseract se trata como runtime local: no se versionan sus binarios. Puede
+usarse una instalacion del sistema, `TESSERACT_CMD` o una copia portable en
+`runtime/tesseract/Tesseract-OCR/`.
+
+Los endpoints API que reciben `source_path`, `file_path` o `destination_path`
+usan rutas del sistema de archivos del servidor, no del navegador. Actualmente
+solo se aceptan importaciones `.json` y `.pdf`, y backups `.db`; los archivos de
+entrada deben existir y el destino de backup no puede ser un directorio.
+
+Ademas, para pedidos/configuracion existen endpoints multipart de subida:
+`/orders/import/json/upload`,
+`/orders/{order_id}/import/albaran-pdf/upload`,
+`/orders/{order_id}/import/factura-pdf/upload` y
+`/settings/imports/orders-json/upload`.
+La UI React usa estos endpoints upload por defecto.
+
 ## Git
 
 Si Git marca el repositorio como propiedad dudosa en Windows, ejecutar:
@@ -125,8 +238,9 @@ Si Git marca el repositorio como propiedad dudosa en Windows, ejecutar:
 git config --global --add safe.directory E:/IREKS/APP/GestionIREKS
 ```
 
-Usar una rama de trabajo para la migracion:
+El flujo actual es trabajar en ramas cortas desde `main` sincronizada, subirlas
+a GitHub y abrir Pull Request. La rama activa de endurecimiento API es:
 
 ```powershell
-git switch -c migration-ui-api-react
+git switch api-hardening
 ```

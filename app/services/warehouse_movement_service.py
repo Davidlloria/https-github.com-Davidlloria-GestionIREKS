@@ -15,6 +15,10 @@ def _col(expr: object) -> Any:
     return cast(Any, expr)
 
 
+class WarehouseStockConflictError(ValueError):
+    """Raised when a movement conflicts with current warehouse stock."""
+
+
 class WarehouseMovementService:
     def expiration_payload(self, almacen_id: str = "") -> tuple[list[AlmacenMovimiento], list[IngredienteIreks]]:
         with Session(engine) as session:
@@ -167,7 +171,7 @@ class WarehouseMovementService:
             if existing is not None:
                 stock -= float(getattr(existing, "cantidad", 0.0) or 0.0)
             if stock + cantidad_signed < -0.0001:
-                raise ValueError("La salida manual dejaria stock negativo para ese producto/lote.")
+                raise WarehouseStockConflictError("La salida manual dejaria stock negativo para ese producto/lote.")
         with Session(engine) as session:
             if existing is None:
                 row = AlmacenMovimiento(

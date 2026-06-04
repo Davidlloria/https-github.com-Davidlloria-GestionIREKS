@@ -1,24 +1,274 @@
-import { useMemo, useState } from 'react'
-import { listCustomers } from '../api/customers'
+import { useCallback, useMemo, useState } from 'react'
+import { listContacts } from '../api/contacts'
+import {
+  createCustomer,
+  deleteCustomer,
+  getCustomerDetail,
+  listCustomers,
+  updateCustomer,
+  updateCustomerActive,
+} from '../api/customers'
 import { QueryState } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
 import { useAsyncResource } from '../features/useAsyncResource'
+import type { ContactListItem, CustomerDetail } from '../types/api'
+
+type CustomerFormMode = 'new' | 'edit'
+
+interface CustomerFormState {
+  cliente_id: string
+  cliente_nombre_comercial: string
+  cliente_nombre_fiscal: string
+  cliente_cif: string
+  cliente_email: string
+  cliente_telefono: string
+  cliente_tipo: string
+  cliente_grupo: string
+  cliente_prospeccion: boolean
+  activo: boolean
+}
+
+const EMPTY_CUSTOMER_FORM: CustomerFormState = {
+  cliente_id: '',
+  cliente_nombre_comercial: '',
+  cliente_nombre_fiscal: '',
+  cliente_cif: '',
+  cliente_email: '',
+  cliente_telefono: '',
+  cliente_tipo: '',
+  cliente_grupo: '',
+  cliente_prospeccion: false,
+  activo: true,
+}
+
+const PAGE_SIZE = 50
+
+function formFromDetail(detail: CustomerDetail): CustomerFormState {
+  return {
+    cliente_id: detail.cliente_id || '',
+    cliente_nombre_comercial: detail.cliente_nombre_comercial || '',
+    cliente_nombre_fiscal: detail.cliente_nombre_fiscal || '',
+    cliente_cif: detail.cliente_cif || '',
+    cliente_email: detail.cliente_email || '',
+    cliente_telefono: detail.cliente_telefono || '',
+    cliente_tipo: detail.cliente_tipo || '',
+    cliente_grupo: detail.cliente_grupo || '',
+    cliente_prospeccion: Boolean(detail.cliente_prospeccion),
+    activo: Boolean(detail.activo),
+  }
+}
 
 export function CustomersPage() {
   const [search, setSearch] = useState('')
+  const [pageIndex, setPageIndex] = useState(0)
+  const [selectedCandidateId, setSelectedCandidateId] = useState('')
+  const [customerActiveLoading, setCustomerActiveLoading] = useState(false)
+  const [customerActiveMessage, setCustomerActiveMessage] = useState('')
+  const [customerActiveError, setCustomerActiveError] = useState('')
+  const [customerDeleteLoading, setCustomerDeleteLoading] = useState(false)
+  const [customerDeleteMessage, setCustomerDeleteMessage] = useState('')
+  const [customerDeleteError, setCustomerDeleteError] = useState('')
+  const [customerFormMode, setCustomerFormMode] = useState<CustomerFormMode>('edit')
+  const [customerForm, setCustomerForm] = useState<CustomerFormState>(EMPTY_CUSTOMER_FORM)
+  const [customerSaveLoading, setCustomerSaveLoading] = useState(false)
+  const [customerSaveMessage, setCustomerSaveMessage] = useState('')
+  const [customerSaveError, setCustomerSaveError] = useState('')
 
-  const query = useAsyncResource(() => listCustomers(search), [], [search])
+  const offset = pageIndex * PAGE_SIZE
+  const query = useAsyncResource(
+    () => listCustomers(search, PAGE_SIZE, offset),
+    { items: [], total: 0, limit: PAGE_SIZE, offset: 0 },
+    [search, offset],
+  )
+  const contactsQuery = useAsyncResource(
+    () => listContacts('', '', 5000, 0),
+    { items: [], total: 0, limit: 5000, offset: 0 },
+    [],
+  )
+  const customerRows = query.data.items
+
+  const selectedCustomerId = useMemo(() => {
+    if (!customerRows.length) {
+      return ''
+    }
+    if (selectedCandidateId && customerRows.some((row) => row.cliente_id === selectedCandidateId)) {
+      return selectedCandidateId
+    }
+    return customerRows[0].cliente_id
+  }, [customerRows, selectedCandidateId])
+
+  const fetchDetail = useCallback(() => {
+    if (!selectedCustomerId) {
+      return Promise.resolve(null as CustomerDetail | null)
+    }
+    return getCustomerDetail(selectedCustomerId)
+  }, [selectedCustomerId])
+
+  const detailQuery = useAsyncResource(fetchDetail, null as CustomerDetail | null, [fetchDetail, selectedCustomerId])
 
   const totals = useMemo(() => {
-    const active = query.data.filter((row) => row.activo).length
-    const prospects = query.data.filter((row) => row.cliente_prospeccion).length
+    const active = customerRows.filter((row) => row.activo).length
+    const prospects = customerRows.filter((row) => row.cliente_prospeccion).length
+    const withEmail = customerRows.filter((row) => !!row.cliente_email).length
     return {
-      total: query.data.length,
+      total: query.data.total,
       active,
       prospects,
-      inactive: query.data.length - active,
+      withEmail,
     }
-  }, [query.data])
+  }, [customerRows, query.data.total])
+
+  const customerContacts = useMemo(() => {
+    if (!selectedCustomerId) {
+      return [] as ContactListItem[]
+    }
+    return contactsQuery.data.items
+      .filter((row) => row.cliente_id === selectedCustomerId)
+      .sort((a, b) => `${a.apellidos} ${a.nombre}`.localeCompare(`${b.apellidos} ${b.nombre}`))
+  }, [contactsQuery.data.items, selectedCustomerId])
+
+  const hasPreviousPage = pageIndex > 0
+  const hasNextPage = offset + customerRows.length < query.data.total
+  const currentPage = pageIndex + 1
+  const totalPages = Math.max(1, Math.ceil(query.data.total / PAGE_SIZE))
+
+  const effectiveCustomerForm = useMemo(() => {
+    if (customerFormMode === 'new') {
+      return customerForm
+    }
+    if (detailQuery.data) {
+      return formFromDetail(detailQuery.data)
+    }
+    return customerForm
+  }, [customerForm, customerFormMode, detailQuery.data])
+
+  const toggleCustomerActive = async () => {
+    if (!detailQuery.data || customerActiveLoading) {
+      return
+    }
+    setCustomerActiveLoading(true)
+    setCustomerActiveError('')
+    setCustomerActiveMessage('')
+    const nextActive = !detailQuery.data.activo
+    try {
+      await updateCustomerActive(detailQuery.data.cliente_id, nextActive)
+      await Promise.all([query.reload(), detailQuery.reload()])
+      setCustomerActiveMessage(nextActive ? 'Cliente activado.' : 'Cliente desactivado.')
+    } catch (error: unknown) {
+      setCustomerActiveError(error instanceof Error ? error.message : 'No se pudo actualizar el estado del cliente.')
+    } finally {
+      setCustomerActiveLoading(false)
+    }
+  }
+
+  const deleteSelectedCustomer = async () => {
+    if (!detailQuery.data || customerDeleteLoading) {
+      return
+    }
+    const confirmed = window.confirm(
+      `Se eliminara el cliente ${detailQuery.data.cliente_nombre_comercial || detailQuery.data.cliente_id}. Esta accion no se puede deshacer.`,
+    )
+    if (!confirmed) {
+      return
+    }
+    setCustomerDeleteLoading(true)
+    setCustomerDeleteError('')
+    setCustomerDeleteMessage('')
+    try {
+      await deleteCustomer(detailQuery.data.cliente_id)
+      setSelectedCandidateId('')
+      await Promise.all([query.reload(), contactsQuery.reload()])
+      setCustomerDeleteMessage('Cliente eliminado correctamente.')
+    } catch (error: unknown) {
+      setCustomerDeleteError(error instanceof Error ? error.message : 'No se pudo eliminar el cliente.')
+    } finally {
+      setCustomerDeleteLoading(false)
+    }
+  }
+
+  const beginCreateCustomer = () => {
+    setCustomerFormMode('new')
+    setCustomerForm(EMPTY_CUSTOMER_FORM)
+    setCustomerSaveMessage('')
+    setCustomerSaveError('')
+  }
+
+  const beginEditCustomer = () => {
+    if (!detailQuery.data) {
+      return
+    }
+    setCustomerFormMode('edit')
+    setCustomerForm(formFromDetail(detailQuery.data))
+    setCustomerSaveMessage('')
+    setCustomerSaveError('')
+  }
+
+  const onCustomerFieldChange = <K extends keyof CustomerFormState>(field: K, value: CustomerFormState[K]) => {
+    setCustomerForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const saveCustomerForm = async () => {
+    if (customerSaveLoading) {
+      return
+    }
+    const payload = {
+      cliente_id: effectiveCustomerForm.cliente_id.trim(),
+      cliente_nombre_comercial: effectiveCustomerForm.cliente_nombre_comercial.trim(),
+      cliente_nombre_fiscal: effectiveCustomerForm.cliente_nombre_fiscal.trim(),
+      cliente_cif: effectiveCustomerForm.cliente_cif.trim(),
+      cliente_email: effectiveCustomerForm.cliente_email.trim(),
+      cliente_telefono: effectiveCustomerForm.cliente_telefono.trim(),
+      cliente_tipo: effectiveCustomerForm.cliente_tipo.trim(),
+      cliente_grupo: effectiveCustomerForm.cliente_grupo.trim(),
+      cliente_prospeccion: Boolean(effectiveCustomerForm.cliente_prospeccion),
+      activo: Boolean(effectiveCustomerForm.activo),
+    }
+    if (!payload.cliente_nombre_comercial) {
+      setCustomerSaveError('El nombre comercial es obligatorio.')
+      setCustomerSaveMessage('')
+      return
+    }
+    if (customerFormMode === 'edit' && !selectedCustomerId) {
+      setCustomerSaveError('No hay cliente seleccionado para editar.')
+      setCustomerSaveMessage('')
+      return
+    }
+
+    setCustomerSaveLoading(true)
+    setCustomerSaveError('')
+    setCustomerSaveMessage('')
+    try {
+      if (customerFormMode === 'new') {
+        const created = await createCustomer({
+          ...payload,
+          cliente_id: payload.cliente_id || undefined,
+        })
+        setSelectedCandidateId(created.cliente_id)
+        setCustomerFormMode('edit')
+        setCustomerForm(formFromDetail(created))
+        setCustomerSaveMessage('Cliente creado correctamente.')
+      } else {
+        const updated = await updateCustomer(selectedCustomerId, {
+          cliente_nombre_comercial: payload.cliente_nombre_comercial,
+          cliente_nombre_fiscal: payload.cliente_nombre_fiscal,
+          cliente_cif: payload.cliente_cif,
+          cliente_email: payload.cliente_email,
+          cliente_telefono: payload.cliente_telefono,
+          cliente_tipo: payload.cliente_tipo,
+          cliente_grupo: payload.cliente_grupo,
+          cliente_prospeccion: payload.cliente_prospeccion,
+          activo: payload.activo,
+        })
+        setCustomerForm(formFromDetail(updated))
+        setCustomerSaveMessage('Cliente actualizado correctamente.')
+      }
+      await Promise.all([query.reload(), detailQuery.reload()])
+    } catch (error: unknown) {
+      setCustomerSaveError(error instanceof Error ? error.message : 'No se pudo guardar el cliente.')
+    } finally {
+      setCustomerSaveLoading(false)
+    }
+  }
 
   return (
     <section className="page-grid">
@@ -26,55 +276,311 @@ export function CustomersPage() {
         <input
           className="input"
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            setSearch(event.target.value)
+            setPageIndex(0)
+          }}
           placeholder="Buscar cliente por nombre, telefono, email o CIF"
         />
+        <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
+          Anterior
+        </button>
+        <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
+          Siguiente
+        </button>
+        <span className="state">
+          Pagina {currentPage} de {totalPages}
+        </span>
       </div>
 
       <div className="cards">
         <StatCard label="Total clientes" value={totals.total} />
         <StatCard label="Activos" value={totals.active} />
         <StatCard label="Prospeccion" value={totals.prospects} />
-        <StatCard label="Inactivos" value={totals.inactive} />
+        <StatCard label="Con email" value={totals.withEmail} />
       </div>
 
       <QueryState
         loading={query.loading}
         error={query.error}
-        empty={!query.data.length}
+        empty={!customerRows.length}
         emptyMessage="No hay clientes para los filtros actuales."
       />
 
-      {!!query.data.length && (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Codigo</th>
-                <th>Nombre comercial</th>
-                <th>Tipo</th>
-                <th>Email</th>
-                <th>Telefono</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {query.data.map((customer) => (
-                <tr key={customer.cliente_id}>
-                  <td>{customer.cliente_codigo}</td>
-                  <td>{customer.cliente_nombre_comercial || '(sin nombre)'}</td>
-                  <td>{customer.cliente_tipo || '-'}</td>
-                  <td>{customer.cliente_email || '-'}</td>
-                  <td>{customer.cliente_telefono || '-'}</td>
-                  <td>
-                    <span className={`pill ${customer.activo ? 'ok' : 'off'}`}>
-                      {customer.activo ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
+      {!!customerRows.length && (
+        <div className="split-panel">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Codigo</th>
+                  <th>Nombre comercial</th>
+                  <th>Tipo</th>
+                  <th>Email</th>
+                  <th>Telefono</th>
+                  <th>Estado</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {customerRows.map((customer) => (
+                  <tr
+                    key={customer.cliente_id}
+                    className={customer.cliente_id === selectedCustomerId ? 'row-selected' : ''}
+                    onClick={() => setSelectedCandidateId(customer.cliente_id)}
+                  >
+                    <td>{customer.cliente_codigo}</td>
+                    <td>{customer.cliente_nombre_comercial || '(sin nombre)'}</td>
+                    <td>{customer.cliente_tipo || '-'}</td>
+                    <td>{customer.cliente_email || '-'}</td>
+                    <td>{customer.cliente_telefono || '-'}</td>
+                    <td>
+                      <span className={`pill ${customer.activo ? 'ok' : 'off'}`}>
+                        {customer.activo ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <aside className="detail-panel">
+            {!selectedCustomerId && <div className="state">Selecciona un cliente para ver el detalle.</div>}
+            {!!selectedCustomerId && (
+              <>
+                <QueryState
+                  loading={detailQuery.loading}
+                  error={detailQuery.error}
+                  empty={!detailQuery.data}
+                  emptyMessage="No se encontro detalle para el cliente seleccionado."
+                />
+
+                {!!detailQuery.data && (
+                  <>
+                    <dl className="detail-list">
+                      <div>
+                        <dt>Cliente ID</dt>
+                        <dd>{detailQuery.data.cliente_id}</dd>
+                      </div>
+                      <div>
+                        <dt>Nombre fiscal</dt>
+                        <dd>{detailQuery.data.cliente_nombre_fiscal || '-'}</dd>
+                      </div>
+                      <div>
+                        <dt>CIF</dt>
+                        <dd>{detailQuery.data.cliente_cif || '-'}</dd>
+                      </div>
+                      <div>
+                        <dt>Grupo</dt>
+                        <dd>{detailQuery.data.cliente_grupo || '-'}</dd>
+                      </div>
+                      <div>
+                        <dt>Direccion</dt>
+                        <dd>{detailQuery.data.cliente_direccion || '-'}</dd>
+                      </div>
+                      <div>
+                        <dt>Codigo postal</dt>
+                        <dd>{detailQuery.data.cliente_direccion_cp || '-'}</dd>
+                      </div>
+                    </dl>
+
+                    <div className="related-block">
+                      <button
+                        type="button"
+                        className="action-btn"
+                        disabled={customerActiveLoading || customerDeleteLoading}
+                        onClick={toggleCustomerActive}
+                      >
+                        {customerActiveLoading
+                          ? 'Guardando...'
+                          : detailQuery.data.activo
+                            ? 'Desactivar cliente'
+                            : 'Activar cliente'}
+                      </button>
+                      {!!customerActiveMessage && <div className="state">{customerActiveMessage}</div>}
+                      {!!customerActiveError && <div className="state">Error: {customerActiveError}</div>}
+                    </div>
+
+                    <div className="related-block">
+                      <button
+                        type="button"
+                        className="action-btn"
+                        disabled={customerDeleteLoading || customerActiveLoading}
+                        onClick={deleteSelectedCustomer}
+                      >
+                        {customerDeleteLoading ? 'Eliminando...' : 'Eliminar cliente'}
+                      </button>
+                      {!!customerDeleteMessage && <div className="state">{customerDeleteMessage}</div>}
+                      {!!customerDeleteError && <div className="state">Error: {customerDeleteError}</div>}
+                    </div>
+
+                    <div className="related-block">
+                      <h3>{customerFormMode === 'new' ? 'Nuevo cliente' : 'Editar cliente'}</h3>
+                      <div className="toolbar">
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={beginCreateCustomer}
+                          disabled={customerSaveLoading}
+                        >
+                          Nuevo
+                        </button>
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={beginEditCustomer}
+                          disabled={customerSaveLoading || !detailQuery.data}
+                        >
+                          Editar seleccionado
+                        </button>
+                      </div>
+                      <div className="form-grid">
+                        <label>
+                          Cliente ID (solo alta)
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_id}
+                            onChange={(event) => onCustomerFieldChange('cliente_id', event.target.value)}
+                            disabled={customerSaveLoading || customerFormMode !== 'new'}
+                          />
+                        </label>
+                        <label>
+                          Nombre comercial
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_nombre_comercial}
+                            onChange={(event) => onCustomerFieldChange('cliente_nombre_comercial', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          Nombre fiscal
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_nombre_fiscal}
+                            onChange={(event) => onCustomerFieldChange('cliente_nombre_fiscal', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          CIF
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_cif}
+                            onChange={(event) => onCustomerFieldChange('cliente_cif', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          Email
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_email}
+                            onChange={(event) => onCustomerFieldChange('cliente_email', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          Telefono
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_telefono}
+                            onChange={(event) => onCustomerFieldChange('cliente_telefono', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          Tipo
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_tipo}
+                            onChange={(event) => onCustomerFieldChange('cliente_tipo', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          Grupo
+                          <input
+                            className="input"
+                            value={effectiveCustomerForm.cliente_grupo}
+                            onChange={(event) => onCustomerFieldChange('cliente_grupo', event.target.value)}
+                            disabled={customerSaveLoading}
+                          />
+                        </label>
+                        <label>
+                          Prospeccion
+                          <select
+                            className="select"
+                            value={effectiveCustomerForm.cliente_prospeccion ? 'si' : 'no'}
+                            onChange={(event) =>
+                              onCustomerFieldChange('cliente_prospeccion', event.target.value === 'si')
+                            }
+                            disabled={customerSaveLoading}
+                          >
+                            <option value="no">No</option>
+                            <option value="si">Si</option>
+                          </select>
+                        </label>
+                        <label>
+                          Activo
+                          <select
+                            className="select"
+                            value={effectiveCustomerForm.activo ? 'si' : 'no'}
+                            onChange={(event) => onCustomerFieldChange('activo', event.target.value === 'si')}
+                            disabled={customerSaveLoading}
+                          >
+                            <option value="si">Si</option>
+                            <option value="no">No</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div className="toolbar">
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={saveCustomerForm}
+                          disabled={customerSaveLoading}
+                        >
+                          {customerSaveLoading ? 'Guardando...' : 'Guardar cliente'}
+                        </button>
+                      </div>
+                      {!!customerSaveMessage && <div className="state">{customerSaveMessage}</div>}
+                      {!!customerSaveError && <div className="state">Error: {customerSaveError}</div>}
+                    </div>
+
+                    <div className="related-block">
+                      <h3>Contactos asociados</h3>
+                      {!customerContacts.length && <div className="state">No hay contactos asociados.</div>}
+                      {!!customerContacts.length && (
+                        <div className="table-wrap">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th>Nombre</th>
+                                <th>Cargo</th>
+                                <th>Email</th>
+                                <th>Telefono</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {customerContacts.map((contact) => (
+                                <tr key={contact.contacto_id}>
+                                  <td>{`${contact.nombre || ''} ${contact.apellidos || ''}`.trim() || '-'}</td>
+                                  <td>{contact.cargo || '-'}</td>
+                                  <td>{contact.email || '-'}</td>
+                                  <td>{contact.telefono || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </aside>
         </div>
       )}
     </section>

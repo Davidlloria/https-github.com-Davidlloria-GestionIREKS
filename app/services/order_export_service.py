@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 import re
@@ -16,6 +17,12 @@ from app.core.config import BASE_DIR, PEDIDOS_EMAIL_DESTINO, PEDIDOS_HISTORICO_D
 from app.core.database import engine
 from app.models import Cliente, IngredienteIreks, Pedido, PedidoItem
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
+
+@dataclass(frozen=True)
+class OrderMailPreparation:
+    attachment_path: Path
+    preview: dict[str, str]
+
 
 LEGAL_TEXT_PEDIDOS = (
     "PROTECCIÓN DE DATOS\n"
@@ -264,6 +271,57 @@ class OrderExportService:
             "Saludos"
         )
         return {"to_email": destino_email, "subject": subject, "body": body}
+
+    def prepare_order_mail_attachment(self, pedido_id: str, pedido_numero: str, destino_email: str) -> OrderMailPreparation:
+        wb, default_base_name = self.build_order_workbook(pedido_id)
+        attachment_path = self.save_order_excel_history(pedido_id, wb, default_base_name)
+        preview = self.build_order_mail_preview(pedido_id, pedido_numero, destino_email)
+        return OrderMailPreparation(attachment_path=attachment_path, preview=preview)
+
+    def send_order_mail(
+        self,
+        *,
+        pedido_id: str,
+        pedido_numero: str,
+        attachment_path: Path,
+        destino_email: str,
+        send_direct: bool,
+        subject: str,
+        body: str,
+    ) -> dict[str, str]:
+        try:
+            outcome = self.open_outlook_mail_with_attachment(
+                pedido_id=pedido_id,
+                pedido_numero=pedido_numero,
+                attachment_path=attachment_path,
+                destino_email=destino_email,
+                send_direct=send_direct,
+                subject=subject,
+                body=body,
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.log_order_mail_event(
+                pedido_id=pedido_id,
+                pedido_numero=pedido_numero,
+                destino_email=destino_email,
+                asunto="",
+                adjunto_path=str(attachment_path),
+                modo_envio="send" if send_direct else "draft",
+                estado="ERROR",
+                error_detalle=str(exc),
+            )
+            raise
+        self.log_order_mail_event(
+            pedido_id=pedido_id,
+            pedido_numero=pedido_numero,
+            destino_email=destino_email,
+            asunto=str(outcome.get("subject") or "").strip(),
+            adjunto_path=str(attachment_path),
+            modo_envio="send" if send_direct else "draft",
+            estado="ENVIADO" if send_direct else "BORRADOR",
+            error_detalle="",
+        )
+        return outcome
 
     def open_outlook_mail_with_attachment(
         self,

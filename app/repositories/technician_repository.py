@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import String, cast
 from sqlmodel import Session, col, or_, select
@@ -42,7 +42,7 @@ class TechnicianRepository:
         return entity
 
     def update(self, session: Session, entity: Tecnico) -> Tecnico:
-        entity.updated_at = datetime.utcnow()
+        entity.updated_at = datetime.now(UTC)
         session.add(entity)
         session.commit()
         session.refresh(entity)

@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlmodel import Session, select
 
 from app.core.database import engine
+from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
 from app.models import CodigoPostal, Cliente, Contacto, Isla, Localidad, Municipio, Provincia, Receta
 from app.schemas.customers import (
     AddressOption,
@@ -13,6 +14,7 @@ from app.schemas.customers import (
     CustomerCreate,
     CustomerDetail,
     CustomerListItem,
+    CustomerListResponse,
     CustomerUpdate,
 )
 from app.services.import_service import ImportService
@@ -93,8 +95,21 @@ class CustomerService:
         with Session(engine) as session:
             return self.vm.list(session, term)
 
-    def list_payload(self, term: str = "") -> list[CustomerListItem]:
-        return CustomerListItem.list_from_entities(self.list(term))
+    def list_payload(
+        self,
+        term: str = "",
+        *,
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
+    ) -> CustomerListResponse:
+        rows = self.list(term)
+        page_rows = page_items(rows, limit=limit, offset=offset)
+        return CustomerListResponse(
+            items=CustomerListItem.list_from_entities(page_rows),
+            total=len(rows),
+            limit=limit,
+            offset=offset,
+        )
 
     def detail_payload(self, customer_id: str) -> CustomerDetail | None:
         with Session(engine) as session:

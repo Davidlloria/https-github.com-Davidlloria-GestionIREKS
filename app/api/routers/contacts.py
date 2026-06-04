@@ -1,27 +1,35 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_contact_service
+from app.api.errors import bad_request, conflict, integrity_is_foreign_key, not_found
+from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.schemas.contacts import (
     ContactCompanyOption,
     ContactCreate,
     ContactDetail,
-    ContactListItem,
+    ContactListResponse,
     ContactUpdate,
 )
-from app.services.contact_service import ContactService
+from app.services.contact_service import ContactPayloadError, ContactService
 
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
 
 
-@router.get("", response_model=list[ContactListItem])
+@router.get("", response_model=ContactListResponse)
 def list_contacts(
-    q: str = "",
+    q: Annotated[str, Query(max_length=120)] = "",
+    cliente_id: Annotated[str, Query(max_length=64)] = "",
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: ContactService = Depends(get_contact_service),
-) -> list[ContactListItem]:
-    return service.list_payload(q)
+) -> ContactListResponse:
+    return service.list_payload(q, company_id=cliente_id, limit=limit, offset=offset)
 
 
 @router.get("/companies", response_model=list[ContactCompanyOption])
@@ -38,7 +46,7 @@ def get_contact(
 ) -> ContactDetail:
     payload = service.detail_payload(contact_id)
     if payload is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contacto no encontrado.")
+        raise not_found("Contacto no encontrado.")
     return payload
 
 
@@ -49,8 +57,14 @@ def create_contact(
 ) -> ContactDetail:
     try:
         return service.create_from_payload(payload)
+    except ContactPayloadError as exc:
+        raise bad_request(exc) from exc
+    except IntegrityError as exc:
+        if integrity_is_foreign_key(exc):
+            raise bad_request("El cliente indicado no existe o no es valido.") from exc
+        raise conflict("No se puede crear el contacto porque ya existe o entra en conflicto con datos unicos.") from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
 
 
 @router.patch("/{contact_id}", response_model=ContactDetail)
@@ -61,8 +75,14 @@ def update_contact(
 ) -> ContactDetail:
     try:
         return service.update_from_payload(contact_id, payload)
+    except ContactPayloadError as exc:
+        raise bad_request(exc) from exc
+    except IntegrityError as exc:
+        if integrity_is_foreign_key(exc):
+            raise bad_request("El cliente indicado no existe o no es valido.") from exc
+        raise conflict("No se puede actualizar el contacto porque entra en conflicto con datos unicos.") from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise not_found(exc) from exc
 
 
 @router.delete("/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -70,6 +90,13 @@ def delete_contact(
     contact_id: str,
     service: ContactService = Depends(get_contact_service),
 ) -> Response:
-    if not service.delete(contact_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contacto no encontrado.")
+    blockers = service.delete_blockers(contact_id)
+    if blockers:
+        raise conflict(f"No se puede eliminar el contacto porque tiene dependencias: {', '.join(blockers)}.")
+    try:
+        deleted = service.delete(contact_id)
+    except IntegrityError as exc:
+        raise conflict("No se puede eliminar el contacto porque tiene dependencias.") from exc
+    if not deleted:
+        raise not_found("Contacto no encontrado.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

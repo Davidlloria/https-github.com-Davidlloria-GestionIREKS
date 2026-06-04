@@ -4,7 +4,7 @@ from datetime import date
 
 from sqlmodel import Field
 
-from .base import AppSchema
+from .base import AppSchema, PaginatedResponse
 
 
 class CatalogOption(AppSchema):
@@ -97,8 +97,8 @@ class IngredientIreksCatalogsPayload(AppSchema):
     envases: list[CatalogOption] = Field(default_factory=list)
 
 
-class IngredientIreksListPayload(AppSchema):
-    rows: list[IngredientIreksRead] = Field(default_factory=list)
+class IngredientIreksListPayload(PaginatedResponse):
+    items: list[IngredientIreksRead] = Field(default_factory=list)
     catalogs: IngredientIreksCatalogsPayload = Field(default_factory=IngredientIreksCatalogsPayload)
 
 
@@ -152,6 +152,10 @@ class IngredientStdRead(IngredientStdBase):
     distribuidor_nombre: str = ""
 
 
+class IngredientStdListResponse(PaginatedResponse):
+    items: list[IngredientStdRead] = Field(default_factory=list)
+
+
 class IngredientStdCreate(IngredientStdBase):
     articulo_id: str | None = None
 
@@ -190,6 +194,7 @@ __all__ = [
     "IngredientIreksUpdate",
     "IngredientStdBase",
     "IngredientStdCreate",
+    "IngredientStdListResponse",
     "IngredientStdRead",
     "IngredientStdUpdate",
     "IngredientActiveUpdate",

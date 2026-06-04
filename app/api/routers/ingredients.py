@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from typing import Annotated, Literal
+
+from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_ingredient_ireks_service, get_ingredient_std_service
+from app.api.errors import bad_request, conflict, not_found
+from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.schemas.ingredients import (
     IngredientActiveUpdate,
     IngredientIreksCreate,
@@ -10,6 +15,7 @@ from app.schemas.ingredients import (
     IngredientIreksRead,
     IngredientIreksUpdate,
     IngredientStdCreate,
+    IngredientStdListResponse,
     IngredientStdRead,
     IngredientStdUpdate,
     MateriaPrimaPrecioRead,
@@ -23,16 +29,19 @@ from app.services.ingredient_std_service import IngredientStdService
 
 
 router = APIRouter(prefix="/ingredients", tags=["ingredients"])
+ActivityFilter = Literal["all", "active", "inactive"]
 
 
 @router.get("/ireks", response_model=IngredientIreksListPayload)
 def list_ireks_ingredients(
-    q: str = "",
-    familia_id: str = "",
-    subfamilia_id: str = "",
-    fabricante_id: str = "",
-    activity_filter: str = "all",
-    distributor_filter_id: str = "",
+    q: Annotated[str, Query(max_length=120)] = "",
+    familia_id: Annotated[str, Query(max_length=120)] = "",
+    subfamilia_id: Annotated[str, Query(max_length=120)] = "",
+    fabricante_id: Annotated[str, Query(max_length=120)] = "",
+    activity_filter: Annotated[ActivityFilter, Query()] = "all",
+    distributor_filter_id: Annotated[str, Query(max_length=120)] = "",
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: IngredientIreksService = Depends(get_ingredient_ireks_service),
 ) -> IngredientIreksListPayload:
     return service.api_list_payload(
@@ -42,6 +51,8 @@ def list_ireks_ingredients(
         fabricante_id=fabricante_id,
         activity_filter=activity_filter,
         distributor_filter_id=distributor_filter_id,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -53,7 +64,7 @@ def create_ireks_ingredient(
     try:
         return service.create_from_payload(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
 
 
 @router.get("/ireks/{row_id}", response_model=IngredientIreksRead)
@@ -63,7 +74,7 @@ def get_ireks_ingredient(
 ) -> IngredientIreksRead:
     payload = service.api_detail_payload(row_id)
     if payload is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingrediente IREKS no encontrado.")
+        raise not_found("Ingrediente IREKS no encontrado.")
     return payload
 
 
@@ -75,7 +86,7 @@ def update_ireks_ingredient(
 ) -> IngredientIreksRead:
     result = service.update_from_payload(row_id, payload)
     if result is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingrediente IREKS no encontrado.")
+        raise not_found("Ingrediente IREKS no encontrado.")
     return result
 
 
@@ -84,8 +95,15 @@ def delete_ireks_ingredient(
     row_id: int,
     service: IngredientIreksService = Depends(get_ingredient_ireks_service),
 ) -> Response:
-    if not service.delete_if_exists(row_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingrediente IREKS no encontrado.")
+    blockers = service.delete_blockers(row_id)
+    if blockers:
+        raise conflict(f"No se puede eliminar el ingrediente IREKS porque tiene dependencias: {', '.join(blockers)}.")
+    try:
+        deleted = service.delete_if_exists(row_id)
+    except IntegrityError as exc:
+        raise conflict("No se puede eliminar el ingrediente IREKS porque tiene dependencias.") from exc
+    if not deleted:
+        raise not_found("Ingrediente IREKS no encontrado.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -113,7 +131,7 @@ def upsert_ireks_tarifa(
     try:
         return service.upsert_tarifa_from_payload(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
 
 
 @router.patch("/ireks/tarifas/{tarifa_id}", response_model=TarifaPrecioIreksRead)
@@ -124,7 +142,7 @@ def update_ireks_tarifa(
 ) -> TarifaPrecioIreksRead:
     result = service.update_tarifa_from_payload(tarifa_id, payload)
     if result is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tarifa no encontrada.")
+        raise not_found("Tarifa no encontrada.")
     return result
 
 
@@ -134,23 +152,27 @@ def delete_ireks_tarifa(
     service: IngredientIreksService = Depends(get_ingredient_ireks_service),
 ) -> Response:
     if not service.delete_tarifa_if_exists(tarifa_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tarifa no encontrada.")
+        raise not_found("Tarifa no encontrada.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/std", response_model=list[IngredientStdRead])
+@router.get("/std", response_model=IngredientStdListResponse)
 def list_std_ingredients(
-    q: str = "",
-    familia_id: str = "",
-    subfamilia_id: str = "",
-    activity_filter: str = "all",
+    q: Annotated[str, Query(max_length=120)] = "",
+    familia_id: Annotated[str, Query(max_length=120)] = "",
+    subfamilia_id: Annotated[str, Query(max_length=120)] = "",
+    activity_filter: Annotated[ActivityFilter, Query()] = "all",
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
     service: IngredientStdService = Depends(get_ingredient_std_service),
-) -> list[IngredientStdRead]:
+) -> IngredientStdListResponse:
     return service.api_list_payload(
         search=q,
         familia_id=familia_id,
         subfamilia_id=subfamilia_id,
         activity_filter=activity_filter,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -162,7 +184,7 @@ def create_std_ingredient(
     try:
         return service.create_from_payload(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise bad_request(exc) from exc
 
 
 @router.get("/std/{articulo_id}", response_model=IngredientStdRead)
@@ -172,7 +194,7 @@ def get_std_ingredient(
 ) -> IngredientStdRead:
     payload = service.api_detail_payload(articulo_id)
     if payload is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia prima no encontrada.")
+        raise not_found("Materia prima no encontrada.")
     return payload
 
 
@@ -184,7 +206,7 @@ def update_std_ingredient(
 ) -> IngredientStdRead:
     result = service.update_from_payload(articulo_id, payload)
     if result is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia prima no encontrada.")
+        raise not_found("Materia prima no encontrada.")
     return result
 
 
@@ -193,8 +215,15 @@ def delete_std_ingredient(
     articulo_id: str,
     service: IngredientStdService = Depends(get_ingredient_std_service),
 ) -> Response:
-    if not service.delete_if_exists(articulo_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia prima no encontrada.")
+    blockers = service.delete_blockers(articulo_id)
+    if blockers:
+        raise conflict(f"No se puede eliminar la materia prima porque tiene dependencias: {', '.join(blockers)}.")
+    try:
+        deleted = service.delete_if_exists(articulo_id)
+    except IntegrityError as exc:
+        raise conflict("No se puede eliminar la materia prima porque tiene dependencias.") from exc
+    if not deleted:
+        raise not_found("Materia prima no encontrada.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -206,7 +235,7 @@ def update_std_active(
 ) -> IngredientStdRead:
     result = service.update_active_from_payload(articulo_id, payload)
     if result is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Materia prima no encontrada.")
+        raise not_found("Materia prima no encontrada.")
     return result
 
 

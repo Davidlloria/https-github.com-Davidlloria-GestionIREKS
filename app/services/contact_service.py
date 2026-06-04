@@ -7,12 +7,14 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.core.database import engine
+from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
 from app.models import Cliente, Contacto
 from app.schemas.contacts import (
     ContactCompanyOption,
     ContactCreate,
     ContactDetail,
     ContactListItem,
+    ContactListResponse,
     ContactUpdate,
 )
 from app.services.import_service import ImportService
@@ -24,6 +26,10 @@ from app.viewmodels.customer_viewmodel import CustomerViewModel
 class ContactCompanyLookup:
     id_to_name: dict[str, str] = field(default_factory=dict)
     name_to_id: dict[str, str] = field(default_factory=dict)
+
+
+class ContactPayloadError(ValueError):
+    """Raised when contact payload contains invalid related data."""
 
 
 class ContactService:
@@ -54,10 +60,18 @@ class ContactService:
             for cliente_id, name in sorted(lookup.id_to_name.items(), key=lambda item: item[1].lower())
         ]
 
-    def list(self, term: str = "", company_id_to_name: dict[str, str] | None = None) -> list[Contacto]:
+    def list(
+        self,
+        term: str = "",
+        company_id: str = "",
+        company_id_to_name: dict[str, str] | None = None,
+    ) -> list[Contacto]:
         company_id_to_name = company_id_to_name or {}
         with Session(engine) as session:
             rows = self.vm.list(session, "")
+        clean_company_id = (company_id or "").strip()
+        if clean_company_id:
+            rows = [row for row in rows if str(row.cliente_id or "").strip() == clean_company_id]
         text = (term or "").strip().lower()
         if not text:
             return rows
@@ -69,10 +83,23 @@ class ContactService:
                 filtered.append(row)
         return filtered
 
-    def list_payload(self, term: str = "") -> list[ContactListItem]:
+    def list_payload(
+        self,
+        term: str = "",
+        *,
+        company_id: str = "",
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
+    ) -> ContactListResponse:
         lookup = self.company_lookup()
-        rows = self.list(term, lookup.id_to_name)
-        return [self._contact_list_item(row, lookup.id_to_name) for row in rows]
+        rows = self.list(term, company_id, lookup.id_to_name)
+        page_rows = page_items(rows, limit=limit, offset=offset)
+        return ContactListResponse(
+            items=[self._contact_list_item(row, lookup.id_to_name) for row in page_rows],
+            total=len(rows),
+            limit=limit,
+            offset=offset,
+        )
 
     def detail_payload(self, contacto_id: str) -> ContactDetail | None:
         with Session(engine) as session:
@@ -96,6 +123,7 @@ class ContactService:
 
     def create_from_payload(self, payload: ContactCreate | dict) -> ContactDetail:
         data = self._payload_dict(payload, ContactCreate, exclude_none=True)
+        self._ensure_customer_exists(str(data.get("cliente_id") or "").strip())
         created = self.create(data)
         return self._contact_detail_from_entity(created)
 
@@ -105,12 +133,24 @@ class ContactService:
 
     def update_from_payload(self, contacto_id: str, payload: ContactUpdate | dict) -> ContactDetail:
         data = self._payload_dict(payload, ContactUpdate, exclude_none=True)
+        if "cliente_id" in data:
+            self._ensure_customer_exists(str(data.get("cliente_id") or "").strip())
         updated = self.update(contacto_id, data)
         return self._contact_detail_from_entity(updated)
 
     def delete(self, contacto_id: str) -> bool:
         with Session(engine) as session:
             return self.vm.delete(session, contacto_id)
+
+    def delete_blockers(self, contacto_id: str) -> list[str]:
+        with engine.begin() as conn:
+            asistentes = conn.exec_driver_sql(
+                "SELECT COUNT(*) FROM asistentes WHERE contacto_id = ?",
+                (contacto_id,),
+            ).scalar_one()
+        if int(asistentes or 0) <= 0:
+            return []
+        return [f"{int(asistentes)} asistente(s) en cursos"]
 
     def import_file(self, file_path: Path) -> tuple[int, list[str]]:
         schema = [
@@ -205,3 +245,12 @@ class ContactService:
         lookup = self.company_lookup()
         item.cliente_nombre = lookup.id_to_name.get(str(row.cliente_id or ""), "")
         return item
+
+    @staticmethod
+    def _ensure_customer_exists(cliente_id: str) -> None:
+        clean_cliente_id = str(cliente_id or "").strip()
+        if not clean_cliente_id:
+            raise ContactPayloadError("El cliente indicado no existe o no es valido.")
+        with Session(engine) as session:
+            if session.get(Cliente, clean_cliente_id) is None:
+                raise ContactPayloadError("El cliente indicado no existe o no es valido.")

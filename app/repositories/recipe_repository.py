@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import desc
 from sqlmodel import Session, col, delete, or_, select
@@ -56,7 +56,7 @@ class RecipeRepository:
         return RecipeAggregate(receta=receta, lineas=lineas)
 
     def save(self, session: Session, receta: Receta, lineas: list[RecetaLinea]) -> RecipeAggregate:
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         payload = receta.model_dump(exclude={"id", "created_at", "updated_at"})
 
         target: Receta

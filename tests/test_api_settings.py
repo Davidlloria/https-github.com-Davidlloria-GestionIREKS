@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.api.deps import get_api_settings_service, get_settings_import_service, get_settings_maintenance_service
 from app.api.main import create_app
+from app.services.api_settings_service import InvalidSettingsConfigError, UnsupportedSettingsProviderError
 from app.services.order_query_service import WarehouseFilterOption
 
 
@@ -75,6 +76,16 @@ class FakeImportService:
         )
 
 
+class FakeApiSettingsErrorService:
+    def provider_payload(self, provider: str) -> dict:
+        raise UnsupportedSettingsProviderError("Proveedor de configuracion no soportado.")
+
+    def save_provider(self, provider: str, config: dict) -> dict:
+        if provider == "warehouse":
+            raise InvalidSettingsConfigError("low_stock_threshold_units debe ser numerico.")
+        raise UnsupportedSettingsProviderError("Proveedor de configuracion no soportado.")
+
+
 def test_settings_maintenance_endpoints_use_service_contracts() -> None:
     app = create_app()
     app.dependency_overrides[get_settings_maintenance_service] = lambda: FakeMaintenanceService()
@@ -107,7 +118,7 @@ def test_settings_maintenance_endpoints_use_service_contracts() -> None:
     assert backup.json()["details"]["path"] == "data\\backup.db" or backup.json()["details"]["path"] == "data/backup.db"
 
 
-def test_settings_api_and_import_endpoints_use_service_contracts() -> None:
+def test_settings_api_and_import_endpoints_use_service_contracts(tmp_path: Path) -> None:
     app = create_app()
     fake_settings = FakeApiSettingsService()
     app.dependency_overrides[get_api_settings_service] = lambda: fake_settings
@@ -136,10 +147,49 @@ def test_settings_api_and_import_endpoints_use_service_contracts() -> None:
     assert warehouses.status_code == 200
     assert warehouses.json() == [{"almacen_id": "alm-1", "almacen_nombre": "Almacen API"}]
 
+    source = tmp_path / "pedido.json"
+    source.write_text("{}", encoding="utf-8")
+
     imported = client.post(
         "/settings/imports/orders-json",
-        json={"file_path": "pedido.json", "almacen_id": "alm-1", "document_type": "order_json"},
+        json={"file_path": str(source), "almacen_id": "alm-1", "document_type": "order_json"},
     )
     assert imported.status_code == 200
     assert imported.json()["pedido_id"] == "order-api"
     assert imported.json()["imported_items"] == 2
+
+    imported_upload = client.post(
+        "/settings/imports/orders-json/upload",
+        data={"almacen_id": "alm-1"},
+        files={"file": ("pedido.json", b"{}", "application/json")},
+    )
+    assert imported_upload.status_code == 200
+    assert imported_upload.json()["pedido_id"] == "order-api"
+    assert imported_upload.json()["imported_items"] == 2
+
+
+def test_settings_save_api_settings_maps_invalid_config_and_unknown_provider() -> None:
+    app = create_app()
+    app.dependency_overrides[get_api_settings_service] = lambda: FakeApiSettingsErrorService()
+    client = TestClient(app)
+
+    invalid = client.put(
+        "/settings/api/warehouse",
+        json={
+            "provider": "warehouse",
+            "enabled": True,
+            "config": {"low_stock_threshold_units": "x"},
+        },
+    )
+    assert invalid.status_code == 400
+    assert "numerico" in invalid.json()["detail"].lower()
+
+    unknown = client.put(
+        "/settings/api/unknown",
+        json={
+            "provider": "unknown",
+            "enabled": True,
+            "config": {},
+        },
+    )
+    assert unknown.status_code == 404
