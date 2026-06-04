@@ -42,6 +42,7 @@ from app.models import AlmacenMovimiento, Distribuidor, Envase, Fabricante, Fami
 from app.services.import_service import ImportService
 from app.services.ingredient_fatsecret_nutrition_flow_service import IngredientFatSecretNutritionFlowService
 from app.services.ingredient_fdc_nutrition_flow_service import IngredientFdcNutritionFlowService
+from app.services.ingredient_chatgpt_nutrition_flow_service import IngredientChatGPTNutritionFlowService
 from app.services.ingredient_entity_service import IngredientEntityService
 from app.services.ingredient_ireks_service import IngredientIreksService
 from app.services.ingredient_nutrition_query_service import IngredientNutritionQueryService
@@ -437,6 +438,9 @@ class IngredientsIreksPage(QWidget):
         )
         self.fatsecret_nutrition_flow_service = IngredientFatSecretNutritionFlowService(
             nutrition_query_service=self.nutrition_query_service,
+        )
+        self.chatgpt_nutrition_flow_service = IngredientChatGPTNutritionFlowService(
+            openai_service=OpenAINutritionService(),
         )
         self.external_distributor_filter_id = ""
         self.import_service = ImportService()
@@ -3693,10 +3697,17 @@ class IngredientStdArticleDialog(QDialog):
         q = str(manual_query or "").strip()
         if not q:
             return
-        service = OpenAINutritionService()
-        result = service.fetch_for_query(q)
-        if not result.ok:
+        result = self.chatgpt_nutrition_flow_service.load_nutrition(q)
+        if result.status == "no_query":
             QMessageBox.warning(self, "ChatGPT", result.message)
+            return
+        if result.status == "service_error":
+            QMessageBox.warning(self, "ChatGPT", result.message)
+            return
+        if result.status == "error":
+            QMessageBox.warning(self, "ChatGPT", result.message or "No se pudo consultar OpenAI.")
+            return
+        if result.status != "ready_to_apply":
             return
         self._apply_nutrition_values(result.values)
         QMessageBox.information(self, "ChatGPT", "Valores nutricionales cargados desde ChatGPT.")

@@ -423,6 +423,20 @@ Fase 5 - Reducir dependencia del desktop.
   - tests ejecutados: `python -m pytest tests\\test_ingredient_fatsecret_nutrition_flow_service.py
     tests\\test_ingredient_nutrition_query_service.py
     tests\\test_architecture_boundaries.py -q`.
+- Flujo ChatGPT de nutricion extraido fuera de UI desktop:
+  - `app/services/ingredient_chatgpt_nutrition_flow_service.py` concentra la
+    validacion de consulta, la llamada al servicio OpenAI y la normalizacion
+    del resultado;
+  - `app/ui/widgets/ingredients_page.py` conserva `QInputDialog`, los
+    mensajes visibles y `_apply_nutrition_values`;
+  - se mantienen los mismos textos visibles y el mismo comportamiento visible
+    de aplicacion de valores nutricionales;
+  - archivos afectados: `app/services/ingredient_chatgpt_nutrition_flow_service.py`,
+    `app/services/__init__.py`, `app/ui/widgets/ingredients_page.py`,
+    `tests/test_ingredient_chatgpt_nutrition_flow_service.py`;
+  - tests ejecutados: `python -m pytest tests\\test_ingredient_chatgpt_nutrition_flow_service.py
+    tests\\test_ingredient_nutrition_query_service.py
+    tests\\test_architecture_boundaries.py -q`.
 - Extraccion de la orquestacion comun de importacion documental de pedidos:
   - `app/services/orders_documents_import_ui_service.py` concentra la
     secuencia compartida de preview, confirmacion e importacion de albaranes y

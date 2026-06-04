@@ -14,6 +14,10 @@ from app.services.api_settings_service import ApiSettingsService
 from app.services.address_catalog_service import AddressCatalogService
 from app.services.fatsecret_client import FatSecretApiError, FatSecretClient, normalize_food_response
 from app.services.fatsecret_settings_service import FatSecretSettingsService
+from app.services.ingredient_chatgpt_nutrition_flow_service import (
+    IngredientChatGPTNutritionFlowResult,
+    IngredientChatGPTNutritionFlowService,
+)
 from app.services.openai_nutrition_service import OpenAINutritionResult, OpenAINutritionService
 from app.services.openai_settings_service import OpenAISettingsService
 from app.services.openai_translation_service import OpenAITranslationService, TranslationResult
@@ -84,6 +88,8 @@ __all__ = [
     "FatSecretApiError",
     "normalize_food_response",
     "FatSecretSettingsService",
+    "IngredientChatGPTNutritionFlowService",
+    "IngredientChatGPTNutritionFlowResult",
     "OpenAINutritionService",
     "OpenAINutritionResult",
     "OpenAISettingsService",

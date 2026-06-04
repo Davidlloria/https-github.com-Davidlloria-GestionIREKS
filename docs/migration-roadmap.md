@@ -41,6 +41,10 @@
   `app/services/warehouse_manual_move_flow_service.py`, dejando en
   `app/ui/widgets/warehouse_page.py` el dialogo manual, los mensajes visibles y
   el refresco de pantalla.
+- Ultimo avance validado: se extrajo la orquestacion no visual del flujo
+  ChatGPT nutricion hacia `app/services/ingredient_chatgpt_nutrition_flow_service.py`,
+  dejando en `app/ui/widgets/ingredients_page.py` el dialogo de consulta, los
+  mensajes visibles y la aplicacion final de valores.
 - Cobertura de caracterizacion ampliada: se validan la preparacion del
   adjunto, la version del historico, el contrato de resultado y el manejo de
   errores previsibles del flujo Outlook sin depender de la UI PySide6.
@@ -74,6 +78,15 @@
     mensajes visibles, la seleccion de movimiento y el refresco de pantalla;
   - se mantienen los mismos textos visibles, validaciones y comportamiento de
     guardado manual.
+- Flujo ChatGPT de nutricion en `ingredients_page.py` coordinado fuera del
+  widget:
+  - `app/services/ingredient_chatgpt_nutrition_flow_service.py` concentra la
+    validacion de consulta, la llamada al servicio OpenAI y la normalizacion
+    del resultado;
+  - `app/ui/widgets/ingredients_page.py` conserva `QInputDialog`, los mensajes
+    visibles y `_apply_nutrition_values`;
+  - se mantienen los mismos textos visibles y el mismo comportamiento de
+    aplicacion de valores nutricionales.
 - Flujo de backup de base de datos en configuracion simplificado:
   - `app/services/settings_maintenance_ui_service.py` ahora genera la ruta por
     defecto del backup con una unica funcion reutilizable;
@@ -253,29 +266,29 @@
 
 ## Siguiente refactor recomendado
 
-- Objetivo concreto: extraer la secuencia interactiva de ChatGPT nutricion en
-  `ingredients_page.py` para dejar el widget como fachada de dialogo y
-  aplicacion de valores.
+- Objetivo concreto: extraer la orquestacion de reportes e impresion en
+  `ingredients_page.py` para dejar el widget como fachada de dialogo y salida
+  visual.
 - Archivos a tocar: `app/ui/widgets/ingredients_page.py`, un nuevo servicio o
-  coordinador pequeno para ChatGPT nutricion y un test pequeno de
+  coordinador pequeno para reportes/impresion y un test pequeno de
   caracterizacion del flujo.
-- Motivo: FatSecret ya quedo completo; el siguiente borde pequeno y de alto
-  retorno en `ingredients_page.py` es la orquestacion interactiva de ChatGPT,
-  que sigue siendo mas simple que reportes/impresion.
-- Riesgo: bajo-medio. Es un cambio de coordinacion y mensajes, con pocas
-  ramas y sin tocar el calculo nutricional ni la edicion de recetas.
-- Tests que deben ejecutarse: `tests/test_ingredient_fatsecret_nutrition_flow_service.py`,
-  `tests/test_ingredient_nutrition_query_service.py` y
-  `tests/test_architecture_boundaries.py`.
-- Validacion manual esperada: abrir `Ingredientes` y comprobar que la busqueda
-  ChatGPT sigue ofreciendo el mismo dialogo y que la aplicacion de valores
-  nutricionales sigue igual.
+- Motivo: ChatGPT ya quedo completo; el siguiente borde de alto retorno en
+  `ingredients_page.py` es reportes/impresion, que sigue siendo mas costoso que
+  un simple dialogo de consulta.
+- Riesgo: medio. Es un cambio de coordinacion y mensajes, con varias rutas de
+  exportacion pero sin tocar el calculo nutricional ni la edicion de recetas.
+- Tests que deben ejecutarse: `tests/test_architecture_boundaries.py` y los
+  nuevos tests del coordinador de reportes/impresion cuando se creen.
+- Validacion manual esperada: abrir `Ingredientes` y comprobar que los
+  reportes y la impresion siguen ofreciendo el mismo dialogo y la misma
+  salida visual.
 
 ## Proximos pasos
 
 1. Tomar este roadmap como referencia operativa unica para la migracion.
 2. Atacar el siguiente bloque pequeno de labels de estado de mantenimiento en
-   `settings_page.py` sin introducir comportamiento nuevo.
+   `ingredients_page.py` reportes/impresion sin introducir comportamiento
+   nuevo.
 3. Mantener el historial detallado en `docs/migration-history.md`.
 4. Seguir cerrando deuda tecnica solo cuando reduzca riesgo o desbloquee la
    migracion.
