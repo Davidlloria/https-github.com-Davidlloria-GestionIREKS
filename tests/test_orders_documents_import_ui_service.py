@@ -4,7 +4,12 @@ from pathlib import Path
 from typing import Any
 
 from app.services.order_document_import_service import OrderDocumentImportResult
-from app.services.orders_documents_import_ui_service import OrdersDocumentsImportUiService
+from app.services.orders_documents_import_ui_service import (
+    OrdersDocumentImportFlowError,
+    OrdersDocumentImportOutcome,
+    OrdersDocumentPreviewData,
+    OrdersDocumentsImportUiService,
+)
 
 
 class _FakeImportService:
@@ -143,3 +148,118 @@ def test_import_outcomes_cover_success_errors_and_already_imported() -> None:
     assert already.already_imported is True
     assert already.title == "Factura ya importada"
     assert already.message == "Ya existe"
+
+
+def test_run_import_document_flow_calls_preview_confirm_and_import_in_order(tmp_path: Path) -> None:
+    source = tmp_path / "doc.pdf"
+    source.write_text("x", encoding="utf-8")
+    fake_import = _FakeImportService(rows=[])
+    fake_docs = _FakeOrderDocumentImportService()
+    service = OrdersDocumentsImportUiService(
+        import_service=fake_import,  # type: ignore[arg-type]
+        order_document_import_service=fake_docs,  # type: ignore[arg-type]
+    )
+    calls: list[str] = []
+
+    def preview_loader(path: Path) -> OrdersDocumentPreviewData:
+        calls.append(f"preview:{path.name}")
+        return OrdersDocumentPreviewData(
+            header={"albaran_numero": "A-1"},
+            rows=[{"articulo_codigo": "X"}],
+        )
+
+    def confirm_preview(header: dict[str, str], rows: list[dict[str, Any]]) -> bool:
+        calls.append(f"confirm:{header['albaran_numero']}:{len(rows)}")
+        return True
+
+    def importer(header: dict[str, str], rows: list[dict[str, Any]]) -> OrdersDocumentImportOutcome:
+        calls.append(f"import:{header['albaran_numero']}:{len(rows)}")
+        return OrdersDocumentImportOutcome(ok=True, title="Importacion completada", message="ok")
+
+    outcome = service.run_import_document_flow(
+        source,
+        preview_loader=preview_loader,
+        confirm_preview=confirm_preview,
+        importer=importer,
+    )
+
+    assert outcome is not None
+    assert outcome.ok is True
+    assert calls == ["preview:doc.pdf", "confirm:A-1:1", "import:A-1:1"]
+
+
+def test_run_import_document_flow_returns_none_when_preview_cancelled(tmp_path: Path) -> None:
+    source = tmp_path / "doc.pdf"
+    source.write_text("x", encoding="utf-8")
+    fake_import = _FakeImportService(rows=[])
+    fake_docs = _FakeOrderDocumentImportService()
+    service = OrdersDocumentsImportUiService(
+        import_service=fake_import,  # type: ignore[arg-type]
+        order_document_import_service=fake_docs,  # type: ignore[arg-type]
+    )
+    calls: list[str] = []
+
+    def preview_loader(path: Path) -> OrdersDocumentPreviewData:
+        calls.append(f"preview:{path.name}")
+        return OrdersDocumentPreviewData(
+            header={"albaran_numero": "A-1"},
+            rows=[{"articulo_codigo": "X"}],
+        )
+
+    def confirm_preview(_header: dict[str, str], _rows: list[dict[str, Any]]) -> bool:
+        calls.append("confirm:no")
+        return False
+
+    def importer(_header: dict[str, str], _rows: list[dict[str, Any]]) -> OrdersDocumentImportOutcome:
+        calls.append("import:yes")
+        return OrdersDocumentImportOutcome(ok=True, title="Importacion completada", message="ok")
+
+    outcome = service.run_import_document_flow(
+        source,
+        preview_loader=preview_loader,
+        confirm_preview=confirm_preview,
+        importer=importer,
+    )
+
+    assert outcome is None
+    assert calls == ["preview:doc.pdf", "confirm:no"]
+
+
+def test_run_import_document_flow_wraps_read_and_import_errors(tmp_path: Path) -> None:
+    source = tmp_path / "doc.pdf"
+    source.write_text("x", encoding="utf-8")
+    fake_import = _FakeImportService(rows=[])
+    fake_docs = _FakeOrderDocumentImportService()
+    service = OrdersDocumentsImportUiService(
+        import_service=fake_import,  # type: ignore[arg-type]
+        order_document_import_service=fake_docs,  # type: ignore[arg-type]
+    )
+
+    try:
+        service.run_import_document_flow(
+            source,
+            preview_loader=lambda _p: (_ for _ in ()).throw(ValueError("lectura rota")),
+            confirm_preview=lambda _h, _r: True,
+            importer=lambda _h, _r: OrdersDocumentImportOutcome(ok=True, title="Importacion completada", message="ok"),
+        )
+    except OrdersDocumentImportFlowError as exc:
+        assert exc.stage == "read"
+        assert str(exc) == "lectura rota"
+    else:
+        raise AssertionError("Expected read error wrapper")
+
+    try:
+        service.run_import_document_flow(
+            source,
+            preview_loader=lambda _p: OrdersDocumentPreviewData(
+                header={"albaran_numero": "A-1"},
+                rows=[{"articulo_codigo": "X"}],
+            ),
+            confirm_preview=lambda _h, _r: True,
+            importer=lambda _h, _r: (_ for _ in ()).throw(ValueError("import rota")),
+        )
+    except OrdersDocumentImportFlowError as exc:
+        assert exc.stage == "import"
+        assert str(exc) == "import rota"
+    else:
+        raise AssertionError("Expected import error wrapper")

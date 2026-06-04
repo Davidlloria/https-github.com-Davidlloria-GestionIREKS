@@ -24,6 +24,12 @@ class OrdersDocumentImportOutcome:
     already_imported: bool = False
 
 
+class OrdersDocumentImportFlowError(RuntimeError):
+    def __init__(self, stage: str, message: str) -> None:
+        super().__init__(message)
+        self.stage = stage
+
+
 class OrdersDocumentsImportUiService:
     def __init__(
         self,
@@ -116,6 +122,25 @@ class OrdersDocumentsImportUiService:
             already_title="Factura ya importada",
             success_message_template="Lineas de factura importadas: {imported}",
         )
+
+    def run_import_document_flow(
+        self,
+        source: Path,
+        *,
+        preview_loader: Callable[[Path], OrdersDocumentPreviewData],
+        importer: Callable[[dict[str, str], list[dict[str, Any]]], OrdersDocumentImportOutcome],
+        confirm_preview: Callable[[dict[str, str], list[dict[str, Any]]], bool],
+    ) -> OrdersDocumentImportOutcome | None:
+        try:
+            preview = preview_loader(source)
+        except Exception as exc:  # noqa: BLE001
+            raise OrdersDocumentImportFlowError("read", str(exc)) from exc
+        if not confirm_preview(preview.header, preview.rows):
+            return None
+        try:
+            return importer(preview.header, preview.rows)
+        except Exception as exc:  # noqa: BLE001
+            raise OrdersDocumentImportFlowError("import", str(exc)) from exc
 
     def _validate_source(self, source: Path) -> Path:
         clean_source = Path(source)

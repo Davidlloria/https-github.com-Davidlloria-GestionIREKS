@@ -54,7 +54,10 @@ from app.models import (
 from app.services.order_document_import_service import OrderDocumentImportService
 from app.services.order_document_parser import OrderDocumentParser
 from app.services.order_export_service import OrderExportService
-from app.services.orders_documents_import_ui_service import OrdersDocumentsImportUiService
+from app.services.orders_documents_import_ui_service import (
+    OrdersDocumentImportFlowError,
+    OrdersDocumentsImportUiService,
+)
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderLineInput, OrderService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
@@ -2828,18 +2831,20 @@ class OrdersPage(QWidget):
             return
 
         try:
-            preview = preview_loader(Path(file_path))
-        except Exception as exc:
-            QMessageBox.warning(self, "Pedidos", f"No se pudo leer la {warning_prefix}: {exc}")
+            outcome = self.orders_documents_import_ui_service.run_import_document_flow(
+                Path(file_path),
+                preview_loader=preview_loader,
+                confirm_preview=confirm_preview,
+                importer=lambda header, rows: importer(row.pedido_id, header, rows),
+            )
+        except OrdersDocumentImportFlowError as exc:
+            if exc.stage == "read":
+                QMessageBox.warning(self, "Pedidos", f"No se pudo leer la {warning_prefix}: {exc}")
+            else:
+                QMessageBox.warning(self, "Pedidos", str(exc))
             return
 
-        if not confirm_preview(preview.header, preview.rows):
-            return
-
-        try:
-            outcome = importer(row.pedido_id, preview.header, preview.rows)
-        except Exception as exc:
-            QMessageBox.warning(self, "Pedidos", str(exc))
+        if outcome is None:
             return
         self.reload()
         if outcome.ok:
