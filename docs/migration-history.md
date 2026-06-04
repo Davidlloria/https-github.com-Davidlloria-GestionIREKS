@@ -401,6 +401,17 @@ Fase 5 - Reducir dependencia del desktop.
   - tests ejecutados: `python -m pytest tests\\test_ingredient_fdc_nutrition_flow_service.py
     tests\\test_ingredient_nutrition_query_service.py
     tests\\test_architecture_boundaries.py -q`.
+- Flujo FatSecret de nutricion por texto extraido fuera de UI desktop:
+  - `app/services/ingredient_fatsecret_nutrition_flow_service.py` concentra la
+    orquestacion no visual del flujo FatSecret por texto, la busqueda de
+    alimentos, la seleccion de alimento y la conversion de raciones a valores;
+  - `app/ui/widgets/ingredients_page.py` conserva la seleccion de modo, los
+    dialogos Qt, los mensajes visibles y la aplicacion final de valores;
+  - se mantienen los mismos textos visibles, la misma formula de sal y el
+    mismo formato visible de labels;
+  - tests ejecutados: `python -m pytest tests\\test_ingredient_fatsecret_nutrition_flow_service.py
+    tests\\test_ingredient_nutrition_query_service.py
+    tests\\test_architecture_boundaries.py -q`.
 - Extraccion de la orquestacion comun de importacion documental de pedidos:
   - `app/services/orders_documents_import_ui_service.py` concentra la
     secuencia compartida de preview, confirmacion e importacion de albaranes y

@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
 )
 from app.models import AlmacenMovimiento, Distribuidor, Envase, Fabricante, Familia, IngredienteIreks, IngredienteStd, Pedido, PedidoItem, Proveedor, ReferenciaDistribuidor, Subfamilia, TarifaPrecioIreks
 from app.services.import_service import ImportService
+from app.services.ingredient_fatsecret_nutrition_flow_service import IngredientFatSecretNutritionFlowService
 from app.services.ingredient_fdc_nutrition_flow_service import IngredientFdcNutritionFlowService
 from app.services.ingredient_entity_service import IngredientEntityService
 from app.services.ingredient_ireks_service import IngredientIreksService
@@ -47,7 +48,6 @@ from app.services.ingredient_nutrition_query_service import IngredientNutritionQ
 from app.services.ingredient_std_service import IngredientStdService
 from app.services.fatsecret_client import FatSecretApiError, FatSecretClient
 from app.services.openai_nutrition_service import OpenAINutritionService
-from app.services.openai_settings_service import OpenAISettingsService
 from app.services.monthly_orders_service import MonthlyOrdersService
 from app.services.product_report_service import ProductReportIntentService, ProductReportResult, ProductReportService
 from app.services.report_export_service import ReportExportService
@@ -433,6 +433,9 @@ class IngredientsIreksPage(QWidget):
         self.report_export_service = ReportExportService()
         self.nutrition_query_service = IngredientNutritionQueryService()
         self.fdc_nutrition_flow_service = IngredientFdcNutritionFlowService(
+            nutrition_query_service=self.nutrition_query_service,
+        )
+        self.fatsecret_nutrition_flow_service = IngredientFatSecretNutritionFlowService(
             nutrition_query_service=self.nutrition_query_service,
         )
         self.external_distributor_filter_id = ""
@@ -3542,8 +3545,8 @@ class IngredientStdArticleDialog(QDialog):
             return
 
         try:
-            client = FatSecretClient()
             if str(mode).startswith("Buscar por código"):
+                client = FatSecretClient()
                 barcode, ok_barcode = QInputDialog.getText(
                     self,
                     "FatSecret barcode",
@@ -3553,94 +3556,126 @@ class IngredientStdArticleDialog(QDialog):
                 if not ok_barcode or not barcode:
                     return
                 normalized = client.find_by_barcode(barcode, region="ES")
-            else:
-                query = (
-                    self.name_input.text().strip()
-                    or self.reference_input.text().strip()
-                    or str(self.articulo_id or "").strip()
-                )
-                if not query:
-                    QMessageBox.warning(self, "FatSecret", "Introduce nombre o referencia para buscar.")
+                servings = list(normalized.get("servings") or [])
+                if not servings:
+                    QMessageBox.information(self, "FatSecret", "El alimento no tiene raciones con datos nutricionales.")
                     return
-                chosen_query = self._choose_fatsecret_query(query)
-                if not chosen_query:
-                    return
-                search_rows = client.search_food(chosen_query, page=0, max_results=20, region="ES")
-                if not search_rows:
-                    QMessageBox.information(self, "FatSecret", f"Sin resultados para: {chosen_query}")
-                    return
-                labels = []
-                for row in search_rows:
-                    name = str(row.get("food_name") or "").strip()
-                    brand = str(row.get("brand_name") or "").strip()
-                    desc = str(row.get("food_description") or "").strip()
-                    q_used = str(row.get("query_used") or chosen_query).strip()
-                    labels.append(f"{name}{f' ({brand})' if brand else ''} - {desc}  [query: {q_used}]")
-                selected_label, ok_food = QInputDialog.getItem(
+                serving = servings[0]
+                if len(servings) > 1:
+                    options = []
+                    for s in servings:
+                        desc = str(s.get("description") or "").strip()
+                        metric_amount = float(s.get("metric_amount") or 0.0)
+                        metric_unit = str(s.get("metric_unit") or "").strip()
+                        options.append(f"{desc} [{metric_amount:g} {metric_unit}]")
+                    chosen, ok_serving = QInputDialog.getItem(
+                        self,
+                        "Seleccionar ración",
+                        "Raciones disponibles:",
+                        options,
+                        0,
+                        False,
+                    )
+                    if not ok_serving or not chosen:
+                        return
+                    sidx = options.index(chosen) if chosen in options else -1
+                    if sidx >= 0:
+                        serving = servings[sidx]
+                sodium_mg = float(serving.get("sodium_mg") or 0.0)
+                values = {
+                    "energia_kcal": float(serving.get("calories_kcal") or 0.0),
+                    "energia_kj": float(serving.get("calories_kcal") or 0.0) * 4.184,
+                    "grasas_g": float(serving.get("fat_g") or 0.0),
+                    "saturadas_g": float(serving.get("saturated_fat_g") or 0.0),
+                    "hidratos_g": float(serving.get("carbohydrates_g") or 0.0),
+                    "azucares_g": float(serving.get("sugars_g") or 0.0),
+                    "fibra_g": float(serving.get("fiber_g") or 0.0),
+                    "proteinas_g": float(serving.get("protein_g") or 0.0),
+                    "sal_g": (sodium_mg / 1000.0) * 2.5,
+                }
+                self._apply_nutrition_values(values)
+                QMessageBox.information(self, "FatSecret", "Valores nutricionales cargados desde FatSecret.")
+                return
+
+            query = (
+                self.name_input.text().strip()
+                or self.reference_input.text().strip()
+                or str(self.articulo_id or "").strip()
+            )
+            if not query:
+                QMessageBox.warning(self, "FatSecret", "Introduce nombre o referencia para buscar.")
+                return
+            chosen_query = self._choose_fatsecret_query(query)
+            if not chosen_query:
+                return
+            search_result = self.fatsecret_nutrition_flow_service.search_food(
+                chosen_query,
+                page=0,
+                max_results=20,
+                region="ES",
+            )
+            if search_result.status == "search_error":
+                QMessageBox.warning(self, "FatSecret", search_result.message)
+                return
+            if search_result.status == "no_results":
+                QMessageBox.information(self, "FatSecret", search_result.message)
+                return
+            if search_result.status != "foods_available":
+                return
+            selected_label, ok_food = QInputDialog.getItem(
+                self,
+                "Seleccionar alimento FatSecret",
+                "Coincidencias encontradas:",
+                search_result.food_labels,
+                0,
+                False,
+            )
+            if not ok_food or not selected_label:
+                return
+            food_result = self.fatsecret_nutrition_flow_service.load_selected_food(
+                search_result,
+                selected_label,
+                region="ES",
+                language="es",
+            )
+            if food_result.status == "no_food_id":
+                QMessageBox.warning(self, "FatSecret", food_result.message)
+                return
+            if food_result.status == "no_servings":
+                QMessageBox.information(self, "FatSecret", food_result.message)
+                return
+            if food_result.status != "servings_available":
+                return
+            servings = list(food_result.servings or [])
+            if not servings:
+                QMessageBox.information(self, "FatSecret", "El alimento no tiene raciones con datos nutricionales.")
+                return
+            serving = servings[0]
+            if len(servings) > 1:
+                chosen, ok_serving = QInputDialog.getItem(
                     self,
-                    "Seleccionar alimento FatSecret",
-                    "Coincidencias encontradas:",
-                    labels,
+                    "Seleccionar ración",
+                    "Raciones disponibles:",
+                    food_result.serving_labels,
                     0,
                     False,
                 )
-                if not ok_food or not selected_label:
+                if not ok_serving or not chosen:
                     return
-                idx = labels.index(selected_label) if selected_label in labels else -1
-                if idx < 0:
+                selected_serving = self.fatsecret_nutrition_flow_service.resolve_selected_serving(food_result, chosen)
+                if selected_serving.selected_serving is None:
                     return
-                food_id = str(search_rows[idx].get("food_id") or "").strip()
-                if not food_id:
-                    QMessageBox.warning(self, "FatSecret", "El resultado no incluye food_id.")
-                    return
-                normalized = client.get_food(food_id, region="ES", language="es")
+                serving = selected_serving.selected_serving
+            values = self.fatsecret_nutrition_flow_service.build_values_from_serving(serving)
+            self._apply_nutrition_values(values)
+            QMessageBox.information(self, "FatSecret", "Valores nutricionales cargados desde FatSecret.")
+            return
         except FatSecretApiError as exc:
             QMessageBox.warning(self, "FatSecret", str(exc))
             return
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "FatSecret", f"No se pudo consultar FatSecret.\n{exc}")
             return
-
-        servings = list(normalized.get("servings") or [])
-        if not servings:
-            QMessageBox.information(self, "FatSecret", "El alimento no tiene raciones con datos nutricionales.")
-            return
-        serving = servings[0]
-        if len(servings) > 1:
-            options = []
-            for s in servings:
-                desc = str(s.get("description") or "").strip()
-                metric_amount = float(s.get("metric_amount") or 0.0)
-                metric_unit = str(s.get("metric_unit") or "").strip()
-                options.append(f"{desc} [{metric_amount:g} {metric_unit}]")
-            chosen, ok_serving = QInputDialog.getItem(
-                self,
-                "Seleccionar ración",
-                "Raciones disponibles:",
-                options,
-                0,
-                False,
-            )
-            if not ok_serving or not chosen:
-                return
-            sidx = options.index(chosen) if chosen in options else -1
-            if sidx >= 0:
-                serving = servings[sidx]
-
-        sodium_mg = float(serving.get("sodium_mg") or 0.0)
-        values = {
-            "energia_kcal": float(serving.get("calories_kcal") or 0.0),
-            "energia_kj": float(serving.get("calories_kcal") or 0.0) * 4.184,
-            "grasas_g": float(serving.get("fat_g") or 0.0),
-            "saturadas_g": float(serving.get("saturated_fat_g") or 0.0),
-            "hidratos_g": float(serving.get("carbohydrates_g") or 0.0),
-            "azucares_g": float(serving.get("sugars_g") or 0.0),
-            "fibra_g": float(serving.get("fiber_g") or 0.0),
-            "proteinas_g": float(serving.get("protein_g") or 0.0),
-            "sal_g": (sodium_mg / 1000.0) * 2.5,
-        }
-        self._apply_nutrition_values(values)
-        QMessageBox.information(self, "FatSecret", "Valores nutricionales cargados desde FatSecret.")
 
     def _load_nutrition_from_chatgpt(self) -> None:
         query = (
@@ -3671,7 +3706,8 @@ class IngredientStdArticleDialog(QDialog):
         QMessageBox.information(self, "ChatGPT", "Valores nutricionales cargados desde ChatGPT.")
 
     def _choose_fatsecret_query(self, source_query: str) -> str:
-        options = self._fatsecret_query_candidates(source_query)
+        options_result = self.fatsecret_nutrition_flow_service.build_query_options(source_query)
+        options = options_result.query_options
         if not options:
             return ""
         selected, ok = QInputDialog.getItem(
@@ -3685,14 +3721,6 @@ class IngredientStdArticleDialog(QDialog):
         if not ok or not selected:
             return ""
         return str(selected).strip()
-
-    def _fatsecret_query_candidates(self, source_query: str) -> list[str]:
-        settings = self._openai_translation_settings()
-        return self.nutrition_query_service.build_fatsecret_candidates(
-            source_query,
-            openai_api_key=settings["api_key"],
-            use_ai_translation=settings["use_ai_translation"],
-        )
 
     def _choose_fdc_query(self, options: list[str]) -> str:
         if not options:
@@ -3708,16 +3736,6 @@ class IngredientStdArticleDialog(QDialog):
         if not ok or not selected:
             return ""
         return str(selected).strip()
-
-    def _openai_translation_settings(self) -> dict[str, Any]:
-        try:
-            loaded = OpenAISettingsService().load()
-        except Exception:
-            loaded = {"api_key": "", "use_ai_translation": False}
-        return {
-            "api_key": str(loaded.get("api_key") or "").strip(),
-            "use_ai_translation": bool(loaded.get("use_ai_translation", False)),
-        }
 
     def nutrition_payload(self) -> dict[str, float]:
         data: dict[str, float] = {}
