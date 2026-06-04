@@ -46,7 +46,7 @@ from app.services.ingredient_entity_service import IngredientEntityService
 from app.services.ingredient_ireks_service import IngredientIreksService
 from app.services.ingredient_nutrition_query_service import IngredientNutritionQueryService
 from app.services.ingredient_std_service import IngredientStdService
-from app.services.fatsecret_client import FatSecretApiError, FatSecretClient
+from app.services.fatsecret_client import FatSecretApiError
 from app.services.openai_nutrition_service import OpenAINutritionService
 from app.services.monthly_orders_service import MonthlyOrdersService
 from app.services.product_report_service import ProductReportIntentService, ProductReportResult, ProductReportService
@@ -3546,7 +3546,6 @@ class IngredientStdArticleDialog(QDialog):
 
         try:
             if str(mode).startswith("Buscar por código"):
-                client = FatSecretClient()
                 barcode, ok_barcode = QInputDialog.getText(
                     self,
                     "FatSecret barcode",
@@ -3555,44 +3554,41 @@ class IngredientStdArticleDialog(QDialog):
                 barcode = str(barcode or "").strip()
                 if not ok_barcode or not barcode:
                     return
-                normalized = client.find_by_barcode(barcode, region="ES")
-                servings = list(normalized.get("servings") or [])
-                if not servings:
-                    QMessageBox.information(self, "FatSecret", "El alimento no tiene raciones con datos nutricionales.")
+                barcode_result = self.fatsecret_nutrition_flow_service.load_barcode(barcode, region="ES")
+                if barcode_result.status == "barcode_cancelled":
                     return
-                serving = servings[0]
-                if len(servings) > 1:
-                    options = []
-                    for s in servings:
-                        desc = str(s.get("description") or "").strip()
-                        metric_amount = float(s.get("metric_amount") or 0.0)
-                        metric_unit = str(s.get("metric_unit") or "").strip()
-                        options.append(f"{desc} [{metric_amount:g} {metric_unit}]")
-                    chosen, ok_serving = QInputDialog.getItem(
-                        self,
-                        "Seleccionar ración",
-                        "Raciones disponibles:",
-                        options,
-                        0,
-                        False,
-                    )
-                    if not ok_serving or not chosen:
+                if barcode_result.status == "search_error":
+                    QMessageBox.warning(self, "FatSecret", barcode_result.message)
+                    return
+                if barcode_result.status == "no_servings":
+                    QMessageBox.information(self, "FatSecret", barcode_result.message)
+                    return
+                if barcode_result.status == "ready_to_apply" and barcode_result.values:
+                    values = barcode_result.values
+                elif barcode_result.status == "servings_available":
+                    servings = list(barcode_result.servings or [])
+                    if not servings:
+                        QMessageBox.information(self, "FatSecret", "El alimento no tiene raciones con datos nutricionales.")
                         return
-                    sidx = options.index(chosen) if chosen in options else -1
-                    if sidx >= 0:
-                        serving = servings[sidx]
-                sodium_mg = float(serving.get("sodium_mg") or 0.0)
-                values = {
-                    "energia_kcal": float(serving.get("calories_kcal") or 0.0),
-                    "energia_kj": float(serving.get("calories_kcal") or 0.0) * 4.184,
-                    "grasas_g": float(serving.get("fat_g") or 0.0),
-                    "saturadas_g": float(serving.get("saturated_fat_g") or 0.0),
-                    "hidratos_g": float(serving.get("carbohydrates_g") or 0.0),
-                    "azucares_g": float(serving.get("sugars_g") or 0.0),
-                    "fibra_g": float(serving.get("fiber_g") or 0.0),
-                    "proteinas_g": float(serving.get("protein_g") or 0.0),
-                    "sal_g": (sodium_mg / 1000.0) * 2.5,
-                }
+                    serving = servings[0]
+                    if len(servings) > 1:
+                        chosen, ok_serving = QInputDialog.getItem(
+                            self,
+                            "Seleccionar ración",
+                            "Raciones disponibles:",
+                            barcode_result.serving_labels,
+                            0,
+                            False,
+                        )
+                        if not ok_serving or not chosen:
+                            return
+                        selected_serving = self.fatsecret_nutrition_flow_service.resolve_selected_serving(barcode_result, chosen)
+                        if selected_serving.selected_serving is None:
+                            return
+                        serving = selected_serving.selected_serving
+                    values = self.fatsecret_nutrition_flow_service.build_values_from_serving(serving)
+                else:
+                    return
                 self._apply_nutrition_values(values)
                 QMessageBox.information(self, "FatSecret", "Valores nutricionales cargados desde FatSecret.")
                 return

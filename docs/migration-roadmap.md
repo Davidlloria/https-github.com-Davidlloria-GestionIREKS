@@ -29,6 +29,10 @@
   FatSecret por texto hacia `app/services/ingredient_fatsecret_nutrition_flow_service.py`,
   dejando en `app/ui/widgets/ingredients_page.py` la seleccion de modo, los
   dialogos Qt, los mensajes visibles y la aplicacion final de valores.
+- Ultimo avance validado: se extrajo la rama barcode del flujo FatSecret hacia
+  `app/services/ingredient_fatsecret_nutrition_flow_service.py`, dejando en
+  `app/ui/widgets/ingredients_page.py` la seleccion de codigo de barras, los
+  dialogos Qt, los mensajes visibles y la aplicacion final de valores.
 - Cobertura de caracterizacion ampliada: se validan la preparacion del
   adjunto, la version del historico, el contrato de resultado y el manejo de
   errores previsibles del flujo Outlook sin depender de la UI PySide6.
@@ -224,24 +228,23 @@
 
 ## Siguiente refactor recomendado
 
-- Objetivo concreto: extraer la rama restante de FatSecret por codigo de barras
-  en `ingredients_page.py` para dejar el widget como fachada de dialogo y
+- Objetivo concreto: extraer la secuencia interactiva de ChatGPT nutricion en
+  `ingredients_page.py` para dejar el widget como fachada de dialogo y
   aplicacion de valores.
 - Archivos a tocar: `app/ui/widgets/ingredients_page.py`, un nuevo servicio o
-  coordinador pequeno para la rama barcode de FatSecret y un test pequeno de
-  caracterizacion del flujo nutricional.
-- Motivo: la rama por texto ya quedo fuera; el siguiente borde pequeno y de
-  alto retorno en `ingredients_page.py` es la orquestacion interactiva de
-  FatSecret por codigo de barras, que aun decide, valida y aplica resultados
-  con menos ramificacion que ChatGPT.
-- Riesgo: medio. Es un cambio de coordinacion y mensajes, con menos ramas que
-  la version completa y sin tocar el calculo nutricional ni la edicion de recetas.
+  coordinador pequeno para ChatGPT nutricion y un test pequeno de
+  caracterizacion del flujo.
+- Motivo: FatSecret ya quedo completo; el siguiente borde pequeno y de alto
+  retorno en `ingredients_page.py` es la orquestacion interactiva de ChatGPT,
+  que sigue siendo mas simple que reportes/impresion.
+- Riesgo: bajo-medio. Es un cambio de coordinacion y mensajes, con pocas
+  ramas y sin tocar el calculo nutricional ni la edicion de recetas.
 - Tests que deben ejecutarse: `tests/test_ingredient_fatsecret_nutrition_flow_service.py`,
   `tests/test_ingredient_nutrition_query_service.py` y
   `tests/test_architecture_boundaries.py`.
 - Validacion manual esperada: abrir `Ingredientes` y comprobar que la busqueda
-  FatSecret por texto sigue ofreciendo las mismas opciones y que la aplicacion
-  de valores nutricionales sigue igual.
+  ChatGPT sigue ofreciendo el mismo dialogo y que la aplicacion de valores
+  nutricionales sigue igual.
 
 ## Proximos pasos
 

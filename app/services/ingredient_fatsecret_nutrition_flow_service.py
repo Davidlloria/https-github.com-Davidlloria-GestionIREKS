@@ -13,6 +13,7 @@ class IngredientFatSecretNutritionFlowResult:
     status: str
     message: str = ""
     source_query: str = ""
+    barcode: str = ""
     query_options: list[str] = field(default_factory=list)
     foods: list[dict[str, Any]] = field(default_factory=list)
     food_labels: list[str] = field(default_factory=list)
@@ -90,6 +91,63 @@ class IngredientFatSecretNutritionFlowService:
             source_query=clean_query,
             foods=list(rows),
             food_labels=labels,
+        )
+
+    def load_barcode(
+        self,
+        barcode: str,
+        *,
+        region: str = "ES",
+    ) -> IngredientFatSecretNutritionFlowResult:
+        clean_barcode = self.nutrition_query_service.normalize_query(barcode)
+        if not clean_barcode:
+            return IngredientFatSecretNutritionFlowResult(status="barcode_cancelled")
+
+        client = self._build_client()
+        try:
+            normalized = client.find_by_barcode(clean_barcode, region=region)
+        except FatSecretApiError as exc:
+            return IngredientFatSecretNutritionFlowResult(
+                status="search_error",
+                barcode=clean_barcode,
+                message=str(exc),
+            )
+        except Exception as exc:  # noqa: BLE001
+            return IngredientFatSecretNutritionFlowResult(
+                status="search_error",
+                barcode=clean_barcode,
+                message=f"No se pudo consultar FatSecret.\n{exc}",
+            )
+
+        servings = list(normalized.get("servings") or [])
+        if not servings:
+            return IngredientFatSecretNutritionFlowResult(
+                status="no_servings",
+                barcode=clean_barcode,
+                selected_food=normalized,
+                message="El alimento no tiene raciones con datos nutricionales.",
+            )
+
+        serving_labels = [self._serving_label(serving) for serving in servings]
+        if len(servings) == 1:
+            selected_serving = servings[0]
+            return IngredientFatSecretNutritionFlowResult(
+                status="ready_to_apply",
+                barcode=clean_barcode,
+                selected_food=normalized,
+                servings=servings,
+                serving_labels=serving_labels,
+                selected_serving_label=serving_labels[0],
+                selected_serving=selected_serving,
+                values=self.build_values_from_serving(selected_serving),
+            )
+
+        return IngredientFatSecretNutritionFlowResult(
+            status="servings_available",
+            barcode=clean_barcode,
+            selected_food=normalized,
+            servings=servings,
+            serving_labels=serving_labels,
         )
 
     def load_selected_food(
@@ -224,8 +282,9 @@ class IngredientFatSecretNutritionFlowService:
 
         selected_serving = result.servings[selected_idx]
         return IngredientFatSecretNutritionFlowResult(
-            status="serving_selected",
+            status="ready_to_apply",
             source_query=result.source_query,
+            barcode=result.barcode,
             foods=list(result.foods),
             food_labels=list(result.food_labels),
             selected_food_label=result.selected_food_label,
@@ -250,6 +309,20 @@ class IngredientFatSecretNutritionFlowService:
             "proteinas_g": float(serving.get("protein_g") or 0.0),
             "sal_g": (sodium_mg / 1000.0) * 2.5,
         }
+
+    def build_barcode_servings(self, barcode_result: IngredientFatSecretNutritionFlowResult) -> IngredientFatSecretNutritionFlowResult:
+        if barcode_result.status != "servings_available" or not barcode_result.servings:
+            return IngredientFatSecretNutritionFlowResult(
+                status="no_query",
+                barcode=barcode_result.barcode,
+            )
+        return IngredientFatSecretNutritionFlowResult(
+            status="servings_available",
+            barcode=barcode_result.barcode,
+            selected_food=barcode_result.selected_food,
+            servings=list(barcode_result.servings),
+            serving_labels=[self._serving_label(serving) for serving in barcode_result.servings],
+        )
 
     def _build_client(self) -> FatSecretClient:
         return self.fatsecret_client_factory()
