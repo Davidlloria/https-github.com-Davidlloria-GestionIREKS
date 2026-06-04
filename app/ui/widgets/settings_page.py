@@ -33,6 +33,7 @@ from app.services.address_catalog_service import AddressCatalogService
 from app.services.settings_orders_import_service import SettingsOrdersImportService
 from app.services.settings_import_service import SettingsImportService
 from app.services.settings_maintenance_ui_service import SettingsMaintenanceUiService
+from app.services.settings_sales_import_flow_ui_service import SettingsSalesImportFlowUiService
 from app.services.settings_provider_service import SettingsProviderService
 from app.services.settings_sales_import_service import SettingsSalesImportService
 from app.services.settings_sales_preview_service import SettingsSalesPreviewService
@@ -1412,8 +1413,7 @@ class SettingsPage(QWidget):
             settings_import_service=self.settings_import_service,
         )
         self.settings_maintenance_ui_service = SettingsMaintenanceUiService()
-        self._igsa_pdf_preview_lines: list[object] = []
-        self._igsa_book_preview_lines: list[object] = []
+        self.settings_sales_import_flow_ui_service = SettingsSalesImportFlowUiService()
         self._build_ui()
         self._refresh_status()
 
@@ -2016,7 +2016,6 @@ class SettingsPage(QWidget):
         except Exception as exc:
             QMessageBox.warning(self, preview_view.pdf_preview_error_title, str(exc))
             return
-        self._igsa_pdf_preview_lines = list(outcome.lines)
         self._show_igsa_pdf_preview_dialog(outcome.lines, outcome.errors)
 
     def _show_igsa_pdf_preview_dialog(self, lines: list[object], errors: list[str]) -> None:
@@ -2092,7 +2091,7 @@ class SettingsPage(QWidget):
         actions.addStretch(1)
         import_btn = QPushButton(preview_view.pdf_import_button_label)
         import_btn.setProperty("btnRole", "success")
-        import_btn.clicked.connect(lambda: self._import_igsa_sales_pdf_preview(close_dialog=dialog))
+        import_btn.clicked.connect(lambda: self._import_igsa_sales_pdf_preview(list(lines), close_dialog=dialog))
         actions.addWidget(import_btn)
         close_btn = QPushButton(preview_view.pdf_close_button_label)
         close_btn.setProperty("btnRole", "secondary")
@@ -2101,15 +2100,26 @@ class SettingsPage(QWidget):
         root.addLayout(actions)
         dialog.exec()
 
-    def _import_igsa_sales_pdf_preview(self, close_dialog: QDialog | None = None) -> None:
-        lines = self._igsa_pdf_preview_lines if isinstance(self._igsa_pdf_preview_lines, list) else []
+    def _import_igsa_sales_pdf_preview(
+        self,
+        lines: list[object],
+        *,
+        close_dialog: QDialog | None = None,
+    ) -> None:
         try:
-            outcome = self.settings_sales_import_service.import_igsa_pdf_lines(
+            flow = self.settings_sales_import_flow_ui_service.run_pdf_preview_import_flow(
+                confirmed=True,
                 lines=lines,
+                importer=lambda clean_lines: self.settings_sales_import_service.import_igsa_pdf_lines(
+                    lines=clean_lines,
+                ),
             )
         except Exception as exc:
             preview_view = self.settings_sales_preview_service.build_preview_view()
             QMessageBox.warning(self, preview_view.pdf_import_error_title, str(exc))
+            return
+        outcome = flow.outcome
+        if outcome is None:
             return
         if outcome.ok:
             QMessageBox.information(self, outcome.title, outcome.message)
@@ -2151,7 +2161,6 @@ class SettingsPage(QWidget):
         except Exception as exc:
             QMessageBox.warning(self, preview_view.workbook_preview_error_title, str(exc))
             return
-        self._igsa_book_preview_lines = list(outcome.raw_lines)
         self._show_igsa_workbook_preview_dialog(outcome.preview_rows, outcome.errors)
 
     def _show_igsa_workbook_preview_dialog(self, lines: list[dict[str, object]], errors: list[str]) -> None:
@@ -2214,7 +2223,7 @@ class SettingsPage(QWidget):
         actions.addStretch(1)
         import_btn = QPushButton(preview_view.workbook_import_button_label)
         import_btn.setProperty("btnRole", "success")
-        import_btn.clicked.connect(lambda: self._import_igsa_sales_workbook_preview(close_dialog=dialog))
+        import_btn.clicked.connect(lambda: self._import_igsa_sales_workbook_preview(list(lines), close_dialog=dialog))
         actions.addWidget(import_btn)
         close_btn = QPushButton(preview_view.workbook_close_button_label)
         close_btn.setProperty("btnRole", "secondary")
@@ -2247,30 +2256,34 @@ class SettingsPage(QWidget):
 
     def _import_igsa_sales_workbook_preview(
         self,
+        lines: list[dict[str, object]],
         close_dialog: QDialog | None = None,
-        *,
-        force_reimport: bool = False,
     ) -> None:
-        lines = self._igsa_book_preview_lines if isinstance(self._igsa_book_preview_lines, list) else []
         try:
-            outcome = self.settings_sales_import_service.import_igsa_workbook_lines(
+            flow = self.settings_sales_import_flow_ui_service.run_workbook_preview_import_flow(
+                confirmed=True,
                 lines=lines,
-                force_reimport=force_reimport,
+                importer=lambda clean_lines, force_reimport: self.settings_sales_import_service.import_igsa_workbook_lines(
+                    lines=clean_lines,
+                    force_reimport=force_reimport,
+                ),
+                ask_reimport=self._show_igsa_book_import_result_dialog,
             )
         except Exception as exc:
             preview_view = self.settings_sales_preview_service.build_preview_view()
             QMessageBox.warning(self, preview_view.workbook_import_error_title, str(exc))
             return
+        outcome = flow.outcome
+        if outcome is None:
+            return
         if outcome.ok:
-            wants_reimport = self._show_igsa_book_import_result_dialog(outcome.message)
             self._append_log(outcome.log_message)
             if close_dialog is not None:
                 close_dialog.accept()
-            if wants_reimport:
-                self._import_igsa_sales_workbook_preview(force_reimport=True)
         else:
             QMessageBox.warning(self, outcome.title, outcome.message)
             self._append_log(outcome.log_message)
+
     def _save_fdc_settings(self) -> None:
         key = self.fdc_api_key_input.text().strip() if hasattr(self, "fdc_api_key_input") else ""
         data_type = self.fdc_data_type_combo.currentText().strip() if hasattr(self, "fdc_data_type_combo") else "Foundation"
