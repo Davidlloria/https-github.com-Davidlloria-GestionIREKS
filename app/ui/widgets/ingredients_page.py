@@ -40,15 +40,14 @@ from PySide6.QtWidgets import (
 )
 from app.models import AlmacenMovimiento, Distribuidor, Envase, Fabricante, Familia, IngredienteIreks, IngredienteStd, Pedido, PedidoItem, Proveedor, ReferenciaDistribuidor, Subfamilia, TarifaPrecioIreks
 from app.services.import_service import ImportService
+from app.services.ingredient_fdc_nutrition_flow_service import IngredientFdcNutritionFlowService
 from app.services.ingredient_entity_service import IngredientEntityService
 from app.services.ingredient_ireks_service import IngredientIreksService
+from app.services.ingredient_nutrition_query_service import IngredientNutritionQueryService
 from app.services.ingredient_std_service import IngredientStdService
-from app.services.fdc_nutrition_service import FdcNutritionService
-from app.services.fdc_settings_service import FdcSettingsService
 from app.services.fatsecret_client import FatSecretApiError, FatSecretClient
 from app.services.openai_nutrition_service import OpenAINutritionService
 from app.services.openai_settings_service import OpenAISettingsService
-from app.services.openai_translation_service import OpenAITranslationService
 from app.services.monthly_orders_service import MonthlyOrdersService
 from app.services.product_report_service import ProductReportIntentService, ProductReportResult, ProductReportService
 from app.services.report_export_service import ReportExportService
@@ -432,6 +431,10 @@ class IngredientsIreksPage(QWidget):
         self.report_intent_service = ProductReportIntentService()
         self.product_report_service = ProductReportService()
         self.report_export_service = ReportExportService()
+        self.nutrition_query_service = IngredientNutritionQueryService()
+        self.fdc_nutrition_flow_service = IngredientFdcNutritionFlowService(
+            nutrition_query_service=self.nutrition_query_service,
+        )
         self.external_distributor_filter_id = ""
         self.import_service = ImportService()
         self.rows: list[IngredienteIreks] = []
@@ -3496,21 +3499,20 @@ class IngredientStdArticleDialog(QDialog):
             or self.reference_input.text().strip()
             or str(self.articulo_id or "").strip()
         )
-        chosen_query = self._choose_fdc_query(query)
+        query_result = self.fdc_nutrition_flow_service.build_query_options(query)
+        if query_result.status == "no_query":
+            return
+        chosen_query = self._choose_fdc_query(query_result.query_options)
         if not chosen_query:
             return
-        service = FdcNutritionService()
-        # La query ya fue seleccionada por el usuario: evitar reinterpretaciones automaticas.
-        service.use_ai_translation = False
-        try:
-            candidates = service.fetch_candidates(chosen_query, limit=10)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "FoodData Central", f"No se pudo consultar FDC.\n{exc}")
+        candidates_result = self.fdc_nutrition_flow_service.fetch_candidates(chosen_query, limit=10)
+        if candidates_result.status == "error":
+            QMessageBox.warning(self, "FoodData Central", candidates_result.message)
             return
-        if not candidates:
-            QMessageBox.information(self, "FoodData Central", f"Sin resultados FDC para: {chosen_query}")
+        if candidates_result.status == "no_results":
+            QMessageBox.information(self, "FoodData Central", candidates_result.message)
             return
-        labels = [f"{c.label}  [query: {c.query_used}]" for c in candidates]
+        labels = candidates_result.labels
         selected_label, ok = QInputDialog.getItem(
             self,
             "Seleccionar alimento FDC",
@@ -3521,11 +3523,10 @@ class IngredientStdArticleDialog(QDialog):
         )
         if not ok or not selected_label:
             return
-        selected_idx = labels.index(selected_label) if selected_label in labels else -1
-        selected = candidates[selected_idx] if selected_idx >= 0 else None
-        if selected is None:
+        selected = self.fdc_nutrition_flow_service.resolve_selected_candidate(candidates_result, selected_label)
+        if selected.selected_candidate is None:
             return
-        self._apply_nutrition_values(selected.values)
+        self._apply_nutrition_values(selected.selected_candidate.values)
         QMessageBox.information(self, "FoodData Central", "Valores nutricionales cargados desde FDC.")
 
     def _load_nutrition_from_fatsecret(self) -> None:
@@ -3686,98 +3687,37 @@ class IngredientStdArticleDialog(QDialog):
         return str(selected).strip()
 
     def _fatsecret_query_candidates(self, source_query: str) -> list[str]:
-        base = str(source_query or "").strip()
-        if not base:
-            return []
-        options: list[str] = []
+        settings = self._openai_translation_settings()
+        return self.nutrition_query_service.build_fatsecret_candidates(
+            source_query,
+            openai_api_key=settings["api_key"],
+            use_ai_translation=settings["use_ai_translation"],
+        )
 
-        # 1) Traducción IA por frase y por palabras (prioridad alta).
-        try:
-            oa = OpenAISettingsService().load()
-            openai_key = str(oa.get("api_key") or "").strip()
-            use_ai = bool(oa.get("use_ai_translation", False))
-            if openai_key and use_ai:
-                translator = OpenAITranslationService(api_key=openai_key)
-                tr = translator.translate_es_to_en(base)
-                if tr.ok and tr.text.strip():
-                    options.append(tr.text.strip())
-                for cand in translator.translate_es_to_en_candidates(base, max_items=8):
-                    if cand.strip():
-                        options.append(cand.strip())
-                words = [w for w in base.replace("/", " ").replace("-", " ").split() if w.strip()]
-                translated_words: list[str] = []
-                for w in words:
-                    tw = translator.translate_es_to_en(w)
-                    if tw.ok and tw.text.strip():
-                        translated_words.append(tw.text.strip())
-                if translated_words:
-                    options.append(" + ".join(translated_words))
-                    options.extend(translated_words)
-        except Exception:
-            pass
-
-        # 2) Mapeos ES->EN por frase y palabra (fallback).
-        lower = base.lower()
-        if lower in FatSecretClient.ES_EN_HINTS:
-            options.append(FatSecretClient.ES_EN_HINTS[lower])
-        for w in lower.replace("/", " ").replace("-", " ").split():
-            mapped = FatSecretClient.ES_EN_HINTS.get(w.strip())
-            if mapped:
-                options.append(mapped)
-
-        # 3) Original.
-        options.append(base)
-
-        unique: list[str] = []
-        seen: set[str] = set()
-        for opt in options:
-            t = str(opt or "").strip()
-            k = t.lower()
-            if not t or k in seen:
-                continue
-            seen.add(k)
-            unique.append(t)
-        return unique
-
-    def _choose_fdc_query(self, source_query: str) -> str:
-        base = str(source_query or "").strip()
-        if not base:
+    def _choose_fdc_query(self, options: list[str]) -> str:
+        if not options:
             return ""
-        options: list[str] = [base]
-        settings = OpenAISettingsService().load()
-        # Diccionario local rapido ES->EN por primera palabra.
-        first = base.lower().replace("/", " ").replace("-", " ").split()
-        if first:
-            mapped = FdcNutritionService.ES_EN_HINTS.get(first[0], "")
-            if mapped:
-                options.append(mapped)
-        # Candidatos de traduccion por IA.
-        openai_key = str(settings.get("api_key") or "").strip()
-        use_ai = bool(settings.get("use_ai_translation", False))
-        if use_ai and openai_key:
-            ai_terms = OpenAITranslationService(api_key=openai_key).translate_es_to_en_candidates(base, max_items=8)
-            options.extend(ai_terms)
-        # unique preserving order
-        unique: list[str] = []
-        seen: set[str] = set()
-        for term in options:
-            t = str(term or "").strip()
-            k = t.lower()
-            if not t or k in seen:
-                continue
-            seen.add(k)
-            unique.append(t)
         selected, ok = QInputDialog.getItem(
             self,
             "Seleccionar traduccion",
             "Selecciona la traduccion/query para buscar en FDC:",
-            unique,
+            options,
             0,
             False,
         )
         if not ok or not selected:
             return ""
         return str(selected).strip()
+
+    def _openai_translation_settings(self) -> dict[str, Any]:
+        try:
+            loaded = OpenAISettingsService().load()
+        except Exception:
+            loaded = {"api_key": "", "use_ai_translation": False}
+        return {
+            "api_key": str(loaded.get("api_key") or "").strip(),
+            "use_ai_translation": bool(loaded.get("use_ai_translation", False)),
+        }
 
     def nutrition_payload(self) -> dict[str, float]:
         data: dict[str, float] = {}

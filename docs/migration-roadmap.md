@@ -17,6 +17,14 @@
   pequeno debe quedar reflejado en la roadmap y en el historial.
 - Ultimo avance validado: se extraio al servicio la preparacion del adjunto
   y la orquestacion comun del flujo de correo de pedidos por Outlook.
+- Ultimo avance validado: se extrajo la orquestacion comun de importacion
+  documental de pedidos hacia `app/services/orders_documents_import_ui_service.py`,
+  dejando en `orders_page.py` solo la seleccion de archivo, la confirmacion de
+  vista previa y los mensajes de interfaz.
+- Ultimo avance validado: se extrajo el coordinador de flujo IGSA de preview e
+  importacion hacia `app/services/settings_sales_import_flow_ui_service.py`,
+  dejando en `app/ui/widgets/settings_page.py` solo el renderizado de dialogos
+  y los mensajes de interfaz.
 - Cobertura de caracterizacion ampliada: se validan la preparacion del
   adjunto, la version del historico, el contrato de resultado y el manejo de
   errores previsibles del flujo Outlook sin depender de la UI PySide6.
@@ -80,6 +88,28 @@
     importacion y cierre;
   - los mensajes de error visibles del flujo IGSA reutilizan titulos
     centralizados en el servicio.
+- Flujo IGSA de previsualizacion e importacion coordinado fuera de UI desktop:
+  - `app/services/settings_sales_import_flow_ui_service.py` concentra la
+    secuencia comun de confirmacion, importacion y reimportacion del workbook;
+  - `app/ui/widgets/settings_page.py` sigue abriendo los dialogos Qt y ahora
+    delega la decision de reimportacion y la secuencia de importacion al
+    coordinador;
+  - se mantiene el mismo comportamiento visible, los mismos mensajes y el
+    mismo parseo/importacion real.
+- Candidatos de nutricion IREKS/STD normalizados fuera del widget:
+  - `app/services/ingredient_nutrition_query_service.py` concentra la
+    normalizacion de queries y la generacion pura de candidatos FDC y
+    FatSecret;
+  - `app/ui/widgets/ingredients_page.py` conserva los dialogos Qt y la
+    aplicacion final de valores, pero ya no construye los candidatos a mano;
+  - se mantienen los mismos mapeos ES/EN, el mismo orden de candidatos y la
+    misma deduplicacion visible.
+- Flujo FDC de nutricion extraido fuera de UI desktop:
+  - `app/services/ingredient_fdc_nutrition_flow_service.py` concentra la
+    orquestacion no visual del flujo FDC y el mapeo de seleccion;
+  - `app/ui/widgets/ingredients_page.py` conserva los dialogos Qt, mensajes y
+    aplicacion final de valores;
+  - se mantienen los mismos textos visibles y el mismo orden de candidatos.
 - Caracterizacion ampliada del flujo:
   - tests de preparacion, versionado del historico, contrato del servicio y
     errores previsibles de Outlook sin UI PySide6.
@@ -182,19 +212,23 @@
 
 ## Siguiente refactor recomendado
 
-- Objetivo concreto: aislar la metadata textual restante del tab de inventarios
-  en `app/ui/widgets/warehouse_page.py` para que la UI conserve solo la
-  estructura visual y las acciones.
-- Archivos a tocar: `app/ui/widgets/warehouse_page.py` y
-  `tests/test_warehouse_count_template_helpers.py`.
-- Motivo: el tab ya tiene un `view` local; el siguiente borde pequeño es
-  terminar de mover los labels y botones visibles del historial de inventarios.
-- Riesgo: bajo. Es un cambio de metadata visible, sin tocar la lógica de stock
-  ni los ajustes.
-- Tests que deben ejecutarse: `tests/test_warehouse_count_template_helpers.py`
-  y `tests/test_architecture_boundaries.py`.
-- Validacion manual esperada: abrir `Almacen` -> `Inventarios` y comprobar que
-  el encabezado del historial y el boton de exportacion siguen iguales.
+- Objetivo concreto: extraer la secuencia interactiva de FatSecret en
+  `ingredients_page.py` para dejar el widget como fachada de dialogo y
+  aplicacion de valores.
+- Archivos a tocar: `app/ui/widgets/ingredients_page.py`, un nuevo servicio o
+  coordinador pequeno para FatSecret y un test pequeno de caracterizacion del
+  flujo nutricional.
+- Motivo: FDC ya quedo fuera; el siguiente borde pequeño y de alto retorno en
+  `ingredients_page.py` es la orquestacion interactiva de FatSecret, que aun
+  decide, valida y aplica resultados con mas ramificacion que ChatGPT.
+- Riesgo: medio-alto. Es un cambio de coordinacion y mensajes, con mas ramas
+  que FDC pero sin tocar el calculo nutricional ni la edicion de recetas.
+- Tests que deben ejecutarse: `tests/test_ingredient_fdc_nutrition_flow_service.py`,
+  `tests/test_ingredient_nutrition_query_service.py` y
+  `tests/test_architecture_boundaries.py`.
+- Validacion manual esperada: abrir `Ingredientes` y comprobar que la busqueda
+  FDC sigue ofreciendo las mismas opciones y que la aplicacion de valores
+  nutricionales sigue igual.
 
 ## Proximos pasos
 
