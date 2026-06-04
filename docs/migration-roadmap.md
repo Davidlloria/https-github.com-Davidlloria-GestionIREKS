@@ -11,12 +11,15 @@
 - Proximo foco tecnico: seguir sacando logica residual de `orders_page.py`,
   `settings_page.py`, `ingredients_page.py` y `warehouse_page.py` hacia capas
   de servicio o helpers puros.
-- Proximo foco tecnico: reducir dependencia de desktop sobre Outlook, OCR,
-  dialogos de archivo/impresion y rutas locales del servidor.
+- Proximo foco tecnico: reducir dependencia de desktop sobre OCR, dialogos de
+  archivo/impresion y rutas locales del servidor.
 - Proximo foco tecnico: mantener gates y trazabilidad documental; cada avance
   pequeno debe quedar reflejado en la roadmap y en el historial.
 - Ultimo avance validado: se extraio al servicio la preparacion del adjunto
   y la orquestacion comun del flujo de correo de pedidos por Outlook.
+- Ultimo avance validado: se extrajo el coordinador no visual de Outlook hacia
+  `app/services/order_mail_flow_service.py`, dejando en `orders_page.py` la
+  seleccion de modo, el preview y los mensajes visibles.
 - Ultimo avance validado: se extrajo la orquestacion comun de importacion
   documental de pedidos hacia `app/services/orders_documents_import_ui_service.py`,
   dejando en `orders_page.py` solo la seleccion de archivo, la confirmacion de
@@ -46,6 +49,8 @@
   - `app/services/order_export_service.py` ahora concentra la preparacion del
     adjunto del pedido (`prepare_order_mail_attachment`) y la orquestacion del
     envio/log de Outlook (`send_order_mail`);
+  - `app/services/order_mail_flow_service.py` concentra la coordinacion no
+    visual de preparacion, preview y envio con estados estructurados;
   - `app/ui/widgets/orders_page.py` queda centrado en seleccion, confirmacion,
     previsualizacion y mensajes visibles;
   - se mantienen los mismos textos al usuario y el mismo contrato visible.

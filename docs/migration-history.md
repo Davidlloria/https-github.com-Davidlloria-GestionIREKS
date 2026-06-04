@@ -481,16 +481,19 @@ Fase 5 - Reducir dependencia del desktop.
 - Refactor del flujo de correo de pedidos por Outlook:
   - extraida del widget la preparacion del adjunto del pedido y la
     orquestacion del envio/log de Outlook hacia `app/services/order_export_service.py`;
+  - `app/services/order_mail_flow_service.py` concentra la coordinacion no
+    visual de preparacion, preview y envio con estados estructurados;
   - `OrdersPage` conserva la seleccion, la previsualizacion y los mensajes,
     sin cambiar textos visibles ni el comportamiento de borrador/envio;
   - cobertura de caracterizacion ampliada con pruebas de preparacion del
     adjunto, versionado del historico, contrato del servicio y errores
     previsibles de Outlook sin abrir la UI PySide6;
   - archivos afectados: `app/services/order_export_service.py`,
-    `app/ui/widgets/orders_page.py`, `tests/test_order_export_mail_preparation.py`;
-  - tests ejecutados: `python -m py_compile` sobre los archivos tocados,
-    `python -m pytest tests\test_order_export_mail_preparation.py
-    tests\test_architecture_boundaries.py tests\test_albaran_pdf_parser.py -q`,
+    `app/services/order_mail_flow_service.py`, `app/ui/widgets/orders_page.py`,
+    `tests/test_order_export_mail_preparation.py`, `tests/test_order_mail_flow_service.py`;
+  - tests ejecutados: `python -m pytest tests\test_order_mail_flow_service.py
+    tests\test_order_export_mail_preparation.py
+    tests\test_architecture_boundaries.py -q`;
     `python -m pytest tests -q`.
 - Refactor de plantilla de inventario en `warehouse_page.py`:
   - extraida la deteccion de columnas y la construccion del mapa de conteos a

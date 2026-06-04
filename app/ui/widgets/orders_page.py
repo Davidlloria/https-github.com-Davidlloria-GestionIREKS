@@ -54,6 +54,7 @@ from app.models import (
 from app.services.order_document_import_service import OrderDocumentImportService
 from app.services.order_document_parser import OrderDocumentParser
 from app.services.order_export_service import OrderExportService
+from app.services.order_mail_flow_service import OrderMailFlowService
 from app.services.orders_documents_import_ui_service import (
     OrdersDocumentImportFlowError,
     OrdersDocumentsImportUiService,
@@ -1097,6 +1098,7 @@ class OrdersPage(QWidget):
         super().__init__()
         self.order_document_import_service = OrderDocumentImportService()
         self.order_export_service = OrderExportService()
+        self.order_mail_flow_service = OrderMailFlowService(order_export_service=self.order_export_service)
         self.order_query_service = OrderQueryService()
         self.order_service = OrderService()
         self.orders_documents_import_ui_service = OrdersDocumentsImportUiService(
@@ -2556,34 +2558,36 @@ class OrdersPage(QWidget):
             return
         send_direct = clicked == send_btn
         try:
-            preparation = self.order_export_service.prepare_order_mail_attachment(
+            preparation = self.order_mail_flow_service.prepare_mail(
                 pedido_id=selected.pedido_id,
                 pedido_numero=selected.pedido_numero,
                 destino_email=destino_email,
             )
+            if preparation.status == "error":
+                QMessageBox.warning(self, "Pedidos", preparation.message)
+                return
             preview = preparation.preview
             edited = self._show_mail_preview_dialog(
                 to_email=str(preview.get("to_email") or ""),
                 subject=str(preview.get("subject") or ""),
                 body=str(preview.get("body") or ""),
-                attachment_path=preparation.attachment_path,
+                attachment_path=preparation.attachment_path or Path(),
                 send_direct=send_direct,
             )
-            if edited is None:
+            result = self.order_mail_flow_service.send_prepared_mail(
+                preparation,
+                edited,
+                send_direct=send_direct,
+            )
+            if result.status == "cancelled":
                 return
-            self.order_export_service.send_order_mail(
-                pedido_id=selected.pedido_id,
-                pedido_numero=selected.pedido_numero,
-                attachment_path=preparation.attachment_path,
-                destino_email=str(edited.get("to_email") or "").strip(),
-                send_direct=send_direct,
-                subject=str(edited.get("subject") or "").strip(),
-                body=str(edited.get("body") or ""),
-            )
+            if result.status == "error":
+                QMessageBox.warning(self, "Pedidos", result.message)
+                return
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Pedidos", f"No se pudo preparar el email.\n{exc}")
             return
-        excel_path = str(preparation.attachment_path)
+        excel_path = str(preparation.attachment_path or "")
         if send_direct:
             QMessageBox.information(self, "Pedidos", f"Correo enviado desde Outlook.\nAdjunto: {excel_path}")
         else:
