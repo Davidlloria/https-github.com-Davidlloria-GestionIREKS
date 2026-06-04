@@ -506,6 +506,17 @@ Fase 5 - Reducir dependencia del desktop.
     `app/ui/widgets/orders_page.py`, `tests/test_order_edit_flow_service.py`;
   - tests ejecutados: `python -m pytest tests\test_order_edit_flow_service.py
     tests\test_architecture_boundaries.py -q`.
+- Refactor de guardado manual de movimientos en `warehouse_page.py`:
+  - extraida la validacion del payload, el calculo de stock y la coordinacion
+    del guardado hacia `app/services/warehouse_manual_move_flow_service.py`;
+  - `warehouse_page.py` conserva `ManualMovementDialog`, `QMessageBox`, la
+    seleccion de movimiento y el refresco de pantalla;
+  - se mantienen los mismos textos visibles y el mismo comportamiento de alta
+    y edicion manual;
+  - archivos afectados: `app/services/warehouse_manual_move_flow_service.py`,
+    `app/ui/widgets/warehouse_page.py`, `tests/test_warehouse_manual_move_flow_service.py`;
+  - tests ejecutados: `python -m pytest tests\test_warehouse_manual_move_flow_service.py
+    tests\test_architecture_boundaries.py -q`.
 - Refactor de plantilla de inventario en `warehouse_page.py`:
   - extraida la deteccion de columnas y la construccion del mapa de conteos a
     helpers puros reutilizables;

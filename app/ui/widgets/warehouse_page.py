@@ -41,6 +41,7 @@ from app.models import (
     Subfamilia,
 )
 from app.services.monthly_orders_service import MonthlyOrdersService
+from app.services.warehouse_manual_move_flow_service import WarehouseManualMoveFlowService
 from app.services.warehouse_catalog_service import WarehouseCatalogService
 from app.services.warehouse_inventory_service import WarehouseInventoryService
 from app.services.warehouse_movement_service import WarehouseMovementService
@@ -507,6 +508,7 @@ class MovimientosTab(QWidget):
         self._building_filters = False
         self._movement_by_id: dict[int, AlmacenMovimiento] = {}
         self.movement_service = WarehouseMovementService()
+        self.manual_move_flow_service = WarehouseManualMoveFlowService(movement_service=self.movement_service)
         self._build_ui()
         self.reload()
 
@@ -1087,7 +1089,7 @@ class MovimientosTab(QWidget):
         self.movement_service.reverse_manual_move(mov)
         self.reload()
 
-    def _save_manual_move(self, payload: dict[str, Any], existing: AlmacenMovimiento | None) -> None:
+    def _save_manual_move_legacy(self, payload: dict[str, Any], existing: AlmacenMovimiento | None) -> None:
         articulo_id = str(payload.get("articulo_id") or "").strip()
         if not articulo_id:
             raise ValueError("Articulo_ID es obligatorio.")
@@ -1125,6 +1127,21 @@ class MovimientosTab(QWidget):
             caducidad=cad,
             albaran=albaran,
         )
+
+
+    def _save_manual_move(self, payload: dict[str, Any], existing: AlmacenMovimiento | None) -> AlmacenMovimiento:
+        context = self.manual_move_flow_service.build_manual_move_context(
+            payload,
+            mode=self._mode,
+            almacen_id=self._almacen_id,
+            existing=existing,
+        )
+        if context.status != "ready":
+            raise ValueError(context.message or "No se pudo guardar el movimiento manual.")
+        result = self.manual_move_flow_service.submit_manual_move(context)
+        if result.status != "success" or result.move is None:
+            raise ValueError(result.message or "No se pudo guardar el movimiento manual.")
+        return result.move
 
 
 def _compute_current_stock_rows(moves: list[AlmacenMovimiento]) -> list[dict[str, Any]]:

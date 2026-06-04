@@ -36,6 +36,11 @@
   `app/services/ingredient_fatsecret_nutrition_flow_service.py`, dejando en
   `app/ui/widgets/ingredients_page.py` la seleccion de codigo de barras, los
   dialogos Qt, los mensajes visibles y la aplicacion final de valores.
+- Ultimo avance validado: se extrajo la orquestacion no visual del guardado de
+  movimientos manuales de almacen hacia
+  `app/services/warehouse_manual_move_flow_service.py`, dejando en
+  `app/ui/widgets/warehouse_page.py` el dialogo manual, los mensajes visibles y
+  el refresco de pantalla.
 - Cobertura de caracterizacion ampliada: se validan la preparacion del
   adjunto, la version del historico, el contrato de resultado y el manejo de
   errores previsibles del flujo Outlook sin depender de la UI PySide6.
@@ -61,6 +66,14 @@
     mensajes visibles, el `reload` y la reseleccion del pedido;
   - se mantienen los mismos textos visibles y el mismo comportamiento de
     guardado, validacion y refresco.
+- Flujo de guardado de movimientos manuales en `warehouse_page.py` coordinado
+  fuera del widget:
+  - `app/services/warehouse_manual_move_flow_service.py` concentra la
+    validacion de payload, el calculo de stock y la coordinacion del guardado;
+  - `app/ui/widgets/warehouse_page.py` conserva `ManualMovementDialog`, los
+    mensajes visibles, la seleccion de movimiento y el refresco de pantalla;
+  - se mantienen los mismos textos visibles, validaciones y comportamiento de
+    guardado manual.
 - Flujo de backup de base de datos en configuracion simplificado:
   - `app/services/settings_maintenance_ui_service.py` ahora genera la ruta por
     defecto del backup con una unica funcion reutilizable;
@@ -159,7 +172,7 @@
 
 ### P2
 
-- `app/ui/widgets/warehouse_page.py`: plantilla de inventario, conteos y
+- `app/ui/widgets/warehouse_page.py`: plantilla de inventario, ajustes y
   exportaciones siguen teniendo logica de soporte que conviene aislar mas.
 - `app/ui/widgets/customers_page.py`: exportacion/impresion y mantenimiento de
   cliente siguen acoplados a UI.
