@@ -109,4 +109,3 @@ def test_prepare_adjustments_returns_error_for_missing_almacen_id() -> None:
     assert result.status == "error"
     assert result.message == "Indica almacen_id."
     assert result.pending == []
-
