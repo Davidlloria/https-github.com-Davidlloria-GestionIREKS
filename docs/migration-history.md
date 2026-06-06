@@ -437,6 +437,35 @@ Fase 5 - Reducir dependencia del desktop.
   - tests ejecutados: `python -m pytest tests\\test_ingredient_chatgpt_nutrition_flow_service.py
     tests\\test_ingredient_nutrition_query_service.py
     tests\\test_architecture_boundaries.py -q`.
+- Flujo de generacion de reportes de producto extraido fuera de UI desktop:
+  - `app/services/product_report_flow_service.py` concentra la validacion de
+    prompt vacio, el parseo de la intencion, la gestion de errores y la
+    ejecucion del listado;
+  - `app/ui/widgets/ingredients_page.py` conserva `QPlainTextEdit`,
+    `QApplication.processEvents()`, `QMessageBox`, `_render_product_report` y
+    la actualizacion visual de estado;
+  - se mantienen los mismos textos visibles, la misma semantica de
+    seleccionados sin seleccion y la misma salida visible del listado;
+  - archivos afectados: `app/services/product_report_flow_service.py`,
+    `app/ui/widgets/ingredients_page.py`,
+    `tests/test_product_report_flow_service.py`;
+  - tests ejecutados: `python -m pytest tests\\test_product_report_flow_service.py
+    tests\\test_architecture_boundaries.py -q`.
+- Preparacion de ajustes de inventario extraida fuera de UI desktop:
+  - `app/services/warehouse_inventory_adjustment_preparation_service.py`
+    concentra el parseo de conteo y teorico, el calculo de diferencias y la
+    construccion de `AlmacenMovimiento`/payload pendiente;
+  - `app/ui/widgets/warehouse_page.py` conserva la lectura de la tabla Qt,
+    los mensajes visibles, la asignacion de `_pending_ajustes` y la
+    actualizacion del contador de pendientes;
+  - se mantienen los mismos textos visibles, la misma logica de stock y la
+    misma semantica de "No hay diferencias para ajustar.";
+  - archivos afectados:
+    `app/services/warehouse_inventory_adjustment_preparation_service.py`,
+    `app/ui/widgets/warehouse_page.py`,
+    `tests/test_warehouse_inventory_adjustment_preparation_service.py`;
+  - tests ejecutados: `python -m pytest tests\\test_warehouse_inventory_adjustment_preparation_service.py
+    tests\\test_architecture_boundaries.py -q`.
 - Extraccion de la orquestacion comun de importacion documental de pedidos:
   - `app/services/orders_documents_import_ui_service.py` concentra la
     secuencia compartida de preview, confirmacion e importacion de albaranes y

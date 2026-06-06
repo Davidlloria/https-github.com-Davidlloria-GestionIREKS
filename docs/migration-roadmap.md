@@ -13,8 +13,21 @@
   de servicio o helpers puros.
 - Proximo foco tecnico: reducir dependencia de desktop sobre OCR, dialogos de
   archivo/impresion y rutas locales del servidor.
+- Proximo foco tecnico: cerrar la orquestacion de reportes/impresion en
+  `ingredients_page.py` ahora que la generacion del listado ya esta coordinada
+  fuera del widget.
 - Proximo foco tecnico: mantener gates y trazabilidad documental; cada avance
   pequeno debe quedar reflejado en la roadmap y en el historial.
+- Ultimo avance validado: se extrajo la orquestacion no visual de generacion
+  de reportes de producto hacia `app/services/product_report_flow_service.py`,
+  dejando en `app/ui/widgets/ingredients_page.py` la lectura del prompt, los
+  mensajes visibles, `QApplication.processEvents()` y la actualizacion visual
+  del listado.
+- Ultimo avance validado: se extrajo la preparacion de ajustes de inventario
+  hacia `app/services/warehouse_inventory_adjustment_preparation_service.py`,
+  dejando en `app/ui/widgets/warehouse_page.py` la lectura de la tabla Qt, los
+  mensajes visibles, la asignacion de pendientes y la actualizacion visual del
+  contador.
 - Ultimo avance validado: se extraio al servicio la preparacion del adjunto
   y la orquestacion comun del flujo de correo de pedidos por Outlook.
 - Ultimo avance validado: se extrajo el coordinador no visual de Outlook hacia

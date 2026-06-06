@@ -50,7 +50,8 @@ from app.services.ingredient_std_service import IngredientStdService
 from app.services.fatsecret_client import FatSecretApiError
 from app.services.openai_nutrition_service import OpenAINutritionService
 from app.services.monthly_orders_service import MonthlyOrdersService
-from app.services.product_report_service import ProductReportIntentService, ProductReportResult, ProductReportService
+from app.services.product_report_flow_service import ProductReportFlowService
+from app.services.product_report_service import ProductReportResult
 from app.services.report_export_service import ReportExportService
 from app.ui.widgets.entity_page import EntityPage
 from app.ui.widgets.ingredient_distributors_tab import IngredientDistributorsTab
@@ -429,8 +430,7 @@ class IngredientsIreksPage(QWidget):
         self.vm = vm or IngredientIreksViewModel()
         self.ireks_service = IngredientIreksService(self.vm)
         self.monthly_orders_service = MonthlyOrdersService()
-        self.report_intent_service = ProductReportIntentService()
-        self.product_report_service = ProductReportService()
+        self.product_report_flow_service = ProductReportFlowService()
         self.report_export_service = ReportExportService()
         self.nutrition_query_service = IngredientNutritionQueryService()
         self.fdc_nutrition_flow_service = IngredientFdcNutritionFlowService(
@@ -2959,23 +2959,32 @@ class IngredientsIreksPage(QWidget):
             return
         self.product_report_status_label.setText("Generando listado...")
         QApplication.processEvents()
-        intent_result = self.report_intent_service.parse(prompt)
-        if not intent_result.ok:
-            QMessageBox.warning(self, "Listados", intent_result.message)
+        result = self.product_report_flow_service.generate_report(
+            prompt,
+            selected_product_ids=self._selected_product_ids,
+        )
+        if result.status == "empty_prompt":
+            QMessageBox.warning(self, "Listados", result.message)
             return
-        if "seleccionad" in prompt.lower():
-            selected_ids = sorted(int(item_id) for item_id in self._selected_product_ids if int(item_id or 0) > 0)
-            if not selected_ids:
-                QMessageBox.warning(self, "Listados", "No hay productos seleccionados en la lista.")
-                self.product_report_status_label.setText("Sin listado generado.")
-                return
-            intent_result.intent.selected_ids = selected_ids
-        report = self.product_report_service.run(intent_result.intent)
+        if result.status == "parse_error":
+            QMessageBox.warning(self, "Listados", result.message)
+            return
+        if result.status == "no_selection":
+            QMessageBox.warning(self, "Listados", result.message)
+            self.product_report_status_label.setText("Sin listado generado.")
+            return
+        if result.status == "error":
+            QMessageBox.warning(self, "Listados", result.message)
+            return
+        if result.status != "ready" or result.report is None:
+            QMessageBox.warning(self, "Listados", "No se pudo generar el listado.")
+            return
+        report = result.report
         self._last_product_report = report
         self._render_product_report(report)
-        source = "ChatGPT" if intent_result.used_ai else "interprete local"
+        source = "ChatGPT" if result.used_ai else "interprete local"
         self.product_report_status_label.setText(f"{report.title} · {len(report.rows)} fila(s) · {source}")
-        self.product_report_status_label.setToolTip(intent_result.message or "")
+        self.product_report_status_label.setToolTip(result.message or "")
 
     def _render_product_report(self, report: ProductReportResult) -> None:
         self.product_report_table.clear()
