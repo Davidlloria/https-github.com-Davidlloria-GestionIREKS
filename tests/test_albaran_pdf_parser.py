@@ -4,6 +4,7 @@ from pathlib import Path
 from reportlab.pdfgen import canvas
 
 import app.services.order_document_parser as order_document_parser
+import app.services.order_document_factura_sidecar_service as order_document_factura_sidecar_service
 import app.services.order_document_ocr_runtime_service as order_document_ocr_runtime_service
 import app.services.address_catalog_service as address_catalog_service
 import app.services.order_document_import_service as order_document_import_service
@@ -88,6 +89,10 @@ def test_order_document_parser_is_ui_free() -> None:
 
 def test_order_document_ocr_runtime_service_is_ui_free() -> None:
     assert "PySide6" not in inspect.getsource(order_document_ocr_runtime_service)
+
+
+def test_order_document_factura_sidecar_service_is_ui_free() -> None:
+    assert "PySide6" not in inspect.getsource(order_document_factura_sidecar_service)
 
 
 def test_address_catalog_service_is_ui_free() -> None:

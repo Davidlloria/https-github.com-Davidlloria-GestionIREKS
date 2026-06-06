@@ -16,6 +16,8 @@
 - Proximo foco tecnico: seguir aislando el runtime OCR local de
   `order_document_parser.py` sin alterar el contrato de parseo ni el formato de
   salida.
+- Proximo foco tecnico: seguir extrayendo helpers de sidecar de factura fuera
+  de `order_document_parser.py` sin tocar la precedencia parsed/sidecar/OCR.
 - Proximo foco tecnico: cerrar la orquestacion de reportes/impresion en
   `ingredients_page.py` ahora que la generacion del listado ya esta coordinada
   fuera del widget.
@@ -65,6 +67,10 @@
   `app/services/order_document_ocr_runtime_service.py`, dejando en
   `app/services/order_document_parser.py` el parseo documental, el OCR de
   lineas, los sidecars y la recuperacion de huerfanas.
+- Ultimo avance validado: se extrae la carga y normalizacion de sidecars de
+  factura hacia `app/services/order_document_factura_sidecar_service.py`,
+  dejando en `app/services/order_document_parser.py` la precedencia entre filas
+  parseadas, sidecars y OCR de recuperacion.
 - Cobertura de caracterizacion ampliada: se validan la preparacion del
   adjunto, la version del historico, el contrato de resultado y el manejo de
   errores previsibles del flujo Outlook sin depender de la UI PySide6.

@@ -8,6 +8,7 @@ from typing import Any
 import fitz
 from pypdf import PdfReader
 
+from app.services.order_document_factura_sidecar_service import OrderDocumentFacturaSidecarService
 from app.services.order_document_ocr_runtime_service import OrderDocumentOcrRuntimeService
 
 
@@ -303,71 +304,8 @@ class OrderDocumentParser:
         return ""
 
     @staticmethod
-    def _factura_sidecar_value(payload: dict[str, Any], names: list[str]) -> Any:
-        normalized = {re.sub(r"[^a-z0-9]", "", str(key).lower()): value for key, value in payload.items()}
-        for name in names:
-            key = re.sub(r"[^a-z0-9]", "", name.lower())
-            if key in normalized:
-                return normalized[key]
-        return ""
-
-    @staticmethod
-    def _load_factura_sidecar_rows(file_path: Path, header: dict[str, str]) -> list[dict[str, Any]]:
-        factura_numero = str(header.get("factura_numero") or "").strip()
-        if not factura_numero:
-            return []
-        rows: list[dict[str, Any]] = []
-        for json_path in sorted(file_path.parent.glob("*.json")):
-            if factura_numero not in json_path.name:
-                continue
-            try:
-                payload = json.loads(json_path.read_text(encoding="utf-8-sig"))
-            except Exception:
-                continue
-            if not isinstance(payload, list):
-                continue
-            for entry in payload:
-                if not isinstance(entry, dict):
-                    continue
-                entry_factura = str(OrderDocumentParser._factura_sidecar_value(entry, ["Factura", "factura_numero"]) or "").strip()
-                if entry_factura and entry_factura != factura_numero:
-                    continue
-                codigo = str(OrderDocumentParser._factura_sidecar_value(entry, ["Código", "Codigo", "CÃ³digo", "articulo_codigo"]) or "").strip()
-                lote = str(OrderDocumentParser._factura_sidecar_value(entry, ["Lote", "articulo_lote"]) or "").strip()
-                if not codigo or not lote:
-                    continue
-                rows.append(
-                    {
-                        "factura_numero": factura_numero,
-                        "factura_fecha": str(OrderDocumentParser._factura_sidecar_value(entry, ["Fecha", "factura_fecha"]) or header.get("factura_fecha") or "").strip(),
-                        "albaran_numero": str(
-                            OrderDocumentParser._factura_sidecar_value(entry, ["Albarán", "Albaran", "AlbarÃ¡n", "albaran_numero"])
-                            or header.get("albaran_numero")
-                            or ""
-                        ).strip(),
-                        "factura_referencia": str(header.get("factura_referencia") or "").strip(),
-                        "articulo_codigo": codigo,
-                        "articulo_descripcion": str(
-                            OrderDocumentParser._factura_sidecar_value(entry, ["Descripción", "Descripcion", "DescripciÃ³n", "articulo_descripcion"]) or codigo
-                        ).strip(),
-                        "articulo_cantidad": str(OrderDocumentParser._factura_sidecar_value(entry, ["Unidades", "Uds", "articulo_cantidad"]) or "").strip(),
-                        "articulo_envase": "",
-                        "articulo_kilos": "",
-                        "articulo_lote": lote,
-                        "articulo_caducidad": str(OrderDocumentParser._factura_sidecar_value(entry, ["Caducidad", "articulo_caducidad"]) or "").strip(),
-                        "precio_unitario": str(OrderDocumentParser._factura_sidecar_value(entry, ["Precio", "precio_unitario"]) or "").strip(),
-                        "dto_pct": str(OrderDocumentParser._factura_sidecar_value(entry, ["Descuento", "Dto", "dto_pct"]) or "20").strip(),
-                        "iva_pct": "",
-                        "total_linea": "",
-                    }
-                )
-            if rows:
-                return rows
-        return rows
-
-    @staticmethod
     def _merge_factura_sidecar_rows(file_path: Path, header: dict[str, str], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        sidecar_rows = OrderDocumentParser._load_factura_sidecar_rows(file_path, header)
+        sidecar_rows = OrderDocumentFacturaSidecarService().load_rows(file_path, header.get("factura_numero") or "", header)
         if not sidecar_rows:
             return rows
         parsed_by_lote = {str(row.get("articulo_lote") or "").strip(): row for row in rows if str(row.get("articulo_lote") or "").strip()}
