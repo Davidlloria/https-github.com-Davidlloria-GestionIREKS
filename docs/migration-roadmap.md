@@ -13,6 +13,9 @@
   de servicio o helpers puros.
 - Proximo foco tecnico: reducir dependencia de desktop sobre OCR, dialogos de
   archivo/impresion y rutas locales del servidor.
+- Proximo foco tecnico: seguir aislando el runtime OCR local de
+  `order_document_parser.py` sin alterar el contrato de parseo ni el formato de
+  salida.
 - Proximo foco tecnico: cerrar la orquestacion de reportes/impresion en
   `ingredients_page.py` ahora que la generacion del listado ya esta coordinada
   fuera del widget.
@@ -58,6 +61,10 @@
   ChatGPT nutricion hacia `app/services/ingredient_chatgpt_nutrition_flow_service.py`,
   dejando en `app/ui/widgets/ingredients_page.py` el dialogo de consulta, los
   mensajes visibles y la aplicacion final de valores.
+- Ultimo avance validado: se extrae la resolucion del runtime OCR local hacia
+  `app/services/order_document_ocr_runtime_service.py`, dejando en
+  `app/services/order_document_parser.py` el parseo documental, el OCR de
+  lineas, los sidecars y la recuperacion de huerfanas.
 - Cobertura de caracterizacion ampliada: se validan la preparacion del
   adjunto, la version del historico, el contrato de resultado y el manejo de
   errores previsibles del flujo Outlook sin depender de la UI PySide6.
