@@ -41,6 +41,9 @@ from app.models import (
     Subfamilia,
 )
 from app.services.monthly_orders_service import MonthlyOrdersService
+from app.services.warehouse_inventory_adjustment_preparation_service import (
+    WarehouseInventoryAdjustmentPreparationService,
+)
 from app.services.warehouse_manual_move_flow_service import WarehouseManualMoveFlowService
 from app.services.warehouse_catalog_service import WarehouseCatalogService
 from app.services.warehouse_inventory_service import WarehouseInventoryService
@@ -1705,6 +1708,7 @@ class InventariosTab(QWidget):
         self._almacen_id = ""
         self._pending_ajustes: list[dict[str, Any]] = []
         self.inventory_service = WarehouseInventoryService()
+        self.inventory_adjustment_preparation_service = WarehouseInventoryAdjustmentPreparationService()
         self.view = InventoryTabView()
         self._build_ui()
         self.reload()
@@ -1954,57 +1958,36 @@ class InventariosTab(QWidget):
         self.reload()
 
     def _prepare_adjustments(self) -> None:
-        ajustes: list[dict[str, Any]] = []
-        today = date.today()
-        inv_code = f"INV-{today.strftime('%Y%m%d')}"
+        rows: list[dict[str, Any]] = []
         for i in range(self.table.rowCount()):
             conteo_cell = self.table.item(i, 5)
             if conteo_cell is None:
                 continue
-            conteo_txt = str(conteo_cell.text() or "").strip().replace(",", ".")
-            if conteo_txt == "":
-                continue
-            try:
-                conteo = float(conteo_txt)
-            except ValueError:
-                continue
-            teorico = float(str(self.table.item(i, 4).text() if self.table.item(i, 4) else "0").replace(",", ".") or 0.0)
-            diff = conteo - teorico
-            if abs(diff) < 0.0001:
-                continue
             key_item = self.table.item(i, 0)
             art_id, lote, cad_iso = key_item.data(Qt.ItemDataRole.UserRole) if key_item else ("", "", "")
-            cad = date.fromisoformat(cad_iso) if cad_iso else None
-            peso = float(self.table.item(i, 5).data(Qt.ItemDataRole.UserRole) or 0.0) if self.table.item(i, 5) else 0.0
-            mov = AlmacenMovimiento(
-                    almacen_id=self._almacen_id,
-                    articulo_id=str(art_id or "").strip(),
-                    pedido_numero=inv_code,
-                    pedido_albaran_numero="INV-AJUSTE",
-                    cantidad=diff,
-                    articulo_lote=str(lote or "").strip(),
-                    articulo_caducidad=cad,
-                    fecha_pedido=today,
-                    albaran_item_id=str(uuid4()),
-                )
-            ajustes.append(
+            rows.append(
                 {
-                    "mov": mov,
                     "articulo_id": str(art_id or "").strip(),
                     "articulo_lote": str(lote or "").strip(),
-                    "articulo_caducidad": cad,
-                    "teorico_uds": teorico,
-                    "conteo_uds": conteo,
-                    "diferencia_uds": diff,
-                    "kg_ajuste": diff * peso,
+                    "articulo_caducidad_iso": str(cad_iso or "").strip(),
+                    "conteo_text": str(conteo_cell.text() or ""),
+                    "teorico_text": str(self.table.item(i, 4).text() if self.table.item(i, 4) else "0"),
+                    "peso": float(conteo_cell.data(Qt.ItemDataRole.UserRole) or 0.0),
                 }
             )
-        if not ajustes:
-            QMessageBox.information(self, "Inventarios", "No hay diferencias para ajustar.")
+        result = self.inventory_adjustment_preparation_service.prepare_adjustments(
+            rows,
+            almacen_id=self._almacen_id,
+        )
+        if result.status == "error":
+            QMessageBox.warning(self, "Inventarios", result.message or "No se pudieron preparar los ajustes.")
             return
-        self._pending_ajustes = ajustes
-        self.pending_label.setText(f"Pendientes: {len(ajustes)}")
-        QMessageBox.information(self, "Inventarios", f"Ajustes preparados: {len(ajustes)}\nRevisa y pulsa 'Aprobar y aplicar'.")
+        if result.status == "no_differences":
+            QMessageBox.information(self, "Inventarios", result.message)
+            return
+        self._pending_ajustes = result.pending
+        self.pending_label.setText(f"Pendientes: {result.prepared_count}")
+        QMessageBox.information(self, "Inventarios", result.message)
 
     def _reload_history(self) -> None:
         rows = self.inventory_service.history(self._almacen_id)
