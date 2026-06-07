@@ -20,7 +20,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.services.sales_reconciliation_service import SalesComparisonRow, SalesReconciliationService
+from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow
+from app.services.sales_reconciliation_service import SalesReconciliationService
 
 
 MONTH_NAMES = [
@@ -74,6 +75,7 @@ class SalesPage(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.sales_service = SalesReconciliationService()
+        self.sales_summary_service = SalesAnnualComparisonService()
         self._building = False
         self._building_igsa = False
         self._product_filter_timer = QTimer(self)
@@ -485,7 +487,7 @@ class SalesPage(QWidget):
                 self._fill_group_headers(date.today().year)
                 self._fill_totals_row(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
                 return
-            rows = self.sales_service.listar_resumen_anual(
+            rows = self.sales_summary_service.listar_resumen_anual(
                 year=year,
                 month=self._current_month(),
                 acumulado=bool(self.acumulado_check.isChecked()),
@@ -507,15 +509,15 @@ class SalesPage(QWidget):
         current_family_id = self._current_family_id()
         current_subfamily_id = self._current_subfamily_id()
 
-        years = self.sales_service.list_years()
+        years = self.sales_summary_service.list_years()
         if not years:
             years = [date.today().year]
-        clients = self.sales_service.list_filter_clients()
-        manufacturers = self.sales_service.list_filter_manufacturers()
-        families = self.sales_service.list_filter_families(current_manufacturer_id)
+        clients = self.sales_summary_service.list_filter_clients()
+        manufacturers = self.sales_summary_service.list_filter_manufacturers()
+        families = self.sales_summary_service.list_filter_families(current_manufacturer_id)
         family_ids = {str(getattr(row, "articulo_familia_id", "") or "").strip() for row in families}
         effective_family_id = current_family_id if current_family_id in family_ids else ""
-        subfamilies = self.sales_service.list_filter_subfamilies(effective_family_id)
+        subfamilies = self.sales_summary_service.list_filter_subfamilies(effective_family_id)
         subfamily_ids = {str(getattr(row, "articulo_subfamilia_id", "") or "").strip() for row in subfamilies}
         effective_subfamily_id = current_subfamily_id if current_subfamily_id in subfamily_ids else ""
 
@@ -657,7 +659,7 @@ class SalesPage(QWidget):
                 self._fill_group_headers_igsa(date.today().year)
                 self._fill_totals_row_igsa(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
                 return
-            rows = self.sales_service.listar_resumen_anual_igsa(
+            rows = self.sales_summary_service.listar_resumen_anual_igsa(
                 year=year,
                 month=self._current_month_igsa(),
                 acumulado=bool(self.acumulado_check_igsa.isChecked()),
@@ -677,14 +679,14 @@ class SalesPage(QWidget):
         current_family_id = self._current_family_id_igsa()
         current_subfamily_id = self._current_subfamily_id_igsa()
 
-        years = self.sales_service.list_years_igsa()
+        years = self.sales_summary_service.list_years_igsa()
         if not years:
             years = [date.today().year]
-        manufacturers = self.sales_service.list_filter_manufacturers_igsa()
-        families = self.sales_service.list_filter_families_igsa(current_manufacturer_id)
+        manufacturers = self.sales_summary_service.list_filter_manufacturers_igsa()
+        families = self.sales_summary_service.list_filter_families_igsa(current_manufacturer_id)
         family_ids = {str(getattr(row, "articulo_familia_id", "") or "").strip() for row in families}
         effective_family_id = current_family_id if current_family_id in family_ids else ""
-        subfamilies = self.sales_service.list_filter_subfamilies_igsa(effective_family_id)
+        subfamilies = self.sales_summary_service.list_filter_subfamilies_igsa(effective_family_id)
         subfamily_ids = {str(getattr(row, "articulo_subfamilia_id", "") or "").strip() for row in subfamilies}
         effective_subfamily_id = current_subfamily_id if current_subfamily_id in subfamily_ids else ""
 
