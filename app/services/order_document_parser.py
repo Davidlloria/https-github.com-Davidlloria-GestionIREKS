@@ -304,6 +304,103 @@ class OrderDocumentParser:
         return ""
 
     @staticmethod
+    def _words_to_factura_lines(words: list[Any]) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for word in sorted(words, key=lambda x: (float(x[1]), float(x[0]))):
+            x0, y0, _x1, _y1, text = word[:5]
+            if float(y0) < 100 or float(y0) > 760:
+                continue
+            placed = False
+            for line in out:
+                if abs(float(line["y"]) - float(y0)) < 3.0:
+                    line["words"].append(word)
+                    line["y"] = (float(line["y"]) * int(line["n"]) + float(y0)) / (int(line["n"]) + 1)
+                    line["n"] = int(line["n"]) + 1
+                    placed = True
+                    break
+            if not placed:
+                out.append({"y": float(y0), "n": 1, "words": [word]})
+        return sorted(out, key=lambda line: float(line["y"]))
+
+    @staticmethod
+    def _factura_line_text(line: dict[str, Any]) -> str:
+        return " ".join(str(w[4] or "") for w in sorted(line["words"], key=lambda x: float(x[0]))).strip()
+
+    @staticmethod
+    def _factura_column_text(line: dict[str, Any], left: float, right: float) -> str:
+        values = [
+            str(w[4] or "")
+            for w in sorted(line["words"], key=lambda x: float(x[0]))
+            if left <= float(w[0]) < right
+        ]
+        return OrderDocumentParser._normalize_invoice_number_token("".join(values)) if left >= 420 else " ".join(values).strip()
+
+    @staticmethod
+    def _factura_value_at(line: dict[str, Any], left: float, right: float) -> str:
+        return OrderDocumentParser._normalize_invoice_number_token(OrderDocumentParser._factura_column_text(line, left, right))
+
+    @staticmethod
+    def _factura_line_has_article_code(line: dict[str, Any], code_rx: re.Pattern[str]) -> bool:
+        return any(float(w[0]) < 65 and code_rx.fullmatch(str(w[4] or "").strip()) for w in line["words"])
+
+    @staticmethod
+    def _extract_factura_lote_from_follow_line(line: dict[str, Any]) -> str:
+        text = OrderDocumentParser._factura_line_text(line)
+        lote_match = re.search(r"Lote:\s*([A-Z0-9./-]+)", text, flags=re.IGNORECASE)
+        if lote_match:
+            return str(lote_match.group(1) or "").strip()
+
+        date_rx = re.compile(r"^[0-9]{2}/[0-9]{2}/[0-9]{2,4}$")
+        candidates = [
+            str(w[4] or "").strip()
+            for w in sorted(line["words"], key=lambda x: float(x[0]))
+            if 95 <= float(w[0]) <= 170
+        ]
+        for token in candidates:
+            clean = token.strip("~ ")
+            if date_rx.fullmatch(clean):
+                continue
+            if re.fullmatch(r"[A-Z0-9][A-Z0-9./-]{5,}", clean):
+                return clean
+        return ""
+
+    @staticmethod
+    def _extract_factura_caducidad_from_follow_line(line: dict[str, Any]) -> str:
+        text = OrderDocumentParser._factura_line_text(line)
+        cad_match = re.search(r"\bCad\S{0,12}:\s*([0-9]{2}/[0-9]{2}/[0-9]{2,4})", text, flags=re.IGNORECASE)
+        if cad_match:
+            return str(cad_match.group(1) or "").strip()
+        words = sorted(line["words"], key=lambda x: float(x[0]))
+        loose_date = next(
+            (
+                str(w[4] or "").strip()
+                for w in words
+                if 105 <= float(w[0]) <= 170
+                and re.fullmatch(r"[0-9]{2}/[0-9]{2}/[0-9]{2,4}", str(w[4] or "").strip())
+            ),
+            "",
+        )
+        if loose_date:
+            return loose_date
+        split_date_parts = [
+            str(w[4] or "").strip()
+            for w in words
+            if 105 <= float(w[0]) <= 170
+        ]
+        for pos in range(len(split_date_parts) - 1):
+            joined = f"{split_date_parts[pos]}{split_date_parts[pos + 1]}".strip()
+            if re.fullmatch(r"[0-9]{2}/[0-9]{2}/[0-9]{2,4}", joined):
+                return joined
+        has_cad_label = any(
+            60 <= float(w[0]) <= 105 and str(w[4] or "").strip().lower().startswith("cad")
+            for w in words
+        )
+        if not has_cad_label:
+            return ""
+        date_match = re.search(r"([0-9]{2}/[0-9]{2}/[0-9]{2,4})", text)
+        return str(date_match.group(1) or "").strip() if date_match else ""
+
+    @staticmethod
     def _merge_factura_sidecar_rows(file_path: Path, header: dict[str, str], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         sidecar_rows = OrderDocumentFacturaSidecarService().load_rows(file_path, header.get("factura_numero") or "", header)
         if not sidecar_rows:
@@ -523,99 +620,9 @@ class OrderDocumentParser:
 
         code_rx = re.compile(r"^(?:\d{3,8}|[A-Z]{1,2}\d{4,8})$")
         item_rows: list[dict[str, Any]] = []
-
-        def words_to_lines(words: list[Any]) -> list[dict[str, Any]]:
-            out: list[dict[str, Any]] = []
-            for word in sorted(words, key=lambda x: (float(x[1]), float(x[0]))):
-                x0, y0, _x1, _y1, text = word[:5]
-                if float(y0) < 100 or float(y0) > 760:
-                    continue
-                placed = False
-                for line in out:
-                    if abs(float(line["y"]) - float(y0)) < 3.0:
-                        line["words"].append(word)
-                        line["y"] = (float(line["y"]) * int(line["n"]) + float(y0)) / (int(line["n"]) + 1)
-                        line["n"] = int(line["n"]) + 1
-                        placed = True
-                        break
-                if not placed:
-                    out.append({"y": float(y0), "n": 1, "words": [word]})
-            return sorted(out, key=lambda line: float(line["y"]))
-
-        def column_text(line: dict[str, Any], left: float, right: float) -> str:
-            values = [str(w[4] or "") for w in sorted(line["words"], key=lambda x: float(x[0])) if left <= float(w[0]) < right]
-            return OrderDocumentParser._normalize_invoice_number_token("".join(values)) if left >= 420 else " ".join(values).strip()
-
-        def value_at(line: dict[str, Any], left: float, right: float) -> str:
-            return OrderDocumentParser._normalize_invoice_number_token(column_text(line, left, right))
-
-        def line_text(line: dict[str, Any]) -> str:
-            return " ".join(str(w[4] or "") for w in sorted(line["words"], key=lambda x: float(x[0]))).strip()
-
-        def line_has_article_code(line: dict[str, Any]) -> bool:
-            return any(
-                float(w[0]) < 65 and code_rx.fullmatch(str(w[4] or "").strip())
-                for w in line["words"]
-            )
-
-        def extract_lote_from_follow_line(line: dict[str, Any]) -> str:
-            text = line_text(line)
-            lote_match = re.search(r"Lote:\s*([A-Z0-9./-]+)", text, flags=re.IGNORECASE)
-            if lote_match:
-                return str(lote_match.group(1) or "").strip()
-
-            date_rx = re.compile(r"^[0-9]{2}/[0-9]{2}/[0-9]{2,4}$")
-            candidates = [
-                str(w[4] or "").strip()
-                for w in sorted(line["words"], key=lambda x: float(x[0]))
-                if 95 <= float(w[0]) <= 170
-            ]
-            for token in candidates:
-                clean = token.strip("~ ")
-                if date_rx.fullmatch(clean):
-                    continue
-                if re.fullmatch(r"[A-Z0-9][A-Z0-9./-]{5,}", clean):
-                    return clean
-            return ""
-
-        def extract_caducidad_from_follow_line(line: dict[str, Any]) -> str:
-            text = line_text(line)
-            cad_match = re.search(r"\bCad\S{0,12}:\s*([0-9]{2}/[0-9]{2}/[0-9]{2,4})", text, flags=re.IGNORECASE)
-            if cad_match:
-                return str(cad_match.group(1) or "").strip()
-            words = sorted(line["words"], key=lambda x: float(x[0]))
-            loose_date = next(
-                (
-                    str(w[4] or "").strip()
-                    for w in words
-                    if 105 <= float(w[0]) <= 170
-                    and re.fullmatch(r"[0-9]{2}/[0-9]{2}/[0-9]{2,4}", str(w[4] or "").strip())
-                ),
-                "",
-            )
-            if loose_date:
-                return loose_date
-            split_date_parts = [
-                str(w[4] or "").strip()
-                for w in words
-                if 105 <= float(w[0]) <= 170
-            ]
-            for pos in range(len(split_date_parts) - 1):
-                joined = f"{split_date_parts[pos]}{split_date_parts[pos + 1]}".strip()
-                if re.fullmatch(r"[0-9]{2}/[0-9]{2}/[0-9]{2,4}", joined):
-                    return joined
-            has_cad_label = any(
-                60 <= float(w[0]) <= 105 and str(w[4] or "").strip().lower().startswith("cad")
-                for w in words
-            )
-            if not has_cad_label:
-                return ""
-            date_match = re.search(r"([0-9]{2}/[0-9]{2}/[0-9]{2,4})", text)
-            return str(date_match.group(1) or "").strip() if date_match else ""
-
         all_item_lines: list[dict[str, Any]] = []
         for page_idx, page in enumerate(doc):
-            page_lines = words_to_lines(page.get_text("words"))
+            page_lines = OrderDocumentParser._words_to_factura_lines(page.get_text("words"))
             table_header_y = next(
                 (
                     float(line["y"])
@@ -655,23 +662,23 @@ class OrderDocumentParser:
                 )
                 if not code:
                     continue
-                description = column_text(line, 65, 245)
+                description = OrderDocumentParser._factura_column_text(line, 65, 245)
                 if not description or description.upper().startswith("TIPO ENVASE"):
                     continue
                 lote = ""
                 caducidad = ""
                 for follow in all_item_lines[line_idx + 1 : line_idx + 12]:
-                    if line_has_article_code(follow):
+                    if OrderDocumentParser._factura_line_has_article_code(follow, code_rx):
                         break
                     if not lote:
-                        lote = extract_lote_from_follow_line(follow)
+                        lote = OrderDocumentParser._extract_factura_lote_from_follow_line(follow)
                     if not caducidad:
-                        caducidad = extract_caducidad_from_follow_line(follow)
+                        caducidad = OrderDocumentParser._extract_factura_caducidad_from_follow_line(follow)
                     if lote and caducidad:
                         break
-                uds_raw = value_at(line, 285, 322)
-                env_raw = value_at(line, 322, 362)
-                kilos_raw = value_at(line, 362, 418)
+                uds_raw = OrderDocumentParser._factura_value_at(line, 285, 322)
+                env_raw = OrderDocumentParser._factura_value_at(line, 322, 362)
+                kilos_raw = OrderDocumentParser._factura_value_at(line, 362, 418)
                 uds_value = OrderDocumentParser._parse_decimal_es_static(uds_raw, 0.0)
                 env_value = OrderDocumentParser._parse_decimal_es_static(env_raw, 0.0)
                 kilos_value = OrderDocumentParser._parse_decimal_es_static(kilos_raw, 0.0)
@@ -693,10 +700,10 @@ class OrderDocumentParser:
                         "articulo_kilos": kilos_raw,
                         "articulo_lote": lote,
                         "articulo_caducidad": caducidad,
-                        "precio_unitario": value_at(line, 420, 460),
-                        "dto_pct": value_at(line, 460, 492) or "20",
-                        "iva_pct": value_at(line, 545, 575),
-                        "total_linea": value_at(line, 492, 545),
+                        "precio_unitario": OrderDocumentParser._factura_value_at(line, 420, 460),
+                        "dto_pct": OrderDocumentParser._factura_value_at(line, 460, 492) or "20",
+                        "iva_pct": OrderDocumentParser._factura_value_at(line, 545, 575),
+                        "total_linea": OrderDocumentParser._factura_value_at(line, 492, 545),
                         "_source_y": float(line.get("global_y", 0.0)),
                     }
                 )
