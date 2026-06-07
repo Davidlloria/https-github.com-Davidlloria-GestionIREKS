@@ -50,6 +50,7 @@ from app.services.ingredient_std_service import IngredientStdService
 from app.services.fatsecret_client import FatSecretApiError
 from app.services.openai_nutrition_service import OpenAINutritionService
 from app.services.monthly_orders_service import MonthlyOrdersService
+from app.services.product_report_document_helper import build_product_report_html
 from app.services.product_report_flow_service import ProductReportFlowService
 from app.services.product_report_service import ProductReportResult
 from app.services.report_export_service import ReportExportService
@@ -3036,34 +3037,8 @@ class IngredientsIreksPage(QWidget):
         if dialog.exec() != QPrintDialog.DialogCode.Accepted:
             return
         document = QTextDocument()
-        document.setHtml(self._product_report_to_html(report))
+        document.setHtml(build_product_report_html(report))
         document.print_(printer)
-
-    def _product_report_to_html(self, report: ProductReportResult) -> str:
-        def esc(value: object) -> str:
-            return (
-                str(value)
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace('"', "&quot;")
-            )
-
-        header_html = "".join(f"<th>{esc(header)}</th>" for header in report.headers)
-        rows_html = ""
-        for row in report.rows:
-            rows_html += "<tr>" + "".join(f"<td>{esc(value)}</td>" for value in row) + "</tr>"
-        return f"""
-        <html>
-        <body>
-        <h2>{esc(report.title)}</h2>
-        <table border="1" cellspacing="0" cellpadding="4" width="100%">
-        <thead><tr>{header_html}</tr></thead>
-        <tbody>{rows_html}</tbody>
-        </table>
-        </body>
-        </html>
-        """
 
     def _new_product(self) -> None:
         try:
