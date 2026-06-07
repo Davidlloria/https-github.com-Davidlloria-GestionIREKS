@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from app.services.course_document_generation_flow_service import CourseDocumentGenerationFlowService
+from app.services.course_document_files_flow_service import CourseDocumentFilesFlowService
 from app.services.certificate_service import CertificateService
 from app.services.course_service import CourseService
 from app.services.signature_sheet_service import SignatureSheetService
@@ -322,6 +323,8 @@ class CoursesPage(QWidget):
             signature_service=self.signature_service,
             certificate_service=self.certificate_service,
         )
+        self.document_files_service = CourseDocumentFilesFlowService(course_service=self.service)
+        self.doc_paths = self.document_files_service.doc_paths
         self.rows = []
         self.attendee_rows = []
         self.technician_rows = []
@@ -664,12 +667,14 @@ class CoursesPage(QWidget):
             self.detail_curso_fecha.setDate(QDate.currentDate())
             self._render_attendees("")
             self._render_technicians("")
+            self.document_files_service.select_course("")
             self._set_documents_fields("", "", "")
             self._is_loading_details = False
             return
         self.detail_curso_nombre.setText(str(row.curso_nombre or ""))
         self.detail_curso_fecha.setDate(QDate(row.curso_fecha.year, row.curso_fecha.month, row.curso_fecha.day))
         docs = self.service.get_documents(row.curso_id)
+        self.document_files_service.load_documents(row.curso_id, docs.portada, docs.invitacion, docs.recetario)
         self._set_documents_fields(docs.portada, docs.invitacion, docs.recetario)
         self._render_attendees(row.curso_id)
         self._render_technicians(row.curso_id)
@@ -944,9 +949,7 @@ class CoursesPage(QWidget):
         stack.setCurrentWidget(placeholder)
 
     def _set_documents_fields(self, portada: str, invitacion: str, recetario: str) -> None:
-        self.doc_paths["portada"] = str(portada or "")
-        self.doc_paths["invitacion"] = str(invitacion or "")
-        self.doc_paths["recetario"] = str(recetario or "")
+        self.document_files_service.set_documents_fields(portada, invitacion, recetario)
         self._refresh_document_preview("portada")
         self._refresh_document_preview("invitacion")
         self._refresh_document_preview("recetario")
@@ -1197,7 +1200,7 @@ class CoursesPage(QWidget):
     def _attach_document(self, field_name: str) -> None:
         file_path, _ = QFileDialog.getOpenFileName(self, "Seleccionar archivo", "", "Todos los archivos (*.*)")
         if file_path:
-            self.doc_paths[field_name] = file_path
+            self.document_files_service.attach_document(field_name, file_path)
             self._refresh_document_preview(field_name)
             self._save_documents(notify=False)
 
@@ -1205,7 +1208,7 @@ class CoursesPage(QWidget):
         self.populate_document_preview_widget(self.doc_previews[field_name], self.doc_paths[field_name])
 
     def _delete_document(self, field_name: str) -> None:
-        self.doc_paths[field_name] = ""
+        self.document_files_service.delete_document(field_name)
         self._refresh_document_preview(field_name)
         self._save_documents(notify=False)
 
@@ -1281,20 +1284,21 @@ class CoursesPage(QWidget):
             pdf.close()
 
     def _save_documents(self, notify: bool = True) -> None:
-        row = self._selected_course()
-        if not row:
+        try:
+            self.document_files_service.save_documents()
+        except ValueError as exc:
             if notify:
-                QMessageBox.warning(self, "Documentos", "Selecciona un curso.")
+                QMessageBox.warning(self, "Documentos", str(exc))
             return
-        payload = dict(self.doc_paths)
-        self.service.save_documents(row.curso_id, payload)
         if notify:
             QMessageBox.information(self, "Documentos", "Documentos guardados.")
 
     def _clear_documents_fields(self) -> None:
-        self._delete_document("portada")
-        self._delete_document("invitacion")
-        self._delete_document("recetario")
+        self.document_files_service.clear_documents_fields()
+        self._refresh_document_preview("portada")
+        self._refresh_document_preview("invitacion")
+        self._refresh_document_preview("recetario")
+        self._save_documents(notify=False)
 
 
 

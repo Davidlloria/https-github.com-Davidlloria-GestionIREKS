@@ -46,6 +46,7 @@ from app.services.technician_service import TechnicianService
 from app.services.distributor_service import DistributorService
 from app.services.contact_service import ContactCompanyLookup, ContactService
 from app.services.course_attendee_flow_service import CourseAttendeeFlowService
+from app.services.course_document_files_flow_service import CourseDocumentFilesFlowService
 from app.services.course_service import CourseService
 from app.services.customer_service import AddressCatalogs, CustomerService as CustomerDataService
 from app.services.provider_service import ProviderService
@@ -134,6 +135,7 @@ __all__ = [
     "ContactCompanyLookup",
     "ContactService",
     "CourseAttendeeFlowService",
+    "CourseDocumentFilesFlowService",
     "CourseService",
     "AddressCatalogs",
     "CustomerDataService",
