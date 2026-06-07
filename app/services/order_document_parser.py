@@ -504,60 +504,98 @@ class OrderDocumentParser:
         all_item_lines: list[dict[str, Any]],
         rows: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
-        def has_core_fields(row: dict[str, Any]) -> bool:
-            return all(
-                str(row.get(field) or "").strip()
-                for field in (
-                    "articulo_codigo",
-                    "articulo_descripcion",
-                    "articulo_cantidad",
-                    "articulo_envase",
-                    "articulo_kilos",
-                    "precio_unitario",
-                    "total_linea",
-                )
-            )
-
         parsed_lotes = {
             str(row.get("articulo_lote") or "").strip()
             for row in rows
-            if str(row.get("articulo_lote") or "").strip() and has_core_fields(row)
+            if OrderDocumentParser._factura_has_core_fields(row) and str(row.get("articulo_lote") or "").strip()
         }
         recovered: list[dict[str, Any]] = []
         for line_idx, line in enumerate(all_item_lines):
-            text = str(line.get("text") or "")
-            normalized_text = re.sub(r"\s+", "", text).lower()
-            lote = ""
-            words = sorted(line.get("words", []), key=lambda x: float(x[0]))
-            candidates = [str(w[4] or "").strip() for w in words if 95 <= float(w[0]) <= 170]
-            for token in candidates:
-                if re.fullmatch(r"[A-Z0-9][A-Z0-9./-]{4,}", token):
-                    lote = token
-                    break
-            if not lote or ("lote" not in normalized_text and "carga" not in normalized_text):
-                if not lote:
-                    continue
-            if not lote or lote in parsed_lotes:
-                continue
-            caducidad = ""
-            for follow in all_item_lines[line_idx + 1 : line_idx + 4]:
-                follow_text = " ".join(str(w[4] or "") for w in sorted(follow.get("words", []), key=lambda x: float(x[0])))
-                normalized_follow_text = re.sub(r"\s*/\s*", "/", follow_text)
-                match = re.search(r"([0-9]{2}/[0-9]{2}/[0-9]{2,4})", normalized_follow_text)
-                if match:
-                    caducidad = str(match.group(1) or "").strip()
-                    break
-            page_idx = int(float(line.get("global_y", 0.0)) // 10000.0)
-            if page_idx < 0 or page_idx >= len(doc):
-                continue
-            row = OrderDocumentParser._ocr_factura_article_line(doc[page_idx], float(line.get("y", 0.0)), header, lote, caducidad)
+            row = OrderDocumentParser._factura_recover_orphan_row(
+                doc,
+                header,
+                all_item_lines,
+                line_idx,
+                line,
+                parsed_lotes,
+            )
             if row is not None:
-                row["_source_y"] = float(line.get("global_y", 0.0)) - 20.0
                 recovered.append(row)
-                parsed_lotes.add(lote)
         if not recovered:
             return rows
-        by_lote = {str(row.get("articulo_lote") or "").strip(): row for row in recovered if str(row.get("articulo_lote") or "").strip()}
+        return OrderDocumentParser._factura_merge_orphan_rows(rows, recovered, all_item_lines)
+
+    @staticmethod
+    def _factura_has_core_fields(row: dict[str, Any]) -> bool:
+        return all(
+            str(row.get(field) or "").strip()
+            for field in (
+                "articulo_codigo",
+                "articulo_descripcion",
+                "articulo_cantidad",
+                "articulo_envase",
+                "articulo_kilos",
+                "precio_unitario",
+                "total_linea",
+            )
+        )
+
+    @staticmethod
+    def _factura_candidate_lote_from_line(line: dict[str, Any]) -> str:
+        text = str(line.get("text") or "")
+        normalized_text = re.sub(r"\s+", "", text).lower()
+        if "lote" not in normalized_text and "carga" not in normalized_text:
+            return ""
+        words = sorted(line.get("words", []), key=lambda x: float(x[0]))
+        for token in [str(w[4] or "").strip() for w in words if 95 <= float(w[0]) <= 170]:
+            if re.fullmatch(r"[A-Z0-9][A-Z0-9./-]{4,}", token):
+                return token
+        return ""
+
+    @staticmethod
+    def _factura_candidate_caducidad_from_follow_lines(all_item_lines: list[dict[str, Any]], line_idx: int) -> str:
+        for follow in all_item_lines[line_idx + 1 : line_idx + 4]:
+            follow_text = " ".join(str(w[4] or "") for w in sorted(follow.get("words", []), key=lambda x: float(x[0])))
+            normalized_follow_text = re.sub(r"\s*/\s*", "/", follow_text)
+            match = re.search(r"([0-9]{2}/[0-9]{2}/[0-9]{2,4})", normalized_follow_text)
+            if match:
+                return str(match.group(1) or "").strip()
+        return ""
+
+    @staticmethod
+    def _factura_recover_orphan_row(
+        doc: Any,
+        header: dict[str, str],
+        all_item_lines: list[dict[str, Any]],
+        line_idx: int,
+        line: dict[str, Any],
+        parsed_lotes: set[str],
+    ) -> dict[str, Any] | None:
+        lote = OrderDocumentParser._factura_candidate_lote_from_line(line)
+        if not lote or lote in parsed_lotes:
+            return None
+        caducidad = OrderDocumentParser._factura_candidate_caducidad_from_follow_lines(all_item_lines, line_idx)
+        page_idx = int(float(line.get("global_y", 0.0)) // 10000.0)
+        if page_idx < 0 or page_idx >= len(doc):
+            return None
+        row = OrderDocumentParser._ocr_factura_article_line(doc[page_idx], float(line.get("y", 0.0)), header, lote, caducidad)
+        if row is None:
+            return None
+        row["_source_y"] = float(line.get("global_y", 0.0)) - 20.0
+        parsed_lotes.add(lote)
+        return row
+
+    @staticmethod
+    def _factura_merge_orphan_rows(
+        rows: list[dict[str, Any]],
+        recovered: list[dict[str, Any]],
+        all_item_lines: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        by_lote = {
+            str(row.get("articulo_lote") or "").strip(): row
+            for row in recovered
+            if str(row.get("articulo_lote") or "").strip()
+        }
         merged: list[dict[str, Any]] = []
         inserted_lotes: set[str] = set()
         for row in rows:
@@ -569,14 +607,7 @@ class OrderDocumentParser:
                 continue
             merged.append(row)
         for line in all_item_lines:
-            lote = ""
-            words = sorted(line.get("words", []), key=lambda x: float(x[0]))
-            normalized_text = re.sub(r"\s+", "", str(line.get("text") or "")).lower()
-            if "lote" in normalized_text or "carga" in normalized_text:
-                for token in [str(w[4] or "").strip() for w in words if 95 <= float(w[0]) <= 170]:
-                    if re.fullmatch(r"[A-Z0-9][A-Z0-9./-]{4,}", token):
-                        lote = token
-                        break
+            lote = OrderDocumentParser._factura_candidate_lote_from_line(line)
             if lote and lote in by_lote and lote not in inserted_lotes:
                 merged.append(by_lote[lote])
                 inserted_lotes.add(lote)
