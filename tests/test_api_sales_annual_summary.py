@@ -167,6 +167,58 @@ def _seed_sales_summary_data(session: Session) -> None:
             venta_kilos_sc=1.0,
             venta_euros=7.0,
         ),
+        VentaMensualRaw(
+            raw_id="raw-7",
+            lote_id="lote-7",
+            fuente="igsa",
+            cliente_id="cli-1",
+            periodo="2025-01",
+            articulo_codigo_origen="D123",
+            articulo_id="art-1",
+            articulo_descripcion_origen="Alpha Producto",
+            venta_kilos=5.0,
+            venta_kilos_sc=1.0,
+            venta_euros=0.0,
+        ),
+        VentaMensualRaw(
+            raw_id="raw-8",
+            lote_id="lote-8",
+            fuente="igsa_pdf",
+            cliente_id="cli-1",
+            periodo="2026-01",
+            articulo_codigo_origen="D123",
+            articulo_id="art-1",
+            articulo_descripcion_origen="Alpha Producto",
+            venta_kilos=6.0,
+            venta_kilos_sc=2.0,
+            venta_euros=0.0,
+        ),
+        VentaMensualRaw(
+            raw_id="raw-9",
+            lote_id="lote-9",
+            fuente="igsa_book",
+            cliente_id="cli-1",
+            periodo="2025-02",
+            articulo_codigo_origen="D456",
+            articulo_id="art-2",
+            articulo_descripcion_origen="Beta Producto",
+            venta_kilos=3.0,
+            venta_kilos_sc=0.0,
+            venta_euros=0.0,
+        ),
+        VentaMensualRaw(
+            raw_id="raw-10",
+            lote_id="lote-10",
+            fuente="igsa",
+            cliente_id="cli-1",
+            periodo="2026-02",
+            articulo_codigo_origen="D456",
+            articulo_id="art-2",
+            articulo_descripcion_origen="Beta Producto",
+            venta_kilos=4.0,
+            venta_kilos_sc=1.0,
+            venta_euros=0.0,
+        ),
     ]
     for row in rows:
         session.add(row)
@@ -268,3 +320,81 @@ def test_sales_annual_summary_order_is_stable(api_client: TestClient) -> None:
 def test_sales_annual_summary_validates_query_params(api_client: TestClient) -> None:
     assert api_client.get("/sales/annual-summary", params={"year": 0}).status_code == 422
     assert api_client.get("/sales/annual-summary", params={"year": 2026, "month": 13}).status_code == 422
+
+
+def test_sales_annual_summary_igsa_returns_rows_for_year(api_client: TestClient) -> None:
+    with Session(sales_annual_service_module.engine) as session:
+        _seed_sales_summary_data(session)
+
+    response = api_client.get("/sales/annual-summary/igsa", params={"year": 2026})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source"] == "igsa"
+    assert payload["year"] == 2026
+    assert payload["month"] == 0
+    assert payload["acumulado"] is False
+    assert payload["total"] == 2
+    assert [row["nombre"] for row in payload["items"]] == ["Alpha Producto", "Beta Producto"]
+
+
+def test_sales_annual_summary_igsa_filters_by_month_and_accumulated(api_client: TestClient) -> None:
+    with Session(sales_annual_service_module.engine) as session:
+        _seed_sales_summary_data(session)
+
+    month_response = api_client.get("/sales/annual-summary/igsa", params={"year": 2026, "month": 1})
+    assert month_response.status_code == 200
+    month_row = month_response.json()["items"][0]
+    assert month_row["kilos_prev"] == 5.0
+    assert month_row["kilos_curr"] == 6.0
+
+    accumulated_response = api_client.get("/sales/annual-summary/igsa", params={"year": 2026, "month": 2, "acumulado": True})
+    assert accumulated_response.status_code == 200
+    accumulated_row = accumulated_response.json()["items"][0]
+    assert accumulated_row["kilos_prev"] == 5.0
+    assert accumulated_row["kilos_curr"] == 6.0
+
+
+def test_sales_annual_summary_igsa_filters_by_product_and_hierarchy(api_client: TestClient) -> None:
+    with Session(sales_annual_service_module.engine) as session:
+        _seed_sales_summary_data(session)
+
+    text_response = api_client.get("/sales/annual-summary/igsa", params={"year": 2026, "producto_texto": "beta"})
+    assert text_response.status_code == 200
+    assert text_response.json()["items"][0]["articulo_id"] == "art-2"
+
+    manufacturer_response = api_client.get("/sales/annual-summary/igsa", params={"year": 2026, "fabricante_id": "fab-2"})
+    assert manufacturer_response.status_code == 200
+    assert manufacturer_response.json()["total"] == 1
+    assert manufacturer_response.json()["items"][0]["fabricante_id"] == "fab-2"
+
+    family_response = api_client.get("/sales/annual-summary/igsa", params={"year": 2026, "familia_id": "fam-1"})
+    assert family_response.status_code == 200
+    assert family_response.json()["total"] == 1
+    assert family_response.json()["items"][0]["familia_id"] == "fam-1"
+
+    subfamily_response = api_client.get("/sales/annual-summary/igsa", params={"year": 2026, "subfamilia_id": "sub-2"})
+    assert subfamily_response.status_code == 200
+    assert subfamily_response.json()["total"] == 1
+    assert subfamily_response.json()["items"][0]["subfamilia_id"] == "sub-2"
+
+
+def test_sales_annual_summary_igsa_returns_empty_response_for_missing_year(api_client: TestClient) -> None:
+    response = api_client.get("/sales/annual-summary/igsa", params={"year": 2030})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 0
+    assert payload["items"] == []
+
+
+def test_sales_annual_summary_igsa_order_is_stable(api_client: TestClient) -> None:
+    with Session(sales_annual_service_module.engine) as session:
+        _seed_sales_summary_data(session)
+
+    response = api_client.get("/sales/annual-summary/igsa", params={"year": 2026})
+    assert response.status_code == 200
+    assert [row["nombre"] for row in response.json()["items"]] == ["Alpha Producto", "Beta Producto"]
+
+
+def test_sales_annual_summary_igsa_validates_query_params(api_client: TestClient) -> None:
+    assert api_client.get("/sales/annual-summary/igsa", params={"year": 0}).status_code == 422
+    assert api_client.get("/sales/annual-summary/igsa", params={"year": 2026, "month": 13}).status_code == 422

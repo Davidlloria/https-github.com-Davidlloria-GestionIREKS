@@ -27,7 +27,7 @@ class SalesAnnualSummaryRow(AppSchema):
 
 
 class SalesAnnualSummaryResponse(AppSchema):
-    source: Literal["ireks"] = "ireks"
+    source: Literal["ireks", "igsa"] = "ireks"
     year: int = 0
     month: int = 0
     acumulado: bool = False
