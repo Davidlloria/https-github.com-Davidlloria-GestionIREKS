@@ -67,6 +67,7 @@ from app.services.settings_sales_preview_service import (
     SettingsSalesWorkbookPreviewOutcome,
 )
 from app.services.warehouse_catalog_service import WarehouseCatalogService
+from app.services.warehouse_count_template_flow_service import WarehouseCountTemplateFlowService
 from app.services.warehouse_inventory_service import WarehouseInventoryService
 from app.services.warehouse_movement_service import WarehouseMovementService
 from app.services.warehouse_reference_service import OtrasRefRow, WarehouseReferenceService
@@ -156,6 +157,7 @@ __all__ = [
     "SettingsSalesPdfPreviewOutcome",
     "SettingsSalesWorkbookPreviewOutcome",
     "WarehouseCatalogService",
+    "WarehouseCountTemplateFlowService",
     "WarehouseInventoryService",
     "WarehouseMovementService",
     "OtrasRefRow",

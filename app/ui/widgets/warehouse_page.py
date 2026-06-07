@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from openpyxl import Workbook, load_workbook
+from openpyxl import Workbook
 
 from app.models import (
     AlmacenMovimiento,
@@ -43,6 +43,7 @@ from app.models import (
 from app.services.monthly_orders_service import MonthlyOrdersService
 from app.services.warehouse_inventory_adjustment_flow_service import WarehouseInventoryAdjustmentFlowResult, WarehouseInventoryAdjustmentFlowService
 from app.services.warehouse_history_flow_service import WarehouseHistoryFlowResult, WarehouseHistoryFlowService
+from app.services.warehouse_count_template_flow_service import WarehouseCountTemplateFlowResult, WarehouseCountTemplateFlowService
 from app.services.warehouse_manual_move_flow_service import WarehouseManualMoveFlowService
 from app.services.warehouse_catalog_service import WarehouseCatalogService
 from app.services.warehouse_inventory_service import WarehouseInventoryService
@@ -59,6 +60,9 @@ def _col(expr: object) -> Any:
     return tcast(Any, expr)
 
 
+_COUNT_TEMPLATE_SERVICE = WarehouseCountTemplateFlowService()
+
+
 class SortableTableWidgetItem(QTableWidgetItem):
     def __init__(self, text: str, sort_value: Any = None) -> None:
         super().__init__(text)
@@ -73,10 +77,7 @@ class SortableTableWidgetItem(QTableWidgetItem):
 
 
 def _count_template_column_indexes(header: list[str]) -> tuple[int, int, int]:
-    idx_id = header.index("articulo_id") if "articulo_id" in header else -1
-    idx_lote = header.index("lote") if "lote" in header else -1
-    idx_conteo = header.index("conteo_uds") if "conteo_uds" in header else -1
-    return idx_id, idx_lote, idx_conteo
+    return _COUNT_TEMPLATE_SERVICE.count_template_column_indexes(header)
 
 
 def _count_template_mapping(
@@ -85,15 +86,7 @@ def _count_template_mapping(
     idx_lote: int,
     idx_conteo: int,
 ) -> dict[tuple[str, str], str]:
-    mapping: dict[tuple[str, str], str] = {}
-    for row in rows:
-        art_id = str(row[idx_id] or "").strip()
-        lote = str(row[idx_lote] or "").strip()
-        conteo_raw = str(row[idx_conteo] or "").strip()
-        if not art_id or conteo_raw == "":
-            continue
-        mapping[(art_id, lote)] = conteo_raw
-    return mapping
+    return _COUNT_TEMPLATE_SERVICE.count_template_mapping(rows, idx_id, idx_lote, idx_conteo)
 
 
 @dataclass(frozen=True)
@@ -1707,9 +1700,11 @@ class InventariosTab(QWidget):
         self._almacen_id = ""
         self._adjustment_flow_result = WarehouseInventoryAdjustmentFlowResult(status="idle")
         self._history_flow_result = WarehouseHistoryFlowResult(status="idle")
+        self._count_template_flow_result = WarehouseCountTemplateFlowResult(status="idle")
         self.inventory_service = WarehouseInventoryService()
         self.inventory_adjustment_flow_service = WarehouseInventoryAdjustmentFlowService(inventory_service=self.inventory_service)
         self.history_flow_service = WarehouseHistoryFlowService(inventory_service=self.inventory_service)
+        self.count_template_flow_service = WarehouseCountTemplateFlowService()
         self.view = InventoryTabView()
         self._build_ui()
         self.reload()
@@ -2159,23 +2154,38 @@ class InventariosTab(QWidget):
         if not file_path.lower().endswith(".xlsx"):
             file_path = f"{file_path}.xlsx"
 
+        simple_rows: list[dict[str, Any]] = []
+        for i in range(self.table.rowCount()):
+            key_item = self.table.item(i, 0)
+            art_id, lote, cad_iso = key_item.data(Qt.ItemDataRole.UserRole) if key_item else ("", "", "")
+            simple_rows.append(
+                {
+                    "articulo_id": str(art_id or ""),
+                    "ref": str(self.table.item(i, 0).text() if self.table.item(i, 0) else ""),
+                    "nombre": str(self.table.item(i, 1).text() if self.table.item(i, 1) else ""),
+                    "lote": str(lote or ""),
+                    "caducidad": str(cad_iso or ""),
+                    "teorico_uds": str(self.table.item(i, 4).text() if self.table.item(i, 4) else "0"),
+                    "conteo_uds": "",
+                }
+            )
+        self._count_template_flow_result = self.count_template_flow_service.prepare_export_rows(simple_rows)
+
         wb = Workbook()
         ws = wb.active
         ws.title = "Conteo"
         headers = ["articulo_id", "ref", "nombre", "lote", "caducidad", "teorico_uds", "conteo_uds"]
         ws.append(headers)
-        for i in range(self.table.rowCount()):
-            key_item = self.table.item(i, 0)
-            art_id, lote, cad_iso = key_item.data(Qt.ItemDataRole.UserRole) if key_item else ("", "", "")
+        for row in self._count_template_flow_result.export_rows:
             ws.append(
                 [
-                    str(art_id or ""),
-                    str(self.table.item(i, 0).text() if self.table.item(i, 0) else ""),
-                    str(self.table.item(i, 1).text() if self.table.item(i, 1) else ""),
-                    str(lote or ""),
-                    cad_iso,
-                    str(self.table.item(i, 4).text() if self.table.item(i, 4) else "0"),
-                    "",
+                    row["articulo_id"],
+                    row["ref"],
+                    row["nombre"],
+                    row["lote"],
+                    row["caducidad"],
+                    row["teorico_uds"],
+                    row["conteo_uds"],
                 ]
             )
         wb.save(file_path)
@@ -2185,19 +2195,14 @@ class InventariosTab(QWidget):
         file_path, _ = QFileDialog.getOpenFileName(self, "Seleccionar conteo inventario", "", "Excel (*.xlsx *.xlsm)")
         if not file_path:
             return
-        wb = load_workbook(file_path, data_only=True)
-        ws = wb.active
-        rows = list(ws.iter_rows(values_only=True))
-        if not rows:
-            QMessageBox.warning(self, "Inventarios", "El archivo no contiene datos.")
+        result = self.count_template_flow_service.read_import_file(Path(file_path))
+        self._count_template_flow_result = result
+        if result.status == "empty":
+            QMessageBox.warning(self, "Inventarios", result.message)
             return
-        header = [str(x or "").strip().lower() for x in rows[0]]
-        idx_id, idx_lote, idx_conteo = _count_template_column_indexes(header)
-        if idx_id < 0 or idx_lote < 0 or idx_conteo < 0:
-            QMessageBox.warning(self, "Inventarios", "Faltan columnas requeridas: articulo_id, lote, conteo_uds.")
+        if result.status == "missing_columns":
+            QMessageBox.warning(self, "Inventarios", result.message)
             return
-
-        mapping = _count_template_mapping(rows[1:], idx_id, idx_lote, idx_conteo)
 
         loaded = 0
         self.table.blockSignals(True)
@@ -2205,9 +2210,9 @@ class InventariosTab(QWidget):
             key_item = self.table.item(i, 0)
             art_id, lote, _cad_iso = key_item.data(Qt.ItemDataRole.UserRole) if key_item else ("", "", "")
             key = (str(art_id or "").strip(), str(lote or "").strip())
-            if key not in mapping:
+            if key not in result.mapping:
                 continue
-            self.table.item(i, 5).setText(str(mapping[key]))
+            self.table.item(i, 5).setText(str(result.mapping[key]))
             loaded += 1
         self.table.blockSignals(False)
         for i in range(self.table.rowCount()):
