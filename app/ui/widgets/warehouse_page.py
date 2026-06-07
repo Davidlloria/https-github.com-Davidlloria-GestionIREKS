@@ -42,6 +42,7 @@ from app.models import (
 )
 from app.services.monthly_orders_service import MonthlyOrdersService
 from app.services.warehouse_inventory_adjustment_flow_service import WarehouseInventoryAdjustmentFlowResult, WarehouseInventoryAdjustmentFlowService
+from app.services.warehouse_history_flow_service import WarehouseHistoryFlowResult, WarehouseHistoryFlowService
 from app.services.warehouse_manual_move_flow_service import WarehouseManualMoveFlowService
 from app.services.warehouse_catalog_service import WarehouseCatalogService
 from app.services.warehouse_inventory_service import WarehouseInventoryService
@@ -1705,8 +1706,10 @@ class InventariosTab(QWidget):
         super().__init__()
         self._almacen_id = ""
         self._adjustment_flow_result = WarehouseInventoryAdjustmentFlowResult(status="idle")
+        self._history_flow_result = WarehouseHistoryFlowResult(status="idle")
         self.inventory_service = WarehouseInventoryService()
         self.inventory_adjustment_flow_service = WarehouseInventoryAdjustmentFlowService(inventory_service=self.inventory_service)
+        self.history_flow_service = WarehouseHistoryFlowService(inventory_service=self.inventory_service)
         self.view = InventoryTabView()
         self._build_ui()
         self.reload()
@@ -1999,22 +2002,24 @@ class InventariosTab(QWidget):
         QMessageBox.information(self, "Inventarios", result.message)
 
     def _reload_history(self) -> None:
-        rows = self.inventory_service.history(self._almacen_id)
+        result = self.history_flow_service.load_history(self._almacen_id)
+        self._history_flow_result = result
+        rows = result.rows
         self.history_table.setRowCount(len(rows))
-        for row_idx, inv in enumerate(rows):
+        for row_idx, row_data in enumerate(rows):
             values = [
-                str(getattr(inv, "inventario_id", "") or "").strip(),
-                getattr(inv, "fecha").strftime("%d/%m/%Y") if getattr(inv, "fecha", None) else "",
-                str(getattr(inv, "contador", "") or "").strip(),
-                str(getattr(inv, "aprobador", "") or "").strip(),
-                str(int(getattr(inv, "lineas", 0) or 0)),
-                str(int(getattr(inv, "ajustes", 0) or 0)),
-                str(getattr(inv, "estado", "") or "").strip(),
+                row_data.inventario_id,
+                row_data.fecha_text,
+                row_data.contador,
+                row_data.aprobador,
+                row_data.lineas,
+                row_data.ajustes,
+                row_data.estado,
             ]
             for col_idx, value in enumerate(values):
                 item = QTableWidgetItem(value)
                 if col_idx == 0:
-                    item.setData(Qt.ItemDataRole.UserRole, str(getattr(inv, "inventario_id", "") or "").strip())
+                    item.setData(Qt.ItemDataRole.UserRole, row_data.inventario_id)
                 self.history_table.setItem(row_idx, col_idx, item)
         if rows:
             self.history_table.selectRow(0)
@@ -2033,25 +2038,18 @@ class InventariosTab(QWidget):
         if not inventario_id:
             self.history_detail_table.setRowCount(0)
             return
-        payload = self.inventory_service.history_detail(inventario_id)
-        detail_rows = payload.details
-        items = payload.items
-        ref_by_articulo = {str(getattr(x, "articulo_id", "") or "").strip(): str(getattr(x, "articulo_referencia_corta", "") or "").strip() for x in items}
-        nombre_by_articulo = {str(getattr(x, "articulo_id", "") or "").strip(): str(getattr(x, "articulo_descripcion", "") or "").strip() for x in items}
-
+        detail_rows = self.history_flow_service.load_history_detail(inventario_id)
         self.history_detail_table.setRowCount(len(detail_rows))
         for row_idx, det in enumerate(detail_rows):
-            art_id = str(getattr(det, "articulo_id", "") or "").strip()
-            cad = getattr(det, "articulo_caducidad", None)
             values = [
-                ref_by_articulo.get(art_id, "") or art_id,
-                nombre_by_articulo.get(art_id, "") or art_id,
-                str(getattr(det, "articulo_lote", "") or "").strip(),
-                cad.strftime("%d/%m/%Y") if cad else "",
-                f"{float(getattr(det, 'teorico_uds', 0.0) or 0.0):.2f}",
-                f"{float(getattr(det, 'conteo_uds', 0.0) or 0.0):.2f}",
-                f"{float(getattr(det, 'diferencia_uds', 0.0) or 0.0):.2f}",
-                f"{float(getattr(det, 'kg_ajuste', 0.0) or 0.0):.2f} kg",
+                det.ref,
+                det.nombre,
+                det.lote,
+                det.caduca_text,
+                det.teorico_text,
+                det.conteo_text,
+                det.diferencia_text,
+                det.kg_ajuste_text,
             ]
             for col_idx, value in enumerate(values):
                 item = QTableWidgetItem(value)
@@ -2061,11 +2059,12 @@ class InventariosTab(QWidget):
 
     def _selected_history_id(self) -> str:
         selected = self.history_table.selectionModel().selectedRows() if self.history_table.selectionModel() else []
-        if not selected:
-            return ""
-        row = selected[0].row()
-        code_item = self.history_table.item(row, 0)
-        return str(code_item.data(Qt.ItemDataRole.UserRole) or "").strip() if code_item else ""
+        items = [
+            str(item.data(Qt.ItemDataRole.UserRole) or "").strip()
+            for item in (self.history_table.item(row.row(), 0) for row in selected)
+            if item is not None
+        ]
+        return self.history_flow_service.resolve_selected_id(items, 0)
 
     def _export_history_excel(self) -> None:
         selected_id = self._selected_history_id()
@@ -2080,23 +2079,17 @@ class InventariosTab(QWidget):
         if not file_path.lower().endswith(".xlsx"):
             file_path = f"{file_path}.xlsx"
 
-        payload = self.inventory_service.export_payload(almacen_id=self._almacen_id, selected_id=selected_id)
-        headers = payload.headers
-        details = payload.details
-        items = payload.items
-
-        if not headers:
+        result = self.history_flow_service.export_rows(self._almacen_id, selected_id)
+        payload = result.export_payload
+        if payload is None or not payload.headers:
             QMessageBox.information(self, "Inventarios", "No hay historial para exportar con el filtro actual.")
             return
-
-        ref_by_articulo = {str(getattr(x, "articulo_id", "") or "").strip(): str(getattr(x, "articulo_referencia_corta", "") or "").strip() for x in items}
-        nombre_by_articulo = {str(getattr(x, "articulo_id", "") or "").strip(): str(getattr(x, "articulo_descripcion", "") or "").strip() for x in items}
 
         wb = Workbook()
         ws_head = wb.active
         ws_head.title = "Inventarios"
         ws_head.append(["inventario_id", "fecha", "almacen_id", "contador", "aprobador", "lineas", "ajustes", "estado"])
-        for inv in headers:
+        for inv in payload.headers:
             ws_head.append(
                 [
                     str(getattr(inv, "inventario_id", "") or "").strip(),
@@ -2125,15 +2118,23 @@ class InventariosTab(QWidget):
                 "kg_ajuste",
             ]
         )
-        for det in details:
+        for det in payload.details:
             art_id = str(getattr(det, "articulo_id", "") or "").strip()
             cad = getattr(det, "articulo_caducidad", None)
             ws_det.append(
                 [
                     str(getattr(det, "inventario_id", "") or "").strip(),
                     art_id,
-                    ref_by_articulo.get(art_id, "") or art_id,
-                    nombre_by_articulo.get(art_id, "") or art_id,
+                    next(
+                        (str(getattr(x, "articulo_referencia_corta", "") or "").strip() for x in payload.items if str(getattr(x, "articulo_id", "") or "").strip() == art_id),
+                        "",
+                    )
+                    or art_id,
+                    next(
+                        (str(getattr(x, "articulo_descripcion", "") or "").strip() for x in payload.items if str(getattr(x, "articulo_id", "") or "").strip() == art_id),
+                        "",
+                    )
+                    or art_id,
                     str(getattr(det, "articulo_lote", "") or "").strip(),
                     cad.isoformat() if cad else "",
                     float(getattr(det, "teorico_uds", 0.0) or 0.0),
@@ -2147,7 +2148,7 @@ class InventariosTab(QWidget):
         QMessageBox.information(
             self,
             "Inventarios",
-            f"Historial exportado.\n{file_path}\n\nInventarios: {len(headers)}\nLíneas detalle: {len(details)}",
+            f"Historial exportado.\n{file_path}\n\nInventarios: {len(payload.headers)}\nLíneas detalle: {len(payload.details)}",
         )
 
     def _export_count_template(self) -> None:
