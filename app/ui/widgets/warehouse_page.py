@@ -41,9 +41,7 @@ from app.models import (
     Subfamilia,
 )
 from app.services.monthly_orders_service import MonthlyOrdersService
-from app.services.warehouse_inventory_adjustment_preparation_service import (
-    WarehouseInventoryAdjustmentPreparationService,
-)
+from app.services.warehouse_inventory_adjustment_flow_service import WarehouseInventoryAdjustmentFlowResult, WarehouseInventoryAdjustmentFlowService
 from app.services.warehouse_manual_move_flow_service import WarehouseManualMoveFlowService
 from app.services.warehouse_catalog_service import WarehouseCatalogService
 from app.services.warehouse_inventory_service import WarehouseInventoryService
@@ -1706,9 +1704,9 @@ class InventariosTab(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self._almacen_id = ""
-        self._pending_ajustes: list[dict[str, Any]] = []
+        self._adjustment_flow_result = WarehouseInventoryAdjustmentFlowResult(status="idle")
         self.inventory_service = WarehouseInventoryService()
-        self.inventory_adjustment_preparation_service = WarehouseInventoryAdjustmentPreparationService()
+        self.inventory_adjustment_flow_service = WarehouseInventoryAdjustmentFlowService(inventory_service=self.inventory_service)
         self.view = InventoryTabView()
         self._build_ui()
         self.reload()
@@ -1931,30 +1929,41 @@ class InventariosTab(QWidget):
         self.table.blockSignals(False)
 
     def _apply_adjustments(self) -> None:
-        if not self._pending_ajustes:
+        if self._adjustment_flow_result.status != "ready" or not self._adjustment_flow_result.pending:
             QMessageBox.information(self, "Inventarios", "No hay ajustes preparados. Pulsa 'Preparar ajustes'.")
             return
         aprobador = str(self.approver_input.text() or "").strip()
         contador = str(self.counter_input.text() or "").strip()
-        if not contador or not aprobador:
-            QMessageBox.warning(self, "Inventarios", "Indica Contador y Aprobador antes de aplicar.")
+        validation = self.inventory_adjustment_flow_service.validate_application(
+            self._adjustment_flow_result,
+            contador=contador,
+            aprobador=aprobador,
+        )
+        if validation.status == "invalid_approval":
+            QMessageBox.warning(self, "Inventarios", validation.message)
+            return
+        if validation.status == "no_differences":
+            QMessageBox.information(self, "Inventarios", validation.message)
             return
         answer = QMessageBox.question(
             self,
             "Confirmar aprobación",
-            f"Se aprobarán y aplicarán {len(self._pending_ajustes)} ajustes.\nContador: {contador}\nAprobador: {aprobador}\n¿Continuar?",
+            f"Se aprobarán y aplicarán {len(self._adjustment_flow_result.pending)} ajustes.\nContador: {contador}\nAprobador: {aprobador}\n¿Continuar?",
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        applied = self.inventory_service.apply_adjustments(
-            pending=self._pending_ajustes,
+        result = self.inventory_adjustment_flow_service.apply_adjustments(
+            validation,
             almacen_id=self._almacen_id,
-            contador=contador,
-            aprobador=aprobador,
+            contador=validation.contador,
+            aprobador=validation.aprobador,
         )
-        self._pending_ajustes = []
+        if result.status == "error":
+            QMessageBox.warning(self, "Inventarios", result.message or "No se pudieron aplicar los ajustes.")
+            return
+        self._adjustment_flow_result = WarehouseInventoryAdjustmentFlowResult(status="idle")
         self.pending_label.setText(self.view.pending_label)
-        QMessageBox.information(self, "Inventarios", f"Ajustes aplicados: {applied}")
+        QMessageBox.information(self, "Inventarios", result.message)
         self.reload()
 
     def _prepare_adjustments(self) -> None:
@@ -1975,7 +1984,7 @@ class InventariosTab(QWidget):
                     "peso": float(conteo_cell.data(Qt.ItemDataRole.UserRole) or 0.0),
                 }
             )
-        result = self.inventory_adjustment_preparation_service.prepare_adjustments(
+        result = self.inventory_adjustment_flow_service.prepare_adjustments(
             rows,
             almacen_id=self._almacen_id,
         )
@@ -1985,7 +1994,7 @@ class InventariosTab(QWidget):
         if result.status == "no_differences":
             QMessageBox.information(self, "Inventarios", result.message)
             return
-        self._pending_ajustes = result.pending
+        self._adjustment_flow_result = result
         self.pending_label.setText(f"Pendientes: {result.prepared_count}")
         QMessageBox.information(self, "Inventarios", result.message)
 
