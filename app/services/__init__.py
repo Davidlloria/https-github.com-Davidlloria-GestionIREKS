@@ -18,6 +18,11 @@ from app.services.ingredient_chatgpt_nutrition_flow_service import (
     IngredientChatGPTNutritionFlowResult,
     IngredientChatGPTNutritionFlowService,
 )
+from app.services.ingredient_ireks_autosave_flow_service import (
+    IngredientIreksAutosaveFlowService,
+    IngredientIreksAutosaveRequest,
+    IngredientIreksAutosaveResult,
+)
 from app.services.openai_nutrition_service import OpenAINutritionResult, OpenAINutritionService
 from app.services.openai_settings_service import OpenAISettingsService
 from app.services.openai_translation_service import OpenAITranslationService, TranslationResult
@@ -90,6 +95,9 @@ __all__ = [
     "FatSecretSettingsService",
     "IngredientChatGPTNutritionFlowService",
     "IngredientChatGPTNutritionFlowResult",
+    "IngredientIreksAutosaveFlowService",
+    "IngredientIreksAutosaveRequest",
+    "IngredientIreksAutosaveResult",
     "OpenAINutritionService",
     "OpenAINutritionResult",
     "OpenAISettingsService",

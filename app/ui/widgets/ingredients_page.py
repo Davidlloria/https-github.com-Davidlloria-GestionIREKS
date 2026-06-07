@@ -43,6 +43,10 @@ from app.services.ingredient_fatsecret_nutrition_flow_service import IngredientF
 from app.services.ingredient_fdc_nutrition_flow_service import IngredientFdcNutritionFlowService
 from app.services.ingredient_chatgpt_nutrition_flow_service import IngredientChatGPTNutritionFlowService
 from app.services.ingredient_entity_service import IngredientEntityService
+from app.services.ingredient_ireks_autosave_flow_service import (
+    IngredientIreksAutosaveFlowService,
+    IngredientIreksAutosaveRequest,
+)
 from app.services.ingredient_ireks_service import IngredientIreksService
 from app.services.ingredient_products_import_flow_service import IngredientProductsImportFlowService
 from app.services.ingredient_nutrition_query_service import IngredientNutritionQueryService
@@ -443,6 +447,7 @@ class IngredientsIreksPage(QWidget):
         self.chatgpt_nutrition_flow_service = IngredientChatGPTNutritionFlowService(
             openai_service=OpenAINutritionService(),
         )
+        self.ingredient_ireks_autosave_flow_service = IngredientIreksAutosaveFlowService()
         self.external_distributor_filter_id = ""
         self.ingredient_products_import_flow_service = IngredientProductsImportFlowService(self.ireks_service)
         self.rows: list[IngredienteIreks] = []
@@ -2862,74 +2867,56 @@ class IngredientsIreksPage(QWidget):
         row = self._selected_row()
         if not row:
             return
-        payload = {
-            "articulo_referencia_corta": self.detail_ref_corta.text().strip(),
-            "articulo_descripcion": self.detail_descripcion.text().strip(),
-            "articulo_referencia": self.detail_referencia.text().strip(),
-            "fabricante_id": self._current_filter_value(self.detail_fabricante_id),
-            "articulo_familia_id": self._current_filter_value(self.detail_familia_id),
-            "articulo_subfamilia_id": self._current_filter_value(self.detail_subfamilia_id),
-            "distribuidor_id": self._current_filter_value(self.detail_distribuidor_id),
-            "articulo_envase_id": str(self.detail_envase_id.currentData() or "").strip(),
-            "articulo_contenido_unidad": self.detail_contenido_unidad.currentText().strip(),
-            "articulo_envase_cantidad": self._to_float_text(self.detail_envase_cantidad.text()),
-            "articulo_envase_peso": self._to_float_text(self.detail_envase_peso.text()),
-            "articulo_envase_unidad_medida": self.detail_envase_unidad.currentText().strip(),
-            "transporte_pallet_tipo": self.transporte_pallet_tipo.currentText().strip(),
-            "transporte_cajas_por_capa": self._to_float_text(self.transporte_cajas_por_capa.text()),
-            "transporte_capas_por_pallet": self._to_float_text(self.transporte_capas_por_pallet.text()),
-            "transporte_observaciones": self.transporte_observaciones.text().strip(),
-            "articulo_status_activo": bool(self.detail_status_activo_si.isChecked()),
-            "articulo_status_en_lista": bool(self.detail_status_en_lista_si.isChecked()),
-            "categoria": self._selected_ireks_category(),
-        }
-        try:
-            row_id = row.id
-            if row_id is None:
+        row_id = row.id
+        if row_id is None:
+            return
+        request = IngredientIreksAutosaveRequest(
+            row_id=int(row_id),
+            articulo_id=str(row.articulo_id or "").strip(),
+            articulo_referencia_corta=self.detail_ref_corta.text().strip(),
+            articulo_descripcion=self.detail_descripcion.text().strip(),
+            articulo_referencia=self.detail_referencia.text().strip(),
+            fabricante_id=self._current_filter_value(self.detail_fabricante_id),
+            articulo_familia_id=self._current_filter_value(self.detail_familia_id),
+            articulo_subfamilia_id=self._current_filter_value(self.detail_subfamilia_id),
+            distribuidor_id=self._current_filter_value(self.detail_distribuidor_id),
+            articulo_envase_id=str(self.detail_envase_id.currentData() or "").strip(),
+            articulo_contenido_unidad=self.detail_contenido_unidad.currentText().strip(),
+            articulo_envase_cantidad=self._to_float_text(self.detail_envase_cantidad.text()),
+            articulo_envase_peso=self._to_float_text(self.detail_envase_peso.text()),
+            articulo_envase_unidad_medida=self.detail_envase_unidad.currentText().strip(),
+            transporte_pallet_tipo=self.transporte_pallet_tipo.currentText().strip(),
+            transporte_cajas_por_capa=self._to_float_text(self.transporte_cajas_por_capa.text()),
+            transporte_capas_por_pallet=self._to_float_text(self.transporte_capas_por_pallet.text()),
+            transporte_observaciones=self.transporte_observaciones.text().strip(),
+            articulo_status_activo=bool(self.detail_status_activo_si.isChecked()),
+            articulo_status_en_lista=bool(self.detail_status_en_lista_si.isChecked()),
+            categoria=self._selected_ireks_category(),
+            referencia_distribuidor=self.detail_referencia_distribuidor.text(),
+            descripcion_distribuidor=self.detail_descripcion_distribuidor.text(),
+        )
+        result = self.ingredient_ireks_autosave_flow_service.autosave_selected(
+            request,
+            update_product=self.ireks_service.update_product,
+            upsert_distributor_reference=self.ireks_service.upsert_distributor_reference,
+        )
+        if not result.ok:
+            if result.status == "invalid_selection":
                 return
-            self.ireks_service.update_product(int(row_id), payload)
-            row.articulo_referencia_corta = str(payload["articulo_referencia_corta"] or "")
-            row.articulo_descripcion = str(payload["articulo_descripcion"] or "")
-            row.articulo_referencia = str(payload["articulo_referencia"] or "")
-            row.fabricante_id = str(payload["fabricante_id"] or "")
-            row.articulo_familia_id = str(payload["articulo_familia_id"] or "")
-            row.articulo_subfamilia_id = str(payload["articulo_subfamilia_id"] or "")
-            row.distribuidor_id = str(payload["distribuidor_id"] or "")
-            row.articulo_envase_id = str(payload["articulo_envase_id"] or "")
-            row.articulo_contenido_unidad = str(payload["articulo_contenido_unidad"] or "")
-            row.articulo_envase_cantidad = float(payload["articulo_envase_cantidad"] or 0.0)
-            row.articulo_envase_peso = float(payload["articulo_envase_peso"] or 0.0)
-            row.articulo_envase_unidad_medida = str(payload["articulo_envase_unidad_medida"] or "")
-            row.transporte_pallet_tipo = str(payload["transporte_pallet_tipo"] or "")
-            row.transporte_cajas_por_capa = float(payload["transporte_cajas_por_capa"] or 0.0)
-            row.transporte_capas_por_pallet = float(payload["transporte_capas_por_pallet"] or 0.0)
-            row.transporte_cajas_por_pallet = row.transporte_cajas_por_capa * row.transporte_capas_por_pallet
-            row.transporte_unidades_por_pallet = row.transporte_cajas_por_pallet * row.articulo_envase_cantidad
-            row.transporte_kg_por_pallet = row.transporte_unidades_por_pallet * row.articulo_envase_peso
-            row.transporte_observaciones = str(payload["transporte_observaciones"] or "")
-            row.articulo_status_activo = bool(payload["articulo_status_activo"])
-            row.articulo_status_en_lista = bool(payload["articulo_status_en_lista"])
-            row.categoria = str(payload["categoria"] or "")
-            ref_key_articulo_id = str(row.articulo_id or "").strip()
-            ref_key_distribuidor_id = str(payload["distribuidor_id"] or "").strip()
-            self.ireks_service.upsert_distributor_reference(
-                articulo_id=ref_key_articulo_id,
-                distribuidor_id=ref_key_distribuidor_id,
-                referencia=self.detail_referencia_distribuidor.text(),
-                descripcion=self.detail_descripcion_distribuidor.text(),
-            )
-            self._update_envase_total_preview()
-            selected = self.table.selectionModel().selectedRows() if self.table.selectionModel() else []
-            if selected:
-                i = selected[0].row()
-                item_ref = self.table.item(i, 0)
-                item_name = self.table.item(i, 1)
-                if item_ref:
-                    item_ref.setText(payload["articulo_referencia_corta"])
-                if item_name:
-                    item_name.setText(payload["articulo_descripcion"])
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Productos IREKS", f"No se pudo guardar.\n{exc}")
+            QMessageBox.warning(self, "Productos IREKS", f"No se pudo guardar.\n{result.message}")
+            return
+        for field_name, value in result.row_updates.items():
+            setattr(row, field_name, value)
+        self._update_envase_total_preview()
+        selected = self.table.selectionModel().selectedRows() if self.table.selectionModel() else []
+        if selected:
+            i = selected[0].row()
+            item_ref = self.table.item(i, 0)
+            item_name = self.table.item(i, 1)
+            if item_ref:
+                item_ref.setText(str(result.payload.get("articulo_referencia_corta") or ""))
+            if item_name:
+                item_name.setText(str(result.payload.get("articulo_descripcion") or ""))
 
     def _selected_ireks_category(self) -> str:
         if self.detail_categoria_harina.isChecked():
