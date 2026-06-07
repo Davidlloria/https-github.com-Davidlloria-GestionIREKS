@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from app.services.course_document_generation_flow_service import CourseDocumentGenerationFlowService
 from app.services.certificate_service import CertificateService
 from app.services.course_service import CourseService
 from app.services.signature_sheet_service import SignatureSheetService
@@ -317,6 +318,10 @@ class CoursesPage(QWidget):
         self.service = CourseService()
         self.signature_service = SignatureSheetService()
         self.certificate_service = CertificateService()
+        self.course_document_generation_service = CourseDocumentGenerationFlowService(
+            signature_service=self.signature_service,
+            certificate_service=self.certificate_service,
+        )
         self.rows = []
         self.attendee_rows = []
         self.technician_rows = []
@@ -1120,52 +1125,16 @@ class CoursesPage(QWidget):
         painter.end()
         QMessageBox.information(self, "Asistentes", f"Archivo generado:\n{save_path}")
 
-    def _build_signature_attendees_payload(self, scope: str) -> list[dict[str, str]]:
-        course = self._selected_course()
-        if not course:
-            raise ValueError("Selecciona un curso.")
-        fecha = ""
-        try:
-            fecha = course.curso_fecha.strftime("%d/%m/%Y")
-        except Exception:
-            fecha = str(getattr(course, "curso_fecha", "") or "")
-
-        attendees = self._sorted_attendee_rows()
-        if scope == "confirmed":
-            attendees = [row for row in attendees if bool(getattr(row, "status_confirmacion", False))]
-            if not attendees:
-                raise ValueError("No hay asistentes confirmados.")
-        if scope == "selected":
-            row = self._selected_attendee()
-            if not row:
-                raise ValueError("Selecciona un asistente para generar una hoja individual.")
-            attendees = [row]
-        payload = [
-            {
-                "fecha": fecha,
-                "nombre": str(item.asistente or ""),
-                "nif": str(item.nif or ""),
-                "empresa": str(item.empresa or ""),
-            }
-            for item in attendees
-        ]
-        if not payload:
-            raise ValueError("No hay asistentes para generar hojas de firma.")
-        return payload
-
     def _generate_signature_pdf(self, scope: str, template_key: str) -> Path:
         course = self._selected_course()
         if not course:
             raise ValueError("Selecciona un curso.")
-        attendees = self._build_signature_attendees_payload(scope)
-        safe_name = "".join(ch if ch.isalnum() else "_" for ch in (course.curso_nombre or "curso"))[:42]
-        suffix_map = {"all": "todos", "confirmed": "confirmados", "selected": "seleccionado"}
-        suffix = suffix_map.get(scope, "todos")
-        output_path = self.signature_service.DEFAULT_OUTPUT_DIR / f"consent_{template_key}_{safe_name}_{suffix}.pdf"
-        return self.signature_service.generate(
-            attendees=attendees,
-            output_path=output_path,
+        return self.course_document_generation_service.generate_signature_pdf(
+            course,
+            self._sorted_attendee_rows(),
+            scope=scope,
             template_key=template_key,
+            selected_attendee=self._selected_attendee(),
         )
 
     def _preview_signature_sheets(self, scope: str, template_key: str) -> None:
@@ -1193,71 +1162,16 @@ class CoursesPage(QWidget):
         )
         dialog.exec()
 
-    def _format_course_date_long(self, course_date) -> str:
-        try:
-            day = int(course_date.day)
-            month = int(course_date.month)
-            year = int(course_date.year)
-        except Exception:
-            return str(course_date or "").strip()
-        month_names = {
-            1: "enero",
-            2: "febrero",
-            3: "marzo",
-            4: "abril",
-            5: "mayo",
-            6: "junio",
-            7: "julio",
-            8: "agosto",
-            9: "septiembre",
-            10: "octubre",
-            11: "noviembre",
-            12: "diciembre",
-        }
-        month_name = month_names.get(month, "")
-        if not month_name:
-            return f"{day:02d}/{month:02d}/{year:04d}"
-        return f"{day} de {month_name} de {year}"
-
-    def _build_certificate_payload(self, scope: str) -> list[dict[str, str]]:
-        course = self._selected_course()
-        if not course:
-            raise ValueError("Selecciona un curso.")
-
-        attendees = self._sorted_attendee_rows()
-        if scope == "confirmed":
-            attendees = [row for row in attendees if bool(getattr(row, "status_confirmacion", False))]
-            if not attendees:
-                raise ValueError("No hay asistentes confirmados.")
-        if scope == "selected":
-            row = self._selected_attendee()
-            if not row:
-                raise ValueError("Selecciona un asistente para generar un certificado individual.")
-            attendees = [row]
-
-        fecha_larga = self._format_course_date_long(getattr(course, "curso_fecha", ""))
-        payload = [
-            {
-                "asistente": str(item.asistente or ""),
-                "curso": str(getattr(course, "curso_nombre", "") or ""),
-                "fecha": f"Arinaga, {fecha_larga}" if fecha_larga else "",
-            }
-            for item in attendees
-        ]
-        if not payload:
-            raise ValueError("No hay asistentes para generar certificados.")
-        return payload
-
     def _generate_certificates_pdf(self, scope: str) -> Path:
         course = self._selected_course()
         if not course:
             raise ValueError("Selecciona un curso.")
-        certificates = self._build_certificate_payload(scope)
-        safe_name = "".join(ch if ch.isalnum() else "_" for ch in (course.curso_nombre or "curso"))[:42]
-        suffix_map = {"all": "todos", "confirmed": "confirmados", "selected": "seleccionado"}
-        suffix = suffix_map.get(scope, "todos")
-        output_path = self.certificate_service.DEFAULT_OUTPUT_DIR / f"certificado_{safe_name}_{suffix}.pdf"
-        return self.certificate_service.generate(certificates=certificates, output_path=output_path)
+        return self.course_document_generation_service.generate_certificates_pdf(
+            course,
+            self._sorted_attendee_rows(),
+            scope=scope,
+            selected_attendee=self._selected_attendee(),
+        )
 
     def _preview_certificates(self, scope: str) -> None:
         try:
