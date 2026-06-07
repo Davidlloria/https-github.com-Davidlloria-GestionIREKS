@@ -8,6 +8,7 @@ from app.services.ingredient_std_service import IngredientStdService
 from app.services.order_document_import_service import OrderDocumentImportService
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderService
+from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
 from app.services.settings_import_service import SettingsImportService
 from app.services.settings_maintenance_service import SettingsMaintenanceService
 from app.services.warehouse_inventory_service import WarehouseInventoryService
@@ -44,6 +45,10 @@ def get_order_service() -> OrderService:
 
 def get_order_document_import_service() -> OrderDocumentImportService:
     return OrderDocumentImportService()
+
+
+def get_sales_annual_comparison_service() -> SalesAnnualComparisonService:
+    return SalesAnnualComparisonService()
 
 
 def get_settings_import_service() -> SettingsImportService:

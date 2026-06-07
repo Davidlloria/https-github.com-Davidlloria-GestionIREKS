@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import contacts, customers, ingredients, orders, settings, warehouse
+from app.api.routers import contacts, customers, ingredients, orders, sales, settings, warehouse
 
 
 def create_app() -> FastAPI:
@@ -19,6 +19,7 @@ def create_app() -> FastAPI:
     api.include_router(contacts.router)
     api.include_router(ingredients.router)
     api.include_router(orders.router)
+    api.include_router(sales.router)
     api.include_router(settings.router)
     api.include_router(warehouse.router)
 
