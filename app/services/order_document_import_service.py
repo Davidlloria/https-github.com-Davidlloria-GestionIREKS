@@ -21,6 +21,7 @@ from app.models import (
     PedidoPendiente,
     TarifaPrecioIreks,
 )
+from app.services.order_document_import_flow_service import OrderDocumentImportFlowService
 from app.services.order_document_parser import OrderDocumentParser
 
 
@@ -37,6 +38,9 @@ class OrderNotFoundError(ValueError):
 
 
 class OrderDocumentImportService:
+    def __init__(self, import_flow_service: OrderDocumentImportFlowService | None = None) -> None:
+        self.import_flow_service = import_flow_service or OrderDocumentImportFlowService()
+
     def import_albaran_pdf(self, pedido_id: str, source: Path) -> OrderDocumentImportResult:
         header, rows = OrderDocumentParser.parse_albaran_pdf(source)
         return self.import_albaran(pedido_id, header, rows)
@@ -180,23 +184,25 @@ class OrderDocumentImportService:
             if pedido is None:
                 raise OrderNotFoundError("El pedido seleccionado ya no existe.")
 
-            preview_albaran_numero = str(preview_header.get("albaran_numero") or "").strip()
-            existing_same_number = None
-            if preview_albaran_numero:
-                existing_same_number = session.exec(
+            clean_pedido_id = str(pedido.pedido_id or "").strip()
+            gate = self.import_flow_service.resolve_albaran_gate(
+                pedido_id=clean_pedido_id,
+                preview_header=preview_header,
+                find_existing_albaran=lambda _pedido_id, albaran_numero: session.exec(
                     select(Albaran).where(
-                        Albaran.pedido_id == str(pedido.pedido_id or "").strip(),
-                        Albaran.albaran_numero == preview_albaran_numero,
+                        Albaran.pedido_id == clean_pedido_id,
+                        Albaran.albaran_numero == albaran_numero,
                     )
-                ).first()
-            if existing_same_number is not None:
-                existing_albaran_id = str(getattr(existing_same_number, "albaran_id", "") or "").strip()
-                self.repair_albaran_item_mappings(session, str(pedido.pedido_id or "").strip(), existing_albaran_id)
+                ).first(),
+                repair_existing_albaran=lambda existing_albaran_id: self.repair_albaran_item_mappings(
+                    session,
+                    clean_pedido_id,
+                    existing_albaran_id,
+                ),
+            )
+            if gate.already_imported:
                 result.already_imported = True
-                result.message = (
-                    f"El albaran {preview_albaran_numero} ya estaba importado para este pedido.\n"
-                    "No se han creado lineas duplicadas. Se han revisado las equivalencias y entradas de almacen existentes."
-                )
+                result.message = gate.message
                 return result
 
             albaran_header: Albaran | None = None
@@ -316,18 +322,20 @@ class OrderDocumentImportService:
             if pedido is None:
                 raise OrderNotFoundError("El pedido seleccionado ya no existe.")
 
-            preview_factura_numero = str(preview_header.get("factura_numero") or "").strip()
-            existing_same_number = None
-            if preview_factura_numero:
-                existing_same_number = session.exec(
+            clean_pedido_id = str(pedido.pedido_id or "").strip()
+            gate = self.import_flow_service.resolve_factura_gate(
+                pedido_id=clean_pedido_id,
+                preview_header=preview_header,
+                find_existing_factura=lambda _pedido_id, factura_numero: session.exec(
                     select(Factura).where(
-                        Factura.pedido_id == str(pedido.pedido_id or "").strip(),
-                        Factura.factura_numero == preview_factura_numero,
+                        Factura.pedido_id == clean_pedido_id,
+                        Factura.factura_numero == factura_numero,
                     )
-                ).first()
-            if existing_same_number is not None:
+                ).first(),
+            )
+            if gate.already_imported:
                 result.already_imported = True
-                result.message = f"La factura {preview_factura_numero} ya estaba importada para este pedido. No se han creado líneas duplicadas."
+                result.message = gate.message
                 return result
 
             factura_header: Factura | None = None
