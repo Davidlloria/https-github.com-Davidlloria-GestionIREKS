@@ -56,6 +56,7 @@ from app.services.order_document_parser import OrderDocumentParser
 from app.services.order_export_service import OrderExportService
 from app.services.order_edit_flow_service import OrderEditFlowService
 from app.services.order_mail_flow_service import OrderMailFlowService
+from app.services.order_selected_flow_service import OrderSelectedFlowService
 from app.services.orders_documents_import_ui_service import (
     OrdersDocumentImportFlowError,
     OrdersDocumentsImportUiService,
@@ -1104,6 +1105,10 @@ class OrdersPage(QWidget):
         self.order_service = OrderService()
         self.order_edit_flow_service = OrderEditFlowService(
             order_query_service=self.order_query_service,
+            order_service=self.order_service,
+        )
+        self.order_selected_flow_service = OrderSelectedFlowService(
+            order_edit_flow_service=self.order_edit_flow_service,
             order_service=self.order_service,
         )
         self.orders_documents_import_ui_service = OrdersDocumentsImportUiService(
@@ -2417,14 +2422,18 @@ class OrdersPage(QWidget):
         if row is None:
             return
         try:
-            parsed_date = self.detail_fecha.date().toPython()
-            payload = {
-                "pedido_fecha": parsed_date,
-                "pedido_numero": self.detail_pedido_numero.text().strip(),
-            }
-            self.order_service.update_order_header(row.pedido_id, payload["pedido_fecha"], payload["pedido_numero"])
-            self.reload()
-            self._select_by_id(row.pedido_id)
+            result = self.order_selected_flow_service.save_selected_order_header(
+                row.pedido_id,
+                self.detail_fecha.date().toPython(),
+                self.detail_pedido_numero.text().strip(),
+            )
+            if result.status == "success":
+                self.reload()
+                self._select_by_id(row.pedido_id)
+                return
+            if result.status == "not_found":
+                return
+            QMessageBox.warning(self, "Pedidos", f"No se pudo guardar.\n{result.message}")
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Pedidos", f"No se pudo guardar.\n{exc}")
 
@@ -2469,7 +2478,7 @@ class OrdersPage(QWidget):
             QMessageBox.warning(self, "Pedidos", "Selecciona un pedido para editar.")
             return
         try:
-            context = self.order_edit_flow_service.build_edit_context(selected.pedido_id)
+            context = self.order_selected_flow_service.build_edit_context(selected.pedido_id, selected.pedido_estado)
             if context.status == "not_found":
                 QMessageBox.warning(self, "Pedidos", f"No se pudo editar.\n{context.message}")
                 return
@@ -2480,7 +2489,6 @@ class OrdersPage(QWidget):
             if pedido is None:
                 QMessageBox.warning(self, "Pedidos", "No se pudo editar.\nPedido no encontrado.")
                 return
-            qty_by_articulo = dict(context.qty_by_articulo)
 
             dialog = NewPedidoDialog(
                 almacen_id=str(pedido.almacen_id or "").strip(),
@@ -2488,9 +2496,9 @@ class OrdersPage(QWidget):
                 title="Editar pedido",
                 pedido_fecha=self._parse_date(getattr(pedido, "pedido_fecha", None)),
                 pedido_numero=str(getattr(pedido, "pedido_numero", "") or "").strip(),
-                initial_qty_by_articulo=qty_by_articulo,
-                confirm_label="Guardar" if selected.pedido_estado == "E" else "Consignar",
-                allow_pending=(selected.pedido_estado != "E"),
+                initial_qty_by_articulo=dict(context.qty_by_articulo),
+                confirm_label=context.confirm_label,
+                allow_pending=context.allow_pending,
             )
             if not dialog.exec():
                 return
@@ -2499,7 +2507,7 @@ class OrdersPage(QWidget):
             pedido_fecha = dialog.pedido_fecha()
             pedido_numero = dialog.pedido_numero()
 
-            result = self.order_edit_flow_service.submit_edit(
+            result = self.order_selected_flow_service.submit_selected_order_edit(
                 selected.pedido_id,
                 pedido_fecha,
                 pedido_numero,
