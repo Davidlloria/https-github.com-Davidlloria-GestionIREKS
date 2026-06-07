@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
 from app.models import Receta, RecetaLinea
 from app.services.openai_process_service import OpenAIProcessService
 from app.services import PdfService
+from app.services.recipe_active_flow_service import RecipeActiveFlowService, RecipeActivePayload
 from app.services.recipe_service import RecipeService
 from app.viewmodels import IngredientChoice
 
@@ -1670,6 +1671,7 @@ class RecipesPage(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.recipe_service = RecipeService()
+        self.recipe_active_flow_service = RecipeActiveFlowService(recipe_service=self.recipe_service)
         self.pdf_service = PdfService()
         self.current_recipe_id: int | None = None
         self.current_base_recipe_id: int | None = None
@@ -3118,25 +3120,15 @@ class RecipesPage(QWidget):
             return quantity * 1000
         return quantity
 
-    def _build_recipe_model(self) -> Receta:
-        nombre = self.nombre_input.text().strip()
-        codigo_receta = self.codigo_input.text().strip() or nombre
+    def _build_recipe_payload(self) -> RecipeActivePayload:
         elaboracion_payload = dict(self.recipe_elaboracion_data)
-        if self._proceso_rich_html.strip():
-            elaboracion_payload[self.PROCESO_RICH_HTML_KEY] = self._proceso_rich_html.strip()
-        else:
-            elaboracion_payload.pop(self.PROCESO_RICH_HTML_KEY, None)
         images_gallery = self._collect_images_gallery()
-        if images_gallery:
-            elaboracion_payload[self.IMAGES_GALLERY_KEY] = json.dumps(images_gallery, ensure_ascii=False)
-        else:
-            elaboracion_payload.pop(self.IMAGES_GALLERY_KEY, None)
-        return Receta(
-            id=self.current_recipe_id,
+        return RecipeActivePayload(
+            recipe_id=self.current_recipe_id,
             cliente_id=self._selected_cliente_id(),
-            nombre=nombre,
-            codigo_receta=codigo_receta,
-            version=self.version_input.text().strip() or "1.0",
+            nombre=self.nombre_input.text().strip(),
+            codigo_receta=self.codigo_input.text().strip(),
+            version=self.version_input.text().strip(),
             es_base=self.current_recipe_is_ireks,
             receta_base_id=self.current_base_recipe_id,
             masa_final_deseada_g=self.masa_spin.value(),
@@ -3145,10 +3137,15 @@ class RecipesPage(QWidget):
             merma_pct=self.merma_spin.value(),
             observaciones=self.observaciones_input.toPlainText().strip(),
             proceso=self.proceso_input.toPlainText().strip(),
-            escandallo_detalle_json=json.dumps(self.recipe_escandallo_data, ensure_ascii=False),
-            parametros_elaboracion_json=json.dumps(elaboracion_payload, ensure_ascii=False),
-            estado=self.estado_input.text().strip() or "borrador",
+            escandallo_data=dict(self.recipe_escandallo_data),
+            elaboracion_data=elaboracion_payload,
+            proceso_rich_html=self._proceso_rich_html.strip(),
+            images_gallery=images_gallery,
+            estado=self.estado_input.text().strip(),
         )
+
+    def _build_recipe_model(self) -> Receta:
+        return self.recipe_active_flow_service.build_recipe_model(self._build_recipe_payload())
 
     def _build_lines(self) -> list[RecetaLinea]:
         lines: list[RecetaLinea] = []
@@ -3213,15 +3210,17 @@ class RecipesPage(QWidget):
         if self._is_loading_recipe:
             return
         try:
-            receta = self._build_recipe_model()
-            if not receta.nombre:
+            result = self.recipe_active_flow_service.autosave_recipe(
+                self._build_recipe_payload(),
+                self._build_lines(),
+                selected_cliente_id=self._selected_cliente_id(),
+                recipe_tab_index=self.recipe_tabs.currentIndex(),
+            )
+            if result.status != "saved":
+                if result.status == "error":
+                    print(f"[AUTOSAVE] Error guardando receta: {result.message}")
                 return
-            if self.recipe_tabs.currentIndex() == 1 and not receta.cliente_id:
-                return
-            lineas = self._build_lines()
-            result = self.recipe_service.calculate(receta, lineas, sync_categories=True)
-            saved = self.recipe_service.save_recipe(result.receta, result.lineas)
-            self.current_recipe_id = saved.receta.id
+            self.current_recipe_id = result.saved_recipe_id
             self._reload_recipe_list()
             self._select_recipe_in_active_table(self.current_recipe_id)
         except Exception as exc:
@@ -3380,30 +3379,32 @@ class RecipesPage(QWidget):
     def _set_issues_text(self, text: str) -> None:
         self.current_issues = text.splitlines() if text else []
 
-    def _validate_recipe(self, receta: Receta) -> bool:
-        if not receta.nombre:
-            QMessageBox.warning(self, "Validacion", "El nombre de receta es obligatorio.")
-            return False
-        return True
-
     def _save_recipe(self) -> None:
         self._autosave_timer.stop()
         if self.current_recipe_id is None:
             self.current_recipe_is_ireks = self.recipe_tabs.currentIndex() == 0
-        if self.recipe_tabs.currentIndex() == 1 and not self._selected_cliente_id():
-            QMessageBox.warning(self, "Recetas", "Selecciona un cliente para guardar una receta de cliente.")
+        result = self.recipe_active_flow_service.save_recipe(
+            self._build_recipe_payload(),
+            self._build_lines(),
+            selected_cliente_id=self._selected_cliente_id(),
+            recipe_tab_index=self.recipe_tabs.currentIndex(),
+        )
+        if result.status == "missing_name":
+            QMessageBox.warning(self, "Validacion", result.message)
             return
-        receta = self._build_recipe_model()
-        if not self._validate_recipe(receta):
+        if result.status == "missing_customer":
+            QMessageBox.warning(self, "Recetas", result.message)
             return
-        lineas = self._build_lines()
-        result = self.recipe_service.calculate(receta, lineas, sync_categories=True)
+        if result.status == "error":
+            QMessageBox.warning(self, "Recetas", f"No se pudo guardar.\n{result.message}")
+            return
+        if result.receta is None:
+            return
         self._render_lines(result.lineas)
         self._update_summary(result.receta, result.lineas)
         self.current_issues = [f"[{i.level.upper()}] {i.message}" for i in result.issues]
         self._set_issues_text("\n".join(self.current_issues))
-        saved = self.recipe_service.save_recipe(result.receta, result.lineas)
-        self.current_recipe_id = saved.receta.id
+        self.current_recipe_id = result.saved_recipe_id
         self._reload_recipe_list()
         QMessageBox.information(self, "Recetas", "Receta guardada.")
 
@@ -3414,9 +3415,22 @@ class RecipesPage(QWidget):
         comentario, ok = QInputDialog.getText(self, "Guardar version", "Comentario:")
         if not ok:
             return
-        receta = self._build_recipe_model()
-        lineas = self._build_lines()
-        self.recipe_service.save_version(receta, lineas, comentario.strip())
+        result = self.recipe_active_flow_service.save_version(
+            self._build_recipe_payload(),
+            self._build_lines(),
+            comentario.strip(),
+            selected_cliente_id=self._selected_cliente_id(),
+            recipe_tab_index=self.recipe_tabs.currentIndex(),
+        )
+        if result.status == "missing_name":
+            QMessageBox.warning(self, "Validacion", result.message)
+            return
+        if result.status == "missing_customer":
+            QMessageBox.warning(self, "Recetas", result.message)
+            return
+        if result.status == "error":
+            QMessageBox.warning(self, "Recetas", f"No se pudo guardar la version.\n{result.message}")
+            return
         QMessageBox.information(self, "Recetas", "Version guardada.")
 
     def _duplicate_recipe(self) -> None:
