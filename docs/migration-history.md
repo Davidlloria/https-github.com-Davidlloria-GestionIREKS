@@ -437,6 +437,19 @@ Fase 5 - Reducir dependencia del desktop.
   - tests ejecutados: `python -m pytest tests\\test_ingredient_chatgpt_nutrition_flow_service.py
     tests\\test_ingredient_nutrition_query_service.py
     tests\\test_architecture_boundaries.py -q`.
+- Importacion de productos IREKS extraida fuera de UI desktop:
+  - `app/services/ingredient_products_import_flow_service.py` concentra la
+    construccion del schema, los aliases y la normalizacion del resultado
+    tecnico de importacion;
+  - `app/ui/widgets/ingredients_page.py` conserva `QFileDialog`,
+    `QMessageBox`, `reload()` y los textos visibles;
+  - se mantiene el mismo comportamiento visible de importacion y de resumen de
+    incidencias;
+  - archivos afectados: `app/services/ingredient_products_import_flow_service.py`,
+    `app/ui/widgets/ingredients_page.py`,
+    `tests/test_ingredient_products_import_flow_service.py`;
+  - tests ejecutados: `python -m pytest tests\\test_ingredient_products_import_flow_service.py
+    tests\\test_architecture_boundaries.py -q`.
 - Resolucion del runtime OCR local extraida fuera de `OrderDocumentParser`:
   - `app/services/order_document_ocr_runtime_service.py` concentra la
     deteccion de `TESSERACT_CMD`, la resolucion de `runtime/tesseract`, la

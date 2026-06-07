@@ -63,6 +63,11 @@
   ChatGPT nutricion hacia `app/services/ingredient_chatgpt_nutrition_flow_service.py`,
   dejando en `app/ui/widgets/ingredients_page.py` el dialogo de consulta, los
   mensajes visibles y la aplicacion final de valores.
+- Ultimo avance validado: se extrajo la importacion de productos de
+  `ingredients_page.py` hacia
+  `app/services/ingredient_products_import_flow_service.py`, dejando en el
+  widget la seleccion de archivo, `QMessageBox`, `reload()` y los textos
+  visibles.
 - Ultimo avance validado: se extrae la resolucion del runtime OCR local hacia
   `app/services/order_document_ocr_runtime_service.py`, dejando en
   `app/services/order_document_parser.py` el parseo documental, el OCR de
