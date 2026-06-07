@@ -34,6 +34,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models import CodigoPostal, Cliente, Contacto, Isla, Localidad, Municipio, Provincia, Receta
 from app.services.customer_report_document_helper import build_customer_report_html
+from app.services.customer_report_flow_service import CustomerReportFlowResult, CustomerReportFlowService
 from app.services.customer_service import CustomerService
 from app.services.customer_report_service import CustomerReportIntentService, CustomerReportResult, CustomerReportService
 from app.services.report_export_service import ReportExportService
@@ -48,6 +49,10 @@ class CustomersPage(QWidget):
         self.customer_service = CustomerService()
         self.report_intent_service = CustomerReportIntentService()
         self.customer_report_service = CustomerReportService()
+        self.customer_report_flow_service = CustomerReportFlowService(
+            intent_service=self.report_intent_service,
+            report_service=self.customer_report_service,
+        )
         self.report_export_service = ReportExportService()
         self.schema = [
             {"name": "cliente_nombre_comercial", "label": "Nombre comercial"},
@@ -98,6 +103,7 @@ class CustomersPage(QWidget):
         self._detail_splitter: QSplitter | None = None
         self._last_selected_customer_id: str = ""
         self._last_customer_report: CustomerReportResult | None = None
+        self._last_customer_report_flow_result: CustomerReportFlowResult = CustomerReportFlowResult(status="idle")
 
         self._build_ui()
         self.reload()
@@ -1852,23 +1858,25 @@ class CustomersPage(QWidget):
                 button.setEnabled(enabled)
 
     def _generate_customer_report(self) -> None:
-        prompt = self.report_prompt.toPlainText().strip()
-        if not prompt:
-            QMessageBox.warning(self, "Listados", "Escribe que listado necesitas.")
-            return
         self.report_status_label.setText("Generando listado...")
         QApplication.processEvents()
-        intent_result = self.report_intent_service.parse(prompt)
-        if not intent_result.ok:
-            QMessageBox.warning(self, "Listados", intent_result.message)
-            return
-        report = self.customer_report_service.run(intent_result.intent)
+        result = self.customer_report_flow_service.generate_report(self.report_prompt.toPlainText())
+        self._last_customer_report_flow_result = result
+        report = result.report
         self._last_customer_report = report
+        if result.status == "empty" and report is None:
+            QMessageBox.warning(self, "Listados", result.message)
+            return
+        if result.status == "error":
+            QMessageBox.warning(self, "Listados", result.message)
+            return
+        if report is None:
+            QMessageBox.warning(self, "Listados", "No se pudo generar el listado.")
+            return
         self._render_customer_report(report)
-        source = "ChatGPT" if intent_result.used_ai else "interprete local"
-        self.report_status_label.setText(f"{report.title} · {len(report.rows)} fila(s) · {source}")
-        if intent_result.message and not intent_result.used_ai:
-            self.report_status_label.setToolTip(intent_result.message)
+        self.report_status_label.setText(f"{report.title} · {len(report.rows)} fila(s) · {result.source}")
+        if result.message and not result.used_ai:
+            self.report_status_label.setToolTip(result.message)
 
     def _render_customer_report(self, report: CustomerReportResult) -> None:
         self.report_table.clear()
@@ -1886,7 +1894,7 @@ class CustomersPage(QWidget):
         self._set_report_actions_enabled(bool(report.rows))
 
     def _export_customer_report_excel(self) -> None:
-        report = self._last_customer_report
+        report = self.customer_report_flow_service.last_report
         if report is None:
             QMessageBox.warning(self, "Listados", "Genera primero un listado.")
             return
@@ -1898,7 +1906,7 @@ class CustomersPage(QWidget):
         QMessageBox.information(self, "Listados", f"Excel exportado:\n{out}")
 
     def _export_customer_report_pdf(self) -> None:
-        report = self._last_customer_report
+        report = self.customer_report_flow_service.last_report
         if report is None:
             QMessageBox.warning(self, "Listados", "Genera primero un listado.")
             return
@@ -1910,7 +1918,7 @@ class CustomersPage(QWidget):
         QMessageBox.information(self, "Listados", f"PDF exportado:\n{out}")
 
     def _print_customer_report(self) -> None:
-        report = self._last_customer_report
+        report = self.customer_report_flow_service.last_report
         if report is None:
             QMessageBox.warning(self, "Listados", "Genera primero un listado.")
             return
