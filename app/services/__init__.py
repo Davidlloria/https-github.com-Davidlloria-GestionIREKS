@@ -24,6 +24,7 @@ from app.services.ingredient_ireks_autosave_flow_service import (
     IngredientIreksAutosaveResult,
 )
 from app.services.igsa_sales_workbook_flow_service import IgsaSalesWorkbookFlowService
+from app.services.igsa_sales_pdf_flow_service import IgsaSalesPdfFlowService
 from app.services.openai_nutrition_service import OpenAINutritionResult, OpenAINutritionService
 from app.services.openai_settings_service import OpenAISettingsService
 from app.services.openai_translation_service import OpenAITranslationService, TranslationResult
@@ -105,6 +106,7 @@ __all__ = [
     "IngredientIreksAutosaveRequest",
     "IngredientIreksAutosaveResult",
     "IgsaSalesWorkbookFlowService",
+    "IgsaSalesPdfFlowService",
     "OpenAINutritionService",
     "OpenAINutritionResult",
     "OpenAISettingsService",
