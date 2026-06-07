@@ -71,6 +71,18 @@ La fase actual consiste en:
 
 12. Mantener siempre los guardrails arquitectónicos existentes.
 
+13. Esta aplicacion es de uso personal/comercial y no safety-critical; priorizar pragmatismo y reduccion de deuda real sobre analisis extensos.
+
+14. Por defecto: inspeccionar, implementar, testear y commitear. Evitar informes largos salvo peticion explicita.
+
+15. Evitar rankings y matrices salvo que el usuario los pida de forma explicita.
+
+16. Evitar micro-refactors y servicios nuevos para mover wrappers de UI.
+
+17. Preferir cortes que eliminen complejidad real, reduzcan riesgo o desbloqueen migracion.
+
+18. Devolver resmenes cortos, operativos y accionables.
+
 ---
 
 ## Dirección arquitectónica
