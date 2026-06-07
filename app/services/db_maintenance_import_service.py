@@ -1,7 +1,6 @@
 ﻿from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
@@ -19,14 +18,13 @@ from app.models import (
     IngredienteStd,
     Isla,
     Localidad,
-    MateriaPrimaPrecio,
     MateriaPrimaValorNutricional,
     Municipio,
     Provincia,
     Proveedor,
-    TarifaPrecioIreks,
 )
 from app.services.import_service import ImportService
+from app.services.db_maintenance_price_import_service import DbMaintenancePriceImportService
 
 
 @dataclass(frozen=True)
@@ -71,6 +69,7 @@ class MaintenanceImportResult:
 class DbMaintenanceImportService:
     def __init__(self) -> None:
         self.import_service = ImportService()
+        self.price_import_service = DbMaintenancePriceImportService()
         self._profiles = self._build_profiles()
         self._ensure_audit_tables()
 
@@ -289,6 +288,8 @@ class DbMaintenanceImportService:
         return payloads, errors
 
     def _normalize_payload(self, *, profile: MaintenanceImportProfile, payload: dict[str, Any]) -> dict[str, Any]:
+        if self.price_import_service.handles(profile.key):
+            return self.price_import_service.normalize_payload(profile.key, payload)
         if profile.key == "productos_ireks":
             return self._normalize_ireks_payload(payload)
         if profile.key == "materias_primas":
@@ -307,15 +308,13 @@ class DbMaintenanceImportService:
             return self._normalize_codigo_postal_payload(payload)
         if profile.key == "localidades":
             return self._normalize_localidad_payload(payload)
-        if profile.key == "tarifa_precios_ireks":
-            return self._normalize_tarifa_payload(payload)
-        if profile.key == "precios_materias_primas":
-            return self._normalize_materia_prima_precio_payload(payload)
         if profile.key == "valores_nutricionales_ireks":
             return self._normalize_nutricion_ireks_payload(payload)
         raise ValueError(f"Perfil de normalizacion no soportado: {profile.key}")
 
     def _build_lookup(self, *, session: Session, profile: MaintenanceImportProfile, payloads: list[dict[str, Any]]) -> dict[str, Any]:
+        if self.price_import_service.handles(profile.key):
+            return self.price_import_service.build_lookup(session=session, profile_key=profile.key, payloads=payloads)
         if profile.key == "productos_ireks":
             return self._build_ireks_lookup(session, payloads)
         if profile.key == "materias_primas":
@@ -334,15 +333,13 @@ class DbMaintenanceImportService:
             return self._build_codigo_postal_lookup(session, payloads)
         if profile.key == "localidades":
             return self._build_localidad_lookup(session, payloads)
-        if profile.key == "tarifa_precios_ireks":
-            return self._build_tarifa_lookup(session, payloads)
-        if profile.key == "precios_materias_primas":
-            return self._build_materia_prima_precio_lookup(session, payloads)
         if profile.key == "valores_nutricionales_ireks":
             return self._build_nutricion_ireks_lookup(session, payloads)
         return {}
 
     def _find_match(self, *, profile: MaintenanceImportProfile, payload: dict[str, Any], lookup: dict[str, Any]) -> Any | None:
+        if self.price_import_service.handles(profile.key):
+            return self.price_import_service.find_match(profile_key=profile.key, payload=payload, lookup=lookup)
         if profile.key == "productos_ireks":
             return self._find_ireks_match(payload, lookup)
         if profile.key == "materias_primas":
@@ -361,15 +358,13 @@ class DbMaintenanceImportService:
             return self._find_codigo_postal_match(payload, lookup)
         if profile.key == "localidades":
             return self._find_localidad_match(payload, lookup)
-        if profile.key == "tarifa_precios_ireks":
-            return self._find_tarifa_match(payload, lookup)
-        if profile.key == "precios_materias_primas":
-            return self._find_materia_prima_precio_match(payload, lookup)
         if profile.key == "valores_nutricionales_ireks":
             return self._find_nutricion_ireks_match(payload, lookup)
         return None
 
     def _create_entity(self, *, session: Session, profile: MaintenanceImportProfile, payload: dict[str, Any]) -> Any:
+        if self.price_import_service.handles(profile.key):
+            return self.price_import_service.create_entity(session=session, profile_key=profile.key, payload=payload)
         if profile.key == "productos_ireks":
             entity = IngredienteIreks(**payload)
         elif profile.key == "materias_primas":
@@ -392,19 +387,6 @@ class DbMaintenanceImportService:
         elif profile.key == "localidades":
             self._ensure_codigo_postal_link(session, str(payload.get("municipio_id") or ""), payload.get("codigo_postal"))
             entity = Localidad(**payload)
-        elif profile.key == "tarifa_precios_ireks":
-            entity = TarifaPrecioIreks(
-                articulo_id=str(payload.get("articulo_id") or "").strip(),
-                tarifa_ano=int(payload.get("tarifa_ano") or 0),
-                precio_fabricante=float(payload.get("precio_fabricante") or 0.0),
-                precio_distribuidor=float(payload.get("precio_distribuidor") or 0.0),
-            )
-        elif profile.key == "precios_materias_primas":
-            entity = MateriaPrimaPrecio(
-                articulo_id=str(payload.get("articulo_id") or "").strip(),
-                fecha_precio=cast(date, payload["fecha_precio"]),
-                costo_neto=float(payload.get("costo_neto") or 0.0),
-            )
         elif profile.key == "valores_nutricionales_ireks":
             entity = MateriaPrimaValorNutricional(
                 articulo_id=str(payload.get("articulo_id") or "").strip(),
@@ -425,6 +407,8 @@ class DbMaintenanceImportService:
         return entity
 
     def _apply_updates(self, *, session: Session, profile: MaintenanceImportProfile, entity: Any, payload: dict[str, Any]) -> bool:
+        if self.price_import_service.handles(profile.key):
+            return self.price_import_service.apply_updates(profile_key=profile.key, entity=entity, payload=payload)
         if profile.key == "localidades":
             self._ensure_codigo_postal_link(session, str(payload.get("municipio_id") or ""), payload.get("codigo_postal"))
             return self._apply_localidad_updates(entity=entity, payload=payload, profile=profile)
@@ -441,6 +425,9 @@ class DbMaintenanceImportService:
         return changed
 
     def _update_lookup_after_insert(self, *, profile: MaintenanceImportProfile, lookup: dict[str, Any], entity: Any) -> None:
+        if self.price_import_service.handles(profile.key):
+            self.price_import_service.update_lookup_after_insert(profile_key=profile.key, lookup=lookup, entity=entity)
+            return
         if profile.key == "productos_ireks":
             articulo_id = str(entity.articulo_id or "").strip()
             if articulo_id:
@@ -491,12 +478,6 @@ class DbMaintenanceImportService:
             eid = str(entity.localidad_id or "").strip()
             if eid:
                 lookup["by_id"][eid] = entity
-        elif profile.key == "tarifa_precios_ireks":
-            key = (str(entity.articulo_id or "").strip(), int(entity.tarifa_ano or 0))
-            lookup["by_pk"][key] = entity
-        elif profile.key == "precios_materias_primas":
-            key = (str(entity.articulo_id or "").strip(), entity.fecha_precio)
-            lookup["by_pk"][key] = entity
         elif profile.key == "valores_nutricionales_ireks":
             aid = str(entity.articulo_id or "").strip()
             if aid:
@@ -1072,61 +1053,6 @@ class DbMaintenanceImportService:
             return None
         return lookup["by_id"].get(eid)
 
-    def _build_tarifa_lookup(self, session: Session, payloads: list[dict[str, Any]]) -> dict[str, Any]:
-        articulo_ids = {str(payload.get("articulo_id") or "").strip() for payload in payloads}
-        articulo_ids.discard("")
-        years = {int(payload.get("tarifa_ano") or 0) for payload in payloads}
-        years.discard(0)
-        rows: list[TarifaPrecioIreks] = []
-        if articulo_ids and years:
-            rows = list(
-                session.exec(
-                    select(TarifaPrecioIreks).where(
-                        col(TarifaPrecioIreks.articulo_id).in_(articulo_ids),
-                        col(TarifaPrecioIreks.tarifa_ano).in_(years),
-                    )
-                )
-            )
-        by_pk = {
-            (str(row.articulo_id or "").strip(), int(row.tarifa_ano or 0)): row
-            for row in rows
-            if str(row.articulo_id or "").strip() and int(row.tarifa_ano or 0) > 0
-        }
-        return {"by_pk": by_pk}
-
-    def _find_tarifa_match(self, payload: dict[str, Any], lookup: dict[str, Any]) -> TarifaPrecioIreks | None:
-        key = (str(payload.get("articulo_id") or "").strip(), int(payload.get("tarifa_ano") or 0))
-        if not key[0] or key[1] <= 0:
-            return None
-        return lookup["by_pk"].get(key)
-
-    def _build_materia_prima_precio_lookup(self, session: Session, payloads: list[dict[str, Any]]) -> dict[str, Any]:
-        articulo_ids = {str(payload.get("articulo_id") or "").strip() for payload in payloads}
-        articulo_ids.discard("")
-        fechas = {payload.get("fecha_precio") for payload in payloads if payload.get("fecha_precio")}
-        rows: list[MateriaPrimaPrecio] = []
-        if articulo_ids and fechas:
-            rows = list(
-                session.exec(
-                    select(MateriaPrimaPrecio).where(
-                        col(MateriaPrimaPrecio.articulo_id).in_(articulo_ids),
-                        col(MateriaPrimaPrecio.fecha_precio).in_(fechas),
-                    )
-                )
-            )
-        by_pk = {
-            (str(row.articulo_id or "").strip(), row.fecha_precio): row
-            for row in rows
-            if str(row.articulo_id or "").strip() and row.fecha_precio
-        }
-        return {"by_pk": by_pk}
-
-    def _find_materia_prima_precio_match(self, payload: dict[str, Any], lookup: dict[str, Any]) -> MateriaPrimaPrecio | None:
-        key = (str(payload.get("articulo_id") or "").strip(), payload.get("fecha_precio"))
-        if not key[0] or not key[1]:
-            return None
-        return lookup["by_pk"].get(key)
-
     def _build_nutricion_ireks_lookup(self, session: Session, payloads: list[dict[str, Any]]) -> dict[str, Any]:
         articulo_ids = {str(payload.get("articulo_id") or "").strip() for payload in payloads}
         articulo_ids.discard("")
@@ -1283,41 +1209,6 @@ class DbMaintenanceImportService:
         data["codigo_postal"] = cp or None
         return data
 
-    def _normalize_tarifa_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
-        data = dict(payload)
-        articulo_id = str(data.get("articulo_id") or "").strip()
-        if not articulo_id:
-            raise ValueError("Campo obligatorio vacio: articulo_id")
-        data["articulo_id"] = articulo_id
-
-        ano_raw = str(data.get("tarifa_ano") or "").strip()
-        if not ano_raw:
-            raise ValueError("Campo obligatorio vacio: tarifa_ano")
-        try:
-            tarifa_ano = int(float(ano_raw.replace(",", ".")))
-        except Exception as exc:  # noqa: BLE001
-            raise ValueError(f"Ano de tarifa invalido: {ano_raw}") from exc
-        if tarifa_ano < 1900 or tarifa_ano > 2100:
-            raise ValueError(f"Ano de tarifa fuera de rango: {tarifa_ano}")
-        data["tarifa_ano"] = tarifa_ano
-        data["precio_fabricante"] = self._to_float(data.get("precio_fabricante"))
-        data["precio_distribuidor"] = self._to_float(data.get("precio_distribuidor"))
-        return data
-
-    def _normalize_materia_prima_precio_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
-        data = dict(payload)
-        articulo_id = str(data.get("articulo_id") or "").strip()
-        if not articulo_id:
-            raise ValueError("Campo obligatorio vacio: articulo_id")
-        data["articulo_id"] = articulo_id
-
-        fecha = self._to_date(data.get("fecha_precio"))
-        if fecha is None:
-            raise ValueError("Campo obligatorio vacio o invalido: fecha_precio")
-        data["fecha_precio"] = fecha
-        data["costo_neto"] = self._to_float(data.get("costo_neto"))
-        return data
-
     def _normalize_nutricion_ireks_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         data = dict(payload)
         data["articulo_id"] = str(data.get("articulo_id") or "").strip()
@@ -1389,24 +1280,6 @@ class DbMaintenanceImportService:
         if text in {"0", "false", "no", "n", ""}:
             return False
         return default
-
-    def _to_date(self, value: Any) -> date | None:
-        if value is None or str(value).strip() == "":
-            return None
-        if isinstance(value, datetime):
-            return value.date()
-        if isinstance(value, date):
-            return value
-        text = str(value).strip()
-        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
-            try:
-                return datetime.strptime(text, fmt).date()
-            except Exception:
-                continue
-        try:
-            return datetime.fromisoformat(text).date()
-        except Exception:
-            return None
 
     def _ensure_audit_tables(self) -> None:
         with engine.begin() as conn:

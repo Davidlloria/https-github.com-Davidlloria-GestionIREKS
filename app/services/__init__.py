@@ -48,6 +48,7 @@ from app.services.contact_service import ContactCompanyLookup, ContactService
 from app.services.course_attendee_flow_service import CourseAttendeeFlowService
 from app.services.course_document_files_flow_service import CourseDocumentFilesFlowService
 from app.services.course_service import CourseService
+from app.services.db_maintenance_price_import_service import DbMaintenancePriceImportService
 from app.services.customer_service import AddressCatalogs, CustomerService as CustomerDataService
 from app.services.provider_service import ProviderService
 from app.services.recipe_service import RecipeService
@@ -138,6 +139,7 @@ __all__ = [
     "CourseAttendeeFlowService",
     "CourseDocumentFilesFlowService",
     "CourseService",
+    "DbMaintenancePriceImportService",
     "AddressCatalogs",
     "CustomerDataService",
     "ProviderService",
