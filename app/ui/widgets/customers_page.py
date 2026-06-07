@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 from sqlalchemy.exc import IntegrityError
 
 from app.models import CodigoPostal, Cliente, Contacto, Isla, Localidad, Municipio, Provincia, Receta
+from app.services.customer_report_document_helper import build_customer_report_html
 from app.services.customer_service import CustomerService
 from app.services.customer_report_service import CustomerReportIntentService, CustomerReportResult, CustomerReportService
 from app.services.report_export_service import ReportExportService
@@ -1919,34 +1920,8 @@ class CustomersPage(QWidget):
         if dialog.exec() != QPrintDialog.DialogCode.Accepted:
             return
         document = QTextDocument()
-        document.setHtml(self._report_to_html(report))
+        document.setHtml(build_customer_report_html(report))
         document.print_(printer)
-
-    def _report_to_html(self, report: CustomerReportResult) -> str:
-        def esc(value: object) -> str:
-            return (
-                str(value)
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace('"', "&quot;")
-            )
-
-        header_html = "".join(f"<th>{esc(header)}</th>" for header in report.headers)
-        rows_html = ""
-        for row in report.rows:
-            rows_html += "<tr>" + "".join(f"<td>{esc(value)}</td>" for value in row) + "</tr>"
-        return f"""
-        <html>
-        <body>
-        <h2>{esc(report.title)}</h2>
-        <table border="1" cellspacing="0" cellpadding="4" width="100%">
-        <thead><tr>{header_html}</tr></thead>
-        <tbody>{rows_html}</tbody>
-        </table>
-        </body>
-        </html>
-        """
 
     def _new_entity(self) -> None:
         dialog = EntityDialog("Nuevo: Clientes", self.edit_schema, parent=self)
