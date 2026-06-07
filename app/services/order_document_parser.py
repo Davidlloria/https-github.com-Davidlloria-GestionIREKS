@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import json
-import os
 import re
-import sys
 from pathlib import Path
 from typing import Any
 
 import fitz
 from pypdf import PdfReader
 
-from app.core.config import BASE_DIR
+from app.services.order_document_factura_sidecar_service import OrderDocumentFacturaSidecarService
+from app.services.order_document_ocr_runtime_service import OrderDocumentOcrRuntimeService
 
 
 class OrderDocumentParser:
@@ -305,71 +304,8 @@ class OrderDocumentParser:
         return ""
 
     @staticmethod
-    def _factura_sidecar_value(payload: dict[str, Any], names: list[str]) -> Any:
-        normalized = {re.sub(r"[^a-z0-9]", "", str(key).lower()): value for key, value in payload.items()}
-        for name in names:
-            key = re.sub(r"[^a-z0-9]", "", name.lower())
-            if key in normalized:
-                return normalized[key]
-        return ""
-
-    @staticmethod
-    def _load_factura_sidecar_rows(file_path: Path, header: dict[str, str]) -> list[dict[str, Any]]:
-        factura_numero = str(header.get("factura_numero") or "").strip()
-        if not factura_numero:
-            return []
-        rows: list[dict[str, Any]] = []
-        for json_path in sorted(file_path.parent.glob("*.json")):
-            if factura_numero not in json_path.name:
-                continue
-            try:
-                payload = json.loads(json_path.read_text(encoding="utf-8-sig"))
-            except Exception:
-                continue
-            if not isinstance(payload, list):
-                continue
-            for entry in payload:
-                if not isinstance(entry, dict):
-                    continue
-                entry_factura = str(OrderDocumentParser._factura_sidecar_value(entry, ["Factura", "factura_numero"]) or "").strip()
-                if entry_factura and entry_factura != factura_numero:
-                    continue
-                codigo = str(OrderDocumentParser._factura_sidecar_value(entry, ["Código", "Codigo", "CÃ³digo", "articulo_codigo"]) or "").strip()
-                lote = str(OrderDocumentParser._factura_sidecar_value(entry, ["Lote", "articulo_lote"]) or "").strip()
-                if not codigo or not lote:
-                    continue
-                rows.append(
-                    {
-                        "factura_numero": factura_numero,
-                        "factura_fecha": str(OrderDocumentParser._factura_sidecar_value(entry, ["Fecha", "factura_fecha"]) or header.get("factura_fecha") or "").strip(),
-                        "albaran_numero": str(
-                            OrderDocumentParser._factura_sidecar_value(entry, ["Albarán", "Albaran", "AlbarÃ¡n", "albaran_numero"])
-                            or header.get("albaran_numero")
-                            or ""
-                        ).strip(),
-                        "factura_referencia": str(header.get("factura_referencia") or "").strip(),
-                        "articulo_codigo": codigo,
-                        "articulo_descripcion": str(
-                            OrderDocumentParser._factura_sidecar_value(entry, ["Descripción", "Descripcion", "DescripciÃ³n", "articulo_descripcion"]) or codigo
-                        ).strip(),
-                        "articulo_cantidad": str(OrderDocumentParser._factura_sidecar_value(entry, ["Unidades", "Uds", "articulo_cantidad"]) or "").strip(),
-                        "articulo_envase": "",
-                        "articulo_kilos": "",
-                        "articulo_lote": lote,
-                        "articulo_caducidad": str(OrderDocumentParser._factura_sidecar_value(entry, ["Caducidad", "articulo_caducidad"]) or "").strip(),
-                        "precio_unitario": str(OrderDocumentParser._factura_sidecar_value(entry, ["Precio", "precio_unitario"]) or "").strip(),
-                        "dto_pct": str(OrderDocumentParser._factura_sidecar_value(entry, ["Descuento", "Dto", "dto_pct"]) or "20").strip(),
-                        "iva_pct": "",
-                        "total_linea": "",
-                    }
-                )
-            if rows:
-                return rows
-        return rows
-
-    @staticmethod
     def _merge_factura_sidecar_rows(file_path: Path, header: dict[str, str], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        sidecar_rows = OrderDocumentParser._load_factura_sidecar_rows(file_path, header)
+        sidecar_rows = OrderDocumentFacturaSidecarService().load_rows(file_path, header.get("factura_numero") or "", header)
         if not sidecar_rows:
             return rows
         parsed_by_lote = {str(row.get("articulo_lote") or "").strip(): row for row in rows if str(row.get("articulo_lote") or "").strip()}
@@ -432,81 +368,10 @@ class OrderDocumentParser:
         return OrderDocumentParser.parse_factura_ocr_article_line(text, header, lote, caducidad)
 
     @staticmethod
-    def _try_configure_tesseract() -> bool:
-        try:
-            import pytesseract
-        except Exception:
-            return False
-
-        candidates: list[Path] = []
-
-        env_cmd = os.environ.get("TESSERACT_CMD")
-        if env_cmd:
-            candidates.append(Path(env_cmd))
-
-        runtime_dirs = [
-            BASE_DIR / "runtime" / "tesseract",
-            Path.cwd() / "runtime" / "tesseract",
-        ]
-        if getattr(sys, "frozen", False):
-            runtime_dirs.insert(0, Path(sys.executable).resolve().parent / "runtime" / "tesseract")
-            bundle_dir = getattr(sys, "_MEIPASS", "")
-            if bundle_dir:
-                runtime_dirs.insert(0, Path(bundle_dir) / "runtime" / "tesseract")
-
-        for runtime_dir in runtime_dirs:
-            candidates.append(runtime_dir / "tesseract.exe")
-            candidates.append(runtime_dir / "Tesseract-OCR" / "tesseract.exe")
-
-        candidates.extend(
-            [
-                Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe"),
-                Path(r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe"),
-            ]
-        )
-
-        def apply_candidate(candidate: Path | None) -> bool:
-            if candidate is None:
-                tesseract_dir = None
-            else:
-                if not candidate.exists():
-                    return False
-                tesseract_dir = candidate.parent
-                pytesseract.pytesseract.tesseract_cmd = str(candidate)
-            if tesseract_dir is not None:
-                tessdata_dir = tesseract_dir / "tessdata"
-                if tessdata_dir.exists():
-                    os.environ["TESSDATA_PREFIX"] = str(tessdata_dir)
-            try:
-                pytesseract.get_tesseract_version()
-                return True
-            except Exception:
-                return False
-
-        seen: set[Path] = set()
-        for candidate in candidates:
-            candidate = candidate.expanduser().resolve()
-            if candidate in seen:
-                continue
-            seen.add(candidate)
-            if apply_candidate(candidate):
-                return True
-        if apply_candidate(None):
-            return True
-        return False
-
-    @staticmethod
-    def _tesseract_ocr_lang() -> str | None:
-        tessdata_prefix = os.environ.get("TESSDATA_PREFIX")
-        if not tessdata_prefix:
-            return None
-        tessdata_dir = Path(tessdata_prefix)
-        langs = [lang for lang in ("eng", "spa") if (tessdata_dir / f"{lang}.traineddata").exists()]
-        return "+".join(langs) if langs else None
-
-    @staticmethod
     def _ocr_factura_article_line(page: Any, lote_line_y: float, header: dict[str, str], lote: str, caducidad: str) -> dict[str, Any] | None:
-        if not OrderDocumentParser._try_configure_tesseract():
+        runtime_service = OrderDocumentOcrRuntimeService()
+        runtime_state = runtime_service.resolve_runtime()
+        if not runtime_state.configured:
             return None
         try:
             import pytesseract
@@ -514,7 +379,7 @@ class OrderDocumentParser:
         except Exception:
             return None
         try:
-            lang = OrderDocumentParser._tesseract_ocr_lang()
+            lang = runtime_state.ocr_lang
             for top_offset, bottom_offset in ((20.0, 2.0), (28.0, 2.0), (30.0, 10.0), (25.0, -3.0)):
                 top = max(100.0, float(lote_line_y) - top_offset)
                 bottom = max(top + 12.0, float(lote_line_y) + bottom_offset)

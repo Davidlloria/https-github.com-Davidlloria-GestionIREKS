@@ -437,6 +437,48 @@ Fase 5 - Reducir dependencia del desktop.
   - tests ejecutados: `python -m pytest tests\\test_ingredient_chatgpt_nutrition_flow_service.py
     tests\\test_ingredient_nutrition_query_service.py
     tests\\test_architecture_boundaries.py -q`.
+- Importacion de productos IREKS extraida fuera de UI desktop:
+  - `app/services/ingredient_products_import_flow_service.py` concentra la
+    construccion del schema, los aliases y la normalizacion del resultado
+    tecnico de importacion;
+  - `app/ui/widgets/ingredients_page.py` conserva `QFileDialog`,
+    `QMessageBox`, `reload()` y los textos visibles;
+  - se mantiene el mismo comportamiento visible de importacion y de resumen de
+    incidencias;
+  - archivos afectados: `app/services/ingredient_products_import_flow_service.py`,
+    `app/ui/widgets/ingredients_page.py`,
+    `tests/test_ingredient_products_import_flow_service.py`;
+  - tests ejecutados: `python -m pytest tests\\test_ingredient_products_import_flow_service.py
+    tests\\test_architecture_boundaries.py -q`.
+- Resolucion del runtime OCR local extraida fuera de `OrderDocumentParser`:
+  - `app/services/order_document_ocr_runtime_service.py` concentra la
+    deteccion de `TESSERACT_CMD`, la resolucion de `runtime/tesseract`, la
+    configuracion de `pytesseract` y la deteccion de idiomas OCR;
+  - `app/services/order_document_parser.py` conserva el parseo documental, el
+    OCR de lineas, los sidecars y la recuperacion de huerfanas;
+  - se mantiene el mismo orden de busqueda de candidatos y el mismo contrato
+    visible de los metodos publicos del parser;
+  - archivos afectados: `app/services/order_document_ocr_runtime_service.py`,
+    `app/services/order_document_parser.py`,
+    `tests/test_order_document_ocr_runtime_service.py`,
+    `tests/test_albaran_pdf_parser.py`;
+  - tests ejecutados: `python -m pytest tests\\test_order_document_ocr_runtime_service.py
+    tests\\test_albaran_pdf_parser.py tests\\test_architecture_boundaries.py -q`.
+- Carga y normalizacion de sidecars de factura extraida fuera de
+  `OrderDocumentParser`:
+  - `app/services/order_document_factura_sidecar_service.py` concentra la
+    lectura de JSON sidecar, la normalizacion de claves y la construccion de
+    filas sidecar;
+  - `app/services/order_document_parser.py` conserva la precedencia entre filas
+    parseadas, sidecars y recuperacion OCR de factura;
+  - se mantiene la misma tolerancia a JSON corrupto, el mismo criterio de
+    coincidencia por `factura_numero` y las mismas claves de salida;
+  - archivos afectados: `app/services/order_document_factura_sidecar_service.py`,
+    `app/services/order_document_parser.py`,
+    `tests/test_order_document_factura_sidecar_service.py`,
+    `tests/test_albaran_pdf_parser.py`;
+  - tests ejecutados: `python -m pytest tests\\test_order_document_factura_sidecar_service.py
+    tests\\test_albaran_pdf_parser.py tests\\test_architecture_boundaries.py -q`.
 - Flujo de generacion de reportes de producto extraido fuera de UI desktop:
   - `app/services/product_report_flow_service.py` concentra la validacion de
     prompt vacio, el parseo de la intencion, la gestion de errores y la

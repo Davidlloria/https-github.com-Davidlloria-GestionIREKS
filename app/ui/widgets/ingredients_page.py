@@ -39,12 +39,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from app.models import AlmacenMovimiento, Distribuidor, Envase, Fabricante, Familia, IngredienteIreks, IngredienteStd, Pedido, PedidoItem, Proveedor, ReferenciaDistribuidor, Subfamilia, TarifaPrecioIreks
-from app.services.import_service import ImportService
 from app.services.ingredient_fatsecret_nutrition_flow_service import IngredientFatSecretNutritionFlowService
 from app.services.ingredient_fdc_nutrition_flow_service import IngredientFdcNutritionFlowService
 from app.services.ingredient_chatgpt_nutrition_flow_service import IngredientChatGPTNutritionFlowService
 from app.services.ingredient_entity_service import IngredientEntityService
 from app.services.ingredient_ireks_service import IngredientIreksService
+from app.services.ingredient_products_import_flow_service import IngredientProductsImportFlowService
 from app.services.ingredient_nutrition_query_service import IngredientNutritionQueryService
 from app.services.ingredient_std_service import IngredientStdService
 from app.services.fatsecret_client import FatSecretApiError
@@ -443,7 +443,7 @@ class IngredientsIreksPage(QWidget):
             openai_service=OpenAINutritionService(),
         )
         self.external_distributor_filter_id = ""
-        self.import_service = ImportService()
+        self.ingredient_products_import_flow_service = IngredientProductsImportFlowService(self.ireks_service)
         self.rows: list[IngredienteIreks] = []
         self._distribuidores: list[Distribuidor] = []
         self._fabricantes: list[Fabricante] = []
@@ -3095,40 +3095,16 @@ class IngredientsIreksPage(QWidget):
         )
         if not file_path:
             return
-        schema = ingredient_schema(include_referencia=True)
-        aliases = {
-            "almacen_id": ["almacen", "almacen_id"],
-            "fabricante_id": ["fabricante", "fabricante_id", "marca_id"],
-            "distribuidor_id": ["distribuidor", "distribuidor_id"],
-            "articulo_id": ["articulo", "articulo_id", "id_articulo"],
-            "articulo_referencia": ["referencia", "ref", "codigo"],
-            "articulo_referencia_corta": ["referencia_corta", "ref_corta", "codigo_corto"],
-            "articulo_descripcion": ["descripcion", "nombre", "articulo_descripcion"],
-            "articulo_envase_id": ["envase", "envase_id", "articulo_envase_id"],
-            "articulo_contenido_unidad": ["unidad_contenido", "contenido_unidad", "unidad_interior", "tipo_contenido"],
-            "articulo_envase_cantidad": ["envase_cantidad", "cantidad_envase"],
-            "articulo_envase_peso": ["envase_peso", "peso_envase"],
-            "articulo_envase_unidad_medida": ["unidad_medida", "unidad", "um"],
-            "articulo_envase_peso_total": ["peso_total", "envase_peso_total"],
-            "articulo_familia_id": ["familia", "familia_id"],
-            "articulo_grupo_id": ["grupo", "grupo_id"],
-            "articulo_subfamilia_id": ["subfamilia", "subfamilia_id"],
-            "articulo_status_activo": ["status_activo", "activo_status", "activo_producto", "estado", "habilitado"],
-            "articulo_status_en_lista": ["status_en_lista", "en_lista", "lista"],
-        }
-
-        imported, errors = self.ireks_service.import_products(file_path, schema, aliases)
+        result = self.ingredient_products_import_flow_service.import_products(file_path)
         self.reload()
-        if errors:
-            preview = "\n".join(errors[:8])
-            extra = "" if len(errors) <= 8 else f"\n... y {len(errors) - 8} errores mas."
+        if result.errors:
             QMessageBox.warning(
                 self,
                 "Importacion completada con incidencias",
-                f"Registros importados: {imported}\nErrores: {len(errors)}\n\n{preview}{extra}",
+                f"Registros importados: {result.imported}\nErrores: {len(result.errors)}\n\n{result.preview}",
             )
             return
-        QMessageBox.information(self, "Importacion completada", f"Registros importados: {imported}")
+        QMessageBox.information(self, "Importacion completada", f"Registros importados: {result.imported}")
 
     def _show_product_id_dialog(self) -> None:
         row = self._selected_row()
