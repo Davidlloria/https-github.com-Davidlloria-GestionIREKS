@@ -6,6 +6,7 @@ from sqlmodel import Session
 
 from app.core.database import engine
 from app.models import Curso, CursoDocumento
+from app.services.course_attendee_flow_service import CourseAttendeeFlowService
 from app.services.import_service import ImportService
 from app.viewmodels.course_viewmodel import (
     AsistenteListadoItem,
@@ -19,6 +20,7 @@ from app.viewmodels.course_viewmodel import (
 class CourseService:
     def __init__(self) -> None:
         self.vm = CourseViewModel()
+        self.attendee_flow = CourseAttendeeFlowService(course_vm=self.vm)
         self.import_service = ImportService()
 
     def list_courses(
@@ -67,8 +69,7 @@ class CourseService:
             return self.vm.list_technicians_for_picker(session, term)
 
     def list_attendees(self, curso_id: str) -> list[AsistenteListadoItem]:
-        with Session(engine) as session:
-            return self.vm.list_attendees(session, curso_id)
+        return self.attendee_flow.list_attendees(curso_id)
 
     def list_course_technicians(self, curso_id: str) -> list[CursoTecnicoListadoItem]:
         with Session(engine) as session:
@@ -82,20 +83,16 @@ class CourseService:
         observaciones: str = "",
         status_confirmacion: bool = False,
     ) -> None:
-        with Session(engine) as session:
-            self.vm.add_attendee(session, curso_id, contacto_id, cliente_id, observaciones, status_confirmacion)
+        self.attendee_flow.add_attendee(curso_id, contacto_id, cliente_id, observaciones, status_confirmacion)
 
     def remove_attendee(self, curso_id: str, contacto_id: str) -> bool:
-        with Session(engine) as session:
-            return self.vm.remove_attendee(session, curso_id, contacto_id)
+        return self.attendee_flow.remove_attendee(curso_id, contacto_id)
 
     def set_attendee_confirmation(self, curso_id: str, contacto_id: str, status: bool) -> None:
-        with Session(engine) as session:
-            self.vm.set_attendee_confirmation(session, curso_id, contacto_id, status)
+        self.attendee_flow.set_attendee_confirmation(curso_id, contacto_id, status)
 
     def update_attendee_observaciones(self, curso_id: str, contacto_id: str, observaciones: str) -> None:
-        with Session(engine) as session:
-            self.vm.update_attendee_observaciones(session, curso_id, contacto_id, observaciones)
+        self.attendee_flow.update_attendee_observaciones(curso_id, contacto_id, observaciones)
 
     def add_course_technician(self, curso_id: str, tecnico_id: str) -> None:
         with Session(engine) as session:
@@ -122,26 +119,4 @@ class CourseService:
         )
 
     def import_attendees(self, file_path: Path) -> tuple[int, list[str]]:
-        schema = [
-            {"name": "curso_id", "label": "Curso_ID"},
-            {"name": "contacto_id", "label": "Contacto_ID"},
-            {"name": "cliente_id", "label": "Cliente_ID"},
-            {"name": "observaciones", "label": "Observaciones"},
-            {"name": "status_confirmacion", "label": "Status_Confirmacion", "type": "bool", "default": False},
-        ]
-
-        def create_payload(payload: dict) -> None:
-            self.add_attendee(
-                str(payload.get("curso_id") or "").strip(),
-                str(payload.get("contacto_id") or "").strip(),
-                str(payload.get("cliente_id") or "").strip(),
-                str(payload.get("observaciones") or "").strip(),
-                bool(payload.get("status_confirmacion") or False),
-            )
-
-        return self.import_service.import_with_schema(
-            file_path=file_path,
-            schema=schema,
-            create_fn=create_payload,
-            required_fields=["curso_id", "contacto_id", "cliente_id"],
-        )
+        return self.attendee_flow.import_attendees(file_path)
