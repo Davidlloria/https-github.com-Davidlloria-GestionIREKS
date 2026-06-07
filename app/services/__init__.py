@@ -27,6 +27,7 @@ from app.services.openai_nutrition_service import OpenAINutritionResult, OpenAIN
 from app.services.openai_settings_service import OpenAISettingsService
 from app.services.openai_translation_service import OpenAITranslationService, TranslationResult
 from app.services.customer_report_service import CustomerReportIntentService, CustomerReportService
+from app.services.customer_contact_flow_service import CustomerContactFlowService
 from app.services.product_report_service import ProductReportIntentService, ProductReportService
 from app.services.report_export_service import ReportExportService
 from app.services.order_document_parser import OrderDocumentParser
@@ -105,6 +106,7 @@ __all__ = [
     "TranslationResult",
     "CustomerReportIntentService",
     "CustomerReportService",
+    "CustomerContactFlowService",
     "ProductReportIntentService",
     "ProductReportService",
     "ReportExportService",

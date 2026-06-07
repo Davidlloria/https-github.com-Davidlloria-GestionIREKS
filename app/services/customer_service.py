@@ -18,8 +18,8 @@ from app.schemas.customers import (
     CustomerUpdate,
 )
 from app.services.import_service import ImportService
+from app.services.customer_contact_flow_service import CustomerContactFlowService
 from app.viewmodels import CustomerViewModel
-from app.viewmodels.contact_viewmodel import ContactViewModel
 
 
 @dataclass
@@ -34,8 +34,8 @@ class AddressCatalogs:
 class CustomerService:
     def __init__(self) -> None:
         self.vm = CustomerViewModel()
-        self.contact_vm = ContactViewModel()
         self.import_service = ImportService()
+        self.contact_flow_service = CustomerContactFlowService(engine=engine, customer_vm=self.vm)
 
     def address_catalogs(self) -> AddressCatalogs:
         with Session(engine) as session:
@@ -164,17 +164,7 @@ class CustomerService:
         return [f"{count} {labels[name]}" for name, count in counts.items() if int(count or 0) > 0]
 
     def related_contacts(self, cliente_id: str) -> list[Contacto]:
-        clean_id = str(cliente_id or "").strip()
-        if not clean_id:
-            return []
-        with Session(engine) as session:
-            return list(
-                session.exec(
-                    select(Contacto)
-                    .where(Contacto.cliente_id == clean_id)
-                    .order_by(Contacto.apellidos, Contacto.nombre)
-                )
-            )
+        return self.contact_flow_service.related_contacts(cliente_id)
 
     def related_recipes(self, cliente_id: str) -> list[Receta]:
         clean_id = str(cliente_id or "").strip()
@@ -197,47 +187,22 @@ class CustomerService:
         return str(getattr(recipe, "cliente_id", "") or "").strip() if recipe is not None else ""
 
     def create_contact(self, payload: dict) -> Contacto:
-        with Session(engine) as session:
-            return self.contact_vm.create(session, payload)
+        return self.contact_flow_service.create_contact(payload)
 
     def update_contact(self, contacto_id: str, payload: dict) -> None:
-        with Session(engine) as session:
-            self.contact_vm.update(session, contacto_id, payload)
+        self.contact_flow_service.update_contact(contacto_id, payload)
 
     def upsert_contact(self, contacto_id: str, payload: dict) -> str:
-        with Session(engine) as session:
-            if contacto_id:
-                self.contact_vm.update(session, contacto_id, payload)
-                return contacto_id
-            created = self.contact_vm.create(session, payload)
-            return str(getattr(created, "contacto_id", "") or "")
+        return self.contact_flow_service.upsert_contact(contacto_id, payload)
 
     def get_contact(self, contacto_id: str) -> Contacto | None:
-        with Session(engine) as session:
-            return session.get(Contacto, contacto_id)
+        return self.contact_flow_service.get_contact(contacto_id)
 
     def ensure_unlinked_customer(self, unlinked_client_id: str) -> None:
-        with Session(engine) as session:
-            existing = session.get(Cliente, unlinked_client_id)
-            if existing:
-                return
-            self.vm.create(
-                session,
-                {
-                    "cliente_id": unlinked_client_id,
-                    "cliente_nombre_comercial": "SIN CLIENTE",
-                    "cliente_nombre_fiscal": "SIN CLIENTE",
-                    "activo": True,
-                },
-            )
+        self.contact_flow_service.ensure_unlinked_customer(unlinked_client_id)
 
     def unlink_contact(self, contacto_id: str, unlinked_client_id: str) -> None:
-        with Session(engine) as session:
-            contact = session.get(Contacto, contacto_id)
-            if not contact:
-                raise ValueError("Contacto no encontrado.")
-        self.ensure_unlinked_customer(unlinked_client_id)
-        self.update_contact(contacto_id, {"cliente_id": unlinked_client_id})
+        self.contact_flow_service.unlink_contact(contacto_id, unlinked_client_id)
 
     def import_file(self, file_path: Path, schema: list[dict]) -> tuple[int, list[str]]:
         aliases = {
