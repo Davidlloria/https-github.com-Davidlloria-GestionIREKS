@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AppErrorBoundary } from './components/AppErrorBoundary'
 import { ContactsPage } from './pages/ContactsPage'
+import { CoursesPage } from './pages/CoursesPage'
 import { CustomersPage } from './pages/CustomersPage'
 import { IngredientsPage } from './pages/IngredientsPage'
 import { OrdersPage } from './pages/OrdersPage'
@@ -9,7 +10,7 @@ import { SalesPage } from './pages/SalesPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { WarehousePage } from './pages/WarehousePage'
 
-type ViewKey = 'sales' | 'recipes' | 'customers' | 'contacts' | 'ingredients' | 'orders' | 'warehouse' | 'settings'
+type ViewKey = 'sales' | 'recipes' | 'courses' | 'customers' | 'contacts' | 'ingredients' | 'orders' | 'warehouse' | 'settings'
 
 type ViewMeta = {
   label: string
@@ -21,6 +22,7 @@ type ViewMeta = {
 const VIEWS: Array<{ key: ViewKey; label: string }> = [
   { key: 'sales', label: 'Ventas' },
   { key: 'recipes', label: 'Recetas' },
+  { key: 'courses', label: 'Cursos' },
   { key: 'customers', label: 'Clientes' },
   { key: 'contacts', label: 'Contactos' },
   { key: 'ingredients', label: 'Ingredientes' },
@@ -40,6 +42,12 @@ const VIEW_META: Record<ViewKey, ViewMeta> = {
     label: 'Recetas',
     title: 'Consulta de recetas',
     subtitle: 'Vista read-only minima para explorar lista, detalle y lineas de receta.',
+    note: 'API',
+  },
+  courses: {
+    label: 'Cursos',
+    title: 'Consulta de cursos',
+    subtitle: 'Vista read-only minima para explorar listado, detalle y asistentes.',
     note: 'API',
   },
   customers: {
@@ -116,6 +124,7 @@ function App() {
         <AppErrorBoundary>
           {activeView === 'sales' && <SalesPage />}
           {activeView === 'recipes' && <RecipesPage />}
+          {activeView === 'courses' && <CoursesPage />}
           {activeView === 'customers' && <CustomersPage />}
           {activeView === 'contacts' && <ContactsPage />}
           {activeView === 'ingredients' && <IngredientsPage />}
