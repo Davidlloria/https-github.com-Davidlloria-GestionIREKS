@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.services.contact_service import ContactService
+from app.services.course_service import CourseService
 from app.services.customer_service import CustomerService
 from app.services.api_settings_service import ApiSettingsService
 from app.services.ingredient_ireks_service import IngredientIreksService
@@ -21,6 +22,10 @@ def get_customer_service() -> CustomerService:
 
 def get_contact_service() -> ContactService:
     return ContactService()
+
+
+def get_course_service() -> CourseService:
+    return CourseService()
 
 
 def get_api_settings_service() -> ApiSettingsService:

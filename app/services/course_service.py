@@ -40,6 +40,10 @@ class CourseService:
                 month_end=month_end,
             )
 
+    def get_course(self, curso_id: str) -> Curso | None:
+        with Session(engine) as session:
+            return session.get(Curso, curso_id)
+
     def create_course(self, payload: dict) -> None:
         with Session(engine) as session:
             self.vm.create_course(session, payload)
