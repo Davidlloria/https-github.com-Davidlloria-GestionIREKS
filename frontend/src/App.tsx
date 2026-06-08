@@ -4,10 +4,11 @@ import { ContactsPage } from './pages/ContactsPage'
 import { CustomersPage } from './pages/CustomersPage'
 import { IngredientsPage } from './pages/IngredientsPage'
 import { OrdersPage } from './pages/OrdersPage'
+import { SalesPage } from './pages/SalesPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { WarehousePage } from './pages/WarehousePage'
 
-type ViewKey = 'customers' | 'contacts' | 'ingredients' | 'orders' | 'warehouse' | 'settings'
+type ViewKey = 'sales' | 'customers' | 'contacts' | 'ingredients' | 'orders' | 'warehouse' | 'settings'
 
 type ViewMeta = {
   label: string
@@ -17,6 +18,7 @@ type ViewMeta = {
 }
 
 const VIEWS: Array<{ key: ViewKey; label: string }> = [
+  { key: 'sales', label: 'Ventas' },
   { key: 'customers', label: 'Clientes' },
   { key: 'contacts', label: 'Contactos' },
   { key: 'ingredients', label: 'Ingredientes' },
@@ -26,6 +28,12 @@ const VIEWS: Array<{ key: ViewKey; label: string }> = [
 ]
 
 const VIEW_META: Record<ViewKey, ViewMeta> = {
+  sales: {
+    label: 'Ventas',
+    title: 'Comparacion anual de ventas',
+    subtitle: 'Prototipo minimo para consumir la API read-only de ventas desde React.',
+    note: 'API',
+  },
   customers: {
     label: 'Clientes',
     title: 'Consulta de clientes',
@@ -65,7 +73,7 @@ const VIEW_META: Record<ViewKey, ViewMeta> = {
 }
 
 function App() {
-  const [activeView, setActiveView] = useState<ViewKey>('customers')
+  const [activeView, setActiveView] = useState<ViewKey>('sales')
   const currentView = VIEW_META[activeView]
 
   return (
@@ -98,6 +106,7 @@ function App() {
 
       <section className="view-panel">
         <AppErrorBoundary>
+          {activeView === 'sales' && <SalesPage />}
           {activeView === 'customers' && <CustomersPage />}
           {activeView === 'contacts' && <ContactsPage />}
           {activeView === 'ingredients' && <IngredientsPage />}

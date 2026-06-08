@@ -323,6 +323,22 @@ tbody tr:hover {
   box-shadow: var(--shadow-soft);
 }
 
+.sales-controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sales-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+}
+
+.sales-hint {
+  padding: 10px 12px;
+}
+
 .detail-list {
   margin: 0;
   display: grid;
