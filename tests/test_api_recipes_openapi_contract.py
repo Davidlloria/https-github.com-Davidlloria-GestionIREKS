@@ -6,6 +6,7 @@ from app.api.main import create_app
 EXPECTED_PATHS = {
     "/recipes",
     "/recipes/{recipe_id}",
+    "/recipes/{recipe_id}/items",
 }
 
 
@@ -27,9 +28,11 @@ def test_recipes_openapi_contract_freezes_readonly_surface() -> None:
 
     recipes = _operation(spec, "/recipes")
     recipe_detail = _operation(spec, "/recipes/{recipe_id}")
+    recipe_items = _operation(spec, "/recipes/{recipe_id}/items")
 
     assert _parameter_names(recipes) == ["q", "cliente_id", "es_base", "limit", "offset"]
     assert _parameter_names(recipe_detail) == ["recipe_id"]
+    assert _parameter_names(recipe_items) == ["recipe_id"]
 
     assert recipes["responses"]["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/RecipeListResponse"
@@ -37,8 +40,14 @@ def test_recipes_openapi_contract_freezes_readonly_surface() -> None:
     assert recipe_detail["responses"]["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/RecipeDetail"
     }
+    assert recipe_items["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/RecipeItemListResponse"
+    }
 
     recipe_id_param = recipe_detail["parameters"][0]
     assert recipe_id_param["in"] == "path"
     assert recipe_id_param["required"] is True
 
+    item_recipe_id_param = recipe_items["parameters"][0]
+    assert item_recipe_id_param["in"] == "path"
+    assert item_recipe_id_param["required"] is True

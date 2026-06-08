@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import app.services.recipe_service as recipe_service_module  # noqa: E402
 from app.api.main import create_app  # noqa: E402
-from app.models import Receta  # noqa: E402
+from app.models import Receta, RecetaLinea  # noqa: E402
 
 
 @pytest.fixture()
@@ -42,6 +42,34 @@ def test_recipes_list_supports_data_and_query_filters(api_client: TestClient) ->
                 masa_final_deseada_g=1000.0,
                 peso_pieza_g=250.0,
                 numero_piezas=4,
+                created_at=datetime(2026, 1, 1, 10, 0, 0),
+                updated_at=datetime(2026, 1, 1, 10, 0, 0),
+            )
+        )
+        session.add(
+            RecetaLinea(
+                id=11,
+                receta_id=1,
+                orden=1,
+                ingrediente_id=100,
+                nombre_mostrado="Harina fuerza",
+                codigo_ingrediente="HAR-001",
+                cantidad_base_g=500.0,
+                cantidad_calculada_g=500.0,
+                notas="Primera línea",
+            )
+        )
+        session.add(
+            RecetaLinea(
+                id=12,
+                receta_id=1,
+                orden=2,
+                ingrediente_id=101,
+                nombre_mostrado="Agua",
+                codigo_ingrediente="LIQ-001",
+                tipo_origen="std",
+                cantidad_base_g=300.0,
+                cantidad_calculada_g=300.0,
             )
         )
         session.add(
@@ -58,6 +86,8 @@ def test_recipes_list_supports_data_and_query_filters(api_client: TestClient) ->
                 masa_final_deseada_g=500.0,
                 peso_pieza_g=125.0,
                 numero_piezas=2,
+                created_at=datetime(2026, 1, 2, 10, 0, 0),
+                updated_at=datetime(2026, 1, 2, 10, 0, 0),
             )
         )
         session.commit()
@@ -65,7 +95,7 @@ def test_recipes_list_supports_data_and_query_filters(api_client: TestClient) ->
     listed = api_client.get("/recipes")
     assert listed.status_code == 200
     assert listed.json()["total"] == 2
-    assert [row["id"] for row in listed.json()["items"]] == [1, 2]
+    assert [row["id"] for row in listed.json()["items"]] == [2, 1]
 
     filtered = api_client.get("/recipes", params={"q": "Dulce"})
     assert filtered.status_code == 200
@@ -86,6 +116,13 @@ def test_recipes_list_supports_data_and_query_filters(api_client: TestClient) ->
     assert detail.json()["estado"] == "borrador"
     assert "lineas" not in detail.json()
 
+    items = api_client.get("/recipes/1/items")
+    assert items.status_code == 200
+    assert items.json()["total"] == 2
+    assert [row["id"] for row in items.json()["items"]] == [11, 12]
+    assert items.json()["items"][0]["nombre_mostrado"] == "Harina fuerza"
+    assert items.json()["items"][0]["cantidad_base_g"] == 500.0
+
 
 def test_recipes_list_empty_and_detail_not_found(api_client: TestClient) -> None:
     listed = api_client.get("/recipes")
@@ -97,3 +134,6 @@ def test_recipes_list_empty_and_detail_not_found(api_client: TestClient) -> None
 
     missing = api_client.get("/recipes/999")
     assert missing.status_code == 404
+
+    missing_items = api_client.get("/recipes/999/items")
+    assert missing_items.status_code == 404

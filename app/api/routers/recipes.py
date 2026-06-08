@@ -8,7 +8,7 @@ from app.api.deps import get_recipe_service
 from app.api.errors import not_found
 from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.core.pagination import page_items
-from app.schemas.recipes import RecipeDetail, RecipeListItem, RecipeListResponse
+from app.schemas.recipes import RecipeDetail, RecipeItem, RecipeItemListResponse, RecipeListItem, RecipeListResponse
 from app.services.recipe_service import RecipeService
 
 
@@ -39,3 +39,15 @@ def get_recipe(
     if aggregate is None:
         raise not_found("Receta no encontrada.")
     return RecipeDetail.from_entity(aggregate.receta)
+
+
+@router.get("/{recipe_id}/items", response_model=RecipeItemListResponse)
+def list_recipe_items(
+    recipe_id: int,
+    service: RecipeService = Depends(get_recipe_service),
+) -> RecipeItemListResponse:
+    aggregate = service.get_recipe(recipe_id)
+    if aggregate is None:
+        raise not_found("Receta no encontrada.")
+    items = RecipeItem.list_from_entities(aggregate.lineas)
+    return RecipeItemListResponse(total=len(items), items=items)

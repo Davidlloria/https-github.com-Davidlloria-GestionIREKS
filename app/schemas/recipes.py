@@ -89,6 +89,23 @@ class RecipeDetail(RecipeListItem):
     pass
 
 
+class RecipeItem(AppSchema):
+    id: int | None = None
+    ingrediente_id: int | None = None
+    nombre_mostrado: str = ""
+    codigo_ingrediente: str = ""
+    tipo_origen: str = "std"
+    cantidad_base_g: float = 0.0
+    cantidad_calculada_g: float = 0.0
+    orden: int = 0
+    notas: str = ""
+
+
+class RecipeItemListResponse(AppSchema):
+    total: int = 0
+    items: list[RecipeItem] = Field(default_factory=list)
+
+
 class RecipeListResponse(PaginatedResponse):
     items: list[RecipeListItem] = Field(default_factory=list)
 
@@ -133,6 +150,8 @@ __all__ = [
     "RecipeLineBase",
     "RecipeLineCreate",
     "RecipeLineRead",
+    "RecipeItem",
+    "RecipeItemListResponse",
     "RecipeListItem",
     "RecipeListResponse",
     "RecipeScalePayload",
