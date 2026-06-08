@@ -4,11 +4,12 @@ import { ContactsPage } from './pages/ContactsPage'
 import { CustomersPage } from './pages/CustomersPage'
 import { IngredientsPage } from './pages/IngredientsPage'
 import { OrdersPage } from './pages/OrdersPage'
+import { RecipesPage } from './pages/RecipesPage'
 import { SalesPage } from './pages/SalesPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { WarehousePage } from './pages/WarehousePage'
 
-type ViewKey = 'sales' | 'customers' | 'contacts' | 'ingredients' | 'orders' | 'warehouse' | 'settings'
+type ViewKey = 'sales' | 'recipes' | 'customers' | 'contacts' | 'ingredients' | 'orders' | 'warehouse' | 'settings'
 
 type ViewMeta = {
   label: string
@@ -19,6 +20,7 @@ type ViewMeta = {
 
 const VIEWS: Array<{ key: ViewKey; label: string }> = [
   { key: 'sales', label: 'Ventas' },
+  { key: 'recipes', label: 'Recetas' },
   { key: 'customers', label: 'Clientes' },
   { key: 'contacts', label: 'Contactos' },
   { key: 'ingredients', label: 'Ingredientes' },
@@ -32,6 +34,12 @@ const VIEW_META: Record<ViewKey, ViewMeta> = {
     label: 'Ventas',
     title: 'Comparacion anual de ventas',
     subtitle: 'Prototipo minimo para consumir la API read-only de ventas desde React.',
+    note: 'API',
+  },
+  recipes: {
+    label: 'Recetas',
+    title: 'Consulta de recetas',
+    subtitle: 'Vista read-only minima para explorar lista, detalle y lineas de receta.',
     note: 'API',
   },
   customers: {
@@ -107,6 +115,7 @@ function App() {
       <section className="view-panel">
         <AppErrorBoundary>
           {activeView === 'sales' && <SalesPage />}
+          {activeView === 'recipes' && <RecipesPage />}
           {activeView === 'customers' && <CustomersPage />}
           {activeView === 'contacts' && <ContactsPage />}
           {activeView === 'ingredients' && <IngredientsPage />}
