@@ -621,7 +621,33 @@ class OrderDocumentImportService:
             session.delete(row)
         session.flush()
 
-        ordered_rows = list(session.exec(select(PedidoItem).where(cast(Any, PedidoItem.pedido_id).in_(pedido_ids))))
+        pedido_order = {pid: idx for idx, pid in enumerate(pedido_ids)}
+        albaran_rows = list(
+            session.exec(
+                select(AlbaranItem, Albaran)
+                .outerjoin(Albaran, cast(Any, Albaran.albaran_id == AlbaranItem.albaran_id))
+                .where(cast(Any, AlbaranItem.pedido_id).in_(pedido_ids))
+                .order_by(cast(Any, Albaran.albaran_fecha), Albaran.albaran_numero, AlbaranItem.item_id)
+            )
+        )
+        orders_with_receipts = {
+            str(getattr(albaran_item, "pedido_id", "") or "").strip()
+            for albaran_item, _albaran in albaran_rows
+            if str(getattr(albaran_item, "pedido_id", "") or "").strip()
+        }
+        if not orders_with_receipts:
+            session.commit()
+            return
+
+        cutoff_index = max((pedido_order.get(pedido_ref_id, -1) for pedido_ref_id in orders_with_receipts), default=-1)
+        if cutoff_index < 0:
+            session.commit()
+            return
+        cutoff_ids = {pid for pid, idx in pedido_order.items() if idx <= cutoff_index}
+
+        ordered_rows = list(
+            session.exec(select(PedidoItem).where(cast(Any, PedidoItem.pedido_id).in_(list(cutoff_ids))))
+        )
         ordered_by_article_pedido: dict[str, dict[str, float]] = {}
         for row in ordered_rows:
             row_pedido_id = str(getattr(row, "pedido_id", "") or "").strip()
@@ -631,7 +657,6 @@ class OrderDocumentImportService:
             by_pedido = ordered_by_article_pedido.setdefault(articulo_id, {})
             by_pedido[row_pedido_id] = by_pedido.get(row_pedido_id, 0.0) + float(getattr(row, "articulo_cantidad", 0.0) or 0.0)
 
-        pedido_order = {pid: idx for idx, pid in enumerate(pedido_ids)}
         stats: dict[tuple[str, str], dict[str, float]] = {}
         open_by_article: dict[str, list[dict[str, float | str]]] = {}
         for articulo_id, by_pedido in ordered_by_article_pedido.items():
@@ -642,17 +667,11 @@ class OrderDocumentImportService:
                 stats[(row_pedido_id, articulo_id)] = {"ordered": ordered_qty, "received": 0.0}
                 open_by_article.setdefault(articulo_id, []).append({"pedido_id": row_pedido_id, "remaining": ordered_qty})
 
-        received_rows = list(
-            session.exec(
-                select(AlbaranItem, Albaran)
-                .outerjoin(Albaran, cast(Any, Albaran.albaran_id == AlbaranItem.albaran_id))
-                .where(cast(Any, AlbaranItem.pedido_id).in_(pedido_ids))
-                .order_by(cast(Any, Albaran.albaran_fecha), Albaran.albaran_numero, AlbaranItem.item_id)
-            )
-        )
         excess_by_pedido_article: dict[tuple[str, str], float] = {}
-        for albaran_item, _albaran in received_rows:
+        for albaran_item, _albaran in albaran_rows:
             source_pedido_id = str(getattr(albaran_item, "pedido_id", "") or "").strip()
+            if source_pedido_id not in cutoff_ids:
+                continue
             articulo_id = str(getattr(albaran_item, "articulo_id", "") or "").strip()
             cantidad = float(getattr(albaran_item, "articulo_cantidad", 0.0) or 0.0)
             if not source_pedido_id or not articulo_id or cantidad <= 1e-9:

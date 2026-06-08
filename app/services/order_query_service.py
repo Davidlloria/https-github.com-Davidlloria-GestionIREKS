@@ -56,7 +56,12 @@ class OrderQueryService:
         self,
         almacen_id: str,
         preload_history: bool,
+        *,
+        reference_date: date | None = None,
+        exclude_pedido_id: str = "",
     ) -> tuple[list[IngredienteIreks], list[Fabricante], list[Familia], list[Subfamilia], dict[str, float], dict[str, float]]:
+        clean_exclude_pedido_id = str(exclude_pedido_id or "").strip()
+        clean_reference_date = reference_date or date.today()
         with Session(engine) as session:
             rows = list(
                 session.exec(
@@ -71,18 +76,29 @@ class OrderQueryService:
             prev_qty_by_articulo: dict[str, float] = {}
             pending_qty_by_articulo: dict[str, float] = {}
             if preload_history:
+                prev_order_query = select(Pedido).where(
+                    Pedido.almacen_id == almacen_id,
+                    Pedido.pedido_fecha <= clean_reference_date,
+                )
+                if clean_exclude_pedido_id:
+                    prev_order_query = prev_order_query.where(Pedido.pedido_id != clean_exclude_pedido_id)
                 prev_order = session.exec(
-                    select(Pedido)
-                    .where(Pedido.almacen_id == almacen_id)
-                    .order_by(Pedido.pedido_fecha.desc(), Pedido.pedido_numero.desc(), Pedido.pedido_id.desc())
+                    prev_order_query.order_by(
+                        Pedido.pedido_fecha.desc(),
+                        Pedido.pedido_numero.desc(),
+                        Pedido.pedido_id.desc(),
+                    )
                 ).first()
                 if prev_order is not None:
-                    prev_items = list(
+                    prev_order_id = str(getattr(prev_order, "pedido_id", "") or "").strip()
+                    prev_received_rows = list(
                         session.exec(
-                            select(PedidoItem).where(PedidoItem.pedido_id == str(getattr(prev_order, "pedido_id", "") or "").strip())
+                            select(AlbaranItem)
+                            .where(AlbaranItem.pedido_id == prev_order_id)
+                            .order_by(AlbaranItem.albaran_fecha, AlbaranItem.albaran_numero, AlbaranItem.item_id)
                         )
                     )
-                    for item in prev_items:
+                    for item in prev_received_rows:
                         articulo_id = str(getattr(item, "articulo_id", "") or "").strip()
                         if not articulo_id:
                             continue
@@ -93,7 +109,12 @@ class OrderQueryService:
                     session.exec(
                         select(PedidoPendiente, Pedido)
                         .join(Pedido, Pedido.pedido_id == PedidoPendiente.pedido_id)
-                        .where(Pedido.almacen_id == almacen_id, PedidoPendiente.estado == "pendiente")
+                        .where(
+                            Pedido.almacen_id == almacen_id,
+                            Pedido.pedido_fecha < clean_reference_date,
+                            Pedido.pedido_id != clean_exclude_pedido_id,
+                            PedidoPendiente.estado == "pendiente",
+                        )
                     )
                 )
                 for pending, _pedido in pendientes_rows:

@@ -708,6 +708,8 @@ class NewPedidoDialog(QDialog):
         pedido_numero: str = "",
         initial_qty_by_articulo: dict[str, float] | None = None,
         preload_history: bool = True,
+        history_reference_date: date | None = None,
+        history_exclude_pedido_id: str = "",
         confirm_label: str = "Consignar",
         allow_pending: bool = True,
     ) -> None:
@@ -717,6 +719,8 @@ class NewPedidoDialog(QDialog):
         self._pedido_numero = str(pedido_numero or "").strip()
         self._initial_qty_by_articulo = dict(initial_qty_by_articulo or {})
         self._preload_history = bool(preload_history)
+        self._history_reference_date = history_reference_date or self._pedido_fecha
+        self._history_exclude_pedido_id = str(history_exclude_pedido_id or "").strip()
         self._confirm_label = str(confirm_label or "Consignar").strip() or "Consignar"
         self._allow_pending = bool(allow_pending)
         self._submit_mode = "consignar"
@@ -741,6 +745,7 @@ class NewPedidoDialog(QDialog):
         self.fecha_edit.setDisplayFormat("dd/MM/yyyy")
         self.fecha_edit.setDate(QDate(self._pedido_fecha.year, self._pedido_fecha.month, self._pedido_fecha.day))
         self.fecha_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.fecha_edit.dateChanged.connect(self._on_fecha_changed)
         top_row.addWidget(self.fecha_edit)
         top_row.addWidget(QLabel("Número"))
         self.numero_edit = QLineEdit()
@@ -861,7 +866,12 @@ class NewPedidoDialog(QDialog):
             subfamilias,
             self._prev_qty_by_articulo,
             self._pending_qty_by_articulo,
-        ) = OrderQueryService().order_dialog_catalogs(self.almacen_id, self._preload_history)
+        ) = OrderQueryService().order_dialog_catalogs(
+            self.almacen_id,
+            self._preload_history,
+            reference_date=self._history_reference_date,
+            exclude_pedido_id=self._history_exclude_pedido_id,
+        )
         self._row_by_articulo = {
             str(getattr(row, "articulo_id", "") or "").strip(): row for row in self._all_rows if str(getattr(row, "articulo_id", "") or "").strip()
         }
@@ -898,6 +908,29 @@ class NewPedidoDialog(QDialog):
         self.familia_filter.blockSignals(False)
         self.subfamilia_filter.blockSignals(False)
         self._render_rows()
+
+    def _reload_history(self) -> None:
+        if not self._preload_history:
+            self._prev_qty_by_articulo = {}
+            self._pending_qty_by_articulo = {}
+            self._render_rows()
+            return
+
+        _rows, _fabricantes, _familias, _subfamilias, prev_qty_by_articulo, pending_qty_by_articulo = (
+            OrderQueryService().order_dialog_catalogs(
+                self.almacen_id,
+                True,
+                reference_date=self._history_reference_date,
+                exclude_pedido_id=self._history_exclude_pedido_id,
+            )
+        )
+        self._prev_qty_by_articulo = prev_qty_by_articulo
+        self._pending_qty_by_articulo = pending_qty_by_articulo
+        self._render_rows()
+
+    def _on_fecha_changed(self, qdate: QDate) -> None:
+        self._history_reference_date = qdate.toPython()
+        self._reload_history()
 
     def _to_float(self, value: str) -> float:
         txt = str(value or "").strip()
@@ -2443,7 +2476,11 @@ class OrdersPage(QWidget):
             QMessageBox.warning(self, "Pedidos", "Selecciona un Cliente/Distribuidor para crear el pedido.")
             return
 
-        dialog = NewPedidoDialog(almacen_id=almacen_id, parent=self, preload_history=False)
+        dialog = NewPedidoDialog(
+            almacen_id=almacen_id,
+            parent=self,
+            preload_history=True,
+        )
         if not dialog.exec():
             return
         lines = dialog.selected_lines()
@@ -2497,6 +2534,8 @@ class OrdersPage(QWidget):
                 pedido_fecha=self._parse_date(getattr(pedido, "pedido_fecha", None)),
                 pedido_numero=str(getattr(pedido, "pedido_numero", "") or "").strip(),
                 initial_qty_by_articulo=dict(context.qty_by_articulo),
+                history_reference_date=self._parse_date(getattr(pedido, "pedido_fecha", None)),
+                history_exclude_pedido_id=str(getattr(pedido, "pedido_id", "") or "").strip(),
                 confirm_label=context.confirm_label,
                 allow_pending=context.allow_pending,
             )
