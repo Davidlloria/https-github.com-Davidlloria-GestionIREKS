@@ -13,6 +13,8 @@ Objetivo final:
 * reducir progresivamente la dependencia de widgets desktop grandes
 * evitar regresiones funcionales durante la migración
 
+Esta aplicación es de uso personal/comercial. No es una aplicación safety-critical. Priorizar avance práctico, estabilidad razonable y reducción de deuda real sobre análisis extensos.
+
 ---
 
 ## Estado actual
@@ -25,14 +27,17 @@ La migración ya dispone de:
 * Gates de validación
 * Contratos API
 * Guardrails de arquitectura
+* Varios flujos legacy extraídos desde widgets hacia servicios
+* `migration-roadmap.md` y `docs/migration-history.md` como contexto cuando aporten decisiones activas
 
 La fase actual NO consiste en crear una arquitectura nueva.
 
 La fase actual consiste en:
 
-* reducir deuda técnica residual
-* extraer lógica restante de widgets PySide6
+* reducir deuda técnica residual con retorno claro
+* evitar sobreingeniería
 * consolidar React/FastAPI
+* mantener PySide6 estable mientras siga existiendo
 * preparar el sistema para mantenimiento a largo plazo
 
 ---
@@ -40,48 +45,89 @@ La fase actual consiste en:
 ## Reglas obligatorias
 
 1. No reescribir la aplicación desde cero.
-
 2. No añadir funcionalidad nueva salvo instrucción explícita.
-
 3. No crear endpoints FastAPI nuevos salvo instrucción explícita.
-
 4. No crear pantallas React nuevas salvo instrucción explícita.
-
 5. No cambiar comportamiento funcional sin crear o actualizar tests.
-
 6. No introducir lógica de negocio nueva dentro de widgets PySide6.
-
 7. No usar `Session(engine)` directamente desde archivos UI nuevos o modificados.
-
-8. No importar:
-
+8. No importar desde `app/ui`:
    * `sqlmodel`
    * `Session`
    * `select`
    * `engine`
    * `app.core.database`
-
-   desde `app/ui`.
-
 9. No importar `PySide6` desde `app/services`.
-
 10. No importar `app.ui` desde `app/api`.
+11. No incluir nunca en commits:
+   * `.env`
+   * bases de datos
+   * backups
+   * exports
+   * runtime
+   * datos reales
+   * credenciales
+12. No cambiar contratos API, formato de salida ni comportamiento visible salvo instrucción explícita.
+13. Mantener siempre los guardrails arquitectónicos existentes.
+14. Antes de tocar un bloque, leer el contexto relevante y declarar qué se va a validar.
+15. Usar tests concretos del bloque tocado y, cuando aplique, ejecutar `tests/test_architecture_boundaries.py` si se tocan límites UI/services/API.
+16. Evitar refactors amplios sin retorno claro y no degradar la separación UI/services/API.
 
-11. No realizar micro-refactors de bajo retorno que no reduzcan deuda P1/P2 ni desbloqueen migración.
+---
 
-12. Mantener siempre los guardrails arquitectónicos existentes.
+## Modo de trabajo por defecto
 
-13. Esta aplicacion es de uso personal/comercial y no safety-critical; priorizar pragmatismo y reduccion de deuda real sobre analisis extensos.
+El modo por defecto es ejecución pragmática, no consultoría extensa.
 
-14. Por defecto: inspeccionar, implementar, testear y commitear. Evitar informes largos salvo peticion explicita.
+Cuando se pida mejorar, refactorizar o limpiar un bloque:
 
-15. Evitar rankings y matrices salvo que el usuario los pida de forma explicita.
+1. Inspeccionar el código.
+2. Revisar contexto/histórico relevante.
+3. Declarar qué se va a validar.
+4. Implementar si el retorno es claro.
+5. Añadir tests mínimos relevantes.
+6. Ejecutar tests concretos del bloque y gates aplicables.
+7. Ejecutar solo los tests/lint/build relacionados.
+8. Crear commit si todo pasa.
+9. Dejar el worktree limpio.
+10. Mantener el alcance pequeño y los cambios revisables.
 
-16. Evitar micro-refactors y servicios nuevos para mover wrappers de UI.
+No generar informes largos salvo petición explícita.
+No generar rankings, matrices o análisis P1/P2 salvo petición explícita.
+No abrir debates arquitectónicos si el cambio es pequeño, claro y seguro.
 
-17. Preferir cortes que eliminen complejidad real, reduzcan riesgo o desbloqueen migracion.
+---
 
-18. Devolver resmenes cortos, operativos y accionables.
+## Criterio para refactor
+
+Hacer refactor solo si cumple al menos una condición:
+
+* elimina lógica real de negocio u orquestación
+* mejora claramente la testabilidad
+* reduce riesgo operativo
+* simplifica un bloque sustancial
+* desbloquea migración hacia servicios/API/React
+* reduce dependencia local desktop relevante
+* mantiene o mejora claramente la separación UI/services/API
+
+No hacer refactor si:
+
+* solo mueve 10-20 líneas
+* solo mueve wrappers de Qt
+* solo cambia nombres o estética interna
+* crea una capa artificial
+* el bloque ya es UI pura
+* el beneficio es marginal
+* no reduce deuda P1/P2 ni desbloquea migración
+
+Regla práctica:
+
+* No crear un servicio/helper/capa nueva si la extracción no elimina al menos unas 50 líneas de complejidad real o no mejora claramente la testabilidad.
+
+Gates típicos:
+
+* `python -m pytest tests -q` cuando el bloque sea amplio
+* `tests/test_architecture_boundaries.py` cuando se toquen límites entre UI, services o API
 
 ---
 
@@ -89,7 +135,8 @@ La fase actual consiste en:
 
 La dirección objetivo es:
 
-UI React
+```text
+React
 ↓
 FastAPI
 ↓
@@ -100,154 +147,4 @@ Repositories
 SQLModel
 ↓
 SQLite / PostgreSQL
-
-Mientras exista desktop:
-
-PySide6
-↓
-ViewModels / Controllers
-↓
-Services
-↓
-Repositories
-↓
-SQLModel
-
----
-
-## Prioridad actual
-
-Fase 5 – Reducir dependencia del desktop.
-
-Prioridades:
-
-1. Mantener PySide6 estable.
-2. Consolidar React/FastAPI como superficie principal.
-3. Extraer lógica residual desde widgets grandes.
-4. Reducir dependencias desktop locales.
-5. Mantener documentación y trazabilidad.
-
-Orden de prioridad de deuda:
-
-### P1
-
-* orders_page.py
-* settings_page.py
-* ingredients_page.py
-
-### P2
-
-* warehouse_page.py
-* customers_page.py
-* courses_page.py
-
-### P3
-
-* limpieza de helpers legacy
-* consolidación documental
-* simplificación de scripts
-
----
-
-## Qué NO hacer ahora
-
-* No iniciar migraciones tecnológicas nuevas.
-* No introducir nuevos frameworks.
-* No rehacer módulos completos.
-* No modificar contratos API estables.
-* No tocar React o FastAPI salvo que el bloque actual lo requiera.
-* No optimizar código únicamente por estética.
-
----
-
-## Antes de modificar código
-
-Codex debe:
-
-1. Leer:
-
-   * AGENTS.md
-   * migration-roadmap.md
-   * docs/migration-history.md
-
-2. Resumir:
-
-   * fase actual
-   * deuda relevante
-   * objetivo del bloque
-
-3. Explicar:
-
-   * qué archivos piensa modificar
-   * riesgo esperado
-   * validación prevista
-
-4. Realizar cambios pequeños, revisables y aislados.
-
----
-
-## Después de modificar código
-
-Codex debe:
-
-1. Ejecutar los tests relacionados.
-
-2. Ejecutar guardrails de arquitectura cuando proceda.
-
-3. Actualizar:
-
-   * migration-roadmap.md
-   * docs/migration-history.md
-
-4. Listar:
-
-   * archivos modificados
-   * comportamiento preservado
-   * riesgos detectados
-
-5. Proponer validación manual.
-
-6. Indicar claramente el siguiente bloque recomendado.
-
----
-
-## Gates mínimos
-
-Antes de considerar terminado un bloque:
-
-### Python
-
-python -m pytest tests -q
-
-### Arquitectura
-
-tests/test_architecture_boundaries.py
-
-### Base de datos
-
-python -c "from app.core.database import run_integrity_check; print(run_integrity_check())"
-
-### Frontend
-
-npm run lint
-
-npm run build
-
-### Gate completo
-
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-gates.ps1
-
----
-
-## Criterio de éxito
-
-El éxito de la migración NO es eliminar PySide6.
-
-El éxito es que:
-
-* React sea la interfaz principal.
-* FastAPI sea la capa principal de acceso.
-* La lógica viva en servicios.
-* Los widgets desktop no contengan reglas de negocio críticas.
-* Los tests y gates permanezcan verdes.
-* Las nuevas funcionalidades se implementen sobre servicios/API y no sobre widgets legacy.
+```
