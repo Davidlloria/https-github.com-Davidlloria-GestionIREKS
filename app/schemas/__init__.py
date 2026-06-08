@@ -61,7 +61,14 @@ from app.schemas.orders import (
     OrderRead,
     OrderUpdate,
 )
-from app.schemas.sales import SalesAnnualSummaryResponse, SalesAnnualSummaryRow
+from app.schemas.sales import (
+    SalesAnnualSummaryResponse,
+    SalesAnnualSummaryRow,
+    SalesFilterOption,
+    SalesFilterOptionsResponse,
+    SalesYearOption,
+    SalesYearOptionsResponse,
+)
 from app.schemas.recipes import (
     RecipeBase,
     RecipeCalculationPayload,
@@ -175,8 +182,12 @@ __all__ = [
     "RecipeListItem",
     "RecipeScalePayload",
     "RecipeUpdate",
+    "SalesFilterOption",
+    "SalesFilterOptionsResponse",
     "SalesAnnualSummaryResponse",
     "SalesAnnualSummaryRow",
+    "SalesYearOption",
+    "SalesYearOptionsResponse",
     "TarifaPrecioIreksCreate",
     "TarifaPrecioIreksRead",
     "TarifaPrecioIreksUpdate",

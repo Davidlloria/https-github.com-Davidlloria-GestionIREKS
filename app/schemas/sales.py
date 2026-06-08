@@ -7,6 +7,26 @@ from sqlmodel import Field
 from .base import AppSchema
 
 
+class SalesYearOption(AppSchema):
+    year: int = 0
+    label: str = ""
+
+
+class SalesYearOptionsResponse(AppSchema):
+    items: list[SalesYearOption] = Field(default_factory=list)
+
+
+class SalesFilterOption(AppSchema):
+    id: str = ""
+    name: str = ""
+    code: str = ""
+    parent_id: str = ""
+
+
+class SalesFilterOptionsResponse(AppSchema):
+    items: list[SalesFilterOption] = Field(default_factory=list)
+
+
 class SalesAnnualSummaryRow(AppSchema):
     articulo_id: str = ""
     fabricante_id: str = ""
@@ -36,6 +56,10 @@ class SalesAnnualSummaryResponse(AppSchema):
 
 
 __all__ = [
+    "SalesFilterOption",
+    "SalesFilterOptionsResponse",
     "SalesAnnualSummaryResponse",
     "SalesAnnualSummaryRow",
+    "SalesYearOption",
+    "SalesYearOptionsResponse",
 ]

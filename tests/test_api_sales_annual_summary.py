@@ -398,3 +398,143 @@ def test_sales_annual_summary_igsa_order_is_stable(api_client: TestClient) -> No
 def test_sales_annual_summary_igsa_validates_query_params(api_client: TestClient) -> None:
     assert api_client.get("/sales/annual-summary/igsa", params={"year": 0}).status_code == 422
     assert api_client.get("/sales/annual-summary/igsa", params={"year": 2026, "month": 13}).status_code == 422
+
+
+def test_sales_filter_year_endpoints_return_available_years(api_client: TestClient) -> None:
+    with Session(sales_annual_service_module.engine) as session:
+        _seed_sales_summary_data(session)
+
+    ireks_years = api_client.get("/sales/annual-summary/years")
+    assert ireks_years.status_code == 200
+    assert ireks_years.json() == {
+        "items": [
+            {"year": 2026, "label": "2026"},
+            {"year": 2025, "label": "2025"},
+        ]
+    }
+
+    igsa_years = api_client.get("/sales/annual-summary/igsa/years")
+    assert igsa_years.status_code == 200
+    assert igsa_years.json() == {
+        "items": [
+            {"year": 2026, "label": "2026"},
+            {"year": 2025, "label": "2025"},
+        ]
+    }
+
+
+def test_sales_filter_catalog_endpoints_return_ireks_options(api_client: TestClient) -> None:
+    with Session(sales_annual_service_module.engine) as session:
+        _seed_sales_summary_data(session)
+
+    clients = api_client.get("/sales/annual-summary/filters/clients")
+    assert clients.status_code == 200
+    assert clients.json() == {
+        "items": [
+            {"id": "cli-1", "name": "Cliente Uno", "code": "1", "parent_id": ""}
+        ]
+    }
+
+    products = api_client.get("/sales/annual-summary/filters/products")
+    assert products.status_code == 200
+    assert [row["id"] for row in products.json()["items"]] == ["art-1", "art-2"]
+    assert products.json()["items"][0] == {"id": "art-1", "name": "Alpha Producto", "code": "D123", "parent_id": ""}
+
+    manufacturers = api_client.get("/sales/annual-summary/filters/manufacturers")
+    assert manufacturers.status_code == 200
+    assert [row["id"] for row in manufacturers.json()["items"]] == ["fab-1", "fab-2"]
+    assert manufacturers.json()["items"][0] == {"id": "fab-1", "name": "Fabricante A", "code": "1", "parent_id": ""}
+
+    families = api_client.get("/sales/annual-summary/filters/families")
+    assert families.status_code == 200
+    assert [row["id"] for row in families.json()["items"]] == ["fam-1", "fam-2"]
+    assert families.json()["items"][0] == {"id": "fam-1", "name": "Familia A", "code": "FA", "parent_id": "fab-1"}
+
+    families_by_manufacturer = api_client.get("/sales/annual-summary/filters/families", params={"fabricante_id": "fab-1"})
+    assert families_by_manufacturer.status_code == 200
+    assert families_by_manufacturer.json()["items"] == [
+        {"id": "fam-1", "name": "Familia A", "code": "FA", "parent_id": "fab-1"}
+    ]
+
+    subfamilies = api_client.get("/sales/annual-summary/filters/subfamilies")
+    assert subfamilies.status_code == 200
+    assert [row["id"] for row in subfamilies.json()["items"]] == ["sub-1", "sub-2"]
+    assert subfamilies.json()["items"][0] == {"id": "sub-1", "name": "Subfamilia A", "code": "SA", "parent_id": "fam-1"}
+
+    subfamilies_by_family = api_client.get("/sales/annual-summary/filters/subfamilies", params={"familia_id": "fam-2"})
+    assert subfamilies_by_family.status_code == 200
+    assert subfamilies_by_family.json()["items"] == [
+        {"id": "sub-2", "name": "Subfamilia B", "code": "SB", "parent_id": "fam-2"}
+    ]
+
+
+def test_sales_filter_catalog_endpoints_return_igsa_options(api_client: TestClient) -> None:
+    with Session(sales_annual_service_module.engine) as session:
+        _seed_sales_summary_data(session)
+
+    manufacturers = api_client.get("/sales/annual-summary/igsa/filters/manufacturers")
+    assert manufacturers.status_code == 200
+    assert [row["id"] for row in manufacturers.json()["items"]] == ["fab-1", "fab-2"]
+
+    families = api_client.get("/sales/annual-summary/igsa/filters/families")
+    assert families.status_code == 200
+    assert [row["id"] for row in families.json()["items"]] == ["fam-1", "fam-2"]
+    assert families.json()["items"][0]["parent_id"] == "fab-1"
+
+    families_by_manufacturer = api_client.get("/sales/annual-summary/igsa/filters/families", params={"fabricante_id": "fab-2"})
+    assert families_by_manufacturer.status_code == 200
+    assert families_by_manufacturer.json()["items"] == [
+        {"id": "fam-2", "name": "Familia B", "code": "FB", "parent_id": "fab-2"}
+    ]
+
+    subfamilies = api_client.get("/sales/annual-summary/igsa/filters/subfamilies")
+    assert subfamilies.status_code == 200
+    assert [row["id"] for row in subfamilies.json()["items"]] == ["sub-1", "sub-2"]
+
+    subfamilies_by_family = api_client.get("/sales/annual-summary/igsa/filters/subfamilies", params={"familia_id": "fam-1"})
+    assert subfamilies_by_family.status_code == 200
+    assert subfamilies_by_family.json()["items"] == [
+        {"id": "sub-1", "name": "Subfamilia A", "code": "SA", "parent_id": "fam-1"}
+    ]
+
+
+def test_sales_filter_endpoints_return_empty_lists_and_stable_shape(api_client: TestClient) -> None:
+    ireks_years = api_client.get("/sales/annual-summary/years")
+    assert ireks_years.status_code == 200
+    assert ireks_years.json() == {"items": []}
+
+    igsa_years = api_client.get("/sales/annual-summary/igsa/years")
+    assert igsa_years.status_code == 200
+    assert igsa_years.json() == {"items": []}
+
+    clients = api_client.get("/sales/annual-summary/filters/clients")
+    assert clients.status_code == 200
+    assert clients.json() == {"items": []}
+
+    products = api_client.get("/sales/annual-summary/filters/products")
+    assert products.status_code == 200
+    assert products.json() == {"items": []}
+
+    manufacturers = api_client.get("/sales/annual-summary/filters/manufacturers")
+    assert manufacturers.status_code == 200
+    assert manufacturers.json() == {"items": []}
+
+    igsa_manufacturers = api_client.get("/sales/annual-summary/igsa/filters/manufacturers")
+    assert igsa_manufacturers.status_code == 200
+    assert igsa_manufacturers.json() == {"items": []}
+
+    families = api_client.get("/sales/annual-summary/filters/families")
+    assert families.status_code == 200
+    assert families.json() == {"items": []}
+
+    igsa_families = api_client.get("/sales/annual-summary/igsa/filters/families")
+    assert igsa_families.status_code == 200
+    assert igsa_families.json() == {"items": []}
+
+    subfamilies = api_client.get("/sales/annual-summary/filters/subfamilies")
+    assert subfamilies.status_code == 200
+    assert subfamilies.json() == {"items": []}
+
+    igsa_subfamilies = api_client.get("/sales/annual-summary/igsa/filters/subfamilies")
+    assert igsa_subfamilies.status_code == 200
+    assert igsa_subfamilies.json() == {"items": []}

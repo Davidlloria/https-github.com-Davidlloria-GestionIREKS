@@ -34,5 +34,7 @@ def test_list_pagination_params_are_bounded() -> None:
     assert client.get("/orders", params={"limit": 1001}).status_code == 422
     assert client.get("/orders/order-1/items", params={"limit": 1001}).status_code == 422
     assert client.get("/orders/order-1/pending", params={"offset": 100001}).status_code == 422
+    assert client.get("/sales/annual-summary/filters/families", params={"fabricante_id": "x" * 121}).status_code == 422
+    assert client.get("/sales/annual-summary/filters/subfamilies", params={"familia_id": "x" * 121}).status_code == 422
     assert client.get("/warehouse/stock", params={"limit": 1001}).status_code == 422
     assert client.get("/warehouse/movements", params={"offset": -1}).status_code == 422
