@@ -4,7 +4,7 @@ from datetime import datetime
 
 from sqlmodel import Field
 
-from .base import AppSchema
+from .base import AppSchema, PaginatedResponse
 
 
 class RecipeLineBase(AppSchema):
@@ -67,14 +67,30 @@ class RecipeBase(AppSchema):
     estado: str = "borrador"
 
 
-class RecipeListItem(RecipeBase):
+class RecipeListItem(AppSchema):
     id: int | None = None
+    cliente_id: str = ""
+    nombre: str = ""
+    codigo_receta: str = ""
+    version: str = "1.0"
+    es_base: bool = False
+    receta_base_id: int | None = None
+    masa_final_deseada_g: float = 0.0
+    peso_pieza_g: float = 0.0
+    numero_piezas: int = 1
+    observaciones: str = ""
+    proceso: str = ""
+    estado: str = "borrador"
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
 
 class RecipeDetail(RecipeListItem):
-    lineas: list[RecipeLineRead] = Field(default_factory=list)
+    pass
+
+
+class RecipeListResponse(PaginatedResponse):
+    items: list[RecipeListItem] = Field(default_factory=list)
 
 
 class RecipeCreate(RecipeBase):
@@ -118,6 +134,7 @@ __all__ = [
     "RecipeLineCreate",
     "RecipeLineRead",
     "RecipeListItem",
+    "RecipeListResponse",
     "RecipeScalePayload",
     "RecipeUpdate",
 ]

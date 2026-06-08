@@ -88,6 +88,7 @@ from app.schemas.recipes import (
     RecipeLineCreate,
     RecipeLineRead,
     RecipeListItem,
+    RecipeListResponse,
     RecipeScalePayload,
     RecipeUpdate,
 )
@@ -198,6 +199,7 @@ __all__ = [
     "RecipeLineCreate",
     "RecipeLineRead",
     "RecipeListItem",
+    "RecipeListResponse",
     "RecipeScalePayload",
     "RecipeUpdate",
     "SalesFilterOption",

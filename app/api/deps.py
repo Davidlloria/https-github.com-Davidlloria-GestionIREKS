@@ -7,6 +7,7 @@ from app.services.customer_service import CustomerService
 from app.services.api_settings_service import ApiSettingsService
 from app.services.ingredient_ireks_service import IngredientIreksService
 from app.services.ingredient_std_service import IngredientStdService
+from app.services.recipe_service import RecipeService
 from app.services.order_document_import_service import OrderDocumentImportService
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderService
@@ -31,6 +32,10 @@ def get_course_service() -> CourseService:
 
 def get_ingredient_read_service() -> IngredientReadService:
     return IngredientReadService()
+
+
+def get_recipe_service() -> RecipeService:
+    return RecipeService()
 
 
 def get_api_settings_service() -> ApiSettingsService:
