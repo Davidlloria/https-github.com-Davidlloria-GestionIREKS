@@ -44,6 +44,9 @@ class CourseService:
         with Session(engine) as session:
             return session.get(Curso, curso_id)
 
+    def list_attendees(self, curso_id: str) -> list[AsistenteListadoItem]:
+        return self.attendee_flow.list_attendees(curso_id)
+
     def create_course(self, payload: dict) -> None:
         with Session(engine) as session:
             self.vm.create_course(session, payload)

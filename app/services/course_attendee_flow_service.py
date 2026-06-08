@@ -13,11 +13,13 @@ from app.viewmodels.course_viewmodel import AsistenteListadoItem, CourseViewMode
 
 @dataclass(slots=True)
 class CourseAttendeeFlowService:
-    engine: object = default_engine
+    engine: object | None = None
     course_vm: CourseViewModel | None = None
     import_service: ImportService | None = None
 
     def __post_init__(self) -> None:
+        if self.engine is None:
+            self.engine = default_engine
         if self.course_vm is None:
             self.course_vm = CourseViewModel()
         if self.import_service is None:

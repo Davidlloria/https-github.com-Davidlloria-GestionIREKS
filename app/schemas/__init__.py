@@ -18,7 +18,13 @@ from app.schemas.customers import (
     CustomerListResponse,
     CustomerUpdate,
 )
-from app.schemas.courses import CourseDetail, CourseListItem, CourseListResponse
+from app.schemas.courses import (
+    CourseAttendeeItem,
+    CourseAttendeeListResponse,
+    CourseDetail,
+    CourseListItem,
+    CourseListResponse,
+)
 from app.schemas.ingredients import (
     CatalogOption,
     IngredientActiveUpdate,
@@ -129,6 +135,8 @@ __all__ = [
     "CustomerListResponse",
     "CustomerUpdate",
     "CourseDetail",
+    "CourseAttendeeItem",
+    "CourseAttendeeListResponse",
     "CourseListItem",
     "CourseListResponse",
     "DocumentImportRequest",

@@ -6,7 +6,13 @@ from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import get_course_service
 from app.api.errors import not_found
-from app.schemas.courses import CourseDetail, CourseListItem, CourseListResponse
+from app.schemas.courses import (
+    CourseAttendeeItem,
+    CourseAttendeeListResponse,
+    CourseDetail,
+    CourseListItem,
+    CourseListResponse,
+)
 from app.services.course_service import CourseService
 
 
@@ -35,3 +41,24 @@ def get_course(
     if course is None:
         raise not_found("Curso no encontrado.")
     return CourseDetail.from_entity(course)
+
+
+@router.get("/{course_id}/attendees", response_model=CourseAttendeeListResponse)
+def list_course_attendees(
+    course_id: str,
+    service: CourseService = Depends(get_course_service),
+) -> CourseAttendeeListResponse:
+    if service.get_course(course_id) is None:
+        raise not_found("Curso no encontrado.")
+    rows = service.list_attendees(course_id)
+    items = [
+        CourseAttendeeItem(
+            id=str(row.contacto_id),
+            nombre=str(getattr(row, "asistente", "") or ""),
+            empresa=str(getattr(row, "empresa", "") or ""),
+            confirmado=bool(getattr(row, "status_confirmacion", False)),
+            observaciones=str(getattr(row, "observaciones", "") or ""),
+        )
+        for row in rows
+    ]
+    return CourseAttendeeListResponse(total=len(items), limit=len(items), offset=0, items=items)
