@@ -156,6 +156,28 @@ class IngredientStdListResponse(PaginatedResponse):
     items: list[IngredientStdRead] = Field(default_factory=list)
 
 
+class IngredientListItem(AppSchema):
+    id: str
+    codigo: str = ""
+    nombre: str = ""
+    fabricante_id: str = ""
+    proveedor_id: str = ""
+    familia_id: str = ""
+    subfamilia_id: str = ""
+    unidad: str = ""
+    activo: bool = True
+    precio: float = 0.0
+    source: str = ""
+
+
+class IngredientDetail(IngredientListItem):
+    pass
+
+
+class IngredientListResponse(PaginatedResponse):
+    items: list[IngredientListItem] = Field(default_factory=list)
+
+
 class IngredientStdCreate(IngredientStdBase):
     articulo_id: str | None = None
 
@@ -192,6 +214,9 @@ __all__ = [
     "IngredientIreksListPayload",
     "IngredientIreksRead",
     "IngredientIreksUpdate",
+    "IngredientDetail",
+    "IngredientListItem",
+    "IngredientListResponse",
     "IngredientStdBase",
     "IngredientStdCreate",
     "IngredientStdListResponse",

@@ -10,6 +10,8 @@ from app.api.errors import bad_request, conflict, not_found
 from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.schemas.ingredients import (
     IngredientActiveUpdate,
+    IngredientDetail,
+    IngredientListResponse,
     IngredientIreksCreate,
     IngredientIreksListPayload,
     IngredientIreksRead,
@@ -24,12 +26,38 @@ from app.schemas.ingredients import (
     TarifaPrecioIreksRead,
     TarifaPrecioIreksUpdate,
 )
+from app.api.deps import get_ingredient_read_service
+from app.services.ingredient_read_service import IngredientReadService
 from app.services.ingredient_ireks_service import IngredientIreksService
 from app.services.ingredient_std_service import IngredientStdService
 
 
 router = APIRouter(prefix="/ingredients", tags=["ingredients"])
 ActivityFilter = Literal["all", "active", "inactive"]
+
+
+@router.get("", response_model=IngredientListResponse)
+def list_ingredients(
+    q: Annotated[str, Query(max_length=120)] = "",
+    familia_id: Annotated[str, Query(max_length=120)] = "",
+    subfamilia_id: Annotated[str, Query(max_length=120)] = "",
+    fabricante_id: Annotated[str, Query(max_length=120)] = "",
+    activity_filter: Annotated[ActivityFilter, Query()] = "all",
+    distributor_filter_id: Annotated[str, Query(max_length=120)] = "",
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=MAX_PAGE_OFFSET)] = 0,
+    service: IngredientReadService = Depends(get_ingredient_read_service),
+) -> IngredientListResponse:
+    return service.list_payload(
+        q=q,
+        familia_id=familia_id,
+        subfamilia_id=subfamilia_id,
+        fabricante_id=fabricante_id,
+        activity_filter=activity_filter,
+        distributor_filter_id=distributor_filter_id,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/ireks", response_model=IngredientIreksListPayload)
@@ -253,3 +281,14 @@ def list_std_prices(
     service: IngredientStdService = Depends(get_ingredient_std_service),
 ) -> list[MateriaPrimaPrecioRead]:
     return service.price_history_payload(articulo_id)
+
+
+@router.get("/{ingredient_id}", response_model=IngredientDetail)
+def get_ingredient(
+    ingredient_id: str,
+    service: IngredientReadService = Depends(get_ingredient_read_service),
+) -> IngredientDetail:
+    payload = service.detail_payload(ingredient_id)
+    if payload is None:
+        raise not_found("Ingrediente no encontrado.")
+    return payload
