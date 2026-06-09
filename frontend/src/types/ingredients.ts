@@ -89,3 +89,26 @@ export interface MateriaPrimaPrecioRead {
   fecha_precio: string
   costo_neto: number
 }
+
+export interface IngredientListItem {
+  id: string
+  codigo: string
+  nombre: string
+  fabricante_id: string
+  proveedor_id: string
+  familia_id: string
+  subfamilia_id: string
+  unidad: string
+  activo: boolean
+  precio: number
+  source: string
+}
+
+export type IngredientDetail = IngredientListItem
+
+export interface IngredientListResponse {
+  items: IngredientListItem[]
+  total: number
+  limit: number
+  offset: number
+}

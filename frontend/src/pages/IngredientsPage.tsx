@@ -1,854 +1,105 @@
-import { useCallback, useMemo, useState } from 'react'
-import {
-  createIreksIngredient,
-  createStdIngredient,
-  createIreksTarifa,
-  deleteIreksTarifa,
-  deleteIreksIngredient,
-  deleteStdIngredient,
-  getIreksIngredientDetail,
-  getIreksNutrition,
-  getStdIngredientDetail,
-  getStdNutrition,
-  listIreksIngredients,
-  listIreksTarifas,
-  listStdIngredients,
-  listStdPrices,
-  updateIreksIngredient,
-  updateIreksTarifa,
-  updateStdActive,
-  updateStdIngredient,
-} from '../api/ingredients'
+import { useMemo, useState } from 'react'
+import { getIngredientDetail, listIngredients } from '../api/ingredients'
 import { QueryState } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
 import { useAsyncResource } from '../features/useAsyncResource'
-import type {
-  IngredientIreksRead,
-  IngredientStdRead,
-  MateriaPrimaPrecioRead,
-  NutritionValues,
-  TarifaPrecioIreksRead,
-} from '../types/api'
+import type { IngredientDetail, IngredientListItem, IngredientListResponse } from '../types/api'
 
-type IngredientMode = 'ireks' | 'std'
+const PAGE_SIZE = 25
 
-interface IreksDetailPayload {
-  detail: IngredientIreksRead | null
-  nutrition: NutritionValues | null
-  tarifas: TarifaPrecioIreksRead[]
+const EMPTY_LIST: IngredientListResponse = {
+  items: [] as IngredientListItem[],
+  total: 0,
+  limit: PAGE_SIZE,
+  offset: 0,
 }
 
-interface StdDetailPayload {
-  detail: IngredientStdRead | null
-  nutrition: NutritionValues | null
-  prices: MateriaPrimaPrecioRead[]
+function formatNumber(value: number) {
+  return new Intl.NumberFormat('es-ES', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number.isFinite(value) ? value : 0)
 }
 
-interface StdEditForm {
-  articulo_descripcion: string
-  pvp_formato: string
-  pvp_unidad_medida: string
+function formatText(value: string | number | boolean | null | undefined) {
+  if (value === null || value === undefined) {
+    return '-'
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'Si' : 'No'
+  }
+  const text = String(value).trim()
+  return text || '-'
 }
-
-interface StdCreateForm {
-  articulo_referencia_distribuidor: string
-  proveedor_id: string
-  articulo_descripcion: string
-  categoria: string
-  formato: string
-  formato_cantidad: string
-  formato_unidad: string
-  pvp_formato: string
-  activo: boolean
-}
-
-interface IreksEditForm {
-  articulo_referencia: string
-  articulo_referencia_corta: string
-  articulo_descripcion: string
-  categoria: string
-}
-
-interface IreksCreateForm {
-  almacen_id: string
-  fabricante_id: string
-  distribuidor_id: string
-  articulo_referencia: string
-  articulo_referencia_corta: string
-  articulo_descripcion: string
-  categoria: string
-  articulo_familia_id: string
-  articulo_subfamilia_id: string
-  articulo_envase_id: string
-  articulo_envase_cantidad: string
-  articulo_envase_peso: string
-  transporte_cajas_por_capa: string
-  transporte_capas_por_pallet: string
-  articulo_status_activo: boolean
-  articulo_status_en_lista: boolean
-}
-
-interface IreksTarifaForm {
-  tarifa_ano: string
-  precio_fabricante: string
-  precio_distribuidor: string
-  descuento_pct: string
-}
-
-const EMPTY_IREKS_DETAIL: IreksDetailPayload = {
-  detail: null,
-  nutrition: null,
-  tarifas: [],
-}
-
-const EMPTY_STD_DETAIL: StdDetailPayload = {
-  detail: null,
-  nutrition: null,
-  prices: [],
-}
-
-const EMPTY_STD_EDIT_FORM: StdEditForm = {
-  articulo_descripcion: '',
-  pvp_formato: '',
-  pvp_unidad_medida: '',
-}
-
-const EMPTY_STD_CREATE_FORM: StdCreateForm = {
-  articulo_referencia_distribuidor: '',
-  proveedor_id: '',
-  articulo_descripcion: '',
-  categoria: '',
-  formato: 'SACO',
-  formato_cantidad: '25',
-  formato_unidad: 'kg',
-  pvp_formato: '',
-  activo: true,
-}
-
-const EMPTY_IREKS_EDIT_FORM: IreksEditForm = {
-  articulo_referencia: '',
-  articulo_referencia_corta: '',
-  articulo_descripcion: '',
-  categoria: '',
-}
-
-const EMPTY_IREKS_CREATE_FORM: IreksCreateForm = {
-  almacen_id: '',
-  fabricante_id: '',
-  distribuidor_id: '',
-  articulo_referencia: '',
-  articulo_referencia_corta: '',
-  articulo_descripcion: '',
-  categoria: '',
-  articulo_familia_id: '',
-  articulo_subfamilia_id: '',
-  articulo_envase_id: '',
-  articulo_envase_cantidad: '1',
-  articulo_envase_peso: '1',
-  transporte_cajas_por_capa: '0',
-  transporte_capas_por_pallet: '0',
-  articulo_status_activo: true,
-  articulo_status_en_lista: true,
-}
-
-const EMPTY_IREKS_TARIFA_FORM: IreksTarifaForm = {
-  tarifa_ano: '',
-  precio_fabricante: '',
-  precio_distribuidor: '',
-  descuento_pct: '',
-}
-
-const PAGE_SIZE = 50
 
 export function IngredientsPage() {
-  const [mode, setMode] = useState<IngredientMode>('ireks')
   const [search, setSearch] = useState('')
-  const [activityFilter, setActivityFilter] = useState('all')
-  const [ireksPageIndex, setIreksPageIndex] = useState(0)
-  const [stdPageIndex, setStdPageIndex] = useState(0)
-  const [selectedIreksCandidateId, setSelectedIreksCandidateId] = useState('')
-  const [selectedStdCandidateId, setSelectedStdCandidateId] = useState('')
-  const [stdActiveLoading, setStdActiveLoading] = useState(false)
-  const [stdActiveMessage, setStdActiveMessage] = useState('')
-  const [stdActiveError, setStdActiveError] = useState('')
-  const [ireksActiveLoading, setIreksActiveLoading] = useState(false)
-  const [ireksActiveMessage, setIreksActiveMessage] = useState('')
-  const [ireksActiveError, setIreksActiveError] = useState('')
-  const [ireksDeleteLoading, setIreksDeleteLoading] = useState(false)
-  const [ireksDeleteMessage, setIreksDeleteMessage] = useState('')
-  const [ireksDeleteError, setIreksDeleteError] = useState('')
-  const [ireksListLoading, setIreksListLoading] = useState(false)
-  const [ireksListMessage, setIreksListMessage] = useState('')
-  const [ireksListError, setIreksListError] = useState('')
-  const [ireksCreateForm, setIreksCreateForm] = useState<IreksCreateForm>(EMPTY_IREKS_CREATE_FORM)
-  const [ireksCreateLoading, setIreksCreateLoading] = useState(false)
-  const [ireksCreateMessage, setIreksCreateMessage] = useState('')
-  const [ireksCreateError, setIreksCreateError] = useState('')
-  const [stdEditForm, setStdEditForm] = useState<StdEditForm>(EMPTY_STD_EDIT_FORM)
-  const [stdEditTargetId, setStdEditTargetId] = useState('')
-  const [stdEditLoading, setStdEditLoading] = useState(false)
-  const [stdEditMessage, setStdEditMessage] = useState('')
-  const [stdEditError, setStdEditError] = useState('')
-  const [stdDeleteLoading, setStdDeleteLoading] = useState(false)
-  const [stdDeleteMessage, setStdDeleteMessage] = useState('')
-  const [stdDeleteError, setStdDeleteError] = useState('')
-  const [stdCreateForm, setStdCreateForm] = useState<StdCreateForm>(EMPTY_STD_CREATE_FORM)
-  const [stdCreateLoading, setStdCreateLoading] = useState(false)
-  const [stdCreateMessage, setStdCreateMessage] = useState('')
-  const [stdCreateError, setStdCreateError] = useState('')
-  const [ireksEditForm, setIreksEditForm] = useState<IreksEditForm>(EMPTY_IREKS_EDIT_FORM)
-  const [ireksEditTargetId, setIreksEditTargetId] = useState('')
-  const [ireksEditLoading, setIreksEditLoading] = useState(false)
-  const [ireksEditMessage, setIreksEditMessage] = useState('')
-  const [ireksEditError, setIreksEditError] = useState('')
-  const [selectedIreksTarifaId, setSelectedIreksTarifaId] = useState<number | null>(null)
-  const [ireksTarifaForm, setIreksTarifaForm] = useState<IreksTarifaForm>(EMPTY_IREKS_TARIFA_FORM)
-  const [ireksTarifaLoading, setIreksTarifaLoading] = useState(false)
-  const [ireksTarifaMessage, setIreksTarifaMessage] = useState('')
-  const [ireksTarifaError, setIreksTarifaError] = useState('')
+  const [pageIndex, setPageIndex] = useState(0)
+  const [selectedCandidateId, setSelectedCandidateId] = useState('')
 
-  const ireksOffset = ireksPageIndex * PAGE_SIZE
-  const stdOffset = stdPageIndex * PAGE_SIZE
-
-  const ireksQuery = useAsyncResource(
-    () => listIreksIngredients(search, activityFilter, PAGE_SIZE, ireksOffset),
-    { items: [], total: 0, limit: PAGE_SIZE, offset: 0, catalogs: { distribuidores: [], fabricantes: [], familias: [], subfamilias: [], envases: [] } },
-    [search, activityFilter, ireksOffset],
+  const offset = pageIndex * PAGE_SIZE
+  const ingredientsQuery = useAsyncResource<IngredientListResponse>(
+    () => listIngredients(search, PAGE_SIZE, offset),
+    EMPTY_LIST,
+    [search, offset],
   )
-  const stdQuery = useAsyncResource(
-    () => listStdIngredients(search, activityFilter, PAGE_SIZE, stdOffset),
-    { items: [], total: 0, limit: PAGE_SIZE, offset: 0 },
-    [search, activityFilter, stdOffset],
+  const ingredientRows: IngredientListItem[] = ingredientsQuery.data.items
+
+  const selectedIngredientId = useMemo(() => {
+    if (!ingredientRows.length) {
+      return ''
+    }
+    if (selectedCandidateId && ingredientRows.some((row) => row.id === selectedCandidateId)) {
+      return selectedCandidateId
+    }
+    return ingredientRows[0].id
+  }, [ingredientRows, selectedCandidateId])
+
+  const detailQuery = useAsyncResource(
+    () => {
+      if (!selectedIngredientId) {
+        return Promise.resolve(null as IngredientDetail | null)
+      }
+      return getIngredientDetail(selectedIngredientId)
+    },
+    null as IngredientDetail | null,
+    [selectedIngredientId],
   )
-
-  const ireksRows = ireksQuery.data.items
-  const stdRows = stdQuery.data.items
-
-  const selectedIreks = useMemo(() => {
-    if (!ireksRows.length) {
-      return null as IngredientIreksRead | null
-    }
-    const explicit = ireksRows.find((row) => row.articulo_id === selectedIreksCandidateId)
-    return explicit ?? ireksRows[0]
-  }, [ireksRows, selectedIreksCandidateId])
-
-  const selectedStd = useMemo(() => {
-    if (!stdRows.length) {
-      return null as IngredientStdRead | null
-    }
-    const explicit = stdRows.find((row) => row.articulo_id === selectedStdCandidateId)
-    return explicit ?? stdRows[0]
-  }, [stdRows, selectedStdCandidateId])
-
-  const loadIreksDetail = useCallback(() => {
-    if (!selectedIreks || selectedIreks.id === null) {
-      return Promise.resolve(EMPTY_IREKS_DETAIL)
-    }
-    const articuloId = selectedIreks.articulo_id
-    return Promise.all([
-      getIreksIngredientDetail(selectedIreks.id),
-      getIreksNutrition(articuloId),
-      listIreksTarifas(articuloId),
-    ]).then(([detail, nutrition, tarifas]) => ({ detail, nutrition, tarifas }))
-  }, [selectedIreks])
-
-  const ireksDetailQuery = useAsyncResource(loadIreksDetail, EMPTY_IREKS_DETAIL, [loadIreksDetail, selectedIreks?.id])
-
-  const loadStdDetail = useCallback(() => {
-    if (!selectedStd) {
-      return Promise.resolve(EMPTY_STD_DETAIL)
-    }
-    const articuloId = selectedStd.articulo_id
-    return Promise.all([
-      getStdIngredientDetail(articuloId),
-      getStdNutrition(articuloId),
-      listStdPrices(articuloId),
-    ]).then(([detail, nutrition, prices]) => ({ detail, nutrition, prices }))
-  }, [selectedStd])
-
-  const stdDetailQuery = useAsyncResource(loadStdDetail, EMPTY_STD_DETAIL, [loadStdDetail, selectedStd?.articulo_id])
 
   const totals = useMemo(() => {
-    const ireksActive = ireksRows.filter((row) => row.articulo_status_activo).length
-    const ireksInList = ireksRows.filter((row) => row.articulo_status_en_lista).length
-    const stdActive = stdRows.filter((row) => row.activo).length
+    const activeCount = ingredientRows.filter((row) => row.activo).length
+    const stdCount = ingredientRows.filter((row) => row.source === 'std').length
+    const pricedCount = ingredientRows.filter((row) => Number.isFinite(row.precio) && row.precio > 0).length
     return {
-      ireksTotal: ireksQuery.data.total,
-      ireksActive,
-      ireksInList,
-      stdTotal: stdQuery.data.total,
-      stdActive,
+      total: ingredientsQuery.data.total,
+      activeCount,
+      stdCount,
+      pricedCount,
     }
-  }, [ireksRows, stdRows, ireksQuery.data.total, stdQuery.data.total])
+  }, [ingredientRows, ingredientsQuery.data.total])
 
-  const hasPreviousPage = mode === 'ireks' ? ireksPageIndex > 0 : stdPageIndex > 0
-  const hasNextPage = mode === 'ireks'
-    ? ireksOffset + ireksRows.length < ireksQuery.data.total
-    : stdOffset + stdRows.length < stdQuery.data.total
-  const currentPage = mode === 'ireks' ? ireksPageIndex + 1 : stdPageIndex + 1
-  const totalPages = Math.max(1, Math.ceil((mode === 'ireks' ? ireksQuery.data.total : stdQuery.data.total) / PAGE_SIZE))
-
-  const currentStdEditForm = useMemo(() => {
-    const detail = stdDetailQuery.data.detail
-    if (!detail) {
-      return EMPTY_STD_EDIT_FORM
-    }
-    if (stdEditTargetId !== detail.articulo_id) {
-      return {
-        articulo_descripcion: detail.articulo_descripcion || '',
-        pvp_formato: String(detail.pvp_formato ?? 0),
-        pvp_unidad_medida: String(detail.pvp_unidad_medida ?? 0),
-      }
-    }
-    return stdEditForm
-  }, [stdDetailQuery.data.detail, stdEditForm, stdEditTargetId])
-
-  const currentIreksEditForm = useMemo(() => {
-    const detail = ireksDetailQuery.data.detail
-    if (!detail) {
-      return EMPTY_IREKS_EDIT_FORM
-    }
-    if (ireksEditTargetId !== detail.articulo_id) {
-      return {
-        articulo_referencia: detail.articulo_referencia || '',
-        articulo_referencia_corta: detail.articulo_referencia_corta || '',
-        articulo_descripcion: detail.articulo_descripcion || '',
-        categoria: detail.categoria || '',
-      }
-    }
-    return ireksEditForm
-  }, [ireksDetailQuery.data.detail, ireksEditForm, ireksEditTargetId])
-
-  const selectedIreksTarifa = useMemo(
-    () =>
-      ireksDetailQuery.data.tarifas.find(
-        (tarifa) => tarifa.id !== null && tarifa.id === selectedIreksTarifaId,
-      ) ?? null,
-    [ireksDetailQuery.data.tarifas, selectedIreksTarifaId],
-  )
-
-  const formatWeight = (value: unknown) => {
-    const numeric = Number(value)
-    return Number.isFinite(numeric) ? numeric.toFixed(2) : '0.00'
-  }
-
-  const saveStdCreate = async () => {
-    if (stdCreateLoading) {
-      return
-    }
-    const referencia = stdCreateForm.articulo_referencia_distribuidor.trim()
-    const proveedorId = stdCreateForm.proveedor_id.trim()
-    const descripcion = stdCreateForm.articulo_descripcion.trim()
-    const formato = stdCreateForm.formato.trim()
-    const formatoUnidad = stdCreateForm.formato_unidad.trim() || 'kg'
-    const categoria = stdCreateForm.categoria.trim()
-    const formatoCantidad = Number.parseFloat(stdCreateForm.formato_cantidad.replace(',', '.'))
-    const pvpFormato = Number.parseFloat(stdCreateForm.pvp_formato.replace(',', '.'))
-
-    if (!referencia) {
-      setStdCreateError('La referencia de distribuidor es obligatoria.')
-      setStdCreateMessage('')
-      return
-    }
-    if (!proveedorId) {
-      setStdCreateError('El proveedor/distribuidor es obligatorio.')
-      setStdCreateMessage('')
-      return
-    }
-    if (!descripcion) {
-      setStdCreateError('La descripcion es obligatoria.')
-      setStdCreateMessage('')
-      return
-    }
-    if (!Number.isFinite(formatoCantidad) || formatoCantidad <= 0) {
-      setStdCreateError('La cantidad de formato debe ser numerica y mayor que 0.')
-      setStdCreateMessage('')
-      return
-    }
-    if (!Number.isFinite(pvpFormato) || pvpFormato < 0) {
-      setStdCreateError('El PVP formato debe ser numerico y mayor o igual que 0.')
-      setStdCreateMessage('')
-      return
-    }
-
-    setStdCreateLoading(true)
-    setStdCreateError('')
-    setStdCreateMessage('')
-    try {
-      const created = await createStdIngredient({
-        articulo_referencia_distribuidor: referencia,
-        proveedor_id: proveedorId,
-        distribuidor_id: proveedorId,
-        articulo_descripcion: descripcion,
-        categoria,
-        formato,
-        formato_cantidad: formatoCantidad,
-        formato_unidad: formatoUnidad,
-        pvp_formato: pvpFormato,
-        pvp_unidad_medida: formatoCantidad > 0 ? pvpFormato / formatoCantidad : 0,
-        activo: stdCreateForm.activo,
-      })
-      setSelectedStdCandidateId(created.articulo_id)
-      setStdEditTargetId(created.articulo_id)
-      setStdEditForm({
-        articulo_descripcion: created.articulo_descripcion || '',
-        pvp_formato: String(created.pvp_formato ?? 0),
-        pvp_unidad_medida: String(created.pvp_unidad_medida ?? 0),
-      })
-      setStdCreateForm(EMPTY_STD_CREATE_FORM)
-      await stdQuery.reload()
-      await stdDetailQuery.reload()
-      setStdCreateMessage(`Materia prima STD creada (${created.articulo_id}).`)
-    } catch (error: unknown) {
-      setStdCreateError(error instanceof Error ? error.message : 'No se pudo crear la materia prima STD.')
-    } finally {
-      setStdCreateLoading(false)
-    }
-  }
-
-  const saveIreksCreate = async () => {
-    if (ireksCreateLoading) {
-      return
-    }
-    const almacenId = ireksCreateForm.almacen_id.trim()
-    const referencia = ireksCreateForm.articulo_referencia.trim()
-    const referenciaCorta = ireksCreateForm.articulo_referencia_corta.trim()
-    const descripcion = ireksCreateForm.articulo_descripcion.trim()
-    const categoria = ireksCreateForm.categoria.trim()
-    const fabricanteId = ireksCreateForm.fabricante_id.trim()
-    const distribuidorId = ireksCreateForm.distribuidor_id.trim()
-    const articuloEnvaseId = ireksCreateForm.articulo_envase_id.trim()
-    const articuloFamiliaId = ireksCreateForm.articulo_familia_id.trim()
-    const articuloSubfamiliaId = ireksCreateForm.articulo_subfamilia_id.trim()
-    const envaseCantidad = Number.parseFloat(ireksCreateForm.articulo_envase_cantidad.replace(',', '.'))
-    const envasePeso = Number.parseFloat(ireksCreateForm.articulo_envase_peso.replace(',', '.'))
-    const cajasPorCapa = Number.parseFloat(ireksCreateForm.transporte_cajas_por_capa.replace(',', '.'))
-    const capasPorPallet = Number.parseFloat(ireksCreateForm.transporte_capas_por_pallet.replace(',', '.'))
-
-    if (!almacenId) {
-      setIreksCreateError('El almacen_id es obligatorio.')
-      setIreksCreateMessage('')
-      return
-    }
-    if (!referencia) {
-      setIreksCreateError('La referencia es obligatoria.')
-      setIreksCreateMessage('')
-      return
-    }
-    if (!descripcion) {
-      setIreksCreateError('La descripcion es obligatoria.')
-      setIreksCreateMessage('')
-      return
-    }
-    if (!Number.isFinite(envaseCantidad) || envaseCantidad < 0) {
-      setIreksCreateError('La cantidad de envase debe ser numerica y mayor o igual que 0.')
-      setIreksCreateMessage('')
-      return
-    }
-    if (!Number.isFinite(envasePeso) || envasePeso < 0) {
-      setIreksCreateError('El peso de envase debe ser numerico y mayor o igual que 0.')
-      setIreksCreateMessage('')
-      return
-    }
-    if (!Number.isFinite(cajasPorCapa) || cajasPorCapa < 0 || !Number.isFinite(capasPorPallet) || capasPorPallet < 0) {
-      setIreksCreateError('Los datos de transporte deben ser numericos y mayor o igual que 0.')
-      setIreksCreateMessage('')
-      return
-    }
-
-    setIreksCreateLoading(true)
-    setIreksCreateError('')
-    setIreksCreateMessage('')
-    try {
-      const created = await createIreksIngredient({
-        almacen_id: almacenId,
-        fabricante_id: fabricanteId,
-        distribuidor_id: distribuidorId,
-        articulo_referencia: referencia,
-        articulo_referencia_corta: referenciaCorta,
-        articulo_descripcion: descripcion,
-        categoria,
-        articulo_familia_id: articuloFamiliaId,
-        articulo_subfamilia_id: articuloSubfamiliaId,
-        articulo_envase_id: articuloEnvaseId,
-        articulo_envase_cantidad: envaseCantidad,
-        articulo_envase_peso: envasePeso,
-        transporte_cajas_por_capa: cajasPorCapa,
-        transporte_capas_por_pallet: capasPorPallet,
-        articulo_status_activo: ireksCreateForm.articulo_status_activo,
-        articulo_status_en_lista: ireksCreateForm.articulo_status_en_lista,
-      })
-      setSelectedIreksCandidateId(created.articulo_id)
-      setIreksEditTargetId(created.articulo_id)
-      setIreksEditForm({
-        articulo_referencia: created.articulo_referencia || '',
-        articulo_referencia_corta: created.articulo_referencia_corta || '',
-        articulo_descripcion: created.articulo_descripcion || '',
-        categoria: created.categoria || '',
-      })
-      setIreksCreateForm((prev) => ({
-        ...EMPTY_IREKS_CREATE_FORM,
-        almacen_id: prev.almacen_id,
-        fabricante_id: prev.fabricante_id,
-        distribuidor_id: prev.distribuidor_id,
-        articulo_familia_id: prev.articulo_familia_id,
-        articulo_subfamilia_id: prev.articulo_subfamilia_id,
-        articulo_envase_id: prev.articulo_envase_id,
-      }))
-      await ireksQuery.reload()
-      await ireksDetailQuery.reload()
-      setIreksCreateMessage(`Ingrediente IREKS creado (id ${created.id ?? '-'}).`)
-    } catch (error: unknown) {
-      setIreksCreateError(error instanceof Error ? error.message : 'No se pudo crear el ingrediente IREKS.')
-    } finally {
-      setIreksCreateLoading(false)
-    }
-  }
-
-  const toggleStdActive = async () => {
-    if (!stdDetailQuery.data.detail || stdActiveLoading) {
-      return
-    }
-    setStdActiveLoading(true)
-    setStdActiveError('')
-    setStdActiveMessage('')
-    const current = stdDetailQuery.data.detail
-    const nextActive = !current.activo
-    try {
-      await updateStdActive(current.articulo_id, nextActive)
-      await Promise.all([stdQuery.reload(), stdDetailQuery.reload()])
-      setStdActiveMessage(nextActive ? 'Materia prima activada.' : 'Materia prima desactivada.')
-    } catch (error: unknown) {
-      setStdActiveError(error instanceof Error ? error.message : 'No se pudo actualizar el estado de la materia prima.')
-    } finally {
-      setStdActiveLoading(false)
-    }
-  }
-
-  const saveStdEdition = async () => {
-    const detail = stdDetailQuery.data.detail
-    if (!detail || stdEditLoading) {
-      return
-    }
-    const pvpFormato = Number.parseFloat(currentStdEditForm.pvp_formato.replace(',', '.'))
-    const pvpUnidad = Number.parseFloat(currentStdEditForm.pvp_unidad_medida.replace(',', '.'))
-    if (!currentStdEditForm.articulo_descripcion.trim()) {
-      setStdEditError('La descripcion es obligatoria.')
-      setStdEditMessage('')
-      return
-    }
-    if (!Number.isFinite(pvpFormato) || pvpFormato < 0) {
-      setStdEditError('PVP formato debe ser un numero mayor o igual que 0.')
-      setStdEditMessage('')
-      return
-    }
-    if (!Number.isFinite(pvpUnidad) || pvpUnidad < 0) {
-      setStdEditError('PVP unidad de medida debe ser un numero mayor o igual que 0.')
-      setStdEditMessage('')
-      return
-    }
-
-    setStdEditLoading(true)
-    setStdEditError('')
-    setStdEditMessage('')
-    try {
-      const updated = await updateStdIngredient(detail.articulo_id, {
-        articulo_descripcion: currentStdEditForm.articulo_descripcion.trim(),
-        pvp_formato: pvpFormato,
-        pvp_unidad_medida: pvpUnidad,
-      })
-      await Promise.all([stdQuery.reload(), stdDetailQuery.reload()])
-      setStdEditTargetId(updated.articulo_id)
-      setStdEditForm({
-        articulo_descripcion: updated.articulo_descripcion || '',
-        pvp_formato: String(updated.pvp_formato ?? 0),
-        pvp_unidad_medida: String(updated.pvp_unidad_medida ?? 0),
-      })
-      setStdEditMessage('Materia prima STD actualizada.')
-    } catch (error: unknown) {
-      setStdEditError(error instanceof Error ? error.message : 'No se pudo actualizar la materia prima STD.')
-    } finally {
-      setStdEditLoading(false)
-    }
-  }
-
-  const toggleIreksActive = async () => {
-    const detail = ireksDetailQuery.data.detail
-    if (!detail || detail.id === null || ireksActiveLoading) {
-      return
-    }
-    const nextActive = !detail.articulo_status_activo
-    setIreksActiveLoading(true)
-    setIreksActiveError('')
-    setIreksActiveMessage('')
-    try {
-      await updateIreksIngredient(detail.id, { articulo_status_activo: nextActive })
-      await Promise.all([ireksQuery.reload(), ireksDetailQuery.reload()])
-      setIreksActiveMessage(nextActive ? 'Ingrediente IREKS activado.' : 'Ingrediente IREKS desactivado.')
-    } catch (error: unknown) {
-      setIreksActiveError(error instanceof Error ? error.message : 'No se pudo actualizar el estado IREKS.')
-    } finally {
-      setIreksActiveLoading(false)
-    }
-  }
-
-  const toggleIreksInList = async () => {
-    const detail = ireksDetailQuery.data.detail
-    if (!detail || detail.id === null || ireksListLoading) {
-      return
-    }
-    const nextInList = !detail.articulo_status_en_lista
-    setIreksListLoading(true)
-    setIreksListError('')
-    setIreksListMessage('')
-    try {
-      await updateIreksIngredient(detail.id, { articulo_status_en_lista: nextInList })
-      await Promise.all([ireksQuery.reload(), ireksDetailQuery.reload()])
-      setIreksListMessage(nextInList ? 'Ingrediente IREKS marcado en lista.' : 'Ingrediente IREKS marcado fuera de lista.')
-    } catch (error: unknown) {
-      setIreksListError(error instanceof Error ? error.message : 'No se pudo actualizar el estado en lista.')
-    } finally {
-      setIreksListLoading(false)
-    }
-  }
-
-  const removeIreks = async () => {
-    const detail = ireksDetailQuery.data.detail
-    if (!detail || detail.id === null || ireksDeleteLoading) {
-      return
-    }
-    const confirmed = window.confirm(
-      `Se eliminara el ingrediente IREKS ${detail.articulo_referencia || detail.articulo_id}. Esta accion no se puede deshacer.`,
-    )
-    if (!confirmed) {
-      return
-    }
-    setIreksDeleteLoading(true)
-    setIreksDeleteError('')
-    setIreksDeleteMessage('')
-    try {
-      await deleteIreksIngredient(detail.id)
-      setSelectedIreksCandidateId('')
-      await Promise.all([ireksQuery.reload(), ireksDetailQuery.reload()])
-      setIreksDeleteMessage('Ingrediente IREKS eliminado correctamente.')
-    } catch (error: unknown) {
-      setIreksDeleteError(error instanceof Error ? error.message : 'No se pudo eliminar el ingrediente IREKS.')
-    } finally {
-      setIreksDeleteLoading(false)
-    }
-  }
-
-  const removeStd = async () => {
-    const detail = stdDetailQuery.data.detail
-    if (!detail || stdDeleteLoading) {
-      return
-    }
-    const confirmed = window.confirm(
-      `Se eliminara la materia prima ${detail.articulo_referencia_distribuidor || detail.articulo_id}. Esta accion no se puede deshacer.`,
-    )
-    if (!confirmed) {
-      return
-    }
-    setStdDeleteLoading(true)
-    setStdDeleteError('')
-    setStdDeleteMessage('')
-    try {
-      await deleteStdIngredient(detail.articulo_id)
-      setSelectedStdCandidateId('')
-      setStdEditTargetId('')
-      setStdEditForm(EMPTY_STD_EDIT_FORM)
-      await Promise.all([stdQuery.reload(), stdDetailQuery.reload()])
-      setStdDeleteMessage('Materia prima STD eliminada correctamente.')
-    } catch (error: unknown) {
-      setStdDeleteError(error instanceof Error ? error.message : 'No se pudo eliminar la materia prima STD.')
-    } finally {
-      setStdDeleteLoading(false)
-    }
-  }
-
-  const saveIreksEdition = async () => {
-    const detail = ireksDetailQuery.data.detail
-    if (!detail || detail.id === null || ireksEditLoading) {
-      return
-    }
-    if (!currentIreksEditForm.articulo_descripcion.trim()) {
-      setIreksEditError('La descripcion es obligatoria.')
-      setIreksEditMessage('')
-      return
-    }
-    setIreksEditLoading(true)
-    setIreksEditError('')
-    setIreksEditMessage('')
-    try {
-      const updated = await updateIreksIngredient(detail.id, {
-        articulo_referencia: currentIreksEditForm.articulo_referencia.trim(),
-        articulo_referencia_corta: currentIreksEditForm.articulo_referencia_corta.trim(),
-        articulo_descripcion: currentIreksEditForm.articulo_descripcion.trim(),
-        categoria: currentIreksEditForm.categoria.trim(),
-      })
-      await Promise.all([ireksQuery.reload(), ireksDetailQuery.reload()])
-      setIreksEditTargetId(updated.articulo_id)
-      setIreksEditForm({
-        articulo_referencia: updated.articulo_referencia || '',
-        articulo_referencia_corta: updated.articulo_referencia_corta || '',
-        articulo_descripcion: updated.articulo_descripcion || '',
-        categoria: updated.categoria || '',
-      })
-      setIreksEditMessage('Ingrediente IREKS actualizado.')
-    } catch (error: unknown) {
-      setIreksEditError(error instanceof Error ? error.message : 'No se pudo actualizar el ingrediente IREKS.')
-    } finally {
-      setIreksEditLoading(false)
-    }
-  }
-
-  const resetIreksTarifaForm = () => {
-    setSelectedIreksTarifaId(null)
-    setIreksTarifaForm(EMPTY_IREKS_TARIFA_FORM)
-  }
-
-  const onSelectIreksTarifa = (tarifa: TarifaPrecioIreksRead) => {
-    setSelectedIreksTarifaId(tarifa.id ?? null)
-    setIreksTarifaForm({
-      tarifa_ano: String(tarifa.tarifa_ano ?? ''),
-      precio_fabricante: String(tarifa.precio_fabricante ?? 0),
-      precio_distribuidor: String(tarifa.precio_distribuidor ?? 0),
-      descuento_pct: String(tarifa.descuento_pct ?? 0),
-    })
-    setIreksTarifaMessage('')
-    setIreksTarifaError('')
-  }
-
-  const saveIreksTarifa = async () => {
-    const detail = ireksDetailQuery.data.detail
-    if (!detail || ireksTarifaLoading) {
-      return
-    }
-    const year = Number.parseInt(ireksTarifaForm.tarifa_ano, 10)
-    const fabricante = Number.parseFloat(ireksTarifaForm.precio_fabricante.replace(',', '.'))
-    const distribuidor = Number.parseFloat(ireksTarifaForm.precio_distribuidor.replace(',', '.'))
-    const descuento = Number.parseFloat(ireksTarifaForm.descuento_pct.replace(',', '.'))
-
-    if (!Number.isFinite(year) || year <= 0) {
-      setIreksTarifaError('El ano de tarifa debe ser numerico y mayor que 0.')
-      setIreksTarifaMessage('')
-      return
-    }
-    if (!Number.isFinite(fabricante) || !Number.isFinite(distribuidor) || !Number.isFinite(descuento)) {
-      setIreksTarifaError('Precios y descuento deben ser valores numericos validos.')
-      setIreksTarifaMessage('')
-      return
-    }
-
-    setIreksTarifaLoading(true)
-    setIreksTarifaError('')
-    setIreksTarifaMessage('')
-    try {
-      const payload = {
-        tarifa_ano: year,
-        precio_fabricante: fabricante,
-        precio_distribuidor: distribuidor,
-        descuento_pct: descuento,
-      }
-      const saved = selectedIreksTarifa && selectedIreksTarifa.id !== null
-        ? await updateIreksTarifa(selectedIreksTarifa.id, payload)
-        : await createIreksTarifa({
-          articulo_id: detail.articulo_id,
-          ...payload,
-        })
-      await ireksDetailQuery.reload()
-      setSelectedIreksTarifaId(saved.id ?? null)
-      setIreksTarifaForm({
-        tarifa_ano: String(saved.tarifa_ano ?? ''),
-        precio_fabricante: String(saved.precio_fabricante ?? 0),
-        precio_distribuidor: String(saved.precio_distribuidor ?? 0),
-        descuento_pct: String(saved.descuento_pct ?? 0),
-      })
-      setIreksTarifaMessage(selectedIreksTarifa ? 'Tarifa actualizada.' : 'Tarifa creada.')
-    } catch (error: unknown) {
-      setIreksTarifaError(error instanceof Error ? error.message : 'No se pudo guardar la tarifa IREKS.')
-    } finally {
-      setIreksTarifaLoading(false)
-    }
-  }
-
-  const removeIreksTarifa = async () => {
-    if (!selectedIreksTarifa || selectedIreksTarifa.id === null || ireksTarifaLoading) {
-      return
-    }
-    const confirmed = window.confirm('Se eliminara la tarifa seleccionada. Esta accion no se puede deshacer.')
-    if (!confirmed) {
-      return
-    }
-    setIreksTarifaLoading(true)
-    setIreksTarifaError('')
-    setIreksTarifaMessage('')
-    try {
-      await deleteIreksTarifa(selectedIreksTarifa.id)
-      await ireksDetailQuery.reload()
-      resetIreksTarifaForm()
-      setIreksTarifaMessage('Tarifa eliminada.')
-    } catch (error: unknown) {
-      setIreksTarifaError(error instanceof Error ? error.message : 'No se pudo eliminar la tarifa IREKS.')
-    } finally {
-      setIreksTarifaLoading(false)
-    }
-  }
+  const hasPreviousPage = pageIndex > 0
+  const hasNextPage = offset + ingredientRows.length < ingredientsQuery.data.total
+  const currentPage = pageIndex + 1
+  const totalPages = Math.max(1, Math.ceil(ingredientsQuery.data.total / PAGE_SIZE))
 
   return (
     <section className="page-grid">
-      <div className="segmented">
-        <button
-          type="button"
-          className={`segment-btn ${mode === 'ireks' ? 'active' : ''}`}
-          onClick={() => setMode('ireks')}
-        >
-          IREKS
-        </button>
-        <button
-          type="button"
-          className={`segment-btn ${mode === 'std' ? 'active' : ''}`}
-          onClick={() => setMode('std')}
-        >
-          STD
-        </button>
-      </div>
-
       <div className="toolbar">
         <input
           className="input"
           value={search}
           onChange={(event) => {
             setSearch(event.target.value)
-            setIreksPageIndex(0)
-            setStdPageIndex(0)
+            setPageIndex(0)
           }}
-          placeholder={mode === 'ireks' ? 'Buscar por referencia, descripcion o almacen' : 'Buscar por referencia o descripcion de materia prima'}
+          placeholder="Buscar ingrediente por nombre, codigo o referencia"
         />
-        <select
-          className="select"
-          value={activityFilter}
-          onChange={(event) => {
-            setActivityFilter(event.target.value)
-            setIreksPageIndex(0)
-            setStdPageIndex(0)
-          }}
-        >
-          <option value="all">Todos</option>
-          <option value="active">Activos</option>
-          <option value="inactive">Inactivos</option>
-        </select>
         <button
           type="button"
           className="action-btn"
           disabled={!hasPreviousPage}
-          onClick={() => {
-            if (mode === 'ireks') {
-              setIreksPageIndex((prev) => Math.max(0, prev - 1))
-            } else {
-              setStdPageIndex((prev) => Math.max(0, prev - 1))
-            }
-          }}
+          onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
         >
           Anterior
         </button>
@@ -856,13 +107,7 @@ export function IngredientsPage() {
           type="button"
           className="action-btn"
           disabled={!hasNextPage}
-          onClick={() => {
-            if (mode === 'ireks') {
-              setIreksPageIndex((prev) => prev + 1)
-            } else {
-              setStdPageIndex((prev) => prev + 1)
-            }
-          }}
+          onClick={() => setPageIndex((prev) => prev + 1)}
         >
           Siguiente
         </button>
@@ -872,886 +117,104 @@ export function IngredientsPage() {
       </div>
 
       <div className="cards">
-        <StatCard label="Total IREKS" value={totals.ireksTotal} />
-        <StatCard label="IREKS activos" value={totals.ireksActive} />
-        <StatCard label="Total STD" value={totals.stdTotal} />
-        <StatCard label="STD activos" value={totals.stdActive} />
+        <StatCard label="Total ingredientes" value={totals.total} />
+        <StatCard label="Activos" value={totals.activeCount} />
+        <StatCard label="STD" value={totals.stdCount} />
+        <StatCard label="Con precio" value={totals.pricedCount} />
       </div>
 
-      {mode === 'ireks' && (
-        <>
-          <div className="related-block">
-            <h3>Alta de ingrediente IREKS</h3>
-            <div className="form-grid">
-              <label>
-                Almacen ID
-                <input
-                  className="input"
-                  value={ireksCreateForm.almacen_id}
-                  onChange={(event) => setIreksCreateForm((prev) => ({ ...prev, almacen_id: event.target.value }))}
-                  disabled={ireksCreateLoading}
-                />
-              </label>
-              <label>
-                Referencia
-                <input
-                  className="input"
-                  value={ireksCreateForm.articulo_referencia}
-                  onChange={(event) =>
-                    setIreksCreateForm((prev) => ({ ...prev, articulo_referencia: event.target.value }))
-                  }
-                  disabled={ireksCreateLoading}
-                />
-              </label>
-              <label>
-                Referencia corta
-                <input
-                  className="input"
-                  value={ireksCreateForm.articulo_referencia_corta}
-                  onChange={(event) =>
-                    setIreksCreateForm((prev) => ({ ...prev, articulo_referencia_corta: event.target.value }))
-                  }
-                  disabled={ireksCreateLoading}
-                />
-              </label>
-              <label>
-                Descripcion
-                <input
-                  className="input"
-                  value={ireksCreateForm.articulo_descripcion}
-                  onChange={(event) =>
-                    setIreksCreateForm((prev) => ({ ...prev, articulo_descripcion: event.target.value }))
-                  }
-                  disabled={ireksCreateLoading}
-                />
-              </label>
-              <label>
-                Categoria
-                <input
-                  className="input"
-                  value={ireksCreateForm.categoria}
-                  onChange={(event) => setIreksCreateForm((prev) => ({ ...prev, categoria: event.target.value }))}
-                  disabled={ireksCreateLoading}
-                />
-              </label>
-              <label>
-                Fabricante
-                <select
-                  className="select"
-                  value={ireksCreateForm.fabricante_id}
-                  onChange={(event) => setIreksCreateForm((prev) => ({ ...prev, fabricante_id: event.target.value }))}
-                  disabled={ireksCreateLoading}
-                >
-                  <option value="">(sin fabricante)</option>
-                  {ireksQuery.data.catalogs.fabricantes.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.name || option.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Distribuidor
-                <select
-                  className="select"
-                  value={ireksCreateForm.distribuidor_id}
-                  onChange={(event) => setIreksCreateForm((prev) => ({ ...prev, distribuidor_id: event.target.value }))}
-                  disabled={ireksCreateLoading}
-                >
-                  <option value="">(sin distribuidor)</option>
-                  {ireksQuery.data.catalogs.distribuidores.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.name || option.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Familia
-                <select
-                  className="select"
-                  value={ireksCreateForm.articulo_familia_id}
-                  onChange={(event) =>
-                    setIreksCreateForm((prev) => ({ ...prev, articulo_familia_id: event.target.value }))
-                  }
-                  disabled={ireksCreateLoading}
-                >
-                  <option value="">(sin familia)</option>
-                  {ireksQuery.data.catalogs.familias.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.name || option.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Subfamilia
-                <select
-                  className="select"
-                  value={ireksCreateForm.articulo_subfamilia_id}
-                  onChange={(event) =>
-                    setIreksCreateForm((prev) => ({ ...prev, articulo_subfamilia_id: event.target.value }))
-                  }
-                  disabled={ireksCreateLoading}
-                >
-                  <option value="">(sin subfamilia)</option>
-                  {ireksQuery.data.catalogs.subfamilias.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.name || option.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Envase
-                <select
-                  className="select"
-                  value={ireksCreateForm.articulo_envase_id}
-                  onChange={(event) => setIreksCreateForm((prev) => ({ ...prev, articulo_envase_id: event.target.value }))}
-                  disabled={ireksCreateLoading}
-                >
-                  <option value="">(sin envase)</option>
-                  {ireksQuery.data.catalogs.envases.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.name || option.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Cantidad envase
-                <input
-                  className="input"
-                  value={ireksCreateForm.articulo_envase_cantidad}
-                  onChange={(event) =>
-                    setIreksCreateForm((prev) => ({ ...prev, articulo_envase_cantidad: event.target.value }))
-                  }
-                  disabled={ireksCreateLoading}
-                />
-              </label>
-              <label>
-                Peso envase
-                <input
-                  className="input"
-                  value={ireksCreateForm.articulo_envase_peso}
-                  onChange={(event) =>
-                    setIreksCreateForm((prev) => ({ ...prev, articulo_envase_peso: event.target.value }))
-                  }
-                  disabled={ireksCreateLoading}
-                />
-              </label>
-              <label>
-                Cajas por capa
-                <input
-                  className="input"
-                  value={ireksCreateForm.transporte_cajas_por_capa}
-                  onChange={(event) =>
-                    setIreksCreateForm((prev) => ({ ...prev, transporte_cajas_por_capa: event.target.value }))
-                  }
-                  disabled={ireksCreateLoading}
-                />
-              </label>
-              <label>
-                Capas por pallet
-                <input
-                  className="input"
-                  value={ireksCreateForm.transporte_capas_por_pallet}
-                  onChange={(event) =>
-                    setIreksCreateForm((prev) => ({ ...prev, transporte_capas_por_pallet: event.target.value }))
-                  }
-                  disabled={ireksCreateLoading}
-                />
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={ireksCreateForm.articulo_status_activo}
-                  onChange={(event) =>
-                    setIreksCreateForm((prev) => ({ ...prev, articulo_status_activo: event.target.checked }))
-                  }
-                  disabled={ireksCreateLoading}
-                />{' '}
-                Activo
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={ireksCreateForm.articulo_status_en_lista}
-                  onChange={(event) =>
-                    setIreksCreateForm((prev) => ({ ...prev, articulo_status_en_lista: event.target.checked }))
-                  }
-                  disabled={ireksCreateLoading}
-                />{' '}
-                En lista
-              </label>
-            </div>
-            <div className="toolbar">
-              <button
-                type="button"
-                className="action-btn"
-                onClick={saveIreksCreate}
-                disabled={ireksCreateLoading}
-              >
-                {ireksCreateLoading ? 'Creando...' : 'Crear IREKS'}
-              </button>
-            </div>
-            {!!ireksCreateMessage && <div className="state">{ireksCreateMessage}</div>}
-            {!!ireksCreateError && <div className="state">Error: {ireksCreateError}</div>}
+      <QueryState
+        loading={ingredientsQuery.loading}
+        error={ingredientsQuery.error}
+        empty={!ingredientRows.length}
+        emptyMessage="No hay ingredientes para los filtros actuales."
+      />
+
+      {!!ingredientRows.length && (
+        <div className="split-panel">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Codigo</th>
+                  <th>Nombre</th>
+                  <th>Origen</th>
+                  <th>Activo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ingredientRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className={row.id === selectedIngredientId ? 'row-selected' : ''}
+                    onClick={() => setSelectedCandidateId(row.id)}
+                  >
+                    <td>{row.id}</td>
+                    <td>{row.codigo || '-'}</td>
+                    <td>{row.nombre || '-'}</td>
+                    <td>{formatText(row.source)}</td>
+                    <td>{row.activo ? 'Si' : 'No'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
-          <QueryState
-            loading={ireksQuery.loading}
-            error={ireksQuery.error}
-            empty={!ireksQuery.data.items.length}
-            emptyMessage="No hay ingredientes IREKS para los filtros actuales."
-          />
+          <aside className="detail-panel">
+            <QueryState
+              loading={detailQuery.loading}
+              error={detailQuery.error}
+              empty={!detailQuery.data}
+              emptyMessage="Selecciona un ingrediente para ver el detalle."
+            />
 
-          {!!ireksQuery.data.items.length && (
-            <div className="split-panel">
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Referencia</th>
-                      <th>Descripcion</th>
-                      <th>Articulo ID</th>
-                      <th>Peso envase total</th>
-                      <th>Categoria</th>
-                      <th>Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ireksQuery.data.items.map((row) => (
-                      <tr
-                        key={`${row.id ?? row.articulo_id}`}
-                        className={row.articulo_id === selectedIreks?.articulo_id ? 'row-selected' : ''}
-                        onClick={() => {
-                          setSelectedIreksCandidateId(row.articulo_id)
-                          setIreksEditTargetId(row.articulo_id)
-                          setIreksEditForm({
-                            articulo_referencia: row.articulo_referencia || '',
-                            articulo_referencia_corta: row.articulo_referencia_corta || '',
-                            articulo_descripcion: row.articulo_descripcion || '',
-                            categoria: row.categoria || '',
-                          })
-                        }}
-                      >
-                        <td>{row.articulo_referencia || '-'}</td>
-                        <td>{row.articulo_descripcion || '-'}</td>
-                        <td>{row.articulo_id || '-'}</td>
-                        <td>{formatWeight(row.articulo_envase_peso_total)}</td>
-                        <td>{row.categoria || '-'}</td>
-                        <td>
-                          <span className={`pill ${row.articulo_status_activo ? 'ok' : 'off'}`}>
-                            {row.articulo_status_activo ? 'Activo' : 'Inactivo'}
-                          </span>{' '}
-                          <span className={`pill ${row.articulo_status_en_lista ? 'warn' : 'off'}`}>
-                            {row.articulo_status_en_lista ? 'En lista' : 'Fuera lista'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <aside className="detail-panel">
-                <QueryState
-                  loading={ireksDetailQuery.loading}
-                  error={ireksDetailQuery.error}
-                  empty={!ireksDetailQuery.data.detail}
-                  emptyMessage="Selecciona un ingrediente IREKS para ver detalle."
-                />
-
-                {!!ireksDetailQuery.data.detail && (
-                  <>
-                    <dl className="detail-list">
-                      <div>
-                        <dt>Referencia corta</dt>
-                        <dd>{ireksDetailQuery.data.detail.articulo_referencia_corta || '-'}</dd>
-                      </div>
-                      <div>
-                        <dt>Fabricante ID</dt>
-                        <dd>{ireksDetailQuery.data.detail.fabricante_id || '-'}</dd>
-                      </div>
-                      <div>
-                        <dt>Distribuidor ID</dt>
-                        <dd>{ireksDetailQuery.data.detail.distribuidor_id || '-'}</dd>
-                      </div>
-                      <div>
-                        <dt>Formato envase</dt>
-                        <dd>
-                          {formatWeight(ireksDetailQuery.data.detail.articulo_envase_cantidad)} x {formatWeight(ireksDetailQuery.data.detail.articulo_envase_peso)}{' '}
-                          {ireksDetailQuery.data.detail.articulo_envase_unidad_medida || '-'}
-                        </dd>
-                      </div>
-                    </dl>
-
-                    <div className="related-block">
-                      <h3>Edicion rapida IREKS</h3>
-                      <div className="form-grid">
-                        <label>
-                          Referencia
-                          <input
-                            className="input"
-                            value={currentIreksEditForm.articulo_referencia}
-                            onChange={(event) => {
-                              if (ireksDetailQuery.data.detail) {
-                                setIreksEditTargetId(ireksDetailQuery.data.detail.articulo_id)
-                              }
-                              setIreksEditForm((prev) => ({ ...prev, articulo_referencia: event.target.value }))
-                            }}
-                            disabled={ireksEditLoading || ireksActiveLoading || ireksListLoading || ireksDeleteLoading}
-                          />
-                        </label>
-                        <label>
-                          Referencia corta
-                          <input
-                            className="input"
-                            value={currentIreksEditForm.articulo_referencia_corta}
-                            onChange={(event) => {
-                              if (ireksDetailQuery.data.detail) {
-                                setIreksEditTargetId(ireksDetailQuery.data.detail.articulo_id)
-                              }
-                              setIreksEditForm((prev) => ({ ...prev, articulo_referencia_corta: event.target.value }))
-                            }}
-                            disabled={ireksEditLoading || ireksActiveLoading || ireksListLoading || ireksDeleteLoading}
-                          />
-                        </label>
-                        <label>
-                          Descripcion
-                          <input
-                            className="input"
-                            value={currentIreksEditForm.articulo_descripcion}
-                            onChange={(event) => {
-                              if (ireksDetailQuery.data.detail) {
-                                setIreksEditTargetId(ireksDetailQuery.data.detail.articulo_id)
-                              }
-                              setIreksEditForm((prev) => ({ ...prev, articulo_descripcion: event.target.value }))
-                            }}
-                            disabled={ireksEditLoading || ireksActiveLoading || ireksListLoading || ireksDeleteLoading}
-                          />
-                        </label>
-                        <label>
-                          Categoria
-                          <input
-                            className="input"
-                            value={currentIreksEditForm.categoria}
-                            onChange={(event) => {
-                              if (ireksDetailQuery.data.detail) {
-                                setIreksEditTargetId(ireksDetailQuery.data.detail.articulo_id)
-                              }
-                              setIreksEditForm((prev) => ({ ...prev, categoria: event.target.value }))
-                            }}
-                            disabled={ireksEditLoading || ireksActiveLoading || ireksListLoading || ireksDeleteLoading}
-                          />
-                        </label>
-                      </div>
-                      <div className="toolbar">
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={saveIreksEdition}
-                          disabled={ireksEditLoading || ireksActiveLoading || ireksListLoading || ireksDeleteLoading}
-                        >
-                          {ireksEditLoading ? 'Guardando...' : 'Guardar cambios IREKS'}
-                        </button>
-                      </div>
-                      {!!ireksEditMessage && <div className="state">{ireksEditMessage}</div>}
-                      {!!ireksEditError && <div className="state">Error: {ireksEditError}</div>}
-                    </div>
-
-                    <div className="related-block">
-                      <button
-                        type="button"
-                        className="action-btn"
-                        disabled={ireksActiveLoading || ireksListLoading || ireksDeleteLoading || ireksEditLoading}
-                        onClick={toggleIreksActive}
-                      >
-                        {ireksActiveLoading
-                          ? 'Guardando...'
-                          : ireksDetailQuery.data.detail.articulo_status_activo
-                            ? 'Desactivar IREKS'
-                            : 'Activar IREKS'}
-                      </button>
-                      {!!ireksActiveMessage && <div className="state">{ireksActiveMessage}</div>}
-                      {!!ireksActiveError && <div className="state">Error: {ireksActiveError}</div>}
-                    </div>
-
-                    <div className="related-block">
-                      <button
-                        type="button"
-                        className="action-btn"
-                        disabled={ireksListLoading || ireksActiveLoading || ireksDeleteLoading || ireksEditLoading}
-                        onClick={toggleIreksInList}
-                      >
-                        {ireksListLoading
-                          ? 'Guardando...'
-                          : ireksDetailQuery.data.detail.articulo_status_en_lista
-                            ? 'Marcar fuera de lista'
-                            : 'Marcar en lista'}
-                      </button>
-                      {!!ireksListMessage && <div className="state">{ireksListMessage}</div>}
-                      {!!ireksListError && <div className="state">Error: {ireksListError}</div>}
-                    </div>
-
-                    <div className="related-block">
-                      <button
-                        type="button"
-                        className="action-btn"
-                        disabled={ireksDeleteLoading || ireksListLoading || ireksActiveLoading || ireksEditLoading}
-                        onClick={removeIreks}
-                      >
-                        {ireksDeleteLoading ? 'Eliminando...' : 'Eliminar IREKS'}
-                      </button>
-                      {!!ireksDeleteMessage && <div className="state">{ireksDeleteMessage}</div>}
-                      {!!ireksDeleteError && <div className="state">Error: {ireksDeleteError}</div>}
-                    </div>
-
-                    {!!ireksDetailQuery.data.nutrition && (
-                      <div className="related-block">
-                        <h3>Nutricion</h3>
-                        <div className="mini-grid">
-                          <span>Kcal: {formatWeight(ireksDetailQuery.data.nutrition.energia_kcal)}</span>
-                          <span>Proteinas: {formatWeight(ireksDetailQuery.data.nutrition.proteinas_g)}</span>
-                          <span>Hidratos: {formatWeight(ireksDetailQuery.data.nutrition.hidratos_g)}</span>
-                          <span>Sal: {formatWeight(ireksDetailQuery.data.nutrition.sal_g)}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="related-block">
-                      <h3>Tarifas</h3>
-                      {!ireksDetailQuery.data.tarifas.length && <div className="state">Sin tarifas registradas.</div>}
-                      {!!ireksDetailQuery.data.tarifas.length && (
-                        <div className="table-wrap">
-                          <table>
-                            <thead>
-                              <tr>
-                                <th>Ano</th>
-                                <th>Fabricante</th>
-                                <th>Distribuidor</th>
-                                <th>Dto %</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {ireksDetailQuery.data.tarifas.slice(0, 8).map((tarifa) => (
-                                <tr
-                                  key={tarifa.id ?? `${tarifa.articulo_id}-${tarifa.tarifa_ano}`}
-                                  className={tarifa.id !== null && tarifa.id === selectedIreksTarifaId ? 'row-selected' : ''}
-                                  onClick={() => onSelectIreksTarifa(tarifa)}
-                                >
-                                  <td>{tarifa.tarifa_ano}</td>
-                                  <td>{formatWeight(tarifa.precio_fabricante)}</td>
-                                  <td>{formatWeight(tarifa.precio_distribuidor)}</td>
-                                  <td>{formatWeight(tarifa.descuento_pct)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                      <div className="form-grid">
-                        <label>
-                          Ano
-                          <input
-                            className="input"
-                            value={ireksTarifaForm.tarifa_ano}
-                            onChange={(event) =>
-                              setIreksTarifaForm((prev) => ({ ...prev, tarifa_ano: event.target.value }))
-                            }
-                            disabled={ireksTarifaLoading}
-                            placeholder="Ej: 2026"
-                          />
-                        </label>
-                        <label>
-                          Precio fabricante
-                          <input
-                            className="input"
-                            value={ireksTarifaForm.precio_fabricante}
-                            onChange={(event) =>
-                              setIreksTarifaForm((prev) => ({ ...prev, precio_fabricante: event.target.value }))
-                            }
-                            disabled={ireksTarifaLoading}
-                          />
-                        </label>
-                        <label>
-                          Precio distribuidor
-                          <input
-                            className="input"
-                            value={ireksTarifaForm.precio_distribuidor}
-                            onChange={(event) =>
-                              setIreksTarifaForm((prev) => ({ ...prev, precio_distribuidor: event.target.value }))
-                            }
-                            disabled={ireksTarifaLoading}
-                          />
-                        </label>
-                        <label>
-                          Descuento %
-                          <input
-                            className="input"
-                            value={ireksTarifaForm.descuento_pct}
-                            onChange={(event) =>
-                              setIreksTarifaForm((prev) => ({ ...prev, descuento_pct: event.target.value }))
-                            }
-                            disabled={ireksTarifaLoading}
-                          />
-                        </label>
-                      </div>
-                      <div className="toolbar">
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={saveIreksTarifa}
-                          disabled={ireksTarifaLoading}
-                        >
-                          {ireksTarifaLoading ? 'Guardando...' : selectedIreksTarifa ? 'Actualizar tarifa' : 'Crear tarifa'}
-                        </button>
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={removeIreksTarifa}
-                          disabled={ireksTarifaLoading || !selectedIreksTarifa || selectedIreksTarifa.id === null}
-                        >
-                          {ireksTarifaLoading ? 'Eliminando...' : 'Eliminar tarifa'}
-                        </button>
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={resetIreksTarifaForm}
-                          disabled={ireksTarifaLoading}
-                        >
-                          Limpiar
-                        </button>
-                      </div>
-                      {!!ireksTarifaMessage && <div className="state">{ireksTarifaMessage}</div>}
-                      {!!ireksTarifaError && <div className="state">Error: {ireksTarifaError}</div>}
-                    </div>
-                  </>
-                )}
-              </aside>
-            </div>
-          )}
-        </>
-      )}
-
-      {mode === 'std' && (
-        <>
-          <div className="related-block">
-            <h3>Alta de materia prima STD</h3>
-            <div className="form-grid">
-              <label>
-                Referencia distribuidor
-                <input
-                  className="input"
-                  value={stdCreateForm.articulo_referencia_distribuidor}
-                  onChange={(event) =>
-                    setStdCreateForm((prev) => ({ ...prev, articulo_referencia_distribuidor: event.target.value }))
-                  }
-                  disabled={stdCreateLoading}
-                />
-              </label>
-              <label>
-                Proveedor/Distribuidor ID
-                <input
-                  className="input"
-                  value={stdCreateForm.proveedor_id}
-                  onChange={(event) =>
-                    setStdCreateForm((prev) => ({ ...prev, proveedor_id: event.target.value }))
-                  }
-                  disabled={stdCreateLoading}
-                />
-              </label>
-              <label>
-                Descripcion
-                <input
-                  className="input"
-                  value={stdCreateForm.articulo_descripcion}
-                  onChange={(event) =>
-                    setStdCreateForm((prev) => ({ ...prev, articulo_descripcion: event.target.value }))
-                  }
-                  disabled={stdCreateLoading}
-                />
-              </label>
-              <label>
-                Categoria
-                <input
-                  className="input"
-                  value={stdCreateForm.categoria}
-                  onChange={(event) => setStdCreateForm((prev) => ({ ...prev, categoria: event.target.value }))}
-                  disabled={stdCreateLoading}
-                />
-              </label>
-              <label>
-                Formato
-                <input
-                  className="input"
-                  value={stdCreateForm.formato}
-                  onChange={(event) => setStdCreateForm((prev) => ({ ...prev, formato: event.target.value }))}
-                  disabled={stdCreateLoading}
-                />
-              </label>
-              <label>
-                Cantidad formato
-                <input
-                  className="input"
-                  value={stdCreateForm.formato_cantidad}
-                  onChange={(event) =>
-                    setStdCreateForm((prev) => ({ ...prev, formato_cantidad: event.target.value }))
-                  }
-                  disabled={stdCreateLoading}
-                />
-              </label>
-              <label>
-                Unidad formato
-                <input
-                  className="input"
-                  value={stdCreateForm.formato_unidad}
-                  onChange={(event) =>
-                    setStdCreateForm((prev) => ({ ...prev, formato_unidad: event.target.value }))
-                  }
-                  disabled={stdCreateLoading}
-                />
-              </label>
-              <label>
-                PVP formato
-                <input
-                  className="input"
-                  value={stdCreateForm.pvp_formato}
-                  onChange={(event) => setStdCreateForm((prev) => ({ ...prev, pvp_formato: event.target.value }))}
-                  disabled={stdCreateLoading}
-                />
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={stdCreateForm.activo}
-                  onChange={(event) => setStdCreateForm((prev) => ({ ...prev, activo: event.target.checked }))}
-                  disabled={stdCreateLoading}
-                />{' '}
-                Activo
-              </label>
-            </div>
-            <div className="toolbar">
-              <button
-                type="button"
-                className="action-btn"
-                onClick={saveStdCreate}
-                disabled={stdCreateLoading}
-              >
-                {stdCreateLoading ? 'Creando...' : 'Crear STD'}
-              </button>
-            </div>
-            {!!stdCreateMessage && <div className="state">{stdCreateMessage}</div>}
-            {!!stdCreateError && <div className="state">Error: {stdCreateError}</div>}
-          </div>
-
-          <QueryState
-            loading={stdQuery.loading}
-            error={stdQuery.error}
-            empty={!stdQuery.data.items.length}
-            emptyMessage="No hay materias primas STD para los filtros actuales."
-          />
-
-          {!!stdQuery.data.items.length && (
-            <div className="split-panel">
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Referencia</th>
-                      <th>Descripcion</th>
-                      <th>Formato</th>
-                      <th>Categoria</th>
-                      <th>PVP formato</th>
-                      <th>Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stdQuery.data.items.map((row) => (
-                      <tr
-                        key={row.articulo_id}
-                        className={row.articulo_id === selectedStd?.articulo_id ? 'row-selected' : ''}
-                        onClick={() => {
-                          setSelectedStdCandidateId(row.articulo_id)
-                          setStdEditTargetId(row.articulo_id)
-                          setStdEditForm({
-                            articulo_descripcion: row.articulo_descripcion || '',
-                            pvp_formato: String(row.pvp_formato ?? 0),
-                            pvp_unidad_medida: String(row.pvp_unidad_medida ?? 0),
-                          })
-                        }}
-                      >
-                        <td>{row.articulo_referencia_distribuidor || '-'}</td>
-                        <td>{row.articulo_descripcion || '-'}</td>
-                        <td>
-                          {formatWeight(row.formato_cantidad)} {row.formato_unidad || '-'}
-                        </td>
-                        <td>{row.categoria || '-'}</td>
-                        <td>{formatWeight(row.pvp_formato)}</td>
-                        <td>
-                          <span className={`pill ${row.activo ? 'ok' : 'off'}`}>{row.activo ? 'Activo' : 'Inactivo'}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <aside className="detail-panel">
-                <QueryState
-                  loading={stdDetailQuery.loading}
-                  error={stdDetailQuery.error}
-                  empty={!stdDetailQuery.data.detail}
-                  emptyMessage="Selecciona una materia prima para ver detalle."
-                />
-
-                {!!stdDetailQuery.data.detail && (
-                  <>
-                    <dl className="detail-list">
-                      <div>
-                        <dt>Proveedor ID</dt>
-                        <dd>{stdDetailQuery.data.detail.proveedor_id || '-'}</dd>
-                      </div>
-                      <div>
-                        <dt>Distribuidor</dt>
-                        <dd>{stdDetailQuery.data.detail.distribuidor_nombre || stdDetailQuery.data.detail.distribuidor_id || '-'}</dd>
-                      </div>
-                      <div>
-                        <dt>PVP unidad medida</dt>
-                        <dd>{formatWeight(stdDetailQuery.data.detail.pvp_unidad_medida)}</dd>
-                      </div>
-                    </dl>
-
-                    <div className="related-block">
-                      <button
-                        type="button"
-                        className="action-btn"
-                        disabled={stdActiveLoading || stdEditLoading || stdDeleteLoading}
-                        onClick={toggleStdActive}
-                      >
-                        {stdActiveLoading
-                          ? 'Guardando...'
-                          : stdDetailQuery.data.detail.activo
-                            ? 'Desactivar materia prima'
-                            : 'Activar materia prima'}
-                      </button>
-                      {!!stdActiveMessage && <div className="state">{stdActiveMessage}</div>}
-                      {!!stdActiveError && <div className="state">Error: {stdActiveError}</div>}
-                    </div>
-
-                    <div className="related-block">
-                      <h3>Edicion rapida STD</h3>
-                      <div className="form-grid">
-                        <label>
-                          Descripcion
-                          <input
-                            className="input"
-                            value={currentStdEditForm.articulo_descripcion}
-                            onChange={(event) => {
-                              if (stdDetailQuery.data.detail) {
-                                setStdEditTargetId(stdDetailQuery.data.detail.articulo_id)
-                              }
-                              setStdEditForm((prev) => ({ ...prev, articulo_descripcion: event.target.value }))
-                            }}
-                            disabled={stdEditLoading || stdActiveLoading}
-                          />
-                        </label>
-                        <label>
-                          PVP formato
-                          <input
-                            className="input"
-                            value={currentStdEditForm.pvp_formato}
-                            onChange={(event) => {
-                              if (stdDetailQuery.data.detail) {
-                                setStdEditTargetId(stdDetailQuery.data.detail.articulo_id)
-                              }
-                              setStdEditForm((prev) => ({ ...prev, pvp_formato: event.target.value }))
-                            }}
-                            disabled={stdEditLoading || stdActiveLoading}
-                          />
-                        </label>
-                        <label>
-                          PVP unidad medida
-                          <input
-                            className="input"
-                            value={currentStdEditForm.pvp_unidad_medida}
-                            onChange={(event) => {
-                              if (stdDetailQuery.data.detail) {
-                                setStdEditTargetId(stdDetailQuery.data.detail.articulo_id)
-                              }
-                              setStdEditForm((prev) => ({ ...prev, pvp_unidad_medida: event.target.value }))
-                            }}
-                            disabled={stdEditLoading || stdActiveLoading}
-                          />
-                        </label>
-                      </div>
-                      <div className="toolbar">
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={saveStdEdition}
-                          disabled={stdEditLoading || stdActiveLoading || stdDeleteLoading}
-                        >
-                          {stdEditLoading ? 'Guardando...' : 'Guardar cambios STD'}
-                        </button>
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={removeStd}
-                          disabled={stdEditLoading || stdActiveLoading || stdDeleteLoading}
-                        >
-                          {stdDeleteLoading ? 'Eliminando...' : 'Eliminar STD'}
-                        </button>
-                      </div>
-                      {!!stdEditMessage && <div className="state">{stdEditMessage}</div>}
-                      {!!stdEditError && <div className="state">Error: {stdEditError}</div>}
-                      {!!stdDeleteMessage && <div className="state">{stdDeleteMessage}</div>}
-                      {!!stdDeleteError && <div className="state">Error: {stdDeleteError}</div>}
-                    </div>
-
-                    {!!stdDetailQuery.data.nutrition && (
-                      <div className="related-block">
-                        <h3>Nutricion</h3>
-                        <div className="mini-grid">
-                          <span>Kcal: {formatWeight(stdDetailQuery.data.nutrition.energia_kcal)}</span>
-                          <span>Proteinas: {formatWeight(stdDetailQuery.data.nutrition.proteinas_g)}</span>
-                          <span>Hidratos: {formatWeight(stdDetailQuery.data.nutrition.hidratos_g)}</span>
-                          <span>Sal: {formatWeight(stdDetailQuery.data.nutrition.sal_g)}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="related-block">
-                      <h3>Historico de precios</h3>
-                      {!stdDetailQuery.data.prices.length && <div className="state">Sin historico de precios.</div>}
-                      {!!stdDetailQuery.data.prices.length && (
-                        <div className="table-wrap">
-                          <table>
-                            <thead>
-                              <tr>
-                                <th>Fecha</th>
-                                <th>Costo neto</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {stdDetailQuery.data.prices.slice(0, 8).map((price) => (
-                                <tr key={price.id ?? `${price.articulo_id}-${price.fecha_precio}`}>
-                                  <td>{price.fecha_precio}</td>
-                                  <td>{formatWeight(price.costo_neto)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </aside>
-            </div>
-          )}
-        </>
+            {!!detailQuery.data && (
+              <>
+                <dl className="detail-list">
+                  <div>
+                    <dt>ID</dt>
+                    <dd>{formatText(detailQuery.data.id)}</dd>
+                  </div>
+                  <div>
+                    <dt>Codigo</dt>
+                    <dd>{formatText(detailQuery.data.codigo)}</dd>
+                  </div>
+                  <div>
+                    <dt>Nombre</dt>
+                    <dd>{formatText(detailQuery.data.nombre)}</dd>
+                  </div>
+                  <div>
+                    <dt>Origen</dt>
+                    <dd>{formatText(detailQuery.data.source)}</dd>
+                  </div>
+                  <div>
+                    <dt>Fabricante / proveedor</dt>
+                    <dd>{formatText(detailQuery.data.fabricante_id || detailQuery.data.proveedor_id)}</dd>
+                  </div>
+                  <div>
+                    <dt>Familia / subfamilia</dt>
+                    <dd>
+                      {formatText(detailQuery.data.familia_id || detailQuery.data.subfamilia_id)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Unidad</dt>
+                    <dd>{formatText(detailQuery.data.unidad)}</dd>
+                  </div>
+                  <div>
+                    <dt>Activo</dt>
+                    <dd>{detailQuery.data.activo ? 'Si' : 'No'}</dd>
+                  </div>
+                  <div>
+                    <dt>Precio</dt>
+                    <dd>{detailQuery.data.precio > 0 ? formatNumber(detailQuery.data.precio) : '-'}</dd>
+                  </div>
+                </dl>
+              </>
+            )}
+          </aside>
+        </div>
       )}
     </section>
   )

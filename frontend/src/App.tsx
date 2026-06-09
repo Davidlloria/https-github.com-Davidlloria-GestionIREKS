@@ -66,8 +66,8 @@ const VIEW_META: Record<ViewKey, ViewMeta> = {
   ingredients: {
     label: 'Ingredientes',
     title: 'Consulta de ingredientes',
-    subtitle: 'Vista densa, ahora con jerarquia mas clara entre filtros, resumen y detalle.',
-    note: 'Catalogo',
+    subtitle: 'Vista read-only minima para explorar listado y detalle de ingredientes.',
+    note: 'API',
   },
   orders: {
     label: 'Pedidos',

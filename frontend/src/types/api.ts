@@ -18,8 +18,11 @@ export type {
   CourseListResponse,
 } from './courses'
 export type {
+  IngredientDetail,
   IngredientIreksListPayload,
   IngredientIreksRead,
+  IngredientListItem,
+  IngredientListResponse,
   IngredientStdRead,
   MateriaPrimaPrecioRead,
   NutritionValues,
