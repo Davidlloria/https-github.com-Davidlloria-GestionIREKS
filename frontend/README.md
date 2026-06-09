@@ -39,3 +39,4 @@ npm.cmd run dev -- --host 127.0.0.1 --port 5174
 
 - `npm.cmd run lint`
 - `npm.cmd run build`
+- `npm.cmd run test`
