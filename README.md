@@ -85,9 +85,12 @@ Por defecto el frontend consume la API en `http://127.0.0.1:8000`.
 Spike local tipo desktop con React + FastAPI:
 
 ```powershell
-cd frontend
-npm.cmd run build
-cd ..
+python .\scripts\run_react_desktop_dev.py --build
+```
+
+Si ya existe `frontend/dist`, tambien puedes arrancar sin rebuild:
+
+```powershell
 python .\scripts\run_react_desktop_dev.py
 ```
 

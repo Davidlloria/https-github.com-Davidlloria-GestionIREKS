@@ -30,6 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--frontend-port", type=int, default=FRONTEND_PORT)
     parser.add_argument("--startup-timeout", type=int, default=60)
     parser.add_argument("--hold-seconds", type=int, default=5)
+    parser.add_argument("--build", action="store_true", help="Run npm.cmd run build in frontend before starting.")
     parser.add_argument("--exit-after-start", action="store_true")
     parser.add_argument("--no-open-browser", action="store_true")
     return parser.parse_args()
@@ -44,6 +45,14 @@ def wait_for_port(host: str, port: int, timeout_seconds: int) -> bool:
         except OSError:
             time.sleep(0.5)
     return False
+
+
+def run_frontend_build() -> None:
+    build_command = ["npm.cmd", "run", "build"]
+    creationflags = getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0)
+    result = subprocess.run(build_command, cwd=str(FRONTEND_DIR), check=False, creationflags=creationflags)
+    if result.returncode != 0:
+        raise RuntimeError("El build del frontend ha fallado. Ejecuta 'cd frontend' y 'npm.cmd run build' para ver el error.")
 
 
 def start_process(command: list[str], cwd: Path, extra_env: dict[str, str] | None = None) -> subprocess.Popen[str]:
@@ -99,6 +108,13 @@ def main() -> int:
     if not FRONTEND_DIR.exists():
         print(f"No existe el directorio frontend: {FRONTEND_DIR}", file=sys.stderr)
         return 1
+
+    if args.build:
+        try:
+            run_frontend_build()
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
 
     if not FRONTEND_DIST.exists():
         print(
