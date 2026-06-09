@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AppErrorBoundary } from './components/AppErrorBoundary'
+import { AppTabs } from './components/AppTabs'
 import { ContactsPage } from './pages/ContactsPage'
 import { CoursesPage } from './pages/CoursesPage'
 import { CustomersPage } from './pages/CustomersPage'
@@ -104,20 +105,7 @@ function App() {
           <span className="surface-chip">{currentView.label}</span>
           <span className="surface-chip surface-chip-muted">{currentView.note}</span>
         </div>
-        <div className="tabs" role="tablist" aria-label="Navegacion principal">
-          {VIEWS.map((view) => (
-            <button
-              key={view.key}
-              type="button"
-              role="tab"
-              aria-selected={activeView === view.key}
-              className={`tab-btn ${activeView === view.key ? 'active' : ''}`}
-              onClick={() => setActiveView(view.key)}
-            >
-              {view.label}
-            </button>
-          ))}
-        </div>
+        <AppTabs activeView={activeView} onChange={setActiveView} views={VIEWS} />
       </header>
 
       <section className="view-panel">

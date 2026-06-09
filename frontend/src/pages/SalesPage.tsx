@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { getSalesAnnualSummary, listSalesAnnualClients, listSalesAnnualYears } from '../api/sales'
-import { QueryState } from '../components/QueryState'
+import { EmptyState, ErrorState, LoadingState, QueryState } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
 import { useAsyncResource } from '../features/useAsyncResource'
 import type {
@@ -121,9 +121,9 @@ export function SalesPage() {
             </span>
           </div>
         </div>
-        {(yearsQuery.loading || clientsQuery.loading) && <div className="state state-loading">Cargando filtros...</div>}
-        {!!yearsQuery.error && <div className="state state-error">Error: {yearsQuery.error}</div>}
-        {!!clientsQuery.error && <div className="state state-error">Error: {clientsQuery.error}</div>}
+        {(yearsQuery.loading || clientsQuery.loading) && <LoadingState>Cargando filtros...</LoadingState>}
+        {!!yearsQuery.error && <ErrorState>{yearsQuery.error}</ErrorState>}
+        {!!clientsQuery.error && <ErrorState>{clientsQuery.error}</ErrorState>}
       </div>
 
       <div className="cards">
@@ -141,7 +141,7 @@ export function SalesPage() {
       </div>
 
       {!canQuery && !yearsQuery.loading && !yearsQuery.error && (
-        <div className="state state-empty">Selecciona un ano para consultar la comparacion anual.</div>
+        <EmptyState>Selecciona un ano para consultar la comparacion anual.</EmptyState>
       )}
 
       <QueryState

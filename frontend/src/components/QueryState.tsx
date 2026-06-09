@@ -5,27 +5,61 @@ interface QueryStateProps {
   emptyMessage: string
 }
 
+interface StateProps {
+  children?: string
+  className?: string
+  role?: 'status' | 'alert'
+  ariaLive?: 'polite' | 'assertive'
+}
+
+export function LoadingState({
+  children = 'Cargando datos...',
+  className = 'state state-loading',
+  role = 'status',
+  ariaLive = 'polite',
+}: StateProps) {
+  return (
+    <div className={className} role={role} aria-live={ariaLive}>
+      {children}
+    </div>
+  )
+}
+
+export function ErrorState({
+  children,
+  className = 'state state-error',
+  role = 'status',
+  ariaLive = 'polite',
+}: StateProps) {
+  return (
+    <div className={className} role={role} aria-live={ariaLive}>
+      Error: {children}
+    </div>
+  )
+}
+
+export function EmptyState({
+  children,
+  className = 'state state-empty',
+  role = 'status',
+  ariaLive,
+}: StateProps) {
+  return (
+    <div className={className} role={role} aria-live={ariaLive}>
+      {children}
+    </div>
+  )
+}
+
 export function QueryState({ loading, error, empty, emptyMessage }: QueryStateProps) {
   if (loading) {
-    return (
-      <div className="state state-loading" role="status" aria-live="polite">
-        Cargando datos...
-      </div>
-    )
+    return <LoadingState />
   }
   if (error) {
-    return (
-      <div className="state state-error" role="status" aria-live="polite">
-        Error: {error}
-      </div>
-    )
+    return <ErrorState>{error}</ErrorState>
   }
   if (empty) {
-    return (
-      <div className="state state-empty" role="status">
-        {emptyMessage}
-      </div>
-    )
+    return <EmptyState>{emptyMessage}</EmptyState>
   }
   return null
 }
