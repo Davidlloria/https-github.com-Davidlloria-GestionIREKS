@@ -82,6 +82,18 @@ npm run dev
 
 Por defecto el frontend consume la API en `http://127.0.0.1:8000`.
 
+Spike local tipo desktop con React + FastAPI:
+
+```powershell
+cd frontend
+npm.cmd run build
+cd ..
+python .\scripts\run_react_desktop_dev.py
+```
+
+Este launcher arranca la API en `127.0.0.1:8000`, sirve `frontend/dist` en
+`127.0.0.1:5173` y abre el navegador. Con `Ctrl+C` se detienen ambos procesos.
+
 Arranque conjunto en dos ventanas de PowerShell, desde la raiz del proyecto:
 
 ```powershell
