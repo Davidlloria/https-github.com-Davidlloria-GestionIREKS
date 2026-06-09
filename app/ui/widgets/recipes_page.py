@@ -545,6 +545,7 @@ class RecipeTechnicalDialog(QDialog):
         self.recipe_name = str(recipe_name or "receta").strip() or "receta"
         self.recipe_id = recipe_id
         self.pdf_service = PdfService()
+        self.recipe_service = RecipeService()
         self.all_lines = list(lines)
         self.lines: list[tuple[RecetaLinea, str, str]] = []
         self._display_indices: list[int] = []
@@ -2913,19 +2914,34 @@ class RecipesPage(QWidget):
 
         recipe = self._build_recipe_model()
         line_models = [row[0] for row in rows_data]
-        result = self.recipe_service.calculate(recipe, line_models, sync_categories=True)
+        dialog_lines = line_models
+        peso_pieza_g = float(recipe.peso_pieza_g or 0.0)
+        try:
+            result = self.recipe_service.calculate(recipe, line_models, sync_categories=True)
+            dialog_lines = result.lineas
+            peso_pieza_g = float(result.receta.peso_pieza_g or peso_pieza_g)
+        except Exception as exc:
+            print(f"[RECETAS] No se pudo recalcular la receta técnica: {exc}")
 
-        final_rows = [(result.lineas[idx], rows_data[idx][1], rows_data[idx][2]) for idx in range(len(rows_data))]
-        dialog = RecipeTechnicalDialog(
-            self.nombre_input.text().strip() or "Sin nombre",
-            self.current_recipe_id,
-            final_rows,
-            result.receta.peso_pieza_g,
-            self.recipe_escandallo_data,
-            self.recipe_elaboracion_data,
-            initial_process=self._current_active_process(),
-            parent=self,
-        )
+        final_rows = [
+            (dialog_lines[idx], rows_data[idx][1], rows_data[idx][2])
+            for idx in range(min(len(rows_data), len(dialog_lines)))
+        ]
+        try:
+            dialog = RecipeTechnicalDialog(
+                self.nombre_input.text().strip() or "Sin nombre",
+                self.current_recipe_id,
+                final_rows,
+                peso_pieza_g,
+                self.recipe_escandallo_data,
+                self.recipe_elaboracion_data,
+                initial_process=self._current_active_process(),
+                parent=self,
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Receta técnica", f"No se pudo abrir la receta técnica.\n{exc}")
+            return
+
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -3288,6 +3304,8 @@ class RecipesPage(QWidget):
         ireks_codes: set[str] = set()
         std_codes: set[str] = set()
         unknown_codes: set[str] = set()
+        ireks_names: set[str] = set()
+        std_names: set[str] = set()
         for line in lineas:
             if str(getattr(line, "tipo_linea", "ingrediente") or "ingrediente").strip().lower() != "ingrediente":
                 continue
@@ -3295,16 +3313,24 @@ class RecipesPage(QWidget):
             if cantidad <= 0:
                 continue
             code = str(getattr(line, "codigo_ingrediente", "") or "").strip()
-            if not code:
+            source = str(getattr(line, "tipo_origen", "") or "").strip().lower()
+            name = str(getattr(line, "nombre_mostrado", "") or "").strip()
+            if not code and not name:
                 continue
             valid_lines.append(line)
-            source = str(getattr(line, "tipo_origen", "") or "").strip().lower()
             if source == "ireks":
-                ireks_codes.add(code)
+                if code:
+                    ireks_codes.add(code)
+                if name:
+                    ireks_names.add(name)
             elif source == "std":
-                std_codes.add(code)
+                if code:
+                    std_codes.add(code)
+                if name:
+                    std_names.add(name)
             else:
-                unknown_codes.add(code)
+                if code:
+                    unknown_codes.add(code)
 
         if not valid_lines:
             self._render_nutrition_table_values(nutrientes)
@@ -3314,18 +3340,26 @@ class RecipesPage(QWidget):
             ireks_codes,
             std_codes,
             unknown_codes,
+            ireks_names,
+            std_names,
         )
 
         for line in valid_lines:
             source = str(getattr(line, "tipo_origen", "") or "").strip().lower()
-            code = str(getattr(line, "codigo_ingrediente", "") or "").strip()
+            code = str(getattr(line, "codigo_ingrediente", "") or "").strip().lower()
+            name = str(getattr(line, "nombre_mostrado", "") or "").strip().lower()
             aid = ""
             if source == "ireks":
-                aid = ireks_by_code.get(code, "")
+                aid = ireks_by_code.get(code, "") or ireks_by_code.get(name, "")
             elif source == "std":
-                aid = std_by_code.get(code, "")
+                aid = std_by_code.get(code, "") or std_by_code.get(name, "")
             else:
-                aid = ireks_by_code.get(code, "") or std_by_code.get(code, "")
+                aid = (
+                    ireks_by_code.get(code, "")
+                    or std_by_code.get(code, "")
+                    or ireks_by_code.get(name, "")
+                    or std_by_code.get(name, "")
+                )
             if not aid:
                 continue
             nutrition = nutrition_by_articulo.get(aid)

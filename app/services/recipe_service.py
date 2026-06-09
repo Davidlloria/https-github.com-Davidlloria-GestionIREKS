@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.core.database import engine
@@ -121,6 +122,8 @@ class RecipeService:
         ireks_codes: set[str],
         std_codes: set[str],
         unknown_codes: set[str],
+        ireks_names: set[str] | None = None,
+        std_names: set[str] | None = None,
     ) -> tuple[dict[str, str], dict[str, str], dict[str, MateriaPrimaValorNutricional]]:
         ireks_by_code: dict[str, str] = {}
         std_by_code: dict[str, str] = {}
@@ -130,28 +133,60 @@ class RecipeService:
             if all_ireks_codes:
                 rows = list(
                     session.exec(
-                        select(IngredienteIreks).where(cast(Any, IngredienteIreks.articulo_referencia).in_(all_ireks_codes))
+                        select(IngredienteIreks).where(
+                            func.lower(cast(Any, IngredienteIreks.articulo_referencia)).in_({code.lower() for code in all_ireks_codes})
+                        )
                     )
                 )
                 ireks_by_code = {
-                    str(getattr(row, "articulo_referencia", "") or "").strip(): str(getattr(row, "articulo_id", "") or "").strip()
+                    str(getattr(row, "articulo_referencia", "") or "").strip().lower(): str(getattr(row, "articulo_id", "") or "").strip()
                     for row in rows
                     if str(getattr(row, "articulo_referencia", "") or "").strip()
                     and str(getattr(row, "articulo_id", "") or "").strip()
                 }
+            if ireks_names:
+                rows = list(
+                    session.exec(
+                        select(IngredienteIreks).where(
+                            func.lower(cast(Any, IngredienteIreks.articulo_descripcion)).in_({name.lower() for name in ireks_names})
+                        )
+                    )
+                )
+                for row in rows:
+                    name_key = str(getattr(row, "articulo_descripcion", "") or "").strip().lower()
+                    articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+                    if name_key and articulo_id and name_key not in ireks_by_code:
+                        ireks_by_code[name_key] = articulo_id
             all_std_codes = set(std_codes) | set(unknown_codes)
             if all_std_codes:
                 rows = list(
                     session.exec(
-                        select(IngredienteStd).where(cast(Any, IngredienteStd.articulo_referencia_distribuidor).in_(all_std_codes))
+                        select(IngredienteStd).where(
+                            func.lower(cast(Any, IngredienteStd.articulo_referencia_distribuidor)).in_(
+                                {code.lower() for code in all_std_codes}
+                            )
+                        )
                     )
                 )
                 std_by_code = {
-                    str(getattr(row, "articulo_referencia_distribuidor", "") or "").strip(): str(getattr(row, "articulo_id", "") or "").strip()
+                    str(getattr(row, "articulo_referencia_distribuidor", "") or "").strip().lower(): str(getattr(row, "articulo_id", "") or "").strip()
                     for row in rows
                     if str(getattr(row, "articulo_referencia_distribuidor", "") or "").strip()
                     and str(getattr(row, "articulo_id", "") or "").strip()
                 }
+            if std_names:
+                rows = list(
+                    session.exec(
+                        select(IngredienteStd).where(
+                            func.lower(cast(Any, IngredienteStd.articulo_descripcion)).in_({name.lower() for name in std_names})
+                        )
+                    )
+                )
+                for row in rows:
+                    name_key = str(getattr(row, "articulo_descripcion", "") or "").strip().lower()
+                    articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+                    if name_key and articulo_id and name_key not in std_by_code:
+                        std_by_code[name_key] = articulo_id
 
             articulo_ids = set(ireks_by_code.values()) | set(std_by_code.values())
             if articulo_ids:

@@ -13,11 +13,13 @@ from reportlab.lib.units import mm
 from reportlab.graphics.shapes import Circle, Drawing, String
 from reportlab.platypus import Image as RLImage
 from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from sqlalchemy import func
 from sqlmodel import Session, col, select
 
 from app.core.database import engine
 from app.models import Cliente, IngredienteIreks, IngredienteStd, MateriaPrimaValorNutricional, Receta, RecetaLinea
 from app.services.recipe_calculation_service import RecipeCalculationService
+from app.services.recipe_service import RecipeService
 
 
 class PdfService:
@@ -316,7 +318,7 @@ class PdfService:
             raise ValueError("Receta no encontrada.")
         # Recalcular al exportar para evitar porcentajes panaderos obsoletos en BD.
         # Esto garantiza que el PDF refleje los datos actuales de la formula.
-        calc = RecipeCalculationService().calculate(receta, lineas)
+        calc = RecipeService().calculate(receta, lineas, sync_categories=True)
         receta = calc.receta
         lineas = calc.lineas
 
@@ -1410,14 +1412,12 @@ class PdfService:
             "proteinas_g": 0.0,
             "sal_g": 0.0,
         }
-        masa_total_g = float(getattr(receta, "masa_total_g", 0.0) or 0.0)
-        if masa_total_g <= 0:
-            return totals
-
         valid_lines: list[RecetaLinea] = []
         ireks_codes: set[str] = set()
         std_codes: set[str] = set()
         unknown_codes: set[str] = set()
+        ireks_names: set[str] = set()
+        std_names: set[str] = set()
         for line in lineas:
             if str(getattr(line, "tipo_linea", "ingrediente") or "ingrediente").strip().lower() != "ingrediente":
                 continue
@@ -1425,18 +1425,32 @@ class PdfService:
             if cantidad <= 0:
                 continue
             code = str(getattr(line, "codigo_ingrediente", "") or "").strip()
-            if not code:
+            name = str(getattr(line, "nombre_mostrado", "") or "").strip()
+            if not code and not name:
                 continue
             valid_lines.append(line)
             source = str(getattr(line, "tipo_origen", "") or "").strip().lower()
             if source == "ireks":
-                ireks_codes.add(code)
+                if code:
+                    ireks_codes.add(code)
+                if name:
+                    ireks_names.add(name)
             elif source == "std":
-                std_codes.add(code)
+                if code:
+                    std_codes.add(code)
+                if name:
+                    std_names.add(name)
             else:
-                unknown_codes.add(code)
+                if code:
+                    unknown_codes.add(code)
 
         if not valid_lines:
+            return totals
+
+        masa_total_g = float(getattr(receta, "masa_total_g", 0.0) or 0.0)
+        if masa_total_g <= 0:
+            masa_total_g = sum(float(getattr(line, "cantidad_base_g", 0.0) or 0.0) for line in valid_lines)
+        if masa_total_g <= 0:
             return totals
 
         ireks_by_code: dict[str, str] = {}
@@ -1447,41 +1461,85 @@ class PdfService:
             if all_ireks_codes:
                 rows = list(
                     session.exec(
-                        select(IngredienteIreks).where(cast(Any, IngredienteIreks.articulo_referencia).in_(all_ireks_codes))
+                        select(IngredienteIreks).where(
+                            func.lower(cast(Any, IngredienteIreks.articulo_referencia)).in_(
+                                {code.lower() for code in all_ireks_codes}
+                            )
+                        )
                     )
                 )
                 ireks_by_code = {
-                    str(getattr(row, "articulo_referencia", "") or "").strip(): str(getattr(row, "articulo_id", "") or "").strip()
+                    str(getattr(row, "articulo_referencia", "") or "").strip().lower(): str(getattr(row, "articulo_id", "") or "").strip()
                     for row in rows
                     if str(getattr(row, "articulo_referencia", "") or "").strip()
                     and str(getattr(row, "articulo_id", "") or "").strip()
                 }
+            if ireks_names:
+                rows = list(
+                    session.exec(
+                        select(IngredienteIreks).where(
+                            func.lower(cast(Any, IngredienteIreks.articulo_descripcion)).in_(
+                                {name.lower() for name in ireks_names}
+                            )
+                        )
+                    )
+                )
+                for row in rows:
+                    name_key = str(getattr(row, "articulo_descripcion", "") or "").strip().lower()
+                    articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+                    if name_key and articulo_id and name_key not in ireks_by_code:
+                        ireks_by_code[name_key] = articulo_id
 
             all_std_codes = set(std_codes) | set(unknown_codes)
             if all_std_codes:
                 rows = list(
                     session.exec(
-                        select(IngredienteStd).where(cast(Any, IngredienteStd.articulo_referencia_distribuidor).in_(all_std_codes))
+                        select(IngredienteStd).where(
+                            func.lower(cast(Any, IngredienteStd.articulo_referencia_distribuidor)).in_(
+                                {code.lower() for code in all_std_codes}
+                            )
+                        )
                     )
                 )
                 std_by_code = {
-                    str(getattr(row, "articulo_referencia_distribuidor", "") or "").strip(): str(getattr(row, "articulo_id", "") or "").strip()
+                    str(getattr(row, "articulo_referencia_distribuidor", "") or "").strip().lower(): str(getattr(row, "articulo_id", "") or "").strip()
                     for row in rows
                     if str(getattr(row, "articulo_referencia_distribuidor", "") or "").strip()
                     and str(getattr(row, "articulo_id", "") or "").strip()
                 }
+            if std_names:
+                rows = list(
+                    session.exec(
+                        select(IngredienteStd).where(
+                            func.lower(cast(Any, IngredienteStd.articulo_descripcion)).in_(
+                                {name.lower() for name in std_names}
+                            )
+                        )
+                    )
+                )
+                for row in rows:
+                    name_key = str(getattr(row, "articulo_descripcion", "") or "").strip().lower()
+                    articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+                    if name_key and articulo_id and name_key not in std_by_code:
+                        std_by_code[name_key] = articulo_id
 
             articulo_ids: set[str] = set()
             for line in valid_lines:
                 source = str(getattr(line, "tipo_origen", "") or "").strip().lower()
-                code = str(getattr(line, "codigo_ingrediente", "") or "").strip()
+                code = str(getattr(line, "codigo_ingrediente", "") or "").strip().lower()
+                name = str(getattr(line, "nombre_mostrado", "") or "").strip().lower()
                 aid = ""
                 if source == "ireks":
-                    aid = ireks_by_code.get(code, "")
+                    aid = ireks_by_code.get(code, "") or ireks_by_code.get(name, "")
                 elif source == "std":
-                    aid = std_by_code.get(code, "")
+                    aid = std_by_code.get(code, "") or std_by_code.get(name, "")
                 else:
-                    aid = ireks_by_code.get(code, "") or std_by_code.get(code, "")
+                    aid = (
+                        ireks_by_code.get(code, "")
+                        or std_by_code.get(code, "")
+                        or ireks_by_code.get(name, "")
+                        or std_by_code.get(name, "")
+                    )
                 if aid:
                     articulo_ids.add(aid)
 
@@ -1499,14 +1557,20 @@ class PdfService:
 
         for line in valid_lines:
             source = str(getattr(line, "tipo_origen", "") or "").strip().lower()
-            code = str(getattr(line, "codigo_ingrediente", "") or "").strip()
+            code = str(getattr(line, "codigo_ingrediente", "") or "").strip().lower()
+            name = str(getattr(line, "nombre_mostrado", "") or "").strip().lower()
             aid = ""
             if source == "ireks":
-                aid = ireks_by_code.get(code, "")
+                aid = ireks_by_code.get(code, "") or ireks_by_code.get(name, "")
             elif source == "std":
-                aid = std_by_code.get(code, "")
+                aid = std_by_code.get(code, "") or std_by_code.get(name, "")
             else:
-                aid = ireks_by_code.get(code, "") or std_by_code.get(code, "")
+                aid = (
+                    ireks_by_code.get(code, "")
+                    or std_by_code.get(code, "")
+                    or ireks_by_code.get(name, "")
+                    or std_by_code.get(name, "")
+                )
             if not aid:
                 continue
             nutrition = nutrition_by_articulo.get(aid)
