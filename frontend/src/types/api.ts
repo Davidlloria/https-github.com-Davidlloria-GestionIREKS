@@ -1,405 +1,45 @@
-export interface PaginatedList<T> {
-  items: T[]
-  total: number
-  limit: number
-  offset: number
-}
-
-export interface CustomerListItem {
-  cliente_id: string
-  cliente_codigo: number
-  cliente_nombre_comercial: string
-  cliente_nombre_fiscal: string
-  cliente_cif: string
-  cliente_grupo: string
-  cliente_tipo: string
-  cliente_email: string
-  cliente_telefono: string
-  cliente_prospeccion: boolean
-  activo: boolean
-}
-
-export interface CustomerDetail extends CustomerListItem {
-  cliente_nombre_interno: string
-  cliente_abreviatura: string
-  cliente_direccion: string
-  cliente_direccion_cp: string
-  cliente_direccion_localidad_id: string
-  cliente_direccion_municipio_id: string
-  cliente_direccion_provincia_id: string
-  cliente_direccion_isla_id: string
-  distribuidor_id: string
-}
-
-export interface ContactListItem {
-  contacto_id: string
-  contacto_codigo: number
-  cliente_id: string
-  cliente_nombre: string
-  nombre: string
-  apellidos: string
-  cargo: string
-  nif: string
-  telefono: string
-  email: string
-}
-
-export interface ContactDetail extends ContactListItem {
-  created_at: string | null
-  updated_at: string | null
-}
-
-export interface ContactCompanyOption {
-  cliente_id: string
-  nombre: string
-}
-
-export interface SalesYearOption {
-  year: number
-  label: string
-}
-
-export interface SalesYearOptionsResponse {
-  items: SalesYearOption[]
-}
-
-export interface SalesFilterOption {
-  id: string
-  name: string
-  code: string
-  parent_id: string
-}
-
-export interface SalesFilterOptionsResponse {
-  items: SalesFilterOption[]
-}
-
-export interface SalesAnnualSummaryRow {
-  articulo_id: string
-  fabricante_id: string
-  familia_id: string
-  subfamilia_id: string
-  codigo: string
-  nombre: string
-  kilos_prev: number
-  sc_prev: number
-  ventas_prev: number
-  kilos_curr: number
-  sc_curr: number
-  ventas_curr: number
-  delta_kg: number
-  delta_kg_pct: number
-  delta_ventas: number
-  delta_ventas_pct: number
-}
-
-export interface SalesAnnualSummaryResponse {
-  source: 'ireks' | 'igsa'
-  year: number
-  month: number
-  acumulado: boolean
-  total: number
-  items: SalesAnnualSummaryRow[]
-}
-
-export interface RecipeListItem {
-  id: number | null
-  cliente_id: string
-  nombre: string
-  codigo_receta: string
-  version: string
-  es_base: boolean
-  receta_base_id: number | null
-  masa_final_deseada_g: number
-  peso_pieza_g: number
-  numero_piezas: number
-  observaciones: string
-  proceso: string
-  estado: string
-  created_at: string | null
-  updated_at: string | null
-}
-
-export interface RecipeListResponse {
-  total: number
-  limit: number
-  offset: number
-  items: RecipeListItem[]
-}
-
-export type RecipeDetail = RecipeListItem
-
-export interface RecipeItem {
-  id: number | null
-  ingrediente_id: number | null
-  nombre_mostrado: string
-  codigo_ingrediente: string
-  tipo_origen: string
-  cantidad_base_g: number
-  cantidad_calculada_g: number
-  orden: number
-  notas: string
-}
-
-export interface RecipeItemListResponse {
-  total: number
-  items: RecipeItem[]
-}
-
-export interface CourseListItem {
-  curso_id: string
-  curso_nombre: string
-  curso_fecha: string | null
-}
-
-export type CourseDetail = CourseListItem
-
-export interface CourseAttendeeItem {
-  id: string
-  nombre: string
-  empresa: string
-  confirmado: boolean
-  observaciones: string
-}
-
-export interface CourseListResponse {
-  total: number
-  limit: number
-  offset: number
-  items: CourseListItem[]
-}
-
-export interface CourseAttendeeListResponse {
-  total: number
-  limit: number
-  offset: number
-  items: CourseAttendeeItem[]
-}
-
-export interface IngredientIreksRead {
-  id: number | null
-  almacen_id: string
-  fabricante_id: string
-  distribuidor_id: string
-  articulo_id: string
-  articulo_referencia: string
-  articulo_referencia_corta: string
-  articulo_descripcion: string
-  articulo_envase_id: string
-  articulo_contenido_unidad: string
-  articulo_envase_cantidad: number
-  articulo_envase_peso: number
-  articulo_envase_unidad_medida: string
-  articulo_envase_peso_total: number
-  transporte_pallet_tipo: string
-  transporte_cajas_por_capa: number
-  transporte_capas_por_pallet: number
-  transporte_cajas_por_pallet: number
-  transporte_unidades_por_pallet: number
-  transporte_kg_por_pallet: number
-  transporte_observaciones: string
-  articulo_familia_id: string
-  articulo_grupo_id: string
-  articulo_subfamilia_id: string
-  categoria: string
-  articulo_status_activo: boolean
-  articulo_status_en_lista: boolean
-}
-
-export interface IngredientIreksListPayload {
-  items: IngredientIreksRead[]
-  total: number
-  limit: number
-  offset: number
-  catalogs: {
-    distribuidores: Array<{ id: string; name: string }>
-    fabricantes: Array<{ id: string; name: string }>
-    familias: Array<{ id: string; name: string }>
-    subfamilias: Array<{ id: string; name: string }>
-    envases: Array<{ id: string; name: string }>
-  }
-}
-
-export interface IngredientStdRead {
-  articulo_id: string
-  articulo_referencia_distribuidor: string
-  proveedor_id: string
-  distribuidor_id: string
-  distribuidor_nombre: string
-  articulo_descripcion: string
-  articulo_grupo_id: string
-  articulo_familia_id: string
-  articulo_subfamilia_id: string
-  categoria: string
-  formato: string
-  formato_cantidad: number
-  formato_unidad: string
-  pvp_formato: number
-  pvp_unidad_medida: number
-  activo: boolean
-}
-
-export interface NutritionValues {
-  articulo_id: string
-  energia_kj: number
-  energia_kcal: number
-  grasas_g: number
-  saturadas_g: number
-  hidratos_g: number
-  azucares_g: number
-  fibra_g: number
-  proteinas_g: number
-  sal_g: number
-}
-
-export interface TarifaPrecioIreksRead {
-  id: number | null
-  articulo_id: string
-  tarifa_ano: number
-  precio_fabricante: number
-  precio_distribuidor: number
-  descuento_pct: number
-}
-
-export interface MateriaPrimaPrecioRead {
-  id: number | null
-  articulo_id: string
-  fecha_precio: string
-  costo_neto: number
-}
-
-export interface WarehouseStockRead {
-  almacen_id: string
-  articulo_id: string
-  cantidad_total: number
-}
-
-export interface WarehouseMovementRead {
-  id: number | null
-  almacen_id: string
-  articulo_id: string
-  pedido_numero: string
-  pedido_albaran_numero: string
-  cantidad: number
-  articulo_lote: string
-  fecha_pedido: string
-  albaran_item_id: string
-}
-
-export interface WarehouseManualMovementCreate {
-  almacen_id: string
-  articulo_id: string
-  cantidad: number
-  mode: 'in' | 'out'
-  fecha_pedido: string
-  articulo_lote: string
-  pedido_albaran_numero: string
-}
-
-export interface InventoryHeaderRead {
-  inventario_id: string
-  almacen_id: string
-  fecha: string
-  contador: string
-  aprobador: string
-  estado: string
-  lineas: number
-  ajustes: number
-}
-
-export interface InventoryAdjustmentInput {
-  articulo_id: string
-  articulo_lote: string
-  articulo_caducidad: string | null
-  teorico_uds: number
-  conteo_uds: number
-  diferencia_uds: number
-  kg_ajuste: number
-}
-
-export interface InventoryAdjustmentPayload {
-  almacen_id: string
-  contador: string
-  aprobador: string
-  adjustments: InventoryAdjustmentInput[]
-}
-
-export interface OrderRead {
-  pedido_id: string
-  almacen_id: string
-  pedido_fecha: string
-  pedido_numero: string
-  pedido_albaran_numero: string
-  pedido_factura_numero: string
-  pedido_ref: string
-  pedido_estado: string
-}
-
-export interface OrderListItem extends OrderRead {
-  almacen_nombre: string
-  semana: number
-  total_kg: number
-}
-
-export interface OrderItemRead {
-  item_id: string
-  pedido_id: string
-  pedido_numero: string
-  pedido_albaran_numero: string
-  pedido_item_fecha: string
-  articulo_id: string
-  articulo_cantidad: number
-}
-
-export interface OrderPendingRead {
-  pendiente_id: string
-  pedido_id: string
-  albaran_id: string
-  articulo_id: string
-  cantidad_pedida: number
-  cantidad_recibida: number
-  cantidad_pendiente: number
-  estado: string
-  fecha_registro: string | null
-}
-
-export interface OrderJsonImportResponse {
-  pedido_id: string
-  imported_items: number
-  skipped_unknown: string[]
-  skipped_invalid: number
-}
-
-export interface OrderDocumentImportResponse {
-  imported: number
-  errors: string[]
-  already_imported: boolean
-  message: string
-}
-
-export interface MaintenanceStatus {
-  db_path: string
-  legacy_db_path: string
-  db_exists: boolean
-  legacy_exists: boolean
-  db_size_bytes: number
-  counts: Record<string, number>
-  orphan_contact_links: number
-}
-
-export interface MaintenanceResult {
-  ok: boolean
-  message: string
-  details: Record<string, unknown>
-}
-
-export interface ApiSettingsPayload {
-  provider: string
-  enabled: boolean
-  config: Record<string, unknown>
-}
-
-export interface WarehouseOption {
-  almacen_id: string
-  almacen_nombre: string
-}
+export type { PaginatedList } from './common'
+export type { CustomerDetail, CustomerListItem } from './customers'
+export type { ContactCompanyOption, ContactDetail, ContactListItem } from './contacts'
+export type {
+  SalesAnnualSummaryResponse,
+  SalesAnnualSummaryRow,
+  SalesFilterOption,
+  SalesFilterOptionsResponse,
+  SalesYearOption,
+  SalesYearOptionsResponse,
+} from './sales'
+export type { RecipeDetail, RecipeItem, RecipeItemListResponse, RecipeListItem, RecipeListResponse } from './recipes'
+export type {
+  CourseAttendeeItem,
+  CourseAttendeeListResponse,
+  CourseDetail,
+  CourseListItem,
+  CourseListResponse,
+} from './courses'
+export type {
+  IngredientIreksListPayload,
+  IngredientIreksRead,
+  IngredientStdRead,
+  MateriaPrimaPrecioRead,
+  NutritionValues,
+  TarifaPrecioIreksRead,
+} from './ingredients'
+export type {
+  InventoryAdjustmentInput,
+  InventoryAdjustmentPayload,
+  InventoryHeaderRead,
+  WarehouseManualMovementCreate,
+  WarehouseMovementRead,
+  WarehouseOption,
+  WarehouseStockRead,
+} from './warehouse'
+export type {
+  OrderDocumentImportResponse,
+  OrderItemRead,
+  OrderJsonImportResponse,
+  OrderListItem,
+  OrderPendingRead,
+  OrderRead,
+} from './orders'
+export type { ApiSettingsPayload, MaintenanceResult, MaintenanceStatus } from './settings'
