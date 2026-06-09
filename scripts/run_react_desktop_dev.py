@@ -102,7 +102,11 @@ def main() -> int:
 
     if not FRONTEND_DIST.exists():
         print(
-            f"No existe {FRONTEND_DIST}. Ejecuta primero 'npm.cmd run build' dentro de frontend.",
+            "No existe frontend/dist.\n"
+            "Ejecuta primero:\n"
+            "  cd frontend\n"
+            "  npm.cmd run build\n"
+            "Luego vuelve a lanzar este script.",
             file=sys.stderr,
         )
         return 1
