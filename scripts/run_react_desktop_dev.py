@@ -21,6 +21,7 @@ FRONTEND_PORT = 5173
 
 _children: list[subprocess.Popen[str]] = []
 _cleaning_up = False
+_runtime_ports: tuple[str, int, int] | None = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,6 +48,17 @@ def wait_for_port(host: str, port: int, timeout_seconds: int) -> bool:
     return False
 
 
+def wait_for_port_closed(host: str, port: int, timeout_seconds: int) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=1):
+                time.sleep(0.5)
+        except OSError:
+            return True
+    return False
+
+
 def run_frontend_build() -> None:
     build_command = ["npm.cmd", "run", "build"]
     creationflags = getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0)
@@ -59,7 +71,16 @@ def start_process(command: list[str], cwd: Path, extra_env: dict[str, str] | Non
     env = os.environ.copy()
     if extra_env:
         env.update(extra_env)
-    process = subprocess.Popen(command, cwd=str(cwd), env=env)
+    popen_kwargs: dict[str, object] = {"cwd": str(cwd), "env": env}
+    if os.name == "nt":
+        popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(
+            subprocess,
+            "CREATE_BREAKAWAY_FROM_JOB",
+            0,
+        )
+    else:
+        popen_kwargs["start_new_session"] = True
+    process = subprocess.Popen(command, **popen_kwargs)
     _children.append(process)
     return process
 
@@ -69,22 +90,26 @@ def terminate_process(process: subprocess.Popen[str]) -> None:
         return
 
     if os.name == "nt":
-        taskkill = subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(process.pid)],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if taskkill.returncode == 0:
-            return
+        try:
+            taskkill = subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if taskkill.returncode == 0:
+                return
+        except BaseException:
+            pass
 
     try:
         process.terminate()
         process.wait(timeout=5)
-    except Exception:
+    except BaseException:
         try:
             process.kill()
-        except Exception:
+            process.wait(timeout=5)
+        except BaseException:
             pass
 
 
@@ -94,16 +119,33 @@ def cleanup() -> None:
         return
     _cleaning_up = True
     for process in reversed(_children):
-        terminate_process(process)
+        try:
+            terminate_process(process)
+        except BaseException:
+            pass
+    if _runtime_ports is None:
+        return
+    api_host, api_port, frontend_port = _runtime_ports
+    for _ in range(3):
+        api_closed = wait_for_port_closed(api_host, api_port, 2)
+        frontend_closed = wait_for_port_closed("127.0.0.1", frontend_port, 2)
+        if api_closed and frontend_closed:
+            return
+        for process in reversed(_children):
+            try:
+                terminate_process(process)
+            except BaseException:
+                pass
 
 
 def handle_signal(_signum: int, _frame: object) -> None:
-    cleanup()
     raise KeyboardInterrupt
 
 
 def main() -> int:
     args = parse_args()
+    global _runtime_ports
+    _runtime_ports = (args.api_host, args.api_port, args.frontend_port)
 
     if not FRONTEND_DIR.exists():
         print(f"No existe el directorio frontend: {FRONTEND_DIR}", file=sys.stderr)
@@ -153,43 +195,38 @@ def main() -> int:
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, handle_signal)
 
-    print(f"Starting API on http://{args.api_host}:{args.api_port}")
-    api_process = start_process(api_command, PROJECT_ROOT)
-
-    if not wait_for_port(args.api_host, args.api_port, args.startup_timeout):
-        cleanup()
-        print("La API no levanto a tiempo.", file=sys.stderr)
-        return 1
-    if api_process.poll() is not None:
-        cleanup()
-        print(f"La API se cerro con codigo {api_process.returncode}.", file=sys.stderr)
-        return 1
-
-    print(f"Starting frontend on http://127.0.0.1:{args.frontend_port}")
-    frontend_process = start_process(frontend_command, PROJECT_ROOT)
-
-    if not wait_for_port("127.0.0.1", args.frontend_port, args.startup_timeout):
-        cleanup()
-        print("El frontend no levanto a tiempo.", file=sys.stderr)
-        return 1
-    if frontend_process.poll() is not None:
-        cleanup()
-        print(f"El frontend se cerro con codigo {frontend_process.returncode}.", file=sys.stderr)
-        return 1
-
-    frontend_url = f"http://127.0.0.1:{args.frontend_port}"
-    print(f"Frontend ready: {frontend_url}")
-    print(f"API ready: http://{args.api_host}:{args.api_port}")
-
-    if not args.no_open_browser:
-        webbrowser.open(frontend_url)
-
-    if args.exit_after_start:
-        time.sleep(max(0, args.hold_seconds))
-        cleanup()
-        return 0
-
     try:
+        print(f"Starting API on http://{args.api_host}:{args.api_port}")
+        api_process = start_process(api_command, PROJECT_ROOT)
+
+        if not wait_for_port(args.api_host, args.api_port, args.startup_timeout):
+            print("La API no levanto a tiempo.", file=sys.stderr)
+            return 1
+        if api_process.poll() is not None:
+            print(f"La API se cerro con codigo {api_process.returncode}.", file=sys.stderr)
+            return 1
+
+        print(f"Starting frontend on http://127.0.0.1:{args.frontend_port}")
+        frontend_process = start_process(frontend_command, PROJECT_ROOT)
+
+        if not wait_for_port("127.0.0.1", args.frontend_port, args.startup_timeout):
+            print("El frontend no levanto a tiempo.", file=sys.stderr)
+            return 1
+        if frontend_process.poll() is not None:
+            print(f"El frontend se cerro con codigo {frontend_process.returncode}.", file=sys.stderr)
+            return 1
+
+        frontend_url = f"http://127.0.0.1:{args.frontend_port}"
+        print(f"Frontend ready: {frontend_url}")
+        print(f"API ready: http://{args.api_host}:{args.api_port}")
+
+        if not args.no_open_browser:
+            webbrowser.open(frontend_url)
+
+        if args.exit_after_start:
+            time.sleep(max(0, args.hold_seconds))
+            return 0
+
         while True:
             if api_process.poll() is not None:
                 print(f"La API termino con codigo {api_process.returncode}.", file=sys.stderr)
