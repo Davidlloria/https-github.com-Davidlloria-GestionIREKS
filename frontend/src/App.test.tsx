@@ -68,10 +68,88 @@ const ingredientList = {
   offset: 0,
 }
 
+const customerList = {
+  items: [
+    {
+      cliente_id: 'C-1',
+      cliente_codigo: 101,
+      cliente_nombre_comercial: 'Cliente Uno',
+      cliente_nombre_fiscal: 'Cliente Uno SL',
+      cliente_cif: 'B123',
+      cliente_grupo: 'Grupo A',
+      cliente_tipo: 'Distribuidor',
+      cliente_email: 'cliente1@example.com',
+      cliente_telefono: '928000000',
+      cliente_prospeccion: false,
+      activo: true,
+    },
+  ],
+  total: 1,
+  limit: 25,
+  offset: 0,
+}
+
+const customerDetail = {
+  ...customerList.items[0],
+  cliente_nombre_interno: 'Interno Uno',
+  cliente_abreviatura: 'C1',
+  cliente_direccion: 'Calle 1',
+  cliente_direccion_cp: '35001',
+  cliente_direccion_localidad_id: 'L1',
+  cliente_direccion_municipio_id: 'M1',
+  cliente_direccion_provincia_id: 'P1',
+  cliente_direccion_isla_id: 'I1',
+  distribuidor_id: 'D1',
+}
+
+const customerContacts = {
+  items: [
+    {
+      contacto_id: 'CT-1',
+      contacto_codigo: 1,
+      cliente_id: 'C-1',
+      cliente_nombre: 'Cliente Uno',
+      nombre: 'Ana',
+      apellidos: 'Lara',
+      cargo: 'Ventas',
+      nif: '123',
+      telefono: '600000000',
+      email: 'ana@example.com',
+    },
+  ],
+  total: 1,
+  limit: 25,
+  offset: 0,
+}
+
 vi.mock('./api/sales', () => ({
   getSalesAnnualSummary: vi.fn(async () => salesSummary),
   listSalesAnnualClients: vi.fn(async () => ({ items: [{ id: '1', name: 'Cliente 1', code: 'C1' }] })),
   listSalesAnnualYears: vi.fn(async () => ({ items: [{ year: 2024, label: '2024' }] })),
+}))
+
+vi.mock('./api/customers', () => ({
+  getCustomerDetail: vi.fn(async () => customerDetail),
+  listCustomers: vi.fn(async () => customerList),
+}))
+
+vi.mock('./api/contacts', () => ({
+  getContactDetail: vi.fn(async () => ({
+    contacto_id: 'CT-1',
+    contacto_codigo: 1,
+    cliente_id: 'C-1',
+    cliente_nombre: 'Cliente Uno',
+    nombre: 'Ana',
+    apellidos: 'Lara',
+    cargo: 'Ventas',
+    nif: '123',
+    telefono: '600000000',
+    email: 'ana@example.com',
+    created_at: null,
+    updated_at: null,
+  })),
+  listContactCompanies: vi.fn(async () => [{ cliente_id: 'C-1', nombre: 'Cliente Uno' }]),
+  listContacts: vi.fn(async () => customerContacts),
 }))
 
 vi.mock('./api/recipes', () => ({
@@ -128,7 +206,7 @@ vi.mock('./api/ingredients', () => ({
 }))
 
 describe('App shell smoke', () => {
-  it('renders the app shell and the four main tabs', async () => {
+  it('renders the app shell and the main tabs', async () => {
     render(<App />)
 
     await screen.findByText('Ventas anual')
@@ -136,6 +214,7 @@ describe('App shell smoke', () => {
     expect(screen.getByRole('tab', { name: 'Ventas' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Recetas' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Cursos' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Clientes' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Ingredientes' })).toBeInTheDocument()
   })
 
@@ -149,6 +228,9 @@ describe('App shell smoke', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Cursos' }))
     expect(await screen.findByPlaceholderText('Buscar curso por nombre o codigo')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Clientes' }))
+    expect(await screen.findByPlaceholderText('Buscar cliente por nombre, email o CIF')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Ingredientes' }))
     expect(await screen.findByPlaceholderText('Buscar ingrediente por nombre, codigo o referencia')).toBeInTheDocument()
