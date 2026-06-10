@@ -29,10 +29,8 @@ export type {
   TarifaPrecioIreksRead,
 } from './ingredients'
 export type {
-  InventoryAdjustmentInput,
-  InventoryAdjustmentPayload,
+  InventoryDetailRead,
   InventoryHeaderRead,
-  WarehouseManualMovementCreate,
   WarehouseMovementRead,
   WarehouseOption,
   WarehouseStockRead,

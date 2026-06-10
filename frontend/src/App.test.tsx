@@ -68,6 +68,53 @@ const ingredientList = {
   offset: 0,
 }
 
+const warehouseStock = {
+  items: [
+    { almacen_id: 'ALM-1', articulo_id: 'ART-1', cantidad_total: 12.5 },
+    { almacen_id: 'ALM-1', articulo_id: 'ART-2', cantidad_total: 3 },
+  ],
+  total: 2,
+  limit: 12,
+  offset: 0,
+}
+
+const warehouseMovements = {
+  items: [
+    {
+      id: 1,
+      almacen_id: 'ALM-1',
+      articulo_id: 'ART-1',
+      pedido_numero: 'P-1',
+      pedido_albaran_numero: 'A-1',
+      cantidad: 4,
+      articulo_lote: 'L-1',
+      fecha_pedido: '2026-01-01',
+      albaran_item_id: 'AI-1',
+    },
+  ],
+  total: 1,
+  limit: 12,
+  offset: 0,
+}
+
+const warehouseHistory = {
+  items: [
+    {
+      inventario_id: 'INV-1',
+      almacen_id: 'ALM-1',
+      fecha: '2026-01-02',
+      contador: 'Contador 1',
+      aprobador: 'Aprobador 1',
+      estado: 'Cerrado',
+      lineas: 1,
+      ajustes: 1,
+    },
+  ],
+  total: 1,
+  limit: 12,
+  offset: 0,
+}
+
 const customerList = {
   items: [
     {
@@ -205,6 +252,26 @@ vi.mock('./api/ingredients', () => ({
   listIngredients: vi.fn(async () => ingredientList),
 }))
 
+vi.mock('./api/warehouse', () => ({
+  getInventoryDetail: vi.fn(async () => [
+    {
+      id: 1,
+      inventario_id: 'INV-1',
+      almacen_id: 'ALM-1',
+      articulo_id: 'ART-1',
+      articulo_lote: 'L-1',
+      articulo_caducidad: '2026-12-31',
+      teorico_uds: 10,
+      conteo_uds: 9,
+      diferencia_uds: -1,
+      kg_ajuste: -2.5,
+    },
+  ]),
+  listInventoryHistory: vi.fn(async () => warehouseHistory),
+  listMovements: vi.fn(async () => warehouseMovements),
+  listStock: vi.fn(async () => warehouseStock),
+}))
+
 describe('App shell smoke', () => {
   it('renders the app shell and the main tabs', async () => {
     render(<App />)
@@ -216,6 +283,7 @@ describe('App shell smoke', () => {
     expect(screen.getByRole('tab', { name: 'Cursos' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Clientes' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Ingredientes' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Almac\u00e9n' })).toBeInTheDocument()
   })
 
   it('switches the visible page when the user clicks the tabs', async () => {
@@ -234,6 +302,9 @@ describe('App shell smoke', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Ingredientes' }))
     expect(await screen.findByPlaceholderText('Buscar ingrediente por nombre, codigo o referencia')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Almac\u00e9n' }))
+    expect(await screen.findByText('Stock actual')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Ventas' }))
     expect(await screen.findByText('Ventas anual')).toBeInTheDocument()

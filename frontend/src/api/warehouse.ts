@@ -1,12 +1,5 @@
-import { apiGet, apiPost } from './http'
-import type {
-  InventoryAdjustmentPayload,
-  InventoryHeaderRead,
-  PaginatedList,
-  WarehouseManualMovementCreate,
-  WarehouseMovementRead,
-  WarehouseStockRead,
-} from '../types/api'
+import { apiGet } from './http'
+import type { InventoryDetailRead, InventoryHeaderRead, PaginatedList, WarehouseMovementRead, WarehouseStockRead } from '../types/api'
 
 export function listStock(almacenId: string, limit?: number, offset?: number) {
   return apiGet<PaginatedList<WarehouseStockRead>>('/warehouse/stock', { almacen_id: almacenId, limit, offset })
@@ -24,10 +17,6 @@ export function listInventoryHistory(almacenId: string, limit = 10, offset = 0) 
   })
 }
 
-export function createManualMovement(payload: WarehouseManualMovementCreate) {
-  return apiPost<WarehouseMovementRead>('/warehouse/movements', payload)
-}
-
-export function applyInventoryAdjustments(payload: InventoryAdjustmentPayload) {
-  return apiPost<InventoryHeaderRead>('/warehouse/inventory/adjustments', payload)
+export function getInventoryDetail(inventoryId: string) {
+  return apiGet<InventoryDetailRead[]>(`/warehouse/inventory/${inventoryId}`)
 }

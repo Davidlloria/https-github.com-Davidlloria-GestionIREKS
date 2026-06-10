@@ -1,16 +1,11 @@
-import { useCallback, useMemo, useState } from 'react'
-import { applyInventoryAdjustments, createManualMovement, listInventoryHistory, listMovements, listStock } from '../api/warehouse'
+import { useMemo, useState } from 'react'
+import { getInventoryDetail, listInventoryHistory, listMovements, listStock } from '../api/warehouse'
 import { QueryState } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
 import { useAsyncResource } from '../features/useAsyncResource'
-import type {
-  InventoryAdjustmentPayload,
-  InventoryHeaderRead,
-  PaginatedList,
-  WarehouseManualMovementCreate,
-  WarehouseMovementRead,
-  WarehouseStockRead,
-} from '../types/api'
+import type { InventoryDetailRead, InventoryHeaderRead, PaginatedList, WarehouseMovementRead, WarehouseStockRead } from '../types/api'
+
+const PAGE_SIZE = 12
 
 interface WarehousePayload {
   stock: PaginatedList<WarehouseStockRead>
@@ -19,231 +14,79 @@ interface WarehousePayload {
 }
 
 const EMPTY_PAYLOAD: WarehousePayload = {
-  stock: { items: [], total: 0, limit: 0, offset: 0 },
-  movements: { items: [], total: 0, limit: 0, offset: 0 },
-  history: { items: [], total: 0, limit: 0, offset: 0 },
+  stock: { items: [], total: 0, limit: PAGE_SIZE, offset: 0 },
+  movements: { items: [], total: 0, limit: PAGE_SIZE, offset: 0 },
+  history: { items: [], total: 0, limit: PAGE_SIZE, offset: 0 },
 }
 
-interface ManualMovementForm {
-  almacen_id: string
-  articulo_id: string
-  cantidad: string
-  mode: 'in' | 'out'
-  fecha_pedido: string
-  articulo_lote: string
-  pedido_albaran_numero: string
-}
-
-interface InventoryAdjustmentForm {
-  almacen_id: string
-  contador: string
-  aprobador: string
-  articulo_id: string
-  articulo_lote: string
-  articulo_caducidad: string
-  teorico_uds: string
-  conteo_uds: string
-  diferencia_uds: string
-  kg_ajuste: string
-}
-
-function todayIsoDate() {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = `${now.getMonth() + 1}`.padStart(2, '0')
-  const day = `${now.getDate()}`.padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+const EMPTY_DETAIL: InventoryDetailRead[] = []
 
 function safeNumber(value: unknown) {
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric : 0
 }
 
+function formatNumber(value: unknown) {
+  return new Intl.NumberFormat('es-ES', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(safeNumber(value))
+}
+
+function formatMaybeText(value: string | number | null | undefined) {
+  if (value === null || value === undefined) {
+    return '-'
+  }
+  const text = String(value).trim()
+  return text || '-'
+}
+
 export function WarehousePage() {
   const [almacenId, setAlmacenId] = useState('')
-  const [movementForm, setMovementForm] = useState<ManualMovementForm>({
-    almacen_id: '',
-    articulo_id: '',
-    cantidad: '',
-    mode: 'in',
-    fecha_pedido: todayIsoDate(),
-    articulo_lote: '',
-    pedido_albaran_numero: '',
-  })
-  const [movementSaving, setMovementSaving] = useState(false)
-  const [movementSaveMessage, setMovementSaveMessage] = useState('')
-  const [movementSaveError, setMovementSaveError] = useState('')
-  const [adjustmentForm, setAdjustmentForm] = useState<InventoryAdjustmentForm>({
-    almacen_id: '',
-    contador: '',
-    aprobador: '',
-    articulo_id: '',
-    articulo_lote: '',
-    articulo_caducidad: '',
-    teorico_uds: '0',
-    conteo_uds: '0',
-    diferencia_uds: '0',
-    kg_ajuste: '0',
-  })
-  const [adjustmentSaving, setAdjustmentSaving] = useState(false)
-  const [adjustmentSaveMessage, setAdjustmentSaveMessage] = useState('')
-  const [adjustmentSaveError, setAdjustmentSaveError] = useState('')
+  const [selectedHistoryCandidateId, setSelectedHistoryCandidateId] = useState('')
 
-  const fetchPayload = useCallback(async () => {
+  const fetchPayload = async () => {
     const [stock, movements, history] = await Promise.all([
-      listStock(almacenId),
-      listMovements(almacenId),
-      listInventoryHistory(almacenId),
+      listStock(almacenId, PAGE_SIZE, 0),
+      listMovements(almacenId, PAGE_SIZE, 0),
+      listInventoryHistory(almacenId, PAGE_SIZE, 0),
     ])
     return { stock, movements, history }
-  }, [almacenId])
+  }
 
-  const query = useAsyncResource(fetchPayload, EMPTY_PAYLOAD, [fetchPayload])
+  const query = useAsyncResource(fetchPayload, EMPTY_PAYLOAD, [almacenId])
+
+  const historyRows = query.data.history.items
+
+  const selectedHistory = useMemo(() => {
+    if (!historyRows.length) {
+      return null
+    }
+    if (selectedHistoryCandidateId && historyRows.some((row) => row.inventario_id === selectedHistoryCandidateId)) {
+      return historyRows.find((row) => row.inventario_id === selectedHistoryCandidateId) ?? null
+    }
+    return historyRows[0] ?? null
+  }, [historyRows, selectedHistoryCandidateId])
+
+  const detailQuery = useAsyncResource(
+    () => (selectedHistory ? getInventoryDetail(selectedHistory.inventario_id) : Promise.resolve(EMPTY_DETAIL)),
+    EMPTY_DETAIL,
+    [selectedHistory?.inventario_id],
+  )
 
   const totals = useMemo(() => {
-    const totalKg = query.data.stock.items.reduce((acc, row) => acc + safeNumber(row.cantidad_total), 0)
+    const stockTotal = query.data.stock.items.reduce((acc, row) => acc + safeNumber(row.cantidad_total), 0)
+    const movementTotal = query.data.movements.items.reduce((acc, row) => acc + safeNumber(row.cantidad), 0)
+    const detailTotal = detailQuery.data.reduce((acc, row) => acc + safeNumber(row.kg_ajuste), 0)
     return {
       stockRows: query.data.stock.total,
-      movements: query.data.movements.total,
-      inventoryChecks: query.data.history.total,
-      totalKg: totalKg.toFixed(2),
+      movementsRows: query.data.movements.total,
+      inventoryRows: query.data.history.total,
+      stockTotal: formatNumber(stockTotal),
+      movementTotal: formatNumber(movementTotal),
+      detailTotal: formatNumber(detailTotal),
     }
-  }, [query.data])
-
-  const onMovementFieldChange = <K extends keyof ManualMovementForm>(field: K, value: ManualMovementForm[K]) => {
-    setMovementForm((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const onAdjustmentFieldChange = <K extends keyof InventoryAdjustmentForm>(
-    field: K,
-    value: InventoryAdjustmentForm[K],
-  ) => {
-    setAdjustmentForm((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const saveMovement = async () => {
-    if (movementSaving) {
-      return
-    }
-    const quantity = Number.parseFloat(movementForm.cantidad.replace(',', '.'))
-    if (!movementForm.almacen_id.trim()) {
-      setMovementSaveError('Debes indicar almacen_id.')
-      setMovementSaveMessage('')
-      return
-    }
-    if (!movementForm.articulo_id.trim()) {
-      setMovementSaveError('Debes indicar articulo_id.')
-      setMovementSaveMessage('')
-      return
-    }
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      setMovementSaveError('La cantidad debe ser un numero mayor que 0.')
-      setMovementSaveMessage('')
-      return
-    }
-    if (!movementForm.fecha_pedido) {
-      setMovementSaveError('Debes indicar fecha del movimiento.')
-      setMovementSaveMessage('')
-      return
-    }
-
-    const payload: WarehouseManualMovementCreate = {
-      almacen_id: movementForm.almacen_id.trim(),
-      articulo_id: movementForm.articulo_id.trim(),
-      cantidad: quantity,
-      mode: movementForm.mode,
-      fecha_pedido: movementForm.fecha_pedido,
-      articulo_lote: movementForm.articulo_lote.trim(),
-      pedido_albaran_numero: movementForm.pedido_albaran_numero.trim(),
-    }
-
-    setMovementSaving(true)
-    setMovementSaveError('')
-    setMovementSaveMessage('')
-    try {
-      await createManualMovement(payload)
-      await query.reload()
-      setMovementSaveMessage(
-        payload.mode === 'in' ? 'Entrada manual registrada correctamente.' : 'Salida manual registrada correctamente.',
-      )
-      setMovementForm((prev) => ({
-        ...prev,
-        cantidad: '',
-        articulo_lote: '',
-        pedido_albaran_numero: '',
-      }))
-    } catch (error: unknown) {
-      setMovementSaveError(error instanceof Error ? error.message : 'No se pudo registrar el movimiento manual.')
-    } finally {
-      setMovementSaving(false)
-    }
-  }
-
-  const saveAdjustment = async () => {
-    if (adjustmentSaving) {
-      return
-    }
-    const almacenIdValue = adjustmentForm.almacen_id.trim()
-    const articuloIdValue = adjustmentForm.articulo_id.trim()
-    if (!almacenIdValue) {
-      setAdjustmentSaveError('Debes indicar almacen_id para el ajuste.')
-      setAdjustmentSaveMessage('')
-      return
-    }
-    if (!articuloIdValue) {
-      setAdjustmentSaveError('Debes indicar articulo_id para el ajuste.')
-      setAdjustmentSaveMessage('')
-      return
-    }
-
-    const teoricoUds = Number.parseFloat(adjustmentForm.teorico_uds.replace(',', '.'))
-    const conteoUds = Number.parseFloat(adjustmentForm.conteo_uds.replace(',', '.'))
-    const diferenciaUds = Number.parseFloat(adjustmentForm.diferencia_uds.replace(',', '.'))
-    const kgAjuste = Number.parseFloat(adjustmentForm.kg_ajuste.replace(',', '.'))
-
-    if (![teoricoUds, conteoUds, diferenciaUds, kgAjuste].every((value) => Number.isFinite(value))) {
-      setAdjustmentSaveError('Los campos numericos del ajuste deben ser validos.')
-      setAdjustmentSaveMessage('')
-      return
-    }
-
-    const payload: InventoryAdjustmentPayload = {
-      almacen_id: almacenIdValue,
-      contador: adjustmentForm.contador.trim(),
-      aprobador: adjustmentForm.aprobador.trim(),
-      adjustments: [
-        {
-          articulo_id: articuloIdValue,
-          articulo_lote: adjustmentForm.articulo_lote.trim(),
-          articulo_caducidad: adjustmentForm.articulo_caducidad.trim() || null,
-          teorico_uds: teoricoUds,
-          conteo_uds: conteoUds,
-          diferencia_uds: diferenciaUds,
-          kg_ajuste: kgAjuste,
-        },
-      ],
-    }
-
-    setAdjustmentSaving(true)
-    setAdjustmentSaveError('')
-    setAdjustmentSaveMessage('')
-    try {
-      const created = await applyInventoryAdjustments(payload)
-      await query.reload()
-      setAdjustmentSaveMessage(`Ajuste aplicado en inventario ${created.inventario_id}.`)
-      setAdjustmentForm((prev) => ({
-        ...prev,
-        articulo_id: '',
-        articulo_lote: '',
-        articulo_caducidad: '',
-      }))
-    } catch (error: unknown) {
-      setAdjustmentSaveError(error instanceof Error ? error.message : 'No se pudo aplicar el ajuste de inventario.')
-    } finally {
-      setAdjustmentSaving(false)
-    }
-  }
+  }, [detailQuery.data, query.data.history.total, query.data.movements.items, query.data.movements.total, query.data.stock.items, query.data.stock.total])
 
   return (
     <section className="page-grid">
@@ -252,272 +95,86 @@ export function WarehousePage() {
           className="input"
           value={almacenId}
           onChange={(event) => setAlmacenId(event.target.value)}
-          placeholder="Filtrar por almacen_id (vacio = todos)"
+          placeholder="Filtrar por almacen_id (opcional)"
         />
-      </div>
-
-      <div className="detail-panel">
-        <h3>Movimiento manual</h3>
-        <div className="form-grid">
-          <label>
-            Almacen ID
-            <input
-              className="input"
-              value={movementForm.almacen_id}
-              onChange={(event) => onMovementFieldChange('almacen_id', event.target.value)}
-              placeholder="Ej: ALM-01"
-              disabled={movementSaving}
-            />
-          </label>
-          <label>
-            Articulo ID
-            <input
-              className="input"
-              value={movementForm.articulo_id}
-              onChange={(event) => onMovementFieldChange('articulo_id', event.target.value)}
-              placeholder="Ej: 000123"
-              disabled={movementSaving}
-            />
-          </label>
-          <label>
-            Modo
-            <select
-              className="select"
-              value={movementForm.mode}
-              onChange={(event) => onMovementFieldChange('mode', event.target.value as 'in' | 'out')}
-              disabled={movementSaving}
-            >
-              <option value="in">Entrada</option>
-              <option value="out">Salida</option>
-            </select>
-          </label>
-          <label>
-            Cantidad
-            <input
-              className="input"
-              value={movementForm.cantidad}
-              onChange={(event) => onMovementFieldChange('cantidad', event.target.value)}
-              placeholder="Ej: 25.50"
-              disabled={movementSaving}
-            />
-          </label>
-          <label>
-            Fecha pedido
-            <input
-              type="date"
-              className="input"
-              value={movementForm.fecha_pedido}
-              onChange={(event) => onMovementFieldChange('fecha_pedido', event.target.value)}
-              disabled={movementSaving}
-            />
-          </label>
-          <label>
-            Lote
-            <input
-              className="input"
-              value={movementForm.articulo_lote}
-              onChange={(event) => onMovementFieldChange('articulo_lote', event.target.value)}
-              placeholder="Opcional"
-              disabled={movementSaving}
-            />
-          </label>
-          <label>
-            Numero albaran/origen
-            <input
-              className="input"
-              value={movementForm.pedido_albaran_numero}
-              onChange={(event) => onMovementFieldChange('pedido_albaran_numero', event.target.value)}
-              placeholder="Opcional"
-              disabled={movementSaving}
-            />
-          </label>
-        </div>
-        <div className="toolbar">
-          <button type="button" className="action-btn" onClick={saveMovement} disabled={movementSaving}>
-            {movementSaving ? 'Guardando...' : 'Registrar movimiento'}
-          </button>
-        </div>
-        {!!movementSaveMessage && <div className="state">{movementSaveMessage}</div>}
-        {!!movementSaveError && <div className="state">Error: {movementSaveError}</div>}
-      </div>
-
-      <div className="detail-panel">
-        <h3>Ajuste de inventario</h3>
-        <div className="form-grid">
-          <label>
-            Almacen ID
-            <input
-              className="input"
-              value={adjustmentForm.almacen_id}
-              onChange={(event) => onAdjustmentFieldChange('almacen_id', event.target.value)}
-              placeholder="Ej: ALM-01"
-              disabled={adjustmentSaving}
-            />
-          </label>
-          <label>
-            Contador
-            <input
-              className="input"
-              value={adjustmentForm.contador}
-              onChange={(event) => onAdjustmentFieldChange('contador', event.target.value)}
-              placeholder="Opcional"
-              disabled={adjustmentSaving}
-            />
-          </label>
-          <label>
-            Aprobador
-            <input
-              className="input"
-              value={adjustmentForm.aprobador}
-              onChange={(event) => onAdjustmentFieldChange('aprobador', event.target.value)}
-              placeholder="Opcional"
-              disabled={adjustmentSaving}
-            />
-          </label>
-          <label>
-            Articulo ID
-            <input
-              className="input"
-              value={adjustmentForm.articulo_id}
-              onChange={(event) => onAdjustmentFieldChange('articulo_id', event.target.value)}
-              placeholder="Ej: 000123"
-              disabled={adjustmentSaving}
-            />
-          </label>
-          <label>
-            Lote
-            <input
-              className="input"
-              value={adjustmentForm.articulo_lote}
-              onChange={(event) => onAdjustmentFieldChange('articulo_lote', event.target.value)}
-              placeholder="Opcional"
-              disabled={adjustmentSaving}
-            />
-          </label>
-          <label>
-            Caducidad
-            <input
-              type="date"
-              className="input"
-              value={adjustmentForm.articulo_caducidad}
-              onChange={(event) => onAdjustmentFieldChange('articulo_caducidad', event.target.value)}
-              disabled={adjustmentSaving}
-            />
-          </label>
-          <label>
-            Teorico UDS
-            <input
-              className="input"
-              value={adjustmentForm.teorico_uds}
-              onChange={(event) => onAdjustmentFieldChange('teorico_uds', event.target.value)}
-              disabled={adjustmentSaving}
-            />
-          </label>
-          <label>
-            Conteo UDS
-            <input
-              className="input"
-              value={adjustmentForm.conteo_uds}
-              onChange={(event) => onAdjustmentFieldChange('conteo_uds', event.target.value)}
-              disabled={adjustmentSaving}
-            />
-          </label>
-          <label>
-            Diferencia UDS
-            <input
-              className="input"
-              value={adjustmentForm.diferencia_uds}
-              onChange={(event) => onAdjustmentFieldChange('diferencia_uds', event.target.value)}
-              disabled={adjustmentSaving}
-            />
-          </label>
-          <label>
-            KG ajuste
-            <input
-              className="input"
-              value={adjustmentForm.kg_ajuste}
-              onChange={(event) => onAdjustmentFieldChange('kg_ajuste', event.target.value)}
-              disabled={adjustmentSaving}
-            />
-          </label>
-        </div>
-        <div className="toolbar">
-          <button type="button" className="action-btn" onClick={saveAdjustment} disabled={adjustmentSaving}>
-            {adjustmentSaving ? 'Aplicando...' : 'Aplicar ajuste'}
-          </button>
-        </div>
-        {!!adjustmentSaveMessage && <div className="state">{adjustmentSaveMessage}</div>}
-        {!!adjustmentSaveError && <div className="state">Error: {adjustmentSaveError}</div>}
       </div>
 
       <div className="cards">
         <StatCard label="Filas stock" value={totals.stockRows} />
-        <StatCard label="Movimientos" value={totals.movements} />
-        <StatCard label="Inventarios" value={totals.inventoryChecks} />
-        <StatCard label="Total stock (uds/kg)" value={totals.totalKg} />
+        <StatCard label="Movimientos" value={totals.movementsRows} />
+        <StatCard label="Inventarios" value={totals.inventoryRows} />
+        <StatCard label="Stock total" value={totals.stockTotal} />
+        <StatCard label="Movimientos uds" value={totals.movementTotal} />
       </div>
 
       <QueryState
         loading={query.loading}
         error={query.error}
-        empty={!query.data.stock.items.length}
-        emptyMessage="No hay stock para el almacen indicado."
+        empty={!query.data.stock.items.length && !query.data.movements.items.length && !query.data.history.items.length}
+        emptyMessage="No hay datos de almacen para el filtro actual."
       />
 
       {!!query.data.stock.items.length && (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Almacen</th>
-                <th>Articulo ID</th>
-                <th>Cantidad total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {query.data.stock.items.map((row) => (
-                <tr key={`${row.almacen_id}-${row.articulo_id}`}>
-                  <td>{row.almacen_id}</td>
-                  <td>{row.articulo_id}</td>
-                  <td>{safeNumber(row.cantidad_total).toFixed(2)}</td>
+        <div className="detail-panel">
+          <h3>Stock actual</h3>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Almacen</th>
+                  <th>Articulo ID</th>
+                  <th>Cantidad total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {query.data.stock.items.map((row) => (
+                  <tr key={`${row.almacen_id}-${row.articulo_id}`}>
+                    <td>{row.almacen_id}</td>
+                    <td>{row.articulo_id}</td>
+                    <td>{formatNumber(row.cantidad_total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {!!query.data.movements.items.length && (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Almacen</th>
-                <th>Articulo</th>
-                <th>Cantidad</th>
-                <th>Pedido/Origen</th>
-                <th>Lote</th>
-              </tr>
-            </thead>
-            <tbody>
-              {query.data.movements.items.slice(0, 12).map((row) => (
-                <tr key={`${row.id ?? row.albaran_item_id}-${row.articulo_id}`}>
-                  <td>{row.fecha_pedido}</td>
-                  <td>{row.almacen_id}</td>
-                  <td>{row.articulo_id}</td>
-                  <td>{safeNumber(row.cantidad).toFixed(2)}</td>
-                  <td>{row.pedido_albaran_numero || row.pedido_numero || '-'}</td>
-                  <td>{row.articulo_lote || '-'}</td>
+        <div className="detail-panel">
+          <h3>Ultimos movimientos</h3>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Almacen</th>
+                  <th>Articulo</th>
+                  <th>Cantidad</th>
+                  <th>Pedido / origen</th>
+                  <th>Lote</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {query.data.movements.items.map((row) => (
+                  <tr key={`${row.id ?? row.albaran_item_id}-${row.articulo_id}-${row.fecha_pedido}`}>
+                    <td>{formatMaybeText(row.fecha_pedido)}</td>
+                    <td>{formatMaybeText(row.almacen_id)}</td>
+                    <td>{formatMaybeText(row.articulo_id)}</td>
+                    <td>{formatNumber(row.cantidad)}</td>
+                    <td>{formatMaybeText(row.pedido_albaran_numero || row.pedido_numero)}</td>
+                    <td>{formatMaybeText(row.articulo_lote)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      {!!query.data.history.items.length && (
+      <div className="split-panel">
         <div className="table-wrap">
+          <h3 style={{ marginTop: 0 }}>Historico de inventarios</h3>
           <table>
             <thead>
               <tr>
@@ -530,12 +187,16 @@ export function WarehousePage() {
               </tr>
             </thead>
             <tbody>
-              {query.data.history.items.slice(0, 12).map((row) => (
-                <tr key={row.inventario_id}>
+              {historyRows.map((row) => (
+                <tr
+                  key={row.inventario_id}
+                  className={row.inventario_id === selectedHistory?.inventario_id ? 'row-selected' : ''}
+                  onClick={() => setSelectedHistoryCandidateId(row.inventario_id)}
+                >
                   <td>{row.inventario_id}</td>
-                  <td>{row.almacen_id || '-'}</td>
-                  <td>{row.fecha}</td>
-                  <td>{row.estado || '-'}</td>
+                  <td>{formatMaybeText(row.almacen_id)}</td>
+                  <td>{formatMaybeText(row.fecha)}</td>
+                  <td>{formatMaybeText(row.estado)}</td>
                   <td>{row.lineas}</td>
                   <td>{row.ajustes}</td>
                 </tr>
@@ -543,7 +204,85 @@ export function WarehousePage() {
             </tbody>
           </table>
         </div>
-      )}
+
+        <aside className="detail-panel">
+          <h3>Detalle de inventario</h3>
+          <QueryState
+            loading={detailQuery.loading}
+            error={detailQuery.error}
+            empty={!selectedHistory || !detailQuery.data.length}
+            emptyMessage={
+              selectedHistory
+                ? 'No hay lineas para el inventario seleccionado.'
+                : 'Selecciona un inventario historico para ver el detalle.'
+            }
+          />
+
+          {!!selectedHistory && !!detailQuery.data.length && (
+            <>
+              <dl className="detail-list">
+                <div>
+                  <dt>Inventario ID</dt>
+                  <dd>{selectedHistory.inventario_id}</dd>
+                </div>
+                <div>
+                  <dt>Almacen</dt>
+                  <dd>{formatMaybeText(selectedHistory.almacen_id)}</dd>
+                </div>
+                <div>
+                  <dt>Fecha</dt>
+                  <dd>{formatMaybeText(selectedHistory.fecha)}</dd>
+                </div>
+                <div>
+                  <dt>Estado</dt>
+                  <dd>{formatMaybeText(selectedHistory.estado)}</dd>
+                </div>
+                <div>
+                  <dt>Lineas</dt>
+                  <dd>{selectedHistory.lineas}</dd>
+                </div>
+                <div>
+                  <dt>Ajustes</dt>
+                  <dd>{selectedHistory.ajustes}</dd>
+                </div>
+                <div>
+                  <dt>Total ajuste KG</dt>
+                  <dd>{totals.detailTotal}</dd>
+                </div>
+              </dl>
+
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Articulo</th>
+                      <th>Lote</th>
+                      <th>Caducidad</th>
+                      <th>Teorico</th>
+                      <th>Conteo</th>
+                      <th>Diferencia</th>
+                      <th>KG ajuste</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detailQuery.data.map((row) => (
+                      <tr key={`${row.id ?? row.articulo_id}-${row.articulo_lote}`}>
+                        <td>{formatMaybeText(row.articulo_id)}</td>
+                        <td>{formatMaybeText(row.articulo_lote)}</td>
+                        <td>{formatMaybeText(row.articulo_caducidad)}</td>
+                        <td>{formatNumber(row.teorico_uds)}</td>
+                        <td>{formatNumber(row.conteo_uds)}</td>
+                        <td>{formatNumber(row.diferencia_uds)}</td>
+                        <td>{formatNumber(row.kg_ajuste)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </aside>
+      </div>
     </section>
   )
 }

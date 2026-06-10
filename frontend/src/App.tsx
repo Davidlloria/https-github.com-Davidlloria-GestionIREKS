@@ -28,7 +28,7 @@ const VIEWS: Array<{ key: ViewKey; label: string }> = [
   { key: 'contacts', label: 'Contactos' },
   { key: 'ingredients', label: 'Ingredientes' },
   { key: 'orders', label: 'Pedidos' },
-  { key: 'warehouse', label: 'Almacen' },
+  { key: 'warehouse', label: 'Almac\u00e9n' },
   { key: 'settings', label: 'Configuracion' },
 ]
 
@@ -76,10 +76,10 @@ const VIEW_META: Record<ViewKey, ViewMeta> = {
     note: 'Operacion',
   },
   warehouse: {
-    label: 'Almacen',
-    title: 'Consulta de almacen',
-    subtitle: 'Mas aire entre tarjetas, tablas y acciones para bajar friccion visual.',
-    note: 'Stock',
+    label: 'Almac\u00e9n',
+    title: 'Consulta de almac\u00e9n',
+    subtitle: 'Vista read-only de stock, movimientos e inventarios historicos.',
+    note: 'Read-only',
   },
   settings: {
     label: 'Configuracion',

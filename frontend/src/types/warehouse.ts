@@ -16,16 +16,6 @@ export interface WarehouseMovementRead {
   albaran_item_id: string
 }
 
-export interface WarehouseManualMovementCreate {
-  almacen_id: string
-  articulo_id: string
-  cantidad: number
-  mode: 'in' | 'out'
-  fecha_pedido: string
-  articulo_lote: string
-  pedido_albaran_numero: string
-}
-
 export interface InventoryHeaderRead {
   inventario_id: string
   almacen_id: string
@@ -37,7 +27,10 @@ export interface InventoryHeaderRead {
   ajustes: number
 }
 
-export interface InventoryAdjustmentInput {
+export interface InventoryDetailRead {
+  id: number | null
+  inventario_id: string
+  almacen_id: string
   articulo_id: string
   articulo_lote: string
   articulo_caducidad: string | null
@@ -45,13 +38,6 @@ export interface InventoryAdjustmentInput {
   conteo_uds: number
   diferencia_uds: number
   kg_ajuste: number
-}
-
-export interface InventoryAdjustmentPayload {
-  almacen_id: string
-  contador: string
-  aprobador: string
-  adjustments: InventoryAdjustmentInput[]
 }
 
 export interface WarehouseOption {
