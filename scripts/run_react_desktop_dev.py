@@ -7,19 +7,42 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 import webbrowser
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+import uvicorn
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
-FRONTEND_DIST = FRONTEND_DIR / "dist"
 API_HOST = "127.0.0.1"
 API_PORT = 8000
 FRONTEND_PORT = 5173
+RUNNING_IN_BUNDLE = bool(getattr(sys, "frozen", False))
+
+
+def get_runtime_root() -> Path:
+    if RUNNING_IN_BUNDLE:
+        bundle_root = getattr(sys, "_MEIPASS", None)
+        if bundle_root:
+            return Path(bundle_root)
+        return Path(sys.executable).resolve().parent
+    return PROJECT_ROOT
+
+
+def get_frontend_dist() -> Path:
+    return get_runtime_root() / "frontend" / "dist"
+
 
 _children: list[subprocess.Popen[str]] = []
+_frozen_api_server: uvicorn.Server | None = None
+_frozen_api_thread: threading.Thread | None = None
+_frozen_frontend_server: ThreadingHTTPServer | None = None
+_frozen_frontend_thread: threading.Thread | None = None
 _cleaning_up = False
 _runtime_ports: tuple[str, int, int] | None = None
 
@@ -67,6 +90,11 @@ def run_frontend_build() -> None:
         raise RuntimeError("El build del frontend ha fallado. Ejecuta 'cd frontend' y 'npm.cmd run build' para ver el error.")
 
 
+class QuietStaticHandler(SimpleHTTPRequestHandler):
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+        return
+
+
 def start_process(command: list[str], cwd: Path, extra_env: dict[str, str] | None = None) -> subprocess.Popen[str]:
     env = os.environ.copy()
     if extra_env:
@@ -83,6 +111,38 @@ def start_process(command: list[str], cwd: Path, extra_env: dict[str, str] | Non
     process = subprocess.Popen(command, **popen_kwargs)
     _children.append(process)
     return process
+
+
+def start_frozen_api_server(host: str, port: int) -> None:
+    global _frozen_api_server, _frozen_api_thread
+
+    from app.api.main import app as fastapi_app
+
+    server = uvicorn.Server(
+        uvicorn.Config(
+            fastapi_app,
+            host=host,
+            port=port,
+            access_log=False,
+            log_level="warning",
+        )
+    )
+    thread = threading.Thread(target=server.run, name="api-server", daemon=True)
+    _frozen_api_server = server
+    _frozen_api_thread = thread
+    thread.start()
+
+
+def start_frozen_frontend_server(port: int) -> None:
+    global _frozen_frontend_server, _frozen_frontend_thread
+
+    frontend_dist = get_frontend_dist()
+    handler = partial(QuietStaticHandler, directory=str(frontend_dist))
+    server = ThreadingHTTPServer(("127.0.0.1", port), handler)
+    thread = threading.Thread(target=server.serve_forever, name="frontend-server", daemon=True)
+    _frozen_frontend_server = server
+    _frozen_frontend_thread = thread
+    thread.start()
 
 
 def terminate_process(process: subprocess.Popen[str]) -> None:
@@ -113,11 +173,70 @@ def terminate_process(process: subprocess.Popen[str]) -> None:
             pass
 
 
+def cleanup_frozen_runtime() -> None:
+    global _frozen_api_server, _frozen_api_thread, _frozen_frontend_server, _frozen_frontend_thread
+
+    if _frozen_frontend_server is not None:
+        try:
+            _frozen_frontend_server.shutdown()
+        except BaseException:
+            pass
+        try:
+            _frozen_frontend_server.server_close()
+        except BaseException:
+            pass
+
+    if _frozen_api_server is not None:
+        try:
+            _frozen_api_server.should_exit = True
+        except BaseException:
+            pass
+
+    if _runtime_ports is not None:
+        api_host, api_port, frontend_port = _runtime_ports
+        for _ in range(3):
+            api_closed = wait_for_port_closed(api_host, api_port, 2)
+            frontend_closed = wait_for_port_closed("127.0.0.1", frontend_port, 2)
+            if api_closed and frontend_closed:
+                break
+            if _frozen_frontend_server is not None:
+                try:
+                    _frozen_frontend_server.shutdown()
+                except BaseException:
+                    pass
+            if _frozen_api_server is not None:
+                try:
+                    _frozen_api_server.should_exit = True
+                except BaseException:
+                    pass
+
+    if _frozen_api_thread is not None:
+        try:
+            _frozen_api_thread.join(timeout=5)
+        except BaseException:
+            pass
+    if _frozen_frontend_thread is not None:
+        try:
+            _frozen_frontend_thread.join(timeout=5)
+        except BaseException:
+            pass
+
+    _frozen_api_server = None
+    _frozen_api_thread = None
+    _frozen_frontend_server = None
+    _frozen_frontend_thread = None
+
+
 def cleanup() -> None:
     global _cleaning_up
     if _cleaning_up:
         return
     _cleaning_up = True
+
+    if RUNNING_IN_BUNDLE:
+        cleanup_frozen_runtime()
+        return
+
     for process in reversed(_children):
         try:
             terminate_process(process)
@@ -147,18 +266,12 @@ def main() -> int:
     global _runtime_ports
     _runtime_ports = (args.api_host, args.api_port, args.frontend_port)
 
-    if not FRONTEND_DIR.exists():
+    if not RUNNING_IN_BUNDLE and not FRONTEND_DIR.exists():
         print(f"No existe el directorio frontend: {FRONTEND_DIR}", file=sys.stderr)
         return 1
 
-    if args.build:
-        try:
-            run_frontend_build()
-        except RuntimeError as exc:
-            print(str(exc), file=sys.stderr)
-            return 1
-
-    if not FRONTEND_DIST.exists():
+    frontend_dist = get_frontend_dist()
+    if not frontend_dist.exists():
         print(
             "No existe frontend/dist.\n"
             "Ejecuta primero:\n"
@@ -169,26 +282,15 @@ def main() -> int:
         )
         return 1
 
-    api_command = [
-        sys.executable,
-        "-m",
-        "uvicorn",
-        "app.api.main:app",
-        "--host",
-        args.api_host,
-        "--port",
-        str(args.api_port),
-    ]
-    frontend_command = [
-        sys.executable,
-        "-m",
-        "http.server",
-        str(args.frontend_port),
-        "--bind",
-        "127.0.0.1",
-        "--directory",
-        str(FRONTEND_DIST),
-    ]
+    if args.build:
+        if RUNNING_IN_BUNDLE:
+            print("--build no esta disponible en el binario empaquetado. Usa el script de desarrollo.", file=sys.stderr)
+            return 1
+        try:
+            run_frontend_build()
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
 
     atexit.register(cleanup)
     signal.signal(signal.SIGINT, handle_signal)
@@ -196,6 +298,68 @@ def main() -> int:
         signal.signal(signal.SIGTERM, handle_signal)
 
     try:
+        if RUNNING_IN_BUNDLE:
+            print(f"Starting API on http://{args.api_host}:{args.api_port}")
+            start_frozen_api_server(args.api_host, args.api_port)
+
+            if not wait_for_port(args.api_host, args.api_port, args.startup_timeout):
+                print("La API no levanto a tiempo.", file=sys.stderr)
+                return 1
+            if _frozen_api_thread is not None and not _frozen_api_thread.is_alive():
+                print("La API se cerro durante el arranque.", file=sys.stderr)
+                return 1
+
+            print(f"Starting frontend on http://127.0.0.1:{args.frontend_port}")
+            start_frozen_frontend_server(args.frontend_port)
+
+            if not wait_for_port("127.0.0.1", args.frontend_port, args.startup_timeout):
+                print("El frontend no levanto a tiempo.", file=sys.stderr)
+                return 1
+            if _frozen_frontend_thread is not None and not _frozen_frontend_thread.is_alive():
+                print("El frontend se cerro durante el arranque.", file=sys.stderr)
+                return 1
+
+            frontend_url = f"http://127.0.0.1:{args.frontend_port}"
+            print(f"Frontend ready: {frontend_url}")
+            print(f"API ready: http://{args.api_host}:{args.api_port}")
+
+            if not args.no_open_browser:
+                webbrowser.open(frontend_url)
+
+            if args.exit_after_start:
+                time.sleep(max(0, args.hold_seconds))
+                return 0
+
+            while True:
+                if _frozen_api_thread is not None and not _frozen_api_thread.is_alive():
+                    print("La API termino durante la ejecucion.", file=sys.stderr)
+                    return 1
+                if _frozen_frontend_thread is not None and not _frozen_frontend_thread.is_alive():
+                    print("El frontend termino durante la ejecucion.", file=sys.stderr)
+                    return 1
+                time.sleep(1)
+
+        api_command = [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "app.api.main:app",
+            "--host",
+            args.api_host,
+            "--port",
+            str(args.api_port),
+        ]
+        frontend_command = [
+            sys.executable,
+            "-m",
+            "http.server",
+            str(args.frontend_port),
+            "--bind",
+            "127.0.0.1",
+            "--directory",
+            str(frontend_dist),
+        ]
+
         print(f"Starting API on http://{args.api_host}:{args.api_port}")
         api_process = start_process(api_command, PROJECT_ROOT)
 
