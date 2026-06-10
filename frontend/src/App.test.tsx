@@ -1,6 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import '@testing-library/jest-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import App from './App'
 
 const salesSummary = {
@@ -22,6 +21,51 @@ const salesSummary = {
       delta_ventas: 1,
     },
   ],
+}
+
+const recipeList = {
+  items: [
+    {
+      id: 1,
+      codigo_receta: 'R-1',
+      nombre: 'Receta 1',
+      version: '1',
+      estado: 'Publicada',
+      es_base: true,
+      proceso: 'Proceso 1',
+    },
+  ],
+  total: 1,
+  limit: 25,
+  offset: 0,
+}
+
+const courseList = {
+  items: [{ curso_id: 'CUR-1', curso_nombre: 'Curso 1', curso_fecha: '2026-01-01' }],
+  total: 1,
+  limit: 25,
+  offset: 0,
+}
+
+const ingredientList = {
+  items: [
+    {
+      id: 'ireks:1',
+      codigo: 'ING-1',
+      nombre: 'Ingrediente 1',
+      fabricante_id: '',
+      proveedor_id: 'PROV-1',
+      familia_id: 'FAM-1',
+      subfamilia_id: 'SUB-1',
+      unidad: 'kg',
+      activo: true,
+      precio: 0,
+      source: 'ireks',
+    },
+  ],
+  total: 1,
+  limit: 25,
+  offset: 0,
 }
 
 vi.mock('./api/sales', () => ({
@@ -51,22 +95,7 @@ vi.mock('./api/recipes', () => ({
       },
     ],
   })),
-  listRecipes: vi.fn(async () => ({
-    items: [
-      {
-        id: 1,
-        codigo_receta: 'R-1',
-        nombre: 'Receta 1',
-        version: '1',
-        estado: 'Publicada',
-        es_base: true,
-        proceso: 'Proceso 1',
-      },
-    ],
-    total: 1,
-    limit: 25,
-    offset: 0,
-  })),
+  listRecipes: vi.fn(async () => recipeList),
 }))
 
 vi.mock('./api/courses', () => ({
@@ -78,12 +107,7 @@ vi.mock('./api/courses', () => ({
   listCourseAttendees: vi.fn(async () => ({
     items: [{ id: 1, nombre: 'Asistente 1', empresa: 'Empresa 1', confirmado: true }],
   })),
-  listCourses: vi.fn(async () => ({
-    items: [{ curso_id: 'CUR-1', curso_nombre: 'Curso 1', curso_fecha: '2026-01-01' }],
-    total: 1,
-    limit: 25,
-    offset: 0,
-  })),
+  listCourses: vi.fn(async () => courseList),
 }))
 
 vi.mock('./api/ingredients', () => ({
@@ -100,59 +124,36 @@ vi.mock('./api/ingredients', () => ({
     precio: 0,
     source: 'ireks',
   })),
-  listIngredients: vi.fn(async () => ({
-    items: [
-      {
-        id: 'ireks:1',
-        codigo: 'ING-1',
-        nombre: 'Ingrediente 1',
-        fabricante_id: '',
-        proveedor_id: 'PROV-1',
-        familia_id: 'FAM-1',
-        subfamilia_id: 'SUB-1',
-        unidad: 'kg',
-        activo: true,
-        precio: 0,
-        source: 'ireks',
-      },
-    ],
-    total: 1,
-    limit: 25,
-    offset: 0,
-  })),
+  listIngredients: vi.fn(async () => ingredientList),
 }))
 
-describe('App shell', () => {
-  beforeEach(() => {
+describe('App shell smoke', () => {
+  it('renders the app shell and the four main tabs', async () => {
     render(<App />)
-  })
 
-  it('renders the app and switches between the four read-only views', async () => {
     await screen.findByText('Ventas anual')
 
     expect(screen.getByRole('tab', { name: 'Ventas' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Recetas' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Cursos' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Ingredientes' })).toBeInTheDocument()
+  })
+
+  it('switches the visible page when the user clicks the tabs', async () => {
+    render(<App />)
+
+    await screen.findByText('Ventas anual')
 
     fireEvent.click(screen.getByRole('tab', { name: 'Recetas' }))
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText('Buscar receta por nombre, codigo o proceso')).toBeInTheDocument()
-    })
+    expect(await screen.findByPlaceholderText('Buscar receta por nombre, codigo o proceso')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Cursos' }))
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText('Buscar curso por nombre o codigo')).toBeInTheDocument()
-    })
+    expect(await screen.findByPlaceholderText('Buscar curso por nombre o codigo')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Ingredientes' }))
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText('Buscar ingrediente por nombre, codigo o referencia')).toBeInTheDocument()
-    })
+    expect(await screen.findByPlaceholderText('Buscar ingrediente por nombre, codigo o referencia')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Ventas' }))
-    await waitFor(() => {
-      expect(screen.getByText('Ventas anual')).toBeInTheDocument()
-    })
+    expect(await screen.findByText('Ventas anual')).toBeInTheDocument()
   })
 })
