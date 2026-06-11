@@ -23,13 +23,13 @@ export function AppShell({
   return (
     <div className={`app-shell ${activeView === 'customers' ? 'app-shell-customers' : ''}`}>
       <header className="app-header">
-        <div className="app-brand">
-          <p className="app-brand-kicker">Gestion IREKS</p>
+        <div className="app-brand app-brand-compact">
+          <div className="app-brand-row">
+            <p className="app-brand-kicker">Gestion IREKS</p>
+            <span className="app-brand-title-chip">{currentBadge}</span>
+          </div>
           <h1>{currentTitle}</h1>
           <p className="app-brand-subtitle">{currentSubtitle}</p>
-        </div>
-        <div className="app-header-badge" aria-hidden="true">
-          <span className="surface-chip">{currentBadge}</span>
         </div>
       </header>
 

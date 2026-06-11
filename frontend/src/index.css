@@ -67,6 +67,8 @@ button {
   height: 100dvh;
   min-height: 100dvh;
   overflow: hidden;
+  gap: 8px;
+  padding: 12px;
 }
 
 .app-shell-customers .app-body {
@@ -106,6 +108,18 @@ button {
   backdrop-filter: blur(10px);
 }
 
+.app-brand-compact {
+  display: grid;
+  gap: 6px;
+}
+
+.app-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .app-brand {
   min-width: 0;
 }
@@ -140,10 +154,17 @@ button {
   line-height: 1.5;
 }
 
-.app-header-badge {
-  display: flex;
-  justify-content: flex-end;
-  flex-wrap: wrap;
+.app-brand-title-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: var(--shadow-soft);
 }
 
 .app-body {
@@ -779,13 +800,12 @@ tbody tr:hover {
 }
 
 .sidebar-nav {
-  display: flex;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 6px;
   width: 100%;
-  padding: 10px 12px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  white-space: nowrap;
+  padding: 8px;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(247, 250, 245, 0.96));
@@ -793,18 +813,27 @@ tbody tr:hover {
 }
 
 .sidebar-item {
-  flex: 0 0 auto;
-  min-width: max-content;
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
-  padding: 10px 14px;
+  gap: 1px;
+  min-width: 0;
+  width: 100%;
+  padding: 8px 10px;
   border-radius: 14px;
+  overflow: hidden;
 }
 
 .sidebar-item-description {
   display: none;
+}
+
+.sidebar-item-label {
+  font-size: 12px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-item.active {
@@ -837,6 +866,53 @@ tbody tr:hover {
   overflow: hidden;
 }
 
+.app-shell-customers .app-header {
+  padding: 12px 16px;
+  border-radius: 18px;
+  gap: 12px;
+}
+
+.app-shell-customers .app-brand-row {
+  gap: 8px;
+}
+
+.app-shell-customers .app-brand-kicker {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.app-shell-customers .app-brand h1 {
+  margin: 0;
+  font-size: clamp(20px, 2vw, 28px);
+}
+
+.app-shell-customers .app-brand-subtitle {
+  font-size: 12px;
+  line-height: 1.35;
+  max-width: 66ch;
+}
+
+.app-shell-customers .app-nav-shell {
+  margin-top: -2px;
+}
+
+.app-shell-customers .sidebar-nav {
+  gap: 4px;
+  padding: 6px;
+  border-radius: 14px;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+}
+
+.app-shell-customers .sidebar-item {
+  padding: 8px 8px 7px;
+  border-radius: 12px;
+}
+
+.app-shell-customers .sidebar-item-label {
+  font-size: 11px;
+  text-align: center;
+}
+
 .app-shell-customers .app-content {
   overflow: hidden;
   display: flex;
@@ -846,8 +922,8 @@ tbody tr:hover {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  padding: 12px;
-  border-radius: 18px;
+  padding: 10px;
+  border-radius: 16px;
   background: #fff;
 }
 
@@ -855,32 +931,32 @@ tbody tr:hover {
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  gap: 12px;
+  gap: 8px;
 }
 
 .customers-page-title {
   display: flex;
   align-items: center;
   min-height: 0;
-  padding: 0 2px 2px;
+  padding: 0 2px;
 }
 
 .customers-page-title h2 {
   margin: 0;
-  font-size: 26px;
+  font-size: 24px;
   line-height: 1.1;
   letter-spacing: -0.03em;
 }
 
 .customers-page-title .module-description {
-  margin-top: 4px;
-  font-size: 13px;
+  margin-top: 2px;
+  font-size: 12px;
 }
 
 .customers-shell {
   display: grid;
   grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
-  gap: 12px;
+  gap: 8px;
   min-height: 0;
   height: 100%;
   overflow: hidden;
@@ -889,20 +965,20 @@ tbody tr:hover {
 .customers-list-pane {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: #fff;
-  padding: 12px;
+  padding: 10px;
   box-shadow: var(--shadow-soft);
 }
 
 .customers-filter-card {
   display: grid;
-  gap: 10px;
-  padding-bottom: 2px;
+  gap: 8px;
+  padding-bottom: 0;
 }
 
 .customers-island-select,
@@ -915,13 +991,13 @@ tbody tr:hover {
 .customers-search-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 
 .customers-clear {
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
   border: 1px solid var(--line);
   background: #fff;
   color: var(--muted);
@@ -933,7 +1009,7 @@ tbody tr:hover {
 .customers-list-meta {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr) 110px;
-  gap: 8px;
+  gap: 6px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
@@ -975,30 +1051,30 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
 .customers-page-state {
-  padding: 10px 12px;
+  padding: 8px 12px;
   text-align: center;
 }
 
 .customers-detail-pane {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: #fff;
-  padding: 12px;
+  padding: 10px;
   box-shadow: var(--shadow-soft);
 }
 
 .customers-toolbar {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -1007,7 +1083,7 @@ tbody tr:hover {
   background: linear-gradient(180deg, #ffffff, #f4f7fb);
   color: var(--text);
   border-radius: 12px;
-  padding: 12px 16px;
+  padding: 8px 12px;
   font-size: 14px;
   font-weight: 700;
   box-shadow: var(--shadow-soft);
@@ -1015,6 +1091,13 @@ tbody tr:hover {
 
 .customers-toolbar-btn:disabled {
   opacity: 0.95;
+  color: var(--text);
+}
+
+.customers-toolbar-btn-green:disabled,
+.customers-toolbar-btn-orange:disabled,
+.customers-toolbar-btn-red:disabled,
+.customers-toolbar-btn-blue:disabled {
   color: #fff;
 }
 
@@ -1039,13 +1122,13 @@ tbody tr:hover {
 }
 
 .customers-toolbar-btn-wide {
-  min-width: 180px;
+  min-width: 156px;
 }
 
 .customers-detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.95fr);
-  gap: 12px;
+  gap: 8px;
   min-height: 0;
   overflow: hidden;
 }
@@ -1057,23 +1140,23 @@ tbody tr:hover {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: #fff;
-  padding: 12px;
+  padding: 10px;
 }
 
 .customers-form-card {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .customers-section-head h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .customers-form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
   align-content: start;
   min-height: 0;
 }
@@ -1098,20 +1181,20 @@ tbody tr:hover {
 
 .customers-type-card {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   align-content: start;
 }
 
 .customers-type-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .customer-type-pill {
   border: 1px solid #d7deea;
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   background: #f8fbff;
   color: var(--text);
   font-weight: 800;
@@ -1126,12 +1209,12 @@ tbody tr:hover {
 .customers-type-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .customers-status-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .customers-status {
@@ -1205,7 +1288,7 @@ tbody tr:hover {
   background: #f4f7fc;
   color: var(--text);
   border-radius: 12px 12px 0 0;
-  padding: 10px 16px;
+  padding: 8px 14px;
   font-weight: 700;
 }
 
@@ -1221,12 +1304,12 @@ tbody tr:hover {
   border: 1px solid var(--line);
   border-radius: 0 16px 16px 16px;
   background: #fff;
-  padding: 12px;
+  padding: 10px;
 }
 
 .customers-tab-scroll {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
   height: 100%;
   overflow: auto;
@@ -1241,13 +1324,13 @@ tbody tr:hover {
 
 .customers-tab-head h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .customers-tab-head p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .customers-empty-panel {
