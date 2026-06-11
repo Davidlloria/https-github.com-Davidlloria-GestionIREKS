@@ -6,6 +6,7 @@ export interface CustomerListItem {
   cliente_cif: string
   cliente_grupo: string
   cliente_tipo: string
+  cliente_direccion_isla_id?: string
   cliente_email: string
   cliente_telefono: string
   cliente_prospeccion: boolean

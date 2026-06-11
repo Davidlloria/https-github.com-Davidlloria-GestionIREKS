@@ -103,12 +103,6 @@ export function CustomersPage() {
             </div>
           </div>
 
-          <div className="customers-list-meta">
-            <span className="customers-count">Cod.</span>
-            <span className="customers-count">Nombre</span>
-            <span className="customers-count">Tipo</span>
-          </div>
-
           <div className="customers-list-scroll">
             <QueryState
               loading={customersQuery.loading}
@@ -124,7 +118,7 @@ export function CustomersPage() {
                     <tr>
                       <th>Cod.</th>
                       <th>Nombre</th>
-                      <th>Tipo</th>
+                      <th>Isla</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -136,7 +130,7 @@ export function CustomersPage() {
                       >
                         <td>{customer.cliente_codigo}</td>
                         <td>{customerLabel(customer)}</td>
-                        <td>{customer.cliente_tipo || '-'}</td>
+                        <td>{customer.cliente_direccion_isla_id || '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -317,7 +311,6 @@ export function CustomersPage() {
                 <div className="customers-tab-head">
                   <div>
                     <h3>Contactos</h3>
-                    <p>Listado read-only de contactos relacionados con el cliente seleccionado.</p>
                   </div>
                   <span className="surface-chip">{contactsQuery.data.items.length} contactos</span>
                 </div>
