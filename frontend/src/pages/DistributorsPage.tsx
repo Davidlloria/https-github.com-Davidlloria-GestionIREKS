@@ -60,26 +60,48 @@ export function DistributorsPage() {
 
   return (
     <section className="page-grid">
-      <div className="toolbar">
-        <input
-          className="input"
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value)
-            setPageIndex(0)
-          }}
-          placeholder="Buscar por codigo, nombre, razon social, CIF o contacto"
-        />
-        <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
-          Anterior
-        </button>
-        <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
-          Siguiente
-        </button>
-        <span className="state">
-          Pagina {currentPage} de {totalPages}
-        </span>
-      </div>
+      <header className="module-header">
+        <div className="module-header-copy">
+          <p className="module-kicker">Modulo read-only</p>
+          <h2>Distribuidores</h2>
+          <p className="module-description">
+            Consulta de distribuidores con detalle lateral para revisar codigo, razon social y contacto sin editar datos.
+          </p>
+        </div>
+        <div className="module-header-meta">
+          <span className="surface-chip">Pagina {currentPage} de {totalPages}</span>
+          <span className="surface-chip">Vista sin mutaciones</span>
+        </div>
+      </header>
+
+      <section className="panel-section">
+        <div className="section-heading">
+          <div>
+            <h3>Filtros</h3>
+            <p>Busca por codigo, nombre, razon social, CIF o contacto y navega por pagina.</p>
+          </div>
+          <div className="toolbar pager-toolbar">
+            <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
+              Anterior
+            </button>
+            <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
+              Siguiente
+            </button>
+          </div>
+        </div>
+
+        <div className="toolbar">
+          <input
+            className="input"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value)
+              setPageIndex(0)
+            }}
+            placeholder="Buscar por codigo, nombre, razon social, CIF o contacto"
+          />
+        </div>
+      </section>
 
       <div className="cards">
         <StatCard label="Total distribuidores" value={totals.total} />
@@ -96,37 +118,54 @@ export function DistributorsPage() {
       />
 
       {!!rows.length && (
-        <div className="split-panel">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Codigo</th>
-                  <th>Nombre</th>
-                  <th>CIF</th>
-                  <th>Telefono</th>
-                  <th>Contacto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr
-                    key={row.distribuidor_id}
-                    className={row.distribuidor_id === selectedDistributorId ? 'row-selected' : ''}
-                    onClick={() => setSelectedCandidateId(row.distribuidor_id)}
-                  >
-                    <td>{row.distribuidor_codigo || '-'}</td>
-                    <td>{distributorLabel(row)}</td>
-                    <td>{row.distribuidor_cif || '-'}</td>
-                    <td>{row.distribuidor_telefono || '-'}</td>
-                    <td>{row.distribuidor_contacto || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="orders-workspace">
+          <section className="orders-list-panel">
+            <div className="panel-section">
+              <div className="section-heading">
+                <div>
+                  <h3>Listado de distribuidores</h3>
+                  <p>Selecciona una fila para abrir el detalle lateral.</p>
+                </div>
+                <span className="surface-chip">Mostrando {rows.length} de {distributorsQuery.data.total}</span>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Codigo</th>
+                      <th>Nombre</th>
+                      <th>CIF</th>
+                      <th>Telefono</th>
+                      <th>Contacto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr
+                        key={row.distribuidor_id}
+                        className={row.distribuidor_id === selectedDistributorId ? 'row-selected' : ''}
+                        onClick={() => setSelectedCandidateId(row.distribuidor_id)}
+                      >
+                        <td>{row.distribuidor_codigo || '-'}</td>
+                        <td>{distributorLabel(row)}</td>
+                        <td>{row.distribuidor_cif || '-'}</td>
+                        <td>{row.distribuidor_telefono || '-'}</td>
+                        <td>{row.distribuidor_contacto || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
 
-          <aside className="detail-panel">
+          <aside className="detail-panel detail-panel-orders">
+            <div className="section-heading section-heading-compact">
+              <div>
+                <h3>Detalle de distribuidor</h3>
+                <p>Datos principales del registro seleccionado.</p>
+              </div>
+            </div>
             {!selectedDistributorId && <div className="state">Selecciona un distribuidor para ver el detalle.</div>}
             {!!selectedDistributorId && (
               <QueryState

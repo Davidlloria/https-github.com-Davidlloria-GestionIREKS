@@ -60,26 +60,48 @@ export function TechniciansPage() {
 
   return (
     <section className="page-grid">
-      <div className="toolbar">
-        <input
-          className="input"
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value)
-            setPageIndex(0)
-          }}
-          placeholder="Buscar por nombre, apellido, movil, interno o email"
-        />
-        <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
-          Anterior
-        </button>
-        <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
-          Siguiente
-        </button>
-        <span className="state">
-          Pagina {currentPage} de {totalPages}
-        </span>
-      </div>
+      <header className="module-header">
+        <div className="module-header-copy">
+          <p className="module-kicker">Modulo read-only</p>
+          <h2>Tecnicos</h2>
+          <p className="module-description">
+            Consulta de tecnicos con detalle lateral, pensada para revisar codigo, contacto y trazabilidad sin editar datos.
+          </p>
+        </div>
+        <div className="module-header-meta">
+          <span className="surface-chip">Pagina {currentPage} de {totalPages}</span>
+          <span className="surface-chip">Vista sin mutaciones</span>
+        </div>
+      </header>
+
+      <section className="panel-section">
+        <div className="section-heading">
+          <div>
+            <h3>Filtros</h3>
+            <p>Busca por nombre, apellido, movil, interno o email y navega por pagina.</p>
+          </div>
+          <div className="toolbar pager-toolbar">
+            <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
+              Anterior
+            </button>
+            <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
+              Siguiente
+            </button>
+          </div>
+        </div>
+
+        <div className="toolbar">
+          <input
+            className="input"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value)
+              setPageIndex(0)
+            }}
+            placeholder="Buscar por nombre, apellido, movil, interno o email"
+          />
+        </div>
+      </section>
 
       <div className="cards">
         <StatCard label="Total tecnicos" value={totals.total} />
@@ -96,37 +118,54 @@ export function TechniciansPage() {
       />
 
       {!!rows.length && (
-        <div className="split-panel">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Codigo</th>
-                  <th>Nombre</th>
-                  <th>Movil</th>
-                  <th>Interno</th>
-                  <th>Email</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr
-                    key={row.tecnico_id}
-                    className={row.tecnico_id === selectedTechnicianId ? 'row-selected' : ''}
-                    onClick={() => setSelectedCandidateId(row.tecnico_id)}
-                  >
-                    <td>{row.tecnico_codigo || '-'}</td>
-                    <td>{fullName(row) || '(sin nombre)'}</td>
-                    <td>{row.movil || '-'}</td>
-                    <td>{row.interno || '-'}</td>
-                    <td>{row.email || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="orders-workspace">
+          <section className="orders-list-panel">
+            <div className="panel-section">
+              <div className="section-heading">
+                <div>
+                  <h3>Listado de tecnicos</h3>
+                  <p>Selecciona una fila para cargar el detalle lateral.</p>
+                </div>
+                <span className="surface-chip">Mostrando {rows.length} de {techniciansQuery.data.total}</span>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Codigo</th>
+                      <th>Nombre</th>
+                      <th>Movil</th>
+                      <th>Interno</th>
+                      <th>Email</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr
+                        key={row.tecnico_id}
+                        className={row.tecnico_id === selectedTechnicianId ? 'row-selected' : ''}
+                        onClick={() => setSelectedCandidateId(row.tecnico_id)}
+                      >
+                        <td>{row.tecnico_codigo || '-'}</td>
+                        <td>{fullName(row) || '(sin nombre)'}</td>
+                        <td>{row.movil || '-'}</td>
+                        <td>{row.interno || '-'}</td>
+                        <td>{row.email || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
 
-          <aside className="detail-panel">
+          <aside className="detail-panel detail-panel-orders">
+            <div className="section-heading section-heading-compact">
+              <div>
+                <h3>Detalle de tecnico</h3>
+                <p>Datos de contacto y trazabilidad del registro seleccionado.</p>
+              </div>
+            </div>
             {!selectedTechnicianId && <div className="state">Selecciona un tecnico para ver el detalle.</div>}
             {!!selectedTechnicianId && (
               <QueryState
