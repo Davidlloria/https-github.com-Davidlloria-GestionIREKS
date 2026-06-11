@@ -90,14 +90,36 @@ export function WarehousePage() {
 
   return (
     <section className="page-grid">
-      <div className="toolbar">
-        <input
-          className="input"
-          value={almacenId}
-          onChange={(event) => setAlmacenId(event.target.value)}
-          placeholder="Filtrar por almacen_id (opcional)"
-        />
-      </div>
+      <header className="module-header">
+        <div className="module-header-copy">
+          <p className="module-kicker">Modulo read-only</p>
+          <h2>Almacen</h2>
+          <p className="module-description">
+            Consulta de stock, movimientos e inventarios historicos con detalle lateral de inventario para revisar ajustes sin mutar datos.
+          </p>
+        </div>
+        <div className="module-header-meta">
+          <span className="surface-chip">Vista sin mutaciones</span>
+          <span className="surface-chip">{selectedHistory ? `Inventario ${selectedHistory.inventario_id}` : 'Sin inventario seleccionado'}</span>
+        </div>
+      </header>
+
+      <section className="panel-section">
+        <div className="section-heading">
+          <div>
+            <h3>Filtro</h3>
+            <p>Reduce el contexto por almacen si necesitas revisar una ubicacion concreta.</p>
+          </div>
+        </div>
+        <div className="toolbar">
+          <input
+            className="input"
+            value={almacenId}
+            onChange={(event) => setAlmacenId(event.target.value)}
+            placeholder="Filtrar por almacen_id (opcional)"
+          />
+        </div>
+      </section>
 
       <div className="cards">
         <StatCard label="Filas stock" value={totals.stockRows} />
@@ -114,9 +136,22 @@ export function WarehousePage() {
         emptyMessage="No hay datos de almacen para el filtro actual."
       />
 
-      {!!query.data.stock.items.length && (
-        <div className="detail-panel">
-          <h3>Stock actual</h3>
+      <div className="cards">
+        <StatCard label="Stock total" value={totals.stockTotal} />
+        <StatCard label="Movimientos uds" value={totals.movementTotal} />
+        <StatCard label="Ajuste KG" value={totals.detailTotal} />
+        <StatCard label="Inventario activo" value={selectedHistory?.inventario_id || '-'} />
+      </div>
+
+      <section className="panel-section">
+        <div className="section-heading">
+          <div>
+            <h3>Stock actual</h3>
+            <p>Consulta de stock agregado por almacen y articulo.</p>
+          </div>
+          <span className="surface-chip">{query.data.stock.total} filas</span>
+        </div>
+          {query.data.stock.items.length > 0 ? (
           <div className="table-wrap">
             <table>
               <thead>
@@ -137,12 +172,20 @@ export function WarehousePage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="state state-empty">Sin filas de stock para el filtro actual.</div>
+        )}
+      </section>
 
-      {!!query.data.movements.items.length && (
-        <div className="detail-panel">
-          <h3>Ultimos movimientos</h3>
+      <section className="panel-section">
+        <div className="section-heading">
+          <div>
+            <h3>Ultimos movimientos</h3>
+            <p>Movimientos recientes del almacen con fecha, articulo y origen.</p>
+          </div>
+          <span className="surface-chip">{query.data.movements.total} filas</span>
+        </div>
+          {query.data.movements.items.length > 0 ? (
           <div className="table-wrap">
             <table>
               <thead>
@@ -169,44 +212,61 @@ export function WarehousePage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="state state-empty">Sin movimientos para el filtro actual.</div>
+        )}
+      </section>
 
-      <div className="split-panel">
-        <div className="table-wrap">
-          <h3 style={{ marginTop: 0 }}>Historico de inventarios</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Inventario ID</th>
-                <th>Almacen</th>
-                <th>Fecha</th>
-                <th>Estado</th>
-                <th>Lineas</th>
-                <th>Ajustes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {historyRows.map((row) => (
-                <tr
-                  key={row.inventario_id}
-                  className={row.inventario_id === selectedHistory?.inventario_id ? 'row-selected' : ''}
-                  onClick={() => setSelectedHistoryCandidateId(row.inventario_id)}
-                >
-                  <td>{row.inventario_id}</td>
-                  <td>{formatMaybeText(row.almacen_id)}</td>
-                  <td>{formatMaybeText(row.fecha)}</td>
-                  <td>{formatMaybeText(row.estado)}</td>
-                  <td>{row.lineas}</td>
-                  <td>{row.ajustes}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="orders-workspace">
+        <section className="orders-list-panel">
+          <div className="panel-section">
+            <div className="section-heading">
+              <div>
+                <h3>Historico de inventarios</h3>
+                <p>Selecciona un inventario para abrir su detalle lateral.</p>
+              </div>
+              <span className="surface-chip">{historyRows.length} visibles</span>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Inventario ID</th>
+                    <th>Almacen</th>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th>Lineas</th>
+                    <th>Ajustes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyRows.map((row) => (
+                    <tr
+                      key={row.inventario_id}
+                      className={row.inventario_id === selectedHistory?.inventario_id ? 'row-selected' : ''}
+                      onClick={() => setSelectedHistoryCandidateId(row.inventario_id)}
+                    >
+                      <td>{row.inventario_id}</td>
+                      <td>{formatMaybeText(row.almacen_id)}</td>
+                      <td>{formatMaybeText(row.fecha)}</td>
+                      <td>{formatMaybeText(row.estado)}</td>
+                      <td>{row.lineas}</td>
+                      <td>{row.ajustes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
 
-        <aside className="detail-panel">
-          <h3>Detalle de inventario</h3>
+        <aside className="detail-panel detail-panel-orders">
+          <div className="section-heading section-heading-compact">
+            <div>
+              <h3>Detalle de inventario</h3>
+              <p>Cabecera del inventario y lineas de ajuste.</p>
+            </div>
+          </div>
           <QueryState
             loading={detailQuery.loading}
             error={detailQuery.error}
