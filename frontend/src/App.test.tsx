@@ -115,6 +115,74 @@ const warehouseHistory = {
   offset: 0,
 }
 
+const orderList = {
+  items: [
+    {
+      pedido_id: 'P-1',
+      almacen_id: 'ALM-1',
+      almacen_nombre: 'Almacen 1',
+      pedido_fecha: '2026-01-03',
+      pedido_numero: 'PED-1',
+      pedido_albaran_numero: 'ALB-1',
+      pedido_factura_numero: 'FAC-1',
+      pedido_ref: 'REF-1',
+      pedido_estado: 'N',
+      semana: 1,
+      total_kg: 25.5,
+    },
+  ],
+  total: 1,
+  limit: 25,
+  offset: 0,
+}
+
+const orderDetail = {
+  pedido_id: 'P-1',
+  almacen_id: 'ALM-1',
+  pedido_fecha: '2026-01-03',
+  pedido_numero: 'PED-1',
+  pedido_albaran_numero: 'ALB-1',
+  pedido_factura_numero: 'FAC-1',
+  pedido_ref: 'REF-1',
+  pedido_estado: 'N',
+}
+
+const orderItems = {
+  items: [
+    {
+      item_id: 'I-1',
+      pedido_id: 'P-1',
+      pedido_numero: 'PED-1',
+      pedido_albaran_numero: 'ALB-1',
+      pedido_item_fecha: '2026-01-03',
+      articulo_id: 'ART-1',
+      articulo_cantidad: 5,
+    },
+  ],
+  total: 1,
+  limit: 25,
+  offset: 0,
+}
+
+const orderPending = {
+  items: [
+    {
+      pendiente_id: 'PE-1',
+      pedido_id: 'P-1',
+      albaran_id: 'ALB-1',
+      articulo_id: 'ART-1',
+      cantidad_pedida: 5,
+      cantidad_recibida: 3,
+      cantidad_pendiente: 2,
+      estado: 'Pendiente',
+      fecha_registro: '2026-01-03',
+    },
+  ],
+  total: 1,
+  limit: 25,
+  offset: 0,
+}
+
 const customerList = {
   items: [
     {
@@ -272,6 +340,13 @@ vi.mock('./api/warehouse', () => ({
   listStock: vi.fn(async () => warehouseStock),
 }))
 
+vi.mock('./api/orders', () => ({
+  getOrderDetail: vi.fn(async () => orderDetail),
+  listOrderItems: vi.fn(async () => orderItems),
+  listOrderPending: vi.fn(async () => orderPending),
+  listOrders: vi.fn(async () => orderList),
+}))
+
 describe('App shell smoke', () => {
   it('renders the app shell and the main modules', async () => {
     render(<App />)
@@ -284,6 +359,7 @@ describe('App shell smoke', () => {
     expect(screen.getByRole('button', { name: 'Cursos' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Clientes' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Contactos' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pedidos' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ingredientes' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Almacen' })).toBeInTheDocument()
   })
@@ -304,6 +380,9 @@ describe('App shell smoke', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Contactos' }))
     expect(await screen.findByPlaceholderText('Buscar por nombre, apellido, cargo, email o empresa')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pedidos' }))
+    expect(await screen.findByPlaceholderText('Ano (ej: 2026)')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Ingredientes' }))
     expect(await screen.findByPlaceholderText('Buscar ingrediente por nombre, codigo o referencia')).toBeInTheDocument()

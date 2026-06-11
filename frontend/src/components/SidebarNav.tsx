@@ -1,4 +1,4 @@
-export type ViewKey = 'sales' | 'recipes' | 'courses' | 'customers' | 'ingredients' | 'warehouse' | 'contacts'
+export type ViewKey = 'sales' | 'recipes' | 'courses' | 'customers' | 'contacts' | 'orders' | 'ingredients' | 'warehouse'
 
 export interface SidebarNavItem {
   key: ViewKey
