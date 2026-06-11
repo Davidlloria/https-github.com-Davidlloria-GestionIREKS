@@ -1,35 +1,28 @@
 import { useState } from 'react'
 import { AppErrorBoundary } from './components/AppErrorBoundary'
-import { AppTabs } from './components/AppTabs'
-import { ContactsPage } from './pages/ContactsPage'
+import { AppShell } from './components/AppShell'
 import { CoursesPage } from './pages/CoursesPage'
 import { CustomersPage } from './pages/CustomersPage'
 import { IngredientsPage } from './pages/IngredientsPage'
-import { OrdersPage } from './pages/OrdersPage'
 import { RecipesPage } from './pages/RecipesPage'
 import { SalesPage } from './pages/SalesPage'
-import { SettingsPage } from './pages/SettingsPage'
 import { WarehousePage } from './pages/WarehousePage'
 
-type ViewKey = 'sales' | 'recipes' | 'courses' | 'customers' | 'contacts' | 'ingredients' | 'orders' | 'warehouse' | 'settings'
+type ViewKey = 'sales' | 'recipes' | 'courses' | 'customers' | 'ingredients' | 'warehouse'
 
 type ViewMeta = {
   label: string
   title: string
   subtitle: string
-  note: string
 }
 
-const VIEWS: Array<{ key: ViewKey; label: string }> = [
-  { key: 'sales', label: 'Ventas' },
-  { key: 'recipes', label: 'Recetas' },
-  { key: 'courses', label: 'Cursos' },
-  { key: 'customers', label: 'Clientes' },
-  { key: 'contacts', label: 'Contactos' },
-  { key: 'ingredients', label: 'Ingredientes' },
-  { key: 'orders', label: 'Pedidos' },
-  { key: 'warehouse', label: 'Almac\u00e9n' },
-  { key: 'settings', label: 'Configuracion' },
+const VIEWS: Array<{ key: ViewKey; label: string; description: string }> = [
+  { key: 'sales', label: 'Ventas', description: 'Ventas anual y comparativas' },
+  { key: 'recipes', label: 'Recetas', description: 'Listado y detalle read-only' },
+  { key: 'courses', label: 'Cursos', description: 'Cursos y asistentes' },
+  { key: 'customers', label: 'Clientes', description: 'Ficha y relaciones' },
+  { key: 'ingredients', label: 'Ingredientes', description: 'Catálogo e inspección' },
+  { key: 'warehouse', label: 'Almacén', description: 'Stock, movimientos e inventario' },
 ]
 
 const VIEW_META: Record<ViewKey, ViewMeta> = {
@@ -37,55 +30,31 @@ const VIEW_META: Record<ViewKey, ViewMeta> = {
     label: 'Ventas',
     title: 'Comparacion anual de ventas',
     subtitle: 'Prototipo minimo para consumir la API read-only de ventas desde React.',
-    note: 'API',
   },
   recipes: {
     label: 'Recetas',
     title: 'Consulta de recetas',
     subtitle: 'Vista read-only minima para explorar lista, detalle y lineas de receta.',
-    note: 'API',
   },
   courses: {
     label: 'Cursos',
     title: 'Consulta de cursos',
     subtitle: 'Vista read-only minima para explorar listado, detalle y asistentes.',
-    note: 'API',
   },
   customers: {
     label: 'Clientes',
     title: 'Consulta de clientes',
     subtitle: 'Ficha, relaciones y estados visibles en una lectura rapida.',
-    note: 'Vista base',
-  },
-  contacts: {
-    label: 'Contactos',
-    title: 'Consulta de contactos',
-    subtitle: 'Listado con detalle lateral para localizar y revisar sin perder contexto.',
-    note: 'Relacionados',
   },
   ingredients: {
     label: 'Ingredientes',
     title: 'Consulta de ingredientes',
     subtitle: 'Vista read-only minima para explorar listado y detalle de ingredientes.',
-    note: 'API',
-  },
-  orders: {
-    label: 'Pedidos',
-    title: 'Consulta de pedidos',
-    subtitle: 'Prioriza lectura del listado, detalle y estados sin saturar la cabecera.',
-    note: 'Operacion',
   },
   warehouse: {
     label: 'Almac\u00e9n',
     title: 'Consulta de almac\u00e9n',
     subtitle: 'Vista read-only de stock, movimientos e inventarios historicos.',
-    note: 'Read-only',
-  },
-  settings: {
-    label: 'Configuracion',
-    title: 'Configuracion y mantenimiento',
-    subtitle: 'Herramientas de soporte con un encuadre mas limpio y predecible.',
-    note: 'Soporte',
   },
 }
 
@@ -94,34 +63,25 @@ function App() {
   const currentView = VIEW_META[activeView]
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
-        <div className="topbar-copy">
-          <p className="eyebrow">Gestion IREKS</p>
-          <h1>{currentView.title}</h1>
-          <p className="view-subtitle">{currentView.subtitle}</p>
-        </div>
-        <div className="topbar-badges" aria-hidden="true">
-          <span className="surface-chip">{currentView.label}</span>
-          <span className="surface-chip surface-chip-muted">{currentView.note}</span>
-        </div>
-        <AppTabs activeView={activeView} onChange={setActiveView} views={VIEWS} />
-      </header>
-
+    <AppShell
+      activeView={activeView}
+      onChangeView={setActiveView}
+      currentTitle={currentView.title}
+      currentSubtitle={currentView.subtitle}
+      currentBadge={currentView.label}
+      navItems={VIEWS}
+    >
       <section className="view-panel">
         <AppErrorBoundary>
           {activeView === 'sales' && <SalesPage />}
           {activeView === 'recipes' && <RecipesPage />}
           {activeView === 'courses' && <CoursesPage />}
           {activeView === 'customers' && <CustomersPage />}
-          {activeView === 'contacts' && <ContactsPage />}
           {activeView === 'ingredients' && <IngredientsPage />}
-          {activeView === 'orders' && <OrdersPage />}
           {activeView === 'warehouse' && <WarehousePage />}
-          {activeView === 'settings' && <SettingsPage />}
         </AppErrorBoundary>
       </section>
-    </main>
+    </AppShell>
   )
 }
 

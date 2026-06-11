@@ -273,40 +273,41 @@ vi.mock('./api/warehouse', () => ({
 }))
 
 describe('App shell smoke', () => {
-  it('renders the app shell and the main tabs', async () => {
+  it('renders the app shell and the main modules', async () => {
     render(<App />)
 
+    expect(screen.getByText('Gestion IREKS')).toBeInTheDocument()
     await screen.findByText('Ventas anual')
 
-    expect(screen.getByRole('tab', { name: 'Ventas' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Recetas' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Cursos' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Clientes' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Ingredientes' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Almac\u00e9n' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ventas' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Recetas' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cursos' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clientes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ingredientes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Almac\u00e9n' })).toBeInTheDocument()
   })
 
-  it('switches the visible page when the user clicks the tabs', async () => {
+  it('switches the visible page when the user clicks the sidebar items', async () => {
     render(<App />)
 
     await screen.findByText('Ventas anual')
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Recetas' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Recetas' }))
     expect(await screen.findByPlaceholderText('Buscar receta por nombre, codigo o proceso')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Cursos' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cursos' }))
     expect(await screen.findByPlaceholderText('Buscar curso por nombre o codigo')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Clientes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Clientes' }))
     expect(await screen.findByPlaceholderText('Buscar cliente por nombre, email o CIF')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Ingredientes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ingredientes' }))
     expect(await screen.findByPlaceholderText('Buscar ingrediente por nombre, codigo o referencia')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Almac\u00e9n' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Almac\u00e9n' }))
     expect(await screen.findByText('Stock actual')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Ventas' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ventas' }))
     expect(await screen.findByText('Ventas anual')).toBeInTheDocument()
   })
 })
