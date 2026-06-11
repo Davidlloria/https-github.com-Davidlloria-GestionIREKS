@@ -5,6 +5,7 @@ import type { ViewKey } from './components/SidebarNav'
 import { ContactsPage } from './pages/ContactsPage'
 import { CoursesPage } from './pages/CoursesPage'
 import { CustomersPage } from './pages/CustomersPage'
+import { DistributorsPage } from './pages/DistributorsPage'
 import { IngredientsPage } from './pages/IngredientsPage'
 import { OrdersPage } from './pages/OrdersPage'
 import { RecipesPage } from './pages/RecipesPage'
@@ -26,6 +27,7 @@ const VIEWS: Array<{ key: ViewKey; label: string; description: string }> = [
   { key: 'contacts', label: 'Contactos', description: 'Consulta read-only' },
   { key: 'orders', label: 'Pedidos', description: 'Consulta read-only' },
   { key: 'technicians', label: 'Tecnicos', description: 'Consulta read-only' },
+  { key: 'distributors', label: 'Distribuidores', description: 'Consulta read-only' },
   { key: 'ingredients', label: 'Ingredientes', description: 'Catalogo e inspeccion' },
   { key: 'warehouse', label: 'Almacen', description: 'Stock, movimientos e inventario' },
 ]
@@ -66,6 +68,11 @@ const VIEW_META: Record<ViewKey, ViewMeta> = {
     title: 'Consulta de tecnicos',
     subtitle: 'Vista read-only minima para explorar listado y detalle de tecnicos.',
   },
+  distributors: {
+    label: 'Distribuidores',
+    title: 'Consulta de distribuidores',
+    subtitle: 'Vista read-only minima para explorar listado y detalle de distribuidores.',
+  },
   ingredients: {
     label: 'Ingredientes',
     title: 'Consulta de ingredientes',
@@ -100,6 +107,7 @@ function App() {
           {activeView === 'contacts' && <ContactsPage />}
           {activeView === 'orders' && <OrdersPage />}
           {activeView === 'technicians' && <TechniciansPage />}
+          {activeView === 'distributors' && <DistributorsPage />}
           {activeView === 'ingredients' && <IngredientsPage />}
           {activeView === 'warehouse' && <WarehousePage />}
         </AppErrorBoundary>

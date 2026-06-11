@@ -206,6 +206,27 @@ const technicianDetail = {
   updated_at: null,
 }
 
+const distributorList = {
+  items: [
+    {
+      distribuidor_id: 'DIST-1',
+      distribuidor_codigo: 10,
+      distribuidor_razon_social: 'Distribuciones Norte SL',
+      distribuidor_nombre_comercial: 'Norte',
+      distribuidor_cif: 'B123',
+      distribuidor_telefono: '928000011',
+      distribuidor_contacto: 'Ana',
+    },
+  ],
+  total: 1,
+  limit: 25,
+  offset: 0,
+}
+
+const distributorDetail = {
+  ...distributorList.items[0],
+}
+
 const customerList = {
   items: [
     {
@@ -375,6 +396,11 @@ vi.mock('./api/technicians', () => ({
   listTechnicians: vi.fn(async () => technicianList),
 }))
 
+vi.mock('./api/distributors', () => ({
+  getDistributorDetail: vi.fn(async () => distributorDetail),
+  listDistributors: vi.fn(async () => distributorList),
+}))
+
 describe('App shell smoke', () => {
   it('renders the app shell and the main modules', async () => {
     render(<App />)
@@ -389,6 +415,7 @@ describe('App shell smoke', () => {
     expect(screen.getByRole('button', { name: 'Contactos' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Pedidos' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Tecnicos' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Distribuidores' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ingredientes' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Almacen' })).toBeInTheDocument()
   })
@@ -415,6 +442,9 @@ describe('App shell smoke', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Tecnicos' }))
     expect(await screen.findByPlaceholderText('Buscar por nombre, apellido, movil, interno o email')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Distribuidores' }))
+    expect(await screen.findByPlaceholderText('Buscar por codigo, nombre, razon social, CIF o contacto')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Ingredientes' }))
     expect(await screen.findByPlaceholderText('Buscar ingrediente por nombre, codigo o referencia')).toBeInTheDocument()
