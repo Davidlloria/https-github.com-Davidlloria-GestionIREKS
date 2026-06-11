@@ -81,14 +81,6 @@ export function CustomersPage() {
 
   return (
     <section className="page-grid customers-layout">
-      <header className="customers-page-title">
-        <div>
-          <p className="module-kicker">Modulo read-only</p>
-          <h2>Clientes</h2>
-          <p className="module-description">Consulta compacta de clientes con detalle, tipo y relaciones asociadas.</p>
-        </div>
-      </header>
-
       <div className="customers-shell">
         <aside className="customers-list-pane">
           <div className="customers-filter-card">

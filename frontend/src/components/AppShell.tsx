@@ -20,20 +20,26 @@ export function AppShell({
   navItems,
   children,
 }: AppShellProps) {
+  const isCustomers = activeView === 'customers'
+
   return (
-    <div className={`app-shell ${activeView === 'customers' ? 'app-shell-customers' : ''}`}>
-      <header className="app-header">
+    <div className={`app-shell ${isCustomers ? 'app-shell-customers' : ''}`}>
+      <header className={`app-header ${isCustomers ? 'app-header-customers' : ''}`}>
         <div className="app-brand app-brand-compact">
           <div className="app-brand-row">
             <p className="app-brand-kicker">Gestion IREKS</p>
             <span className="app-brand-title-chip">{currentBadge}</span>
           </div>
-          <h1>{currentTitle}</h1>
-          <p className="app-brand-subtitle">{currentSubtitle}</p>
+          {!isCustomers && (
+            <>
+              <h1>{currentTitle}</h1>
+              <p className="app-brand-subtitle">{currentSubtitle}</p>
+            </>
+          )}
         </div>
       </header>
 
-      <div className="app-nav-shell">
+      <div className={`app-nav-shell ${isCustomers ? 'app-nav-shell-customers' : ''}`}>
         <SidebarNav activeView={activeView} onChange={onChangeView} items={navItems} />
       </div>
 
