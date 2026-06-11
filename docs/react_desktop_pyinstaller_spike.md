@@ -12,6 +12,7 @@ This spike checks whether the current React + FastAPI launcher can be packaged w
   - the FastAPI app in-process with `uvicorn`;
   - the React static server in-process with `ThreadingHTTPServer`.
 - The bundle expects `frontend/dist` to be included as `frontend/dist` inside the PyInstaller runtime tree.
+- The bundle also stages `data/gestion_ireks.db` into `_internal/data/gestion_ireks.db`.
 - A minimal PyInstaller spec was added.
 - A small build wrapper script was added.
 
@@ -40,6 +41,7 @@ Expected output:
 - The launcher remains the source of truth.
 - `--build` stays available only in source mode.
 - The bundle is intentionally not optimized for size.
+- The build wrapper fails fast if `data/gestion_ireks.db` is missing or empty.
 
 ## Commands validated
 

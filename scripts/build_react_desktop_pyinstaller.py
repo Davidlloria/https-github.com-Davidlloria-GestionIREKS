@@ -2,13 +2,33 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from shutil import copytree, rmtree
+from shutil import copy2, copytree, rmtree
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC_FILE = ROOT / "react_desktop_launcher.spec"
 FRONTEND_DIST = ROOT / "frontend" / "dist"
+SOURCE_DB = ROOT / "data" / "gestion_ireks.db"
+
+
+def stage_runtime_assets(bundle_root: Path) -> None:
+    if not SOURCE_DB.exists():
+        raise RuntimeError(f"No existe la base de datos real: {SOURCE_DB}")
+    if SOURCE_DB.stat().st_size == 0:
+        raise RuntimeError(f"La base de datos real esta vacia: {SOURCE_DB}")
+
+    bundle_frontend_dist = bundle_root / "_internal" / "frontend" / "dist"
+    if bundle_frontend_dist.exists():
+        rmtree(bundle_frontend_dist)
+    bundle_frontend_dist.parent.mkdir(parents=True, exist_ok=True)
+    copytree(FRONTEND_DIST, bundle_frontend_dist)
+
+    bundle_db = bundle_root / "_internal" / "data" / "gestion_ireks.db"
+    bundle_db.parent.mkdir(parents=True, exist_ok=True)
+    copy2(SOURCE_DB, bundle_db)
+    if bundle_db.stat().st_size == 0:
+        raise RuntimeError(f"La base de datos empaquetada quedo vacia: {bundle_db}")
 
 
 def main() -> int:
@@ -42,11 +62,7 @@ def main() -> int:
         return result.returncode
 
     bundle_root = ROOT / "dist" / "react_desktop_pyinstaller" / "GestionIREKSReactDesktop"
-    bundle_frontend_dist = bundle_root / "_internal" / "frontend" / "dist"
-    if bundle_frontend_dist.exists():
-        rmtree(bundle_frontend_dist)
-    bundle_frontend_dist.parent.mkdir(parents=True, exist_ok=True)
-    copytree(FRONTEND_DIST, bundle_frontend_dist)
+    stage_runtime_assets(bundle_root)
 
     return result.returncode
 

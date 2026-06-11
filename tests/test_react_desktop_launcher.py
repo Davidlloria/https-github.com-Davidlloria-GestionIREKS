@@ -83,3 +83,12 @@ def test_get_frontend_dist_uses_bundle_root(monkeypatch):
     monkeypatch.setattr(module.sys, '_MEIPASS', str(bundle_root), raising=False)
 
     assert module.get_frontend_dist() == bundle_root / 'frontend' / 'dist'
+
+
+def test_get_runtime_db_path_uses_bundle_root(monkeypatch):
+    module = load_launcher_module()
+    monkeypatch.setattr(module, 'RUNNING_IN_BUNDLE', True)
+    bundle_root = Path('C:/bundle-root')
+    monkeypatch.setattr(module.sys, '_MEIPASS', str(bundle_root), raising=False)
+
+    assert module.get_runtime_db_path() == bundle_root / 'data' / 'gestion_ireks.db'

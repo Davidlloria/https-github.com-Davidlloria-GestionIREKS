@@ -38,6 +38,10 @@ def get_frontend_dist() -> Path:
     return get_runtime_root() / "frontend" / "dist"
 
 
+def get_runtime_db_path() -> Path:
+    return get_runtime_root() / "data" / "gestion_ireks.db"
+
+
 _children: list[subprocess.Popen[str]] = []
 _frozen_api_server: uvicorn.Server | None = None
 _frozen_api_thread: threading.Thread | None = None
@@ -88,6 +92,23 @@ def run_frontend_build() -> None:
     result = subprocess.run(build_command, cwd=str(FRONTEND_DIR), check=False, creationflags=creationflags)
     if result.returncode != 0:
         raise RuntimeError("El build del frontend ha fallado. Ejecuta 'cd frontend' y 'npm.cmd run build' para ver el error.")
+
+
+def validate_runtime_database() -> None:
+    if not RUNNING_IN_BUNDLE:
+        return
+
+    db_path = get_runtime_db_path()
+    if not db_path.exists():
+        raise RuntimeError(
+            "No existe la base de datos real en el bundle.\n"
+            "Vuelve a ejecutar el build PyInstaller y asegúrate de copiar data/gestion_ireks.db."
+        )
+    if db_path.stat().st_size == 0:
+        raise RuntimeError(
+            "La base de datos del bundle esta vacia.\n"
+            "Vuelve a ejecutar el build PyInstaller con data/gestion_ireks.db real."
+        )
 
 
 class QuietStaticHandler(SimpleHTTPRequestHandler):
@@ -299,6 +320,7 @@ def main() -> int:
 
     try:
         if RUNNING_IN_BUNDLE:
+            validate_runtime_database()
             print(f"Starting API on http://{args.api_host}:{args.api_port}")
             start_frozen_api_server(args.api_host, args.api_port)
 
