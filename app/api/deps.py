@@ -11,6 +11,7 @@ from app.services.recipe_service import RecipeService
 from app.services.order_document_import_service import OrderDocumentImportService
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderService
+from app.services.distributor_service import DistributorService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
 from app.services.settings_import_service import SettingsImportService
 from app.services.settings_maintenance_service import SettingsMaintenanceService
@@ -69,6 +70,10 @@ def get_sales_annual_comparison_service() -> SalesAnnualComparisonService:
 
 def get_technician_service() -> TechnicianService:
     return TechnicianService()
+
+
+def get_distributor_service() -> DistributorService:
+    return DistributorService()
 
 
 def get_settings_import_service() -> SettingsImportService:

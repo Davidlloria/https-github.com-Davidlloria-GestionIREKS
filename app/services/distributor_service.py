@@ -5,7 +5,9 @@ from pathlib import Path
 from sqlmodel import Session
 
 from app.core.database import engine
+from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
 from app.models import Distribuidor
+from app.schemas.distributors import DistributorDetail, DistributorListItem, DistributorListResponse
 from app.services.import_service import ImportService
 from app.viewmodels.distributor_viewmodel import DistributorViewModel
 
@@ -18,6 +20,29 @@ class DistributorService:
     def list(self, term: str = "") -> list[Distribuidor]:
         with Session(engine) as session:
             return self.vm.list(session, term)
+
+    def list_payload(
+        self,
+        term: str = "",
+        *,
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
+    ) -> DistributorListResponse:
+        rows = self.list(term)
+        page_rows = page_items(rows, limit=limit, offset=offset)
+        return DistributorListResponse(
+            items=DistributorListItem.list_from_entities(page_rows),
+            total=len(rows),
+            limit=limit,
+            offset=offset,
+        )
+
+    def detail_payload(self, distribuidor_id: str) -> DistributorDetail | None:
+        with Session(engine) as session:
+            entity = self.vm.get(session, distribuidor_id)
+            if entity is None:
+                return None
+            return DistributorDetail.from_entity(entity)
 
     def create(self, payload: dict) -> None:
         with Session(engine) as session:

@@ -25,6 +25,7 @@ from app.schemas.courses import (
     CourseListItem,
     CourseListResponse,
 )
+from app.schemas.distributors import DistributorDetail, DistributorListItem, DistributorListResponse
 from app.schemas.ingredients import (
     CatalogOption,
     IngredientActiveUpdate,
@@ -146,6 +147,9 @@ __all__ = [
     "CourseAttendeeListResponse",
     "CourseListItem",
     "CourseListResponse",
+    "DistributorDetail",
+    "DistributorListItem",
+    "DistributorListResponse",
     "DocumentImportRequest",
     "FacturaItemRead",
     "FacturaRead",

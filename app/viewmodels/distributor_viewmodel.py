@@ -16,6 +16,9 @@ class DistributorViewModel:
     def list(self, session: Session, term: str = "") -> list[Distribuidor]:
         return self.repository.search(session, term)
 
+    def get(self, session: Session, distribuidor_id: str) -> Distribuidor | None:
+        return self.repository.get(session, distribuidor_id)
+
     def create(self, session: Session, payload: dict) -> Distribuidor:
         self._normalize_ids(payload, force=True)
         self._ensure_distribuidor_codigo(session, payload, force=True)

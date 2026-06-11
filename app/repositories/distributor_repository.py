@@ -34,8 +34,11 @@ class DistributorRepository(BaseRepository[Distribuidor]):
         )
         return list(session.exec(stmt))
 
-    def get_by_id(self, session: Session, entity_id: object) -> Distribuidor | None:
+    def get(self, session: Session, entity_id: object) -> Distribuidor | None:
         return session.get(Distribuidor, entity_id)
+
+    def get_by_id(self, session: Session, entity_id: object) -> Distribuidor | None:
+        return self.get(session, entity_id)
 
     def delete(self, session: Session, entity_id: object) -> bool:
         entity = self.get_by_id(session, entity_id)
