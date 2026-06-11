@@ -50,8 +50,8 @@ const VIEW_META: Record<ViewKey, ViewMeta> = {
   },
   customers: {
     label: 'Clientes',
-    title: 'Consulta de clientes',
-    subtitle: 'Ficha, relaciones y estados visibles en una lectura rapida.',
+    title: 'Clientes',
+    subtitle: 'Consulta read-only de clientes con detalle compacto y relaciones.',
   },
   contacts: {
     label: 'Contactos',

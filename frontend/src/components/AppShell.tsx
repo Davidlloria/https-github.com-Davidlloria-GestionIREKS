@@ -33,14 +33,11 @@ export function AppShell({
         </div>
       </header>
 
-      <div className="app-body">
-        <aside className="app-sidebar">
-          <div className="app-sidebar-title">{"Módulos"}</div>
-          <SidebarNav activeView={activeView} onChange={onChangeView} items={navItems} />
-        </aside>
-
-        <main className="app-content">{children}</main>
+      <div className="app-nav-shell">
+        <SidebarNav activeView={activeView} onChange={onChangeView} items={navItems} />
       </div>
+
+      <main className="app-content">{children}</main>
     </div>
   )
 }

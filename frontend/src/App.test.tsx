@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
 
@@ -432,10 +432,10 @@ describe('App shell smoke', () => {
     expect(await screen.findByPlaceholderText('Buscar curso por nombre o codigo')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Clientes' }))
-    expect(await screen.findByPlaceholderText('Buscar cliente por nombre, email o CIF')).toBeInTheDocument()
+    expect(await screen.findByPlaceholderText('Buscar cliente...')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Contactos' }))
-    expect(await screen.findByPlaceholderText('Buscar por nombre, apellido, cargo, email o empresa')).toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('main')).getByRole('button', { name: 'Contactos' }))
+    expect(await screen.findByText('1 contactos')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Pedidos' }))
     expect(await screen.findByPlaceholderText('Ano (ej: 2026)')).toBeInTheDocument()
