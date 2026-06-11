@@ -64,41 +64,63 @@ export function ContactsPage() {
 
   return (
     <section className="page-grid">
-      <div className="toolbar">
-        <input
-          className="input"
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value)
-            setPageIndex(0)
-          }}
-          placeholder="Buscar por nombre, apellido, cargo, email o empresa"
-        />
-        <select
-          className="select"
-          value={companyFilter}
-          onChange={(event) => {
-            setCompanyFilter(event.target.value)
-            setPageIndex(0)
-          }}
-        >
-          <option value="">Todas las empresas</option>
-          {companiesQuery.data.map((company) => (
-            <option key={company.cliente_id} value={company.cliente_id}>
-              {company.nombre}
-            </option>
-          ))}
-        </select>
-        <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
-          Anterior
-        </button>
-        <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
-          Siguiente
-        </button>
-        <span className="state">
-          Pagina {currentPage} de {totalPages}
-        </span>
-      </div>
+      <header className="module-header">
+        <div className="module-header-copy">
+          <p className="module-kicker">Modulo read-only</p>
+          <h2>Contactos</h2>
+          <p className="module-description">
+            Consulta de contactos con filtros por empresa y detalle lateral para revisar datos de contacto y trazabilidad.
+          </p>
+        </div>
+        <div className="module-header-meta">
+          <span className="surface-chip">Pagina {currentPage} de {totalPages}</span>
+          <span className="surface-chip">Vista sin mutaciones</span>
+        </div>
+      </header>
+
+      <section className="panel-section">
+        <div className="section-heading">
+          <div>
+            <h3>Filtros</h3>
+            <p>Usa el texto libre y el filtro de empresa para acotar el listado.</p>
+          </div>
+          <div className="toolbar pager-toolbar">
+            <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
+              Anterior
+            </button>
+            <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
+              Siguiente
+            </button>
+          </div>
+        </div>
+
+        <div className="toolbar">
+          <input
+            className="input"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value)
+              setPageIndex(0)
+            }}
+            placeholder="Buscar por nombre, apellido, cargo, email o empresa"
+          />
+          <select
+            className="select"
+            value={companyFilter}
+            onChange={(event) => {
+              setCompanyFilter(event.target.value)
+              setPageIndex(0)
+            }}
+          >
+            <option value="">Todas las empresas</option>
+            {companiesQuery.data.map((company) => (
+              <option key={company.cliente_id} value={company.cliente_id}>
+                {company.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
 
       <div className="cards">
         <StatCard label="Total contactos" value={totals.total} />
@@ -115,37 +137,54 @@ export function ContactsPage() {
       />
 
       {!!contactRows.length && (
-        <div className="split-panel">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Empresa</th>
-                  <th>Cargo</th>
-                  <th>Email</th>
-                  <th>Telefono</th>
-                </tr>
-              </thead>
-              <tbody>
-                {contactRows.map((row) => (
-                  <tr
-                    key={row.contacto_id}
-                    className={row.contacto_id === selectedContactId ? 'row-selected' : ''}
-                    onClick={() => setSelectedCandidateId(row.contacto_id)}
-                  >
-                    <td>{fullName(row) || '(sin nombre)'}</td>
-                    <td>{row.cliente_nombre || '-'}</td>
-                    <td>{row.cargo || '-'}</td>
-                    <td>{row.email || '-'}</td>
-                    <td>{row.telefono || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="orders-workspace">
+          <section className="orders-list-panel">
+            <div className="panel-section">
+              <div className="section-heading">
+                <div>
+                  <h3>Listado de contactos</h3>
+                  <p>Selecciona una fila para revisar el detalle lateral del contacto activo.</p>
+                </div>
+                <span className="surface-chip">Mostrando {contactRows.length} de {contactsQuery.data.total}</span>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Nombre</th>
+                      <th>Empresa</th>
+                      <th>Cargo</th>
+                      <th>Email</th>
+                      <th>Telefono</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {contactRows.map((row) => (
+                      <tr
+                        key={row.contacto_id}
+                        className={row.contacto_id === selectedContactId ? 'row-selected' : ''}
+                        onClick={() => setSelectedCandidateId(row.contacto_id)}
+                      >
+                        <td>{fullName(row) || '(sin nombre)'}</td>
+                        <td>{row.cliente_nombre || '-'}</td>
+                        <td>{row.cargo || '-'}</td>
+                        <td>{row.email || '-'}</td>
+                        <td>{row.telefono || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
 
-          <aside className="detail-panel">
+          <aside className="detail-panel detail-panel-orders">
+            <div className="section-heading section-heading-compact">
+              <div>
+                <h3>Detalle de contacto</h3>
+                <p>Datos de identidad, empresa y trazabilidad del registro seleccionado.</p>
+              </div>
+            </div>
             {!selectedContactId && <div className="state">Selecciona un contacto para ver el detalle.</div>}
             {!!selectedContactId && (
               <>
