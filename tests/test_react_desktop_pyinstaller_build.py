@@ -22,7 +22,7 @@ def test_stage_runtime_assets_copies_database_and_frontend():
         bundle_root = Path(temp_dir) / 'GestionIREKSReactDesktop'
         module.stage_runtime_assets(bundle_root)
 
-        db_path = bundle_root / '_internal' / 'data' / 'gestion_ireks.db'
+        db_path = bundle_root / 'data' / 'gestion_ireks.db'
         frontend_index = bundle_root / '_internal' / 'frontend' / 'dist' / 'index.html'
 
         assert db_path.exists()

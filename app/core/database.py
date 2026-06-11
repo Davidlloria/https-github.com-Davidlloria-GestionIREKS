@@ -1,6 +1,7 @@
 ﻿from collections.abc import Iterator, Sequence
 from datetime import date
 from pathlib import Path
+import os
 import shutil
 import sqlite3
 from typing import Any
@@ -11,9 +12,22 @@ from sqlmodel import Session, SQLModel, create_engine
 from app.core.config import DATA_DIR, DB_PATH, DB_URL, LEGACY_DB_PATH
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+EXTERNAL_DATA_DIR = bool(os.environ.get("GESTION_IREKS_DATA_DIR"))
 
 
 def _bootstrap_database_file() -> None:
+    if EXTERNAL_DATA_DIR:
+        if not DB_PATH.exists():
+            raise RuntimeError(
+                "No existe la base de datos externa para el ejecutable.\n"
+                "Crea GestionIREKSReactDesktop/data/gestion_ireks.db o vuelve a ejecutar el build."
+            )
+        if DB_PATH.stat().st_size == 0:
+            raise RuntimeError(
+                "La base de datos externa para el ejecutable esta vacia.\n"
+                "Crea GestionIREKSReactDesktop/data/gestion_ireks.db con la base de datos real."
+            )
+        return
     if DB_PATH.exists() or not LEGACY_DB_PATH.exists():
         return
     shutil.copy2(LEGACY_DB_PATH, DB_PATH)

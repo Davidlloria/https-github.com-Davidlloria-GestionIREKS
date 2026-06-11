@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import tempfile
 from pathlib import Path
 
 
@@ -88,7 +89,49 @@ def test_get_frontend_dist_uses_bundle_root(monkeypatch):
 def test_get_runtime_db_path_uses_bundle_root(monkeypatch):
     module = load_launcher_module()
     monkeypatch.setattr(module, 'RUNNING_IN_BUNDLE', True)
-    bundle_root = Path('C:/bundle-root')
-    monkeypatch.setattr(module.sys, '_MEIPASS', str(bundle_root), raising=False)
+    monkeypatch.setattr(module.sys, 'executable', str(Path('C:/bundle-root/GestionIREKSReactDesktop.exe')), raising=False)
 
-    assert module.get_runtime_db_path() == bundle_root / 'data' / 'gestion_ireks.db'
+    assert module.get_runtime_db_path() == Path('C:/bundle-root/data/gestion_ireks.db')
+
+
+def test_get_runtime_db_path_honors_env_override(monkeypatch):
+    module = load_launcher_module()
+    monkeypatch.setenv('GESTION_IREKS_DATA_DIR', 'C:/external-data')
+    monkeypatch.setattr(module, 'RUNNING_IN_BUNDLE', True)
+    monkeypatch.setattr(module.sys, 'executable', str(Path('C:/bundle-root/GestionIREKSReactDesktop.exe')), raising=False)
+
+    assert module.get_runtime_db_path() == Path('C:/external-data/gestion_ireks.db')
+
+
+def test_validate_runtime_database_rejects_missing_external_db(monkeypatch):
+    module = load_launcher_module()
+    monkeypatch.setattr(module, 'RUNNING_IN_BUNDLE', True)
+    monkeypatch.setattr(module.sys, 'executable', str(Path('C:/bundle-root/GestionIREKSReactDesktop.exe')), raising=False)
+
+    try:
+        module.validate_runtime_database()
+    except RuntimeError as exc:
+        assert 'base de datos real' in str(exc).lower()
+    else:
+        raise AssertionError('validate_runtime_database should reject a missing external database')
+
+
+def test_validate_runtime_database_rejects_empty_external_db(monkeypatch):
+    module = load_launcher_module()
+    monkeypatch.setattr(module, 'RUNNING_IN_BUNDLE', True)
+    root = Path(__file__).resolve().parents[1]
+
+    with tempfile.TemporaryDirectory(dir=root) as temp_dir:
+        temp_root = Path(temp_dir)
+        data_dir = temp_root / 'data'
+        data_dir.mkdir(parents=True, exist_ok=True)
+        db_path = data_dir / 'gestion_ireks.db'
+        db_path.write_bytes(b'')
+        monkeypatch.setattr(module.sys, 'executable', str(temp_root / 'GestionIREKSReactDesktop.exe'), raising=False)
+
+        try:
+            module.validate_runtime_database()
+        except RuntimeError as exc:
+            assert 'vacia' in str(exc).lower()
+        else:
+            raise AssertionError('validate_runtime_database should reject an empty external database')

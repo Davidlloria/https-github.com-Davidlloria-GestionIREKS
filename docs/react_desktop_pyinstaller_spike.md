@@ -12,7 +12,8 @@ This spike checks whether the current React + FastAPI launcher can be packaged w
   - the FastAPI app in-process with `uvicorn`;
   - the React static server in-process with `ThreadingHTTPServer`.
 - The bundle expects `frontend/dist` to be included as `frontend/dist` inside the PyInstaller runtime tree.
-- The bundle also stages `data/gestion_ireks.db` into `_internal/data/gestion_ireks.db`.
+- The executable now reads its SQLite database from `GestionIREKSReactDesktop/data/gestion_ireks.db` by default.
+- If `GESTION_IREKS_DATA_DIR` is set, that directory wins and `gestion_ireks.db` is resolved there.
 - A minimal PyInstaller spec was added.
 - A small build wrapper script was added.
 
@@ -41,7 +42,9 @@ Expected output:
 - The launcher remains the source of truth.
 - `--build` stays available only in source mode.
 - The bundle is intentionally not optimized for size.
-- The build wrapper fails fast if `data/gestion_ireks.db` is missing or empty.
+- The build wrapper stages the SQLite file next to the exe, not inside `_internal`.
+- The launcher fails fast if the external database is missing or empty.
+- The app no longer silently creates a blank database in bundled mode.
 
 ## Commands validated
 

@@ -24,9 +24,18 @@ def stage_runtime_assets(bundle_root: Path) -> None:
     bundle_frontend_dist.parent.mkdir(parents=True, exist_ok=True)
     copytree(FRONTEND_DIST, bundle_frontend_dist)
 
-    bundle_db = bundle_root / "_internal" / "data" / "gestion_ireks.db"
+    bundle_db = bundle_root / "data" / "gestion_ireks.db"
+    if bundle_db.parent.exists() and bundle_db.is_file():
+        bundle_db.unlink()
     bundle_db.parent.mkdir(parents=True, exist_ok=True)
     copy2(SOURCE_DB, bundle_db)
+    for suffix in ("-wal", "-shm"):
+        source_sidecar = SOURCE_DB.with_name(f"{SOURCE_DB.name}{suffix}")
+        bundle_sidecar = bundle_db.with_name(f"{bundle_db.name}{suffix}")
+        if source_sidecar.exists():
+            copy2(source_sidecar, bundle_sidecar)
+        elif bundle_sidecar.exists():
+            bundle_sidecar.unlink()
     if bundle_db.stat().st_size == 0:
         raise RuntimeError(f"La base de datos empaquetada quedo vacia: {bundle_db}")
 

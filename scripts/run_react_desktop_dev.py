@@ -22,6 +22,7 @@ FRONTEND_DIR = PROJECT_ROOT / "frontend"
 API_HOST = "127.0.0.1"
 API_PORT = 8000
 FRONTEND_PORT = 5173
+RUNTIME_DATA_DIR_ENV = "GESTION_IREKS_DATA_DIR"
 RUNNING_IN_BUNDLE = bool(getattr(sys, "frozen", False))
 
 
@@ -34,12 +35,25 @@ def get_runtime_root() -> Path:
     return PROJECT_ROOT
 
 
+def get_distribution_root() -> Path:
+    if RUNNING_IN_BUNDLE:
+        return Path(sys.executable).resolve().parent
+    return PROJECT_ROOT
+
+
+def get_runtime_data_dir() -> Path:
+    override = os.environ.get(RUNTIME_DATA_DIR_ENV)
+    if override:
+        return Path(override)
+    return get_distribution_root() / "data"
+
+
 def get_frontend_dist() -> Path:
     return get_runtime_root() / "frontend" / "dist"
 
 
 def get_runtime_db_path() -> Path:
-    return get_runtime_root() / "data" / "gestion_ireks.db"
+    return get_runtime_data_dir() / "gestion_ireks.db"
 
 
 _children: list[subprocess.Popen[str]] = []
@@ -107,8 +121,13 @@ def validate_runtime_database() -> None:
     if db_path.stat().st_size == 0:
         raise RuntimeError(
             "La base de datos del bundle esta vacia.\n"
-            "Vuelve a ejecutar el build PyInstaller con data/gestion_ireks.db real."
+            "Crea GestionIREKSReactDesktop/data/gestion_ireks.db con la base de datos real."
         )
+
+
+def configure_runtime_environment() -> None:
+    if RUNNING_IN_BUNDLE:
+        os.environ.setdefault(RUNTIME_DATA_DIR_ENV, str(get_runtime_data_dir()))
 
 
 class QuietStaticHandler(SimpleHTTPRequestHandler):
@@ -137,6 +156,7 @@ def start_process(command: list[str], cwd: Path, extra_env: dict[str, str] | Non
 def start_frozen_api_server(host: str, port: int) -> None:
     global _frozen_api_server, _frozen_api_thread
 
+    configure_runtime_environment()
     from app.api.main import app as fastapi_app
 
     server = uvicorn.Server(
