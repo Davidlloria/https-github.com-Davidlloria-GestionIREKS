@@ -75,26 +75,53 @@ export function RecipesPage() {
 
   return (
     <section className="page-grid">
-      <div className="toolbar">
-        <input
-          className="input"
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value)
-            setPageIndex(0)
-          }}
-          placeholder="Buscar receta por nombre, codigo o proceso"
-        />
-        <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
-          Anterior
-        </button>
-        <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
-          Siguiente
-        </button>
-        <span className="state">
-          Pagina {currentPage} de {totalPages}
-        </span>
-      </div>
+      <header className="module-header">
+        <div className="module-header-copy">
+          <p className="module-kicker">Modulo read-only</p>
+          <h2>Recetas</h2>
+          <p className="module-description">
+            Consulta de recetas con detalle lateral, cabecera separada y composicion de lineas para revisar la formula sin editar.
+          </p>
+        </div>
+        <div className="module-header-meta">
+          <span className="surface-chip">Pagina {currentPage} de {totalPages}</span>
+          <span className="surface-chip">Vista sin mutaciones</span>
+        </div>
+      </header>
+
+      <section className="panel-section">
+        <div className="section-heading">
+          <div>
+            <h3>Filtros</h3>
+            <p>Busca por nombre, codigo o proceso y usa la paginacion antes de abrir detalle.</p>
+          </div>
+          <div className="toolbar pager-toolbar">
+            <button
+              type="button"
+              className="action-btn"
+              disabled={!hasPreviousPage}
+              onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+            >
+              Anterior
+            </button>
+            <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
+              Siguiente
+            </button>
+          </div>
+        </div>
+
+        <div className="toolbar">
+          <input
+            className="input"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value)
+              setPageIndex(0)
+            }}
+            placeholder="Buscar receta por nombre, codigo o proceso"
+          />
+        </div>
+      </section>
 
       <div className="cards">
         <StatCard label="Total recetas" value={totals.total} />
@@ -111,37 +138,54 @@ export function RecipesPage() {
       />
 
       {!!recipeRows.length && (
-        <div className="split-panel">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Codigo</th>
-                  <th>Nombre</th>
-                  <th>Version</th>
-                  <th>Estado</th>
-                  <th>Base</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recipeRows.map((recipe) => (
-                  <tr
-                    key={recipe.id ?? recipe.codigo_receta}
-                    className={recipe.id === selectedRecipeId ? 'row-selected' : ''}
-                    onClick={() => setSelectedCandidateId(recipe.id)}
-                  >
-                    <td>{recipe.codigo_receta || recipe.id}</td>
-                    <td>{recipe.nombre || '-'}</td>
-                    <td>{recipe.version || '-'}</td>
-                    <td>{recipe.estado || '-'}</td>
-                    <td>{recipe.es_base ? 'Si' : 'No'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="orders-workspace">
+          <section className="orders-list-panel">
+            <div className="panel-section">
+              <div className="section-heading">
+                <div>
+                  <h3>Listado de recetas</h3>
+                  <p>Selecciona una fila para cargar la cabecera y las lineas en el panel lateral.</p>
+                </div>
+                <span className="surface-chip">Mostrando {recipeRows.length} de {recipesQuery.data.total}</span>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Codigo</th>
+                      <th>Nombre</th>
+                      <th>Version</th>
+                      <th>Estado</th>
+                      <th>Base</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recipeRows.map((recipe) => (
+                      <tr
+                        key={recipe.id ?? recipe.codigo_receta}
+                        className={recipe.id === selectedRecipeId ? 'row-selected' : ''}
+                        onClick={() => setSelectedCandidateId(recipe.id)}
+                      >
+                        <td>{recipe.codigo_receta || recipe.id}</td>
+                        <td>{recipe.nombre || '-'}</td>
+                        <td>{recipe.version || '-'}</td>
+                        <td>{recipe.estado || '-'}</td>
+                        <td>{recipe.es_base ? 'Si' : 'No'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
 
-          <aside className="detail-panel">
+          <aside className="detail-panel detail-panel-orders">
+            <div className="section-heading section-heading-compact">
+              <div>
+                <h3>Detalle de receta</h3>
+                <p>Cabecera de receta y composicion separadas en secciones claras.</p>
+              </div>
+            </div>
             {!selectedRecipeId && <div className="state">Selecciona una receta para ver el detalle.</div>}
             {!!selectedRecipeId && (
               <>
@@ -182,7 +226,21 @@ export function RecipesPage() {
                     </dl>
 
                     <div className="related-block">
-                      <h3>Lineas de receta</h3>
+                      <div className="section-heading section-heading-compact">
+                        <div>
+                          <h3>Cabecera de receta</h3>
+                          <p>Resumen de datos principales de la receta activa.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="related-block">
+                      <div className="section-heading section-heading-compact">
+                        <div>
+                          <h3>Lineas de receta</h3>
+                          <p>Composicion read-only de la formula seleccionada.</p>
+                        </div>
+                      </div>
                       {!detailQuery.data.items.length && <div className="state">Sin lineas.</div>}
                       {!!detailQuery.data.items.length && (
                         <div className="table-wrap">
