@@ -434,8 +434,8 @@ describe('App shell smoke', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clientes' }))
     expect(await screen.findByPlaceholderText('Buscar cliente...')).toBeInTheDocument()
 
-    fireEvent.click(within(screen.getByRole('main')).getByRole('button', { name: 'Contactos' }))
-    expect(await screen.findByText('1 contactos')).toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Navegacion principal' })).getByRole('button', { name: 'Contactos' }))
+    expect(await screen.findByRole('heading', { name: 'Contactos' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Pedidos' }))
     expect(await screen.findByPlaceholderText('Ano (ej: 2026)')).toBeInTheDocument()
