@@ -7,6 +7,7 @@ export interface CustomerListItem {
   cliente_grupo: string
   cliente_tipo: string
   cliente_direccion_isla_id?: string
+  cliente_direccion_isla?: string
   cliente_email: string
   cliente_telefono: string
   cliente_prospeccion: boolean
@@ -22,5 +23,6 @@ export interface CustomerDetail extends CustomerListItem {
   cliente_direccion_municipio_id: string
   cliente_direccion_provincia_id: string
   cliente_direccion_isla_id: string
+  cliente_direccion_isla?: string
   distribuidor_id: string
 }

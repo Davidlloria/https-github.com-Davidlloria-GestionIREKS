@@ -130,7 +130,7 @@ export function CustomersPage() {
                       >
                         <td>{customer.cliente_codigo}</td>
                         <td>{customerLabel(customer)}</td>
-                        <td>{customer.cliente_direccion_isla_id || '-'}</td>
+                        <td>{customer.cliente_direccion_isla || customer.cliente_direccion_isla_id || '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -222,7 +222,11 @@ export function CustomersPage() {
                       </label>
                       <label>
                         <span>Isla</span>
-                        <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_direccion_isla_id)} />
+                        <input
+                          className="input customers-field"
+                          readOnly
+                          value={valueOrDash(detailQuery.data.cliente_direccion_isla || detailQuery.data.cliente_direccion_isla_id)}
+                        />
                       </label>
                       <label>
                         <span>Municipio</span>

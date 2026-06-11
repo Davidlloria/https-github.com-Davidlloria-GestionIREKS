@@ -805,13 +805,13 @@ tbody tr:hover {
 }
 
 .app-nav-shell-customers {
-  margin-top: -6px;
+  margin-top: -4px;
 }
 
 .sidebar-nav {
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   padding: 0;
   overflow: hidden;
@@ -828,11 +828,11 @@ tbody tr:hover {
   gap: 1px;
   min-width: 0;
   width: 100%;
-  padding: 9px 12px;
-  border-radius: 10px 10px 6px 6px;
+  padding: 8px 12px;
+  border-radius: 8px 8px 0 0;
   overflow: hidden;
   border-color: transparent;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 249, 253, 0.86));
+  background: transparent;
   box-shadow: none;
   border-bottom: 2px solid transparent;
 }
@@ -843,7 +843,7 @@ tbody tr:hover {
 
 .sidebar-item-label {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
@@ -851,8 +851,8 @@ tbody tr:hover {
 }
 
 .sidebar-item.active {
-  background: linear-gradient(180deg, rgba(59, 120, 231, 0.12), rgba(59, 120, 231, 0.06));
-  border-color: rgba(59, 120, 231, 0.25);
+  background: rgba(59, 120, 231, 0.08);
+  border-color: rgba(59, 120, 231, 0.14);
   border-bottom-color: var(--brand);
   box-shadow: none;
 }
@@ -884,9 +884,9 @@ tbody tr:hover {
 }
 
 .app-shell-customers .app-header {
-  padding: 8px 10px;
-  border-radius: 16px;
-  gap: 8px;
+  padding: 8px 10px 6px;
+  border-radius: 14px;
+  gap: 6px;
 }
 
 .app-shell-customers .app-brand-row {
@@ -899,11 +899,11 @@ tbody tr:hover {
 }
 
 .app-shell-customers .app-nav-shell {
-  margin-top: -4px;
+  margin-top: -5px;
 }
 
 .app-shell-customers .sidebar-nav {
-  gap: 6px;
+  gap: 4px;
   padding: 0;
   border: none;
   border-radius: 0;
@@ -912,10 +912,10 @@ tbody tr:hover {
 }
 
 .app-shell-customers .sidebar-item {
-  padding: 9px 12px;
-  border-radius: 10px 10px 6px 6px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(247, 249, 253, 0.92));
-  border: 1px solid #d7deea;
+  padding: 8px 11px;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  border: 1px solid transparent;
   border-bottom: 2px solid transparent;
 }
 
@@ -927,6 +927,44 @@ tbody tr:hover {
 .app-shell-customers .app-content {
   overflow: hidden;
   display: flex;
+}
+
+.app-stage {
+  display: block;
+  min-height: 0;
+}
+
+.app-stage-customers {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+}
+
+.app-rail {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.app-rail-item {
+  display: grid;
+  place-items: center;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid #d7deea;
+  background: rgba(255, 255, 255, 0.9);
+  color: #5b6781;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.app-rail-item.active {
+  background: rgba(59, 120, 231, 0.12);
+  border-color: rgba(59, 120, 231, 0.3);
+  color: var(--brand-strong);
 }
 
 .app-shell-customers .view-panel {
@@ -1314,12 +1352,6 @@ tbody tr:hover {
   font-size: 15px;
 }
 
-.customers-tab-head p {
-  margin: 1px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-}
-
 .customers-empty-panel {
   display: grid;
   place-items: center;
@@ -1335,8 +1367,8 @@ tbody tr:hover {
 }
 
 .app-shell-customers .sidebar-item.active {
-  border-color: #a6bef4;
-  background: #eaf2ff;
+  border-color: rgba(59, 120, 231, 0.18);
+  background: rgba(59, 120, 231, 0.08);
   border-bottom-color: var(--brand);
   box-shadow: none;
 }
@@ -1350,14 +1382,14 @@ tbody tr:hover {
   .customers-list-pane {
     grid-template-rows: auto auto auto auto;
   }
-}
 
-.app-shell-customers .sidebar-item {
-  border-radius: 10px 10px 6px 6px;
-}
+  .app-stage-customers {
+    grid-template-columns: 1fr;
+  }
 
-.app-shell-customers .sidebar-item.active {
-  box-shadow: none;
+  .app-rail {
+    display: none;
+  }
 }
 
 @media (max-width: 900px) {

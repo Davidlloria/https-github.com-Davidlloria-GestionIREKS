@@ -6,7 +6,6 @@ interface AppShellProps {
   onChangeView: (view: ViewKey) => void
   currentTitle: string
   currentSubtitle: string
-  currentBadge: string
   navItems: SidebarNavItem[]
   children: ReactNode
 }
@@ -16,11 +15,24 @@ export function AppShell({
   onChangeView,
   currentTitle,
   currentSubtitle,
-  currentBadge,
   navItems,
   children,
 }: AppShellProps) {
   const isCustomers = activeView === 'customers'
+  const customerRailItems = navItems
+
+  const railGlyphs: Record<ViewKey, string> = {
+    customers: 'CL',
+    contacts: 'CO',
+    technicians: 'TE',
+    distributors: 'DI',
+    courses: 'CU',
+    recipes: 'RE',
+    ingredients: 'IN',
+    warehouse: 'AL',
+    orders: 'PE',
+    sales: 'VE',
+  }
 
   return (
     <div className={`app-shell ${isCustomers ? 'app-shell-customers' : ''}`}>
@@ -28,7 +40,6 @@ export function AppShell({
         <div className="app-brand app-brand-compact">
           <div className="app-brand-row">
             <p className="app-brand-kicker">Gestion IREKS</p>
-            <span className="app-brand-title-chip">{currentBadge}</span>
           </div>
           {!isCustomers && (
             <>
@@ -43,7 +54,19 @@ export function AppShell({
         <SidebarNav activeView={activeView} onChange={onChangeView} items={navItems} />
       </div>
 
-      <main className="app-content">{children}</main>
+      <div className={`app-stage ${isCustomers ? 'app-stage-customers' : ''}`}>
+        {isCustomers && (
+          <aside className="app-rail" aria-hidden="true">
+            {customerRailItems.map((item) => (
+              <span key={item.key} className={`app-rail-item ${activeView === item.key ? 'active' : ''}`}>
+                {railGlyphs[item.key]}
+              </span>
+            ))}
+          </aside>
+        )}
+
+        <main className="app-content">{children}</main>
+      </div>
     </div>
   )
 }
