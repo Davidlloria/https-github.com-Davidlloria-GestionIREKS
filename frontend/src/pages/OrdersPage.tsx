@@ -88,53 +88,75 @@ export function OrdersPage() {
 
   return (
     <section className="page-grid">
-      <div className="toolbar">
-        <input
-          className="input"
-          value={year}
-          onChange={(event) => {
-            setYear(event.target.value)
-            setPageIndex(0)
-          }}
-          placeholder="Ano (ej: 2026)"
-        />
-        <input
-          className="input"
-          value={monthFrom}
-          onChange={(event) => {
-            setMonthFrom(event.target.value)
-            setPageIndex(0)
-          }}
-          placeholder="Mes desde (1-12)"
-        />
-        <input
-          className="input"
-          value={monthTo}
-          onChange={(event) => {
-            setMonthTo(event.target.value)
-            setPageIndex(0)
-          }}
-          placeholder="Mes hasta (1-12)"
-        />
-        <input
-          className="input"
-          value={almacenId}
-          onChange={(event) => {
-            setAlmacenId(event.target.value)
-            setPageIndex(0)
-          }}
-          placeholder="Filtrar por almacen_id"
-        />
-        <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
-          Anterior
-        </button>
-        <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
-          Siguiente
-        </button>
-        <span className="state">
-          Pagina {currentPage} de {totalPages}
-        </span>
-      </div>
+      <header className="module-header">
+        <div className="module-header-copy">
+          <p className="module-kicker">Modulo read-only</p>
+          <h2>Pedidos</h2>
+          <p className="module-description">
+            Consulta de pedidos, lineas y pendientes con navegacion por pagina y detalle lateral.
+          </p>
+        </div>
+        <div className="module-header-meta">
+          <span className="surface-chip">Pagina {currentPage} de {totalPages}</span>
+          <span className="surface-chip">Vista sin mutaciones</span>
+        </div>
+      </header>
+
+      <section className="panel-section">
+        <div className="section-heading">
+          <div>
+            <h3>Filtros</h3>
+            <p>Reduce el listado antes de revisar detalle o pendientes.</p>
+          </div>
+          <div className="toolbar pager-toolbar">
+            <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
+              Anterior
+            </button>
+            <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
+              Siguiente
+            </button>
+          </div>
+        </div>
+
+        <div className="toolbar orders-toolbar">
+          <input
+            className="input"
+            value={year}
+            onChange={(event) => {
+              setYear(event.target.value)
+              setPageIndex(0)
+            }}
+            placeholder="Ano (ej: 2026)"
+          />
+          <input
+            className="input"
+            value={monthFrom}
+            onChange={(event) => {
+              setMonthFrom(event.target.value)
+              setPageIndex(0)
+            }}
+            placeholder="Mes desde (1-12)"
+          />
+          <input
+            className="input"
+            value={monthTo}
+            onChange={(event) => {
+              setMonthTo(event.target.value)
+              setPageIndex(0)
+            }}
+            placeholder="Mes hasta (1-12)"
+          />
+          <input
+            className="input"
+            value={almacenId}
+            onChange={(event) => {
+              setAlmacenId(event.target.value)
+              setPageIndex(0)
+            }}
+            placeholder="Filtrar por almacen_id"
+          />
+        </div>
+      </section>
 
       <div className="cards">
         <StatCard label="Total pedidos" value={totals.total} />
@@ -151,39 +173,56 @@ export function OrdersPage() {
       />
 
       {!!orderRows.length && (
-        <div className="split-panel">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Almacen</th>
-                  <th>N pedido</th>
-                  <th>Estado</th>
-                  <th>Semana</th>
-                  <th>Total kg</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orderRows.map((row) => (
-                  <tr
-                    key={row.pedido_id}
-                    className={row.pedido_id === selectedOrder?.pedido_id ? 'row-selected' : ''}
-                    onClick={() => setSelectedCandidateId(row.pedido_id)}
-                  >
-                    <td>{row.pedido_fecha}</td>
-                    <td>{row.almacen_nombre || row.almacen_id}</td>
-                    <td>{row.pedido_numero || '-'}</td>
-                    <td>{row.pedido_estado || '-'}</td>
-                    <td>{row.semana}</td>
-                    <td>{safeNumber(row.total_kg).toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="orders-workspace">
+          <section className="orders-list-panel">
+            <div className="panel-section">
+              <div className="section-heading">
+                <div>
+                  <h3>Listado de pedidos</h3>
+                  <p>Selecciona una fila para abrir el detalle lateral.</p>
+                </div>
+                <span className="surface-chip">Mostrando {orderRows.length} de {ordersQuery.data.total}</span>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Almacen</th>
+                      <th>N pedido</th>
+                      <th>Estado</th>
+                      <th>Semana</th>
+                      <th>Total kg</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderRows.map((row) => (
+                      <tr
+                        key={row.pedido_id}
+                        className={row.pedido_id === selectedOrder?.pedido_id ? 'row-selected' : ''}
+                        onClick={() => setSelectedCandidateId(row.pedido_id)}
+                      >
+                        <td>{row.pedido_fecha}</td>
+                        <td>{row.almacen_nombre || row.almacen_id}</td>
+                        <td>{row.pedido_numero || '-'}</td>
+                        <td>{row.pedido_estado || '-'}</td>
+                        <td>{row.semana}</td>
+                        <td>{safeNumber(row.total_kg).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
 
-          <aside className="detail-panel">
+          <aside className="detail-panel detail-panel-orders">
+            <div className="section-heading section-heading-compact">
+              <div>
+                <h3>Detalle de pedido</h3>
+                <p>Cabecera, lineas y pendientes del pedido seleccionado.</p>
+              </div>
+            </div>
             <QueryState
               loading={detailQuery.loading}
               error={detailQuery.error}

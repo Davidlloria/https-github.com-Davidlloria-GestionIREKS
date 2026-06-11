@@ -228,6 +228,109 @@ button {
   gap: 16px;
 }
 
+.module-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 2px 2px;
+}
+
+.module-header-copy {
+  min-width: 0;
+}
+
+.module-kicker {
+  margin: 0 0 8px;
+  color: var(--brand-strong);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.module-header h2 {
+  margin: 0;
+  font-size: clamp(24px, 2.2vw, 34px);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.module-description {
+  margin: 8px 0 0;
+  max-width: 72ch;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.module-header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.panel-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(247, 250, 245, 0.96));
+  box-shadow: var(--shadow-soft);
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-heading h3 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.section-heading p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.section-heading-compact {
+  padding-bottom: 4px;
+  border-bottom: 1px solid #dde7db;
+}
+
+.orders-toolbar {
+  align-items: stretch;
+}
+
+.pager-toolbar {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
+.orders-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(320px, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.orders-list-panel {
+  min-width: 0;
+}
+
+.detail-panel-orders {
+  display: grid;
+  gap: 14px;
+}
+
 .toolbar {
   display: flex;
   gap: 12px;
@@ -521,6 +624,10 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 
+  .orders-workspace {
+    grid-template-columns: 1fr;
+  }
+
   table {
     min-width: 760px;
   }
@@ -547,6 +654,22 @@ tbody tr:hover {
 
   .cards {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .module-header {
+    flex-direction: column;
+  }
+
+  .module-header-meta {
+    justify-content: flex-start;
+  }
+
+  .section-heading {
+    flex-direction: column;
+  }
+
+  .pager-toolbar {
+    justify-content: flex-start;
   }
 
   .input {
