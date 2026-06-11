@@ -1483,7 +1483,7 @@ tbody tr:hover {
 
 .customers-saas-workspace {
   display: grid;
-  grid-template-columns: minmax(320px, 0.35fr) minmax(0, 0.65fr);
+  grid-template-columns: minmax(300px, 0.31fr) minmax(0, 0.69fr);
   gap: 16px;
   height: 100%;
   min-height: 0;
@@ -1516,7 +1516,7 @@ tbody tr:hover {
   gap: 12px;
   min-height: 0;
   overflow: hidden;
-  padding: 14px;
+  padding: 12px;
 }
 
 .customers-list-head {
@@ -1541,7 +1541,7 @@ tbody tr:hover {
 
 .customers-list-head h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.15;
 }
 
@@ -1573,7 +1573,7 @@ tbody tr:hover {
   overflow: hidden;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
+  gap: 8px;
 }
 
 .customers-list-table {
@@ -1603,7 +1603,7 @@ tbody tr:hover {
 
 .customers-list-table th:nth-child(1),
 .customers-list-table td:nth-child(1) {
-  width: 72px;
+  width: 66px;
 }
 
 .customers-list-table th:nth-child(2),
@@ -1613,7 +1613,13 @@ tbody tr:hover {
 
 .customers-list-table th:nth-child(3),
 .customers-list-table td:nth-child(3) {
-  width: 110px;
+  width: 96px;
+}
+
+.customers-list-table th,
+.customers-list-table td {
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
 
 .customers-list-table tbody tr {
@@ -1636,7 +1642,7 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .customers-pager-btn {
@@ -1669,28 +1675,29 @@ tbody tr:hover {
 .customers-detail-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 12px;
+  gap: 10px;
   min-height: 0;
   overflow: hidden;
-  padding: 14px;
+  padding: 12px;
 }
 
 .customers-detail-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .customers-action-btn {
-  min-height: 34px;
+  min-height: 32px;
   border-radius: 8px;
-  padding: 0 12px;
+  padding: 0 10px;
   border: 1px solid transparent;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   box-shadow: none;
   opacity: 1;
+  white-space: nowrap;
 }
 
 .customers-action-btn-primary {
@@ -1720,15 +1727,15 @@ tbody tr:hover {
 .customers-detail-body {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 12px;
+  gap: 10px;
   min-height: 0;
   overflow: hidden;
 }
 
 .customers-detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.85fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(250px, 0.85fr);
+  gap: 10px;
   min-height: 0;
 }
 
@@ -1736,12 +1743,12 @@ tbody tr:hover {
 .customers-type-panel {
   min-height: 0;
   overflow: auto;
-  padding: 14px;
+  padding: 12px;
 }
 
 .customers-detail-card {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .customers-section-head {
@@ -1753,21 +1760,21 @@ tbody tr:hover {
 
 .customers-section-head h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.15;
 }
 
 .customers-section-head p {
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.45;
 }
 
 .customers-field-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
   align-content: start;
 }
 
@@ -1795,7 +1802,7 @@ tbody tr:hover {
 .customers-field {
   min-width: 0;
   width: 100%;
-  min-height: 36px;
+  min-height: 34px;
   border-radius: 10px;
   border-color: #dbe4f0;
   background: #f8fafc;
@@ -1804,14 +1811,14 @@ tbody tr:hover {
 
 .customers-type-panel {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   align-content: start;
 }
 
 .customers-type-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .customer-type-pill {
@@ -1819,13 +1826,13 @@ tbody tr:hover {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 36px;
+  min-height: 34px;
   border: 1px solid #dbe4f0;
   border-radius: 10px;
-  padding: 0 10px;
+  padding: 0 9px;
   background: #ffffff;
   color: #0f172a;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   text-align: left;
 }
@@ -1852,12 +1859,12 @@ tbody tr:hover {
 .customers-type-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .customers-status-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
@@ -1865,12 +1872,12 @@ tbody tr:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 92px;
-  min-height: 34px;
+  min-width: 84px;
+  min-height: 32px;
   border-radius: 999px;
   border: 1px solid transparent;
-  padding: 0 12px;
-  font-size: 12px;
+  padding: 0 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.02em;
 }
@@ -1891,18 +1898,18 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
 .customers-radio-readonly {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
 .customers-radio-readonly span {
   position: relative;
-  padding-left: 22px;
+  padding-left: 20px;
   color: #0f172a;
 }
 
@@ -1911,8 +1918,8 @@ tbody tr:hover {
   position: absolute;
   left: 0;
   top: 1px;
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   border: 2px solid #cbd5e1;
   background: #ffffff;
@@ -1927,10 +1934,10 @@ tbody tr:hover {
 .customers-tabs-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 12px;
+  gap: 10px;
   min-height: 0;
   overflow: hidden;
-  padding: 14px;
+  padding: 12px;
   border-radius: 12px;
 }
 
@@ -1939,18 +1946,18 @@ tbody tr:hover {
   gap: 6px;
   align-items: flex-end;
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding: 0 2px 2px;
 }
 
 .customers-tab {
-  min-height: 34px;
+  min-height: 32px;
   border: 1px solid #dbe4f0;
   border-bottom: 2px solid transparent;
   background: #f8fafc;
   color: #334155;
   border-radius: 10px 10px 0 0;
-  padding: 0 12px;
-  font-size: 13px;
+  padding: 0 11px;
+  font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -1970,7 +1977,7 @@ tbody tr:hover {
 .customers-tab-scroll {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 12px;
+  gap: 8px;
   min-height: 0;
   height: 100%;
   overflow: auto;
@@ -1978,14 +1985,15 @@ tbody tr:hover {
 
 .customers-tab-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
+  padding: 0 2px;
 }
 
 .customers-tab-head h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.2;
 }
 
@@ -2007,33 +2015,39 @@ tbody tr:hover {
 
 .customers-contacts-table th:nth-child(1),
 .customers-contacts-table td:nth-child(1) {
-  width: 28%;
+  width: 27%;
 }
 
 .customers-contacts-table th:nth-child(2),
 .customers-contacts-table td:nth-child(2) {
-  width: 24%;
+  width: 23%;
 }
 
 .customers-contacts-table th:nth-child(3),
 .customers-contacts-table td:nth-child(3) {
-  width: 18%;
+  width: 17%;
 }
 
 .customers-contacts-table th:nth-child(4),
 .customers-contacts-table td:nth-child(4) {
-  width: 18%;
+  width: 17%;
 }
 
 .customers-contacts-table th:nth-child(5),
 .customers-contacts-table td:nth-child(5) {
-  width: 12%;
+  width: 16%;
+}
+
+.customers-contacts-table th,
+.customers-contacts-table td {
+  padding: 8px 9px;
+  font-size: 13px;
 }
 
 .customers-empty-panel {
   display: grid;
   place-items: center;
-  min-height: 140px;
+  min-height: 112px;
 }
 
 @media (max-width: 1200px) {
