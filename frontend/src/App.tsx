@@ -25,11 +25,11 @@ const VIEWS: Array<{ key: ViewKey; label: string; description: string }> = [
   { key: 'technicians', label: 'Tecnicos', description: 'Consulta read-only' },
   { key: 'distributors', label: 'Distribuidores', description: 'Consulta read-only' },
   { key: 'courses', label: 'Cursos', description: 'Cursos y asistentes' },
+  { key: 'recipes', label: 'Recetas', description: 'Listado y detalle read-only' },
   { key: 'ingredients', label: 'Ingredientes', description: 'Catalogo e inspeccion' },
   { key: 'warehouse', label: 'Almacen', description: 'Stock, movimientos e inventario' },
   { key: 'orders', label: 'Pedidos', description: 'Consulta read-only' },
   { key: 'sales', label: 'Ventas', description: 'Ventas anual y comparativas' },
-  { key: 'recipes', label: 'Recetas', description: 'Listado y detalle read-only' },
 ]
 
 const VIEW_META: Record<ViewKey, ViewMeta> = {
