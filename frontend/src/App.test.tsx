@@ -283,8 +283,9 @@ describe('App shell smoke', () => {
     expect(screen.getByRole('button', { name: 'Recetas' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cursos' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Clientes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Contactos' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ingredientes' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Almac\u00e9n' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Almacen' })).toBeInTheDocument()
   })
 
   it('switches the visible page when the user clicks the sidebar items', async () => {
@@ -301,10 +302,13 @@ describe('App shell smoke', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clientes' }))
     expect(await screen.findByPlaceholderText('Buscar cliente por nombre, email o CIF')).toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('button', { name: 'Contactos' }))
+    expect(await screen.findByPlaceholderText('Buscar por nombre, apellido, cargo, email o empresa')).toBeInTheDocument()
+
     fireEvent.click(screen.getByRole('button', { name: 'Ingredientes' }))
     expect(await screen.findByPlaceholderText('Buscar ingrediente por nombre, codigo o referencia')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Almac\u00e9n' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Almacen' }))
     expect(await screen.findByText('Stock actual')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Ventas' }))

@@ -1,7 +1,5 @@
 import { type ReactNode } from 'react'
-import { SidebarNav, type SidebarNavItem } from './SidebarNav'
-
-type ViewKey = 'sales' | 'recipes' | 'courses' | 'customers' | 'ingredients' | 'warehouse'
+import { SidebarNav, type SidebarNavItem, type ViewKey } from './SidebarNav'
 
 interface AppShellProps {
   activeView: ViewKey
