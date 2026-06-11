@@ -828,13 +828,13 @@ tbody tr:hover {
   gap: 1px;
   min-width: 0;
   width: 100%;
-  padding: 8px 12px;
-  border-radius: 8px 8px 0 0;
+  padding: 10px 14px;
+  border-radius: 8px;
   overflow: hidden;
   border-color: transparent;
   background: transparent;
   box-shadow: none;
-  border-bottom: 2px solid transparent;
+  border: 1px solid transparent;
 }
 
 .sidebar-item-description {
@@ -843,7 +843,7 @@ tbody tr:hover {
 
 .sidebar-item-label {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
@@ -851,9 +851,8 @@ tbody tr:hover {
 }
 
 .sidebar-item.active {
-  background: rgba(59, 120, 231, 0.08);
-  border-color: rgba(59, 120, 231, 0.14);
-  border-bottom-color: var(--brand);
+  background: rgba(223, 229, 223, 0.96);
+  border-color: #1f2329;
   box-shadow: none;
 }
 
@@ -913,10 +912,10 @@ tbody tr:hover {
 
 .app-shell-customers .sidebar-item {
   padding: 8px 11px;
-  border-radius: 8px 8px 0 0;
+  border-radius: 8px;
   background: transparent;
   border: 1px solid transparent;
-  border-bottom: 2px solid transparent;
+  border-bottom: 1px solid transparent;
 }
 
 .app-shell-customers .sidebar-item-label {
@@ -936,27 +935,27 @@ tbody tr:hover {
 
 .app-stage-customers {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 8px;
   min-height: 0;
 }
 
 .app-rail {
   display: grid;
   align-content: start;
-  gap: 10px;
-  padding-top: 10px;
+  gap: 8px;
+  padding-top: 8px;
 }
 
 .app-rail-item {
   display: grid;
   place-items: center;
-  height: 38px;
-  border-radius: 12px;
+  height: 42px;
+  border-radius: 14px;
   border: 1px solid #d7deea;
   background: rgba(255, 255, 255, 0.9);
   color: #5b6781;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.02em;
 }
@@ -1367,9 +1366,8 @@ tbody tr:hover {
 }
 
 .app-shell-customers .sidebar-item.active {
-  border-color: rgba(59, 120, 231, 0.18);
-  background: rgba(59, 120, 231, 0.08);
-  border-bottom-color: var(--brand);
+  border-color: #1f2329;
+  background: rgba(223, 229, 223, 0.96);
   box-shadow: none;
 }
 
