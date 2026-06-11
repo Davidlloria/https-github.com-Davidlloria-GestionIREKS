@@ -85,36 +85,53 @@ export function IngredientsPage() {
 
   return (
     <section className="page-grid">
-      <div className="toolbar">
-        <input
-          className="input"
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value)
-            setPageIndex(0)
-          }}
-          placeholder="Buscar ingrediente por nombre, codigo o referencia"
-        />
-        <button
-          type="button"
-          className="action-btn"
-          disabled={!hasPreviousPage}
-          onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
-        >
-          Anterior
-        </button>
-        <button
-          type="button"
-          className="action-btn"
-          disabled={!hasNextPage}
-          onClick={() => setPageIndex((prev) => prev + 1)}
-        >
-          Siguiente
-        </button>
-        <span className="state">
-          Pagina {currentPage} de {totalPages}
-        </span>
-      </div>
+      <header className="module-header">
+        <div className="module-header-copy">
+          <p className="module-kicker">Modulo read-only</p>
+          <h2>Ingredientes</h2>
+          <p className="module-description">
+            Consulta del catalogo de ingredientes con detalle lateral para revisar origen, familia, unidad y precio sin editar.
+          </p>
+        </div>
+        <div className="module-header-meta">
+          <span className="surface-chip">Pagina {currentPage} de {totalPages}</span>
+          <span className="surface-chip">Vista sin mutaciones</span>
+        </div>
+      </header>
+
+      <section className="panel-section">
+        <div className="section-heading">
+          <div>
+            <h3>Filtros</h3>
+            <p>Busca por nombre, codigo o referencia y navega por pagina antes de abrir el detalle.</p>
+          </div>
+          <div className="toolbar pager-toolbar">
+            <button
+              type="button"
+              className="action-btn"
+              disabled={!hasPreviousPage}
+              onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+            >
+              Anterior
+            </button>
+            <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
+              Siguiente
+            </button>
+          </div>
+        </div>
+
+        <div className="toolbar">
+          <input
+            className="input"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value)
+              setPageIndex(0)
+            }}
+            placeholder="Buscar ingrediente por nombre, codigo o referencia"
+          />
+        </div>
+      </section>
 
       <div className="cards">
         <StatCard label="Total ingredientes" value={totals.total} />
@@ -131,37 +148,56 @@ export function IngredientsPage() {
       />
 
       {!!ingredientRows.length && (
-        <div className="split-panel">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Codigo</th>
-                  <th>Nombre</th>
-                  <th>Origen</th>
-                  <th>Activo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ingredientRows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className={row.id === selectedIngredientId ? 'row-selected' : ''}
-                    onClick={() => setSelectedCandidateId(row.id)}
-                  >
-                    <td>{row.id}</td>
-                    <td>{row.codigo || '-'}</td>
-                    <td>{row.nombre || '-'}</td>
-                    <td>{formatText(row.source)}</td>
-                    <td>{row.activo ? 'Si' : 'No'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="orders-workspace">
+          <section className="orders-list-panel">
+            <div className="panel-section">
+              <div className="section-heading">
+                <div>
+                  <h3>Listado de ingredientes</h3>
+                  <p>Selecciona una fila para cargar el detalle del ingrediente activo.</p>
+                </div>
+                <span className="surface-chip">Mostrando {ingredientRows.length} de {ingredientsQuery.data.total}</span>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Codigo</th>
+                      <th>Nombre</th>
+                      <th>Origen</th>
+                      <th>Precio</th>
+                      <th>Activo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ingredientRows.map((row) => (
+                      <tr
+                        key={row.id}
+                        className={row.id === selectedIngredientId ? 'row-selected' : ''}
+                        onClick={() => setSelectedCandidateId(row.id)}
+                      >
+                        <td>{row.id}</td>
+                        <td>{row.codigo || '-'}</td>
+                        <td>{row.nombre || '-'}</td>
+                        <td>{formatText(row.source)}</td>
+                        <td>{Number.isFinite(row.precio) && row.precio > 0 ? formatNumber(row.precio) : '-'}</td>
+                        <td>{row.activo ? 'Si' : 'No'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
 
-          <aside className="detail-panel">
+          <aside className="detail-panel detail-panel-orders">
+            <div className="section-heading section-heading-compact">
+              <div>
+                <h3>Detalle de ingrediente</h3>
+                <p>Campos principales del ingrediente seleccionado.</p>
+              </div>
+            </div>
             <QueryState
               loading={detailQuery.loading}
               error={detailQuery.error}
@@ -187,6 +223,10 @@ export function IngredientsPage() {
                   <div>
                     <dt>Origen</dt>
                     <dd>{formatText(detailQuery.data.source)}</dd>
+                  </div>
+                  <div>
+                    <dt>Codigo / referencia</dt>
+                    <dd>{formatText(detailQuery.data.codigo || detailQuery.data.id)}</dd>
                   </div>
                   <div>
                     <dt>Fabricante / proveedor</dt>
