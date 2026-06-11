@@ -95,7 +95,6 @@ function App() {
       onChangeView={setActiveView}
       currentTitle={currentView.title}
       currentSubtitle={currentView.subtitle}
-      currentBadge={currentView.label}
       navItems={VIEWS}
     >
       <section className="view-panel">
