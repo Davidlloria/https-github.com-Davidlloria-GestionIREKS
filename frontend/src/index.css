@@ -63,6 +63,36 @@ button {
   gap: 16px;
 }
 
+.app-shell-customers {
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+.app-shell-customers .app-body {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell-customers .app-content {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
+
+.app-shell-customers .view-panel {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+}
+
+.app-shell-customers .page-grid {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
 .app-header {
   display: flex;
   align-items: flex-start;
@@ -228,6 +258,10 @@ button {
   gap: 16px;
 }
 
+.customers-layout {
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+}
+
 .module-header {
   display: flex;
   align-items: flex-start;
@@ -322,6 +356,14 @@ button {
   align-items: start;
 }
 
+.customers-workspace {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.92fr) minmax(0, 1.08fr);
+  gap: 14px;
+  align-items: stretch;
+  min-height: 0;
+}
+
 .orders-list-panel {
   min-width: 0;
 }
@@ -329,6 +371,34 @@ button {
 .detail-panel-orders {
   display: grid;
   gap: 14px;
+}
+
+.customers-panel-fill,
+.customers-detail-scroll {
+  min-height: 0;
+}
+
+.customers-panel-fill {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.customers-list-scroll {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
+
+.customers-list-scroll .table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.customers-detail-scroll {
+  display: grid;
+  gap: 14px;
+  overflow: auto;
+  min-width: 0;
 }
 
 .toolbar {
@@ -625,6 +695,10 @@ tbody tr:hover {
   }
 
   .orders-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .customers-workspace {
     grid-template-columns: 1fr;
   }
 

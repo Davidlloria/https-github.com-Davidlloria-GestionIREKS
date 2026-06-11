@@ -71,7 +71,7 @@ export function CustomersPage() {
   }, [customerRows, customersQuery.data.total])
 
   return (
-    <section className="page-grid">
+    <section className="page-grid customers-layout">
       <header className="module-header">
         <div className="module-header-copy">
           <p className="module-kicker">Modulo read-only</p>
@@ -130,9 +130,9 @@ export function CustomersPage() {
       />
 
       {!!customerRows.length && (
-        <div className="orders-workspace">
+        <div className="customers-workspace">
           <section className="orders-list-panel">
-            <div className="panel-section">
+            <div className="panel-section customers-panel-fill">
               <div className="section-heading">
                 <div>
                   <h3>Listado de clientes</h3>
@@ -140,37 +140,39 @@ export function CustomersPage() {
                 </div>
                 <span className="surface-chip">Mostrando {customerRows.length} de {customersQuery.data.total}</span>
               </div>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Codigo</th>
-                      <th>Nombre comercial</th>
-                      <th>Nombre fiscal</th>
-                      <th>Email</th>
-                      <th>Telefono</th>
-                      <th>Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {customerRows.map((customer) => (
-                      <tr
-                        key={customer.cliente_id}
-                        className={customer.cliente_id === selectedCustomerId ? 'row-selected' : ''}
-                        onClick={() => setSelectedCandidateId(customer.cliente_id)}
-                      >
-                        <td>{customer.cliente_codigo}</td>
-                        <td>{customerLabel(customer)}</td>
-                        <td>{customer.cliente_nombre_fiscal || '-'}</td>
-                        <td>{customer.cliente_email || '-'}</td>
-                        <td>{customer.cliente_telefono || '-'}</td>
-                        <td>
-                          <span className={`pill ${customer.activo ? 'ok' : 'off'}`}>{customer.activo ? 'Activo' : 'Inactivo'}</span>
-                        </td>
+              <div className="customers-list-scroll">
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Codigo</th>
+                        <th>Nombre comercial</th>
+                        <th>Nombre fiscal</th>
+                        <th>Email</th>
+                        <th>Telefono</th>
+                        <th>Estado</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {customerRows.map((customer) => (
+                        <tr
+                          key={customer.cliente_id}
+                          className={customer.cliente_id === selectedCustomerId ? 'row-selected' : ''}
+                          onClick={() => setSelectedCandidateId(customer.cliente_id)}
+                        >
+                          <td>{customer.cliente_codigo}</td>
+                          <td>{customerLabel(customer)}</td>
+                          <td>{customer.cliente_nombre_fiscal || '-'}</td>
+                          <td>{customer.cliente_email || '-'}</td>
+                          <td>{customer.cliente_telefono || '-'}</td>
+                          <td>
+                            <span className={`pill ${customer.activo ? 'ok' : 'off'}`}>{customer.activo ? 'Activo' : 'Inactivo'}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </section>
@@ -185,7 +187,7 @@ export function CustomersPage() {
             {!selectedCustomerId && <div className="state">Selecciona un cliente para ver el detalle.</div>}
 
             {!!selectedCustomerId && (
-              <>
+              <div className="customers-detail-scroll">
                 <QueryState
                   loading={detailQuery.loading}
                   error={detailQuery.error}
@@ -286,7 +288,7 @@ export function CustomersPage() {
                     </div>
                   </>
                 )}
-              </>
+              </div>
             )}
           </aside>
         </div>

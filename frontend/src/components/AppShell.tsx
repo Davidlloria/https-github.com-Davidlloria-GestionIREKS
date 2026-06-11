@@ -21,7 +21,7 @@ export function AppShell({
   children,
 }: AppShellProps) {
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${activeView === 'customers' ? 'app-shell-customers' : ''}`}>
       <header className="app-header">
         <div className="app-brand">
           <p className="app-brand-kicker">Gestion IREKS</p>
