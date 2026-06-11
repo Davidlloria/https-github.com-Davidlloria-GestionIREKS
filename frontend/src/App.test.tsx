@@ -406,7 +406,7 @@ describe('App shell smoke', () => {
     render(<App />)
 
     expect(screen.getByText('Gestion IREKS')).toBeInTheDocument()
-    await screen.findByText('Ventas anual')
+    await screen.findByRole('heading', { name: 'Ventas' })
 
     expect(screen.getByRole('button', { name: 'Ventas' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Recetas' })).toBeInTheDocument()
@@ -423,7 +423,7 @@ describe('App shell smoke', () => {
   it('switches the visible page when the user clicks the sidebar items', async () => {
     render(<App />)
 
-    await screen.findByText('Ventas anual')
+    await screen.findByRole('heading', { name: 'Ventas' })
 
     fireEvent.click(screen.getByRole('button', { name: 'Recetas' }))
     expect(await screen.findByPlaceholderText('Buscar receta por nombre, codigo o proceso')).toBeInTheDocument()
@@ -453,6 +453,6 @@ describe('App shell smoke', () => {
     expect(await screen.findByText('Stock actual')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Ventas' }))
-    expect(await screen.findByText('Ventas anual')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Ventas' })).toBeInTheDocument()
   })
 })

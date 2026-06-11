@@ -3,11 +3,7 @@ import { getSalesAnnualSummary, listSalesAnnualClients, listSalesAnnualYears } f
 import { EmptyState, ErrorState, LoadingState, QueryState } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
 import { useAsyncResource } from '../features/useAsyncResource'
-import type {
-  SalesAnnualSummaryResponse,
-  SalesFilterOption,
-  SalesYearOption,
-} from '../types/api'
+import type { SalesAnnualSummaryResponse, SalesFilterOption, SalesYearOption } from '../types/api'
 
 const EMPTY_SUMMARY: SalesAnnualSummaryResponse = {
   source: 'ireks',
@@ -82,8 +78,33 @@ export function SalesPage() {
 
   return (
     <section className="page-grid">
-      <div className="detail-panel">
-        <h3>Ventas anual</h3>
+      <header className="module-header">
+        <div className="module-header-copy">
+          <p className="module-kicker">Modulo read-only</p>
+          <h2>Ventas</h2>
+          <p className="module-description">
+            Comparativa anual de kilos y ventas con filtros de ano y cliente, pensada para revisar la evolucion sin editar datos.
+          </p>
+        </div>
+        <div className="module-header-meta">
+          <span className="surface-chip">{selectedYear ? `Año ${selectedYear}` : 'Sin año seleccionado'}</span>
+          <span className="surface-chip">Vista sin mutaciones</span>
+        </div>
+      </header>
+
+      <section className="panel-section">
+        <div className="section-heading">
+          <div>
+            <h3>Filtros</h3>
+            <p>Selecciona año y cliente antes de consultar el resumen anual.</p>
+          </div>
+          <div className="toolbar pager-toolbar">
+            <button type="button" className="action-btn" onClick={() => setRefreshToken((value) => value + 1)}>
+              Consultar
+            </button>
+          </div>
+        </div>
+
         <div className="form-grid sales-controls">
           <label>
             Ano
@@ -113,9 +134,6 @@ export function SalesPage() {
             </select>
           </label>
           <div className="sales-actions">
-            <button type="button" className="action-btn" onClick={() => setRefreshToken((value) => value + 1)}>
-              Consultar
-            </button>
             <span className="state sales-hint">
               Datos desde <strong>/sales/annual-summary</strong> y filtros de años/clientes
             </span>
@@ -124,7 +142,7 @@ export function SalesPage() {
         {(yearsQuery.loading || clientsQuery.loading) && <LoadingState>Cargando filtros...</LoadingState>}
         {!!yearsQuery.error && <ErrorState>{yearsQuery.error}</ErrorState>}
         {!!clientsQuery.error && <ErrorState>{clientsQuery.error}</ErrorState>}
-      </div>
+      </section>
 
       <div className="cards">
         <StatCard label="Lineas" value={metrics.rows} />
@@ -152,36 +170,45 @@ export function SalesPage() {
       />
 
       {!!summaryQuery.data.items.length && (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Codigo</th>
-                <th>Nombre</th>
-                <th>Kg prev</th>
-                <th>Kg curr</th>
-                <th>Ventas prev</th>
-                <th>Ventas curr</th>
-                <th>Delta kg</th>
-                <th>Delta ventas</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summaryQuery.data.items.map((row) => (
-                <tr key={row.articulo_id || row.codigo}>
-                  <td>{row.codigo || row.articulo_id}</td>
-                  <td>{row.nombre || '-'}</td>
-                  <td>{formatNumber(row.kilos_prev)}</td>
-                  <td>{formatNumber(row.kilos_curr)}</td>
-                  <td>{formatNumber(row.ventas_prev)}</td>
-                  <td>{formatNumber(row.ventas_curr)}</td>
-                  <td>{formatSigned(row.delta_kg)}</td>
-                  <td>{formatSigned(row.delta_ventas)}</td>
+        <section className="panel-section">
+          <div className="section-heading">
+            <div>
+              <h3>Resumen anual</h3>
+              <p>Comparativa detallada por articulo con kilos, ventas y deltas.</p>
+            </div>
+            <span className="surface-chip">Fuente {summaryQuery.data.source ? summaryQuery.data.source.toUpperCase() : '-'}</span>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Codigo</th>
+                  <th>Nombre</th>
+                  <th>Kg prev</th>
+                  <th>Kg curr</th>
+                  <th>Ventas prev</th>
+                  <th>Ventas curr</th>
+                  <th>Delta kg</th>
+                  <th>Delta ventas</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {summaryQuery.data.items.map((row) => (
+                  <tr key={row.articulo_id || row.codigo}>
+                    <td>{row.codigo || row.articulo_id}</td>
+                    <td>{row.nombre || '-'}</td>
+                    <td>{formatNumber(row.kilos_prev)}</td>
+                    <td>{formatNumber(row.kilos_curr)}</td>
+                    <td>{formatNumber(row.ventas_prev)}</td>
+                    <td>{formatNumber(row.ventas_curr)}</td>
+                    <td>{formatSigned(row.delta_kg)}</td>
+                    <td>{formatSigned(row.delta_ventas)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
     </section>
   )
