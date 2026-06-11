@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import contacts, courses, customers, ingredients, orders, recipes, sales, settings, warehouse
+from app.api.routers import contacts, courses, customers, ingredients, orders, recipes, sales, settings, technicians, warehouse
 
 
 def create_app() -> FastAPI:
@@ -23,6 +23,7 @@ def create_app() -> FastAPI:
     api.include_router(recipes.router)
     api.include_router(sales.router)
     api.include_router(settings.router)
+    api.include_router(technicians.router)
     api.include_router(warehouse.router)
 
     @api.get("/health", tags=["health"])

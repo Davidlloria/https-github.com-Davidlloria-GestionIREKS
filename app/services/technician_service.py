@@ -5,9 +5,11 @@ from pathlib import Path
 from sqlmodel import Session
 
 from app.core.database import engine
+from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
 from app.models import Tecnico
 from app.services.import_service import ImportService
 from app.viewmodels.technician_viewmodel import TechnicianViewModel
+from app.schemas.technicians import TechnicianDetail, TechnicianListItem, TechnicianListResponse
 
 
 class TechnicianService:
@@ -18,6 +20,29 @@ class TechnicianService:
     def list(self, term: str = "") -> list[Tecnico]:
         with Session(engine) as session:
             return self.vm.list(session, term)
+
+    def list_payload(
+        self,
+        term: str = "",
+        *,
+        limit: int = DEFAULT_PAGE_LIMIT,
+        offset: int = 0,
+    ) -> TechnicianListResponse:
+        rows = self.list(term)
+        page_rows = page_items(rows, limit=limit, offset=offset)
+        return TechnicianListResponse(
+            items=TechnicianListItem.list_from_entities(page_rows),
+            total=len(rows),
+            limit=limit,
+            offset=offset,
+        )
+
+    def detail_payload(self, tecnico_id: str) -> TechnicianDetail | None:
+        with Session(engine) as session:
+            entity = self.vm.get(session, tecnico_id)
+            if entity is None:
+                return None
+            return TechnicianDetail.from_entity(entity)
 
     def create(self, payload: dict) -> None:
         with Session(engine) as session:

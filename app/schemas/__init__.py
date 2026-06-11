@@ -103,6 +103,7 @@ from app.schemas.settings import (
     MaintenanceResult,
     MaintenanceStatus,
 )
+from app.schemas.technicians import TechnicianDetail, TechnicianListItem, TechnicianListResponse
 from app.schemas.warehouse import (
     InventoryAdjustmentInput,
     InventoryAdjustmentPayload,
@@ -212,6 +213,9 @@ __all__ = [
     "SalesAnnualSummaryRow",
     "SalesYearOption",
     "SalesYearOptionsResponse",
+    "TechnicianDetail",
+    "TechnicianListItem",
+    "TechnicianListResponse",
     "TarifaPrecioIreksCreate",
     "TarifaPrecioIreksRead",
     "TarifaPrecioIreksUpdate",

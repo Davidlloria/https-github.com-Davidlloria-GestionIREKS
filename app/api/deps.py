@@ -16,6 +16,7 @@ from app.services.settings_import_service import SettingsImportService
 from app.services.settings_maintenance_service import SettingsMaintenanceService
 from app.services.warehouse_inventory_service import WarehouseInventoryService
 from app.services.warehouse_movement_service import WarehouseMovementService
+from app.services.technician_service import TechnicianService
 
 
 def get_customer_service() -> CustomerService:
@@ -64,6 +65,10 @@ def get_order_document_import_service() -> OrderDocumentImportService:
 
 def get_sales_annual_comparison_service() -> SalesAnnualComparisonService:
     return SalesAnnualComparisonService()
+
+
+def get_technician_service() -> TechnicianService:
+    return TechnicianService()
 
 
 def get_settings_import_service() -> SettingsImportService:

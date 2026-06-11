@@ -32,8 +32,11 @@ class TechnicianRepository:
         )
         return list(session.exec(stmt))
 
-    def get_by_id(self, session: Session, tecnico_id: str) -> Tecnico | None:
+    def get(self, session: Session, tecnico_id: str) -> Tecnico | None:
         return session.get(Tecnico, tecnico_id)
+
+    def get_by_id(self, session: Session, tecnico_id: str) -> Tecnico | None:
+        return self.get(session, tecnico_id)
 
     def create(self, session: Session, entity: Tecnico) -> Tecnico:
         session.add(entity)

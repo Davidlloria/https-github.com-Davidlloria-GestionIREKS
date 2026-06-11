@@ -11,6 +11,9 @@ class TechnicianViewModel:
     def list(self, session: Session, term: str = "") -> list[Tecnico]:
         return self.repository.search(session, term)
 
+    def get(self, session: Session, tecnico_id: str) -> Tecnico | None:
+        return self.repository.get(session, tecnico_id)
+
     def create(self, session: Session, payload: dict) -> Tecnico:
         data = dict(payload)
         data.pop("tecnico_id", None)
