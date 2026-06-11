@@ -6,6 +6,7 @@ interface AppShellProps {
   onChangeView: (view: ViewKey) => void
   currentTitle: string
   currentSubtitle: string
+  currentBadge: string
   navItems: SidebarNavItem[]
   children: ReactNode
 }
@@ -15,6 +16,7 @@ export function AppShell({
   onChangeView,
   currentTitle,
   currentSubtitle,
+  currentBadge,
   navItems,
   children,
 }: AppShellProps) {
@@ -40,6 +42,7 @@ export function AppShell({
         <div className="app-brand app-brand-compact">
           <div className="app-brand-row">
             <p className="app-brand-kicker">Gestion IREKS</p>
+            {isCustomers && <span className="app-brand-title-chip">{currentBadge}</span>}
           </div>
           {!isCustomers && (
             <>

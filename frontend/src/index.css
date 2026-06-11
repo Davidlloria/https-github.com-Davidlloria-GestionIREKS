@@ -226,9 +226,9 @@ button {
 }
 
 .sidebar-item.active {
-  border-color: rgba(45, 122, 78, 0.4);
-  background: linear-gradient(180deg, rgba(45, 122, 78, 0.12), rgba(45, 122, 78, 0.06));
-  box-shadow: 0 10px 20px rgba(45, 122, 78, 0.12);
+  border-color: rgba(59, 120, 231, 0.24);
+  background: rgba(59, 120, 231, 0.08);
+  box-shadow: none;
 }
 
 .sidebar-item[aria-current='page'] {
@@ -1366,8 +1366,9 @@ tbody tr:hover {
 }
 
 .app-shell-customers .sidebar-item.active {
-  border-color: #1f2329;
-  background: rgba(223, 229, 223, 0.96);
+  border-color: rgba(59, 120, 231, 0.24);
+  background: rgba(59, 120, 231, 0.08);
+  border-bottom-color: var(--brand);
   box-shadow: none;
 }
 
