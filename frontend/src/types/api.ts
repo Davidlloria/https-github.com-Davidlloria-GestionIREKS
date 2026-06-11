@@ -1,6 +1,7 @@
 export type { PaginatedList } from './common'
 export type { CustomerDetail, CustomerListItem } from './customers'
 export type { ContactCompanyOption, ContactDetail, ContactListItem } from './contacts'
+export type { TechnicianDetail, TechnicianListItem } from './technicians'
 export type {
   SalesAnnualSummaryResponse,
   SalesAnnualSummaryRow,

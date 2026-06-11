@@ -183,6 +183,29 @@ const orderPending = {
   offset: 0,
 }
 
+const technicianList = {
+  items: [
+    {
+      tecnico_id: 'TECH-1',
+      tecnico_codigo: 10,
+      nombre: 'Ana',
+      apellidos: 'Lopez',
+      movil: '600000010',
+      interno: '101',
+      email: 'ana@example.com',
+    },
+  ],
+  total: 1,
+  limit: 25,
+  offset: 0,
+}
+
+const technicianDetail = {
+  ...technicianList.items[0],
+  created_at: null,
+  updated_at: null,
+}
+
 const customerList = {
   items: [
     {
@@ -347,6 +370,11 @@ vi.mock('./api/orders', () => ({
   listOrders: vi.fn(async () => orderList),
 }))
 
+vi.mock('./api/technicians', () => ({
+  getTechnicianDetail: vi.fn(async () => technicianDetail),
+  listTechnicians: vi.fn(async () => technicianList),
+}))
+
 describe('App shell smoke', () => {
   it('renders the app shell and the main modules', async () => {
     render(<App />)
@@ -360,6 +388,7 @@ describe('App shell smoke', () => {
     expect(screen.getByRole('button', { name: 'Clientes' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Contactos' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Pedidos' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Tecnicos' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ingredientes' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Almacen' })).toBeInTheDocument()
   })
@@ -383,6 +412,9 @@ describe('App shell smoke', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Pedidos' }))
     expect(await screen.findByPlaceholderText('Ano (ej: 2026)')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tecnicos' }))
+    expect(await screen.findByPlaceholderText('Buscar por nombre, apellido, movil, interno o email')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Ingredientes' }))
     expect(await screen.findByPlaceholderText('Buscar ingrediente por nombre, codigo o referencia')).toBeInTheDocument()
