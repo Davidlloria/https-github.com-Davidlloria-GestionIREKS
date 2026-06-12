@@ -1578,7 +1578,7 @@ tbody tr:hover {
 
 .customers-list-table {
   min-height: 0;
-  padding-right: 6px;
+  padding-right: 10px;
   padding-bottom: 4px;
   scrollbar-gutter: stable both-edges;
 }
@@ -1594,11 +1594,19 @@ tbody tr:hover {
   z-index: 2;
   background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%);
   color: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
   font-weight: 700;
   box-shadow:
     inset 0 -1px 0 rgba(255, 255, 255, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.customers-list-table thead th:first-child {
+  border-top-left-radius: 10px;
+}
+
+.customers-list-table thead th:last-child {
+  border-top-right-radius: 10px;
 }
 
 .customers-list-table th,
@@ -1631,13 +1639,23 @@ tbody tr:hover {
 
 .customers-list-table tbody tr {
   cursor: pointer;
+  background: #ffffff;
 }
 
-.customers-list-table tbody tr:hover {
+.customers-list-table tbody td {
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.customers-list-table tbody tr:hover td {
   background: #f8fbff;
 }
 
 .customers-list-table tbody tr.is-selected td {
+  background: #eef4ff;
+}
+
+.customers-list-table tbody tr.is-selected:hover td {
   background: #eef4ff;
 }
 
