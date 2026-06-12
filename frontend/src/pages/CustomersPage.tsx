@@ -45,6 +45,10 @@ function locationValueOrDash(value: string | null | undefined) {
     return '-'
   }
 
+  if (/^\d+$/.test(text)) {
+    return '-'
+  }
+
   if (/^[A-Z]{1,4}\d+$/i.test(text)) {
     return '-'
   }
@@ -295,66 +299,80 @@ export function CustomersPage() {
 
                     {!!detailQuery.data && (
                       <div className="customers-field-grid">
-                        <label>
-                          <span>Cod.</span>
-                          <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_codigo)} />
-                        </label>
-                        <label className="customers-wide-field">
-                          <span>Nombre Comercial</span>
-                          <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_nombre_comercial)} />
-                        </label>
-                        <label>
-                          <span>Telef.</span>
-                          <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_telefono)} />
-                        </label>
-                        <label>
-                          <span>C.I.F.</span>
-                          <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_cif)} />
-                        </label>
-                        <label className="customers-wide-field">
-                          <span>Nombre Fiscal</span>
-                          <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_nombre_fiscal)} />
-                        </label>
-                        <label>
-                          <span>Provincia</span>
-                          <input
-                            className="input customers-field"
-                            readOnly
-                            value={locationValueOrDash(detailQuery.data.cliente_direccion_provincia_id)}
-                          />
-                        </label>
-                        <label>
-                          <span>Isla</span>
-                          <input
-                            className="input customers-field"
-                            readOnly
-                            value={locationValueOrDash(detailQuery.data.cliente_direccion_isla)}
-                          />
-                        </label>
-                        <label>
-                          <span>Municipio</span>
-                          <input
-                            className="input customers-field"
-                            readOnly
-                            value={locationValueOrDash(detailQuery.data.cliente_direccion_municipio_id)}
-                          />
-                        </label>
-                        <label className="customers-wide-field">
-                          <span>Calle</span>
-                          <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_direccion)} />
-                        </label>
-                        <label>
-                          <span>C.P.</span>
-                          <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_direccion_cp)} />
-                        </label>
-                        <label>
-                          <span>Localidad</span>
-                          <input
-                            className="input customers-field"
-                            readOnly
-                            value={locationValueOrDash(detailQuery.data.cliente_direccion_localidad_id)}
-                          />
-                        </label>
+                        <div className="customers-field-row customers-field-row-top">
+                          <label className="customers-field-code">
+                            <span>Cod.</span>
+                            <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_codigo)} />
+                          </label>
+                          <label className="customers-field-commercial">
+                            <span>Nombre Comercial</span>
+                            <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_nombre_comercial)} />
+                          </label>
+                          <label className="customers-field-tax">
+                            <span>C.I.F.</span>
+                            <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_cif)} />
+                          </label>
+                        </div>
+
+                        <div className="customers-field-row customers-field-row-mid">
+                          <label className="customers-field-phone">
+                            <span>Telef.</span>
+                            <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_telefono)} />
+                          </label>
+                          <label className="customers-field-fiscal">
+                            <span>Nombre Fiscal</span>
+                            <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_nombre_fiscal)} />
+                          </label>
+                        </div>
+
+                        <div className="customers-field-row customers-field-row-location">
+                          <label>
+                            <span>Provincia</span>
+                            <input
+                              className="input customers-field"
+                              readOnly
+                              value={locationValueOrDash(detailQuery.data.cliente_direccion_provincia_id)}
+                            />
+                          </label>
+                          <label>
+                            <span>Isla</span>
+                            <input
+                              className="input customers-field"
+                              readOnly
+                              value={locationValueOrDash(detailQuery.data.cliente_direccion_isla)}
+                            />
+                          </label>
+                          <label>
+                            <span>Municipio</span>
+                            <input
+                              className="input customers-field"
+                              readOnly
+                              value={locationValueOrDash(detailQuery.data.cliente_direccion_municipio_id)}
+                            />
+                          </label>
+                        </div>
+
+                        <div className="customers-field-row customers-field-row-location customers-field-row-location-compact">
+                          <label className="customers-field-locality">
+                            <span>Localidad</span>
+                            <input
+                              className="input customers-field"
+                              readOnly
+                              value={locationValueOrDash(detailQuery.data.cliente_direccion_localidad_id)}
+                            />
+                          </label>
+                          <label className="customers-field-postal">
+                            <span>C.P.</span>
+                            <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_direccion_cp)} />
+                          </label>
+                        </div>
+
+                        <div className="customers-field-row customers-field-row-street">
+                          <label>
+                            <span>Calle</span>
+                            <input className="input customers-field" readOnly value={valueOrDash(detailQuery.data.cliente_direccion)} />
+                          </label>
+                        </div>
                       </div>
                     )}
                   </>

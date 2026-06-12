@@ -1578,6 +1578,9 @@ tbody tr:hover {
 
 .customers-list-table {
   min-height: 0;
+  padding-right: 6px;
+  padding-bottom: 4px;
+  scrollbar-gutter: stable both-edges;
 }
 
 .customers-list-table table {
@@ -1588,10 +1591,12 @@ tbody tr:hover {
 .customers-list-table thead th {
   position: sticky;
   top: 0;
-  z-index: 1;
-  background: #f8fafc;
-  color: #475569;
+  z-index: 2;
+  background: #eef4ff;
+  color: #334155;
   border-bottom: 1px solid #e2e8f0;
+  font-weight: 700;
+  box-shadow: inset 0 -1px 0 #dbe4f0;
 }
 
 .customers-list-table th,
@@ -1603,7 +1608,7 @@ tbody tr:hover {
 
 .customers-list-table th:nth-child(1),
 .customers-list-table td:nth-child(1) {
-  width: 66px;
+  width: 58px;
 }
 
 .customers-list-table th:nth-child(2),
@@ -1613,13 +1618,13 @@ tbody tr:hover {
 
 .customers-list-table th:nth-child(3),
 .customers-list-table td:nth-child(3) {
-  width: 96px;
+  width: 84px;
 }
 
 .customers-list-table th,
 .customers-list-table td {
-  padding-top: 8px;
-  padding-bottom: 8px;
+  padding-top: 7px;
+  padding-bottom: 7px;
 }
 
 .customers-list-table tbody tr {
@@ -1734,7 +1739,7 @@ tbody tr:hover {
 
 .customers-detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(250px, 0.85fr);
+  grid-template-columns: minmax(0, 1.68fr) minmax(250px, 0.88fr);
   gap: 10px;
   min-height: 0;
 }
@@ -1773,40 +1778,81 @@ tbody tr:hover {
 
 .customers-field-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   align-content: start;
+}
+
+.customers-field-row {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.customers-field-row-top {
+  grid-template-columns: minmax(64px, 0.45fr) minmax(0, 1.75fr) minmax(96px, 0.55fr);
+}
+
+.customers-field-row-mid {
+  grid-template-columns: minmax(138px, 0.62fr) minmax(0, 1.38fr);
+}
+
+.customers-field-row-location {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.customers-field-row-location-compact {
+  grid-template-columns: minmax(0, 1.5fr) minmax(92px, 0.42fr);
+}
+
+.customers-field-row-street {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .customers-field-grid label,
 .customers-type-fields label,
 .customers-prospect-row {
   display: grid;
-  gap: 4px;
-  font-size: 12px;
+  gap: 3px;
+  font-size: 11px;
   color: var(--muted);
+  min-width: 0;
 }
 
 .customers-field-grid label span,
 .customers-type-fields label span {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  line-height: 1.1;
 }
 
-.customers-wide-field {
-  grid-column: span 2;
+.customers-field-code,
+.customers-field-tax,
+.customers-field-phone,
+.customers-field-commercial,
+.customers-field-fiscal,
+.customers-field-locality,
+.customers-field-postal {
+  min-width: 0;
 }
 
 .customers-field {
   min-width: 0;
   width: 100%;
   min-height: 34px;
-  border-radius: 10px;
+  height: 34px;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-radius: 9px;
   border-color: #dbe4f0;
   background: #f8fafc;
   box-shadow: none;
+  font-size: 13px;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .customers-type-panel {
@@ -2062,11 +2108,14 @@ tbody tr:hover {
 
 @media (max-width: 900px) {
   .customers-field-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
-  .customers-wide-field {
-    grid-column: span 2;
+  .customers-field-row-top,
+  .customers-field-row-mid,
+  .customers-field-row-location,
+  .customers-field-row-location-compact {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2088,20 +2137,12 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 
-  .customers-wide-field {
-    grid-column: span 1;
-  }
-
   .customers-detail-actions {
     gap: 6px;
   }
 }
 
 @media (max-width: 560px) {
-  .customers-field-grid {
-    grid-template-columns: 1fr;
-  }
-
   .customers-search-row {
     grid-template-columns: 1fr;
   }
