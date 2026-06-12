@@ -128,11 +128,6 @@ export function CustomersPage() {
     [selectedCustomerId],
   )
 
-  const hasPreviousPage = pageIndex > 0
-  const hasNextPage = offset + customerRows.length < customersQuery.data.total
-  const currentPage = pageIndex + 1
-  const totalPages = Math.max(1, Math.ceil(customersQuery.data.total / PAGE_SIZE))
-
   return (
     <section className="customers-saas-page">
       <div className="customers-saas-workspace">
@@ -211,7 +206,7 @@ export function CustomersPage() {
                   </thead>
                   <tbody>
                     {visibleCustomerRows.map((customer) => {
-                      const island = customer.cliente_direccion_isla?.trim() || '-'
+                      const island = locationValueOrDash(customer.cliente_direccion_isla)
                       const isSelected = customer.cliente_id === selectedCustomerId
 
                       return (
@@ -232,22 +227,6 @@ export function CustomersPage() {
             )}
           </div>
 
-          <div className="customers-list-pager">
-            <button
-              type="button"
-              className="customers-pager-btn"
-              disabled={!hasPreviousPage}
-              onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
-            >
-              Anterior
-            </button>
-            <span className="customers-pager-state">
-              Pagina {currentPage} de {totalPages}
-            </span>
-            <button type="button" className="customers-pager-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
-              Siguiente
-            </button>
-          </div>
         </aside>
 
         <section className="customers-detail-panel">
