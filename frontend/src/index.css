@@ -1678,6 +1678,10 @@ tbody tr:hover {
   overflow: hidden;
 }
 
+.customers-detail-main {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .customers-detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.68fr) minmax(250px, 0.88fr);
@@ -1685,6 +1689,10 @@ tbody tr:hover {
   align-items: stretch;
   height: 100%;
   min-height: 0;
+}
+
+.customers-detail-top {
+  align-items: stretch;
 }
 
 .customers-detail-card,
@@ -1970,6 +1978,11 @@ tbody tr:hover {
   overflow: hidden;
 }
 
+.customers-tabs-body {
+  min-height: 0;
+  height: 100%;
+}
+
 .customers-tab-scroll {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -2045,6 +2058,10 @@ tbody tr:hover {
   display: grid;
   place-items: center;
   height: 100%;
+  min-height: 112px;
+}
+
+.customers-tab-empty {
   min-height: 112px;
 }
 

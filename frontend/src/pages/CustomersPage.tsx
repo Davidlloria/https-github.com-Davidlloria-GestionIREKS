@@ -272,8 +272,8 @@ export function CustomersPage() {
             </button>
           </div>
 
-          <div className="customers-detail-body">
-            <div className="customers-detail-grid">
+          <div className="customers-detail-body customers-detail-main">
+            <div className="customers-detail-grid customers-detail-top">
               <section className="customers-detail-card">
                 <div className="customers-section-head">
                   <div>
@@ -452,7 +452,7 @@ export function CustomersPage() {
                 ))}
               </div>
 
-              <div className="customers-tabs-content">
+              <div className="customers-tabs-content customers-tabs-body">
                 {activeTab === 'contacts' && (
                   <div className="customers-tab-scroll">
                     <div className="customers-tab-head">
@@ -497,9 +497,9 @@ export function CustomersPage() {
                   </div>
                 )}
 
-                {activeTab === 'sales' && <div className="state customers-empty-panel">Sin datos asociados a ventas.</div>}
-                {activeTab === 'recipes' && <div className="state customers-empty-panel">Sin datos asociados a recetas.</div>}
-                {activeTab === 'agenda' && <div className="state customers-empty-panel">Sin datos asociados a agenda.</div>}
+                {activeTab === 'sales' && <div className="state customers-empty-panel customers-tab-empty">Sin datos asociados a ventas.</div>}
+                {activeTab === 'recipes' && <div className="state customers-empty-panel customers-tab-empty">Sin datos asociados a recetas.</div>}
+                {activeTab === 'agenda' && <div className="state customers-empty-panel customers-tab-empty">Sin datos asociados a agenda.</div>}
               </div>
             </section>
           </div>
