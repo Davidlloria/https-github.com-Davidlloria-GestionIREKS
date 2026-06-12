@@ -215,34 +215,32 @@ export function CustomersPage() {
             />
 
             {!!visibleCustomerRows.length && (
-              <div className="table-wrap customers-list-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>COD.</th>
-                      <th>NOMBRE</th>
-                      <th>ISLA</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleCustomerRows.map((customer) => {
-                      const island = locationValueOrDash(customer.cliente_direccion_isla)
-                      const isSelected = customer.cliente_id === selectedCustomerId
+              <div className="customers-list-grid">
+                <div className="customers-list-header">
+                  <div className="customers-list-cell">COD.</div>
+                  <div className="customers-list-cell">NOMBRE</div>
+                  <div className="customers-list-cell">ISLA</div>
+                </div>
 
-                      return (
-                        <tr
-                          key={customer.cliente_id}
-                          className={isSelected ? 'is-selected' : ''}
-                          onClick={() => setSelectedCandidateId(customer.cliente_id)}
-                        >
-                          <td>{customer.cliente_codigo}</td>
-                          <td>{customerLabel(customer)}</td>
-                          <td>{island}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                <div className="customers-list-body">
+                  {visibleCustomerRows.map((customer) => {
+                    const island = locationValueOrDash(customer.cliente_direccion_isla)
+                    const isSelected = customer.cliente_id === selectedCustomerId
+
+                    return (
+                      <button
+                        key={customer.cliente_id}
+                        type="button"
+                        className={`customers-list-row ${isSelected ? 'is-selected' : ''}`}
+                        onClick={() => setSelectedCandidateId(customer.cliente_id)}
+                      >
+                        <span className="customers-list-cell">{customer.cliente_codigo}</span>
+                        <span className="customers-list-cell customers-list-cell-name">{customerLabel(customer)}</span>
+                        <span className="customers-list-cell">{island}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>
