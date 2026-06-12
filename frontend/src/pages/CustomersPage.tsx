@@ -70,18 +70,41 @@ function statusLabel(active?: boolean) {
   return '-'
 }
 
+async function listAllCustomers(search: string) {
+  const firstPage = await listCustomers(search, PAGE_SIZE, 0)
+  const items = [...firstPage.items]
+  let offset = items.length
+
+  while (offset < firstPage.total) {
+    const page = await listCustomers(search, PAGE_SIZE, offset)
+    if (!page.items.length) {
+      break
+    }
+    items.push(...page.items)
+    offset += page.items.length
+    if (page.items.length < PAGE_SIZE) {
+      break
+    }
+  }
+
+  return {
+    ...firstPage,
+    items,
+    limit: items.length,
+    offset: 0,
+  }
+}
+
 export function CustomersPage() {
   const [search, setSearch] = useState('')
   const [islandFilter, setIslandFilter] = useState('')
-  const [pageIndex, setPageIndex] = useState(0)
   const [selectedCandidateId, setSelectedCandidateId] = useState('')
   const [activeTab, setActiveTab] = useState<CustomerTab>('contacts')
 
-  const offset = pageIndex * PAGE_SIZE
   const customersQuery = useAsyncResource(
-    () => listCustomers(search, PAGE_SIZE, offset),
+    () => listAllCustomers(search),
     { items: [], total: 0, limit: PAGE_SIZE, offset: 0 },
-    [search, offset],
+    [search],
   )
   const customerRows = customersQuery.data.items
 
@@ -146,7 +169,6 @@ export function CustomersPage() {
               value={islandFilter}
               onChange={(event) => {
                 setIslandFilter(event.target.value)
-                setPageIndex(0)
                 setSelectedCandidateId('')
               }}
             >
@@ -164,7 +186,6 @@ export function CustomersPage() {
                 value={search}
                 onChange={(event) => {
                   setSearch(event.target.value)
-                  setPageIndex(0)
                   setSelectedCandidateId('')
                 }}
                 placeholder="Buscar cliente..."
@@ -177,7 +198,6 @@ export function CustomersPage() {
                 onClick={() => {
                   setSearch('')
                   setIslandFilter('')
-                  setPageIndex(0)
                   setSelectedCandidateId('')
                 }}
               >

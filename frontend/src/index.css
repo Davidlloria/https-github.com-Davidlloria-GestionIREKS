@@ -1641,10 +1641,6 @@ tbody tr:hover {
   background: #eef4ff;
 }
 
-.customers-list-table tbody tr.is-selected td:first-child {
-  box-shadow: inset 3px 0 0 #2563eb;
-}
-
 .customers-list-pager {
   display: flex;
   align-items: center;
