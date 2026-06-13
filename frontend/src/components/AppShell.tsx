@@ -129,7 +129,7 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const isCustomers = activeView === 'customers'
-  const isSaasShell = isCustomers || activeView === 'contacts' || activeView === 'dashboard'
+  const isSaasShell = isCustomers || activeView === 'contacts' || activeView === 'dashboard' || activeView === 'technicians'
   const activeNavItem = navItems.find((item) => item.key === activeView)
 
   return (

@@ -3028,3 +3028,329 @@ tbody tr:hover {
     width: 100%;
   }
 }
+
+.technicians-saas-page {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.technicians-saas-workspace {
+  display: grid;
+  grid-template-columns: minmax(340px, 0.96fr) minmax(0, 1.04fr);
+  gap: 14px;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.technicians-list-panel,
+.technicians-detail-panel {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 12px;
+  box-shadow: var(--shadow-soft);
+}
+
+.technicians-list-panel {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.technicians-detail-panel {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.technicians-list-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.technicians-list-head-copy {
+  min-width: 0;
+}
+
+.technicians-list-kicker,
+.technicians-detail-kicker {
+  margin: 0 0 6px;
+  color: var(--brand-strong);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.technicians-list-head-copy h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.technicians-list-head-copy p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.technicians-list-filters {
+  display: grid;
+  gap: 8px;
+}
+
+.technicians-search {
+  width: 100%;
+  min-width: 0;
+}
+
+.technicians-list-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.technicians-pager-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.technicians-pager-btn {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #ffffff, #f4f7fb);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 7px 11px;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: var(--shadow-soft);
+}
+
+.technicians-pager-btn:disabled {
+  opacity: 0.95;
+  color: var(--text);
+}
+
+.technicians-list-scroll {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.technicians-list-scroll > .state {
+  margin: 0;
+}
+
+.technicians-list-grid {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
+}
+
+.technicians-list-header {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.7fr) minmax(0, 1.05fr) minmax(0, 0.8fr) minmax(0, 1.15fr);
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  padding-right: calc(12px + 10px);
+  background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%);
+  color: #ffffff;
+  border: 1px solid #1d4ed8;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.technicians-list-body {
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  border: 1px solid #dbe3ef;
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+  background: #ffffff;
+}
+
+.technicians-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.7fr) minmax(0, 1.05fr) minmax(0, 0.8fr) minmax(0, 1.15fr);
+  align-items: center;
+  min-height: 40px;
+  width: 100%;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 1px solid #e5eaf2;
+  background: #ffffff;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.technicians-list-row:hover {
+  background: #f8fbff;
+}
+
+.technicians-list-row.is-selected,
+.technicians-list-row.is-selected:hover {
+  background: #eef4ff;
+}
+
+.technicians-list-cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.technicians-list-cell-name {
+  padding-right: 6px;
+  font-weight: 600;
+}
+
+.technicians-detail-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), var(--surface-2));
+  box-shadow: var(--shadow-soft);
+}
+
+.technicians-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.technicians-section-head h3 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.technicians-section-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.technicians-field-grid {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.technicians-field-row {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.technicians-field-row-top {
+  grid-template-columns: minmax(64px, 0.45fr) minmax(0, 1.6fr) minmax(0, 1fr);
+}
+
+.technicians-field-row-mid {
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
+}
+
+.technicians-field-row-bottom {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.technicians-field-grid label {
+  display: grid;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.technicians-field-grid label span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.technicians-field {
+  min-width: 0;
+  width: 100%;
+  min-height: 34px;
+  height: 34px;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-radius: 9px;
+  border-color: #dbe4f0;
+  background: #f8fafc;
+  box-shadow: none;
+  font-size: 13px;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .technicians-saas-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .technicians-field-row-top,
+  .technicians-field-row-mid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .technicians-list-head,
+  .technicians-list-meta,
+  .technicians-section-head {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 720px) {
+  .technicians-list-panel,
+  .technicians-detail-panel,
+  .technicians-detail-card {
+    padding: 12px;
+  }
+}
