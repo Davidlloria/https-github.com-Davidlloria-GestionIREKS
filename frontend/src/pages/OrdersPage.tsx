@@ -85,15 +85,16 @@ export function OrdersPage() {
   const hasNextPage = offset + orderRows.length < ordersQuery.data.total
   const currentPage = pageIndex + 1
   const totalPages = Math.max(1, Math.ceil(ordersQuery.data.total / PAGE_SIZE))
+  const hasRows = orderRows.length > 0
 
   return (
-    <section className="page-grid">
-      <header className="module-header">
+    <section className={`page-grid orders-page ${hasRows ? 'orders-page-with-rows' : 'orders-page-empty'}`}>
+      <header className="module-header orders-page-header">
         <div className="module-header-copy">
           <p className="module-kicker">Modulo read-only</p>
           <h2>Pedidos</h2>
           <p className="module-description">
-            Consulta de pedidos, lineas y pendientes con navegacion por pagina y detalle lateral.
+            Consulta read-only compacta de pedidos con listado, detalle, lineas y pendientes.
           </p>
         </div>
         <div className="module-header-meta">
@@ -102,8 +103,8 @@ export function OrdersPage() {
         </div>
       </header>
 
-      <section className="panel-section">
-        <div className="section-heading">
+      <section className="panel-section orders-filters-panel">
+        <div className="section-heading section-heading-compact">
           <div>
             <h3>Filtros</h3>
             <p>Reduce el listado antes de revisar detalle o pendientes.</p>
@@ -158,11 +159,11 @@ export function OrdersPage() {
         </div>
       </section>
 
-      <div className="cards">
+      <div className="cards orders-summary-cards">
         <StatCard label="Total pedidos" value={totals.total} />
-        <StatCard label="Con albaran" value={totals.withAlbaran} />
+        <StatCard label="Con albarán" value={totals.withAlbaran} />
         <StatCard label="Con factura" value={totals.withFactura} />
-        <StatCard label="Total kg (listado)" value={totals.totalKg} />
+        <StatCard label="Kilos listados" value={totals.totalKg} />
       </div>
 
       <QueryState
@@ -174,15 +175,15 @@ export function OrdersPage() {
 
       {!!orderRows.length && (
         <div className="orders-workspace">
-          <section className="orders-list-panel">
-            <div className="panel-section">
-              <div className="section-heading">
-                <div>
-                  <h3>Listado de pedidos</h3>
-                  <p>Selecciona una fila para abrir el detalle lateral.</p>
-                </div>
-                <span className="surface-chip">Mostrando {orderRows.length} de {ordersQuery.data.total}</span>
+          <section className="panel-section orders-list-panel">
+            <div className="section-heading section-heading-compact">
+              <div>
+                <h3>Listado de pedidos</h3>
+                <p>Selecciona una fila para abrir el detalle lateral.</p>
               </div>
+              <span className="surface-chip">Mostrando {orderRows.length} de {ordersQuery.data.total}</span>
+            </div>
+            <div className="orders-list-scroll">
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -203,7 +204,7 @@ export function OrdersPage() {
                         onClick={() => setSelectedCandidateId(row.pedido_id)}
                       >
                         <td>{row.pedido_fecha}</td>
-                        <td>{row.almacen_nombre || row.almacen_id}</td>
+                        <td>{row.almacen_nombre || '-'}</td>
                         <td>{row.pedido_numero || '-'}</td>
                         <td>{row.pedido_estado || '-'}</td>
                         <td>{row.semana}</td>
@@ -216,7 +217,7 @@ export function OrdersPage() {
             </div>
           </section>
 
-          <aside className="detail-panel detail-panel-orders">
+          <aside className="panel-section detail-panel detail-panel-orders orders-detail-panel">
             <div className="section-heading section-heading-compact">
               <div>
                 <h3>Detalle de pedido</h3>
@@ -231,22 +232,18 @@ export function OrdersPage() {
             />
 
             {!!detailQuery.data.detail && (
-              <>
+              <div className="orders-detail-scroll">
                 <dl className="detail-list">
                   <div>
-                    <dt>Pedido ID</dt>
-                    <dd>{detailQuery.data.detail.pedido_id}</dd>
+                    <dt>Pedido</dt>
+                    <dd>{detailQuery.data.detail.pedido_numero || '-'}</dd>
                   </div>
                   <div>
                     <dt>Fecha</dt>
                     <dd>{detailQuery.data.detail.pedido_fecha}</dd>
                   </div>
                   <div>
-                    <dt>Numero pedido</dt>
-                    <dd>{detailQuery.data.detail.pedido_numero || '-'}</dd>
-                  </div>
-                  <div>
-                    <dt>Albaran</dt>
+                    <dt>Albarán</dt>
                     <dd>{detailQuery.data.detail.pedido_albaran_numero || '-'}</dd>
                   </div>
                   <div>
@@ -257,19 +254,23 @@ export function OrdersPage() {
                     <dt>Referencia</dt>
                     <dd>{detailQuery.data.detail.pedido_ref || '-'}</dd>
                   </div>
+                  <div>
+                    <dt>Estado</dt>
+                    <dd>{detailQuery.data.detail.pedido_estado || '-'}</dd>
+                  </div>
                 </dl>
 
                 <div className="related-block">
-                  <h3>Lineas de pedido</h3>
+                  <h3>Líneas de pedido</h3>
                   {!detailQuery.data.items.length && <div className="state">Sin lineas.</div>}
                   {!!detailQuery.data.items.length && (
                     <div className="table-wrap">
                       <table>
                         <thead>
                           <tr>
-                            <th>Articulo ID</th>
+                            <th>Artículo</th>
                             <th>Cantidad</th>
-                            <th>Fecha linea</th>
+                            <th>Fecha línea</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -294,7 +295,7 @@ export function OrdersPage() {
                       <table>
                         <thead>
                           <tr>
-                            <th>Articulo ID</th>
+                            <th>Artículo</th>
                             <th>Pedida</th>
                             <th>Recibida</th>
                             <th>Pendiente</th>
@@ -316,7 +317,7 @@ export function OrdersPage() {
                     </div>
                   )}
                 </div>
-              </>
+              </div>
             )}
           </aside>
         </div>

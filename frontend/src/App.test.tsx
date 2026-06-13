@@ -613,7 +613,11 @@ describe('App shell smoke', () => {
     expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Pedidos' }))
-    expect(await screen.findByPlaceholderText('Ano (ej: 2026)')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Pedidos', level: 2 })).toBeInTheDocument()
+    expect(screen.queryByText('Consulta de pedidos')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Consulta de pedidos, lineas y pendientes con navegacion por pagina y detalle lateral.'),
+    ).not.toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Tecnicos' }))
     expect(await screen.findByPlaceholderText('Buscar por nombre, apellido, movil, interno o email')).toBeInTheDocument()

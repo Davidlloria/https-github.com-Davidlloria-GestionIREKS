@@ -375,11 +375,142 @@ button {
   justify-content: flex-end;
 }
 
+.orders-page {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  height: 100%;
+  align-content: start;
+}
+
+.orders-page-with-rows {
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+}
+
+.orders-page-empty {
+  grid-template-rows: auto auto auto auto;
+}
+
+.orders-page .module-header {
+  padding: 4px 2px 2px;
+}
+
+.orders-page .module-header h2 {
+  font-size: clamp(22px, 2vw, 32px);
+}
+
+.orders-page .module-description {
+  max-width: 68ch;
+}
+
+.orders-page .module-header-meta {
+  align-items: flex-start;
+}
+
+.orders-page .cards {
+  min-width: 0;
+}
+
+.orders-summary-cards .card {
+  min-width: 0;
+}
+
+.orders-filters-panel {
+  display: grid;
+  gap: 12px;
+}
+
 .orders-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.65fr) minmax(320px, 0.9fr);
   gap: 14px;
   align-items: start;
+}
+
+.orders-page .orders-workspace {
+  align-items: stretch;
+  min-height: 0;
+  height: 100%;
+}
+
+.orders-page .orders-list-panel,
+.orders-page .orders-detail-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  height: 100%;
+}
+
+.orders-page .orders-list-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.orders-page .orders-detail-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.orders-list-scroll {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
+
+.orders-list-scroll .table-wrap {
+  flex: 1;
+  min-height: 0;
+  scrollbar-gutter: stable;
+}
+
+.orders-detail-scroll {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  scrollbar-gutter: stable;
+}
+
+.orders-page .row-selected {
+  background: #eef4ff;
+}
+
+.orders-page .row-selected:hover {
+  background: #eef4ff;
+}
+
+.orders-page table {
+  min-width: 720px;
+}
+
+.orders-page .detail-list dd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.orders-page .state {
+  margin: 0;
+}
+
+.orders-page .section-heading h3 {
+  font-size: 15px;
+}
+
+.orders-page .section-heading p {
+  font-size: 12px;
+}
+
+.orders-page .toolbar {
+  gap: 10px;
+}
+
+.orders-page .input {
+  min-width: 200px;
+}
+
+.orders-page .pager-toolbar .action-btn {
+  min-width: 92px;
 }
 
 .ingredients-workspace {
