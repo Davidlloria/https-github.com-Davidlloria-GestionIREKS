@@ -87,6 +87,24 @@ function TabButton({
   )
 }
 
+function ActionButton({
+  children,
+  className = '',
+  disabled = true,
+  onClick,
+}: {
+  children: string
+  className?: string
+  disabled?: boolean
+  onClick?: () => void
+}) {
+  return (
+    <button type="button" className={`action-btn ireks-action-btn ${className}`.trim()} disabled={disabled} onClick={onClick}>
+      {children}
+    </button>
+  )
+}
+
 async function loadAllIreksIngredients(search: string): Promise<LoadedIreksData> {
   const items: IngredientIreksRead[] = []
   let offset = 0
@@ -214,7 +232,12 @@ export function IreksProductsPage() {
             />
           </div>
 
-          <QueryState loading={query.loading} error={query.error} empty={!rows.length} emptyMessage="No hay productos IREKS para los filtros actuales." />
+          <QueryState
+            loading={query.loading}
+            error={query.error}
+            empty={!rows.length}
+            emptyMessage="No hay productos IREKS para los filtros actuales."
+          />
 
           <div className="ireks-products-list-scroll">
             {!!rows.length && (
@@ -257,30 +280,20 @@ export function IreksProductsPage() {
         <div className="ireks-products-right-stack">
           <section className="panel-section ireks-products-detail-panel">
             <div className="ireks-products-detail-toolbar">
-              <button type="button" className="action-btn" disabled>
-                Nuevo
-              </button>
-              <button type="button" className="action-btn" disabled>
-                Eliminar
-              </button>
-              <button type="button" className="action-btn" disabled>
-                ID
-              </button>
-              <button type="button" className="action-btn" disabled>
-                Importar Excel/CSV
-              </button>
-              <button type="button" className="action-btn" disabled>
-                Listados
-              </button>
-              <button
-                type="button"
-                className="action-btn"
+              <ActionButton className="ireks-action-btn-success">Nuevo</ActionButton>
+              <ActionButton className="ireks-action-btn-danger">Eliminar</ActionButton>
+              <ActionButton className="ireks-action-btn-outline">ID</ActionButton>
+              <ActionButton className="ireks-action-btn-outline">Importar Excel/CSV</ActionButton>
+              <ActionButton className="ireks-action-btn-primary">Listados</ActionButton>
+              <ActionButton
+                className="ireks-action-btn-outline"
+                disabled={false}
                 onClick={() => {
                   setRefreshTick((prev) => prev + 1)
                 }}
               >
                 Refrescar
-              </button>
+              </ActionButton>
             </div>
 
             <div className="section-heading section-heading-compact">
@@ -290,32 +303,34 @@ export function IreksProductsPage() {
               </div>
             </div>
 
-            <QueryState
-              loading={detailQuery.loading}
-              error={detailQuery.error}
-              empty={!detailQuery.data}
-              emptyMessage="Selecciona un producto para ver el detalle read-only."
-            />
+            <div className="ireks-products-detail-scroll">
+              <QueryState
+                loading={detailQuery.loading}
+                error={detailQuery.error}
+                empty={!detailQuery.data}
+                emptyMessage="Selecciona un producto para ver el detalle read-only."
+              />
 
-            {!!detailQuery.data && (
-              <div className="ireks-products-detail-grid">
-                <ReadonlyField label="Ref." value={detailQuery.data.articulo_referencia || detailQuery.data.articulo_id} />
-                <ReadonlyField label="Ref. corta" value={detailQuery.data.articulo_referencia_corta} />
-                <ReadonlyField label="Descripción" value={detailQuery.data.articulo_descripcion} />
-                <ReadonlyField label="Distribuidor" value={formatCatalog(detailQuery.data.distribuidor_id, distribuidorLookup)} />
-                <ReadonlyField label="Referencia" value={detailQuery.data.articulo_referencia || detailQuery.data.articulo_id} />
-                <ReadonlyField label="Descripción comercial" value={detailQuery.data.articulo_descripcion} />
-                <div className="ireks-products-status-row">
-                  <span className="surface-chip">{detailQuery.data.articulo_status_activo ? 'Status activo' : 'Status inactivo'}</span>
+              {!!detailQuery.data && (
+                <div className="ireks-products-detail-grid">
+                  <ReadonlyField label="Ref." value={detailQuery.data.articulo_referencia || detailQuery.data.articulo_id} />
+                  <ReadonlyField label="Ref. corta" value={detailQuery.data.articulo_referencia_corta} />
+                  <ReadonlyField label="Descripción" value={detailQuery.data.articulo_descripcion} />
+                  <ReadonlyField label="Distribuidor" value={formatCatalog(detailQuery.data.distribuidor_id, distribuidorLookup)} />
+                  <ReadonlyField label="Referencia" value={detailQuery.data.articulo_referencia || detailQuery.data.articulo_id} />
+                  <ReadonlyField label="Descripción comercial" value={detailQuery.data.articulo_descripcion} />
+                  <div className="ireks-products-status-row">
+                    <span className="surface-chip">{detailQuery.data.articulo_status_activo ? 'Status activo' : 'Status inactivo'}</span>
+                  </div>
+                  <div className="ireks-products-status-row">
+                    <span className="surface-chip">{detailQuery.data.articulo_status_en_lista ? 'Status en lista' : 'Fuera de lista'}</span>
+                  </div>
+                  <div className="ireks-products-status-row">
+                    <span className="surface-chip">{formatText(detailQuery.data.categoria)}</span>
+                  </div>
                 </div>
-                <div className="ireks-products-status-row">
-                  <span className="surface-chip">{detailQuery.data.articulo_status_en_lista ? 'Status en lista' : 'Fuera de lista'}</span>
-                </div>
-                <div className="ireks-products-status-row">
-                  <span className="surface-chip">{formatText(detailQuery.data.categoria)}</span>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </section>
 
           <section className="panel-section ireks-products-tabs-panel">
@@ -332,7 +347,9 @@ export function IreksProductsPage() {
               ))}
             </div>
 
-            <div className="ireks-products-tab-body">{activeTab === 'Datos' ? dataTab : <div className="ireks-products-tab-empty">{tabPlaceholder(activeTab)}</div>}</div>
+            <div className="ireks-products-tab-body">
+              {activeTab === 'Datos' ? dataTab : <div className="ireks-products-tab-empty">{tabPlaceholder(activeTab)}</div>}
+            </div>
           </section>
         </div>
       </div>
