@@ -3716,7 +3716,9 @@ tbody tr:hover {
 }
 
 .courses-detail-panel {
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  overflow: hidden;
 }
 
 .courses-list-head {
@@ -3896,6 +3898,27 @@ tbody tr:hover {
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), var(--surface-2));
   box-shadow: var(--shadow-soft);
+}
+
+.courses-detail-module {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: var(--shadow-soft);
+}
+
+.courses-tabs-module {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .courses-actions-bar,
