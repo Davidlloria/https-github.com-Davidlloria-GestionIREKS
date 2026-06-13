@@ -622,11 +622,19 @@ describe('App shell smoke', () => {
     expect(await screen.findByPlaceholderText('Buscar por codigo, nombre, razon social, CIF o contacto')).toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Productos IREKS' }))
-    expect(await screen.findByRole('heading', { name: 'Productos IREKS', level: 2 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Productos IREKS', level: 3 })).toBeInTheDocument()
     expect(await screen.findByPlaceholderText('Buscar producto por referencia o nombre')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Anterior' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Siguiente' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Pagina/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Refrescar' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Datos' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Tarifa' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Detalle del producto' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Información del producto' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tarifa' }))
+    expect(await screen.findByText('Tarifa pendiente de migración read-only')).toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Materias primas' }))
     expect(await screen.findByPlaceholderText('Buscar materia prima por nombre, codigo o referencia')).toBeInTheDocument()
