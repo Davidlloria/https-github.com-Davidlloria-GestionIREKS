@@ -143,9 +143,8 @@ export function DashboardPage({ onChangeView }: DashboardPageProps) {
     <section className="dashboard-page">
       <header className="dashboard-header">
         <div className="dashboard-header-copy">
-          <p className="dashboard-kicker">Inicio</p>
           <h1>Dashboard</h1>
-          <p>Resumen general de actividad</p>
+          <span className="dashboard-header-pill">Datos pendientes de conexión</span>
         </div>
 
         <button type="button" className="dashboard-period-select" disabled>
@@ -163,8 +162,6 @@ export function DashboardPage({ onChangeView }: DashboardPageProps) {
           </span>
         </button>
       </header>
-
-      <p className="dashboard-note">Dashboard visual pendiente de conexión a datos reales</p>
 
       <section className="dashboard-kpi-grid" aria-label="Indicadores principales">
         {kpiCards.map((card) => (

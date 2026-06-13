@@ -2415,52 +2415,47 @@ tbody tr:hover {
 .dashboard-page {
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr);
-  gap: 14px;
+  gap: 10px;
   width: 100%;
   min-width: 0;
   min-height: 0;
   height: 100%;
+  overflow: auto;
+  padding-bottom: 6px;
 }
 
 .dashboard-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
 }
 
 .dashboard-header-copy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
-}
-
-.dashboard-kicker {
-  margin: 0 0 8px;
-  color: var(--brand-strong);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .dashboard-header h1 {
   margin: 0;
-  font-size: clamp(24px, 2.2vw, 34px);
+  font-size: clamp(22px, 2vw, 30px);
   line-height: 1.05;
   letter-spacing: -0.04em;
 }
 
-.dashboard-header p {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.45;
-}
-
-.dashboard-note {
-  margin: 0;
-  color: var(--muted);
+.dashboard-header-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid #dbe4f0;
+  background: #f8fafc;
+  color: #64748b;
+  padding: 4px 10px;
   font-size: 12px;
-  line-height: 1.35;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .dashboard-period-select {
@@ -2495,8 +2490,9 @@ tbody tr:hover {
 .dashboard-kpi-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
+  align-items: stretch;
 }
 
 .dashboard-kpi-card {
@@ -2504,7 +2500,7 @@ tbody tr:hover {
   grid-template-columns: 56px minmax(0, 1fr);
   gap: 14px;
   align-items: center;
-  padding: 18px;
+  padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: #ffffff;
@@ -2529,7 +2525,7 @@ tbody tr:hover {
 
 .dashboard-kpi-copy h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.2;
   font-weight: 700;
 }
@@ -2537,7 +2533,7 @@ tbody tr:hover {
 .dashboard-kpi-copy strong {
   display: block;
   margin-top: 6px;
-  font-size: clamp(24px, 2vw, 40px);
+  font-size: clamp(20px, 1.7vw, 32px);
   line-height: 1;
   letter-spacing: -0.04em;
 }
@@ -2545,7 +2541,7 @@ tbody tr:hover {
 .dashboard-kpi-copy p {
   margin: 8px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
@@ -2614,11 +2610,11 @@ tbody tr:hover {
 
 .dashboard-panel {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   align-content: start;
   min-width: 0;
   min-height: 0;
-  padding: 16px;
+  padding: 14px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: #ffffff;
@@ -2634,7 +2630,7 @@ tbody tr:hover {
 
 .dashboard-panel-head h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.2;
 }
 
@@ -2668,8 +2664,8 @@ tbody tr:hover {
   display: grid;
   place-items: center;
   gap: 6px;
-  min-height: 160px;
-  padding: 18px;
+  min-height: 110px;
+  padding: 14px;
   border: 1px dashed #d6e2d8;
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(248, 251, 248, 0.92), rgba(242, 247, 243, 0.92));
@@ -2778,8 +2774,8 @@ tbody tr:hover {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: end;
-  gap: 10px;
-  min-height: 220px;
+  gap: 8px;
+  min-height: 180px;
   padding: 8px 0 0;
   border-top: 1px solid #e5ece3;
 }
@@ -2796,7 +2792,7 @@ tbody tr:hover {
   align-items: end;
   gap: 3px;
   width: 100%;
-  height: 160px;
+  height: 120px;
 }
 
 .dashboard-chart-bar {
@@ -2820,7 +2816,7 @@ tbody tr:hover {
 
 .dashboard-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .dashboard-list-item {
@@ -2829,7 +2825,7 @@ tbody tr:hover {
   align-items: center;
   gap: 10px;
   min-width: 0;
-  padding: 8px 0;
+  padding: 6px 0;
   border-bottom: 1px solid #e5ece3;
 }
 
@@ -2876,7 +2872,7 @@ tbody tr:hover {
 .dashboard-quick-actions {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .dashboard-quick-action {
@@ -2884,7 +2880,7 @@ tbody tr:hover {
   justify-items: center;
   gap: 8px;
   min-width: 0;
-  padding: 14px 10px 12px;
+  padding: 12px 10px 10px;
   border: 1px solid #dbe4f0;
   border-radius: 14px;
   background: #ffffff;
@@ -2897,8 +2893,8 @@ tbody tr:hover {
 .dashboard-quick-icon {
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   border-radius: 16px;
 }
 
@@ -2993,6 +2989,10 @@ tbody tr:hover {
 
   .dashboard-quick-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-header-copy {
+    flex-wrap: wrap;
   }
 }
 
