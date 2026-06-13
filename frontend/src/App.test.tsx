@@ -7,7 +7,7 @@ const salesSummary = {
   year: 2024,
   month: 1,
   acumulado: false,
-  total: 1,
+  total: 2,
   items: [
     {
       articulo_id: 'A-1',
@@ -61,6 +61,19 @@ const ingredientList = {
       activo: true,
       precio: 0,
       source: 'ireks',
+    },
+    {
+      id: 'std:1',
+      codigo: 'STD-1',
+      nombre: 'Materia prima 1',
+      fabricante_id: '',
+      proveedor_id: 'PROV-2',
+      familia_id: 'FAM-2',
+      subfamilia_id: 'SUB-2',
+      unidad: 'kg',
+      activo: true,
+      precio: 2.5,
+      source: 'std',
     },
   ],
   total: 1,
@@ -348,19 +361,37 @@ vi.mock('./api/courses', () => ({
 }))
 
 vi.mock('./api/ingredients', () => ({
-  getIngredientDetail: vi.fn(async () => ({
-    id: 'ireks:1',
-    codigo: 'ING-1',
-    nombre: 'Ingrediente 1',
-    fabricante_id: '',
-    proveedor_id: 'PROV-1',
-    familia_id: 'FAM-1',
-    subfamilia_id: 'SUB-1',
-    unidad: 'kg',
-    activo: true,
-    precio: 0,
-    source: 'ireks',
-  })),
+  getIngredientDetail: vi.fn(async (ingredientId: string) => {
+    if (ingredientId === 'std:1') {
+      return {
+        id: 'std:1',
+        codigo: 'STD-1',
+        nombre: 'Materia prima 1',
+        fabricante_id: '',
+        proveedor_id: 'PROV-2',
+        familia_id: 'FAM-2',
+        subfamilia_id: 'SUB-2',
+        unidad: 'kg',
+        activo: true,
+        precio: 2.5,
+        source: 'std',
+      }
+    }
+
+    return {
+      id: 'ireks:1',
+      codigo: 'ING-1',
+      nombre: 'Ingrediente 1',
+      fabricante_id: '',
+      proveedor_id: 'PROV-1',
+      familia_id: 'FAM-1',
+      subfamilia_id: 'SUB-1',
+      unidad: 'kg',
+      activo: true,
+      precio: 0,
+      source: 'ireks',
+    }
+  }),
   listIngredients: vi.fn(async () => ingredientList),
 }))
 
@@ -418,7 +449,8 @@ describe('App shell smoke', () => {
     expect(getNav().getByRole('button', { name: 'Pedidos' })).toBeInTheDocument()
     expect(getNav().getByRole('button', { name: 'Tecnicos' })).toBeInTheDocument()
     expect(getNav().getByRole('button', { name: 'Distribuidores' })).toBeInTheDocument()
-    expect(getNav().getByRole('button', { name: 'Ingredientes' })).toBeInTheDocument()
+    expect(getNav().getByRole('button', { name: 'Productos IREKS' })).toBeInTheDocument()
+    expect(getNav().getByRole('button', { name: 'Materias primas' })).toBeInTheDocument()
     expect(getNav().getByRole('button', { name: 'Almacen' })).toBeInTheDocument()
   })
 
@@ -452,8 +484,11 @@ describe('App shell smoke', () => {
     fireEvent.click(getNav().getByRole('button', { name: 'Distribuidores' }))
     expect(await screen.findByPlaceholderText('Buscar por codigo, nombre, razon social, CIF o contacto')).toBeInTheDocument()
 
-    fireEvent.click(getNav().getByRole('button', { name: 'Ingredientes' }))
-    expect(await screen.findByPlaceholderText('Buscar ingrediente por nombre, codigo o referencia')).toBeInTheDocument()
+    fireEvent.click(getNav().getByRole('button', { name: 'Productos IREKS' }))
+    expect(await screen.findByPlaceholderText('Buscar producto IREKS por nombre, codigo o referencia')).toBeInTheDocument()
+
+    fireEvent.click(getNav().getByRole('button', { name: 'Materias primas' }))
+    expect(await screen.findByPlaceholderText('Buscar materia prima por nombre, codigo o referencia')).toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Almacen' }))
     expect(await screen.findByText('Stock actual')).toBeInTheDocument()

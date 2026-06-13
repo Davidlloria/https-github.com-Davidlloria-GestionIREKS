@@ -28,7 +28,8 @@ const VIEWS: Array<{ key: ViewKey; label: string; description: string }> = [
   { key: 'distributors', label: 'Distribuidores', description: 'Consulta read-only' },
   { key: 'courses', label: 'Cursos', description: 'Cursos y asistentes' },
   { key: 'recipes', label: 'Recetas', description: 'Listado y detalle read-only' },
-  { key: 'ingredients', label: 'Ingredientes', description: 'Catalogo e inspeccion' },
+  { key: 'ingredientsIreks', label: 'Productos IREKS', description: 'Catalogo read-only de productos IREKS' },
+  { key: 'ingredientsStd', label: 'Materias primas', description: 'Catalogo read-only de materias primas' },
   { key: 'warehouse', label: 'Almacen', description: 'Stock, movimientos e inventario' },
   { key: 'orders', label: 'Pedidos', description: 'Consulta read-only' },
   { key: 'sales', label: 'Ventas', description: 'Ventas anual y comparativas' },
@@ -49,6 +50,11 @@ const VIEW_META: Record<ViewKey, ViewMeta> = {
     label: 'Recetas',
     title: 'Consulta de recetas',
     subtitle: 'Vista read-only minima para explorar lista, detalle y lineas de receta.',
+  },
+  ingredients: {
+    label: 'Productos IREKS',
+    title: 'Productos IREKS',
+    subtitle: 'Vista read-only minima para explorar listado y detalle de productos IREKS.',
   },
   courses: {
     label: 'Cursos',
@@ -80,10 +86,15 @@ const VIEW_META: Record<ViewKey, ViewMeta> = {
     title: 'Consulta de distribuidores',
     subtitle: 'Vista read-only minima para explorar listado y detalle de distribuidores.',
   },
-  ingredients: {
-    label: 'Ingredientes',
-    title: 'Consulta de ingredientes',
-    subtitle: 'Vista read-only minima para explorar listado y detalle de ingredientes.',
+  ingredientsIreks: {
+    label: 'Productos IREKS',
+    title: 'Productos IREKS',
+    subtitle: 'Vista read-only minima para explorar listado y detalle de productos IREKS.',
+  },
+  ingredientsStd: {
+    label: 'Materias primas',
+    title: 'Materias primas',
+    subtitle: 'Vista read-only minima para explorar listado y detalle de materias primas.',
   },
   warehouse: {
     label: 'Almacen',
@@ -115,7 +126,8 @@ function App() {
           {activeView === 'orders' && <OrdersPage />}
           {activeView === 'technicians' && <TechniciansPage />}
           {activeView === 'distributors' && <DistributorsPage />}
-          {activeView === 'ingredients' && <IngredientsPage />}
+          {(activeView === 'ingredients' || activeView === 'ingredientsIreks') && <IngredientsPage mode="ireks" />}
+          {activeView === 'ingredientsStd' && <IngredientsPage mode="std" />}
           {activeView === 'warehouse' && <WarehousePage />}
         </AppErrorBoundary>
       </section>

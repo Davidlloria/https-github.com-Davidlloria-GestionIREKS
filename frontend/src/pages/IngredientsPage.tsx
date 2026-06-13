@@ -7,6 +7,12 @@ import type { IngredientDetail, IngredientListItem, IngredientListResponse } fro
 
 const PAGE_SIZE = 25
 
+type IngredientsMode = 'ireks' | 'std'
+
+interface IngredientsPageProps {
+  mode: IngredientsMode
+}
+
 const EMPTY_LIST: IngredientListResponse = {
   items: [] as IngredientListItem[],
   total: 0,
@@ -32,7 +38,43 @@ function formatText(value: string | number | boolean | null | undefined) {
   return text || '-'
 }
 
-export function IngredientsPage() {
+const MODE_COPY: Record<
+  IngredientsMode,
+  {
+    title: string
+    subtitle: string
+    searchPlaceholder: string
+    listTitle: string
+    listDescription: string
+    detailTitle: string
+    detailDescription: string
+    emptyMessage: string
+  }
+> = {
+  ireks: {
+    title: 'Productos IREKS',
+    subtitle: 'Vista read-only de productos IREKS separada del catalogo de materias primas.',
+    searchPlaceholder: 'Buscar producto IREKS por nombre, codigo o referencia',
+    listTitle: 'Listado de productos IREKS',
+    listDescription: 'Selecciona una fila para cargar el detalle del producto activo.',
+    detailTitle: 'Detalle de producto IREKS',
+    detailDescription: 'Campos principales del producto IREKS seleccionado.',
+    emptyMessage: 'No hay productos IREKS para los filtros actuales.',
+  },
+  std: {
+    title: 'Materias primas',
+    subtitle: 'Vista read-only de materias primas separada del catalogo de productos IREKS.',
+    searchPlaceholder: 'Buscar materia prima por nombre, codigo o referencia',
+    listTitle: 'Listado de materias primas',
+    listDescription: 'Selecciona una fila para cargar el detalle de la materia prima activa.',
+    detailTitle: 'Detalle de materia prima',
+    detailDescription: 'Campos principales de la materia prima seleccionada.',
+    emptyMessage: 'No hay materias primas para los filtros actuales.',
+  },
+}
+
+export function IngredientsPage({ mode }: IngredientsPageProps) {
+  const modeCopy = MODE_COPY[mode]
   const [search, setSearch] = useState('')
   const [pageIndex, setPageIndex] = useState(0)
   const [selectedCandidateId, setSelectedCandidateId] = useState('')
@@ -44,16 +86,20 @@ export function IngredientsPage() {
     [search, offset],
   )
   const ingredientRows: IngredientListItem[] = ingredientsQuery.data.items
+  const visibleRows = useMemo(
+    () => ingredientRows.filter((row) => row.source === mode),
+    [ingredientRows, mode],
+  )
 
   const selectedIngredientId = useMemo(() => {
-    if (!ingredientRows.length) {
+    if (!visibleRows.length) {
       return ''
     }
-    if (selectedCandidateId && ingredientRows.some((row) => row.id === selectedCandidateId)) {
+    if (selectedCandidateId && visibleRows.some((row) => row.id === selectedCandidateId)) {
       return selectedCandidateId
     }
-    return ingredientRows[0].id
-  }, [ingredientRows, selectedCandidateId])
+    return visibleRows[0].id
+  }, [selectedCandidateId, visibleRows])
 
   const detailQuery = useAsyncResource(
     () => {
@@ -67,16 +113,15 @@ export function IngredientsPage() {
   )
 
   const totals = useMemo(() => {
-    const activeCount = ingredientRows.filter((row) => row.activo).length
-    const stdCount = ingredientRows.filter((row) => row.source === 'std').length
-    const pricedCount = ingredientRows.filter((row) => Number.isFinite(row.precio) && row.precio > 0).length
+    const activeCount = visibleRows.filter((row) => row.activo).length
+    const pricedCount = visibleRows.filter((row) => Number.isFinite(row.precio) && row.precio > 0).length
     return {
-      total: ingredientsQuery.data.total,
+      total: visibleRows.length,
       activeCount,
-      stdCount,
       pricedCount,
+      unpricedCount: visibleRows.length - pricedCount,
     }
-  }, [ingredientRows, ingredientsQuery.data.total])
+  }, [visibleRows])
 
   const hasPreviousPage = pageIndex > 0
   const hasNextPage = offset + ingredientRows.length < ingredientsQuery.data.total
@@ -88,10 +133,8 @@ export function IngredientsPage() {
       <header className="module-header">
         <div className="module-header-copy">
           <p className="module-kicker">Modulo read-only</p>
-          <h2>Ingredientes</h2>
-          <p className="module-description">
-            Consulta del catalogo de ingredientes con detalle lateral para revisar origen, familia, unidad y precio sin editar.
-          </p>
+          <h2>{modeCopy.title}</h2>
+          <p className="module-description">{modeCopy.subtitle}</p>
         </div>
         <div className="module-header-meta">
           <span className="surface-chip">Pagina {currentPage} de {totalPages}</span>
@@ -128,35 +171,35 @@ export function IngredientsPage() {
               setSearch(event.target.value)
               setPageIndex(0)
             }}
-            placeholder="Buscar ingrediente por nombre, codigo o referencia"
+            placeholder={modeCopy.searchPlaceholder}
           />
         </div>
       </section>
 
       <div className="cards">
-        <StatCard label="Total ingredientes" value={totals.total} />
+        <StatCard label="Total" value={totals.total} />
         <StatCard label="Activos" value={totals.activeCount} />
-        <StatCard label="STD" value={totals.stdCount} />
         <StatCard label="Con precio" value={totals.pricedCount} />
+        <StatCard label="Sin precio" value={totals.unpricedCount} />
       </div>
 
       <QueryState
         loading={ingredientsQuery.loading}
         error={ingredientsQuery.error}
-        empty={!ingredientRows.length}
-        emptyMessage="No hay ingredientes para los filtros actuales."
+        empty={!visibleRows.length}
+        emptyMessage={modeCopy.emptyMessage}
       />
 
-      {!!ingredientRows.length && (
+      {!!visibleRows.length && (
         <div className="orders-workspace">
           <section className="orders-list-panel">
             <div className="panel-section">
               <div className="section-heading">
                 <div>
-                  <h3>Listado de ingredientes</h3>
-                  <p>Selecciona una fila para cargar el detalle del ingrediente activo.</p>
+                  <h3>{modeCopy.listTitle}</h3>
+                  <p>{modeCopy.listDescription}</p>
                 </div>
-                <span className="surface-chip">Mostrando {ingredientRows.length} de {ingredientsQuery.data.total}</span>
+                <span className="surface-chip">Mostrando {visibleRows.length} de {ingredientsQuery.data.total}</span>
               </div>
               <div className="table-wrap">
                 <table>
@@ -171,7 +214,7 @@ export function IngredientsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {ingredientRows.map((row) => (
+                    {visibleRows.map((row) => (
                       <tr
                         key={row.id}
                         className={row.id === selectedIngredientId ? 'row-selected' : ''}
@@ -194,8 +237,8 @@ export function IngredientsPage() {
           <aside className="detail-panel detail-panel-orders">
             <div className="section-heading section-heading-compact">
               <div>
-                <h3>Detalle de ingrediente</h3>
-                <p>Campos principales del ingrediente seleccionado.</p>
+                <h3>{modeCopy.detailTitle}</h3>
+                <p>{modeCopy.detailDescription}</p>
               </div>
             </div>
             <QueryState

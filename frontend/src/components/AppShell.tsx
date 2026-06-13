@@ -80,6 +80,8 @@ function ModuleIcon({ view }: { view: ViewKey }) {
         </svg>
       )
     case 'ingredients':
+    case 'ingredientsIreks':
+    case 'ingredientsStd':
       return (
         <svg {...commonProps}>
           <path d="M12 3c2.8 2.2 5 5.2 5 8.6A5 5 0 0 1 12 17a5 5 0 0 1-5-5.4C7 8.2 9.2 5.2 12 3Z" />
@@ -136,7 +138,10 @@ export function AppShell({
     activeView === 'technicians' ||
     activeView === 'distributors' ||
     activeView === 'courses' ||
-    activeView === 'recipes'
+    activeView === 'recipes' ||
+    activeView === 'ingredients' ||
+    activeView === 'ingredientsIreks' ||
+    activeView === 'ingredientsStd'
   const activeNavItem = navItems.find((item) => item.key === activeView)
 
   return (
