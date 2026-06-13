@@ -2456,6 +2456,13 @@ tbody tr:hover {
   line-height: 1.45;
 }
 
+.dashboard-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .dashboard-period-select {
   display: inline-flex;
   align-items: center;
@@ -2608,6 +2615,7 @@ tbody tr:hover {
 .dashboard-panel {
   display: grid;
   gap: 12px;
+  align-content: start;
   min-width: 0;
   min-height: 0;
   padding: 16px;
@@ -2654,6 +2662,31 @@ tbody tr:hover {
   content: '›';
   font-size: 18px;
   line-height: 1;
+}
+
+.dashboard-empty-state {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  min-height: 160px;
+  padding: 18px;
+  border: 1px dashed #d6e2d8;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(248, 251, 248, 0.92), rgba(242, 247, 243, 0.92));
+  color: var(--muted);
+  text-align: center;
+}
+
+.dashboard-empty-state strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dashboard-empty-state p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .dashboard-table-wrap {
