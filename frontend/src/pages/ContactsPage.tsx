@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { getContactDetail, listContactCompanies, listContacts } from '../api/contacts'
 import { QueryState } from '../components/QueryState'
-import { StatCard } from '../components/StatCard'
 import { useAsyncResource } from '../features/useAsyncResource'
 import type { ContactListItem } from '../types/api'
 
@@ -9,6 +8,15 @@ const PAGE_SIZE = 50
 
 function fullName(row: ContactListItem) {
   return `${row.nombre || ''} ${row.apellidos || ''}`.trim()
+}
+
+function valueOrDash(value: string | number | null | undefined) {
+  if (value === null || value === undefined) {
+    return '-'
+  }
+
+  const text = String(value).trim()
+  return text || '-'
 }
 
 export function ContactsPage() {
@@ -30,9 +38,11 @@ export function ContactsPage() {
     if (!contactRows.length) {
       return ''
     }
+
     if (selectedCandidateId && contactRows.some((row) => row.contacto_id === selectedCandidateId)) {
       return selectedCandidateId
     }
+
     return contactRows[0].contacto_id
   }, [contactRows, selectedCandidateId])
 
@@ -40,206 +50,218 @@ export function ContactsPage() {
     if (!selectedContactId) {
       return Promise.resolve(null)
     }
+
     return getContactDetail(selectedContactId)
   }, [selectedContactId])
 
   const detailQuery = useAsyncResource(loadSelectedDetail, null, [loadSelectedDetail, selectedContactId])
 
-  const totals = useMemo(() => {
-    const withEmail = contactRows.filter((row) => !!row.email).length
-    const withPhone = contactRows.filter((row) => !!row.telefono).length
-    const uniqueCompanies = new Set(contactRows.map((row) => row.cliente_id).filter(Boolean)).size
-    return {
-      total: contactsQuery.data.total,
-      withEmail,
-      withPhone,
-      uniqueCompanies,
-    }
-  }, [contactRows, contactsQuery.data.total])
-
   const hasPreviousPage = pageIndex > 0
   const hasNextPage = offset + contactRows.length < contactsQuery.data.total
   const currentPage = pageIndex + 1
   const totalPages = Math.max(1, Math.ceil(contactsQuery.data.total / PAGE_SIZE))
+  const detailContact = detailQuery.data
+  const fullDetailName = detailContact ? fullName(detailContact) : '-'
 
   return (
-    <section className="page-grid">
-      <header className="module-header">
-        <div className="module-header-copy">
-          <p className="module-kicker">Modulo read-only</p>
-          <h2>Contactos</h2>
-          <p className="module-description">
-            Consulta de contactos con filtros por empresa y detalle lateral para revisar datos de contacto y trazabilidad.
-          </p>
-        </div>
-        <div className="module-header-meta">
-          <span className="surface-chip">Pagina {currentPage} de {totalPages}</span>
-          <span className="surface-chip">Vista sin mutaciones</span>
-        </div>
-      </header>
-
-      <section className="panel-section">
-        <div className="section-heading">
-          <div>
-            <h3>Filtros</h3>
-            <p>Usa el texto libre y el filtro de empresa para acotar el listado.</p>
+    <section className="contacts-saas-page">
+      <div className="contacts-saas-workspace">
+        <aside className="contacts-list-panel">
+          <div className="contacts-list-head">
+            <div className="contacts-list-head-copy">
+              <p className="contacts-list-kicker">Contactos</p>
+              <h2>Contactos</h2>
+              <p>Listado read-only</p>
+            </div>
+            <span className="surface-chip">{contactRows.length} visibles</span>
           </div>
-          <div className="toolbar pager-toolbar">
-            <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
-              Anterior
-            </button>
-            <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
-              Siguiente
-            </button>
+
+          <div className="contacts-list-filters">
+            <input
+              className="input contacts-search"
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value)
+                setPageIndex(0)
+                setSelectedCandidateId('')
+              }}
+              placeholder="Buscar por nombre, apellido, cargo, email o empresa"
+            />
+            <select
+              className="select contacts-company-select"
+              value={companyFilter}
+              onChange={(event) => {
+                setCompanyFilter(event.target.value)
+                setPageIndex(0)
+                setSelectedCandidateId('')
+              }}
+            >
+              <option value="">Todas las empresas</option>
+              {companiesQuery.data.map((company) => (
+                <option key={company.cliente_id} value={company.cliente_id}>
+                  {company.nombre}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
 
-        <div className="toolbar">
-          <input
-            className="input"
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value)
-              setPageIndex(0)
-            }}
-            placeholder="Buscar por nombre, apellido, cargo, email o empresa"
-          />
-          <select
-            className="select"
-            value={companyFilter}
-            onChange={(event) => {
-              setCompanyFilter(event.target.value)
-              setPageIndex(0)
-            }}
-          >
-            <option value="">Todas las empresas</option>
-            {companiesQuery.data.map((company) => (
-              <option key={company.cliente_id} value={company.cliente_id}>
-                {company.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
-      </section>
+          <div className="contacts-list-meta">
+            <span className="surface-chip">
+              Pagina {currentPage} de {totalPages}
+            </span>
+            <div className="contacts-pager-actions" aria-label="Paginacion de contactos">
+              <button
+                type="button"
+                className="contacts-pager-btn"
+                disabled={!hasPreviousPage}
+                onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                className="contacts-pager-btn"
+                disabled={!hasNextPage}
+                onClick={() => setPageIndex((prev) => prev + 1)}
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
 
-      <div className="cards">
-        <StatCard label="Total contactos" value={totals.total} />
-        <StatCard label="Con email" value={totals.withEmail} />
-        <StatCard label="Con telefono" value={totals.withPhone} />
-        <StatCard label="Empresas con contactos" value={totals.uniqueCompanies} />
-      </div>
+          <div className="contacts-list-scroll">
+            <QueryState
+              loading={contactsQuery.loading}
+              error={contactsQuery.error}
+              empty={!contactRows.length}
+              emptyMessage="No hay contactos para los filtros actuales."
+            />
 
-      <QueryState
-        loading={contactsQuery.loading}
-        error={contactsQuery.error}
-        empty={!contactRows.length}
-        emptyMessage="No hay contactos para los filtros actuales."
-      />
-
-      {!!contactRows.length && (
-        <div className="orders-workspace">
-          <section className="orders-list-panel">
-            <div className="panel-section">
-              <div className="section-heading">
-                <div>
-                  <h3>Listado de contactos</h3>
-                  <p>Selecciona una fila para revisar el detalle lateral del contacto activo.</p>
+            {!!contactRows.length && (
+              <div className="contacts-list-grid">
+                <div className="contacts-list-header">
+                  <div className="contacts-list-cell">NOMBRE</div>
+                  <div className="contacts-list-cell">EMPRESA</div>
+                  <div className="contacts-list-cell">CARGO</div>
+                  <div className="contacts-list-cell">TELEFONO / EMAIL</div>
                 </div>
-                <span className="surface-chip">Mostrando {contactRows.length} de {contactsQuery.data.total}</span>
-              </div>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Nombre</th>
-                      <th>Empresa</th>
-                      <th>Cargo</th>
-                      <th>Email</th>
-                      <th>Telefono</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {contactRows.map((row) => (
-                      <tr
+
+                <div className="contacts-list-body">
+                  {contactRows.map((row) => {
+                    const isSelected = row.contacto_id === selectedContactId
+
+                    return (
+                      <button
                         key={row.contacto_id}
-                        className={row.contacto_id === selectedContactId ? 'row-selected' : ''}
+                        type="button"
+                        className={`contacts-list-row ${isSelected ? 'is-selected' : ''}`}
                         onClick={() => setSelectedCandidateId(row.contacto_id)}
                       >
-                        <td>{fullName(row) || '(sin nombre)'}</td>
-                        <td>{row.cliente_nombre || '-'}</td>
-                        <td>{row.cargo || '-'}</td>
-                        <td>{row.email || '-'}</td>
-                        <td>{row.telefono || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        <span className="contacts-list-cell contacts-list-cell-name">{fullName(row) || '(sin nombre)'}</span>
+                        <span className="contacts-list-cell">{valueOrDash(row.cliente_nombre)}</span>
+                        <span className="contacts-list-cell">{valueOrDash(row.cargo)}</span>
+                        <span className="contacts-list-cell">{valueOrDash(row.telefono || row.email)}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          </section>
-
-          <aside className="detail-panel detail-panel-orders">
-            <div className="section-heading section-heading-compact">
-              <div>
-                <h3>Detalle de contacto</h3>
-                <p>Datos de identidad, empresa y trazabilidad del registro seleccionado.</p>
-              </div>
-            </div>
-            {!selectedContactId && <div className="state">Selecciona un contacto para ver el detalle.</div>}
-            {!!selectedContactId && (
-              <>
-                <QueryState
-                  loading={detailQuery.loading}
-                  error={detailQuery.error}
-                  empty={!detailQuery.data}
-                  emptyMessage="No se encontro detalle para el contacto seleccionado."
-                />
-
-                {!!detailQuery.data && (
-                  <dl className="detail-list">
-                    <div>
-                      <dt>Nombre completo</dt>
-                      <dd>{`${detailQuery.data.nombre || ''} ${detailQuery.data.apellidos || ''}`.trim() || '-'}</dd>
-                    </div>
-                    <div>
-                      <dt>Empresa</dt>
-                      <dd>{detailQuery.data.cliente_nombre || '-'}</dd>
-                    </div>
-                    <div>
-                      <dt>Cliente ID</dt>
-                      <dd>{detailQuery.data.cliente_id || '-'}</dd>
-                    </div>
-                    <div>
-                      <dt>Cargo</dt>
-                      <dd>{detailQuery.data.cargo || '-'}</dd>
-                    </div>
-                    <div>
-                      <dt>NIF</dt>
-                      <dd>{detailQuery.data.nif || '-'}</dd>
-                    </div>
-                    <div>
-                      <dt>Email</dt>
-                      <dd>{detailQuery.data.email || '-'}</dd>
-                    </div>
-                    <div>
-                      <dt>Telefono</dt>
-                      <dd>{detailQuery.data.telefono || '-'}</dd>
-                    </div>
-                    <div>
-                      <dt>Creado</dt>
-                      <dd>{detailQuery.data.created_at || '-'}</dd>
-                    </div>
-                    <div>
-                      <dt>Actualizado</dt>
-                      <dd>{detailQuery.data.updated_at || '-'}</dd>
-                    </div>
-                  </dl>
-                )}
-              </>
             )}
-          </aside>
-        </div>
-      )}
+          </div>
+        </aside>
+
+        <section className="contacts-detail-panel">
+          <div className="contacts-detail-actions">
+            <button type="button" className="customers-action-btn customers-action-btn-primary" disabled>
+              + Nuevo
+            </button>
+            <button type="button" className="customers-action-btn customers-action-btn-outline" disabled>
+              Editar
+            </button>
+            <button type="button" className="customers-action-btn customers-action-btn-danger" disabled>
+              Eliminar
+            </button>
+            <button type="button" className="customers-action-btn customers-action-btn-ghost" disabled>
+              Refrescar
+            </button>
+          </div>
+
+          <div className="contacts-detail-body">
+            <section className="contacts-detail-card">
+              <div className="contacts-section-head">
+                <div>
+                  <p className="contacts-detail-kicker">Modulo read-only</p>
+                  <h3>Detalle de contacto</h3>
+                  <p>Ficha compacta sin mutaciones.</p>
+                </div>
+                {!!detailContact && <span className="surface-chip">Cod. {valueOrDash(detailContact.contacto_codigo)}</span>}
+              </div>
+
+              {!selectedContactId && <div className="state">Selecciona un contacto para ver el detalle.</div>}
+
+              {!!selectedContactId && (
+                <>
+                  <QueryState
+                    loading={detailQuery.loading}
+                    error={detailQuery.error}
+                    empty={!detailQuery.data}
+                    emptyMessage="No se encontro detalle para el contacto seleccionado."
+                  />
+
+                  {!!detailContact && (
+                    <div className="contacts-field-grid">
+                      <div className="contacts-field-row contacts-field-row-top">
+                        <label className="contacts-field-code">
+                          <span>Cod.</span>
+                          <input className="input contacts-field" readOnly value={valueOrDash(detailContact.contacto_codigo)} />
+                        </label>
+                        <label className="contacts-field-name">
+                          <span>Nombre</span>
+                          <input className="input contacts-field" readOnly value={fullDetailName} />
+                        </label>
+                        <label className="contacts-field-company">
+                          <span>Empresa</span>
+                          <input className="input contacts-field" readOnly value={valueOrDash(detailContact.cliente_nombre)} />
+                        </label>
+                      </div>
+
+                      <div className="contacts-field-row contacts-field-row-mid">
+                        <label className="contacts-field-role">
+                          <span>Cargo</span>
+                          <input className="input contacts-field" readOnly value={valueOrDash(detailContact.cargo)} />
+                        </label>
+                        <label className="contacts-field-email">
+                          <span>Email</span>
+                          <input className="input contacts-field" readOnly value={valueOrDash(detailContact.email)} />
+                        </label>
+                        <label className="contacts-field-phone">
+                          <span>Telefono</span>
+                          <input className="input contacts-field" readOnly value={valueOrDash(detailContact.telefono)} />
+                        </label>
+                      </div>
+
+                      <div className="contacts-field-row contacts-field-row-bottom">
+                        <label className="contacts-field-nif">
+                          <span>NIF</span>
+                          <input className="input contacts-field" readOnly value={valueOrDash(detailContact.nif)} />
+                        </label>
+                        <label className="contacts-field-created">
+                          <span>Creado</span>
+                          <input className="input contacts-field" readOnly value={valueOrDash(detailContact.created_at)} />
+                        </label>
+                        <label className="contacts-field-updated">
+                          <span>Actualizado</span>
+                          <input className="input contacts-field" readOnly value={valueOrDash(detailContact.updated_at)} />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+          </div>
+        </section>
+      </div>
     </section>
   )
 }
