@@ -641,6 +641,8 @@ describe('App shell smoke', () => {
 
     fireEvent.click(getNav().getByRole('button', { name: 'Almacen' }))
     expect(await screen.findByRole('heading', { name: 'Almacén', level: 2 })).toBeInTheDocument()
+    expect(screen.queryByText('Consulta de almacen')).not.toBeInTheDocument()
+    expect(screen.queryByText('Vista read-only de stock, movimientos e inventarios historicos.')).not.toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Artículos' })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Entradas' }).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('button', { name: 'Stock' }).length).toBeGreaterThan(0)

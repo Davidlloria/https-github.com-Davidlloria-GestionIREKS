@@ -141,7 +141,8 @@ export function AppShell({
     activeView === 'recipes' ||
     activeView === 'ingredients' ||
     activeView === 'ingredientsIreks' ||
-    activeView === 'ingredientsStd'
+    activeView === 'ingredientsStd' ||
+    activeView === 'warehouse'
 
   return (
     <div className={`app-shell ${isSaasShell ? 'app-shell-customers' : ''}`}>
