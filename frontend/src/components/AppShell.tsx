@@ -135,7 +135,8 @@ export function AppShell({
     activeView === 'dashboard' ||
     activeView === 'technicians' ||
     activeView === 'distributors' ||
-    activeView === 'courses'
+    activeView === 'courses' ||
+    activeView === 'recipes'
   const activeNavItem = navItems.find((item) => item.key === activeView)
 
   return (
