@@ -1433,6 +1433,8 @@ tbody tr:hover {
 
 .customers-saas-page {
   display: block;
+  width: 100%;
+  min-width: 0;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -1442,6 +1444,8 @@ tbody tr:hover {
   display: grid;
   grid-template-columns: minmax(300px, 0.31fr) minmax(0, 0.69fr);
   gap: 16px;
+  width: 100%;
+  min-width: 0;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -1472,6 +1476,8 @@ tbody tr:hover {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 12px;
+  width: 100%;
+  min-width: 0;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -1620,6 +1626,8 @@ tbody tr:hover {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
+  width: 100%;
+  min-width: 0;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -1673,6 +1681,8 @@ tbody tr:hover {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
+  width: 100%;
+  min-width: 0;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -1680,6 +1690,7 @@ tbody tr:hover {
 
 .customers-detail-main {
   grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
 }
 
 .customers-detail-grid {
@@ -1687,16 +1698,21 @@ tbody tr:hover {
   grid-template-columns: minmax(0, 1.68fr) minmax(250px, 0.88fr);
   gap: 10px;
   align-items: stretch;
+  width: 100%;
+  min-width: 0;
   height: 100%;
   min-height: 0;
 }
 
 .customers-detail-top {
   align-items: stretch;
+  width: 100%;
 }
 
 .customers-detail-card,
 .customers-type-panel {
+  width: 100%;
+  min-width: 0;
   height: 100%;
   min-height: 0;
   overflow: auto;
@@ -1811,6 +1827,7 @@ tbody tr:hover {
   display: grid;
   gap: 10px;
   align-content: start;
+  min-width: 0;
 }
 
 .customers-type-grid {
@@ -1933,6 +1950,8 @@ tbody tr:hover {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 6px;
+  width: 100%;
+  min-width: 0;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -1946,6 +1965,8 @@ tbody tr:hover {
   display: flex;
   gap: 6px;
   align-items: flex-end;
+  width: 100%;
+  min-width: 0;
   overflow-x: auto;
   padding: 0 2px;
   border-bottom: 1px solid #dbe4f0;
@@ -1973,12 +1994,16 @@ tbody tr:hover {
 
 .customers-tabs-content {
   display: grid;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   height: 100%;
   overflow: hidden;
 }
 
 .customers-tabs-body {
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   height: 100%;
 }
@@ -1987,6 +2012,8 @@ tbody tr:hover {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 8px;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   height: 100%;
   overflow: auto;
@@ -2057,11 +2084,15 @@ tbody tr:hover {
 .customers-empty-panel {
   display: grid;
   place-items: center;
+  width: 100%;
+  min-width: 0;
   height: 100%;
   min-height: 112px;
 }
 
 .customers-tab-empty {
+  width: 100%;
+  min-width: 0;
   min-height: 112px;
 }
 
