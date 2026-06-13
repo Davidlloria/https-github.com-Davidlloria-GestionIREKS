@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getIngredientDetail, listIngredients } from './ingredients'
+import { getIreksIngredientDetail, getIngredientDetail, listIreksIngredients, listIngredients } from './ingredients'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -28,6 +28,31 @@ describe('ingredients api client', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:8000/ingredients/ireks:1',
+      expect.any(Object),
+    )
+  })
+
+  it('lists IREKS ingredients with search and paging query params', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ items: [], total: 0, catalogs: {} }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await listIreksIngredients('harina', 15, 30)
+
+    expect(result).toEqual({ items: [], total: 0, catalogs: {} })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8000/ingredients/ireks?q=harina&limit=15&offset=30',
+      expect.any(Object),
+    )
+  })
+
+  it('fetches IREKS ingredient detail from the expected endpoint', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: 1 }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getIreksIngredientDetail(1)).resolves.toEqual({ id: 1 })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8000/ingredients/ireks/1',
       expect.any(Object),
     )
   })

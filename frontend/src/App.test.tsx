@@ -76,9 +76,82 @@ const ingredientList = {
       source: 'std',
     },
   ],
-  total: 1,
+  total: 2,
   limit: 25,
   offset: 0,
+}
+
+const ireksIngredientList = {
+  items: [
+    {
+      id: 1,
+      almacen_id: 'ALM-1',
+      fabricante_id: 'FAB-1',
+      distribuidor_id: 'DIST-1',
+      articulo_id: 'ART-1',
+      articulo_referencia: 'IR-001',
+      articulo_referencia_corta: 'IR-1',
+      articulo_descripcion: 'Producto IREKS 1',
+      articulo_envase_id: 'ENV-1',
+      articulo_contenido_unidad: 'kg',
+      articulo_envase_cantidad: 1,
+      articulo_envase_peso: 1,
+      articulo_envase_unidad_medida: 'kg',
+      articulo_envase_peso_total: 1,
+      transporte_pallet_tipo: '',
+      transporte_cajas_por_capa: 0,
+      transporte_capas_por_pallet: 0,
+      transporte_cajas_por_pallet: 0,
+      transporte_unidades_por_pallet: 0,
+      transporte_kg_por_pallet: 0,
+      transporte_observaciones: '',
+      articulo_familia_id: 'FAM-1',
+      articulo_grupo_id: 'GRP-1',
+      articulo_subfamilia_id: 'SUB-1',
+      categoria: 'PAN',
+      articulo_status_activo: true,
+      articulo_status_en_lista: true,
+    },
+    {
+      id: 2,
+      almacen_id: 'ALM-1',
+      fabricante_id: 'FAB-2',
+      distribuidor_id: 'DIST-2',
+      articulo_id: 'ART-2',
+      articulo_referencia: 'IR-002',
+      articulo_referencia_corta: 'IR-2',
+      articulo_descripcion: 'Producto IREKS 2',
+      articulo_envase_id: 'ENV-2',
+      articulo_contenido_unidad: 'kg',
+      articulo_envase_cantidad: 2,
+      articulo_envase_peso: 2,
+      articulo_envase_unidad_medida: 'kg',
+      articulo_envase_peso_total: 2,
+      transporte_pallet_tipo: '',
+      transporte_cajas_por_capa: 0,
+      transporte_capas_por_pallet: 0,
+      transporte_cajas_por_pallet: 0,
+      transporte_unidades_por_pallet: 0,
+      transporte_kg_por_pallet: 0,
+      transporte_observaciones: '',
+      articulo_familia_id: 'FAM-2',
+      articulo_grupo_id: 'GRP-2',
+      articulo_subfamilia_id: 'SUB-2',
+      categoria: 'MIX',
+      articulo_status_activo: true,
+      articulo_status_en_lista: false,
+    },
+  ],
+  total: 2,
+  limit: 25,
+  offset: 0,
+  catalogs: {
+    distribuidores: [],
+    fabricantes: [],
+    familias: [],
+    subfamilias: [],
+    envases: [],
+  },
 }
 
 const warehouseStock = {
@@ -361,6 +434,70 @@ vi.mock('./api/courses', () => ({
 }))
 
 vi.mock('./api/ingredients', () => ({
+  getIreksIngredientDetail: vi.fn(async (rowId: number) => {
+    if (rowId === 2) {
+      return {
+        id: 2,
+        almacen_id: 'ALM-1',
+        fabricante_id: 'FAB-2',
+        distribuidor_id: 'DIST-2',
+        articulo_id: 'ART-2',
+        articulo_referencia: 'IR-002',
+        articulo_referencia_corta: 'IR-2',
+        articulo_descripcion: 'Producto IREKS 2',
+        articulo_envase_id: 'ENV-2',
+        articulo_contenido_unidad: 'kg',
+        articulo_envase_cantidad: 2,
+        articulo_envase_peso: 2,
+        articulo_envase_unidad_medida: 'kg',
+        articulo_envase_peso_total: 2,
+        transporte_pallet_tipo: '',
+        transporte_cajas_por_capa: 0,
+        transporte_capas_por_pallet: 0,
+        transporte_cajas_por_pallet: 0,
+        transporte_unidades_por_pallet: 0,
+        transporte_kg_por_pallet: 0,
+        transporte_observaciones: '',
+        articulo_familia_id: 'FAM-2',
+        articulo_grupo_id: 'GRP-2',
+        articulo_subfamilia_id: 'SUB-2',
+        categoria: 'MIX',
+        articulo_status_activo: true,
+        articulo_status_en_lista: false,
+      }
+    }
+
+    return {
+      id: 1,
+      almacen_id: 'ALM-1',
+      fabricante_id: 'FAB-1',
+      distribuidor_id: 'DIST-1',
+      articulo_id: 'ART-1',
+      articulo_referencia: 'IR-001',
+      articulo_referencia_corta: 'IR-1',
+      articulo_descripcion: 'Producto IREKS 1',
+      articulo_envase_id: 'ENV-1',
+      articulo_contenido_unidad: 'kg',
+      articulo_envase_cantidad: 1,
+      articulo_envase_peso: 1,
+      articulo_envase_unidad_medida: 'kg',
+      articulo_envase_peso_total: 1,
+      transporte_pallet_tipo: '',
+      transporte_cajas_por_capa: 0,
+      transporte_capas_por_pallet: 0,
+      transporte_cajas_por_pallet: 0,
+      transporte_unidades_por_pallet: 0,
+      transporte_kg_por_pallet: 0,
+      transporte_observaciones: '',
+      articulo_familia_id: 'FAM-1',
+      articulo_grupo_id: 'GRP-1',
+      articulo_subfamilia_id: 'SUB-1',
+      categoria: 'PAN',
+      articulo_status_activo: true,
+      articulo_status_en_lista: true,
+    }
+  }),
+  listIreksIngredients: vi.fn(async () => ireksIngredientList),
   getIngredientDetail: vi.fn(async (ingredientId: string) => {
     if (ingredientId === 'std:1') {
       return {
@@ -485,7 +622,8 @@ describe('App shell smoke', () => {
     expect(await screen.findByPlaceholderText('Buscar por codigo, nombre, razon social, CIF o contacto')).toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Productos IREKS' }))
-    expect(await screen.findByPlaceholderText('Buscar producto IREKS por nombre, codigo o referencia')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Productos IREKS', level: 2 })).toBeInTheDocument()
+    expect(await screen.findByPlaceholderText('Buscar producto IREKS por nombre, referencia o codigo')).toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Materias primas' }))
     expect(await screen.findByPlaceholderText('Buscar materia prima por nombre, codigo o referencia')).toBeInTheDocument()

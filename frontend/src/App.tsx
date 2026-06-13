@@ -7,6 +7,7 @@ import { ContactsPage } from './pages/ContactsPage'
 import { CoursesPage } from './pages/CoursesPage'
 import { CustomersPage } from './pages/CustomersPage'
 import { DistributorsPage } from './pages/DistributorsPage'
+import { IreksProductsPage } from './pages/IreksProductsPage'
 import { IngredientsPage } from './pages/IngredientsPage'
 import { OrdersPage } from './pages/OrdersPage'
 import { RecipesPage } from './pages/RecipesPage'
@@ -126,7 +127,7 @@ function App() {
           {activeView === 'orders' && <OrdersPage />}
           {activeView === 'technicians' && <TechniciansPage />}
           {activeView === 'distributors' && <DistributorsPage />}
-          {(activeView === 'ingredients' || activeView === 'ingredientsIreks') && <IngredientsPage mode="ireks" />}
+          {(activeView === 'ingredients' || activeView === 'ingredientsIreks') && <IreksProductsPage />}
           {activeView === 'ingredientsStd' && <IngredientsPage mode="std" />}
           {activeView === 'warehouse' && <WarehousePage />}
         </AppErrorBoundary>
