@@ -861,6 +861,7 @@ tbody tr:hover {
 }
 
 .app-shell-customers {
+  --saas-workspace-bg: #f1f8f3;
   --bg: #f8fafc;
   --bg-strong: #f8fafc;
   --surface: #ffffff;
@@ -884,7 +885,7 @@ tbody tr:hover {
   overflow: hidden;
   padding: 0;
   gap: 0;
-  background: #f8fafc;
+  background: var(--saas-workspace-bg);
 }
 
 .app-topbar {
@@ -989,8 +990,8 @@ tbody tr:hover {
   min-height: 0;
   overflow: hidden;
   display: flex;
+  background: var(--saas-workspace-bg);
   padding: 16px 18px 18px;
-  background: #f8fafc;
 }
 
 .view-panel-customers {
