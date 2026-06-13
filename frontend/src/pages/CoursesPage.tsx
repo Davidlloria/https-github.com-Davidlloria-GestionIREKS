@@ -15,6 +15,13 @@ const EMPTY_DETAIL: CourseDetailPayload = {
 }
 
 const PAGE_SIZE = 25
+type CourseTab = 'attendees' | 'technicians' | 'documents'
+
+const COURSE_TABS: Array<{ key: CourseTab; label: string }> = [
+  { key: 'attendees', label: 'Asistentes' },
+  { key: 'technicians', label: 'Tecnicos' },
+  { key: 'documents', label: 'Documentos' },
+]
 
 function formatDate(value: string | null) {
   return value || '-'
@@ -37,6 +44,7 @@ export function CoursesPage() {
   const [search, setSearch] = useState('')
   const [pageIndex, setPageIndex] = useState(0)
   const [selectedCandidateId, setSelectedCandidateId] = useState('')
+  const [activeTab, setActiveTab] = useState<CourseTab>('attendees')
 
   const offset = pageIndex * PAGE_SIZE
   const coursesQuery = useAsyncResource(
@@ -162,6 +170,21 @@ export function CoursesPage() {
 
         <section className="courses-detail-panel">
           <div className="courses-detail-card">
+            <div className="courses-actions-bar" aria-label="Acciones de curso">
+              <button type="button" className="courses-action-btn courses-action-btn-success" disabled>
+                Nuevo
+              </button>
+              <button type="button" className="courses-action-btn courses-action-btn-danger" disabled>
+                Eliminar
+              </button>
+              <button type="button" className="courses-action-btn courses-action-btn-outline" disabled>
+                Importar Excel/CSV
+              </button>
+              <button type="button" className="courses-action-btn courses-action-btn-outline" disabled>
+                Refrescar
+              </button>
+            </div>
+
             <div className="courses-section-head">
               <div>
                 <p className="courses-detail-kicker">Modulo read-only</p>
@@ -202,38 +225,96 @@ export function CoursesPage() {
                   </label>
                 </div>
 
-                <section className="courses-attendees-panel">
-                  <div className="courses-section-head courses-section-head-sub">
-                    <div>
-                      <h3>Asistentes</h3>
-                      <p>Listado read-only de asistentes del curso seleccionado.</p>
-                    </div>
-                    <span className="surface-chip">{detailQuery.data.attendees.length} asistentes</span>
+                <section className="courses-tabs-panel">
+                  <div className="courses-tabs" role="tablist" aria-label="Secciones del curso">
+                    {COURSE_TABS.map((tab) => (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === tab.key}
+                        className={`courses-tab ${activeTab === tab.key ? 'active' : ''}`}
+                        onClick={() => setActiveTab(tab.key)}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
                   </div>
 
-                  {!detailQuery.data.attendees.length && <div className="state">Sin asistentes registrados.</div>}
-
-                  {!!detailQuery.data.attendees.length && (
-                    <div className="courses-attendees-scroll">
-                      <div className="courses-attendees-list">
-                        <div className="courses-attendees-header">
-                          <div className="courses-attendees-cell">Nombre</div>
-                          <div className="courses-attendees-cell">Empresa</div>
-                          <div className="courses-attendees-cell">Confirmado</div>
+                  <div className="courses-tab-body">
+                    {activeTab === 'attendees' && (
+                      <div className="courses-attendees-panel">
+                        <div className="courses-attendees-toolbar" aria-label="Acciones de asistentes">
+                          <button type="button" className="courses-attendees-btn courses-attendees-btn-success" disabled>
+                            Añadir
+                          </button>
+                          <button type="button" className="courses-attendees-btn courses-attendees-btn-danger" disabled>
+                            Eliminar
+                          </button>
+                          <button type="button" className="courses-attendees-btn courses-attendees-btn-outline" disabled>
+                            Importar
+                          </button>
+                          <button type="button" className="courses-attendees-btn courses-attendees-btn-outline" disabled>
+                            Exportar Excel
+                          </button>
+                          <button type="button" className="courses-attendees-btn courses-attendees-btn-outline" disabled>
+                            Exportar PDF
+                          </button>
+                          <button type="button" className="courses-attendees-btn courses-attendees-btn-outline" disabled>
+                            Consentimientos
+                          </button>
+                          <button type="button" className="courses-attendees-btn courses-attendees-btn-outline" disabled>
+                            Certificado
+                          </button>
+                          <span className="surface-chip">
+                            {detailQuery.data.attendees.length}/{detailQuery.data.attendees.length}
+                          </span>
                         </div>
 
-                        <div className="courses-attendees-body">
-                          {detailQuery.data.attendees.map((attendee) => (
-                            <div key={attendee.id} className="courses-attendees-row">
-                              <span className="courses-attendees-cell courses-attendees-cell-name">{valueOrDash(attendee.nombre)}</span>
-                              <span className="courses-attendees-cell">{valueOrDash(attendee.empresa)}</span>
-                              <span className="courses-attendees-cell">{attendee.confirmado ? 'Si' : 'No'}</span>
+                        <div className="courses-section-head courses-section-head-sub">
+                          <div>
+                            <h3>Asistentes</h3>
+                            <p>Listado read-only de asistentes del curso seleccionado.</p>
+                          </div>
+                          <span className="surface-chip">{detailQuery.data.attendees.length} asistentes</span>
+                        </div>
+
+                        {!detailQuery.data.attendees.length && <div className="state">Sin asistentes registrados.</div>}
+
+                        {!!detailQuery.data.attendees.length && (
+                          <div className="courses-attendees-scroll">
+                            <div className="courses-attendees-list">
+                              <div className="courses-attendees-header courses-attendees-header-extended">
+                                <div className="courses-attendees-cell">Asiste</div>
+                                <div className="courses-attendees-cell">Asistente</div>
+                                <div className="courses-attendees-cell">Empresa</div>
+                                <div className="courses-attendees-cell">Observaciones</div>
+                              </div>
+
+                              <div className="courses-attendees-body">
+                                {detailQuery.data.attendees.map((attendee) => (
+                                  <div key={attendee.id} className="courses-attendees-row courses-attendees-row-extended">
+                                    <span className="courses-attendees-cell courses-attendees-cell-flag">{attendee.confirmado ? 'Si' : 'No'}</span>
+                                    <span className="courses-attendees-cell courses-attendees-cell-name">{valueOrDash(attendee.nombre)}</span>
+                                    <span className="courses-attendees-cell">{valueOrDash(attendee.empresa)}</span>
+                                    <span className="courses-attendees-cell">{valueOrDash(attendee.observaciones)}</span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    )}
+
+                    {activeTab === 'technicians' && (
+                      <div className="state courses-tab-empty">Sin datos disponibles en esta versión read-only.</div>
+                    )}
+
+                    {activeTab === 'documents' && (
+                      <div className="state courses-tab-empty">Pendiente de conexión a datos reales.</div>
+                    )}
+                  </div>
                 </section>
               </div>
             )}
