@@ -31,6 +31,16 @@ function ModuleIcon({ view }: { view: ViewKey }) {
           <path d="M17 6v6" />
         </svg>
       )
+    case 'dashboard':
+      return (
+        <svg {...commonProps}>
+          <path d="M4 19V5" />
+          <path d="M4 19h16" />
+          <path d="M7 15v-4" />
+          <path d="M11 15V8" />
+          <path d="M15 15v-6" />
+        </svg>
+      )
     case 'contacts':
       return (
         <svg {...commonProps}>
@@ -119,7 +129,7 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const isCustomers = activeView === 'customers'
-  const isSaasShell = isCustomers || activeView === 'contacts'
+  const isSaasShell = isCustomers || activeView === 'contacts' || activeView === 'dashboard'
   const activeNavItem = navItems.find((item) => item.key === activeView)
 
   return (

@@ -404,55 +404,61 @@ vi.mock('./api/distributors', () => ({
 describe('App shell smoke', () => {
   it('renders the app shell and the main modules', async () => {
     render(<App />)
+    const getNav = () => within(screen.getByRole('navigation', { name: 'Navegacion principal' }))
 
-    expect(screen.getByText('Gestion IREKS')).toBeInTheDocument()
-    await screen.findByRole('heading', { name: 'Ventas' })
+    expect(screen.getByText('GESTIÓN IREKS')).toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Dashboard' })
 
-    expect(screen.getByRole('button', { name: 'Ventas' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Recetas' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Cursos' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Clientes' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Contactos' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Pedidos' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Tecnicos' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Distribuidores' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Ingredientes' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Almacen' })).toBeInTheDocument()
+    expect(getNav().getByRole('button', { name: 'Inicio' })).toBeInTheDocument()
+    expect(getNav().getByRole('button', { name: 'Ventas' })).toBeInTheDocument()
+    expect(getNav().getByRole('button', { name: 'Recetas' })).toBeInTheDocument()
+    expect(getNav().getByRole('button', { name: 'Cursos' })).toBeInTheDocument()
+    expect(getNav().getByRole('button', { name: 'Clientes' })).toBeInTheDocument()
+    expect(getNav().getByRole('button', { name: 'Contactos' })).toBeInTheDocument()
+    expect(getNav().getByRole('button', { name: 'Pedidos' })).toBeInTheDocument()
+    expect(getNav().getByRole('button', { name: 'Tecnicos' })).toBeInTheDocument()
+    expect(getNav().getByRole('button', { name: 'Distribuidores' })).toBeInTheDocument()
+    expect(getNav().getByRole('button', { name: 'Ingredientes' })).toBeInTheDocument()
+    expect(getNav().getByRole('button', { name: 'Almacen' })).toBeInTheDocument()
   })
 
   it('switches the visible page when the user clicks the sidebar items', async () => {
     render(<App />)
+    const getNav = () => within(screen.getByRole('navigation', { name: 'Navegacion principal' }))
 
-    await screen.findByRole('heading', { name: 'Ventas' })
+    await screen.findByRole('heading', { name: 'Dashboard' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Recetas' }))
+    fireEvent.click(getNav().getByRole('button', { name: 'Recetas' }))
     expect(await screen.findByPlaceholderText('Buscar receta por nombre, codigo o proceso')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cursos' }))
+    fireEvent.click(getNav().getByRole('button', { name: 'Cursos' }))
     expect(await screen.findByPlaceholderText('Buscar curso por nombre o codigo')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clientes' }))
+    fireEvent.click(getNav().getByRole('button', { name: 'Clientes' }))
     expect(await screen.findByPlaceholderText('Buscar cliente...')).toBeInTheDocument()
 
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Navegacion principal' })).getByRole('button', { name: 'Contactos' }))
+    fireEvent.click(getNav().getByRole('button', { name: 'Contactos' }))
     expect(await screen.findByRole('heading', { name: 'Contactos' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pedidos' }))
+    fireEvent.click(getNav().getByRole('button', { name: 'Inicio' }))
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+
+    fireEvent.click(getNav().getByRole('button', { name: 'Pedidos' }))
     expect(await screen.findByPlaceholderText('Ano (ej: 2026)')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tecnicos' }))
+    fireEvent.click(getNav().getByRole('button', { name: 'Tecnicos' }))
     expect(await screen.findByPlaceholderText('Buscar por nombre, apellido, movil, interno o email')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Distribuidores' }))
+    fireEvent.click(getNav().getByRole('button', { name: 'Distribuidores' }))
     expect(await screen.findByPlaceholderText('Buscar por codigo, nombre, razon social, CIF o contacto')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ingredientes' }))
+    fireEvent.click(getNav().getByRole('button', { name: 'Ingredientes' }))
     expect(await screen.findByPlaceholderText('Buscar ingrediente por nombre, codigo o referencia')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Almacen' }))
+    fireEvent.click(getNav().getByRole('button', { name: 'Almacen' }))
     expect(await screen.findByText('Stock actual')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ventas' }))
+    fireEvent.click(getNav().getByRole('button', { name: 'Ventas' }))
     expect(await screen.findByRole('heading', { name: 'Ventas' })).toBeInTheDocument()
   })
 })

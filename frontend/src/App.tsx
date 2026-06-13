@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AppErrorBoundary } from './components/AppErrorBoundary'
 import { AppShell } from './components/AppShell'
 import type { ViewKey } from './components/SidebarNav'
+import { DashboardPage } from './pages/DashboardPage'
 import { ContactsPage } from './pages/ContactsPage'
 import { CoursesPage } from './pages/CoursesPage'
 import { CustomersPage } from './pages/CustomersPage'
@@ -20,6 +21,7 @@ type ViewMeta = {
 }
 
 const VIEWS: Array<{ key: ViewKey; label: string; description: string }> = [
+  { key: 'dashboard', label: 'Inicio', description: 'Resumen general' },
   { key: 'customers', label: 'Clientes', description: 'Ficha y relaciones' },
   { key: 'contacts', label: 'Contactos', description: 'Consulta read-only' },
   { key: 'technicians', label: 'Tecnicos', description: 'Consulta read-only' },
@@ -33,6 +35,11 @@ const VIEWS: Array<{ key: ViewKey; label: string; description: string }> = [
 ]
 
 const VIEW_META: Record<ViewKey, ViewMeta> = {
+  dashboard: {
+    label: 'Inicio',
+    title: 'Dashboard',
+    subtitle: 'Resumen general de actividad',
+  },
   sales: {
     label: 'Ventas',
     title: 'Comparacion anual de ventas',
@@ -86,7 +93,7 @@ const VIEW_META: Record<ViewKey, ViewMeta> = {
 }
 
 function App() {
-  const [activeView, setActiveView] = useState<ViewKey>('sales')
+  const [activeView, setActiveView] = useState<ViewKey>('dashboard')
   const currentView = VIEW_META[activeView]
 
   return (
@@ -99,6 +106,7 @@ function App() {
     >
       <section className="view-panel">
         <AppErrorBoundary>
+          {activeView === 'dashboard' && <DashboardPage onChangeView={setActiveView} />}
           {activeView === 'sales' && <SalesPage />}
           {activeView === 'recipes' && <RecipesPage />}
           {activeView === 'courses' && <CoursesPage />}
