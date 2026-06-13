@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { getOrderDetail, listOrderItems, listOrderPending, listOrders } from '../api/orders'
-import { QueryState } from '../components/QueryState'
-import { StatCard } from '../components/StatCard'
+import { EmptyState, ErrorState, LoadingState } from '../components/QueryState'
 import { useAsyncResource } from '../features/useAsyncResource'
 import type { OrderItemRead, OrderListItem, OrderPendingRead, OrderRead } from '../types/api'
 
@@ -18,19 +17,54 @@ const EMPTY_ORDER_DETAIL: OrderDetailPayload = {
 }
 
 const PAGE_SIZE = 50
+const CURRENT_YEAR = String(new Date().getFullYear())
+
+const MONTH_OPTIONS = [
+  ['1', 'Enero'],
+  ['2', 'Febrero'],
+  ['3', 'Marzo'],
+  ['4', 'Abril'],
+  ['5', 'Mayo'],
+  ['6', 'Junio'],
+  ['7', 'Julio'],
+  ['8', 'Agosto'],
+  ['9', 'Septiembre'],
+  ['10', 'Octubre'],
+  ['11', 'Noviembre'],
+  ['12', 'Diciembre'],
+] as const
+
+type DetailTab = 'pedido' | 'albaran' | 'factura' | 'pendientes'
+
+const DETAIL_TABS: Array<{ key: DetailTab; label: string }> = [
+  { key: 'pedido', label: 'Pedido' },
+  { key: 'albaran', label: 'Albaran' },
+  { key: 'factura', label: 'Factura' },
+  { key: 'pendientes', label: 'Pendientes' },
+]
 
 function safeNumber(value: unknown) {
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric : 0
 }
 
+function formatNumber(value: number) {
+  return value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function buildYearOptions() {
+  const current = Number(CURRENT_YEAR)
+  return Array.from({ length: 5 }, (_, index) => String(current - 2 + index))
+}
+
 export function OrdersPage() {
-  const [year, setYear] = useState('')
-  const [monthFrom, setMonthFrom] = useState('')
-  const [monthTo, setMonthTo] = useState('')
+  const [year, setYear] = useState(CURRENT_YEAR)
+  const [monthFrom, setMonthFrom] = useState('1')
+  const [monthTo, setMonthTo] = useState('12')
   const [almacenId, setAlmacenId] = useState('')
   const [pageIndex, setPageIndex] = useState(0)
   const [selectedCandidateId, setSelectedCandidateId] = useState('')
+  const [activeTab, setActiveTab] = useState<DetailTab>('pedido')
 
   const offset = pageIndex * PAGE_SIZE
   const ordersQuery = useAsyncResource(
@@ -47,6 +81,18 @@ export function OrdersPage() {
     [year, monthFrom, monthTo, almacenId, offset],
   )
   const orderRows = ordersQuery.data.items
+
+  const almacenOptions = useMemo(() => {
+    const seen = new Map<string, string>()
+    orderRows.forEach((row) => {
+      const value = String(row.almacen_id || '').trim()
+      if (!value || seen.has(value)) {
+        return
+      }
+      seen.set(value, row.almacen_nombre || value)
+    })
+    return Array.from(seen.entries()).map(([value, label]) => ({ value, label }))
+  }, [orderRows])
 
   const selectedOrder = useMemo(() => {
     if (!orderRows.length) {
@@ -69,131 +115,143 @@ export function OrdersPage() {
 
   const detailQuery = useAsyncResource(loadSelectedOrder, EMPTY_ORDER_DETAIL, [loadSelectedOrder, selectedOrder?.pedido_id])
 
-  const totals = useMemo(() => {
-    const withAlbaran = orderRows.filter((row) => !!row.pedido_albaran_numero).length
-    const withFactura = orderRows.filter((row) => !!row.pedido_factura_numero).length
-    const totalKg = orderRows.reduce((acc, row) => acc + safeNumber(row.total_kg), 0)
-    return {
-      total: ordersQuery.data.total,
-      withAlbaran,
-      withFactura,
-      totalKg: totalKg.toFixed(2),
-    }
-  }, [orderRows, ordersQuery.data.total])
-
   const hasPreviousPage = pageIndex > 0
   const hasNextPage = offset + orderRows.length < ordersQuery.data.total
   const currentPage = pageIndex + 1
   const totalPages = Math.max(1, Math.ceil(ordersQuery.data.total / PAGE_SIZE))
-  const hasRows = orderRows.length > 0
+  const listTotalKg = orderRows.reduce((acc, row) => acc + safeNumber(row.total_kg), 0)
+  const detailLineQty = detailQuery.data.items.reduce((acc, row) => acc + safeNumber(row.articulo_cantidad), 0)
+  const pendingQty = detailQuery.data.pending.reduce((acc, row) => acc + safeNumber(row.cantidad_pendiente), 0)
 
   return (
-    <section className={`page-grid orders-page ${hasRows ? 'orders-page-with-rows' : 'orders-page-empty'}`}>
-      <header className="module-header orders-page-header">
-        <div className="module-header-copy">
-          <p className="module-kicker">Modulo read-only</p>
+    <section className="page-grid orders-page">
+      <header className="orders-page-header">
+        <div className="orders-page-header-copy">
+          <p className="module-kicker">Pedidos</p>
           <h2>Pedidos</h2>
-          <p className="module-description">
-            Consulta read-only compacta de pedidos con listado, detalle, lineas y pendientes.
-          </p>
         </div>
-        <div className="module-header-meta">
-          <span className="surface-chip">Pagina {currentPage} de {totalPages}</span>
-          <span className="surface-chip">Vista sin mutaciones</span>
-        </div>
+        <span className="surface-chip">{ordersQuery.data.total} visibles</span>
       </header>
 
-      <section className="panel-section orders-filters-panel">
-        <div className="section-heading section-heading-compact">
-          <div>
-            <h3>Filtros</h3>
-            <p>Reduce el listado antes de revisar detalle o pendientes.</p>
-          </div>
-          <div className="toolbar pager-toolbar">
-            <button type="button" className="action-btn" disabled={!hasPreviousPage} onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}>
-              Anterior
-            </button>
-            <button type="button" className="action-btn" disabled={!hasNextPage} onClick={() => setPageIndex((prev) => prev + 1)}>
-              Siguiente
-            </button>
-          </div>
-        </div>
-
-        <div className="toolbar orders-toolbar">
-          <input
-            className="input"
-            value={year}
-            onChange={(event) => {
-              setYear(event.target.value)
-              setPageIndex(0)
-            }}
-            placeholder="Ano (ej: 2026)"
-          />
-          <input
-            className="input"
-            value={monthFrom}
-            onChange={(event) => {
-              setMonthFrom(event.target.value)
-              setPageIndex(0)
-            }}
-            placeholder="Mes desde (1-12)"
-          />
-          <input
-            className="input"
-            value={monthTo}
-            onChange={(event) => {
-              setMonthTo(event.target.value)
-              setPageIndex(0)
-            }}
-            placeholder="Mes hasta (1-12)"
-          />
-          <input
-            className="input"
-            value={almacenId}
-            onChange={(event) => {
-              setAlmacenId(event.target.value)
-              setPageIndex(0)
-            }}
-            placeholder="Filtrar por almacen_id"
-          />
-        </div>
-      </section>
-
-      <div className="cards orders-summary-cards">
-        <StatCard label="Total pedidos" value={totals.total} />
-        <StatCard label="Con albarán" value={totals.withAlbaran} />
-        <StatCard label="Con factura" value={totals.withFactura} />
-        <StatCard label="Kilos listados" value={totals.totalKg} />
-      </div>
-
-      <QueryState
-        loading={ordersQuery.loading}
-        error={ordersQuery.error}
-        empty={!orderRows.length}
-        emptyMessage="No hay pedidos para los filtros actuales."
-      />
-
-      {!!orderRows.length && (
-        <div className="orders-workspace">
-          <section className="panel-section orders-list-panel">
-            <div className="section-heading section-heading-compact">
-              <div>
-                <h3>Listado de pedidos</h3>
-                <p>Selecciona una fila para abrir el detalle lateral.</p>
-              </div>
-              <span className="surface-chip">Mostrando {orderRows.length} de {ordersQuery.data.total}</span>
+      <div className="orders-workspace">
+        <section className="panel-section orders-list-panel">
+          <div className="section-heading section-heading-compact">
+            <div>
+              <h3>Listado de pedidos</h3>
+              <p>Consulta read-only con filtros y seleccion de pedido.</p>
             </div>
-            <div className="orders-list-scroll">
-              <div className="table-wrap">
+          </div>
+
+          <div className="orders-filter-grid">
+            <label className="orders-filter-field">
+              <span>Ano</span>
+              <select
+                className="select"
+                value={year}
+                onChange={(event) => {
+                  setYear(event.target.value)
+                  setPageIndex(0)
+                }}
+              >
+                {buildYearOptions().map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="orders-filter-field">
+              <span>Mes inicial</span>
+              <select
+                className="select"
+                value={monthFrom}
+                onChange={(event) => {
+                  setMonthFrom(event.target.value)
+                  setPageIndex(0)
+                }}
+              >
+                {MONTH_OPTIONS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="orders-filter-field">
+              <span>Mes final</span>
+              <select
+                className="select"
+                value={monthTo}
+                onChange={(event) => {
+                  setMonthTo(event.target.value)
+                  setPageIndex(0)
+                }}
+              >
+                {MONTH_OPTIONS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="orders-filter-field orders-filter-field-wide">
+              <span>Cliente/Distribuidor</span>
+              <select
+                className="select"
+                value={almacenId}
+                onChange={(event) => {
+                  setAlmacenId(event.target.value)
+                  setPageIndex(0)
+                }}
+              >
+                <option value="">Todos</option>
+                {almacenOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="toolbar orders-action-toolbar">
+            <button type="button" className="orders-action-btn orders-action-btn-success">
+              Nuevo pedido
+            </button>
+            <button type="button" className="orders-action-btn orders-action-btn-warning">
+              Editar
+            </button>
+            <button type="button" className="orders-action-btn orders-action-btn-danger">
+              Eliminar
+            </button>
+            <button type="button" className="orders-action-btn orders-action-btn-outline">
+              Exportar
+            </button>
+            <button type="button" className="orders-action-btn orders-action-btn-outline">
+              Enviar Outlook
+            </button>
+            <button type="button" className="orders-action-btn orders-action-btn-outline">
+              Imprimir
+            </button>
+          </div>
+
+          <div className="orders-list-scroll">
+            {ordersQuery.loading && <LoadingState />}
+            {!ordersQuery.loading && ordersQuery.error && <ErrorState>{ordersQuery.error}</ErrorState>}
+            {!ordersQuery.loading && !ordersQuery.error && !orderRows.length && (
+              <EmptyState>No hay pedidos para los filtros actuales.</EmptyState>
+            )}
+            {!ordersQuery.loading && !ordersQuery.error && !!orderRows.length && (
+              <div className="table-wrap orders-table-wrap">
                 <table>
                   <thead>
                     <tr>
-                      <th>Fecha</th>
                       <th>Almacen</th>
-                      <th>N pedido</th>
-                      <th>Estado</th>
+                      <th>N&ordm;</th>
+                      <th>Fecha</th>
                       <th>Semana</th>
-                      <th>Total kg</th>
+                      <th>Total Kg</th>
+                      <th>Estado</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -203,125 +261,209 @@ export function OrdersPage() {
                         className={row.pedido_id === selectedOrder?.pedido_id ? 'row-selected' : ''}
                         onClick={() => setSelectedCandidateId(row.pedido_id)}
                       >
-                        <td>{row.pedido_fecha}</td>
-                        <td>{row.almacen_nombre || '-'}</td>
+                        <td>{row.almacen_nombre || row.almacen_id || '-'}</td>
                         <td>{row.pedido_numero || '-'}</td>
-                        <td>{row.pedido_estado || '-'}</td>
+                        <td>{row.pedido_fecha}</td>
                         <td>{row.semana}</td>
-                        <td>{safeNumber(row.total_kg).toFixed(2)}</td>
+                        <td>{formatNumber(safeNumber(row.total_kg))}</td>
+                        <td>{row.pedido_estado || '-'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </div>
-          </section>
+            )}
+          </div>
 
-          <aside className="panel-section detail-panel detail-panel-orders orders-detail-panel">
-            <div className="section-heading section-heading-compact">
-              <div>
-                <h3>Detalle de pedido</h3>
-                <p>Cabecera, lineas y pendientes del pedido seleccionado.</p>
+          <div className="orders-list-footer">
+            <strong>TOTAL</strong>
+            <span>{formatNumber(listTotalKg)} kg</span>
+            <div className="orders-page-controls">
+              <span className="surface-chip">Pagina {currentPage} de {totalPages}</span>
+              <div className="toolbar pager-toolbar">
+                <button
+                  type="button"
+                  className="orders-action-btn orders-action-btn-outline"
+                  disabled={!hasPreviousPage}
+                  onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  className="orders-action-btn orders-action-btn-outline"
+                  disabled={!hasNextPage}
+                  onClick={() => setPageIndex((prev) => prev + 1)}
+                >
+                  Siguiente
+                </button>
               </div>
             </div>
-            <QueryState
-              loading={detailQuery.loading}
-              error={detailQuery.error}
-              empty={!detailQuery.data.detail}
-              emptyMessage="Selecciona un pedido para ver detalle."
-            />
+          </div>
+        </section>
 
-            {!!detailQuery.data.detail && (
-              <div className="orders-detail-scroll">
-                <dl className="detail-list">
-                  <div>
-                    <dt>Pedido</dt>
-                    <dd>{detailQuery.data.detail.pedido_numero || '-'}</dd>
-                  </div>
-                  <div>
-                    <dt>Fecha</dt>
-                    <dd>{detailQuery.data.detail.pedido_fecha}</dd>
-                  </div>
-                  <div>
-                    <dt>Albarán</dt>
-                    <dd>{detailQuery.data.detail.pedido_albaran_numero || '-'}</dd>
-                  </div>
-                  <div>
-                    <dt>Factura</dt>
-                    <dd>{detailQuery.data.detail.pedido_factura_numero || '-'}</dd>
-                  </div>
-                  <div>
-                    <dt>Referencia</dt>
-                    <dd>{detailQuery.data.detail.pedido_ref || '-'}</dd>
-                  </div>
-                  <div>
-                    <dt>Estado</dt>
-                    <dd>{detailQuery.data.detail.pedido_estado || '-'}</dd>
-                  </div>
-                </dl>
+        <aside className="panel-section orders-detail-panel">
+          <div className="section-heading section-heading-compact">
+            <div>
+              <h3>Detalle del pedido</h3>
+              <p>Cabecera, lineas y pendientes del pedido seleccionado.</p>
+            </div>
+          </div>
 
-                <div className="related-block">
-                  <h3>Líneas de pedido</h3>
-                  {!detailQuery.data.items.length && <div className="state">Sin lineas.</div>}
-                  {!!detailQuery.data.items.length && (
-                    <div className="table-wrap">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Artículo</th>
-                            <th>Cantidad</th>
-                            <th>Fecha línea</th>
+          <div className="orders-detail-meta-grid">
+            <label className="orders-detail-field">
+              <span>Semana</span>
+              <input className="input" readOnly value={selectedOrder ? String(selectedOrder.semana) : '-'} />
+            </label>
+            <label className="orders-detail-field">
+              <span>Fecha</span>
+              <input className="input" readOnly value={selectedOrder?.pedido_fecha || '-'} />
+            </label>
+            <label className="orders-detail-field">
+              <span>Numero</span>
+              <input className="input" readOnly value={selectedOrder?.pedido_numero || '-'} />
+            </label>
+          </div>
+
+          <div className="orders-tabs" role="tablist" aria-label="Detalle del pedido">
+            {DETAIL_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.key}
+                className={`orders-tab-btn ${activeTab === tab.key ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="toolbar orders-detail-actions">
+            <button type="button" className="orders-action-btn orders-action-btn-success">
+              Anadir
+            </button>
+            <button type="button" className="orders-action-btn orders-action-btn-warning">
+              Editar
+            </button>
+            <button type="button" className="orders-action-btn orders-action-btn-danger">
+              Eliminar
+            </button>
+            <button type="button" className="orders-action-btn orders-action-btn-warning">
+              Editar pedido
+            </button>
+          </div>
+
+          <div className="orders-detail-scroll">
+            {detailQuery.loading && <LoadingState />}
+            {!detailQuery.loading && detailQuery.error && <ErrorState>{detailQuery.error}</ErrorState>}
+            {!detailQuery.loading && !detailQuery.error && !selectedOrder && (
+              <EmptyState>Selecciona un pedido para ver detalle.</EmptyState>
+            )}
+
+            {!detailQuery.loading && !detailQuery.error && selectedOrder && activeTab === 'pedido' && (
+              <div className="orders-tab-stack">
+                <div className="table-wrap orders-detail-table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Cod.</th>
+                        <th>Nombre</th>
+                        <th>Cantidad</th>
+                        <th>Kg</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detailQuery.data.items.length ? (
+                        detailQuery.data.items.map((item) => (
+                          <tr key={item.item_id}>
+                            <td>{item.articulo_id}</td>
+                            <td>{item.articulo_id || '-'}</td>
+                            <td>{formatNumber(safeNumber(item.articulo_cantidad))}</td>
+                            <td>{formatNumber(safeNumber(item.articulo_cantidad))} kg</td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {detailQuery.data.items.slice(0, 12).map((item) => (
-                            <tr key={item.item_id}>
-                              <td>{item.articulo_id}</td>
-                              <td>{safeNumber(item.articulo_cantidad).toFixed(2)}</td>
-                              <td>{item.pedido_item_fecha}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={4}>
+                            <EmptyState>No hay lineas para el pedido seleccionado.</EmptyState>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-
-                <div className="related-block">
-                  <h3>Pendientes</h3>
-                  {!detailQuery.data.pending.length && <div className="state">Sin pendientes.</div>}
-                  {!!detailQuery.data.pending.length && (
-                    <div className="table-wrap">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Artículo</th>
-                            <th>Pedida</th>
-                            <th>Recibida</th>
-                            <th>Pendiente</th>
-                            <th>Estado</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {detailQuery.data.pending.slice(0, 12).map((row) => (
-                            <tr key={row.pendiente_id}>
-                              <td>{row.articulo_id}</td>
-                              <td>{safeNumber(row.cantidad_pedida).toFixed(2)}</td>
-                              <td>{safeNumber(row.cantidad_recibida).toFixed(2)}</td>
-                              <td>{safeNumber(row.cantidad_pendiente).toFixed(2)}</td>
-                              <td>{row.estado || '-'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                <div className="orders-tab-footer">
+                  <strong>TOTAL</strong>
+                  <span>{formatNumber(detailLineQty)} kg</span>
                 </div>
               </div>
             )}
-          </aside>
-        </div>
-      )}
+
+            {!detailQuery.loading && !detailQuery.error && selectedOrder && activeTab === 'albaran' && (
+              <div className="orders-tab-stack">
+                <EmptyState>{`Albaran ${selectedOrder.pedido_albaran_numero || '-'} pendiente de conexion read-only.`}</EmptyState>
+                <div className="orders-tab-footer">
+                  <strong>TOTAL</strong>
+                  <span>{selectedOrder.pedido_albaran_numero || '-'}</span>
+                </div>
+              </div>
+            )}
+
+            {!detailQuery.loading && !detailQuery.error && selectedOrder && activeTab === 'factura' && (
+              <div className="orders-tab-stack">
+                <EmptyState>{`Factura ${selectedOrder.pedido_factura_numero || '-'} pendiente de conexion read-only.`}</EmptyState>
+                <div className="orders-tab-footer">
+                  <strong>TOTAL</strong>
+                  <span>{selectedOrder.pedido_factura_numero || '-'}</span>
+                </div>
+              </div>
+            )}
+
+            {!detailQuery.loading && !detailQuery.error && selectedOrder && activeTab === 'pendientes' && (
+              <div className="orders-tab-stack">
+                <div className="table-wrap orders-detail-table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Cod.</th>
+                        <th>Pedida</th>
+                        <th>Recibida</th>
+                        <th>Pendiente</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detailQuery.data.pending.length ? (
+                        detailQuery.data.pending.map((row) => (
+                          <tr key={row.pendiente_id}>
+                            <td>{row.articulo_id}</td>
+                            <td>{formatNumber(safeNumber(row.cantidad_pedida))}</td>
+                            <td>{formatNumber(safeNumber(row.cantidad_recibida))}</td>
+                            <td>{formatNumber(safeNumber(row.cantidad_pendiente))}</td>
+                            <td>{row.estado || '-'}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5}>
+                            <EmptyState>Sin pendientes.</EmptyState>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="orders-tab-footer">
+                  <strong>TOTAL</strong>
+                  <span>{formatNumber(pendingQty)} kg</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
     </section>
   )
 }
