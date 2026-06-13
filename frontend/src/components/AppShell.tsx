@@ -119,15 +119,17 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const isCustomers = activeView === 'customers'
+  const isSaasShell = isCustomers || activeView === 'contacts'
+  const activeNavItem = navItems.find((item) => item.key === activeView)
 
   return (
-    <div className={`app-shell ${isCustomers ? 'app-shell-customers' : ''}`}>
-      {isCustomers ? (
+    <div className={`app-shell ${isSaasShell ? 'app-shell-customers' : ''}`}>
+      {isSaasShell ? (
         <>
           <header className="app-topbar">
             <div className="app-topbar-brand">
               <span className="app-topbar-brand-name">GESTIÓN IREKS</span>
-              <span className="app-topbar-section">Clientes</span>
+              <span className="app-topbar-section">{activeNavItem?.label ?? currentTitle}</span>
             </div>
 
             <nav className="app-topbar-nav" aria-label="Navegacion principal">
