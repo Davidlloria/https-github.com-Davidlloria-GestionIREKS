@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+﻿import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
 
@@ -641,10 +641,20 @@ describe('App shell smoke', () => {
 
     fireEvent.click(getNav().getByRole('button', { name: 'Almacen' }))
     expect(await screen.findByRole('heading', { name: 'Almacén', level: 2 })).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'Stock actual' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Últimos movimientos' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Histórico de inventarios' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Artículos' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Entradas' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'Stock' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Inventarios' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Refrescar' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Detalle del producto' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Información del producto' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Inventarios' }))
+    expect(await screen.findByRole('heading', { name: 'Inventarios' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Detalle de inventario' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Stock' })[0])
+    expect(await screen.findByRole('heading', { name: 'Stock' })).toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Ventas' }))
     expect(await screen.findByRole('heading', { name: 'Ventas' })).toBeInTheDocument()
