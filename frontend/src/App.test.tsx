@@ -640,7 +640,11 @@ describe('App shell smoke', () => {
     expect(await screen.findByPlaceholderText('Buscar materia prima por nombre, codigo o referencia')).toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Almacen' }))
-    expect(await screen.findByText('Stock actual')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Almacén', level: 2 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Stock actual' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Últimos movimientos' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Histórico de inventarios' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Detalle de inventario' })).toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Ventas' }))
     expect(await screen.findByRole('heading', { name: 'Ventas' })).toBeInTheDocument()

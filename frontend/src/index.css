@@ -407,6 +407,179 @@ button {
   min-width: 0;
 }
 
+.warehouse-page {
+  display: grid;
+  gap: 14px;
+  min-height: 0;
+  height: 100%;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  align-content: start;
+}
+
+.warehouse-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 2px 2px;
+}
+
+.warehouse-header-copy {
+  min-width: 0;
+}
+
+.warehouse-kicker {
+  margin: 0 0 8px;
+  color: var(--brand-strong);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.warehouse-header h2 {
+  margin: 0;
+  font-size: clamp(24px, 2.2vw, 34px);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.warehouse-subtitle {
+  margin: 8px 0 0;
+  max-width: 72ch;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.warehouse-header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.warehouse-filter-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.warehouse-filter-toolbar {
+  justify-content: flex-start;
+}
+
+.warehouse-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.warehouse-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.95fr);
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  align-items: stretch;
+}
+
+.warehouse-left-column,
+.warehouse-right-column {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.warehouse-right-column {
+  grid-template-rows: minmax(0, 0.95fr) minmax(0, 1.05fr);
+}
+
+.warehouse-left-column {
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.warehouse-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.warehouse-stock-panel,
+.warehouse-movements-panel {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.warehouse-history-panel {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.warehouse-detail-panel {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.warehouse-section-head {
+  padding-bottom: 4px;
+  border-bottom: 1px solid #dde7db;
+}
+
+.warehouse-scroll {
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.warehouse-detail-scroll {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  scrollbar-gutter: stable;
+}
+
+.warehouse-table-wrap {
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.warehouse-detail-summary {
+  margin: 0;
+}
+
+.warehouse-detail-summary dd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.warehouse-panel .state {
+  margin: 0;
+}
+
+.warehouse-panel .section-heading h3 {
+  font-size: 15px;
+}
+
+.warehouse-panel .section-heading p {
+  font-size: 12px;
+}
+
+.warehouse-panel table {
+  min-width: 760px;
+}
+
+.warehouse-page .stat-card,
+.warehouse-page .card {
+  min-width: 0;
+}
+
 .ireks-products-page {
   display: flex;
   flex: 1;
@@ -610,6 +783,32 @@ button {
 
 .ireks-products-page .ireks-products-tabs-panel .state {
   margin: 0;
+}
+
+@media (max-width: 1200px) {
+  .warehouse-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .warehouse-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .warehouse-header {
+    flex-direction: column;
+  }
+
+  .warehouse-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .warehouse-summary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .ingredients-action-toolbar {
