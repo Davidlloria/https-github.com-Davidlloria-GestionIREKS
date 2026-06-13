@@ -142,7 +142,6 @@ export function AppShell({
     activeView === 'ingredients' ||
     activeView === 'ingredientsIreks' ||
     activeView === 'ingredientsStd'
-  const activeNavItem = navItems.find((item) => item.key === activeView)
 
   return (
     <div className={`app-shell ${isSaasShell ? 'app-shell-customers' : ''}`}>
@@ -151,7 +150,6 @@ export function AppShell({
           <header className="app-topbar">
             <div className="app-topbar-brand">
               <span className="app-topbar-brand-name">GESTIÓN IREKS</span>
-              <span className="app-topbar-section">{activeNavItem?.label ?? currentTitle}</span>
             </div>
 
             <nav className="app-topbar-nav" aria-label="Navegacion principal">

@@ -382,6 +382,50 @@ button {
   align-items: start;
 }
 
+.ingredients-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+  gap: 14px;
+  align-items: start;
+  min-height: 0;
+}
+
+.ingredients-list-panel,
+.ingredients-detail-panel {
+  min-width: 0;
+}
+
+.ingredients-list-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.ingredients-detail-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.ingredients-search-toolbar {
+  justify-content: space-between;
+}
+
+.ingredients-search-toolbar .input {
+  flex: 1 1 320px;
+  min-width: 220px;
+}
+
+.ingredients-search-toolbar .surface-chip {
+  flex: 0 0 auto;
+}
+
+.ingredients-table-wrap {
+  min-width: 0;
+}
+
+.ingredients-detail-list {
+  min-height: 0;
+}
+
 .customers-workspace {
   display: grid;
   grid-template-columns: minmax(360px, 0.92fr) minmax(0, 1.08fr);
