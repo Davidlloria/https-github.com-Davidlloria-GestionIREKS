@@ -623,7 +623,10 @@ describe('App shell smoke', () => {
 
     fireEvent.click(getNav().getByRole('button', { name: 'Productos IREKS' }))
     expect(await screen.findByRole('heading', { name: 'Productos IREKS', level: 2 })).toBeInTheDocument()
-    expect(await screen.findByPlaceholderText('Buscar producto IREKS por nombre, referencia o codigo')).toBeInTheDocument()
+    expect(await screen.findByPlaceholderText('Buscar producto por referencia o nombre')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Refrescar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Datos' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Tarifa' })).toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Materias primas' }))
     expect(await screen.findByPlaceholderText('Buscar materia prima por nombre, codigo o referencia')).toBeInTheDocument()
