@@ -14,11 +14,15 @@ const salesSummary = {
       codigo: 'A-1',
       nombre: 'Venta 1',
       kilos_prev: 1,
+      sc_prev: 0.5,
       kilos_curr: 2,
+      sc_curr: 0.75,
       ventas_prev: 3,
       ventas_curr: 4,
       delta_kg: 1,
+      delta_kg_pct: 100,
       delta_ventas: 1,
+      delta_ventas_pct: 33.3333,
     },
   ],
 }
@@ -371,6 +375,9 @@ vi.mock('./api/sales', () => ({
   getSalesAnnualSummary: vi.fn(async () => salesSummary),
   listSalesAnnualClients: vi.fn(async () => ({ items: [{ id: '1', name: 'Cliente 1', code: 'C1' }] })),
   listSalesAnnualYears: vi.fn(async () => ({ items: [{ year: 2024, label: '2024' }] })),
+  listSalesAnnualManufacturers: vi.fn(async () => ({ items: [{ id: 'FAB-1', name: 'Fabricante 1', code: 'F1' }] })),
+  listSalesAnnualFamilies: vi.fn(async () => ({ items: [{ id: 'FAM-1', name: 'Familia 1', code: 'FA1' }] })),
+  listSalesAnnualSubfamilies: vi.fn(async () => ({ items: [{ id: 'SUB-1', name: 'Subfamilia 1', code: 'SU1' }] })),
 }))
 
 vi.mock('./api/customers', () => ({
