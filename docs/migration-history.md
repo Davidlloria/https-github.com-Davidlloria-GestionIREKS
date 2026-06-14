@@ -2,7 +2,49 @@
 
 ## Estado verificado
 
-Revision local: 2026-06-02.
+Revision local: 2026-06-14.
+
+### Checkpoint provisional actual
+
+- HEAD validado: `5451a0e5`.
+- Worktree limpio.
+- Gates validados:
+  - frontend: `npm run lint`, `npm run build`, `npm run test` OK;
+  - backend/API read-only: `pytest` OK;
+  - launcher/PyInstaller: `pytest` OK.
+- Conteos de pruebas:
+  - frontend: `40 passed`;
+  - backend/API: `50 passed`;
+  - launcher/PyInstaller: `9 passed`.
+- Warnings no bloqueantes:
+  - Git: `unable to find all commit-graph files`;
+  - backend/API: deprecaciones de `httpx`/Starlette, `ReportLab` y `Pydantic`.
+
+### Estado funcional provisional
+
+- Fase read-only principal cerrada provisionalmente como bloque estable.
+- Dashboard/Inicio: base SaaS provisional.
+- Clientes: base SaaS provisional.
+- Contactos: base SaaS provisional.
+- Técnicos: base SaaS provisional.
+- Distribuidores: base SaaS provisional.
+- Cursos: base SaaS provisional.
+- Recetas: base SaaS provisional.
+- Productos IREKS: base SaaS read-only provisional.
+- Materias primas: cerrada provisionalmente, con endpoints propios `GET /ingredients/std` y `GET /ingredients/std/{articulo_id}`; ya no usa `/ingredients` agregado ni filtrado mixto `source === "std"`.
+- Almacén: base SaaS read-only provisional.
+- Pedidos: base SaaS read-only provisional.
+- Ventas: base SaaS read-only provisional.
+- Configuración: placeholder read-only provisional, accesible solo desde Dashboard / Accesos rápidos; no aparece en topbar.
+
+### Bloqueos activos
+
+- Mutaciones bloqueadas.
+- Export/import/mantenimiento/backup/API writes/correo bloqueados.
+- No tocar backend/API/types salvo decisión explícita.
+- No tocar PySide6/launcher/PyInstaller salvo decisión explícita.
+- No activar Configuración real todavía.
+- No reabrir Materias primas salvo retoque estético explícito.
 
 - Rama principal local sincronizada con `origin/main`.
 - PR inicial de migracion fusionado en GitHub: `Merge pull request #1`.
