@@ -135,3 +135,28 @@ def test_validate_runtime_database_rejects_empty_external_db(monkeypatch):
             assert 'vacia' in str(exc).lower()
         else:
             raise AssertionError('validate_runtime_database should reject an empty external database')
+
+
+def test_open_frontend_in_app_mode_uses_browser_app_mode(monkeypatch):
+    module = load_launcher_module()
+    browser_path = Path('C:/Browsers/Edge/msedge.exe')
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(module, 'find_browser_app_path', lambda: browser_path)
+    monkeypatch.setattr(module.subprocess, 'Popen', lambda command, **kwargs: captured.update({'command': command, 'kwargs': kwargs}))
+
+    module.open_frontend_in_app_mode('http://127.0.0.1:5173')
+
+    assert captured['command'] == [str(browser_path), '--app=http://127.0.0.1:5173']
+
+
+def test_open_frontend_in_app_mode_falls_back_to_webbrowser(monkeypatch):
+    module = load_launcher_module()
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(module, 'find_browser_app_path', lambda: None)
+    monkeypatch.setattr(module.webbrowser, 'open', lambda url: captured.update({'url': url}))
+
+    module.open_frontend_in_app_mode('http://127.0.0.1:5173')
+
+    assert captured['url'] == 'http://127.0.0.1:5173'

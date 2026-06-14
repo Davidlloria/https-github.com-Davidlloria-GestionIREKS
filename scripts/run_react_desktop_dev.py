@@ -108,6 +108,48 @@ def run_frontend_build() -> None:
         raise RuntimeError("El build del frontend ha fallado. Ejecuta 'cd frontend' y 'npm.cmd run build' para ver el error.")
 
 
+def get_browser_candidate_paths() -> list[Path]:
+    if os.name != "nt":
+        return []
+
+    candidates: list[Path] = []
+    env_paths = [
+        os.environ.get("PROGRAMFILES"),
+        os.environ.get("PROGRAMFILES(X86)"),
+        os.environ.get("LOCALAPPDATA"),
+    ]
+    for base_path in env_paths:
+        if not base_path:
+            continue
+        base = Path(base_path)
+        candidates.extend(
+            [
+                base / "Microsoft" / "Edge" / "Application" / "msedge.exe",
+                base / "Google" / "Chrome" / "Application" / "chrome.exe",
+                base / "BraveSoftware" / "Brave-Browser" / "Application" / "brave.exe",
+            ]
+        )
+    return candidates
+
+
+def find_browser_app_path() -> Path | None:
+    for candidate in get_browser_candidate_paths():
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def open_frontend_in_app_mode(frontend_url: str) -> None:
+    browser_path = find_browser_app_path()
+    if browser_path is not None:
+        command = [str(browser_path), f"--app={frontend_url}"]
+        creationflags = getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0)
+        subprocess.Popen(command, creationflags=creationflags)
+        return
+
+    webbrowser.open(frontend_url)
+
+
 def validate_runtime_database() -> None:
     if not RUNNING_IN_BUNDLE:
         return
@@ -366,7 +408,7 @@ def main() -> int:
             print(f"API ready: http://{args.api_host}:{args.api_port}")
 
             if not args.no_open_browser:
-                webbrowser.open(frontend_url)
+                open_frontend_in_app_mode(frontend_url)
 
             if args.exit_after_start:
                 time.sleep(max(0, args.hold_seconds))
@@ -427,7 +469,7 @@ def main() -> int:
         print(f"API ready: http://{args.api_host}:{args.api_port}")
 
         if not args.no_open_browser:
-            webbrowser.open(frontend_url)
+            open_frontend_in_app_mode(frontend_url)
 
         if args.exit_after_start:
             time.sleep(max(0, args.hold_seconds))
