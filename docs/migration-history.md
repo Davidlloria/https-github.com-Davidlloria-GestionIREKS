@@ -20,6 +20,30 @@ Revision local: 2026-06-14.
   - Git: `unable to find all commit-graph files`;
   - backend/API: deprecaciones de `httpx`/Starlette, `ReportLab` y `Pydantic`.
 
+### Checkpoint packaging / smoke test
+
+- Build PyInstaller real ejecutado con `python .\scripts\build_react_desktop_pyinstaller.py`.
+- Bundle generado en `dist\react_desktop_pyinstaller\GestionIREKSReactDesktop\`.
+- Ejecutable empaquetado probado: `dist\react_desktop_pyinstaller\GestionIREKSReactDesktop\GestionIREKSReactDesktop.exe`.
+- Estructura verificada en el bundle:
+  - `_internal\frontend\dist`
+  - `data\gestion_ireks.db`
+  - `GestionIREKSReactDesktop.exe`
+- Smoke test local aceptado:
+  - el `.exe` arranca;
+  - API local disponible en `http://127.0.0.1:8000`;
+  - frontend disponible en `http://127.0.0.1:5173/`;
+  - la pantalla read-only de inicio carga;
+  - la base usada es `data\gestion_ireks.db` dentro del bundle;
+  - el cierre fue correcto;
+  - no quedaron procesos residuales relevantes;
+  - `netstat` solo mostró `TIME_WAIT` al finalizar, sin listeners activos en `8000` ni `5173`.
+- Riesgos detectados:
+  - si ya existe otra instancia usando `8000/5173`, aparece `WinError 10048`;
+  - no se debe lanzar dos instancias simultáneas;
+  - la entrega debe ser la carpeta completa, no el `.exe` aislado;
+  - queda pendiente una prueba en máquina limpia antes de una entrega final.
+
 ### Estado funcional provisional
 
 - Fase read-only principal cerrada provisionalmente como bloque estable.
