@@ -44,6 +44,20 @@ Revision local: 2026-06-14.
   - la entrega debe ser la carpeta completa, no el `.exe` aislado;
   - queda pendiente una prueba en máquina limpia antes de una entrega final.
 
+### Checkpoint portable / maquina limpia
+
+- Prueba de portabilidad ejecutada sobre una copia completa del bundle en `TEMP`.
+- La copia incluia `GestionIREKSReactDesktop.exe`, `_internal\frontend\dist` y `data\gestion_ireks.db`.
+- El `.exe` arranco desde esa copia sin modificar el repo.
+- API confirmada en `http://127.0.0.1:8000`.
+- Frontend confirmada en `http://127.0.0.1:5173/`.
+- La pantalla read-only de inicio / Dashboard cargo correctamente.
+- La aplicacion se cerro con `taskkill` y no quedaron listeners activos en `8000` ni `5173` al final.
+- Riesgos observados:
+  - si habia otra instancia ocupando `8000/5173`, se produjo `WinError 10048`;
+  - no se debe lanzar mas de una instancia simultanea;
+  - la validacion de entrega final sigue pendiente en una maquina limpia real si se quiere reproducir el entorno al 100%.
+
 ### Estado funcional provisional
 
 - Fase read-only principal cerrada provisionalmente como bloque estable.
