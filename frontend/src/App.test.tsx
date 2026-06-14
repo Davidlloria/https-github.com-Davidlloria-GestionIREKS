@@ -596,6 +596,13 @@ describe('App shell smoke', () => {
     expect(getNav().getByRole('button', { name: 'Productos IREKS' })).toBeInTheDocument()
     expect(getNav().getByRole('button', { name: 'Materias primas' })).toBeInTheDocument()
     expect(getNav().getByRole('button', { name: 'Almacen' })).toBeInTheDocument()
+
+    expect(screen.getByRole('button', { name: 'Configuración' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Configuración' }))
+    expect(await screen.findByRole('heading', { name: 'Configuración' })).toBeInTheDocument()
+    expect(screen.getByText('Vista controlada')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Volver al inicio' }))
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
   })
 
   it('switches the visible page when the user clicks the sidebar items', async () => {

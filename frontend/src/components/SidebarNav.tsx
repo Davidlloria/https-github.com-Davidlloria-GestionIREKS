@@ -1,5 +1,6 @@
 export type ViewKey =
   | 'dashboard'
+  | 'settings'
   | 'sales'
   | 'recipes'
   | 'courses'

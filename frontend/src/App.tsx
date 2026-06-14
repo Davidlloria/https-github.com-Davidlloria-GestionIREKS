@@ -7,6 +7,7 @@ import { ContactsPage } from './pages/ContactsPage'
 import { CoursesPage } from './pages/CoursesPage'
 import { CustomersPage } from './pages/CustomersPage'
 import { DistributorsPage } from './pages/DistributorsPage'
+import { ConfigurationPage } from './pages/ConfigurationPage'
 import { IreksProductsPage } from './pages/IreksProductsPage'
 import { IngredientsPage } from './pages/IngredientsPage'
 import { OrdersPage } from './pages/OrdersPage'
@@ -41,6 +42,11 @@ const VIEW_META: Record<ViewKey, ViewMeta> = {
     label: 'Inicio',
     title: 'Dashboard',
     subtitle: 'Resumen general de actividad',
+  },
+  settings: {
+    label: 'Configuración',
+    title: 'Configuración',
+    subtitle: 'Acceso controlado y read-only desde Dashboard.',
   },
   sales: {
     label: 'Ventas',
@@ -124,6 +130,7 @@ function App() {
           {activeView === 'courses' && <CoursesPage />}
           {activeView === 'customers' && <CustomersPage />}
           {activeView === 'contacts' && <ContactsPage />}
+          {activeView === 'settings' && <ConfigurationPage onBack={() => setActiveView('dashboard')} />}
           {activeView === 'orders' && <OrdersPage />}
           {activeView === 'technicians' && <TechniciansPage />}
           {activeView === 'distributors' && <DistributorsPage />}

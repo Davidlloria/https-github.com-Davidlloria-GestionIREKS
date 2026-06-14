@@ -135,6 +135,7 @@ export function AppShell({
     isCustomers ||
     activeView === 'contacts' ||
     activeView === 'dashboard' ||
+    activeView === 'settings' ||
     activeView === 'technicians' ||
     activeView === 'distributors' ||
     activeView === 'courses' ||

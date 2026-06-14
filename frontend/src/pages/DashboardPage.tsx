@@ -46,6 +46,7 @@ const quickActions: Array<{ view: ViewKey; label: string; tone: string }> = [
   { view: 'recipes', label: 'Recetas', tone: 'violet' },
   { view: 'ingredients', label: 'Ingredientes', tone: 'leaf' },
   { view: 'courses', label: 'Cursos', tone: 'amber' },
+  { view: 'settings', label: 'Configuración', tone: 'slate' },
 ]
 
 function DashboardIcon({ tone }: { tone: string }) {
@@ -104,6 +105,13 @@ function DashboardIcon({ tone }: { tone: string }) {
         <svg {...common}>
           <path d="M4 8l8-4 8 4-8 4-8-4z" />
           <path d="M7 10v4c0 1.7 2.2 3 5 3s5-1.3 5-3v-4" />
+        </svg>
+      )
+    case 'slate':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="3.2" />
+          <path d="M19 12a7 7 0 0 0-.08-1l1.76-1.36-1.9-3.29-2.12.72a7 7 0 0 0-1.73-1l-.32-2.19h-3.8l-.32 2.2a7 7 0 0 0-1.73 1l-2.12-.73-1.9 3.29L5.08 11A7 7 0 0 0 5 12c0 .34.03.67.08 1l-1.76 1.36 1.9 3.29 2.12-.72a7 7 0 0 0 1.73 1l.32 2.19h3.8l.32-2.2a7 7 0 0 0 1.73-1l2.12.73 1.9-3.29L18.92 13c.05-.33.08-.66.08-1Z" />
         </svg>
       )
     case 'green':
