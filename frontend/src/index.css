@@ -1937,7 +1937,7 @@ button {
   min-width: 0;
   min-height: 0;
   height: 100%;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .ingredients-std-tabs-panel {
@@ -2006,8 +2006,19 @@ button {
 
 .ingredients-std-list-panel {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
   gap: 12px;
+}
+
+.ingredients-std-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.ingredients-std-actions .action-btn {
+  min-width: 0;
 }
 
 .ingredients-std-filters {

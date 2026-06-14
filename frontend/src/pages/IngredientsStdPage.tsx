@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 
 import { getStdIngredient, listStdIngredientPrices, listStdIngredients } from '../api/ingredients'
 import { QueryState } from '../components/QueryState'
-import { StatCard } from '../components/StatCard'
 import { useAsyncResource } from '../features/useAsyncResource'
 import type { IngredientStdListResponse } from '../api/ingredients'
 import type { IngredientStdRead, MateriaPrimaPrecioRead } from '../types/ingredients'
@@ -131,12 +130,37 @@ export function IngredientsStdPage() {
       <section className="panel-section ingredients-std-list-panel">
         <div className="section-heading">
           <div>
-            <h3>Listado de materias primas</h3>
+            <h3>Articulos</h3>
             <p>Vista read-only propia, separada de Productos IREKS.</p>
           </div>
           <span className="surface-chip">
             {visibleRows.length} visibles de {listQuery.data.total}
           </span>
+        </div>
+
+        <div className="toolbar ingredients-std-actions" aria-label="Acciones de materias primas">
+          <button type="button" className="action-btn action-btn-success" disabled>
+            Nuevo
+          </button>
+          <button type="button" className="action-btn action-btn-warning" disabled>
+            Editar
+          </button>
+          <button type="button" className="action-btn action-btn-danger" disabled>
+            Eliminar
+          </button>
+          <button type="button" className="action-btn" disabled>
+            Importar Excel/CSV
+          </button>
+          <button
+            type="button"
+            className="action-btn"
+            onClick={() => {
+              setPageIndex(0)
+              setSelectedCandidateId('')
+            }}
+          >
+            Refrescar
+          </button>
         </div>
 
         <div className="ingredients-std-filters">
@@ -411,13 +435,6 @@ export function IngredientsStdPage() {
           <span className="surface-chip">Vista sin mutaciones</span>
         </div>
       </header>
-
-      <div className="cards">
-        <StatCard label="Total" value={visibleRows.length} />
-        <StatCard label="Activas" value={visibleRows.filter((row) => row.activo).length} />
-        <StatCard label="Con precio" value={visibleRows.filter((row) => Number.isFinite(row.pvp_formato) && row.pvp_formato > 0).length} />
-        <StatCard label="Proveedores" value={providerSummary.length} />
-      </div>
 
       <section className="panel-section ingredients-std-tabs-panel">
         <div className="section-heading">

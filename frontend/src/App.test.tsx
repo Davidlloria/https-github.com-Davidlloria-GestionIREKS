@@ -724,11 +724,13 @@ describe('App shell smoke', () => {
 
     fireEvent.click(getNav().getByRole('button', { name: 'Materias primas' }))
     expect(await screen.findByRole('heading', { name: 'Materias primas', level: 2 })).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'Listado de materias primas', level: 3 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Articulos', level: 3 })).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Buscar materia prima por nombre, codigo o referencia')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Articulo' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Proveedores' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Detalle de materia prima', level: 3 })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Nuevo' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Importar Excel/CSV' })).toBeDisabled()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Almacen' }))
     expect(await screen.findByRole('heading', { name: 'Almacén', level: 2 })).toBeInTheDocument()
