@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { listContacts } from '../api/contacts'
-import { getCustomerDetail, listCustomers } from '../api/customers'
+import { getCustomerAddressCatalogs, getCustomerDetail, listCustomers } from '../api/customers'
 import { QueryState } from '../components/QueryState'
 import { useAsyncResource } from '../features/useAsyncResource'
-import type { ContactListItem, CustomerDetail } from '../types/api'
+import type { ContactListItem, CustomerAddressCatalogsPayload, CustomerDetail } from '../types/api'
 
 const PAGE_SIZE = 25
 
 type CustomerTab = 'contacts' | 'sales' | 'recipes' | 'agenda'
+type CustomerSortKey = 'code' | 'name' | 'island'
 
 const TABS: Array<{ key: CustomerTab; label: string }> = [
   { key: 'contacts', label: 'Contactos' },
@@ -35,29 +36,30 @@ function valueOrDash(value: string | number | boolean | null | undefined) {
   return text || '-'
 }
 
-function locationValueOrDash(value: string | null | undefined) {
-  if (!value) {
-    return '-'
-  }
-
-  const text = value.trim()
-  if (!text) {
-    return '-'
-  }
-
-  if (/^\d+$/.test(text)) {
-    return '-'
-  }
-
-  if (/^[A-Z]{1,4}\d+$/i.test(text)) {
-    return '-'
-  }
-
-  if (/^[0-9a-f-]{8,}$/i.test(text)) {
-    return '-'
-  }
-
+function normalizeLookupKey(value: string | null | undefined) {
+  const text = value?.trim() ?? ''
   return text
+}
+
+function resolveAddressLabel(value: string | null | undefined, lookup: Map<string, string>) {
+  const key = normalizeLookupKey(value)
+  if (!key) {
+    return '-'
+  }
+  return lookup.get(key) || '-'
+}
+
+function islandInitials(value: string | null | undefined, lookup: Map<string, string>) {
+  const key = normalizeLookupKey(value)
+  if (!key) {
+    return '-'
+  }
+
+  return lookup.get(key) || '-'
+}
+
+function compareText(a: string, b: string) {
+  return a.localeCompare(b, 'es', { sensitivity: 'base', numeric: true })
 }
 
 function statusLabel(active?: boolean) {
@@ -100,41 +102,85 @@ export function CustomersPage() {
   const [islandFilter, setIslandFilter] = useState('')
   const [selectedCandidateId, setSelectedCandidateId] = useState('')
   const [activeTab, setActiveTab] = useState<CustomerTab>('contacts')
+  const [sortKey, setSortKey] = useState<CustomerSortKey>('code')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
+  const catalogsQuery = useAsyncResource(
+    () => getCustomerAddressCatalogs(),
+    { provincias: [], islas: [], municipios: [], codigos_postales: [], localidades: [] } as CustomerAddressCatalogsPayload,
+    [],
+  )
   const customersQuery = useAsyncResource(
     () => listAllCustomers(search),
     { items: [], total: 0, limit: PAGE_SIZE, offset: 0 },
     [search],
   )
   const customerRows = customersQuery.data.items
+  const customerCatalogs = catalogsQuery.data
 
-  const islandOptions = useMemo(() => {
-    const values = new Set<string>()
-    customerRows.forEach((customer) => {
-      const island = customer.cliente_direccion_isla?.trim()
-      if (island) {
-        values.add(island)
-      }
-    })
-    return Array.from(values).sort((a, b) => a.localeCompare(b, 'es'))
-  }, [customerRows])
+  const provinceNameById = useMemo(
+    () => new Map(customerCatalogs.provincias.map((option) => [option.id, option.label])),
+    [customerCatalogs.provincias],
+  )
+  const islandNameById = useMemo(
+    () => new Map(customerCatalogs.islas.map((option) => [option.id, option.label])),
+    [customerCatalogs.islas],
+  )
+  const islandInitialsById = useMemo(
+    () => new Map(customerCatalogs.islas.map((option) => [option.id, option.code || option.label])),
+    [customerCatalogs.islas],
+  )
+  const municipalityNameById = useMemo(
+    () => new Map(customerCatalogs.municipios.map((option) => [option.id, option.label])),
+    [customerCatalogs.municipios],
+  )
+  const localityNameById = useMemo(
+    () => new Map(customerCatalogs.localidades.map((option) => [option.id, option.label])),
+    [customerCatalogs.localidades],
+  )
 
   const visibleCustomerRows = useMemo(() => {
     if (!islandFilter) {
       return customerRows
     }
-    return customerRows.filter((customer) => customer.cliente_direccion_isla?.trim() === islandFilter)
+    return customerRows.filter((customer) => normalizeLookupKey(customer.cliente_direccion_isla_id) === islandFilter)
   }, [customerRows, islandFilter])
 
+  const sortedCustomerRows = useMemo(() => {
+    const rows = [...visibleCustomerRows]
+    rows.sort((left, right) => {
+      let comparison: number
+      if (sortKey === 'code') {
+        comparison = (left.cliente_codigo || 0) - (right.cliente_codigo || 0)
+      } else if (sortKey === 'name') {
+        comparison = compareText(customerLabel(left), customerLabel(right))
+      } else {
+        comparison = compareText(
+          islandInitials(left.cliente_direccion_isla_id, islandInitialsById),
+          islandInitials(right.cliente_direccion_isla_id, islandInitialsById),
+        )
+      }
+
+      if (comparison === 0) {
+        comparison = compareText(customerLabel(left), customerLabel(right))
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+    return rows
+  }, [visibleCustomerRows, sortDirection, sortKey, islandInitialsById])
+
+  const sortAriaValue = sortDirection === 'asc' ? 'ascending' : 'descending'
+
   const selectedCustomerId = useMemo(() => {
-    if (!visibleCustomerRows.length) {
+    if (!sortedCustomerRows.length) {
       return ''
     }
-    if (selectedCandidateId && visibleCustomerRows.some((row) => row.cliente_id === selectedCandidateId)) {
+    if (selectedCandidateId && sortedCustomerRows.some((row) => row.cliente_id === selectedCandidateId)) {
       return selectedCandidateId
     }
-    return visibleCustomerRows[0].cliente_id
-  }, [visibleCustomerRows, selectedCandidateId])
+    return sortedCustomerRows[0].cliente_id
+  }, [sortedCustomerRows, selectedCandidateId])
 
   const detailQuery = useAsyncResource(
     () => (selectedCustomerId ? getCustomerDetail(selectedCustomerId) : Promise.resolve(null as CustomerDetail | null)),
@@ -157,10 +203,9 @@ export function CustomersPage() {
         <aside className="customers-list-panel">
           <div className="customers-list-head">
             <div className="customers-list-head-copy">
-              <p className="customers-list-kicker">Clientes</p>
-              <h2>Listado</h2>
+              <h2>Clientes</h2>
             </div>
-            <span className="surface-chip">{visibleCustomerRows.length} visibles</span>
+            <span className="surface-chip">{sortedCustomerRows.length} visibles</span>
           </div>
 
           <div className="customers-list-filters">
@@ -173,9 +218,9 @@ export function CustomersPage() {
               }}
             >
               <option value="">Todas las islas</option>
-              {islandOptions.map((island) => (
-                <option key={island} value={island}>
-                  {island}
+              {customerCatalogs.islas.map((island) => (
+                <option key={island.id} value={island.id}>
+                  {island.label}
                 </option>
               ))}
             </select>
@@ -201,7 +246,9 @@ export function CustomersPage() {
                   setSelectedCandidateId('')
                 }}
               >
-                ×
+                <span aria-hidden="true" className="customers-clear-icon">
+                  ↺
+                </span>
               </button>
             </div>
           </div>
@@ -210,21 +257,67 @@ export function CustomersPage() {
             <QueryState
               loading={customersQuery.loading}
               error={customersQuery.error}
-              empty={!visibleCustomerRows.length}
+              empty={!sortedCustomerRows.length}
               emptyMessage="No hay clientes para los filtros actuales."
             />
 
-            {!!visibleCustomerRows.length && (
+            {!!sortedCustomerRows.length && (
               <div className="customers-list-grid">
                 <div className="customers-list-header">
-                  <div className="customers-list-cell">COD.</div>
-                  <div className="customers-list-cell">NOMBRE</div>
-                  <div className="customers-list-cell">ISLA</div>
+                  <button
+                    type="button"
+                    className="customers-list-header-cell"
+                    onClick={() => {
+                      if (sortKey === 'code') {
+                        setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+                      } else {
+                        setSortKey('code')
+                        setSortDirection('asc')
+                      }
+                    }}
+                    aria-sort={sortKey === 'code' ? sortAriaValue : 'none'}
+                  >
+                    <span>COD.</span>
+                    {sortKey === 'code' && <span className="customers-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                  </button>
+                  <button
+                    type="button"
+                    className="customers-list-header-cell"
+                    onClick={() => {
+                      if (sortKey === 'name') {
+                        setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+                      } else {
+                        setSortKey('name')
+                        setSortDirection('asc')
+                      }
+                    }}
+                    aria-sort={sortKey === 'name' ? sortAriaValue : 'none'}
+                  >
+                    <span>NOMBRE</span>
+                    {sortKey === 'name' && <span className="customers-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                  </button>
+                  <button
+                    type="button"
+                    className="customers-list-header-cell"
+                    onClick={() => {
+                      if (sortKey === 'island') {
+                        setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+                      } else {
+                        setSortKey('island')
+                        setSortDirection('asc')
+                      }
+                    }}
+                    aria-sort={sortKey === 'island' ? sortAriaValue : 'none'}
+                  >
+                    <span>ISLA</span>
+                    {sortKey === 'island' && <span className="customers-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                  </button>
                 </div>
 
                 <div className="customers-list-body">
-                  {visibleCustomerRows.map((customer) => {
-                    const island = locationValueOrDash(customer.cliente_direccion_isla)
+                  {sortedCustomerRows.map((customer) => {
+                    const islandLabel = resolveAddressLabel(customer.cliente_direccion_isla_id, islandNameById)
+                    const islandAbbrev = islandInitials(customer.cliente_direccion_isla_id, islandInitialsById)
                     const isSelected = customer.cliente_id === selectedCustomerId
 
                     return (
@@ -233,10 +326,12 @@ export function CustomersPage() {
                         type="button"
                         className={`customers-list-row ${isSelected ? 'is-selected' : ''}`}
                         onClick={() => setSelectedCandidateId(customer.cliente_id)}
-                      >
+                        >
                         <span className="customers-list-cell">{customer.cliente_codigo}</span>
                         <span className="customers-list-cell customers-list-cell-name">{customerLabel(customer)}</span>
-                        <span className="customers-list-cell">{island}</span>
+                        <span className="customers-list-cell customers-list-cell-island" title={islandLabel}>
+                          {islandAbbrev}
+                        </span>
                       </button>
                     )
                   })}
@@ -328,7 +423,7 @@ export function CustomersPage() {
                             <input
                               className="input customers-field"
                               readOnly
-                              value={locationValueOrDash(detailQuery.data.cliente_direccion_provincia_id)}
+                              value={resolveAddressLabel(detailQuery.data.cliente_direccion_provincia_id, provinceNameById)}
                             />
                           </label>
                           <label>
@@ -336,7 +431,7 @@ export function CustomersPage() {
                             <input
                               className="input customers-field"
                               readOnly
-                              value={locationValueOrDash(detailQuery.data.cliente_direccion_isla)}
+                              value={resolveAddressLabel(detailQuery.data.cliente_direccion_isla_id, islandNameById)}
                             />
                           </label>
                           <label>
@@ -344,7 +439,7 @@ export function CustomersPage() {
                             <input
                               className="input customers-field"
                               readOnly
-                              value={locationValueOrDash(detailQuery.data.cliente_direccion_municipio_id)}
+                              value={resolveAddressLabel(detailQuery.data.cliente_direccion_municipio_id, municipalityNameById)}
                             />
                           </label>
                         </div>
@@ -355,7 +450,7 @@ export function CustomersPage() {
                             <input
                               className="input customers-field"
                               readOnly
-                              value={locationValueOrDash(detailQuery.data.cliente_direccion_localidad_id)}
+                              value={resolveAddressLabel(detailQuery.data.cliente_direccion_localidad_id, localityNameById)}
                             />
                           </label>
                           <label className="customers-field-postal">
@@ -508,3 +603,4 @@ export function CustomersPage() {
     </section>
   )
 }
+

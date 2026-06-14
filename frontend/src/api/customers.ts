@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from './http'
-import type { CustomerDetail, CustomerListItem, PaginatedList } from '../types/api'
+import type { CustomerAddressCatalogsPayload, CustomerDetail, CustomerListItem, PaginatedList } from '../types/api'
 
 export function listCustomers(search: string, limit?: number, offset?: number) {
   return apiGet<PaginatedList<CustomerListItem>>('/customers', { q: search, limit, offset })
@@ -7,6 +7,10 @@ export function listCustomers(search: string, limit?: number, offset?: number) {
 
 export function getCustomerDetail(customerId: string) {
   return apiGet<CustomerDetail>(`/customers/${customerId}`)
+}
+
+export function getCustomerAddressCatalogs() {
+  return apiGet<CustomerAddressCatalogsPayload>('/customers/address-catalogs')
 }
 
 export function updateCustomerActive(customerId: string, active: boolean) {

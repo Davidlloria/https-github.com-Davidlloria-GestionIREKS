@@ -105,6 +105,19 @@ def test_customers_list_supports_limit_and_offset(api_client: TestClient) -> Non
     assert response.json()["offset"] == 1
 
 
+def test_customers_address_catalogs_endpoint_returns_address_options(api_client: TestClient) -> None:
+    response = api_client.get("/customers/address-catalogs")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert set(payload) == {"provincias", "islas", "municipios", "codigos_postales", "localidades"}
+    assert payload["provincias"] == []
+    assert payload["islas"] == []
+    assert payload["municipios"] == []
+    assert payload["codigos_postales"] == []
+    assert payload["localidades"] == []
+
+
 def test_contacts_crud_endpoints_include_company_payload(api_client: TestClient) -> None:
     api_client.post(
         "/customers",

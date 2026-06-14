@@ -382,6 +382,7 @@ const customerList = {
       cliente_cif: 'B123',
       cliente_grupo: 'Grupo A',
       cliente_tipo: 'Distribuidor',
+      cliente_direccion_isla_id: 'I1',
       cliente_email: 'cliente1@example.com',
       cliente_telefono: '928000000',
       cliente_prospeccion: false,
@@ -436,6 +437,13 @@ vi.mock('./api/sales', () => ({
 }))
 
 vi.mock('./api/customers', () => ({
+  getCustomerAddressCatalogs: vi.fn(async () => ({
+    provincias: [{ id: 'P1', label: 'Provincia 1', parent_id: '', code: 'PR1' }],
+    islas: [{ id: 'I1', label: 'Isla Uno', parent_id: 'P1', code: 'IU' }],
+    municipios: [{ id: 'M1', label: 'Municipio 1', parent_id: 'I1', code: 'MU1' }],
+    codigos_postales: [{ id: 'P1:35001', label: '35001', parent_id: 'M1', code: '35001' }],
+    localidades: [{ id: 'L1', label: 'Localidad 1', parent_id: 'M1', code: 'LOC1' }],
+  })),
   getCustomerDetail: vi.fn(async () => customerDetail),
   listCustomers: vi.fn(async () => customerList),
 }))

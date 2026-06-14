@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getCustomerDetail, listCustomers } from './customers'
+import { getCustomerAddressCatalogs, getCustomerDetail, listCustomers } from './customers'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -27,5 +27,22 @@ describe('customers api client', () => {
     await expect(getCustomerDetail('C-1')).resolves.toEqual({ cliente_id: 'C-1' })
 
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8000/customers/C-1', expect.any(Object))
+  })
+
+  it('fetches customer address catalogs from the expected endpoint', async () => {
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ provincias: [], islas: [], municipios: [], codigos_postales: [], localidades: [] }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getCustomerAddressCatalogs()).resolves.toEqual({
+      provincias: [],
+      islas: [],
+      municipios: [],
+      codigos_postales: [],
+      localidades: [],
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8000/customers/address-catalogs', expect.any(Object))
   })
 })

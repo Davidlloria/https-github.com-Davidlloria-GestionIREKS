@@ -5,6 +5,7 @@ from app.api.main import create_app
 
 EXPECTED_CUSTOMER_PATHS = {
     "/customers",
+    "/customers/address-catalogs",
     "/customers/{customer_id}",
 }
 
@@ -38,18 +39,21 @@ def test_customers_openapi_contract_freezes_customers_and_contacts_surface() -> 
     assert contact_paths == EXPECTED_CONTACT_PATHS
 
     customers = _operation(spec, "/customers")
+    customer_catalogs = _operation(spec, "/customers/address-catalogs")
     customer_detail = _operation(spec, "/customers/{customer_id}")
     contacts = _operation(spec, "/contacts")
     contact_detail = _operation(spec, "/contacts/{contact_id}")
     contact_companies = _operation(spec, "/contacts/companies")
 
     assert list(_parameter_map(customers)) == ["q", "limit", "offset"]
+    assert list(_parameter_map(customer_catalogs)) == []
     assert list(_parameter_map(customer_detail)) == ["customer_id"]
     assert list(_parameter_map(contacts)) == ["q", "cliente_id", "limit", "offset"]
     assert list(_parameter_map(contact_detail)) == ["contact_id"]
     assert list(_parameter_map(contact_companies)) == []
 
     assert _response_schema(customers) == {"$ref": "#/components/schemas/CustomerListResponse"}
+    assert _response_schema(customer_catalogs) == {"$ref": "#/components/schemas/CustomerAddressCatalogsPayload"}
     assert _response_schema(customer_detail) == {"$ref": "#/components/schemas/CustomerDetail"}
     assert _response_schema(contacts) == {"$ref": "#/components/schemas/ContactListResponse"}
     assert _response_schema(contact_detail) == {"$ref": "#/components/schemas/ContactDetail"}

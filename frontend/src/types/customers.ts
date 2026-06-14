@@ -1,3 +1,18 @@
+export interface AddressOption {
+  id: string
+  label: string
+  parent_id: string
+  code: string
+}
+
+export interface CustomerAddressCatalogsPayload {
+  provincias: AddressOption[]
+  islas: AddressOption[]
+  municipios: AddressOption[]
+  codigos_postales: AddressOption[]
+  localidades: AddressOption[]
+}
+
 export interface CustomerListItem {
   cliente_id: string
   cliente_codigo: number
@@ -23,6 +38,5 @@ export interface CustomerDetail extends CustomerListItem {
   cliente_direccion_municipio_id: string
   cliente_direccion_provincia_id: string
   cliente_direccion_isla_id: string
-  cliente_direccion_isla?: string
   distribuidor_id: string
 }

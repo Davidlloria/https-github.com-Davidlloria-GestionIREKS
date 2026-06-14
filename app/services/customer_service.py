@@ -57,7 +57,7 @@ class CustomerService:
                 for row in catalogs.provincias
             ],
             islas=[
-                self._address_option(row, "isla_id", "isla_nombre", code_attr="isla_codigo", parent_attr="provincia_id")
+                self._address_option(row, "isla_id", "isla_nombre", code_attr="isla_iniciales", parent_attr="provincia_id")
                 for row in catalogs.islas
             ],
             municipios=[

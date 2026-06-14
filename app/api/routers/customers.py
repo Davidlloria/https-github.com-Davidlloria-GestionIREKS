@@ -9,6 +9,7 @@ from app.api.deps import get_customer_service
 from app.api.errors import bad_request, conflict, not_found
 from app.api.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, MAX_PAGE_OFFSET
 from app.schemas.customers import (
+    CustomerAddressCatalogsPayload,
     CustomerCreate,
     CustomerDetail,
     CustomerListResponse,
@@ -28,6 +29,13 @@ def list_customers(
     service: CustomerService = Depends(get_customer_service),
 ) -> CustomerListResponse:
     return service.list_payload(q, limit=limit, offset=offset)
+
+
+@router.get("/address-catalogs", response_model=CustomerAddressCatalogsPayload)
+def address_catalogs(
+    service: CustomerService = Depends(get_customer_service),
+) -> CustomerAddressCatalogsPayload:
+    return service.address_catalogs_payload()
 
 
 @router.get("/{customer_id}", response_model=CustomerDetail)
