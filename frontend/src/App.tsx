@@ -9,7 +9,7 @@ import { CustomersPage } from './pages/CustomersPage'
 import { DistributorsPage } from './pages/DistributorsPage'
 import { ConfigurationPage } from './pages/ConfigurationPage'
 import { IreksProductsPage } from './pages/IreksProductsPage'
-import { IngredientsPage } from './pages/IngredientsPage'
+import { IngredientsStdPage } from './pages/IngredientsStdPage'
 import { OrdersPage } from './pages/OrdersPage'
 import { RecipesPage } from './pages/RecipesPage'
 import { SalesPage } from './pages/SalesPage'
@@ -135,7 +135,7 @@ function App() {
           {activeView === 'technicians' && <TechniciansPage />}
           {activeView === 'distributors' && <DistributorsPage />}
           {(activeView === 'ingredients' || activeView === 'ingredientsIreks') && <IreksProductsPage />}
-          {activeView === 'ingredientsStd' && <IngredientsPage mode="std" />}
+          {activeView === 'ingredientsStd' && <IngredientsStdPage />}
           {activeView === 'warehouse' && <WarehousePage />}
         </AppErrorBoundary>
       </section>

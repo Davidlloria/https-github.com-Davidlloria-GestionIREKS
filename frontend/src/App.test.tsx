@@ -85,6 +85,61 @@ const ingredientList = {
   offset: 0,
 }
 
+const stdIngredientList = {
+  items: [
+    {
+      articulo_id: 'std-1',
+      articulo_referencia_distribuidor: 'STD-001',
+      proveedor_id: 'PROV-1',
+      distribuidor_id: 'DIST-1',
+      distribuidor_nombre: 'Proveedor 1',
+      articulo_descripcion: 'Materia prima 1',
+      articulo_grupo_id: 'GRP-1',
+      articulo_familia_id: 'FAM-1',
+      articulo_subfamilia_id: 'SUB-1',
+      categoria: 'HARINAS',
+      formato: 'SACO',
+      formato_cantidad: 25,
+      formato_unidad: 'kg',
+      pvp_formato: 12.5,
+      pvp_unidad_medida: 0.5,
+      activo: true,
+    },
+    {
+      articulo_id: 'std-2',
+      articulo_referencia_distribuidor: 'STD-002',
+      proveedor_id: 'PROV-2',
+      distribuidor_id: 'DIST-2',
+      distribuidor_nombre: 'Proveedor 2',
+      articulo_descripcion: 'Materia prima 2',
+      articulo_grupo_id: 'GRP-2',
+      articulo_familia_id: 'FAM-2',
+      articulo_subfamilia_id: 'SUB-2',
+      categoria: 'MEJORANTES',
+      formato: 'BOLSA',
+      formato_cantidad: 10,
+      formato_unidad: 'kg',
+      pvp_formato: 15,
+      pvp_unidad_medida: 1.5,
+      activo: true,
+    },
+  ],
+  total: 2,
+  limit: 25,
+  offset: 0,
+}
+
+const stdIngredientDetail = stdIngredientList.items[0]
+
+const stdIngredientPrices = [
+  {
+    id: 1,
+    articulo_id: 'std-1',
+    fecha_precio: '2026-01-01',
+    costo_neto: 11.25,
+  },
+]
+
 const ireksIngredientList = {
   items: [
     {
@@ -537,6 +592,14 @@ vi.mock('./api/ingredients', () => ({
     }
   }),
   listIngredients: vi.fn(async () => ingredientList),
+  getStdIngredient: vi.fn(async (articuloId: string) => {
+    if (articuloId === 'std-2') {
+      return stdIngredientList.items[1]
+    }
+    return stdIngredientDetail
+  }),
+  listStdIngredients: vi.fn(async () => stdIngredientList),
+  listStdIngredientPrices: vi.fn(async () => stdIngredientPrices),
 }))
 
 vi.mock('./api/warehouse', () => ({
@@ -660,7 +723,12 @@ describe('App shell smoke', () => {
     expect(await screen.findByText('Tarifa pendiente de migración read-only')).toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Materias primas' }))
-    expect(await screen.findByPlaceholderText('Buscar materia prima por nombre, codigo o referencia')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Materias primas', level: 2 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Listado de materias primas', level: 3 })).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Buscar materia prima por nombre, codigo o referencia')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Articulo' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Proveedores' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Detalle de materia prima', level: 3 })).toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Almacen' }))
     expect(await screen.findByRole('heading', { name: 'Almacén', level: 2 })).toBeInTheDocument()
