@@ -58,6 +58,47 @@ Revision local: 2026-06-14.
   - no se debe lanzar mas de una instancia simultanea;
   - la validacion de entrega final sigue pendiente en una maquina limpia real si se quiere reproducir el entorno al 100%.
 
+### Checkpoint Clientes - controles de listado
+
+- Commit validado: `d5b75eb` (`frontend: refine customers list controls`).
+- Ajustes aplicados en Clientes:
+  - la cabecera superior muestra `Clientes` y ya no usa la etiqueta `CLIENTES`;
+  - el combo de islas separa mejor la flecha del borde derecho;
+  - el boton de limpiar filtro usa color rojo acorde a la paleta de la app;
+  - el icono del boton de limpiar tiene mas presencia visual;
+  - el listado mantiene ordenacion por `COD.`, `NOMBRE` e `ISLA`.
+- Validacion ejecutada y OK:
+  - `npm.cmd run lint`
+  - `npm.cmd run build`
+  - `npm.cmd run test`
+- Resultado de pruebas frontend: `41 passed`.
+- Worktree final del commit: limpio.
+
+### Checkpoint Dashboard - KPI Clientes unificado
+
+- Se sustituyeron los KPI separados de `Clientes` y `Contactos` por un unico KPI de `Clientes`.
+- El KPI de `Clientes` muestra:
+  - total de clientes;
+  - desglose por isla con iniciales y recuentos;
+  - datos derivados del frontend a partir de la lista de clientes y el catalogo de islas.
+- El bloque de `Clientes` se presenta como tarjeta ancha para dar espacio al desglose por islas.
+- El resto del Dashboard sigue con paneles read-only y accesos rapidos sin cambios de alcance.
+- Validacion ejecutada y OK:
+  - `npm.cmd run lint`
+  - `npm.cmd run build`
+  - `npm.cmd run test`
+- Resultado de pruebas frontend: `41 passed`.
+
+### Checkpoint Dashboard - KPI Clientes compacto
+
+- Se redujo el ancho visual del KPI de `Clientes` y se fijo su posicion en el layout.
+- Se mantuvo oculto cualquier desglose de islas con `0` clientes.
+- Se aumento la tipografia del total de clientes para que destaque mas.
+- La isla `Fuerteventura` queda identificada por la pastilla `FV` con color propio y contraste suficiente.
+- Se incorporo una pastilla de resumen inferior con una metrica derivada real del bloque de clientes.
+- Validacion ejecutada y OK:
+  - `npm.cmd run build`
+
 ### Estado funcional provisional
 
 - Fase read-only principal cerrada provisionalmente como bloque estable.

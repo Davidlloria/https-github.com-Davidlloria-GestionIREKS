@@ -1,41 +1,12 @@
+import { useMemo } from 'react'
+import { getCustomerAddressCatalogs, listCustomers } from '../api/customers'
+import { useAsyncResource } from '../features/useAsyncResource'
 import type { ViewKey } from '../components/SidebarNav'
+import type { CustomerAddressCatalogsPayload, CustomerListItem } from '../types/api'
 
 interface DashboardPageProps {
   onChangeView: (view: ViewKey) => void
 }
-
-const kpiCards = [
-  {
-    title: 'Ventas año actual',
-    value: 'Pendiente',
-    detail: 'Pendiente de datos reales',
-    tone: 'green',
-  },
-  {
-    title: 'Pedidos pendientes',
-    value: 'Pendiente',
-    detail: 'Pendiente de datos reales',
-    tone: 'orange',
-  },
-  {
-    title: 'Clientes',
-    value: '—',
-    detail: 'Pendiente de datos reales',
-    tone: 'blue',
-  },
-  {
-    title: 'Contactos',
-    value: '—',
-    detail: 'Pendiente de datos reales',
-    tone: 'purple',
-  },
-  {
-    title: 'Stock total',
-    value: 'Pendiente',
-    detail: 'Pendiente de datos reales',
-    tone: 'emerald',
-  },
-] as const
 
 const quickActions: Array<{ view: ViewKey; label: string; tone: string }> = [
   { view: 'customers', label: 'Clientes', tone: 'blue' },
@@ -48,6 +19,152 @@ const quickActions: Array<{ view: ViewKey; label: string; tone: string }> = [
   { view: 'courses', label: 'Cursos', tone: 'amber' },
   { view: 'settings', label: 'Configuración', tone: 'slate' },
 ]
+
+const DASHBOARD_CUSTOMERS_PAGE_SIZE = 250
+
+async function listAllCustomers() {
+  const firstPage = await listCustomers('', DASHBOARD_CUSTOMERS_PAGE_SIZE, 0)
+  const items = [...firstPage.items]
+  let offset = items.length
+
+  while (offset < firstPage.total) {
+    const page = await listCustomers('', DASHBOARD_CUSTOMERS_PAGE_SIZE, offset)
+    if (!page.items.length) {
+      break
+    }
+    items.push(...page.items)
+    offset += page.items.length
+    if (page.items.length < DASHBOARD_CUSTOMERS_PAGE_SIZE) {
+      break
+    }
+  }
+
+  return {
+    ...firstPage,
+    items,
+    limit: items.length,
+    offset: 0,
+  }
+}
+
+function normalizeKey(value: string | null | undefined) {
+  return value?.trim() ?? ''
+}
+
+function deriveIslandCode(label: string) {
+  const cleanLabel = label.trim()
+  if (!cleanLabel) {
+    return '--'
+  }
+
+  const normalized = cleanLabel.toLowerCase()
+  if (normalized.includes('fuerteventura')) {
+    return 'FV'
+  }
+  if (normalized.includes('gran canaria')) {
+    return 'GC'
+  }
+  if (normalized.includes('lanzarote')) {
+    return 'LZ'
+  }
+  if (normalized.includes('la palma')) {
+    return 'LP'
+  }
+  if (normalized.includes('la gomera')) {
+    return 'LG'
+  }
+  if (normalized.includes('tenerife')) {
+    return 'TF'
+  }
+
+  const words = cleanLabel.split(/[\s-]+/).filter(Boolean)
+  if (words.length === 1) {
+    return words[0].slice(0, 2).toUpperCase()
+  }
+
+  return words.map((word) => word[0]).join('').slice(0, 2).toUpperCase()
+}
+
+function normalizeIslandCode(code: string | null | undefined, label: string) {
+  const normalizedCode = (code ?? '').trim().toUpperCase()
+  const normalizedLabel = label.trim().toLowerCase()
+
+  if (normalizedLabel.includes('fuerteventura') || normalizedCode === 'FUERTEVENTURA') {
+    return 'FV'
+  }
+  if (normalizedLabel.includes('gran canaria') || normalizedCode === 'GRAN CANARIA') {
+    return 'GC'
+  }
+  if (normalizedLabel.includes('lanzarote') || normalizedCode === 'LANZAROTE') {
+    return 'LZ'
+  }
+  if (normalizedLabel.includes('la palma') || normalizedCode === 'LA PALMA') {
+    return 'LP'
+  }
+  if (normalizedLabel.includes('la gomera') || normalizedCode === 'LA GOMERA') {
+    return 'LG'
+  }
+  if (normalizedLabel.includes('tenerife') || normalizedCode === 'TENERIFE') {
+    return 'TF'
+  }
+
+  return normalizedCode || deriveIslandCode(label)
+}
+
+function islandBadgeStyle(code: string) {
+  switch (code) {
+    case 'FV':
+      return {
+        background: 'linear-gradient(180deg, #fb7185 0%, #e11d48 100%)',
+        color: '#ffffff',
+      }
+    case 'TF':
+      return {
+        background: 'linear-gradient(180deg, #4f84ff 0%, #316fee 100%)',
+        color: '#ffffff',
+      }
+    case 'GC':
+      return {
+        background: 'linear-gradient(180deg, #6ad180 0%, #3dc16a 100%)',
+        color: '#ffffff',
+      }
+    case 'LZ':
+      return {
+        background: 'linear-gradient(180deg, #ffb02c 0%, #f59e0b 100%)',
+        color: '#ffffff',
+      }
+    case 'LP':
+      return {
+        background: 'linear-gradient(180deg, #7d70ff 0%, #6366f1 100%)',
+        color: '#ffffff',
+      }
+    case 'LG':
+      return {
+        background: 'linear-gradient(180deg, #28c6d9 0%, #18b7cc 100%)',
+        color: '#ffffff',
+      }
+    default:
+      return {
+        background: 'linear-gradient(180deg, #94a3b8 0%, #64748b 100%)',
+        color: '#ffffff',
+      }
+  }
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat('es-ES').format(value)
+}
+
+function percentage(value: number, total: number) {
+  if (!total) {
+    return 0
+  }
+  return (value / total) * 100
+}
+
+function formatPercent(value: number) {
+  return `${value.toFixed(1).replace('.', ',')}%`
+}
 
 function DashboardIcon({ tone }: { tone: string }) {
   const common = {
@@ -137,12 +254,154 @@ function DashboardIcon({ tone }: { tone: string }) {
   }
 }
 
+function DashboardClientsIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M16.5 11a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Z" />
+      <path d="M8 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" />
+      <path d="M3 20v-1.5A4.5 4.5 0 0 1 7.5 14h1A4.5 4.5 0 0 1 13 18.5V20" />
+      <path d="M12.5 20v-1.1A4.2 4.2 0 0 1 16.7 14h.6a4.7 4.7 0 0 1 4.7 4.7V20" />
+    </svg>
+  )
+}
+
 function EmptyState({ title, description }: { title: string; description: string }) {
   return (
     <div className="dashboard-empty-state">
       <strong>{title}</strong>
       <p>{description}</p>
     </div>
+  )
+}
+
+function DashboardClientKpi() {
+  const customersQuery = useAsyncResource(
+    () => listAllCustomers(),
+    { items: [], total: 0, limit: DASHBOARD_CUSTOMERS_PAGE_SIZE, offset: 0 },
+    [],
+  )
+  const catalogsQuery = useAsyncResource(
+    () => getCustomerAddressCatalogs(),
+    { provincias: [], islas: [], municipios: [], codigos_postales: [], localidades: [] } as CustomerAddressCatalogsPayload,
+    [],
+  )
+
+  const summary = useMemo(() => {
+    const customers = customersQuery.data.items
+    const countsByIslandId = new Map<string, number>()
+
+    customers.forEach((customer: CustomerListItem) => {
+      const islandId = normalizeKey(customer.cliente_direccion_isla_id)
+      if (!islandId) {
+        return
+      }
+      countsByIslandId.set(islandId, (countsByIslandId.get(islandId) || 0) + 1)
+    })
+
+    const islands = catalogsQuery.data.islas
+      .map((island) => {
+        const count = countsByIslandId.get(island.id) || 0
+        const code = normalizeIslandCode(island.code, island.label)
+        return {
+          id: island.id,
+          code,
+          label: island.label,
+          count,
+        }
+      })
+      .filter((island) => island.count > 0)
+      .sort((left, right) => {
+        if (right.count !== left.count) {
+          return right.count - left.count
+        }
+        return left.code.localeCompare(right.code, 'es', { sensitivity: 'base', numeric: true })
+      })
+
+    const total = customers.length
+    const islandsWithCustomers = islands.filter((island) => island.count > 0).length
+    const loading = customersQuery.loading || catalogsQuery.loading
+    const error = customersQuery.error || catalogsQuery.error
+
+    return { total, islands, islandsWithCustomers, loading, error }
+  }, [catalogsQuery.data.islas, catalogsQuery.error, catalogsQuery.loading, customersQuery.data.items, customersQuery.error, customersQuery.loading])
+
+  const hasData = !summary.loading && !summary.error
+  const activeIslands = summary.islandsWithCustomers
+  const totalIslands = catalogsQuery.data.islas.length
+  const islandCoverage = totalIslands ? (activeIslands / totalIslands) * 100 : 0
+
+  return (
+    <article className="dashboard-panel dashboard-client-panel">
+      <div className="dashboard-client-panel-top">
+        <div className="dashboard-client-icon">
+          <DashboardClientsIcon />
+        </div>
+        <div className="dashboard-client-heading">
+          <h2>Clientes</h2>
+          <p>Clientes y contactos combinados</p>
+        </div>
+        <div className="dashboard-client-mini-icon" aria-hidden="true">
+          <DashboardClientsIcon />
+        </div>
+      </div>
+
+      <div className="dashboard-client-panel-body">
+        <div className="dashboard-client-panel-main">
+          <strong>{hasData ? formatNumber(summary.total) : 'Pendiente'}</strong>
+          <span>Clientes totales</span>
+
+          <div className="dashboard-client-summary-pill" aria-label="Resumen de islas activas">
+            <span className="dashboard-client-summary-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19V5" />
+                <path d="M4 19h16" />
+                <path d="M7 15l4-4 3 3 5-5" />
+              </svg>
+            </span>
+            <span className="dashboard-client-summary-copy">
+              <strong>{formatPercent(islandCoverage)}</strong>
+              <span>{activeIslands} de {totalIslands || 0} islas con clientes</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="dashboard-client-divider" aria-hidden="true" />
+
+        <div className="dashboard-client-panel-right">
+          <div className="dashboard-client-panel-right-title">
+            <span className="dashboard-client-location-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 21s6-5.5 6-11a6 6 0 0 0-12 0c0 5.5 6 11 6 11z" />
+                <circle cx="12" cy="10" r="2.2" />
+              </svg>
+            </span>
+            <strong>Por isla</strong>
+          </div>
+
+          <div className="dashboard-client-islands">
+            {hasData &&
+              summary.islands.map((island) => (
+                <div key={island.id} className="dashboard-client-island-row">
+                  <span className={`dashboard-client-island-code dashboard-client-island-code-${island.code}`} style={islandBadgeStyle(island.code)}>{island.code}</span>
+                  <span className="dashboard-client-island-label">{island.label}</span>
+                  <span className="dashboard-client-island-count">
+                    {formatNumber(island.count)} <small>({formatPercent(percentage(island.count, summary.total))})</small>
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      </div>
+
+    </article>
   )
 }
 
@@ -171,20 +430,7 @@ export function DashboardPage({ onChangeView }: DashboardPageProps) {
         </button>
       </header>
 
-      <section className="dashboard-kpi-grid" aria-label="Indicadores principales">
-        {kpiCards.map((card) => (
-          <article key={card.title} className={`dashboard-kpi-card tone-${card.tone}`}>
-            <div className="dashboard-kpi-icon">
-              <DashboardIcon tone={card.tone} />
-            </div>
-            <div className="dashboard-kpi-copy">
-              <h2>{card.title}</h2>
-              <strong>{card.value}</strong>
-              <p>{card.detail}</p>
-            </div>
-          </article>
-        ))}
-      </section>
+      <DashboardClientKpi />
 
       <section className="dashboard-main-grid">
         <article className="dashboard-panel dashboard-chart-panel">
@@ -194,20 +440,14 @@ export function DashboardPage({ onChangeView }: DashboardPageProps) {
               Mensual
             </button>
           </div>
-          <EmptyState
-            title="Ventas pendientes de conexión"
-            description="Se mostrará al conectar los datos reales."
-          />
+          <EmptyState title="Ventas pendientes de conexión" description="Se mostrará al conectar los datos reales." />
         </article>
 
         <article className="dashboard-panel dashboard-table-panel">
           <div className="dashboard-panel-head">
             <h3>Pedidos pendientes</h3>
           </div>
-          <EmptyState
-            title="Sin datos reales conectados"
-            description="Pendiente de conexión a pedidos."
-          />
+          <EmptyState title="Sin datos reales conectados" description="Pendiente de conexión a pedidos." />
           <a href="#" className="dashboard-panel-link" onClick={(event) => event.preventDefault()}>
             Ver todos los pedidos pendientes
           </a>
@@ -217,10 +457,7 @@ export function DashboardPage({ onChangeView }: DashboardPageProps) {
           <div className="dashboard-panel-head">
             <h3>Stock bajo mínimo</h3>
           </div>
-          <EmptyState
-            title="Sin datos reales conectados"
-            description="Pendiente de conexión a inventario."
-          />
+          <EmptyState title="Sin datos reales conectados" description="Pendiente de conexión a inventario." />
           <a href="#" className="dashboard-panel-link" onClick={(event) => event.preventDefault()}>
             Ver inventario completo
           </a>
@@ -232,10 +469,7 @@ export function DashboardPage({ onChangeView }: DashboardPageProps) {
           <div className="dashboard-panel-head">
             <h3>Clientes recientes</h3>
           </div>
-          <EmptyState
-            title="Pendiente de conectar clientes reales"
-            description="Cuando se active la fuente de datos se mostrará el historial real."
-          />
+          <EmptyState title="Pendiente de conectar clientes reales" description="Cuando se active la fuente de datos se mostrará el historial real." />
           <a href="#" className="dashboard-panel-link" onClick={(event) => event.preventDefault()}>
             Ver todos los clientes
           </a>
@@ -245,10 +479,7 @@ export function DashboardPage({ onChangeView }: DashboardPageProps) {
           <div className="dashboard-panel-head">
             <h3>Contactos recientes</h3>
           </div>
-          <EmptyState
-            title="Pendiente de conectar contactos reales"
-            description="Cuando se active la fuente de datos se mostrará el historial real."
-          />
+          <EmptyState title="Pendiente de conectar contactos reales" description="Cuando se active la fuente de datos se mostrará el historial real." />
           <a href="#" className="dashboard-panel-link" onClick={(event) => event.preventDefault()}>
             Ver todos los contactos
           </a>
@@ -258,10 +489,7 @@ export function DashboardPage({ onChangeView }: DashboardPageProps) {
           <div className="dashboard-panel-head">
             <h3>Últimos pedidos</h3>
           </div>
-          <EmptyState
-            title="Pendiente de conectar pedidos reales"
-            description="Cuando se active la fuente de datos se mostrará el historial real."
-          />
+          <EmptyState title="Pendiente de conectar pedidos reales" description="Cuando se active la fuente de datos se mostrará el historial real." />
           <a href="#" className="dashboard-panel-link" onClick={(event) => event.preventDefault()}>
             Ver todos los pedidos
           </a>
