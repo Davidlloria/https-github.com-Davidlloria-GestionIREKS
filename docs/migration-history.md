@@ -99,6 +99,16 @@ Revision local: 2026-06-14.
 - Validacion ejecutada y OK:
   - `npm.cmd run build`
 
+### Checkpoint Productos IREKS - tabla compacta
+
+- Se cambio la cabecera de la lista de productos IREKS a tonos azules.
+- Se elimino la barra de desplazamiento horizontal de la tabla.
+- Se redujo el ancho de las columnas para que entren dentro del panel sin overflow horizontal.
+- La columna `Sel.` ahora muestra una casilla para seleccionar o deseleccionar el producto.
+- Las columnas `Ref.`, `Nombre` y `Sel.` son ordenables desde la cabecera.
+- Validacion ejecutada y OK:
+  - `npm.cmd run build`
+
 ### Estado funcional provisional
 
 - Fase read-only principal cerrada provisionalmente como bloque estable.

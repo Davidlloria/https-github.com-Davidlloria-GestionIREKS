@@ -7,6 +7,7 @@ import type { IngredientIreksListPayload, IngredientIreksRead } from '../types/a
 const PAGE_SIZE = 100
 
 type IreksTab = 'Datos' | 'Tarifa' | 'Entradas' | 'Salidas' | 'Stock' | 'Mensual' | 'Pedidos' | 'Nutrición' | 'Clientes'
+type IreksSortKey = 'ref' | 'name' | 'sel'
 
 interface LoadedIreksData {
   items: IngredientIreksRead[]
@@ -130,19 +131,76 @@ export function IreksProductsPage() {
   const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null)
   const [refreshTick, setRefreshTick] = useState(0)
   const [activeTab, setActiveTab] = useState<IreksTab>('Datos')
+  const [sortKey, setSortKey] = useState<IreksSortKey>('ref')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
   const query = useAsyncResource<LoadedIreksData>(() => loadAllIreksIngredients(search), EMPTY_DATA, [search, refreshTick])
   const rows = query.data.items
 
+  const sortedRows = useMemo(() => {
+    const sorted = [...rows]
+
+    sorted.sort((left, right) => {
+      let comparison = 0
+
+      if (sortKey === 'ref') {
+        comparison = (left.articulo_referencia_corta || left.articulo_referencia || left.articulo_id).localeCompare(
+          right.articulo_referencia_corta || right.articulo_referencia || right.articulo_id,
+          'es',
+          { sensitivity: 'base', numeric: true },
+        )
+      } else if (sortKey === 'name') {
+        comparison = (left.articulo_descripcion || '').localeCompare(right.articulo_descripcion || '', 'es', {
+          sensitivity: 'base',
+          numeric: true,
+        })
+      } else {
+        const leftSelected = selectedCandidateId !== null && left.id === selectedCandidateId
+        const rightSelected = selectedCandidateId !== null && right.id === selectedCandidateId
+        comparison = Number(leftSelected) - Number(rightSelected)
+      }
+
+      if (comparison === 0) {
+        comparison =
+          (left.articulo_referencia_corta || left.articulo_referencia || left.articulo_id).localeCompare(
+            right.articulo_referencia_corta || right.articulo_referencia || right.articulo_id,
+            'es',
+            { sensitivity: 'base', numeric: true },
+          )
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+
+    return sorted
+  }, [rows, selectedCandidateId, sortDirection, sortKey])
+
   const selectedRowId = useMemo(() => {
-    if (!rows.length) {
+    if (!sortedRows.length) {
       return null
     }
-    if (selectedCandidateId !== null && rows.some((row) => row.id === selectedCandidateId)) {
+    if (selectedCandidateId !== null && sortedRows.some((row) => row.id === selectedCandidateId)) {
       return selectedCandidateId
     }
-    return rows[0].id ?? null
-  }, [rows, selectedCandidateId])
+    return sortedRows[0].id ?? null
+  }, [selectedCandidateId, sortedRows])
+
+  const sortAriaValue = (key: IreksSortKey) => {
+    if (sortKey !== key) {
+      return 'none'
+    }
+    return sortDirection === 'asc' ? 'ascending' : 'descending'
+  }
+
+  const updateSort = (nextKey: IreksSortKey) => {
+    if (sortKey === nextKey) {
+      setSortDirection((currentDirection) => (currentDirection === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+
+    setSortKey(nextKey)
+    setSortDirection('asc')
+  }
 
   const detailQuery = useAsyncResource(
     () => {
@@ -245,15 +303,31 @@ export function IreksProductsPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Ref.</th>
-                      <th>Nombre</th>
-                      <th>Sel.</th>
+                      <th aria-sort={sortAriaValue('ref')}>
+                        <button type="button" className="ireks-sort-button" onClick={() => updateSort('ref')}>
+                          <span>Ref.</span>
+                          {sortKey === 'ref' && <span className="ireks-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                        </button>
+                      </th>
+                      <th aria-sort={sortAriaValue('name')}>
+                        <button type="button" className="ireks-sort-button" onClick={() => updateSort('name')}>
+                          <span>Nombre</span>
+                          {sortKey === 'name' && <span className="ireks-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                        </button>
+                      </th>
+                      <th aria-sort={sortAriaValue('sel')}>
+                        <button type="button" className="ireks-sort-button ireks-sort-button-center" onClick={() => updateSort('sel')}>
+                          <span>Sel.</span>
+                          {sortKey === 'sel' && <span className="ireks-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                        </button>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row, index) => {
+                    {sortedRows.map((row, index) => {
                       const rowId = row.id ?? null
                       const isSelected = rowId !== null && rowId === selectedRowId
+                      const isChecked = rowId !== null && rowId === selectedCandidateId
                       return (
                         <tr
                           key={rowId ?? row.articulo_id ?? index}
@@ -266,7 +340,20 @@ export function IreksProductsPage() {
                         >
                           <td>{row.articulo_referencia_corta || row.articulo_referencia || row.articulo_id}</td>
                           <td>{row.articulo_descripcion || '-'}</td>
-                          <td>{row.articulo_status_en_lista ? 'Si' : 'No'}</td>
+                          <td className="ireks-products-sel-cell">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              aria-label={`Seleccionar ${row.articulo_descripcion || row.articulo_referencia || row.articulo_id}`}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={() => {
+                                if (rowId === null) {
+                                  return
+                                }
+                                setSelectedCandidateId((currentId) => (currentId === rowId ? null : rowId))
+                              }}
+                            />
+                          </td>
                         </tr>
                       )
                     })}
