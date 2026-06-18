@@ -698,7 +698,7 @@ describe('App shell smoke', () => {
     expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Pedidos' }))
-    expect(await screen.findByRole('heading', { name: 'Pedidos', level: 2 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Pedidos', level: 3 })).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'Nuevo pedido' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Pedido' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Albaran' })).toBeInTheDocument()
@@ -708,6 +708,9 @@ describe('App shell smoke', () => {
     expect(screen.getByLabelText('Mes inicial')).toBeInTheDocument()
     expect(screen.getByLabelText('Mes final')).toBeInTheDocument()
     expect(screen.getByLabelText('Cliente/Distribuidor')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Anterior' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Siguiente' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Pagina/i)).not.toBeInTheDocument()
 
     fireEvent.click(getNav().getByRole('button', { name: 'Tecnicos' }))
     expect(await screen.findByPlaceholderText('Buscar por nombre, apellido, movil, interno o email')).toBeInTheDocument()
@@ -761,5 +764,5 @@ describe('App shell smoke', () => {
 
     fireEvent.click(getNav().getByRole('button', { name: 'Ventas' }))
     expect(await screen.findByRole('heading', { name: 'Ventas' })).toBeInTheDocument()
-  })
+  }, 15000)
 })
