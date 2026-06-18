@@ -1625,6 +1625,15 @@ button {
   text-align: center;
 }
 
+.ireks-products-page .ireks-products-list-scroll .table-wrap tbody tr {
+  cursor: pointer;
+}
+
+.ireks-products-page .ireks-products-list-scroll .table-wrap thead th,
+.ireks-products-page .ireks-products-list-scroll .table-wrap tbody td {
+  cursor: default;
+}
+
 .ireks-products-page .ireks-sort-button {
   display: inline-flex;
   align-items: center;
@@ -1659,6 +1668,11 @@ button {
   height: 16px;
   accent-color: #2563eb;
   cursor: pointer;
+}
+
+.ireks-products-page .row-selected .ireks-products-sel-cell input[type='checkbox'] {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+  border-radius: 4px;
 }
 
 .ireks-products-page .ireks-products-right-stack {
@@ -1715,10 +1729,38 @@ button {
 
 .ireks-products-page .ireks-products-detail-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(120px, 0.75fr) minmax(120px, 0.75fr) minmax(0, 1.5fr);
   gap: 10px 12px;
   min-width: 0;
   min-height: 0;
+}
+
+.ireks-products-page .ireks-field {
+  min-width: 0;
+}
+
+.ireks-products-page .ireks-field .input {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ireks-products-page .ireks-field--compact {
+  max-width: 220px;
+}
+
+.ireks-products-page .ireks-field--ref,
+.ireks-products-page .ireks-field--ref-corta {
+  max-width: 120px;
+}
+
+.ireks-products-page .ireks-field--distributor-reference {
+  max-width: 220px;
+}
+
+.ireks-products-page .ireks-field--description {
+  max-width: none;
 }
 
 .ireks-products-page .ireks-products-status-row {

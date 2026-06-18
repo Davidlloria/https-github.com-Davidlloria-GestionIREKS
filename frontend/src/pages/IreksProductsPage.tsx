@@ -56,16 +56,18 @@ function ReadonlyField({
   label,
   value,
   kind = 'text',
+  className = '',
 }: {
   label: string
   value: string | number | boolean | null | undefined
   kind?: 'text' | 'number'
+  className?: string
 }) {
   const displayValue =
     kind === 'number' ? formatNumber(typeof value === 'number' ? value : Number(value)) : formatText(value)
 
   return (
-    <label className="ireks-field">
+    <label className={`ireks-field ${className}`.trim()}>
       <span>{label}</span>
       <input className="input" value={displayValue} readOnly />
     </label>
@@ -129,6 +131,7 @@ async function loadAllIreksIngredients(search: string): Promise<LoadedIreksData>
 export function IreksProductsPage() {
   const [search, setSearch] = useState('')
   const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null)
+  const [checkedCandidateId, setCheckedCandidateId] = useState<number | null>(null)
   const [refreshTick, setRefreshTick] = useState(0)
   const [activeTab, setActiveTab] = useState<IreksTab>('Datos')
   const [sortKey, setSortKey] = useState<IreksSortKey>('ref')
@@ -155,8 +158,8 @@ export function IreksProductsPage() {
           numeric: true,
         })
       } else {
-        const leftSelected = selectedCandidateId !== null && left.id === selectedCandidateId
-        const rightSelected = selectedCandidateId !== null && right.id === selectedCandidateId
+        const leftSelected = checkedCandidateId !== null && left.id === checkedCandidateId
+        const rightSelected = checkedCandidateId !== null && right.id === checkedCandidateId
         comparison = Number(leftSelected) - Number(rightSelected)
       }
 
@@ -173,7 +176,7 @@ export function IreksProductsPage() {
     })
 
     return sorted
-  }, [rows, selectedCandidateId, sortDirection, sortKey])
+  }, [rows, checkedCandidateId, sortDirection, sortKey])
 
   const selectedRowId = useMemo(() => {
     if (!sortedRows.length) {
@@ -327,7 +330,7 @@ export function IreksProductsPage() {
                     {sortedRows.map((row, index) => {
                       const rowId = row.id ?? null
                       const isSelected = rowId !== null && rowId === selectedRowId
-                      const isChecked = rowId !== null && rowId === selectedCandidateId
+                      const isChecked = rowId !== null && rowId === checkedCandidateId
                       return (
                         <tr
                           key={rowId ?? row.articulo_id ?? index}
@@ -350,7 +353,7 @@ export function IreksProductsPage() {
                                 if (rowId === null) {
                                   return
                                 }
-                                setSelectedCandidateId((currentId) => (currentId === rowId ? null : rowId))
+                                setCheckedCandidateId((currentId) => (currentId === rowId ? null : rowId))
                               }}
                             />
                           </td>
@@ -400,11 +403,27 @@ export function IreksProductsPage() {
 
               {!!detailQuery.data && (
                 <div className="ireks-products-detail-grid">
-                  <ReadonlyField label="Ref." value={detailQuery.data.articulo_referencia || detailQuery.data.articulo_id} />
-                  <ReadonlyField label="Ref. corta" value={detailQuery.data.articulo_referencia_corta} />
-                  <ReadonlyField label="Descripción" value={detailQuery.data.articulo_descripcion} />
+                  <ReadonlyField
+                    label="Ref."
+                    value={detailQuery.data.articulo_referencia || detailQuery.data.articulo_id}
+                    className="ireks-field--compact ireks-field--ref"
+                  />
+                  <ReadonlyField
+                    label="Ref. corta"
+                    value={detailQuery.data.articulo_referencia_corta}
+                    className="ireks-field--compact ireks-field--ref-corta"
+                  />
+                  <ReadonlyField
+                    label="Descripción"
+                    value={detailQuery.data.articulo_descripcion}
+                    className="ireks-field--description"
+                  />
                   <ReadonlyField label="Distribuidor" value={formatCatalog(detailQuery.data.distribuidor_id, distribuidorLookup)} />
-                  <ReadonlyField label="Referencia" value={detailQuery.data.articulo_referencia || detailQuery.data.articulo_id} />
+                  <ReadonlyField
+                    label="Referencia"
+                    value={detailQuery.data.articulo_referencia || detailQuery.data.articulo_id}
+                    className="ireks-field--compact ireks-field--distributor-reference"
+                  />
                   <ReadonlyField label="Descripción comercial" value={detailQuery.data.articulo_descripcion} />
                   <div className="ireks-products-status-row">
                     <span className="surface-chip">{detailQuery.data.articulo_status_activo ? 'Status activo' : 'Status inactivo'}</span>
