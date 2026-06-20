@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   createCustomer,
   deleteCustomer,
@@ -17,7 +17,7 @@ const PAGE_SIZE = 25
 
 type CustomerTab = 'contacts' | 'sales' | 'recipes' | 'agenda'
 type CustomerSortKey = 'code' | 'name' | 'island'
-type CustomerEditorMode = 'create' | 'edit' | null
+type CustomerEditorMode = 'create' | null
 
 interface CustomerDraft {
   cliente_codigo: string
@@ -232,9 +232,12 @@ export function CustomersPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [editorMode, setEditorMode] = useState<CustomerEditorMode>(null)
   const [draft, setDraft] = useState<CustomerDraft>(emptyCustomerDraft())
+  const [syncedDraft, setSyncedDraft] = useState<CustomerDraft>(emptyCustomerDraft())
   const [refreshTick, setRefreshTick] = useState(0)
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
+  const autosaveTimerRef = useRef<number | null>(null)
+  const invalidSignatureRef = useRef('')
 
   const catalogsQuery = useAsyncResource(
     () => getCustomerAddressCatalogs(),
@@ -249,14 +252,11 @@ export function CustomersPage() {
   const customerRows = customersQuery.data.items
   const customerCatalogs = catalogsQuery.data
 
-  const provinceNameById = useMemo(() => buildAddressLookup(customerCatalogs.provincias), [customerCatalogs.provincias])
   const islandNameById = useMemo(() => buildAddressLookup(customerCatalogs.islas), [customerCatalogs.islas])
   const islandInitialsById = useMemo(
     () => new Map(customerCatalogs.islas.map((option) => [option.id, option.code || option.label])),
     [customerCatalogs.islas],
   )
-  const municipalityNameById = useMemo(() => buildAddressLookup(customerCatalogs.municipios), [customerCatalogs.municipios])
-  const localityNameById = useMemo(() => buildAddressLookup(customerCatalogs.localidades), [customerCatalogs.localidades])
 
   const visibleCustomerRows = useMemo(() => {
     if (!islandFilter) {
@@ -319,12 +319,11 @@ export function CustomersPage() {
 
   const sortAriaValue = sortDirection === 'asc' ? 'ascending' : 'descending'
   const selectedDetail = detailQuery.data
-  const hasEditor = editorMode !== null
-  const firstCustomerId = sortedCustomerRows[0]?.cliente_id || ''
-  const selectedAddressProvinceId = hasEditor ? draft.cliente_direccion_provincia_id : selectedDetail?.cliente_direccion_provincia_id || ''
-  const selectedAddressIslandId = hasEditor ? draft.cliente_direccion_isla_id : selectedDetail?.cliente_direccion_isla_id || ''
-  const selectedAddressMunicipalityId = hasEditor ? draft.cliente_direccion_municipio_id : selectedDetail?.cliente_direccion_municipio_id || ''
-  const selectedAddressLocalityId = hasEditor ? draft.cliente_direccion_localidad_id : selectedDetail?.cliente_direccion_localidad_id || ''
+  const isCreating = editorMode === 'create'
+  const selectedAddressProvinceId = draft.cliente_direccion_provincia_id
+  const selectedAddressIslandId = draft.cliente_direccion_isla_id
+  const selectedAddressMunicipalityId = draft.cliente_direccion_municipio_id
+  const selectedAddressLocalityId = draft.cliente_direccion_localidad_id
 
   const filteredIslands = useMemo(
     () => filterAddressOptions(customerCatalogs.islas, selectedAddressProvinceId),
@@ -343,6 +342,74 @@ export function CustomersPage() {
     [customerCatalogs.codigos_postales, selectedAddressMunicipalityId],
   )
 
+  useEffect(() => {
+    if (isCreating || !selectedDetail) {
+      return
+    }
+
+    const nextDraft = draftFromDetail(selectedDetail)
+    setDraft(nextDraft)
+    setSyncedDraft(nextDraft)
+    setFormError('')
+    invalidSignatureRef.current = ''
+  }, [isCreating, selectedDetail, selectedCustomerId])
+
+  useEffect(() => {
+    if (isCreating || !selectedDetail || !selectedCustomerId) {
+      return
+    }
+
+    if (autosaveTimerRef.current !== null) {
+      window.clearTimeout(autosaveTimerRef.current)
+      autosaveTimerRef.current = null
+    }
+
+    const nextPayload = draftToPayload(draft)
+    const baselinePayload = draftToPayload(syncedDraft)
+    const nextSignature = JSON.stringify(nextPayload)
+    const baselineSignature = JSON.stringify(baselinePayload)
+
+    if (nextSignature === baselineSignature) {
+      invalidSignatureRef.current = ''
+      setFormError('')
+      return
+    }
+
+    if (!nextPayload.cliente_nombre_comercial) {
+      if (invalidSignatureRef.current !== nextSignature) {
+        invalidSignatureRef.current = nextSignature
+        setFormError('El nombre comercial es obligatorio.')
+      }
+      return
+    }
+
+    invalidSignatureRef.current = ''
+    autosaveTimerRef.current = window.setTimeout(() => {
+      setSaving(true)
+      setFormError('')
+      updateCustomer(selectedCustomerId, nextPayload)
+        .then((saved) => {
+          const nextDraft = draftFromDetail(saved)
+          setDraft(nextDraft)
+          setSyncedDraft(nextDraft)
+          setRefreshTick((current) => current + 1)
+        })
+        .catch((error) => {
+          setFormError(getErrorMessage(error))
+        })
+        .finally(() => {
+          setSaving(false)
+        })
+    }, 650)
+
+    return () => {
+      if (autosaveTimerRef.current !== null) {
+        window.clearTimeout(autosaveTimerRef.current)
+        autosaveTimerRef.current = null
+      }
+    }
+  }, [draft, isCreating, selectedDetail, selectedCustomerId, syncedDraft])
+
   const setDraftField = <K extends keyof CustomerDraft>(key: K, value: CustomerDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }))
   }
@@ -350,27 +417,20 @@ export function CustomersPage() {
   const openCreateForm = () => {
     setEditorMode('create')
     setFormError('')
-    setDraft(emptyCustomerDraft())
+    const nextDraft = emptyCustomerDraft()
+    setDraft(nextDraft)
+    setSyncedDraft(nextDraft)
     setSelectedCandidateId('')
-  }
-
-  const openEditForm = () => {
-    if (!selectedDetail) {
-      return
-    }
-    setEditorMode('edit')
-    setFormError('')
-    setDraft(draftFromDetail(selectedDetail))
   }
 
   const closeEditor = () => {
     setEditorMode(null)
     setFormError('')
     setSaving(false)
-    setDraft(emptyCustomerDraft())
-    if (!selectedCandidateId && firstCustomerId) {
-      setSelectedCandidateId(firstCustomerId)
-    }
+    invalidSignatureRef.current = ''
+    const nextDraft = selectedDetail ? draftFromDetail(selectedDetail) : emptyCustomerDraft()
+    setDraft(nextDraft)
+    setSyncedDraft(nextDraft)
   }
 
   const refreshData = () => {
@@ -391,7 +451,9 @@ export function CustomersPage() {
     try {
       await deleteCustomer(selectedCustomerId)
       setEditorMode(null)
-      setDraft(emptyCustomerDraft())
+      const nextDraft = emptyCustomerDraft()
+      setDraft(nextDraft)
+      setSyncedDraft(nextDraft)
       setSelectedCandidateId('')
       setRefreshTick((current) => current + 1)
     } catch (error) {
@@ -413,12 +475,11 @@ export function CustomersPage() {
     setSaving(true)
     setFormError('')
     try {
-      const saved =
-        editorMode === 'create'
-          ? await createCustomer(payload)
-          : await updateCustomer(selectedCustomerId, payload)
+      const saved = await createCustomer(payload)
       setEditorMode(null)
-      setDraft(emptyCustomerDraft())
+      const nextDraft = draftFromDetail(saved)
+      setDraft(nextDraft)
+      setSyncedDraft(nextDraft)
       setSelectedCandidateId(saved.cliente_id)
       setRefreshTick((current) => current + 1)
     } catch (error) {
@@ -427,10 +488,6 @@ export function CustomersPage() {
       setSaving(false)
     }
   }
-
-  const canEdit = Boolean(selectedDetail) && !hasEditor
-  const canDelete = Boolean(selectedCustomerId) && !hasEditor
-  const canCreate = !hasEditor
 
   return (
     <section className="customers-saas-page">
@@ -561,11 +618,11 @@ export function CustomersPage() {
                         type="button"
                         className={`customers-list-row ${isSelected ? 'is-selected' : ''}`}
                         onClick={() => {
-                          if (!hasEditor) {
+                          if (!isCreating) {
                             setSelectedCandidateId(customer.cliente_id)
                           }
                         }}
-                        disabled={hasEditor}
+                        disabled={isCreating}
                       >
                         <span className="customers-list-cell">{customer.cliente_codigo}</span>
                         <span className="customers-list-cell customers-list-cell-name">{customerLabel(customer)}</span>
@@ -583,19 +640,16 @@ export function CustomersPage() {
 
         <section className="customers-detail-panel">
           <div className="customers-detail-actions">
-            <button type="button" className="customers-action-btn customers-action-btn-primary" disabled={!canCreate} onClick={openCreateForm}>
+            <button type="button" className="customers-action-btn customers-action-btn-primary" disabled={isCreating} onClick={openCreateForm}>
               + Nuevo
             </button>
-            <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={!canEdit} onClick={openEditForm}>
-              Editar
-            </button>
-            <button type="button" className="customers-action-btn customers-action-btn-danger" disabled={!canDelete} onClick={handleDelete}>
+            <button type="button" className="customers-action-btn customers-action-btn-danger" disabled={isCreating || !selectedCustomerId} onClick={handleDelete}>
               Eliminar
             </button>
             <button type="button" className="customers-action-btn customers-action-btn-ghost" disabled={saving} onClick={refreshData}>
               Refrescar
             </button>
-            {hasEditor && (
+            {isCreating && (
               <button type="button" className="customers-action-btn customers-action-btn-ghost" onClick={closeEditor}>
                 Cancelar
               </button>
@@ -607,11 +661,13 @@ export function CustomersPage() {
               <section className="customers-detail-card">
                 <div className="customers-section-head">
                   <div>
-                    <h3>{hasEditor ? (editorMode === 'create' ? 'Nuevo cliente' : 'Editar cliente') : 'Detalle de cliente'}</h3>
-                    <p>{hasEditor ? 'Formulario de edicion con persistencia real.' : 'Ficha de consulta con acciones CRUD.'}</p>
+                    <h3>{isCreating ? 'Nuevo cliente' : 'Detalle de cliente'}</h3>
+                    <p>{isCreating ? 'Formulario de alta con persistencia real.' : 'Edicion automática sobre el registro seleccionado.'}</p>
                   </div>
-                  {!!selectedDetail && !hasEditor && <span className="surface-chip">{statusLabel(selectedDetail.activo)}</span>}
-                  {!!hasEditor && <span className="surface-chip">Edicion activa</span>}
+                  {!!selectedDetail && !isCreating && (
+                    <span className="surface-chip">{saving ? 'Guardando...' : statusLabel(selectedDetail.activo)}</span>
+                  )}
+                  {isCreating && <span className="surface-chip">Alta activa</span>}
                 </div>
 
                 {formError && (
@@ -620,7 +676,7 @@ export function CustomersPage() {
                   </div>
                 )}
 
-                {hasEditor ? (
+                {isCreating ? (
                   <form className="customers-field-grid" onSubmit={handleSubmit}>
                     <div className="customers-field-row customers-field-row-top">
                       <label className="customers-field-code">
@@ -880,26 +936,50 @@ export function CustomersPage() {
                             <div className="customers-field-row customers-field-row-top">
                               <label className="customers-field-code">
                                 <span>Cod.</span>
-                                <input className="input customers-field" readOnly value={valueOrDash(selectedDetail.cliente_codigo)} />
+                                <input className="input customers-field" readOnly value={draft.cliente_codigo || 'Auto'} />
                               </label>
                               <label className="customers-field-commercial">
                                 <span>Nombre comercial</span>
-                                <input className="input customers-field" readOnly value={valueOrDash(selectedDetail.cliente_nombre_comercial)} />
+                                <input
+                                  className="input customers-field"
+                                  value={draft.cliente_nombre_comercial}
+                                  onChange={(event) => setDraftField('cliente_nombre_comercial', event.target.value)}
+                                  placeholder="Nombre comercial"
+                                  autoComplete="organization"
+                                />
                               </label>
                               <label className="customers-field-tax">
                                 <span>C.I.F.</span>
-                                <input className="input customers-field" readOnly value={valueOrDash(selectedDetail.cliente_cif)} />
+                                <input
+                                  className="input customers-field"
+                                  value={draft.cliente_cif}
+                                  onChange={(event) => setDraftField('cliente_cif', event.target.value)}
+                                  placeholder="CIF"
+                                  autoComplete="off"
+                                />
                               </label>
                             </div>
 
                             <div className="customers-field-row customers-field-row-mid">
                               <label className="customers-field-phone">
                                 <span>Telefono</span>
-                                <input className="input customers-field" readOnly value={valueOrDash(selectedDetail.cliente_telefono)} />
+                                <input
+                                  className="input customers-field"
+                                  value={draft.cliente_telefono}
+                                  onChange={(event) => setDraftField('cliente_telefono', event.target.value)}
+                                  placeholder="Telefono"
+                                  autoComplete="tel"
+                                />
                               </label>
                               <label className="customers-field-fiscal">
                                 <span>Nombre fiscal</span>
-                                <input className="input customers-field" readOnly value={valueOrDash(selectedDetail.cliente_nombre_fiscal)} />
+                                <input
+                                  className="input customers-field"
+                                  value={draft.cliente_nombre_fiscal}
+                                  onChange={(event) => setDraftField('cliente_nombre_fiscal', event.target.value)}
+                                  placeholder="Nombre fiscal"
+                                  autoComplete="organization"
+                                />
                               </label>
                             </div>
 
@@ -908,51 +988,192 @@ export function CustomersPage() {
                             <div className="customers-field-row customers-field-row-location">
                               <label>
                                 <span>Provincia</span>
-                                <input
-                                  className="input customers-field"
-                                  readOnly
-                                  value={resolveAddressLabel(selectedDetail.cliente_direccion_provincia_id, provinceNameById)}
-                                />
+                                <select
+                                  className="select customers-field"
+                                  value={selectedAddressProvinceId}
+                                  onChange={(event) => {
+                                    const provinceId = event.target.value
+                                    setDraft((current) => ({
+                                      ...current,
+                                      cliente_direccion_provincia_id: provinceId,
+                                      cliente_direccion_isla_id: '',
+                                      cliente_direccion_municipio_id: '',
+                                      cliente_direccion_localidad_id: '',
+                                    }))
+                                  }}
+                                >
+                                  <option value="">Selecciona provincia</option>
+                                  {customerCatalogs.provincias.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
                               </label>
                               <label>
                                 <span>Isla</span>
-                                <input
-                                  className="input customers-field"
-                                  readOnly
-                                  value={resolveAddressLabel(selectedDetail.cliente_direccion_isla_id, islandNameById)}
-                                />
+                                <select
+                                  className="select customers-field"
+                                  value={selectedAddressIslandId}
+                                  onChange={(event) => {
+                                    const islandId = event.target.value
+                                    setDraft((current) => ({
+                                      ...current,
+                                      cliente_direccion_isla_id: islandId,
+                                      cliente_direccion_municipio_id: '',
+                                      cliente_direccion_localidad_id: '',
+                                    }))
+                                  }}
+                                >
+                                  <option value="">Selecciona isla</option>
+                                  {filteredIslands.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
                               </label>
                               <label>
                                 <span>Municipio</span>
-                                <input
-                                  className="input customers-field"
-                                  readOnly
-                                  value={resolveAddressLabel(selectedDetail.cliente_direccion_municipio_id, municipalityNameById)}
-                                />
+                                <select
+                                  className="select customers-field"
+                                  value={selectedAddressMunicipalityId}
+                                  onChange={(event) => {
+                                    const municipalityId = event.target.value
+                                    setDraft((current) => ({
+                                      ...current,
+                                      cliente_direccion_municipio_id: municipalityId,
+                                      cliente_direccion_localidad_id: '',
+                                    }))
+                                  }}
+                                >
+                                  <option value="">Selecciona municipio</option>
+                                  {filteredMunicipalities.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
                               </label>
                             </div>
 
                             <div className="customers-field-row customers-field-row-location customers-field-row-location-compact">
                               <label className="customers-field-locality">
                                 <span>Localidad</span>
-                                <input
-                                  className="input customers-field"
-                                  readOnly
-                                  value={resolveAddressLabel(selectedDetail.cliente_direccion_localidad_id, localityNameById)}
-                                />
+                                <select
+                                  className="select customers-field"
+                                  value={selectedAddressLocalityId}
+                                  onChange={(event) => setDraftField('cliente_direccion_localidad_id', event.target.value)}
+                                >
+                                  <option value="">Selecciona localidad</option>
+                                  {filteredLocalities.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
                               </label>
                               <label className="customers-field-postal">
                                 <span>C.P.</span>
-                                <input className="input customers-field" readOnly value={valueOrDash(selectedDetail.cliente_direccion_cp)} />
+                                <input
+                                  className="input customers-field"
+                                  value={draft.cliente_direccion_cp}
+                                  onChange={(event) => setDraftField('cliente_direccion_cp', event.target.value)}
+                                  placeholder="C.P."
+                                  list="customer-postal-codes"
+                                />
+                                <datalist id="customer-postal-codes">
+                                  {filteredPostalCodes.map((option) => (
+                                    <option key={option.id} value={option.code || option.label} />
+                                  ))}
+                                </datalist>
                               </label>
                             </div>
 
                             <div className="customers-field-row customers-field-row-street">
                               <label>
                                 <span>Calle</span>
-                                <input className="input customers-field" readOnly value={valueOrDash(selectedDetail.cliente_direccion)} />
+                                <input
+                                  className="input customers-field"
+                                  value={draft.cliente_direccion}
+                                  onChange={(event) => setDraftField('cliente_direccion', event.target.value)}
+                                  placeholder="Calle"
+                                  autoComplete="street-address"
+                                />
                               </label>
                             </div>
+
+                            <div className="customers-field-row customers-field-row-location">
+                              <label>
+                                <span>Tipo</span>
+                                <input
+                                  className="input customers-field"
+                                  value={draft.cliente_tipo}
+                                  onChange={(event) => setDraftField('cliente_tipo', event.target.value)}
+                                  placeholder="Tipo de cliente"
+                                  list="customer-types"
+                                />
+                                <datalist id="customer-types">
+                                  {CUSTOMER_TYPES.map((type) => (
+                                    <option key={type} value={type} />
+                                  ))}
+                                </datalist>
+                              </label>
+                              <label>
+                                <span>Grupo</span>
+                                <input
+                                  className="input customers-field"
+                                  value={draft.cliente_grupo}
+                                  onChange={(event) => setDraftField('cliente_grupo', event.target.value)}
+                                  placeholder="Grupo"
+                                />
+                              </label>
+                              <label>
+                                <span>Distribuidor</span>
+                                <input
+                                  className="input customers-field"
+                                  value={draft.distribuidor_id}
+                                  onChange={(event) => setDraftField('distribuidor_id', event.target.value)}
+                                  placeholder="ID distribuidor"
+                                />
+                              </label>
+                            </div>
+
+                            <div className="customers-field-row customers-field-row-location">
+                              <label className="customers-prospect-row">
+                                <span>Activo</span>
+                                <input
+                                  type="checkbox"
+                                  checked={draft.activo}
+                                  onChange={(event) => setDraftField('activo', event.target.checked)}
+                                />
+                              </label>
+                              <label className="customers-prospect-row">
+                                <span>Prospeccion</span>
+                                <input
+                                  type="checkbox"
+                                  checked={draft.cliente_prospeccion}
+                                  onChange={(event) => setDraftField('cliente_prospeccion', event.target.checked)}
+                                />
+                              </label>
+                              <div className="customers-prospect-row">
+                                <span>Estado</span>
+                                <span className={`customers-status-pill ${draft.activo ? 'is-active' : 'is-inactive'}`}>
+                                  {draft.activo ? 'ACTIVO' : 'INACTIVO'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {isCreating && (
+                              <div className="customers-detail-actions">
+                                <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={saving}>
+                                  Guardar
+                                </button>
+                                <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={saving} onClick={closeEditor}>
+                                  Cancelar
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </>
@@ -965,11 +1186,11 @@ export function CustomersPage() {
                 <div className="customers-section-head">
                   <div>
                     <h3>Tipo de cliente</h3>
-                    <p>{hasEditor ? 'Resumen del borrador en curso.' : 'Seleccion read-only con estado limpio.'}</p>
+                    <p>{isCreating ? 'Resumen del alta en curso.' : 'Edicion automática con estado limpio.'}</p>
                   </div>
                 </div>
 
-                {hasEditor ? (
+                {isCreating ? (
                   <>
                     <div className="customers-type-grid">
                       {CUSTOMER_TYPES.map((type) => {
@@ -1034,24 +1255,24 @@ export function CustomersPage() {
                         <div className="customers-type-fields">
                           <label>
                             <span>Tipo</span>
-                            <input className="input customers-field" readOnly value={valueOrDash(selectedDetail.cliente_tipo)} />
+                            <input className="input customers-field" readOnly value={valueOrDash(draft.cliente_tipo)} />
                           </label>
                         </div>
 
                         <div className="customers-status-row">
-                          <span className={`customers-status-pill ${selectedDetail.activo ? 'is-active' : 'is-inactive'}`}>
-                            {selectedDetail.activo ? 'ACTIVO' : 'INACTIVO'}
+                          <span className={`customers-status-pill ${draft.activo ? 'is-active' : 'is-inactive'}`}>
+                            {draft.activo ? 'ACTIVO' : 'INACTIVO'}
                           </span>
-                          <span className={`customers-status-pill ${selectedDetail.activo ? 'is-inactive' : 'is-active'}`}>
-                            {selectedDetail.activo ? 'INACTIVO' : 'ACTIVO'}
+                          <span className={`customers-status-pill ${draft.activo ? 'is-inactive' : 'is-active'}`}>
+                            {draft.activo ? 'INACTIVO' : 'ACTIVO'}
                           </span>
                         </div>
 
                         <div className="customers-prospect-row">
                           <span>Prospeccion</span>
                           <div className="customers-radio-readonly">
-                            <span className={selectedDetail.cliente_prospeccion ? 'selected' : ''}>Si</span>
-                            <span className={!selectedDetail.cliente_prospeccion ? 'selected' : ''}>No</span>
+                            <span className={draft.cliente_prospeccion ? 'selected' : ''}>Si</span>
+                            <span className={!draft.cliente_prospeccion ? 'selected' : ''}>No</span>
                           </div>
                         </div>
                       </>

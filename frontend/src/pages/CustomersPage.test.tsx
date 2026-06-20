@@ -104,17 +104,17 @@ describe('CustomersPage CRUD', () => {
 
     expect(await screen.findByText('Cliente Dos')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Nuevo cliente' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByText('Cliente Uno'))
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
-    expect(await screen.findByRole('heading', { name: 'Editar cliente' })).toBeInTheDocument()
+    expect(await screen.findByDisplayValue('Cliente Uno')).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('Nombre comercial'), { target: { value: 'Cliente Uno Editado' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
     await waitFor(() => {
-      expect(screen.getByText('Cliente Uno Editado')).toBeInTheDocument()
-    })
+      expect(screen.getByDisplayValue('Cliente Uno Editado')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Cliente Uno Editado/ })).toBeInTheDocument()
+    }, { timeout: 7000 })
 
     fireEvent.click(screen.getByText('Cliente Uno Editado'))
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }))
@@ -128,5 +128,5 @@ describe('CustomersPage CRUD', () => {
     })
 
     confirmSpy.mockRestore()
-  })
+  }, 15000)
 })
