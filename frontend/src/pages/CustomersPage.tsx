@@ -1923,50 +1923,64 @@ export function CustomersPage() {
                 </div>
               </aside>
 
-              {listingResult && (
-                <div className="customers-listings-result">
-                  <div className="customers-listings-result-head">
-                    <div>
-                      <strong>{listingResult.title || 'Listado de clientes'}</strong>
-                      <span>{listingResult.source || 'interprete local'}</span>
-                    </div>
-                    <span className="surface-chip customers-status-chip is-active">
-                      <ListingIcon tone="check" className="customers-listings-status-icon" />
-                      Listo
-                    </span>
+              <div className="customers-listings-result">
+                <div className="customers-listings-result-head">
+                  <div>
+                    <strong>{listingResult?.title || 'Listado de clientes'}</strong>
+                    <span>{listingResult?.source || 'Vista previa del listado'}</span>
                   </div>
+                  <span className={`surface-chip customers-status-chip ${listingResult ? 'is-active' : 'is-inactive'}`}>
+                    {listingResult ? (
+                      <>
+                        <ListingIcon tone="check" className="customers-listings-status-icon" />
+                        Listo
+                      </>
+                    ) : (
+                      <>
+                        <ListingIcon tone="info" className="customers-listings-status-icon" />
+                        Pendiente
+                      </>
+                    )}
+                  </span>
+                </div>
 
-                  {!!listingResult.headers.length && (
-                    <div className="customers-listings-table-wrap">
-                      <table className="customers-listings-table">
-                        <thead>
-                          <tr>
-                            {listingResult.headers.map((header) => (
-                              <th key={header}>{header}</th>
+                {listingResult?.rows.length ? (
+                  <div className="customers-listings-table-wrap">
+                    <table className="customers-listings-table">
+                      <thead>
+                        <tr>
+                          {listingResult.headers.map((header) => (
+                            <th key={header}>{header}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {listingResult.rows.slice(0, 5).map((row, rowIndex) => (
+                          <tr key={rowIndex}>
+                            {row.map((cell, cellIndex) => (
+                              <td key={`${rowIndex}-${cellIndex}`}>{cell === null || cell === undefined || cell === '' ? '-' : String(cell)}</td>
                             ))}
                           </tr>
-                        </thead>
-                        <tbody>
-                          {listingResult.rows.slice(0, 5).map((row, rowIndex) => (
-                            <tr key={rowIndex}>
-                              {row.map((cell, cellIndex) => (
-                                <td key={`${rowIndex}-${cellIndex}`}>{cell === null || cell === undefined || cell === '' ? '-' : String(cell)}</td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  <div className="customers-listings-result-footer">
-                    <span>
-                      {listingResult.rows.length ? `Mostrando ${Math.min(5, listingResult.rows.length)} de +${listingResult.rows.length} resultados` : 'Mostrando 0 resultados'}
-                    </span>
-                    <span>Los resultados completos se descargarán al generar el listado.</span>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
+                ) : (
+                  <div className="customers-listings-result-empty">
+                    <ListingIcon tone="preview" className="customers-listings-help-note-icon" />
+                    <p className="customers-listings-result-message">Aquí aparecerá el listado generado. Escribe una solicitud y pulsa Generar listado.</p>
+                  </div>
+                )}
+
+                <div className="customers-listings-result-footer">
+                  <span>
+                    {listingResult?.rows.length
+                      ? `Mostrando ${Math.min(5, listingResult.rows.length)} de +${listingResult.rows.length} resultados`
+                      : 'Todavía no se ha generado ningún listado'}
+                  </span>
+                  <span>Los resultados completos se descargarán al generar el listado.</span>
                 </div>
-              )}
+              </div>
 
               {listingError && (
                 <div className="state" role="alert">

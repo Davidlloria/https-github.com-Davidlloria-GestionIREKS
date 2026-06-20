@@ -4823,6 +4823,18 @@ tbody tr:hover {
   line-height: 1.45;
 }
 
+.customers-listings-result-empty {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 16px 14px;
+  border: 1px dashed #dbe4f0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #64748b;
+}
+
 .customers-listings-table-wrap {
   max-height: none;
   min-height: 0;
