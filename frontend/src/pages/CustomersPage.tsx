@@ -1849,7 +1849,7 @@ export function CustomersPage() {
 
               <div className="customers-listings-help-note customers-listings-ribbon-note">
                 <ListingIcon tone="info" className="customers-listings-help-note-icon" />
-                <span>Puedes usar datos de clientes, contactos, ventas, recetas y mÃ¡s.</span>
+                <span>Puedes usar datos de clientes, contactos, ventas, recetas y más.</span>
               </div>
 
               <aside className="customers-listings-help-card">
