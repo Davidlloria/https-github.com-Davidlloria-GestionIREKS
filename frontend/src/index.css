@@ -3972,7 +3972,7 @@ tbody tr:hover {
 
 .customers-list-panel {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 12px;
   width: 100%;
   min-width: 0;
@@ -3991,6 +3991,13 @@ tbody tr:hover {
 
 .customers-list-head-copy {
   min-width: 0;
+}
+
+.customers-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
 }
 
 .customers-list-kicker {
@@ -4068,9 +4075,86 @@ tbody tr:hover {
   min-height: 0;
   height: 100%;
   overflow: hidden;
+  position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
+}
+
+.customers-loading-toast {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(238, 242, 255, 0.98));
+  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.12);
+}
+
+.customers-loading-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 2px solid rgba(79, 70, 229, 0.22);
+  border-top-color: #4f46e5;
+  animation: customers-loading-spin 0.8s linear infinite;
+}
+
+.customers-loading-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: #312e81;
+}
+
+.customers-loading-copy strong {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.customers-loading-copy span {
+  font-size: 11px;
+  color: #6366f1;
+}
+
+.customers-loading-bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(165, 180, 252, 0.3);
+}
+
+.customers-loading-bar span {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6366f1, #22c55e);
+  animation: customers-loading-bar-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes customers-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes customers-loading-bar-slide {
+  0% {
+    transform: translateX(-30%);
+  }
+  50% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-30%);
+  }
 }
 
 .customers-list-grid {
@@ -4214,29 +4298,159 @@ tbody tr:hover {
   padding: 12px;
 }
 
+.customers-detail-panel.is-create-flow {
+  display: none;
+}
+
 .customers-detail-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
+.customers-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(2px);
+}
+
+.customers-modal {
+  width: min(1180px, 100%);
+  max-height: calc(100vh - 40px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #dbe4f0;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+}
+
+.customers-modal-confirm {
+  width: min(560px, 100%);
+  grid-template-rows: auto auto auto auto;
+}
+
+.customers-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.customers-modal-head h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.customers-modal-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.customers-modal-body {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+}
+
+.customers-modal-actions {
+  margin-top: 2px;
+}
+
+.customers-delete-summary {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.customers-delete-summary strong {
+  color: #1f2937;
+  font-size: 15px;
+}
+
+.customers-delete-summary-grid {
+  display: grid;
+  gap: 4px;
+  color: #334155;
+  font-size: 13px;
+}
+
+.customers-delete-summary-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.customers-delete-actions {
+  justify-content: flex-end;
+}
+
 .customers-action-btn {
-  min-height: 32px;
-  border-radius: 8px;
-  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  border-radius: 10px;
+  padding: 0 12px;
   border: 1px solid transparent;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1;
   box-shadow: none;
   opacity: 1;
   white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+
+.customers-action-btn:not(:disabled):hover,
+.customers-action-btn:not(:disabled):focus-visible {
+  transform: translateY(-1px);
+  outline: none;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+}
+
+.customers-action-btn:disabled {
+  cursor: not-allowed;
+}
+
+.customers-action-btn-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  font-size: 15px;
+  line-height: 1;
 }
 
 .customers-action-btn-primary {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: #5aa64e;
+  border-color: #5aa64e;
   color: #ffffff;
+}
+
+.customers-action-btn-primary:not(:disabled):hover,
+.customers-action-btn-primary:not(:disabled):focus-visible {
+  background: #4f9842;
+  border-color: #4f9842;
 }
 
 .customers-action-btn-outline {
@@ -4246,15 +4460,27 @@ tbody tr:hover {
 }
 
 .customers-action-btn-danger {
-  background: #ffffff;
-  border-color: #fecaca;
+  background: #fff5f5;
+  border-color: #f3c1c1;
   color: #b91c1c;
 }
 
+.customers-action-btn-danger:not(:disabled):hover,
+.customers-action-btn-danger:not(:disabled):focus-visible {
+  background: #fde8e8;
+  border-color: #ef9a9a;
+}
+
 .customers-action-btn-ghost {
-  background: #f8fafc;
-  border-color: #dbe4f0;
+  background: #eef3fb;
+  border-color: #d3dcef;
   color: #334155;
+}
+
+.customers-action-btn-ghost:not(:disabled):hover,
+.customers-action-btn-ghost:not(:disabled):focus-visible {
+  background: #dde7f7;
+  border-color: #becbe2;
 }
 
 .customers-detail-body {

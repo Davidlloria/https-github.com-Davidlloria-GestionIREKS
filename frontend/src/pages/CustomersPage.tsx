@@ -19,6 +19,11 @@ const PAGE_SIZE = 25
 type CustomerTab = 'contacts' | 'sales' | 'recipes' | 'agenda'
 type CustomerSortKey = 'code' | 'name' | 'island'
 type CustomerEditorMode = 'create' | null
+type CustomerDeleteTarget = {
+  customerId: string
+  customerLabel: string
+  customerCode: string | number | null
+}
 
 interface CustomerDraft {
   cliente_codigo: string
@@ -337,6 +342,9 @@ export function CustomersPage() {
   const [refreshTick, setRefreshTick] = useState(0)
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<CustomerDeleteTarget | null>(null)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleting, setDeleting] = useState(false)
   const autosaveTimerRef = useRef<number | null>(null)
   const invalidSignatureRef = useRef('')
 
@@ -534,23 +542,42 @@ export function CustomersPage() {
     setSyncedDraft(nextDraft)
   }
 
-  const refreshData = () => {
-    setRefreshTick((current) => current + 1)
-  }
-
-  const handleDelete = async () => {
+  const openDeleteConfirm = () => {
     if (!selectedCustomerId) {
       return
     }
-    const confirmed = window.confirm('Eliminar cliente')
-    if (!confirmed) {
+
+    const selectedCustomer = customerRows.find((row) => row.cliente_id === selectedCustomerId) || null
+    const targetLabel = selectedDetail ? customerLabel(selectedDetail) : selectedCustomer ? customerLabel(selectedCustomer) : selectedCustomerId
+    const customerCode = selectedDetail?.cliente_codigo ?? selectedCustomer?.cliente_codigo ?? null
+
+    setDeleteTarget({
+      customerId: selectedCustomerId,
+      customerLabel: targetLabel,
+      customerCode,
+    })
+    setDeleteError('')
+  }
+
+  const closeDeleteConfirm = () => {
+    if (deleting) {
+      return
+    }
+    setDeleteTarget(null)
+    setDeleteError('')
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) {
       return
     }
 
-    setSaving(true)
+    setDeleting(true)
+    setDeleteError('')
     setFormError('')
     try {
-      await deleteCustomer(selectedCustomerId)
+      await deleteCustomer(deleteTarget.customerId)
+      setDeleteTarget(null)
       setEditorMode(null)
       const nextDraft = emptyCustomerDraft()
       setDraft(nextDraft)
@@ -558,9 +585,9 @@ export function CustomersPage() {
       setSelectedCandidateId('')
       setRefreshTick((current) => current + 1)
     } catch (error) {
-      setFormError(getErrorMessage(error))
+      setDeleteError(getErrorMessage(error))
     } finally {
-      setSaving(false)
+      setDeleting(false)
     }
   }
 
@@ -599,6 +626,27 @@ export function CustomersPage() {
               <h2>Clientes</h2>
             </div>
             <span className="surface-chip">{sortedCustomerRows.length} visibles</span>
+          </div>
+
+          <div className="customers-list-actions">
+            <button type="button" className="customers-action-btn customers-action-btn-primary" disabled={isCreating} onClick={openCreateForm}>
+              <span className="customers-action-btn-icon" aria-hidden="true">
+                +
+              </span>
+              <span>Nuevo</span>
+            </button>
+            <button type="button" className="customers-action-btn customers-action-btn-danger" disabled={isCreating || !selectedCustomerId} onClick={openDeleteConfirm}>
+              <span className="customers-action-btn-icon" aria-hidden="true">
+                🗑
+              </span>
+              <span>Eliminar</span>
+            </button>
+            <button type="button" className="customers-action-btn customers-action-btn-ghost" disabled title="Listado pendiente en la versión web">
+              <span className="customers-action-btn-icon" aria-hidden="true">
+                📄
+              </span>
+              <span>Listados</span>
+            </button>
           </div>
 
           <div className="customers-list-filters">
@@ -647,12 +695,30 @@ export function CustomersPage() {
           </div>
 
           <div className="customers-list-scroll">
-            <QueryState
-              loading={customersQuery.loading}
-              error={customersQuery.error}
-              empty={!sortedCustomerRows.length}
-              emptyMessage="No hay clientes para los filtros actuales."
-            />
+            {customersQuery.loading && (
+              <div className="customers-loading-toast" role="status" aria-live="polite" aria-label="Cargando clientes">
+                <span className="customers-loading-spinner" aria-hidden="true" />
+                <div className="customers-loading-copy">
+                  <strong>Cargando clientes</strong>
+                  <span>Actualizando listado...</span>
+                </div>
+                <div className="customers-loading-bar" aria-hidden="true">
+                  <span />
+                </div>
+              </div>
+            )}
+
+            {!customersQuery.loading && customersQuery.error && (
+              <div className="state state-error" role="alert">
+                Error: {customersQuery.error}
+              </div>
+            )}
+
+            {!customersQuery.loading && !customersQuery.error && !sortedCustomerRows.length && (
+              <div className="state state-empty" role="status">
+                No hay clientes para los filtros actuales.
+              </div>
+            )}
 
             {!!sortedCustomerRows.length && (
               <div className="customers-list-grid">
@@ -744,24 +810,7 @@ export function CustomersPage() {
           </div>
         </aside>
 
-        <section className="customers-detail-panel">
-          <div className="customers-detail-actions">
-            <button type="button" className="customers-action-btn customers-action-btn-primary" disabled={isCreating} onClick={openCreateForm}>
-              + Nuevo
-            </button>
-            <button type="button" className="customers-action-btn customers-action-btn-danger" disabled={isCreating || !selectedCustomerId} onClick={handleDelete}>
-              Eliminar
-            </button>
-            <button type="button" className="customers-action-btn customers-action-btn-ghost" disabled={saving} onClick={refreshData}>
-              Refrescar
-            </button>
-            {isCreating && (
-              <button type="button" className="customers-action-btn customers-action-btn-ghost" onClick={closeEditor}>
-                Cancelar
-              </button>
-            )}
-          </div>
-
+        <section className={`customers-detail-panel ${isCreating ? 'is-create-flow' : ''}`} hidden={isCreating}>
           <div className="customers-detail-body customers-detail-main">
             <div className="customers-detail-grid customers-detail-top">
               <section className="customers-detail-card">
@@ -1352,6 +1401,345 @@ export function CustomersPage() {
           </div>
         </section>
       </div>
+
+      {deleteTarget && (
+        <div className="customers-modal-overlay" role="presentation">
+          <div
+            className="customers-modal customers-modal-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="customers-delete-modal-title"
+          >
+            <div className="customers-modal-head">
+              <div>
+                <h3 id="customers-delete-modal-title">Eliminar cliente</h3>
+                <p>Confirma si quieres borrar este registro de la base de datos.</p>
+              </div>
+              <span className="surface-chip customers-status-chip is-inactive">Confirmación</span>
+            </div>
+
+            <div className="customers-delete-summary">
+              <div>
+                <span className="customers-delete-summary-label">Registro seleccionado</span>
+                <strong>{deleteTarget.customerLabel}</strong>
+              </div>
+              <div className="customers-delete-summary-grid">
+                <span className="customers-delete-summary-label">Código</span>
+                <span>{deleteTarget.customerCode ?? '-'}</span>
+              </div>
+            </div>
+
+            {deleteError && (
+              <div className="state" role="alert">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="customers-detail-actions customers-modal-actions customers-delete-actions">
+              <button type="button" className="customers-action-btn customers-action-btn-danger" disabled={deleting} onClick={handleDeleteConfirm}>
+                {deleting ? 'Eliminando...' : 'Eliminar'}
+              </button>
+              <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={deleting} onClick={closeDeleteConfirm}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCreating && (
+        <div className="customers-modal-overlay" role="presentation">
+          <div
+            className="customers-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="customers-create-modal-title"
+          >
+            <div className="customers-modal-head">
+              <div>
+                <h3 id="customers-create-modal-title">Nuevo cliente</h3>
+                <p>Introduce los datos del cliente y guarda para crear el registro en la base de datos.</p>
+              </div>
+              <span className="surface-chip">Alta activa</span>
+            </div>
+
+            <form className="customers-modal-body" onSubmit={handleSubmit}>
+              <div className="customers-detail-grid customers-detail-top">
+                <section className="customers-detail-card">
+                  <div className="customers-section-head">
+                    <div>
+                      <h3>Detalle de cliente</h3>
+                    </div>
+                    <span className="surface-chip customers-status-chip is-active">Activo</span>
+                  </div>
+
+                  {formError && (
+                    <div className="state" role="alert">
+                      {formError}
+                    </div>
+                  )}
+
+                  <div className="customers-field-grid">
+                    <div className="customers-field-row customers-field-row-top">
+                      <label className="customers-field-code">
+                        <span>Cod.</span>
+                        <input className="input customers-field" readOnly value={draft.cliente_codigo || 'Auto'} />
+                      </label>
+                      <label className="customers-field-commercial">
+                        <span>Nombre comercial</span>
+                        <input
+                          className="input customers-field"
+                          value={draft.cliente_nombre_comercial}
+                          onChange={(event) => setDraftField('cliente_nombre_comercial', event.target.value)}
+                          placeholder="Nombre comercial"
+                          autoComplete="organization"
+                        />
+                      </label>
+                      <label className="customers-field-tax">
+                        <span>C.I.F.</span>
+                        <input
+                          className="input customers-field"
+                          value={draft.cliente_cif}
+                          onChange={(event) => setDraftField('cliente_cif', event.target.value)}
+                          placeholder="CIF"
+                          autoComplete="off"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="customers-field-row customers-field-row-mid">
+                      <label className="customers-field-phone">
+                        <span>Telefono</span>
+                        <input
+                          className="input customers-field"
+                          value={draft.cliente_telefono}
+                          onChange={(event) => setDraftField('cliente_telefono', event.target.value)}
+                          placeholder="Telefono"
+                          autoComplete="tel"
+                        />
+                      </label>
+                      <label className="customers-field-fiscal">
+                        <span>Nombre fiscal</span>
+                        <input
+                          className="input customers-field"
+                          value={draft.cliente_nombre_fiscal}
+                          onChange={(event) => setDraftField('cliente_nombre_fiscal', event.target.value)}
+                          placeholder="Nombre fiscal"
+                          autoComplete="organization"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="customers-field-divider" aria-hidden="true" />
+
+                    <div className="customers-field-row customers-field-row-location">
+                      <label>
+                        <span>Provincia</span>
+                        <select
+                          className="select customers-field"
+                          value={selectedAddressProvinceId}
+                          onChange={(event) => {
+                            const provinceId = event.target.value
+                            setDraft((current) => ({
+                              ...current,
+                              cliente_direccion_provincia_id: provinceId,
+                              cliente_direccion_isla_id: '',
+                              cliente_direccion_municipio_id: '',
+                              cliente_direccion_localidad_id: '',
+                            }))
+                          }}
+                        >
+                          <option value="">Selecciona provincia</option>
+                          {customerCatalogs.provincias.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span>Isla</span>
+                        <select
+                          className="select customers-field"
+                          value={selectedAddressIslandId}
+                          onChange={(event) => {
+                            const islandId = event.target.value
+                            setDraft((current) => ({
+                              ...current,
+                              cliente_direccion_isla_id: islandId,
+                              cliente_direccion_municipio_id: '',
+                              cliente_direccion_localidad_id: '',
+                            }))
+                          }}
+                        >
+                          <option value="">Selecciona isla</option>
+                          {filteredIslands.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span>Municipio</span>
+                        <select
+                          className="select customers-field"
+                          value={selectedAddressMunicipalityId}
+                          onChange={(event) => {
+                            const municipalityId = event.target.value
+                            setDraft((current) => ({
+                              ...current,
+                              cliente_direccion_municipio_id: municipalityId,
+                              cliente_direccion_localidad_id: '',
+                            }))
+                          }}
+                        >
+                          <option value="">Selecciona municipio</option>
+                          {filteredMunicipalities.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="customers-field-row customers-field-row-location customers-field-row-location-compact">
+                      <label className="customers-field-locality">
+                        <span>Localidad</span>
+                        <select
+                          className="select customers-field"
+                          value={selectedAddressLocalityId}
+                          onChange={(event) => setDraftField('cliente_direccion_localidad_id', event.target.value)}
+                        >
+                          <option value="">Selecciona localidad</option>
+                          {filteredLocalities.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <PostalCodeField value={draft.cliente_direccion_cp} onChange={(nextValue) => setDraftField('cliente_direccion_cp', nextValue)} options={filteredPostalCodes} />
+                    </div>
+
+                    <div className="customers-field-row customers-field-row-street">
+                      <label>
+                        <span>Calle</span>
+                        <input
+                          className="input customers-field"
+                          value={draft.cliente_direccion}
+                          onChange={(event) => setDraftField('cliente_direccion', event.target.value)}
+                          placeholder="Calle"
+                          autoComplete="street-address"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="customers-detail-actions customers-modal-actions">
+                      <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={saving}>
+                        Guardar
+                      </button>
+                      <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={saving} onClick={closeEditor}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </section>
+
+                <aside className="customers-type-panel">
+                  <div className="customers-section-head">
+                    <div>
+                      <h3>Clasificación del cliente</h3>
+                      <span className="customers-type-subhead">Actividad</span>
+                    </div>
+                  </div>
+
+                  <div className="customers-type-grid">
+                    {CUSTOMER_ACTIVITIES.map((activity) => {
+                      const isActive = customerActivitySelection(draft.cliente_actividad).includes(activity)
+                      return (
+                        <button
+                          key={activity}
+                          type="button"
+                          className={`customer-type-pill ${customerActivityToneClass(activity)} ${isActive ? 'active' : ''}`}
+                          aria-pressed={isActive}
+                          disabled={saving}
+                          onClick={() => {
+                            const nextSelection = customerActivitySelection(draft.cliente_actividad)
+                            const nextSet = new Set(nextSelection)
+                            if (nextSet.has(activity)) {
+                              nextSet.delete(activity)
+                            } else {
+                              nextSet.add(activity)
+                            }
+                            setDraftField(
+                              'cliente_actividad',
+                              CUSTOMER_ACTIVITIES.filter((item) => nextSet.has(item)).join(', '),
+                            )
+                          }}
+                        >
+                          <span className="customer-type-pill-icon" aria-hidden="true">
+                            {customerActivityIcon(activity)}
+                          </span>
+                          <span className="customer-type-pill-label">{activity}</span>
+                          {isActive && <span className="customer-type-pill-check">✓</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <div className="customers-type-divider" aria-hidden="true" />
+
+                  <div className="customers-type-fields">
+                    <div className="customers-binary-row">
+                      <span>Tipo</span>
+                      <BinaryToggleSelect
+                        value={draft.cliente_tipo.toUpperCase() === 'DIRECTO'}
+                        onChange={(nextValue) => setDraftField('cliente_tipo', nextValue ? 'DIRECTO' : 'INDIRECTO')}
+                        trueLabel="DIREC."
+                        falseLabel="INDIR."
+                        disabled={saving}
+                        ariaLabel="Tipo de cliente"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="customers-type-divider" aria-hidden="true" />
+
+                  <div className="customers-binary-row">
+                    <span>Estado</span>
+                    <BinaryToggleSelect
+                      value={draft.activo}
+                      onChange={(nextValue) => setDraftField('activo', nextValue)}
+                      trueLabel="ACTI."
+                      falseLabel="INACT."
+                      disabled={saving}
+                      ariaLabel="Estado del cliente"
+                      className="binary-toggle-select--customer-status"
+                    />
+                  </div>
+
+                  <div className="customers-type-divider" aria-hidden="true" />
+
+                  <div className="customers-binary-row customers-prospect-row">
+                    <span>Prospección</span>
+                    <BinaryToggleSelect
+                      value={draft.cliente_prospeccion}
+                      onChange={(nextValue) => setDraftField('cliente_prospeccion', nextValue)}
+                      trueLabel="SI"
+                      falseLabel="NO"
+                      disabled={saving}
+                      ariaLabel="Prospección"
+                      className="binary-toggle-select--customer-prospect"
+                    />
+                  </div>
+                </aside>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

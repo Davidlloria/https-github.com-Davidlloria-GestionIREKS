@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { CustomersPage } from './CustomersPage'
 
@@ -86,21 +86,21 @@ vi.mock('../api/contacts', () => ({
 
 describe('CustomersPage CRUD', () => {
   it('creates, updates and deletes customers from the page', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<CustomersPage />)
 
-    expect(await screen.findByRole('button', { name: '+ Nuevo' })).toBeEnabled()
+    expect(await screen.findByRole('button', { name: 'Nuevo' })).toBeEnabled()
     expect(screen.getByText('Cliente Uno')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Nuevo' }))
-    expect(await screen.findByRole('heading', { name: 'Nuevo cliente' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Nuevo' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Nuevo cliente' })
+    const modal = within(dialog)
 
-    fireEvent.change(screen.getByLabelText('Nombre comercial'), { target: { value: 'Cliente Dos' } })
-    fireEvent.change(screen.getByLabelText('Nombre fiscal'), { target: { value: 'Cliente Dos SL' } })
-    fireEvent.change(screen.getByLabelText('C.I.F.'), { target: { value: 'B999' } })
-    fireEvent.change(screen.getByLabelText('Telefono'), { target: { value: '928000002' } })
+    fireEvent.change(modal.getByLabelText('Nombre comercial'), { target: { value: 'Cliente Dos' } })
+    fireEvent.change(modal.getByLabelText('Nombre fiscal'), { target: { value: 'Cliente Dos SL' } })
+    fireEvent.change(modal.getByLabelText('C.I.F.'), { target: { value: 'B999' } })
+    fireEvent.change(modal.getByLabelText('Telefono'), { target: { value: '928000002' } })
 
-    fireEvent.submit(screen.getByLabelText('Nombre comercial').closest('form') as HTMLFormElement)
+    fireEvent.submit(modal.getByLabelText('Nombre comercial').closest('form') as HTMLFormElement)
 
     expect(await screen.findByText('Cliente Dos')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Nuevo cliente' })).not.toBeInTheDocument()
@@ -119,14 +119,22 @@ describe('CustomersPage CRUD', () => {
     fireEvent.click(screen.getByText('Cliente Uno Editado'))
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }))
 
+    const deleteDialog = await screen.findByRole('dialog', { name: 'Eliminar cliente' })
+    const deleteModal = within(deleteDialog)
+    expect(deleteModal.getByText('Cliente Uno Editado')).toBeInTheDocument()
+
+    fireEvent.click(deleteModal.getByRole('button', { name: 'Cancelar' }))
     await waitFor(() => {
-      expect(confirmSpy).toHaveBeenCalled()
+      expect(screen.queryByRole('dialog', { name: 'Eliminar cliente' })).not.toBeInTheDocument()
     })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }))
+    const confirmDialog = await screen.findByRole('dialog', { name: 'Eliminar cliente' })
+    const confirmModal = within(confirmDialog)
+    fireEvent.click(confirmModal.getByRole('button', { name: 'Eliminar' }))
 
     await waitFor(() => {
       expect(screen.queryByText('Cliente Uno Editado')).not.toBeInTheDocument()
     })
-
-    confirmSpy.mockRestore()
   }, 15000)
 })
