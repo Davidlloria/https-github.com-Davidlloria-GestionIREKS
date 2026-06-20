@@ -35,6 +35,9 @@ const baseCustomer = {
 
 let customerStore = [baseCustomer]
 let nextCustomerCode = 102
+const mocks = vi.hoisted(() => ({
+  updateCustomerMock: vi.fn(),
+}))
 
 function buildListResponse() {
   return {
@@ -62,7 +65,7 @@ vi.mock('../api/customers', () => ({
     customerStore = [...customerStore, created]
     return { ...created }
   }),
-  updateCustomer: vi.fn(async (customerId: string, payload: Record<string, unknown>) => {
+  updateCustomer: mocks.updateCustomerMock.mockImplementation(async (customerId: string, payload: Record<string, unknown>) => {
     customerStore = customerStore.map((item) => (item.cliente_id === customerId ? { ...item, ...payload } : item))
     const customer = customerStore.find((item) => item.cliente_id === customerId)
     return customer ? { ...customer } : baseCustomer
@@ -109,7 +112,7 @@ describe('CustomersPage CRUD', () => {
     fireEvent.change(screen.getByLabelText('Nombre comercial'), { target: { value: 'Cliente Uno Editado' } })
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue('Cliente Uno Editado')).toBeInTheDocument()
+      expect(mocks.updateCustomerMock).toHaveBeenCalled()
       expect(screen.getByRole('button', { name: /Cliente Uno Editado/ })).toBeInTheDocument()
     }, { timeout: 7000 })
 

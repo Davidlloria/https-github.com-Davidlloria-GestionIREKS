@@ -86,6 +86,10 @@ function customerLabel(customer: { cliente_id: string; cliente_nombre_comercial:
   return customer.cliente_nombre_comercial || customer.cliente_nombre_fiscal || customer.cliente_id
 }
 
+function customerActivityText(customer: { cliente_actividad?: string; cliente_grupo?: string }) {
+  return customer.cliente_actividad || customer.cliente_grupo || ''
+}
+
 function contactLabel(contact: Pick<ContactListItem, 'nombre' | 'apellidos' | 'contacto_id'>) {
   return `${contact.nombre || ''} ${contact.apellidos || ''}`.trim() || contact.contacto_id
 }
@@ -198,6 +202,7 @@ function emptyCustomerDraft(): CustomerDraft {
 }
 
 function draftFromDetail(detail: CustomerDetail): CustomerDraft {
+  const customerActivity = customerActivityText(detail)
   return {
     cliente_codigo: detail.cliente_codigo ? String(detail.cliente_codigo) : '',
     cliente_nombre_comercial: detail.cliente_nombre_comercial || '',
@@ -214,7 +219,7 @@ function draftFromDetail(detail: CustomerDetail): CustomerDraft {
     cliente_direccion_provincia_id: detail.cliente_direccion_provincia_id || '',
     cliente_direccion_isla_id: detail.cliente_direccion_isla_id || '',
     cliente_tipo: detail.cliente_tipo || '',
-    cliente_actividad: detail.cliente_actividad || '',
+    cliente_actividad: customerActivity,
     cliente_prospeccion: Boolean(detail.cliente_prospeccion),
     distribuidor_id: detail.distribuidor_id || '',
     activo: Boolean(detail.activo),
@@ -222,6 +227,7 @@ function draftFromDetail(detail: CustomerDetail): CustomerDraft {
 }
 
 function draftToPayload(draft: CustomerDraft): CustomerSavePayload {
+  const customerActivity = customerActivityValue(draft.cliente_actividad)
   return {
     cliente_codigo: draft.cliente_codigo.trim() ? Number(draft.cliente_codigo) : undefined,
     cliente_nombre_comercial: draft.cliente_nombre_comercial.trim(),
@@ -238,7 +244,8 @@ function draftToPayload(draft: CustomerDraft): CustomerSavePayload {
     cliente_direccion_provincia_id: draft.cliente_direccion_provincia_id.trim(),
     cliente_direccion_isla_id: draft.cliente_direccion_isla_id.trim(),
     cliente_tipo: draft.cliente_tipo.trim(),
-    cliente_actividad: customerActivityValue(draft.cliente_actividad),
+    cliente_actividad: customerActivity,
+    cliente_grupo: customerActivity,
     cliente_prospeccion: draft.cliente_prospeccion,
     distribuidor_id: draft.distribuidor_id.trim(),
     activo: draft.activo,
@@ -721,7 +728,7 @@ export function CustomersPage() {
                         <span className="customers-list-cell">{customer.cliente_codigo}</span>
                         <span className="customers-list-cell customers-list-cell-name">
                           <span className="customers-list-cell-icon" aria-hidden="true">
-                            {customerActivityIcon(customer.cliente_actividad || customer.cliente_tipo || customer.cliente_nombre_comercial)}
+                            {customerActivityIcon(customerActivityText(customer) || customer.cliente_tipo || customer.cliente_nombre_comercial)}
                           </span>
                           <span>{customerLabel(customer)}</span>
                         </span>

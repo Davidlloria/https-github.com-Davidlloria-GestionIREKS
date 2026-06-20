@@ -19,6 +19,7 @@ export interface CustomerSavePayload {
   cliente_direccion_isla_id?: string
   cliente_tipo?: string
   cliente_actividad?: string
+  cliente_grupo?: string
   cliente_prospeccion?: boolean
   distribuidor_id?: string
   activo?: boolean

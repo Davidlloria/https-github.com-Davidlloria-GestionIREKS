@@ -20,6 +20,7 @@ export interface CustomerListItem {
   cliente_nombre_fiscal: string
   cliente_cif: string
   cliente_actividad: string
+  cliente_grupo?: string
   cliente_tipo: string
   cliente_direccion_isla_id?: string
   cliente_direccion_isla?: string
@@ -39,4 +40,5 @@ export interface CustomerDetail extends CustomerListItem {
   cliente_direccion_provincia_id: string
   cliente_direccion_isla_id: string
   distribuidor_id: string
+  cliente_grupo?: string
 }
