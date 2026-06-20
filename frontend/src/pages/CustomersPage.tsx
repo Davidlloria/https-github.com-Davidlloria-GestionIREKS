@@ -207,6 +207,18 @@ function formatRelativeListingTime(timestamp: number) {
   return `${diffDays} d`
 }
 
+function escapeCsvValue(value: string) {
+  return `"${value.replace(/"/g, '""')}"`
+}
+
+function rowsToCsv(headers: string[], rows: Array<Array<string | number | boolean | null>>) {
+  const lines = [headers.map((header) => escapeCsvValue(String(header))).join(',')]
+  rows.forEach((row) => {
+    lines.push(row.map((cell) => escapeCsvValue(cell === null || cell === undefined ? '-' : String(cell))).join(','))
+  })
+  return lines.join('\r\n')
+}
+
 function customerLabel(customer: { cliente_id: string; cliente_nombre_comercial: string; cliente_nombre_fiscal: string }) {
   return customer.cliente_nombre_comercial || customer.cliente_nombre_fiscal || customer.cliente_id
 }
@@ -555,6 +567,7 @@ export function CustomersPage() {
   const [listingSubmitting, setListingSubmitting] = useState(false)
   const [listingHistory, setListingHistory] = useState<ListingHistoryItem[]>(() => loadListingHistory())
   const autosaveTimerRef = useRef<number | null>(null)
+  const listingsPrintWindowRef = useRef<Window | null>(null)
   const invalidSignatureRef = useRef('')
 
   const catalogsQuery = useAsyncResource(
@@ -801,6 +814,91 @@ export function CustomersPage() {
     }
     setListingModalOpen(false)
     setListingError('')
+  }
+
+  const downloadListingFile = (filename: string, content: string, mimeType: string) => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    const blob = new Blob([content], { type: mimeType })
+    const url = window.URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    window.URL.revokeObjectURL(url)
+  }
+
+  const handleListingCsvExport = () => {
+    if (!listingResult?.headers.length || !listingResult.rows.length) {
+      return
+    }
+    const csv = rowsToCsv(listingResult.headers, listingResult.rows)
+    downloadListingFile('listado-clientes.csv', csv, 'text/csv;charset=utf-8')
+  }
+
+  const handleListingExcelExport = () => {
+    if (!listingResult?.headers.length || !listingResult.rows.length) {
+      return
+    }
+    const csv = rowsToCsv(listingResult.headers, listingResult.rows)
+    downloadListingFile('listado-clientes.xls', csv, 'application/vnd.ms-excel;charset=utf-8')
+  }
+
+  const handleListingPdfExport = () => {
+    if (!listingResult?.headers.length || !listingResult.rows.length || typeof window === 'undefined') {
+      return
+    }
+
+    const tableRows = listingResult.rows
+      .map((row) => `<tr>${row.map((cell) => `<td>${cell === null || cell === undefined || cell === '' ? '-' : String(cell)}</td>`).join('')}</tr>`)
+      .join('')
+    const headers = listingResult.headers.map((header) => `<th>${header}</th>`).join('')
+    const html = `
+      <html>
+        <head>
+          <title>${listingResult.title || 'Listado de clientes'}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #1f2937; }
+            h1 { font-size: 20px; margin: 0 0 8px; }
+            p { margin: 0 0 16px; color: #64748b; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #dbe4f0; padding: 8px 10px; text-align: left; vertical-align: top; }
+            th { background: #eef4ff; color: #1d4ed8; }
+          </style>
+        </head>
+        <body>
+          <h1>${listingResult.title || 'Listado de clientes'}</h1>
+          <p>${listingResult.source || 'interprete local'}</p>
+          <table>
+            <thead><tr>${headers}</tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </body>
+      </html>
+    `
+
+    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=800')
+    if (!printWindow) {
+      return
+    }
+    listingsPrintWindowRef.current = printWindow
+    printWindow.document.open()
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => {
+      printWindow.print()
+    }, 250)
+  }
+
+  const handleListingPrint = () => {
+    if (!listingResult?.headers.length || !listingResult.rows.length || typeof window === 'undefined') {
+      return
+    }
+    handleListingPdfExport()
   }
 
   const handleListingSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1717,33 +1815,6 @@ export function CustomersPage() {
             </div>
 
             <form className="customers-modal-body customers-listings-body customers-listings-layout" onSubmit={handleListingSubmitV2}>
-              <div className="customers-listings-presets">
-                <button
-                  type="button"
-                  className="customers-listings-preset customers-listings-preset-green"
-                  onClick={() => setListingTarget('Clientes activos de Tenerife con contactos principales')}
-                >
-                  <ListingIcon tone="green" className="customers-listings-preset-icon" />
-                  <span>Clientes activos de Tenerife</span>
-                </button>
-                <button
-                  type="button"
-                  className="customers-listings-preset customers-listings-preset-amber"
-                  onClick={() => setListingTarget('Clientes con actividad panadería y ventas del último mes')}
-                >
-                  <ListingIcon tone="amber" className="customers-listings-preset-icon" />
-                  <span>Clientes con actividad panadería</span>
-                </button>
-                <button
-                  type="button"
-                  className="customers-listings-preset customers-listings-preset-blue"
-                  onClick={() => setListingTarget('Clientes con contactos, ventas y recetas relacionadas')}
-                >
-                  <ListingIcon tone="blue" className="customers-listings-preset-icon" />
-                  <span>Clientes con contactos y ventas</span>
-                </button>
-              </div>
-
               <label className="customers-listings-field">
                 <span>Solicitud</span>
                 <textarea
@@ -1751,14 +1822,14 @@ export function CustomersPage() {
                   value={listingTarget}
                   onChange={(event) => setListingTarget(event.target.value)}
                   placeholder="Escribe el listado que quieres generar..."
-                      rows={5}
+                  rows={2}
                 />
               </label>
 
               <aside className="customers-listings-help-card">
                 <div className="customers-listings-help-head">
                   <ListingIcon tone="info" className="customers-listings-help-head-icon" />
-                  <h4>Solicitudes</h4>
+                  <h4>Solicitudes y exportación</h4>
                 </div>
 
                 <div className="customers-listings-history-block">
@@ -1803,9 +1874,26 @@ export function CustomersPage() {
                   )}
                 </div>
 
-                <div className="customers-listings-help-note">
-                  <ListingIcon tone="info" className="customers-listings-help-note-icon" />
-                  <span>Puedes usar datos de clientes, contactos, ventas, recetas y más.</span>
+                <div className="customers-listings-export-block">
+                  <div className="customers-listings-history-title">Exportar</div>
+                  <div className="customers-listings-export-actions">
+                    <button type="button" className="customers-listings-export-btn" onClick={handleListingPrint} disabled={!listingResult?.rows.length}>
+                      Imprimir
+                    </button>
+                    <button type="button" className="customers-listings-export-btn" onClick={handleListingPdfExport} disabled={!listingResult?.rows.length}>
+                      PDF
+                    </button>
+                    <button type="button" className="customers-listings-export-btn" onClick={handleListingExcelExport} disabled={!listingResult?.rows.length}>
+                      Excel
+                    </button>
+                    <button type="button" className="customers-listings-export-btn" onClick={handleListingCsvExport} disabled={!listingResult?.rows.length}>
+                      CSV
+                    </button>
+                  </div>
+                  <div className="customers-listings-help-note">
+                    <ListingIcon tone="info" className="customers-listings-help-note-icon" />
+                    <span>Puedes usar datos de clientes, contactos, ventas, recetas y más.</span>
+                  </div>
                 </div>
               </aside>
 
@@ -1860,13 +1948,15 @@ export function CustomersPage() {
                 </div>
               )}
 
-              <div className="customers-detail-actions customers-modal-actions customers-listings-actions">
-                <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={listingSubmitting}>
-                  {listingSubmitting ? 'Preparando...' : 'Generar listado'}
-                </button>
-                <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={listingSubmitting} onClick={closeListingsModal}>
-                  Cancelar
-                </button>
+              <div className="customers-listings-footer-actions">
+                <div className="customers-detail-actions customers-modal-actions customers-listings-actions">
+                  <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={listingSubmitting}>
+                    {listingSubmitting ? 'Preparando...' : 'Generar listado'}
+                  </button>
+                  <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={listingSubmitting} onClick={closeListingsModal}>
+                    Cancelar
+                  </button>
+                </div>
               </div>
             </form>
           </div>

@@ -4389,14 +4389,14 @@ tbody tr:hover {
 }
 
 .customers-listings-body {
-  gap: 18px;
+  gap: 14px;
   overflow: hidden;
 }
 
 .customers-listings-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.9fr) minmax(340px, 0.95fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(360px, 0.95fr);
+  gap: 14px;
   align-items: start;
   overflow: hidden;
 }
@@ -4464,7 +4464,7 @@ tbody tr:hover {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  min-height: 42px;
+  min-height: 34px;
   padding: 0 18px;
   border: 1px solid #d8e1ef;
   border-radius: 999px;
@@ -4516,17 +4516,17 @@ tbody tr:hover {
 
 .customers-listings-field > span {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
 .customers-listings-textarea {
-  min-height: 128px;
+  min-height: 84px;
   resize: vertical;
-  padding-top: 12px;
-  padding-bottom: 12px;
+  padding-top: 10px;
+  padding-bottom: 10px;
   line-height: 1.5;
   border-radius: 16px;
   background: #ffffff;
@@ -4535,7 +4535,7 @@ tbody tr:hover {
 
 .customers-listings-help-card {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   padding: 18px 20px 16px;
   border-radius: 18px;
   background: linear-gradient(180deg, #f8fbff, #f6f9ff);
@@ -4556,19 +4556,19 @@ tbody tr:hover {
 
 .customers-listings-help-head h4 {
   margin: 0;
-  font-size: 17px;
+  font-size: 15px;
   line-height: 1.2;
 }
 
 .customers-listings-tips {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .customers-listings-tip {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
-  gap: 12px;
+  gap: 10px;
   align-items: start;
 }
 
@@ -4599,12 +4599,12 @@ tbody tr:hover {
 
 .customers-listings-tip-copy strong {
   color: #1e293b;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .customers-listings-tip-copy span {
   color: #64748b;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.45;
 }
 
@@ -4612,7 +4612,7 @@ tbody tr:hover {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding-top: 18px;
+  padding-top: 12px;
   border-top: 1px solid #dbe7ff;
   color: #3b82f6;
   font-size: 12px;
@@ -4627,7 +4627,7 @@ tbody tr:hover {
 
 .customers-listings-history-block {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .customers-listings-history-title {
@@ -4640,14 +4640,14 @@ tbody tr:hover {
 
 .customers-listings-history-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .customers-listings-history-item {
   display: grid;
   gap: 4px;
   width: 100%;
-  padding: 10px 12px;
+  padding: 9px 10px;
   border: 1px solid #dbe7ff;
   border-radius: 14px;
   background: linear-gradient(180deg, #ffffff, #f9fbff);
@@ -4666,31 +4666,64 @@ tbody tr:hover {
 
 .customers-listings-history-prompt {
   color: #1e293b;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1.35;
 }
 
 .customers-listings-history-meta {
   color: #64748b;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
 }
 
 .customers-listings-history-empty {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px dashed #d7e3f5;
   border-radius: 14px;
   color: #64748b;
   background: rgba(255, 255, 255, 0.78);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.45;
+}
+
+.customers-listings-export-block {
+  display: grid;
+  gap: 8px;
+}
+
+.customers-listings-export-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.customers-listings-export-btn {
+  min-height: 34px;
+  border: 1px solid #cbdaf7;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff, #f7faff);
+  color: #3957b7;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.customers-listings-export-btn:hover:not(:disabled),
+.customers-listings-export-btn:focus-visible:not(:disabled) {
+  outline: none;
+  border-color: #9eb7f7;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+}
+
+.customers-listings-export-btn:disabled {
+  opacity: 0.55;
+  color: #94a3b8;
 }
 
 .customers-listings-result {
   display: grid;
   gap: 10px;
-  padding: 14px;
+  padding: 12px;
   border: 1px solid #dbe4f0;
   border-radius: 18px;
   background: linear-gradient(180deg, #ffffff, #fbfdff);
@@ -4709,7 +4742,7 @@ tbody tr:hover {
 .customers-listings-result-head strong {
   display: block;
   color: #1f2937;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .customers-listings-result-head span {
@@ -4722,7 +4755,7 @@ tbody tr:hover {
   justify-content: space-between;
   gap: 12px;
   color: #6b7280;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.35;
 }
 
@@ -4734,7 +4767,7 @@ tbody tr:hover {
 }
 
 .customers-listings-table-wrap {
-  max-height: 276px;
+  max-height: 248px;
   overflow: auto;
   border: 1px solid #dbe4f0;
   border-radius: 14px;
@@ -4751,7 +4784,7 @@ tbody tr:hover {
 .customers-listings-table thead th {
   position: sticky;
   top: 0;
-  padding: 10px 12px;
+  padding: 8px 10px;
   background: linear-gradient(180deg, #f8fbff, #edf4ff);
   color: var(--brand-strong);
   text-align: left;
@@ -4761,7 +4794,7 @@ tbody tr:hover {
 }
 
 .customers-listings-table tbody td {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-bottom: 1px solid #edf2f7;
   color: #1f2937;
   font-size: 12px;
@@ -4777,6 +4810,14 @@ tbody tr:hover {
   justify-content: flex-end;
   grid-column: 1 / -1;
   margin-top: 0;
+}
+
+.customers-listings-footer-actions {
+  grid-column: 1 / -1;
+  position: sticky;
+  bottom: 0;
+  padding-top: 4px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), #ffffff 38%);
 }
 
 .customers-modal-actions {
