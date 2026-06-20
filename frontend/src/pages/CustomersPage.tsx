@@ -132,81 +132,6 @@ const LISTING_TIPS = [
   },
 ] as const
 
-type ListingHistoryItem = {
-  prompt: string
-  count: number
-  lastUsedAt: number
-}
-
-const LISTING_HISTORY_STORAGE_KEY = 'customers.listings.history.v1'
-const LISTING_HISTORY_LIMIT = 6
-
-function normalizeListingPrompt(prompt: string) {
-  return prompt.trim().replace(/\s+/g, ' ').toLowerCase()
-}
-
-function loadListingHistory(): ListingHistoryItem[] {
-  if (typeof window === 'undefined') {
-    return []
-  }
-
-  try {
-    const raw = window.localStorage.getItem(LISTING_HISTORY_STORAGE_KEY)
-    if (!raw) {
-      return []
-    }
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) {
-      return []
-    }
-    return parsed
-      .map((item) => ({
-        prompt: String(item?.prompt || '').trim(),
-        count: Number(item?.count || 0),
-        lastUsedAt: Number(item?.lastUsedAt || 0),
-      }))
-      .filter((item) => item.prompt)
-      .slice(0, LISTING_HISTORY_LIMIT)
-  } catch {
-    return []
-  }
-}
-
-function mergeListingHistory(history: ListingHistoryItem[], prompt: string) {
-  const normalized = normalizeListingPrompt(prompt)
-  if (!normalized) {
-    return history
-  }
-
-  const now = Date.now()
-  const existing = history.find((item) => normalizeListingPrompt(item.prompt) === normalized)
-  const nextItem: ListingHistoryItem = {
-    prompt: prompt.trim(),
-    count: (existing?.count || 0) + 1,
-    lastUsedAt: now,
-  }
-  const nextHistory = [nextItem, ...history.filter((item) => normalizeListingPrompt(item.prompt) !== normalized)]
-  return nextHistory.slice(0, LISTING_HISTORY_LIMIT)
-}
-
-function formatRelativeListingTime(timestamp: number) {
-  if (!timestamp) {
-    return ''
-  }
-
-  const diffMs = Date.now() - timestamp
-  const diffMinutes = Math.max(1, Math.round(diffMs / 60000))
-  if (diffMinutes < 60) {
-    return `${diffMinutes} min`
-  }
-  const diffHours = Math.max(1, Math.round(diffMinutes / 60))
-  if (diffHours < 24) {
-    return `${diffHours} h`
-  }
-  const diffDays = Math.max(1, Math.round(diffHours / 24))
-  return `${diffDays} d`
-}
-
 function escapeCsvValue(value: string) {
   return `"${value.replace(/"/g, '""')}"`
 }
@@ -565,7 +490,6 @@ export function CustomersPage() {
   const [listingResult, setListingResult] = useState<CustomerListingResponse | null>(null)
   const [listingModalOpen, setListingModalOpen] = useState(false)
   const [listingSubmitting, setListingSubmitting] = useState(false)
-  const [listingHistory, setListingHistory] = useState<ListingHistoryItem[]>(() => loadListingHistory())
   const autosaveTimerRef = useRef<number | null>(null)
   const listingsPrintWindowRef = useRef<Window | null>(null)
   const invalidSignatureRef = useRef('')
@@ -619,12 +543,6 @@ export function CustomersPage() {
     })
     return rows
   }, [visibleCustomerRows, sortDirection, sortKey, islandInitialsById])
-
-  const recentListingHistory = useMemo(() => [...listingHistory].sort((left, right) => right.lastUsedAt - left.lastUsedAt).slice(0, 3), [listingHistory])
-  const popularListingHistory = useMemo(
-    () => [...listingHistory].sort((left, right) => right.count - left.count || right.lastUsedAt - left.lastUsedAt).slice(0, 3),
-    [listingHistory],
-  )
 
   const selectedCustomerId = useMemo(() => {
     if (!sortedCustomerRows.length) {
@@ -746,13 +664,6 @@ export function CustomersPage() {
       }
     }
   }, [draft, isCreating, selectedDetail, selectedCustomerId, syncedDraft])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
-    window.localStorage.setItem(LISTING_HISTORY_STORAGE_KEY, JSON.stringify(listingHistory))
-  }, [listingHistory])
 
   const setDraftField = <K extends keyof CustomerDraft>(key: K, value: CustomerDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }))
@@ -939,7 +850,6 @@ export function CustomersPage() {
     try {
       const result = await generateCustomerListing(prompt)
       setListingResult(result)
-      setListingHistory((current) => mergeListingHistory(current, prompt))
     } catch (error) {
       setListingError(getErrorMessage(error))
     } finally {
@@ -1851,76 +1761,6 @@ export function CustomersPage() {
                 <ListingIcon tone="info" className="customers-listings-help-note-icon" />
                 <span>Puedes usar datos de clientes, contactos, ventas, recetas y más.</span>
               </div>
-
-              <div className="customers-listings-right-title">
-                <h4 className="customers-listings-section-label">Solicitudes y exportación</h4>
-              </div>
-
-              <aside className="customers-listings-help-card">
-                <div className="customers-listings-history-block">
-                  <div className="customers-listings-history-title">Recientes</div>
-                  {recentListingHistory.length ? (
-                    <div className="customers-listings-history-list">
-                      {recentListingHistory.map((item) => (
-                        <button
-                          key={`recent-${item.prompt}`}
-                          type="button"
-                          className="customers-listings-history-item"
-                          onClick={() => setListingTarget(item.prompt)}
-                        >
-                          <span className="customers-listings-history-prompt">{item.prompt}</span>
-                          <span className="customers-listings-history-meta">{formatRelativeListingTime(item.lastUsedAt)}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="customers-listings-history-empty">Aún no hay solicitudes recientes.</div>
-                  )}
-                </div>
-
-                <div className="customers-listings-history-block">
-                  <div className="customers-listings-history-title">Más usadas</div>
-                  {popularListingHistory.length ? (
-                    <div className="customers-listings-history-list">
-                      {popularListingHistory.map((item) => (
-                        <button
-                          key={`popular-${item.prompt}`}
-                          type="button"
-                          className="customers-listings-history-item"
-                          onClick={() => setListingTarget(item.prompt)}
-                        >
-                          <span className="customers-listings-history-prompt">{item.prompt}</span>
-                          <span className="customers-listings-history-meta">{item.count} usos</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="customers-listings-history-empty">Las consultas más usadas aparecerán aquí.</div>
-                  )}
-                </div>
-
-                <div className="customers-listings-export-block">
-                  <div className="customers-listings-history-title">Exportar</div>
-                  <div className="customers-listings-export-actions">
-                    <button type="button" className="customers-listings-export-btn" onClick={handleListingPrint} disabled={!listingResult?.rows.length}>
-                      Imprimir
-                    </button>
-                    <button type="button" className="customers-listings-export-btn" onClick={handleListingPdfExport} disabled={!listingResult?.rows.length}>
-                      PDF
-                    </button>
-                    <button type="button" className="customers-listings-export-btn" onClick={handleListingExcelExport} disabled={!listingResult?.rows.length}>
-                      Excel
-                    </button>
-                    <button type="button" className="customers-listings-export-btn" onClick={handleListingCsvExport} disabled={!listingResult?.rows.length}>
-                      CSV
-                    </button>
-                  </div>
-                  <div className="customers-listings-help-note">
-                    <ListingIcon tone="info" className="customers-listings-help-note-icon" />
-                    <span>Puedes usar datos de clientes, contactos, ventas, recetas y más.</span>
-                  </div>
-                </div>
-              </aside>
 
               <div className="customers-listings-result">
                 <div className="customers-listings-result-head">

@@ -3905,8 +3905,6 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 
-  .customers-listings-help-card,
-  .customers-listings-right-title,
   .customers-listings-ribbon,
   .customers-listings-ribbon-note,
   .customers-listings-result,
@@ -4398,9 +4396,9 @@ tbody tr:hover {
 
 .customers-listings-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(360px, 0.95fr);
+  grid-template-columns: minmax(0, 1fr);
   --customers-listings-card-height: clamp(360px, 46vh, 520px);
-  grid-template-rows: auto auto auto var(--customers-listings-card-height) auto auto;
+  grid-template-rows: auto auto auto var(--customers-listings-card-height) auto;
   gap: 14px 16px;
   align-items: start;
   align-content: start;
@@ -4570,7 +4568,7 @@ tbody tr:hover {
 
 .customers-listings-ribbon-note {
   grid-column: 1;
-  grid-row: 6;
+  grid-row: 5;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -4583,44 +4581,6 @@ tbody tr:hover {
   background: linear-gradient(180deg, #f8fbff, #f6f9ff);
   color: #3b82f6;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
-}
-
-.customers-listings-right-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  grid-column: 2;
-  grid-row: 1;
-  align-self: start;
-  margin-bottom: -10px;
-  padding: 6px 2px 2px;
-  color: #1e40af;
-  z-index: 1;
-}
-
-.customers-listings-right-title h4 {
-  margin: 0;
-  color: inherit;
-}
-
-.customers-listings-help-card {
-  display: grid;
-  gap: 12px;
-  padding: 28px 20px 16px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #f8fbff, #f6f9ff);
-  border: 1px solid #dbe7ff;
-  color: #334155;
-  grid-column: 2;
-  grid-row: 1 / span 5;
-  min-height: 100%;
-  height: 100%;
-  overflow: auto;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
-}
-
-.customers-listings-help-card .customers-listings-history-block:first-child {
-  margin-top: 0;
 }
 
 .customers-listings-tips {
