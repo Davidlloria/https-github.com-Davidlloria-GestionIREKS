@@ -3906,6 +3906,8 @@ tbody tr:hover {
   }
 
   .customers-listings-help-card,
+  .customers-listings-ribbon,
+  .customers-listings-ribbon-note,
   .customers-listings-result,
   .customers-listings-error,
   .customers-listings-actions {
@@ -4352,7 +4354,7 @@ tbody tr:hover {
 
 .customers-modal-listings {
   width: min(1320px, calc(100vw - 48px));
-  max-height: min(900px, calc(100vh - 48px));
+  height: min(900px, calc(100vh - 48px));
   grid-template-rows: auto minmax(0, 1fr);
   padding: 22px 26px 24px;
   border-radius: 28px;
@@ -4396,8 +4398,11 @@ tbody tr:hover {
 .customers-listings-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(360px, 0.95fr);
-  gap: 14px;
+  grid-template-rows: auto auto minmax(320px, 1fr) auto auto;
+  gap: 14px 16px;
   align-items: start;
+  align-content: start;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -4512,6 +4517,7 @@ tbody tr:hover {
   display: grid;
   gap: 6px;
   grid-column: 1;
+  grid-row: 1;
 }
 
 .customers-listings-field > span {
@@ -4533,6 +4539,39 @@ tbody tr:hover {
   box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
+.customers-listings-ribbon {
+  display: grid;
+  gap: 10px;
+  grid-column: 1;
+  grid-row: 2;
+  padding: 12px 14px;
+  border: 1px solid #dbe4f0;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fbfdff, #f7faff);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.customers-listings-ribbon-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #1e40af;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.customers-listings-export-actions-ribbon {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.customers-listings-ribbon-note {
+  grid-column: 1;
+  grid-row: 4;
+  margin-top: -2px;
+}
+
 .customers-listings-help-card {
   display: grid;
   gap: 12px;
@@ -4542,8 +4581,10 @@ tbody tr:hover {
   border: 1px solid #dbe7ff;
   color: #334155;
   grid-column: 2;
-  grid-row: 2 / span 3;
+  grid-row: 1 / span 5;
   min-height: 100%;
+  height: 100%;
+  overflow: auto;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
@@ -4688,8 +4729,7 @@ tbody tr:hover {
 }
 
 .customers-listings-export-block {
-  display: grid;
-  gap: 8px;
+  display: none;
 }
 
 .customers-listings-export-actions {
@@ -4722,6 +4762,7 @@ tbody tr:hover {
 
 .customers-listings-result {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 10px;
   padding: 12px;
   border: 1px solid #dbe4f0;
@@ -4729,6 +4770,10 @@ tbody tr:hover {
   background: linear-gradient(180deg, #ffffff, #fbfdff);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
   grid-column: 1;
+  grid-row: 3;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .customers-listings-result-head {
@@ -4767,7 +4812,8 @@ tbody tr:hover {
 }
 
 .customers-listings-table-wrap {
-  max-height: 248px;
+  max-height: none;
+  min-height: 0;
   overflow: auto;
   border: 1px solid #dbe4f0;
   border-radius: 14px;
@@ -4814,6 +4860,7 @@ tbody tr:hover {
 
 .customers-listings-footer-actions {
   grid-column: 1 / -1;
+  grid-row: 5;
   position: sticky;
   bottom: 0;
   padding-top: 4px;
@@ -4826,6 +4873,7 @@ tbody tr:hover {
 
 .customers-listings-error {
   grid-column: 1;
+  grid-row: 4;
 }
 
 .customers-delete-summary {

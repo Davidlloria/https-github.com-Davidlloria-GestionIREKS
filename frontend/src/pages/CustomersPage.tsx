@@ -1826,6 +1826,32 @@ export function CustomersPage() {
                 />
               </label>
 
+              <div className="customers-listings-ribbon">
+                <div className="customers-listings-ribbon-head">
+                  <ListingIcon tone="preview" className="customers-listings-help-head-icon" />
+                  <span>Exportar listado</span>
+                </div>
+                <div className="customers-listings-export-actions customers-listings-export-actions-ribbon">
+                  <button type="button" className="customers-listings-export-btn" onClick={handleListingPrint} disabled={!listingResult?.rows.length}>
+                    Imprimir
+                  </button>
+                  <button type="button" className="customers-listings-export-btn" onClick={handleListingPdfExport} disabled={!listingResult?.rows.length}>
+                    PDF
+                  </button>
+                  <button type="button" className="customers-listings-export-btn" onClick={handleListingExcelExport} disabled={!listingResult?.rows.length}>
+                    Excel
+                  </button>
+                  <button type="button" className="customers-listings-export-btn" onClick={handleListingCsvExport} disabled={!listingResult?.rows.length}>
+                    CSV
+                  </button>
+                </div>
+              </div>
+
+              <div className="customers-listings-help-note customers-listings-ribbon-note">
+                <ListingIcon tone="info" className="customers-listings-help-note-icon" />
+                <span>Puedes usar datos de clientes, contactos, ventas, recetas y mÃ¡s.</span>
+              </div>
+
               <aside className="customers-listings-help-card">
                 <div className="customers-listings-help-head">
                   <ListingIcon tone="info" className="customers-listings-help-head-icon" />
