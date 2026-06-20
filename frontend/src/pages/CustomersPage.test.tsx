@@ -96,9 +96,6 @@ describe('CustomersPage CRUD', () => {
     fireEvent.change(screen.getByLabelText('Nombre fiscal'), { target: { value: 'Cliente Dos SL' } })
     fireEvent.change(screen.getByLabelText('C.I.F.'), { target: { value: 'B999' } })
     fireEvent.change(screen.getByLabelText('Telefono'), { target: { value: '928000002' } })
-    fireEvent.change(screen.getByPlaceholderText('Tipo de cliente'), { target: { value: 'HOTEL' } })
-    fireEvent.change(screen.getByLabelText('Grupo'), { target: { value: 'Grupo B' } })
-    fireEvent.change(screen.getByLabelText('Distribuidor'), { target: { value: 'DIST-2' } })
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 

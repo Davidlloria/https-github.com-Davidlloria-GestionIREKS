@@ -865,67 +865,6 @@ export function CustomersPage() {
                       </label>
                     </div>
 
-                    <div className="customers-field-row customers-field-row-location">
-                      <label>
-                        <span>Tipo</span>
-                        <input
-                          className="input customers-field"
-                          value={draft.cliente_tipo}
-                          onChange={(event) => setDraftField('cliente_tipo', event.target.value)}
-                          placeholder="Tipo de cliente"
-                          list="customer-types"
-                        />
-                        <datalist id="customer-types">
-                          {CUSTOMER_TYPES.map((type) => (
-                            <option key={type} value={type} />
-                          ))}
-                        </datalist>
-                      </label>
-                      <label>
-                        <span>Grupo</span>
-                        <input
-                          className="input customers-field"
-                          value={draft.cliente_grupo}
-                          onChange={(event) => setDraftField('cliente_grupo', event.target.value)}
-                          placeholder="Grupo"
-                        />
-                      </label>
-                      <label>
-                        <span>Distribuidor</span>
-                        <input
-                          className="input customers-field"
-                          value={draft.distribuidor_id}
-                          onChange={(event) => setDraftField('distribuidor_id', event.target.value)}
-                          placeholder="ID distribuidor"
-                        />
-                      </label>
-                    </div>
-
-                    <div className="customers-field-row customers-field-row-location">
-                      <label className="customers-prospect-row">
-                        <span>Activo</span>
-                        <input
-                          type="checkbox"
-                          checked={draft.activo}
-                          onChange={(event) => setDraftField('activo', event.target.checked)}
-                        />
-                      </label>
-                      <label className="customers-prospect-row">
-                        <span>Prospeccion</span>
-                        <input
-                          type="checkbox"
-                          checked={draft.cliente_prospeccion}
-                          onChange={(event) => setDraftField('cliente_prospeccion', event.target.checked)}
-                        />
-                      </label>
-                      <div className="customers-prospect-row">
-                        <span>Estado de edicion</span>
-                        <span className={`customers-status-pill ${draft.activo ? 'is-active' : 'is-inactive'}`}>
-                          {draft.activo ? 'ACTIVO' : 'INACTIVO'}
-                        </span>
-                      </div>
-                    </div>
-
                     <div className="customers-detail-actions">
                       <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={saving}>
                         Guardar
@@ -1104,67 +1043,6 @@ export function CustomersPage() {
                                   autoComplete="street-address"
                                 />
                               </label>
-                            </div>
-
-                            <div className="customers-field-row customers-field-row-location">
-                              <label>
-                                <span>Tipo</span>
-                                <input
-                                  className="input customers-field"
-                                  value={draft.cliente_tipo}
-                                  onChange={(event) => setDraftField('cliente_tipo', event.target.value)}
-                                  placeholder="Tipo de cliente"
-                                  list="customer-types"
-                                />
-                                <datalist id="customer-types">
-                                  {CUSTOMER_TYPES.map((type) => (
-                                    <option key={type} value={type} />
-                                  ))}
-                                </datalist>
-                              </label>
-                              <label>
-                                <span>Grupo</span>
-                                <input
-                                  className="input customers-field"
-                                  value={draft.cliente_grupo}
-                                  onChange={(event) => setDraftField('cliente_grupo', event.target.value)}
-                                  placeholder="Grupo"
-                                />
-                              </label>
-                              <label>
-                                <span>Distribuidor</span>
-                                <input
-                                  className="input customers-field"
-                                  value={draft.distribuidor_id}
-                                  onChange={(event) => setDraftField('distribuidor_id', event.target.value)}
-                                  placeholder="ID distribuidor"
-                                />
-                              </label>
-                            </div>
-
-                            <div className="customers-field-row customers-field-row-location">
-                              <label className="customers-prospect-row">
-                                <span>Activo</span>
-                                <input
-                                  type="checkbox"
-                                  checked={draft.activo}
-                                  onChange={(event) => setDraftField('activo', event.target.checked)}
-                                />
-                              </label>
-                              <label className="customers-prospect-row">
-                                <span>Prospeccion</span>
-                                <input
-                                  type="checkbox"
-                                  checked={draft.cliente_prospeccion}
-                                  onChange={(event) => setDraftField('cliente_prospeccion', event.target.checked)}
-                                />
-                              </label>
-                              <div className="customers-prospect-row">
-                                <span>Estado</span>
-                                <span className={`customers-status-pill ${draft.activo ? 'is-active' : 'is-inactive'}`}>
-                                  {draft.activo ? 'ACTIVO' : 'INACTIVO'}
-                                </span>
-                              </div>
                             </div>
 
                             {isCreating && (
