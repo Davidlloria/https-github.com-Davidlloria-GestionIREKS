@@ -32,7 +32,7 @@ export function BinaryToggleSelect({
 }: BinaryToggleSelectProps) {
   const rootClassName = ['binary-toggle-select', className, disabled ? 'is-disabled' : ''].filter(Boolean).join(' ')
   const resolvedTrueIcon = resolveIcon(trueIcon, <span aria-hidden="true">✓</span>)
-  const resolvedFalseIcon = resolveIcon(falseIcon, <span aria-hidden="true">✕</span>)
+  const resolvedFalseIcon = resolveIcon(falseIcon, <span aria-hidden="true">×</span>)
 
   return (
     <div className={rootClassName} role="group" aria-label={ariaLabel} data-value={value ? 'true' : 'false'}>

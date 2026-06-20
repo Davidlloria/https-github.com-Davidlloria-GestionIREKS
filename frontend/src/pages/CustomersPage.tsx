@@ -58,7 +58,6 @@ const EMPTY_LIST: PaginatedList<CustomerListItem> = {
 }
 
 const CUSTOMER_TYPES = ['PANADERIA', 'PASTELERIA', 'HELADERIA', 'CAFETERIA', 'RESTAURANTE', 'HOTEL']
-const CUSTOMER_TYPE_OPTIONS = ['DIRECTO', 'INDIRECTO']
 const CUSTOMER_TYPE_TONES: Record<string, string> = {
   PANADERIA: 'tone-panaderia',
   PASTELERIA: 'tone-pasteleria',
@@ -1100,31 +1099,25 @@ export function CustomersPage() {
                     <div className="customers-type-fields">
                       <label>
                         <span>Tipo</span>
-                        <select
-                          className="select customers-field"
-                          value={draft.cliente_tipo}
-                          onChange={(event) => setDraftField('cliente_tipo', event.target.value)}
+                        <BinaryToggleSelect
+                          value={draft.cliente_tipo.toUpperCase() === 'DIRECTO'}
+                          onChange={(nextValue) => setDraftField('cliente_tipo', nextValue ? 'DIRECTO' : 'INDIRECTO')}
+                          trueLabel="DIREC."
+                          falseLabel="INDIR."
                           disabled={saving}
-                        >
-                          <option value="">Selecciona tipo</option>
-                          {CUSTOMER_TYPE_OPTIONS.map((type) => (
-                            <option key={type} value={type}>
-                              {type}
-                            </option>
-                          ))}
-                        </select>
+                          ariaLabel="Tipo de cliente"
+                        />
                       </label>
                     </div>
 
                     <BinaryToggleSelect
                       value={draft.activo}
                       onChange={(nextValue) => setDraftField('activo', nextValue)}
-                      trueLabel="ACTIVO"
-                      falseLabel="INACTIVO"
-                      trueIcon={<span aria-hidden="true">✓</span>}
-                      falseIcon={<span aria-hidden="true">✕</span>}
+                      trueLabel="ACTI."
+                      falseLabel="INACT."
                       disabled={saving}
                       ariaLabel="Estado del cliente"
+                      className="binary-toggle-select--customer-status"
                     />
 
                     <div className="customers-prospect-row">
@@ -1132,12 +1125,11 @@ export function CustomersPage() {
                       <BinaryToggleSelect
                         value={draft.cliente_prospeccion}
                         onChange={(nextValue) => setDraftField('cliente_prospeccion', nextValue)}
-                        trueLabel="Sí"
-                        falseLabel="No"
-                        trueIcon={<span aria-hidden="true">✓</span>}
-                        falseIcon={<span aria-hidden="true">✕</span>}
+                        trueLabel="SI"
+                        falseLabel="NO"
                         disabled={saving}
                         ariaLabel="Prospección"
+                        className="binary-toggle-select--customer-prospect"
                       />
                     </div>
                   </>
@@ -1178,8 +1170,7 @@ export function CustomersPage() {
                             {draft.activo ? 'INACTIVO' : 'ACTIVO'}
                           </span>
                         </div>
-
-                        <div className="customers-prospect-row">
+                    <div className="customers-prospect-row">
                           <span>Prospeccion</span>
                           <div className="customers-radio-readonly">
                             <span className={draft.cliente_prospeccion ? 'selected' : ''}>Si</span>

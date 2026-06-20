@@ -2692,6 +2692,15 @@ button {
   max-width: 420px;
 }
 
+.binary-toggle-select--customer-status,
+.binary-toggle-select--customer-prospect {
+  width: 100%;
+}
+
+.customers-type-fields .binary-toggle-select {
+  width: 100%;
+}
+
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -4554,9 +4563,9 @@ tbody tr:hover {
 }
 
 .customers-prospect-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
 }
 
