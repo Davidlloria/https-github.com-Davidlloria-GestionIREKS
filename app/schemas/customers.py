@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlmodel import Field
 
 from .base import AppSchema, PaginatedResponse
@@ -81,9 +83,25 @@ class CustomerAddressCatalogsPayload(AppSchema):
     localidades: list[AddressOption] = Field(default_factory=list)
 
 
+class CustomerListingRequest(AppSchema):
+    prompt: str = ""
+
+
+class CustomerListingResponse(AppSchema):
+    status: str = ""
+    message: str = ""
+    title: str = ""
+    headers: list[str] = Field(default_factory=list)
+    rows: list[list[Any]] = Field(default_factory=list)
+    source: str = ""
+    used_ai: bool = False
+
+
 __all__ = [
     "AddressOption",
     "CustomerAddressCatalogsPayload",
+    "CustomerListingRequest",
+    "CustomerListingResponse",
     "CustomerBase",
     "CustomerCreate",
     "CustomerDetail",

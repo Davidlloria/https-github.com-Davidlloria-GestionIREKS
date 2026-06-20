@@ -13,6 +13,22 @@ export interface CustomerAddressCatalogsPayload {
   localidades: AddressOption[]
 }
 
+export type CustomerListingCell = string | number | boolean | null
+
+export interface CustomerListingRequest {
+  prompt: string
+}
+
+export interface CustomerListingResponse {
+  status: string
+  message: string
+  title: string
+  headers: string[]
+  rows: CustomerListingCell[][]
+  source: string
+  used_ai: boolean
+}
+
 export interface CustomerListItem {
   cliente_id: string
   cliente_codigo: number

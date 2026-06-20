@@ -73,6 +73,15 @@ vi.mock('../api/customers', () => ({
   deleteCustomer: vi.fn(async (customerId: string) => {
     customerStore = customerStore.filter((item) => item.cliente_id !== customerId)
   }),
+  generateCustomerListing: vi.fn(async () => ({
+    status: 'ready',
+    message: 'Generado con ChatGPT.',
+    title: 'Listado de clientes activos',
+    headers: ['Cod.', 'Nombre comercial'],
+    rows: [['101', 'Cliente Uno']],
+    source: 'ChatGPT',
+    used_ai: true,
+  })),
 }))
 
 vi.mock('../api/contacts', () => ({
@@ -141,6 +150,11 @@ describe('CustomersPage CRUD', () => {
     const listingsDialog = await screen.findByRole('dialog', { name: 'Listados asistidos' })
     const listingsModal = within(listingsDialog)
     fireEvent.change(listingsModal.getByLabelText('Solicitud'), { target: { value: 'Clientes activos' } })
+    fireEvent.click(listingsModal.getByRole('button', { name: 'Generar listado' }))
+
+    expect(await listingsModal.findByText('Listado de clientes activos')).toBeInTheDocument()
+    expect(listingsModal.getByText('Cliente Uno')).toBeInTheDocument()
+
     fireEvent.click(listingsModal.getByRole('button', { name: 'Cancelar' }))
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Listados asistidos' })).not.toBeInTheDocument()

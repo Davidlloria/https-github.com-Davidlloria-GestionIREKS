@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   createCustomer,
   deleteCustomer,
+  generateCustomerListing,
   getCustomerAddressCatalogs,
   getCustomerDetail,
   listCustomers,
@@ -12,7 +13,15 @@ import { listContacts } from '../api/contacts'
 import { BinaryToggleSelect } from '../components/BinaryToggleSelect'
 import { QueryState } from '../components/QueryState'
 import { useAsyncResource } from '../features/useAsyncResource'
-import type { AddressOption, ContactListItem, CustomerAddressCatalogsPayload, CustomerDetail, CustomerListItem, PaginatedList } from '../types/api'
+import type {
+  AddressOption,
+  ContactListItem,
+  CustomerAddressCatalogsPayload,
+  CustomerDetail,
+  CustomerListItem,
+  CustomerListingResponse,
+  PaginatedList,
+} from '../types/api'
 
 const PAGE_SIZE = 25
 
@@ -347,6 +356,7 @@ export function CustomersPage() {
   const [deleting, setDeleting] = useState(false)
   const [listingTarget, setListingTarget] = useState('')
   const [listingError, setListingError] = useState('')
+  const [listingResult, setListingResult] = useState<CustomerListingResponse | null>(null)
   const [listingModalOpen, setListingModalOpen] = useState(false)
   const [listingSubmitting, setListingSubmitting] = useState(false)
   const autosaveTimerRef = useRef<number | null>(null)
@@ -573,6 +583,7 @@ export function CustomersPage() {
 
   const openListingsModal = () => {
     setListingError('')
+    setListingResult(null)
     setListingModalOpen(true)
   }
 
@@ -606,6 +617,30 @@ export function CustomersPage() {
       setListingSubmitting(false)
     }
   }
+
+  const handleListingSubmitV2 = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const prompt = listingTarget.trim()
+    if (!prompt) {
+      setListingError('Escribe primero qué listado necesitas.')
+      return
+    }
+
+    setListingSubmitting(true)
+    setListingError('')
+
+    try {
+      const result = await generateCustomerListing(prompt)
+      setListingResult(result)
+    } catch (error) {
+      setListingError(getErrorMessage(error))
+    } finally {
+      setListingSubmitting(false)
+    }
+  }
+
+  void handleListingSubmit
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) {
@@ -1458,7 +1493,7 @@ export function CustomersPage() {
               <span className="surface-chip customers-status-chip">ChatGPT</span>
             </div>
 
-            <form className="customers-modal-body customers-listings-body" onSubmit={handleListingSubmit}>
+            <form className="customers-modal-body customers-listings-body" onSubmit={handleListingSubmitV2}>
               <div className="customers-listings-presets">
                 <button type="button" className="customers-listings-preset" onClick={() => setListingTarget('Clientes activos de Tenerife con contactos principales')}>
                   Clientes activos de Tenerife
@@ -1486,6 +1521,45 @@ export function CustomersPage() {
                 <strong>Incluye detalles útiles.</strong>
                 <span>Por ejemplo: filtros, columnas, orden, rango de fechas o tablas relacionadas como contactos, ventas o recetas.</span>
               </div>
+
+              {listingResult && (
+                <div className="customers-listings-result">
+                  <div className="customers-listings-result-head">
+                    <div>
+                      <strong>{listingResult.title || 'Listado de clientes'}</strong>
+                      <span>{listingResult.source || 'interprete local'}</span>
+                    </div>
+                    <span className={`surface-chip ${listingResult.used_ai ? 'customers-status-chip is-active' : 'customers-status-chip is-inactive'}`}>
+                      {listingResult.used_ai ? 'ChatGPT' : 'Local'}
+                    </span>
+                  </div>
+
+                  {listingResult.message && <p className="customers-listings-result-message">{listingResult.message}</p>}
+
+                  {!!listingResult.headers.length && (
+                    <div className="customers-listings-table-wrap">
+                      <table className="customers-listings-table">
+                        <thead>
+                          <tr>
+                            {listingResult.headers.map((header) => (
+                              <th key={header}>{header}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {listingResult.rows.map((row, rowIndex) => (
+                            <tr key={rowIndex}>
+                              {row.map((cell, cellIndex) => (
+                                <td key={`${rowIndex}-${cellIndex}`}>{cell === null || cell === undefined || cell === '' ? '-' : String(cell)}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {listingError && (
                 <div className="state" role="alert">

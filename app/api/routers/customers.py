@@ -12,9 +12,13 @@ from app.schemas.customers import (
     CustomerAddressCatalogsPayload,
     CustomerCreate,
     CustomerDetail,
+    CustomerListingRequest,
+    CustomerListingResponse,
     CustomerListResponse,
     CustomerUpdate,
 )
+from app.api.deps import get_customer_report_flow_service
+from app.services.customer_report_flow_service import CustomerReportFlowService
 from app.services.customer_service import CustomerService
 
 
@@ -36,6 +40,34 @@ def address_catalogs(
     service: CustomerService = Depends(get_customer_service),
 ) -> CustomerAddressCatalogsPayload:
     return service.address_catalogs_payload()
+
+
+@router.post("/listings", response_model=CustomerListingResponse)
+def generate_listing(
+    payload: CustomerListingRequest,
+    service: CustomerReportFlowService = Depends(get_customer_report_flow_service),
+) -> CustomerListingResponse:
+    result = service.generate_report(payload.prompt)
+    report = result.report
+    if report is None:
+        return CustomerListingResponse(
+            status=result.status,
+            message=result.message,
+            title="",
+            headers=[],
+            rows=[],
+            source=result.source,
+            used_ai=result.used_ai,
+        )
+    return CustomerListingResponse(
+        status=result.status,
+        message=result.message,
+        title=report.title,
+        headers=report.headers,
+        rows=report.rows,
+        source=result.source,
+        used_ai=result.used_ai,
+    )
 
 
 @router.get("/{customer_id}", response_model=CustomerDetail)

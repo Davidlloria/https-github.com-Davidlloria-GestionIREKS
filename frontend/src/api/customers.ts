@@ -1,5 +1,12 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from './http'
-import type { CustomerAddressCatalogsPayload, CustomerDetail, CustomerListItem, PaginatedList } from '../types/api'
+import type {
+  CustomerAddressCatalogsPayload,
+  CustomerDetail,
+  CustomerListItem,
+  CustomerListingRequest,
+  CustomerListingResponse,
+  PaginatedList,
+} from '../types/api'
 
 export interface CustomerSavePayload {
   cliente_id?: string
@@ -51,4 +58,9 @@ export function createCustomer(payload: CustomerSavePayload) {
 
 export function updateCustomer(customerId: string, payload: CustomerSavePayload) {
   return apiPatch<CustomerDetail>(`/customers/${customerId}`, payload)
+}
+
+export function generateCustomerListing(prompt: string) {
+  const payload: CustomerListingRequest = { prompt }
+  return apiPost<CustomerListingResponse>('/customers/listings', payload)
 }

@@ -4,6 +4,7 @@ from app.services.contact_service import ContactService
 from app.services.course_service import CourseService
 from app.services.ingredient_read_service import IngredientReadService
 from app.services.customer_service import CustomerService
+from app.services.customer_report_flow_service import CustomerReportFlowService
 from app.services.api_settings_service import ApiSettingsService
 from app.services.ingredient_ireks_service import IngredientIreksService
 from app.services.ingredient_std_service import IngredientStdService
@@ -22,6 +23,10 @@ from app.services.technician_service import TechnicianService
 
 def get_customer_service() -> CustomerService:
     return CustomerService()
+
+
+def get_customer_report_flow_service() -> CustomerReportFlowService:
+    return CustomerReportFlowService()
 
 
 def get_contact_service() -> ContactService:
