@@ -223,6 +223,60 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Error de red'
 }
 
+function PostalCodeField({
+  value,
+  onChange,
+  options,
+}: {
+  value: string
+  onChange: (value: string) => void
+  options: AddressOption[]
+}) {
+  const [open, setOpen] = useState(false)
+
+  const visibleOptions = options.slice(0, 20)
+
+  return (
+    <label className="customers-field-postal">
+      <span>C.P.</span>
+      <div className="customers-postal-combo">
+        <input
+          className="input customers-field"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="C.P."
+          onFocus={() => setOpen(true)}
+          onBlur={() => {
+            window.setTimeout(() => setOpen(false), 120)
+          }}
+          autoComplete="off"
+        />
+        {open && visibleOptions.length > 0 && (
+          <div className="customers-postal-menu" role="listbox" aria-label="Codigos postales">
+            {visibleOptions.map((option) => {
+              const optionValue = option.code || option.label
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  className="customers-postal-option"
+                  onMouseDown={(event) => {
+                    event.preventDefault()
+                    onChange(optionValue)
+                    setOpen(false)
+                  }}
+                >
+                  {optionValue}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </label>
+  )
+}
+
 export function CustomersPage() {
   const [search, setSearch] = useState('')
   const [islandFilter, setIslandFilter] = useState('')
@@ -818,21 +872,7 @@ export function CustomersPage() {
                           ))}
                         </select>
                       </label>
-                      <label className="customers-field-postal">
-                        <span>C.P.</span>
-                        <input
-                          className="input customers-field"
-                          value={draft.cliente_direccion_cp}
-                          onChange={(event) => setDraftField('cliente_direccion_cp', event.target.value)}
-                          placeholder="C.P."
-                          list="customer-postal-codes"
-                        />
-                        <datalist id="customer-postal-codes">
-                          {filteredPostalCodes.map((option) => (
-                            <option key={option.id} value={option.code || option.label} />
-                          ))}
-                        </datalist>
-                      </label>
+                      <PostalCodeField value={draft.cliente_direccion_cp} onChange={(nextValue) => setDraftField('cliente_direccion_cp', nextValue)} options={filteredPostalCodes} />
                     </div>
 
                     <div className="customers-field-row customers-field-row-street">
@@ -1073,21 +1113,7 @@ export function CustomersPage() {
                                   ))}
                                 </select>
                               </label>
-                              <label className="customers-field-postal">
-                                <span>C.P.</span>
-                                <input
-                                  className="input customers-field"
-                                  value={draft.cliente_direccion_cp}
-                                  onChange={(event) => setDraftField('cliente_direccion_cp', event.target.value)}
-                                  placeholder="C.P."
-                                  list="customer-postal-codes"
-                                />
-                                <datalist id="customer-postal-codes">
-                                  {filteredPostalCodes.map((option) => (
-                                    <option key={option.id} value={option.code || option.label} />
-                                  ))}
-                                </datalist>
-                              </label>
+                              <PostalCodeField value={draft.cliente_direccion_cp} onChange={(nextValue) => setDraftField('cliente_direccion_cp', nextValue)} options={filteredPostalCodes} />
                             </div>
 
                             <div className="customers-field-row customers-field-row-street">
