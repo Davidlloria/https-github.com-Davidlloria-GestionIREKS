@@ -232,77 +232,21 @@ function PostalCodeField({
   onChange: (value: string) => void
   options: AddressOption[]
 }) {
-  const [open, setOpen] = useState(false)
-  const comboRef = useRef<HTMLDivElement | null>(null)
-  const toggleOpen = () => setOpen((current) => !current)
-
-  useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      if (comboRef.current && !comboRef.current.contains(event.target as Node)) {
-        setOpen(false)
-      }
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown)
-    return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [])
-
-  const visibleOptions = options.slice(0, 20)
-
   return (
     <label className="customers-field-postal">
       <span>C.P.</span>
-      <div ref={comboRef} className="customers-postal-combo">
-        <input
-          className="input customers-field"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="C.P."
-          onFocus={() => setOpen(true)}
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              setOpen(true)
-            }
-            if (event.key === 'Escape') {
-              setOpen(false)
-            }
-          }}
-          autoComplete="off"
-        />
-        <button
-          type="button"
-          className="customers-postal-toggle"
-          aria-label={open ? 'Cerrar codigos postales' : 'Abrir codigos postales'}
-          aria-expanded={open}
-          onClick={toggleOpen}
-        >
-          <span className="customers-postal-toggle-icon" aria-hidden="true">
-            ▾
-          </span>
-        </button>
-        {open && visibleOptions.length > 0 && (
-          <div className="customers-postal-menu" role="listbox" aria-label="Codigos postales">
-            {visibleOptions.map((option) => {
-              const optionValue = option.code || option.label
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  className="customers-postal-option"
-                  onMouseDown={(event) => {
-                    event.preventDefault()
-                    onChange(optionValue)
-                    setOpen(false)
-                  }}
-                >
-                  {optionValue}
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </div>
+      <input
+        className="input customers-field"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="C.P."
+        list="customer-postal-codes"
+      />
+      <datalist id="customer-postal-codes">
+        {options.map((option) => (
+          <option key={option.id} value={option.code || option.label} />
+        ))}
+      </datalist>
     </label>
   )
 }
