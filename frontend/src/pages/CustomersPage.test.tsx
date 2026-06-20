@@ -136,5 +136,14 @@ describe('CustomersPage CRUD', () => {
     await waitFor(() => {
       expect(screen.queryByText('Cliente Uno Editado')).not.toBeInTheDocument()
     })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Listados' }))
+    const listingsDialog = await screen.findByRole('dialog', { name: 'Listados asistidos' })
+    const listingsModal = within(listingsDialog)
+    fireEvent.change(listingsModal.getByLabelText('Solicitud'), { target: { value: 'Clientes activos' } })
+    fireEvent.click(listingsModal.getByRole('button', { name: 'Cancelar' }))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Listados asistidos' })).not.toBeInTheDocument()
+    })
   }, 15000)
 })

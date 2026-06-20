@@ -4338,6 +4338,11 @@ tbody tr:hover {
   grid-template-rows: auto auto auto auto;
 }
 
+.customers-modal-listings {
+  width: min(760px, 100%);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .customers-modal-head {
   display: flex;
   align-items: flex-start;
@@ -4363,6 +4368,82 @@ tbody tr:hover {
   overflow: auto;
   display: grid;
   gap: 12px;
+}
+
+.customers-listings-body {
+  gap: 14px;
+}
+
+.customers-listings-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.customers-listings-preset {
+  border: 1px solid #d8e1ef;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #f8fbff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.customers-listings-preset:not(:disabled):hover,
+.customers-listings-preset:not(:disabled):focus-visible {
+  transform: translateY(-1px);
+  border-color: #9fc2ff;
+  background: #edf4ff;
+  outline: none;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+}
+
+.customers-listings-field {
+  display: grid;
+  gap: 6px;
+}
+
+.customers-listings-field > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.customers-listings-textarea {
+  min-height: 160px;
+  resize: vertical;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  line-height: 1.5;
+}
+
+.customers-listings-help {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f4f8ff;
+  border: 1px solid #dbe7ff;
+  color: #334155;
+}
+
+.customers-listings-help strong {
+  font-size: 12px;
+}
+
+.customers-listings-help span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.customers-listings-actions {
+  justify-content: flex-end;
 }
 
 .customers-modal-actions {

@@ -345,6 +345,10 @@ export function CustomersPage() {
   const [deleteTarget, setDeleteTarget] = useState<CustomerDeleteTarget | null>(null)
   const [deleteError, setDeleteError] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [listingTarget, setListingTarget] = useState('')
+  const [listingError, setListingError] = useState('')
+  const [listingModalOpen, setListingModalOpen] = useState(false)
+  const [listingSubmitting, setListingSubmitting] = useState(false)
   const autosaveTimerRef = useRef<number | null>(null)
   const invalidSignatureRef = useRef('')
 
@@ -567,6 +571,42 @@ export function CustomersPage() {
     setDeleteError('')
   }
 
+  const openListingsModal = () => {
+    setListingError('')
+    setListingModalOpen(true)
+  }
+
+  const closeListingsModal = () => {
+    if (listingSubmitting) {
+      return
+    }
+    setListingModalOpen(false)
+    setListingError('')
+  }
+
+  const handleListingSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const prompt = listingTarget.trim()
+    if (!prompt) {
+      setListingError('Escribe primero qué listado necesitas.')
+      return
+    }
+
+    setListingSubmitting(true)
+    setListingError('')
+
+    try {
+      // La integración real con ChatGPT se conectará en el siguiente paso.
+      setListingModalOpen(false)
+      setListingTarget('')
+    } catch (error) {
+      setListingError(getErrorMessage(error))
+    } finally {
+      setListingSubmitting(false)
+    }
+  }
+
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) {
       return
@@ -641,7 +681,7 @@ export function CustomersPage() {
               </span>
               <span>Eliminar</span>
             </button>
-            <button type="button" className="customers-action-btn customers-action-btn-ghost" disabled title="Listado pendiente en la versión web">
+            <button type="button" className="customers-action-btn customers-action-btn-ghost" onClick={openListingsModal}>
               <span className="customers-action-btn-icon" aria-hidden="true">
                 📄
               </span>
@@ -1401,6 +1441,70 @@ export function CustomersPage() {
           </div>
         </section>
       </div>
+
+      {listingModalOpen && (
+        <div className="customers-modal-overlay" role="presentation">
+          <div
+            className="customers-modal customers-modal-listings"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="customers-listings-modal-title"
+          >
+            <div className="customers-modal-head">
+              <div>
+                <h3 id="customers-listings-modal-title">Listados asistidos</h3>
+                <p>Describe el listado que necesitas y dejaremos preparada la consulta para su procesamiento automático.</p>
+              </div>
+              <span className="surface-chip customers-status-chip">ChatGPT</span>
+            </div>
+
+            <form className="customers-modal-body customers-listings-body" onSubmit={handleListingSubmit}>
+              <div className="customers-listings-presets">
+                <button type="button" className="customers-listings-preset" onClick={() => setListingTarget('Clientes activos de Tenerife con contactos principales')}>
+                  Clientes activos de Tenerife
+                </button>
+                <button type="button" className="customers-listings-preset" onClick={() => setListingTarget('Clientes con actividad panadería y ventas del último mes')}>
+                  Clientes con actividad panadería
+                </button>
+                <button type="button" className="customers-listings-preset" onClick={() => setListingTarget('Clientes con contactos, ventas y recetas relacionadas')}>
+                  Clientes con contactos y ventas
+                </button>
+              </div>
+
+              <label className="customers-listings-field">
+                <span>Solicitud</span>
+                <textarea
+                  className="input customers-listings-textarea"
+                  value={listingTarget}
+                  onChange={(event) => setListingTarget(event.target.value)}
+                  placeholder="Escribe el listado que quieres generar..."
+                  rows={7}
+                />
+              </label>
+
+              <div className="customers-listings-help">
+                <strong>Incluye detalles útiles.</strong>
+                <span>Por ejemplo: filtros, columnas, orden, rango de fechas o tablas relacionadas como contactos, ventas o recetas.</span>
+              </div>
+
+              {listingError && (
+                <div className="state" role="alert">
+                  {listingError}
+                </div>
+              )}
+
+              <div className="customers-detail-actions customers-modal-actions customers-listings-actions">
+                <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={listingSubmitting}>
+                  {listingSubmitting ? 'Preparando...' : 'Generar listado'}
+                </button>
+                <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={listingSubmitting} onClick={closeListingsModal}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {deleteTarget && (
         <div className="customers-modal-overlay" role="presentation">
