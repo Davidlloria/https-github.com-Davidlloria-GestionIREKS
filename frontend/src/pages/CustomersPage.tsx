@@ -1112,26 +1112,6 @@ export function CustomersPage() {
                           ))}
                         </select>
                       </label>
-                      <label>
-                        <span>Grupo</span>
-                        <input
-                          className="input customers-field"
-                          value={draft.cliente_grupo}
-                          onChange={(event) => setDraftField('cliente_grupo', event.target.value)}
-                          placeholder="Grupo"
-                          disabled={saving}
-                        />
-                      </label>
-                      <label>
-                        <span>Distribuidor</span>
-                        <input
-                          className="input customers-field"
-                          value={draft.distribuidor_id}
-                          onChange={(event) => setDraftField('distribuidor_id', event.target.value)}
-                          placeholder="ID distribuidor"
-                          disabled={saving}
-                        />
-                      </label>
                     </div>
 
                     <div className="customers-status-row">
