@@ -4592,6 +4592,7 @@ tbody tr:hover {
   grid-column: 2;
   grid-row: 1;
   align-self: start;
+  margin-bottom: -6px;
   padding: 6px 2px 0;
   color: #1e40af;
 }
@@ -4612,7 +4613,7 @@ tbody tr:hover {
   border: 1px solid #dbe7ff;
   color: #334155;
   grid-column: 2;
-  grid-row: 2 / span 5;
+  grid-row: 1 / span 5;
   min-height: 100%;
   height: 100%;
   overflow: auto;
