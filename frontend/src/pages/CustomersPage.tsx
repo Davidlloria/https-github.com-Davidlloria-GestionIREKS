@@ -1853,7 +1853,6 @@ export function CustomersPage() {
               </div>
 
               <div className="customers-listings-right-title">
-                <ListingIcon tone="info" className="customers-listings-help-head-icon" />
                 <h4 className="customers-listings-section-label">Solicitudes y exportación</h4>
               </div>
 
