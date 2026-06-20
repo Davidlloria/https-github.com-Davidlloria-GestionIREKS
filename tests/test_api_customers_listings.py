@@ -79,3 +79,9 @@ def test_customer_listings_endpoint_returns_report_data(api_client: TestClient) 
     assert payload["title"].startswith("Listado:")
     assert payload["headers"] == ["Cod.", "Nombre comercial", "Telefono", "Isla", "Tipo", "Activo"]
     assert payload["rows"] == [[101, "Cliente Uno", "", "Isla Uno", "directo", "Si"]]
+
+    response_blank_island = api_client.post("/customers/listings", json={"prompt": 'clientes con isla = ""'})
+    assert response_blank_island.status_code == 200
+    payload_blank_island = response_blank_island.json()
+    assert payload_blank_island["status"] == "ready"
+    assert payload_blank_island["rows"]

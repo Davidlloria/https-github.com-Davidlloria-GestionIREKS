@@ -141,7 +141,7 @@ class CustomerReportIntentService:
             intent = self._intent_from_mapping(parsed, fallback)
             return ReportIntentResult(True, intent, "Generado con ChatGPT.", True)
         except Exception as exc:  # noqa: BLE001
-            return ReportIntentResult(True, fallback, f"ChatGPT no disponible; usado interprete local. Detalle: {exc}", False)
+            return ReportIntentResult(True, fallback, "Generado con interprete local. ChatGPT no disponible.", False)
 
     def _fallback_parse(self, text: str) -> CustomerReportIntent:
         t = self._normalize(text)
@@ -179,11 +179,17 @@ class CustomerReportIntentService:
         elif "receta" in t:
             columns.append("recetas")
 
-        for island in ("tenerife", "gran canaria", "lanzarote", "fuerteventura", "la palma", "la gomera", "el hierro"):
-            if island in t:
-                filters.append(ReportFilter("isla", "contiene", island))
-                if "isla" not in columns:
-                    columns.append("isla")
+        island_value = self._extract_named_value(t, "isla")
+        if island_value:
+            filters.append(ReportFilter("isla", "contiene", island_value))
+            if "isla" not in columns:
+                columns.append("isla")
+        else:
+            for island in ("tenerife", "gran canaria", "lanzarote", "fuerteventura", "la palma", "la gomera", "el hierro"):
+                if island in t:
+                    filters.append(ReportFilter("isla", "contiene", island))
+                    if "isla" not in columns:
+                        columns.append("isla")
 
         if "email" in t or "correo" in t:
             columns.append("email")
@@ -199,6 +205,19 @@ class CustomerReportIntentService:
         intent.filters = filters
         intent.columns = self._unique_valid(columns)
         return intent
+
+    def _extract_named_value(self, text: str, field: str) -> str:
+        pattern = rf"\b{re.escape(field)}\s*=\s*(?:\"([^\"]+)\"|'([^']+)'|([^\s,;]+))"
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if not match:
+            return ""
+        for group in match.groups():
+            if group is None:
+                continue
+            value = str(group).strip().strip('"').strip("'")
+            if value:
+                return value
+        return ""
 
     def _intent_from_mapping(self, data: dict[str, Any], fallback: CustomerReportIntent) -> CustomerReportIntent:
         intent = CustomerReportIntent()
