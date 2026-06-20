@@ -12,13 +12,6 @@ export type BinaryToggleSelectProps = {
   className?: string
 }
 
-function resolveIcon(icon: ReactNode | undefined, fallback: ReactNode) {
-  if (icon === null) {
-    return null
-  }
-  return icon ?? fallback
-}
-
 export function BinaryToggleSelect({
   value,
   onChange,
@@ -31,8 +24,8 @@ export function BinaryToggleSelect({
   className,
 }: BinaryToggleSelectProps) {
   const rootClassName = ['binary-toggle-select', className, disabled ? 'is-disabled' : ''].filter(Boolean).join(' ')
-  const resolvedTrueIcon = resolveIcon(trueIcon, <span aria-hidden="true">✓</span>)
-  const resolvedFalseIcon = resolveIcon(falseIcon, <span aria-hidden="true">×</span>)
+  const showTrueIcon = trueIcon !== undefined && trueIcon !== null
+  const showFalseIcon = falseIcon !== undefined && falseIcon !== null
 
   return (
     <div className={rootClassName} role="group" aria-label={ariaLabel} data-value={value ? 'true' : 'false'}>
@@ -43,9 +36,9 @@ export function BinaryToggleSelect({
         disabled={disabled}
         onClick={() => onChange(true)}
       >
-        {resolvedTrueIcon !== null && (
+        {showTrueIcon && (
           <span className="binary-toggle-select__icon" aria-hidden="true">
-            {resolvedTrueIcon}
+            {trueIcon}
           </span>
         )}
         <span className="binary-toggle-select__label">{trueLabel}</span>
@@ -59,9 +52,9 @@ export function BinaryToggleSelect({
         onClick={() => onChange(false)}
       >
         <span className="binary-toggle-select__label">{falseLabel}</span>
-        {resolvedFalseIcon !== null && (
+        {showFalseIcon && (
           <span className="binary-toggle-select__icon" aria-hidden="true">
-            {resolvedFalseIcon}
+            {falseIcon}
           </span>
         )}
       </button>

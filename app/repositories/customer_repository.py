@@ -27,7 +27,7 @@ class CustomerRepository(BaseRepository[Cliente]):
                     col(Cliente.cliente_email).like(like_term),
                     col(Cliente.cliente_direccion).like(like_term),
                     col(Cliente.cliente_tipo).like(like_term),
-                    col(Cliente.cliente_grupo).like(like_term),
+                    col(Cliente.cliente_actividad).like(like_term),
                 )
             )
             .order_by(col(Cliente.cliente_nombre_comercial))

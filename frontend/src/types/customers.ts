@@ -19,7 +19,7 @@ export interface CustomerListItem {
   cliente_nombre_comercial: string
   cliente_nombre_fiscal: string
   cliente_cif: string
-  cliente_grupo: string
+  cliente_actividad: string
   cliente_tipo: string
   cliente_direccion_isla_id?: string
   cliente_direccion_isla?: string

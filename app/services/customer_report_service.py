@@ -20,7 +20,8 @@ REPORT_COLUMNS: dict[str, tuple[str, str]] = {
     "municipio": ("Municipio", "COALESCE(m.municipio_nombre, '')"),
     "localidad": ("Localidad", "COALESCE(l.localidad_nombre, '')"),
     "tipo": ("Tipo", "c.cliente_tipo"),
-    "grupo": ("Grupo", "c.cliente_grupo"),
+    "actividad": ("Actividad", "c.cliente_actividad"),
+    "grupo": ("Actividad", "c.cliente_actividad"),
     "prospeccion": ("Prospeccion", "c.cliente_prospeccion"),
     "activo": ("Activo", "c.activo"),
     "nombre_contacto": (
@@ -50,6 +51,7 @@ TEXT_FIELDS = {
     "municipio",
     "localidad",
     "tipo",
+    "actividad",
     "grupo",
     "nombre_contacto",
 }

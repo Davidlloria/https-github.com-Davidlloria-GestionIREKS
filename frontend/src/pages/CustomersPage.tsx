@@ -36,7 +36,7 @@ interface CustomerDraft {
   cliente_direccion_provincia_id: string
   cliente_direccion_isla_id: string
   cliente_tipo: string
-  cliente_grupo: string
+  cliente_actividad: string
   cliente_prospeccion: boolean
   distribuidor_id: string
   activo: boolean
@@ -57,14 +57,22 @@ const EMPTY_LIST: PaginatedList<CustomerListItem> = {
   offset: 0,
 }
 
-const CUSTOMER_TYPES = ['PANADERIA', 'PASTELERIA', 'HELADERIA', 'CAFETERIA', 'RESTAURANTE', 'HOTEL']
-const CUSTOMER_TYPE_TONES: Record<string, string> = {
+const CUSTOMER_ACTIVITIES = ['PANADERIA', 'PASTELERIA', 'HELADERIA', 'CAFETERIA', 'RESTAURANTE', 'HOTEL']
+const CUSTOMER_ACTIVITY_TONES: Record<string, string> = {
   PANADERIA: 'tone-panaderia',
   PASTELERIA: 'tone-pasteleria',
   HELADERIA: 'tone-heladeria',
   CAFETERIA: 'tone-cafeteria',
   RESTAURANTE: 'tone-restaurante',
   HOTEL: 'tone-hotel',
+}
+const CUSTOMER_ACTIVITY_ICONS: Record<string, string> = {
+  PANADERIA: '🥖',
+  PASTELERIA: '🧁',
+  HELADERIA: '🍦',
+  CAFETERIA: '☕',
+  RESTAURANTE: '🍽',
+  HOTEL: '🏨',
 }
 
 const TABS: Array<{ key: CustomerTab; label: string }> = [
@@ -119,8 +127,50 @@ function statusLabel(active?: boolean) {
   return '-'
 }
 
-function customerTypeToneClass(type: string) {
-  return CUSTOMER_TYPE_TONES[type.toUpperCase()] || 'tone-default'
+function normalizeActivityKey(value: string) {
+  return value
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+}
+
+function splitActivityValues(value: string) {
+  return value
+    .split(/[\n,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function customerActivityToneClass(activity: string) {
+  return CUSTOMER_ACTIVITY_TONES[normalizeActivityKey(activity)] || 'tone-default'
+}
+
+function customerActivityIcon(activity: string) {
+  const token = splitActivityValues(activity).find((item) => {
+    const normalized = normalizeActivityKey(item)
+    return CUSTOMER_ACTIVITIES.some((candidate) => normalizeActivityKey(candidate) === normalized)
+  })
+  if (token) {
+    const matched = CUSTOMER_ACTIVITIES.find((candidate) => normalizeActivityKey(candidate) === normalizeActivityKey(token))
+    if (matched) {
+      return CUSTOMER_ACTIVITY_ICONS[matched]
+    }
+  }
+  const normalizedActivity = normalizeActivityKey(activity)
+  const matchedActivity = CUSTOMER_ACTIVITIES.find((candidate) => normalizeActivityKey(candidate) === normalizedActivity)
+  return matchedActivity ? CUSTOMER_ACTIVITY_ICONS[matchedActivity] : '•'
+}
+
+function customerActivitySelection(value: string) {
+  const tokens = splitActivityValues(value)
+  const normalizedTokens = new Set(tokens.map((token) => normalizeActivityKey(token)))
+
+  return CUSTOMER_ACTIVITIES.filter((activity) => normalizedTokens.has(normalizeActivityKey(activity)))
+}
+
+function customerActivityValue(value: string) {
+  return customerActivitySelection(value).join(', ')
 }
 
 function emptyCustomerDraft(): CustomerDraft {
@@ -140,7 +190,7 @@ function emptyCustomerDraft(): CustomerDraft {
     cliente_direccion_provincia_id: '',
     cliente_direccion_isla_id: '',
     cliente_tipo: '',
-    cliente_grupo: '',
+    cliente_actividad: '',
     cliente_prospeccion: false,
     distribuidor_id: '',
     activo: true,
@@ -164,7 +214,7 @@ function draftFromDetail(detail: CustomerDetail): CustomerDraft {
     cliente_direccion_provincia_id: detail.cliente_direccion_provincia_id || '',
     cliente_direccion_isla_id: detail.cliente_direccion_isla_id || '',
     cliente_tipo: detail.cliente_tipo || '',
-    cliente_grupo: detail.cliente_grupo || '',
+    cliente_actividad: detail.cliente_actividad || '',
     cliente_prospeccion: Boolean(detail.cliente_prospeccion),
     distribuidor_id: detail.distribuidor_id || '',
     activo: Boolean(detail.activo),
@@ -188,7 +238,7 @@ function draftToPayload(draft: CustomerDraft): CustomerSavePayload {
     cliente_direccion_provincia_id: draft.cliente_direccion_provincia_id.trim(),
     cliente_direccion_isla_id: draft.cliente_direccion_isla_id.trim(),
     cliente_tipo: draft.cliente_tipo.trim(),
-    cliente_grupo: draft.cliente_grupo.trim(),
+    cliente_actividad: customerActivityValue(draft.cliente_actividad),
     cliente_prospeccion: draft.cliente_prospeccion,
     distribuidor_id: draft.distribuidor_id.trim(),
     activo: draft.activo,
@@ -669,7 +719,12 @@ export function CustomersPage() {
                         disabled={isCreating}
                       >
                         <span className="customers-list-cell">{customer.cliente_codigo}</span>
-                        <span className="customers-list-cell customers-list-cell-name">{customerLabel(customer)}</span>
+                        <span className="customers-list-cell customers-list-cell-name">
+                          <span className="customers-list-cell-icon" aria-hidden="true">
+                            {customerActivityIcon(customer.cliente_actividad || customer.cliente_tipo || customer.cliente_nombre_comercial)}
+                          </span>
+                          <span>{customerLabel(customer)}</span>
+                        </span>
                         <span className="customers-list-cell customers-list-cell-island" title={islandLabel}>
                           {islandAbbrev}
                         </span>
@@ -708,7 +763,11 @@ export function CustomersPage() {
                     <h3>{isCreating ? 'Nuevo cliente' : 'Detalle de cliente'}</h3>
                   </div>
                   {!!selectedDetail && !isCreating && (
-                    <span className="surface-chip">{saving ? 'Guardando...' : statusLabel(selectedDetail.activo)}</span>
+                    <span
+                      className={`surface-chip customers-status-chip ${selectedDetail.activo ? 'is-active' : 'is-inactive'}`}
+                    >
+                      {saving ? 'Guardando...' : statusLabel(selectedDetail.activo)}
+                    </span>
                   )}
                   {isCreating && <span className="surface-chip">Alta activa</span>}
                 </div>
@@ -1070,34 +1129,51 @@ export function CustomersPage() {
               <aside className="customers-type-panel">
                 <div className="customers-section-head">
                   <div>
-                    <h3>Tipo de cliente</h3>
-                    <p>{isCreating ? 'Resumen del alta en curso.' : 'Edicion automática con estado limpio.'}</p>
+                    <h3>Clasificación del cliente</h3>
+                    <span className="customers-type-subhead">Actividad</span>
                   </div>
                 </div>
 
                 {isCreating || selectedDetail ? (
                   <>
                     <div className="customers-type-grid">
-                      {CUSTOMER_TYPES.map((type) => {
-                        const isActive = draft.cliente_tipo.toUpperCase() === type
+                      {CUSTOMER_ACTIVITIES.map((activity) => {
+                        const isActive = customerActivitySelection(draft.cliente_actividad).includes(activity)
                         return (
                           <button
-                            key={type}
+                            key={activity}
                             type="button"
-                            className={`customer-type-pill ${customerTypeToneClass(type)} ${isActive ? 'active' : ''}`}
+                            className={`customer-type-pill ${customerActivityToneClass(activity)} ${isActive ? 'active' : ''}`}
                             aria-pressed={isActive}
                             disabled={saving}
-                            onClick={() => setDraftField('cliente_tipo', type)}
+                            onClick={() => {
+                              const nextSelection = customerActivitySelection(draft.cliente_actividad)
+                              const nextSet = new Set(nextSelection)
+                              if (nextSet.has(activity)) {
+                                nextSet.delete(activity)
+                              } else {
+                                nextSet.add(activity)
+                              }
+                              setDraftField(
+                                'cliente_actividad',
+                                CUSTOMER_ACTIVITIES.filter((item) => nextSet.has(item)).join(', '),
+                              )
+                            }}
                           >
-                            <span className="customer-type-pill-label">{type}</span>
+                            <span className="customer-type-pill-icon" aria-hidden="true">
+                              {customerActivityIcon(activity)}
+                            </span>
+                            <span className="customer-type-pill-label">{activity}</span>
                             {isActive && <span className="customer-type-pill-check">✓</span>}
                           </button>
                         )
                       })}
                     </div>
 
+                    <div className="customers-type-divider" aria-hidden="true" />
+
                     <div className="customers-type-fields">
-                      <label>
+                      <div className="customers-binary-row">
                         <span>Tipo</span>
                         <BinaryToggleSelect
                           value={draft.cliente_tipo.toUpperCase() === 'DIRECTO'}
@@ -1107,21 +1183,28 @@ export function CustomersPage() {
                           disabled={saving}
                           ariaLabel="Tipo de cliente"
                         />
-                      </label>
+                      </div>
                     </div>
 
-                    <BinaryToggleSelect
-                      value={draft.activo}
-                      onChange={(nextValue) => setDraftField('activo', nextValue)}
-                      trueLabel="ACTI."
-                      falseLabel="INACT."
-                      disabled={saving}
-                      ariaLabel="Estado del cliente"
-                      className="binary-toggle-select--customer-status"
-                    />
+                    <div className="customers-type-divider" aria-hidden="true" />
 
-                    <div className="customers-prospect-row">
-                      <span>Prospeccion</span>
+                    <div className="customers-binary-row">
+                      <span>Estado</span>
+                      <BinaryToggleSelect
+                        value={draft.activo}
+                        onChange={(nextValue) => setDraftField('activo', nextValue)}
+                        trueLabel="ACTI."
+                        falseLabel="INACT."
+                        disabled={saving}
+                        ariaLabel="Estado del cliente"
+                        className="binary-toggle-select--customer-status"
+                      />
+                    </div>
+
+                    <div className="customers-type-divider" aria-hidden="true" />
+
+                    <div className="customers-binary-row customers-prospect-row">
+                      <span>Prospección</span>
                       <BinaryToggleSelect
                         value={draft.cliente_prospeccion}
                         onChange={(nextValue) => setDraftField('cliente_prospeccion', nextValue)}
@@ -1138,17 +1221,20 @@ export function CustomersPage() {
                     {selectedDetail ? (
                       <>
                         <div className="customers-type-grid">
-                          {CUSTOMER_TYPES.map((type) => {
-                            const isActive = draft.cliente_tipo.toUpperCase() === type
+                          {CUSTOMER_ACTIVITIES.map((activity) => {
+                            const isActive = customerActivitySelection(draft.cliente_actividad).includes(activity)
                             return (
                               <button
-                                key={type}
+                                key={activity}
                                 type="button"
-                                className={`customer-type-pill ${isActive ? 'active' : ''}`}
+                                className={`customer-type-pill ${customerActivityToneClass(activity)} ${isActive ? 'active' : ''}`}
                                 aria-pressed={isActive}
                                 disabled
                               >
-                                <span className="customer-type-pill-label">{type}</span>
+                                <span className="customer-type-pill-icon" aria-hidden="true">
+                                  {customerActivityIcon(activity)}
+                                </span>
+                                <span className="customer-type-pill-label">{activity}</span>
                                 {isActive && <span className="customer-type-pill-check">✓</span>}
                               </button>
                             )
@@ -1156,6 +1242,10 @@ export function CustomersPage() {
                         </div>
 
                         <div className="customers-type-fields">
+                          <label>
+                            <span>Actividad</span>
+                            <input className="input customers-field" readOnly value={valueOrDash(draft.cliente_actividad)} />
+                          </label>
                           <label>
                             <span>Tipo</span>
                             <input className="input customers-field" readOnly value={valueOrDash(draft.cliente_tipo)} />

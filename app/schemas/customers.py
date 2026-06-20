@@ -20,7 +20,7 @@ class CustomerBase(AppSchema):
     cliente_direccion_provincia_id: str = ""
     cliente_direccion_isla_id: str = ""
     cliente_tipo: str = ""
-    cliente_grupo: str = ""
+    cliente_actividad: str = ""
     cliente_prospeccion: bool = False
     distribuidor_id: str = ""
     activo: bool = True
@@ -60,7 +60,7 @@ class CustomerUpdate(AppSchema):
     cliente_direccion_provincia_id: str | None = None
     cliente_direccion_isla_id: str | None = None
     cliente_tipo: str | None = None
-    cliente_grupo: str | None = None
+    cliente_actividad: str | None = None
     cliente_prospeccion: bool | None = None
     distribuidor_id: str | None = None
     activo: bool | None = None

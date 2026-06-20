@@ -27,7 +27,7 @@ const baseCustomer = {
   cliente_direccion_provincia_id: 'P1',
   cliente_direccion_isla_id: 'I1',
   cliente_tipo: 'CAFETERIA',
-  cliente_grupo: 'Grupo A',
+  cliente_actividad: 'PANADERIA',
   cliente_prospeccion: false,
   distribuidor_id: 'DIST-1',
   activo: true,

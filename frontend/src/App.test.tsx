@@ -380,7 +380,7 @@ const customerList = {
       cliente_nombre_comercial: 'Cliente Uno',
       cliente_nombre_fiscal: 'Cliente Uno SL',
       cliente_cif: 'B123',
-      cliente_grupo: 'Grupo A',
+      cliente_actividad: 'PANADERIA',
       cliente_tipo: 'Distribuidor',
       cliente_direccion_isla_id: 'I1',
       cliente_email: 'cliente1@example.com',

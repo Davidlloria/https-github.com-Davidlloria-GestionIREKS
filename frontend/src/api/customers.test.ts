@@ -65,7 +65,7 @@ describe('customers api client', () => {
         cliente_telefono: '928000001',
         cliente_email: 'nuevo@example.com',
         cliente_tipo: 'CAFETERIA',
-        cliente_grupo: 'Grupo B',
+        cliente_actividad: 'PANADERIA',
         cliente_prospeccion: true,
         activo: true,
       }),
@@ -86,7 +86,7 @@ describe('customers api client', () => {
     await expect(
       updateCustomer('C-1', {
         cliente_nombre_comercial: 'Cliente Uno Editado',
-        cliente_grupo: 'Grupo C',
+        cliente_actividad: 'PANADERIA',
       }),
     ).resolves.toEqual({ cliente_id: 'C-1' })
 
