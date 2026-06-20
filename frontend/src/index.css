@@ -3860,6 +3860,7 @@ tbody tr:hover {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  color-scheme: light;
 }
 
 .customers-saas-workspace {
