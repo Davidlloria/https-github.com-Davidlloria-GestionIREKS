@@ -9,6 +9,7 @@ import {
   type CustomerSavePayload,
 } from '../api/customers'
 import { listContacts } from '../api/contacts'
+import { BinaryToggleSelect } from '../components/BinaryToggleSelect'
 import { QueryState } from '../components/QueryState'
 import { useAsyncResource } from '../features/useAsyncResource'
 import type { AddressOption, ContactListItem, CustomerAddressCatalogsPayload, CustomerDetail, CustomerListItem, PaginatedList } from '../types/api'
@@ -1115,49 +1116,29 @@ export function CustomersPage() {
                       </label>
                     </div>
 
-                    <div className="customers-status-row">
-                      <button
-                        type="button"
-                        className={`customers-status-pill customers-status-pill-toggle ${draft.activo ? 'is-active selected' : 'is-inactive'}`}
-                        onClick={() => setDraftField('activo', true)}
-                        disabled={saving}
-                        aria-pressed={draft.activo}
-                      >
-                        ACTIVO
-                      </button>
-                      <button
-                        type="button"
-                        className={`customers-status-pill customers-status-pill-toggle ${!draft.activo ? 'is-active selected' : 'is-inactive'}`}
-                        onClick={() => setDraftField('activo', false)}
-                        disabled={saving}
-                        aria-pressed={!draft.activo}
-                      >
-                        INACTIVO
-                      </button>
-                    </div>
+                    <BinaryToggleSelect
+                      value={draft.activo}
+                      onChange={(nextValue) => setDraftField('activo', nextValue)}
+                      trueLabel="ACTIVO"
+                      falseLabel="INACTIVO"
+                      trueIcon={<span aria-hidden="true">✓</span>}
+                      falseIcon={<span aria-hidden="true">✕</span>}
+                      disabled={saving}
+                      ariaLabel="Estado del cliente"
+                    />
 
                     <div className="customers-prospect-row">
                       <span>Prospeccion</span>
-                      <div className="customers-radio-readonly">
-                        <button
-                          type="button"
-                          className={draft.cliente_prospeccion ? 'selected' : ''}
-                          onClick={() => setDraftField('cliente_prospeccion', true)}
-                          disabled={saving}
-                          aria-pressed={draft.cliente_prospeccion}
-                        >
-                          Si
-                        </button>
-                        <button
-                          type="button"
-                          className={!draft.cliente_prospeccion ? 'selected' : ''}
-                          onClick={() => setDraftField('cliente_prospeccion', false)}
-                          disabled={saving}
-                          aria-pressed={!draft.cliente_prospeccion}
-                        >
-                          No
-                        </button>
-                      </div>
+                      <BinaryToggleSelect
+                        value={draft.cliente_prospeccion}
+                        onChange={(nextValue) => setDraftField('cliente_prospeccion', nextValue)}
+                        trueLabel="Sí"
+                        falseLabel="No"
+                        trueIcon={<span aria-hidden="true">✓</span>}
+                        falseIcon={<span aria-hidden="true">✕</span>}
+                        disabled={saving}
+                        ariaLabel="Prospección"
+                      />
                     </div>
                   </>
                 ) : (
