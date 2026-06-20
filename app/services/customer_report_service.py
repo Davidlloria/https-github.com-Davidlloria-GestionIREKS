@@ -4,7 +4,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 from app.core.database import engine
 from app.services.openai_settings_service import OpenAISettingsService
@@ -134,7 +134,10 @@ class CustomerReportIntentService:
             req.add_header("Authorization", f"Bearer {self.api_key}")
             req.add_header("Content-Type", "application/json")
             req.add_header("Accept", "application/json")
-            with urlopen(req, timeout=self.timeout) as resp:  # noqa: S310
+            # Ignore inherited proxy settings so local runs do not get routed
+            # through a broken system proxy like 127.0.0.1:9.
+            opener = build_opener(ProxyHandler({}))
+            with opener.open(req, timeout=self.timeout) as resp:
                 body = resp.read().decode("utf-8")
             data = json.loads(body or "{}")
             parsed = self._parse_json(self._extract_text(data))

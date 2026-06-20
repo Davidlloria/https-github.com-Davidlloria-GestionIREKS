@@ -23,6 +23,11 @@ def api_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     )
     SQLModel.metadata.create_all(TEST_ENGINE)
     monkeypatch.setattr(customer_report_service_module, "engine", TEST_ENGINE)
+    monkeypatch.setattr(
+        customer_report_service_module.OpenAISettingsService,
+        "load",
+        lambda self: {"api_key": "", "use_ai_translation": False},
+    )
     return TestClient(create_app())
 
 
