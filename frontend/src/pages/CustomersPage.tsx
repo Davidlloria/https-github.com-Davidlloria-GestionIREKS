@@ -672,27 +672,6 @@ export function CustomersPage() {
                       </label>
                     </div>
 
-                    <div className="customers-field-row customers-field-row-mid">
-                      <label className="customers-field-commercial">
-                        <span>Nombre interno</span>
-                        <input
-                          className="input customers-field"
-                          value={draft.cliente_nombre_interno}
-                          onChange={(event) => setDraftField('cliente_nombre_interno', event.target.value)}
-                          placeholder="Nombre interno"
-                        />
-                      </label>
-                      <label className="customers-field-fiscal">
-                        <span>Abreviatura</span>
-                        <input
-                          className="input customers-field"
-                          value={draft.cliente_abreviatura}
-                          onChange={(event) => setDraftField('cliente_abreviatura', event.target.value)}
-                          placeholder="Abreviatura"
-                        />
-                      </label>
-                    </div>
-
                     <div className="customers-field-row customers-field-row-location">
                       <label>
                         <span>Provincia</span>
@@ -922,17 +901,6 @@ export function CustomersPage() {
                               </label>
                             </div>
 
-                            <div className="customers-field-row customers-field-row-mid">
-                              <label className="customers-field-commercial">
-                                <span>Nombre interno</span>
-                                <input className="input customers-field" readOnly value={valueOrDash(selectedDetail.cliente_nombre_interno)} />
-                              </label>
-                              <label className="customers-field-fiscal">
-                                <span>Abreviatura</span>
-                                <input className="input customers-field" readOnly value={valueOrDash(selectedDetail.cliente_abreviatura)} />
-                              </label>
-                            </div>
-
                             <div className="customers-field-row customers-field-row-location">
                               <label>
                                 <span>Provincia</span>
@@ -1022,10 +990,6 @@ export function CustomersPage() {
                         <span>Tipo</span>
                         <input className="input customers-field" readOnly value={valueOrDash(draft.cliente_tipo)} />
                       </label>
-                      <label>
-                        <span>Abrev. pedido</span>
-                        <input className="input customers-field" readOnly value={valueOrDash(draft.cliente_abreviatura)} />
-                      </label>
                     </div>
 
                     <div className="customers-status-row">
@@ -1067,10 +1031,6 @@ export function CustomersPage() {
                           <label>
                             <span>Tipo</span>
                             <input className="input customers-field" readOnly value={valueOrDash(selectedDetail.cliente_tipo)} />
-                          </label>
-                          <label>
-                            <span>Abrev. pedido</span>
-                            <input className="input customers-field" readOnly value={valueOrDash(selectedDetail.cliente_abreviatura)} />
                           </label>
                         </div>
 
