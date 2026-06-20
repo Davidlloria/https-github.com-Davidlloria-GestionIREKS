@@ -1852,12 +1852,12 @@ export function CustomersPage() {
                 <span>Puedes usar datos de clientes, contactos, ventas, recetas y más.</span>
               </div>
 
-              <aside className="customers-listings-help-card">
-                <div className="customers-listings-help-head">
-                  <ListingIcon tone="info" className="customers-listings-help-head-icon" />
-                  <h4>Solicitudes y exportación</h4>
-                </div>
+              <div className="customers-listings-right-title">
+                <ListingIcon tone="info" className="customers-listings-help-head-icon" />
+                <h4>Solicitudes y exportación</h4>
+              </div>
 
+              <aside className="customers-listings-help-card">
                 <div className="customers-listings-history-block">
                   <div className="customers-listings-history-title">Recientes</div>
                   {recentListingHistory.length ? (
