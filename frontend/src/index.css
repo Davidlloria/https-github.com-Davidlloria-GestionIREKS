@@ -4522,7 +4522,7 @@ tbody tr:hover {
   grid-row: 1;
 }
 
-.customers-listings-field > span {
+.customers-listings-section-label {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
@@ -4598,9 +4598,7 @@ tbody tr:hover {
 
 .customers-listings-right-title h4 {
   margin: 0;
-  font-size: 15px;
-  line-height: 1.2;
-  font-weight: 800;
+  color: inherit;
 }
 
 .customers-listings-help-card {

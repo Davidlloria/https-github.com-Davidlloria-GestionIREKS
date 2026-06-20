@@ -1816,7 +1816,7 @@ export function CustomersPage() {
 
             <form className="customers-modal-body customers-listings-body customers-listings-layout" onSubmit={handleListingSubmitV2}>
               <label className="customers-listings-field">
-                <span>Solicitud</span>
+                <span className="customers-listings-section-label">Solicitud</span>
                 <textarea
                   className="input customers-listings-textarea"
                   value={listingTarget}
@@ -1854,7 +1854,7 @@ export function CustomersPage() {
 
               <div className="customers-listings-right-title">
                 <ListingIcon tone="info" className="customers-listings-help-head-icon" />
-                <h4>Solicitudes y exportación</h4>
+                <h4 className="customers-listings-section-label">Solicitudes y exportación</h4>
               </div>
 
               <aside className="customers-listings-help-card">
