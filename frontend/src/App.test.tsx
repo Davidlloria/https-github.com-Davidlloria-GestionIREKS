@@ -446,6 +446,9 @@ vi.mock('./api/customers', () => ({
   })),
   getCustomerDetail: vi.fn(async () => customerDetail),
   listCustomers: vi.fn(async () => customerList),
+  createCustomer: vi.fn(async () => customerDetail),
+  updateCustomer: vi.fn(async () => customerDetail),
+  deleteCustomer: vi.fn(async () => undefined),
 }))
 
 vi.mock('./api/contacts', () => ({
