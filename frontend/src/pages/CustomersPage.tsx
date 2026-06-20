@@ -693,7 +693,6 @@ export function CustomersPage() {
                 <div className="customers-section-head">
                   <div>
                     <h3>{isCreating ? 'Nuevo cliente' : 'Detalle de cliente'}</h3>
-                    <p>{isCreating ? 'Formulario de alta con persistencia real.' : 'Edicion automática sobre el registro seleccionado.'}</p>
                   </div>
                   {!!selectedDetail && !isCreating && (
                     <span className="surface-chip">{saving ? 'Guardando...' : statusLabel(selectedDetail.activo)}</span>
