@@ -672,6 +672,8 @@ export function CustomersPage() {
                       </label>
                     </div>
 
+                    <div className="customers-field-divider" aria-hidden="true" />
+
                     <div className="customers-field-row customers-field-row-location">
                       <label>
                         <span>Provincia</span>
@@ -900,6 +902,8 @@ export function CustomersPage() {
                                 <input className="input customers-field" readOnly value={valueOrDash(selectedDetail.cliente_nombre_fiscal)} />
                               </label>
                             </div>
+
+                            <div className="customers-field-divider" aria-hidden="true" />
 
                             <div className="customers-field-row customers-field-row-location">
                               <label>

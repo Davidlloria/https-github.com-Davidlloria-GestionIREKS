@@ -4255,6 +4255,13 @@ tbody tr:hover {
   grid-template-columns: minmax(138px, 0.62fr) minmax(0, 1.38fr);
 }
 
+.customers-field-divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0), rgba(148, 163, 184, 0.5), rgba(148, 163, 184, 0));
+  margin: 2px 0 4px;
+}
+
 .customers-field-row-location {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
