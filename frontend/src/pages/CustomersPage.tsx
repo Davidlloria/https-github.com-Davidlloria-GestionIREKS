@@ -235,18 +235,21 @@ function PostalCodeField({
   return (
     <label className="customers-field-postal">
       <span>C.P.</span>
-      <input
-        className="input customers-field"
+      <select
+        className="select customers-field"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="C.P."
-        list="customer-postal-codes"
-      />
-      <datalist id="customer-postal-codes">
-        {options.map((option) => (
-          <option key={option.id} value={option.code || option.label} />
-        ))}
-      </datalist>
+      >
+        <option value="">Selecciona C.P.</option>
+        {options.map((option) => {
+          const optionValue = option.code || option.label
+          return (
+            <option key={option.id} value={optionValue}>
+              {optionValue}
+            </option>
+          )
+        })}
+      </select>
     </label>
   )
 }
