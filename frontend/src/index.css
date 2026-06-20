@@ -4413,7 +4413,7 @@ tbody tr:hover {
 }
 
 .customers-listings-chatgpt-chip {
-  min-width: 132px;
+  min-width: 124px;
   justify-content: center;
   gap: 8px;
   padding-inline: 16px;
@@ -4433,8 +4433,8 @@ tbody tr:hover {
 .customers-listings-close {
   display: inline-grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border: 1px solid #d7dee9;
   border-radius: 999px;
   background: linear-gradient(180deg, #ffffff, #f3f6fb);
@@ -4464,7 +4464,7 @@ tbody tr:hover {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  min-height: 52px;
+  min-height: 42px;
   padding: 0 18px;
   border: 1px solid #d8e1ef;
   border-radius: 999px;
@@ -4523,10 +4523,10 @@ tbody tr:hover {
 }
 
 .customers-listings-textarea {
-  min-height: 170px;
+  min-height: 128px;
   resize: vertical;
-  padding-top: 14px;
-  padding-bottom: 14px;
+  padding-top: 12px;
+  padding-bottom: 12px;
   line-height: 1.5;
   border-radius: 16px;
   background: #ffffff;
@@ -4625,16 +4625,66 @@ tbody tr:hover {
   margin-top: 1px;
 }
 
-.customers-listings-help-card strong {
-  color: #1e293b;
-  font-size: 17px;
-  line-height: 1.2;
+.customers-listings-history-block {
+  display: grid;
+  gap: 10px;
 }
 
-.customers-listings-help-card span {
+.customers-listings-history-title {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.customers-listings-history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.customers-listings-history-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #dbe7ff;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff, #f9fbff);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.customers-listings-history-item:hover,
+.customers-listings-history-item:focus-visible {
+  transform: translateY(-1px);
+  outline: none;
+  border-color: #b9cdfc;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+}
+
+.customers-listings-history-prompt {
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.customers-listings-history-meta {
   color: #64748b;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.customers-listings-history-empty {
+  padding: 10px 12px;
+  border: 1px dashed #d7e3f5;
+  border-radius: 14px;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .customers-listings-result {
