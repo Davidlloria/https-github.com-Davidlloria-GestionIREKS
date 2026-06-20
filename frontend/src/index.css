@@ -4399,7 +4399,7 @@ tbody tr:hover {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(360px, 0.95fr);
   --customers-listings-card-height: clamp(360px, 46vh, 520px);
-  grid-template-rows: auto auto var(--customers-listings-card-height) auto auto;
+  grid-template-rows: auto auto auto var(--customers-listings-card-height) auto auto;
   gap: 14px 16px;
   align-items: start;
   align-content: start;
@@ -4569,7 +4569,7 @@ tbody tr:hover {
 
 .customers-listings-ribbon-note {
   grid-column: 1;
-  grid-row: 4;
+  grid-row: 6;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -4593,7 +4593,7 @@ tbody tr:hover {
   border: 1px solid #dbe7ff;
   color: #334155;
   grid-column: 2;
-  grid-row: 3;
+  grid-row: 4;
   min-height: 100%;
   height: 100%;
   overflow: auto;
@@ -4782,7 +4782,7 @@ tbody tr:hover {
   background: linear-gradient(180deg, #ffffff, #fbfdff);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
   grid-column: 1;
-  grid-row: 3;
+  grid-row: 4;
   min-height: 0;
   height: 100%;
   overflow: hidden;
@@ -4872,7 +4872,7 @@ tbody tr:hover {
 
 .customers-listings-footer-actions {
   grid-column: 1 / -1;
-  grid-row: 5;
+  grid-row: 3;
   position: sticky;
   bottom: 0;
   padding-top: 4px;
@@ -4885,7 +4885,7 @@ tbody tr:hover {
 
 .customers-listings-error {
   grid-column: 1;
-  grid-row: 4;
+  grid-row: 5;
 }
 
 .customers-delete-summary {
