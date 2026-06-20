@@ -96,6 +96,42 @@ const TABS: Array<{ key: CustomerTab; label: string }> = [
   { key: 'agenda', label: 'Agenda' },
 ]
 
+const LISTING_PRESETS = [
+  {
+    label: 'Clientes activos de Tenerife',
+    prompt: 'Clientes activos de Tenerife con contactos principales',
+    tone: 'green',
+  },
+  {
+    label: 'Clientes con actividad panadería',
+    prompt: 'Clientes con actividad panadería y ventas del último mes',
+    tone: 'amber',
+  },
+  {
+    label: 'Clientes con contactos y ventas',
+    prompt: 'Clientes con contactos, ventas y recetas relacionadas',
+    tone: 'blue',
+  },
+] as const
+
+const LISTING_TIPS = [
+  {
+    title: 'Sé específico',
+    text: 'Indica filtros, condiciones y valores concretos para obtener mejores resultados.',
+    tone: 'blue',
+  },
+  {
+    title: 'Elige columnas clave',
+    text: 'Selecciona los campos que realmente necesitas ver en el listado.',
+    tone: 'violet',
+  },
+  {
+    title: 'Usa rangos de fechas',
+    text: 'Especifica periodos para analizar datos relevantes en el tiempo.',
+    tone: 'green',
+  },
+] as const
+
 function customerLabel(customer: { cliente_id: string; cliente_nombre_comercial: string; cliente_nombre_fiscal: string }) {
   return customer.cliente_nombre_comercial || customer.cliente_nombre_fiscal || customer.cliente_id
 }
@@ -189,6 +225,89 @@ function customerActivitySelection(value: string) {
 
 function customerActivityValue(value: string) {
   return customerActivitySelection(value).join(', ')
+}
+
+function ListingIcon({
+  tone,
+  className,
+}: {
+  tone: (typeof LISTING_PRESETS)[number]['tone'] | (typeof LISTING_TIPS)[number]['tone'] | 'chatgpt' | 'close' | 'preview' | 'check' | 'info'
+  className?: string
+}) {
+  const common = { className, 'aria-hidden': true, viewBox: '0 0 24 24', fill: 'none' as const }
+
+  switch (tone) {
+    case 'green':
+      return (
+        <svg {...common}>
+          <path d="M16 11.5c0 3.2-2.4 5.8-5.4 5.8S5.2 14.7 5.2 11.5 7.6 5.7 10.6 5.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M14.2 7.2c.7-1.5 2-2.5 3.5-2.5 2.2 0 4 1.9 4 4.2 0 4.1-5.7 7.6-8.2 9-1 .6-2.3.6-3.4 0-1.6-.8-4.6-2.7-4.6-5.9 0-1.7 1.1-3 2.8-3.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="8.3" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="1.8" />
+          <circle cx="16.6" cy="17" r="1.5" stroke="currentColor" strokeWidth="1.8" />
+        </svg>
+      )
+    case 'amber':
+      return (
+        <svg {...common}>
+          <path d="M7.5 8.5c0-1.9 1.5-3.5 3.4-3.5 1.2 0 2.3.6 3 1.5.5-1.5 1.8-2.6 3.4-2.6 2 0 3.7 1.6 3.7 3.6 0 1.1-.5 2.1-1.2 2.7L12 20.1 5 11.8c-1-.9-1.5-2-1.5-3.3 0-2 1.5-3.6 3.4-3.6.9 0 1.8.3 2.5 1.1.6.7.9 1.5.1 2.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'blue':
+      return (
+        <svg {...common}>
+          <path d="M5 16.5c1.9-3.4 4.4-5.2 7-5.2 1.8 0 3.2.8 4.1 2.1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="8.1" cy="8.3" r="2.4" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M14.5 17.4V13m3.2 4.4V11m3.2 6.4v-8.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      )
+    case 'violet':
+      return (
+        <svg {...common}>
+          <rect x="4.5" y="5" width="15" height="14" rx="3.2" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M9 5v14M15 5v14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      )
+    case 'check':
+      return (
+        <svg {...common}>
+          <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'info':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="8.2" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M12 10.5v5M12 7.8h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      )
+    case 'preview':
+      return (
+        <svg {...common}>
+          <path d="M4.5 7.5h15M4.5 12h15M4.5 16.5h15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M8 4.5v15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      )
+    case 'chatgpt':
+      return (
+        <svg {...common}>
+          <path d="M12 4.5c1.5 0 2.9.8 3.7 2l1.1-.3c1.6-.4 3.2.5 3.7 2.1.4 1.4-.2 2.9-1.4 3.7l.1 1.2c.2 1.7-.9 3.2-2.6 3.5-1.2.2-2.4-.2-3.2-1l-1 .5c-1.4.8-3.2.7-4.5-.4-1.1-.9-1.6-2.3-1.4-3.6l-.9-.7c-1.4-1.1-1.8-3-1-4.6.7-1.4 2.1-2.2 3.7-2.1l.6-1c.8-1.3 2.2-2 3.8-2Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+          <path d="M8.7 8.5 12 6.6l3.3 1.9v3.8L12 14.2l-3.3-1.9V8.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'close':
+      return (
+        <svg {...common}>
+          <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      )
+    default:
+      return (
+        <svg {...common}>
+          <path d="M12 4.5c1.5 0 2.9.8 3.7 2l1.1-.3c1.6-.4 3.2.5 3.7 2.1.4 1.4-.2 2.9-1.4 3.7l.1 1.2c.2 1.7-.9 3.2-2.6 3.5-1.2.2-2.4-.2-3.2-1l-1 .5c-1.4.8-3.2.7-4.5-.4-1.1-.9-1.6-2.3-1.4-3.6l-.9-.7c-1.4-1.1-1.8-3-1-4.6.7-1.4 2.1-2.2 3.7-2.1l.6-1c.8-1.3 2.2-2 3.8-2Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+          <path d="M8.7 8.5 12 6.6l3.3 1.9v3.8L12 14.2l-3.3-1.9V8.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        </svg>
+      )
+  }
 }
 
 function emptyCustomerDraft(): CustomerDraft {
@@ -1485,24 +1604,53 @@ export function CustomersPage() {
             aria-modal="true"
             aria-labelledby="customers-listings-modal-title"
           >
-            <div className="customers-modal-head">
-              <div>
+            <div className="customers-modal-head customers-listings-head">
+              <div className="customers-listings-head-copy">
                 <h3 id="customers-listings-modal-title">Listados asistidos</h3>
-                <p>Describe el listado que necesitas y dejaremos preparada la consulta para su procesamiento automático.</p>
+                <p>Describe el listado que necesitas y generaremos la consulta automáticamente.</p>
               </div>
-              <span className="surface-chip customers-status-chip">ChatGPT</span>
+              <div className="customers-listings-head-actions">
+                <span className="surface-chip customers-status-chip customers-listings-chatgpt-chip is-active">
+                  <ListingIcon tone="chatgpt" className="customers-listings-chatgpt-icon" />
+                  ChatGPT
+                </span>
+                <button
+                  type="button"
+                  className="customers-listings-close"
+                  aria-label="Cerrar"
+                  onClick={closeListingsModal}
+                  disabled={listingSubmitting}
+                >
+                  <ListingIcon tone="close" className="customers-listings-close-icon" />
+                </button>
+              </div>
             </div>
 
-            <form className="customers-modal-body customers-listings-body" onSubmit={handleListingSubmitV2}>
+            <form className="customers-modal-body customers-listings-body customers-listings-layout" onSubmit={handleListingSubmitV2}>
               <div className="customers-listings-presets">
-                <button type="button" className="customers-listings-preset" onClick={() => setListingTarget('Clientes activos de Tenerife con contactos principales')}>
-                  Clientes activos de Tenerife
+                <button
+                  type="button"
+                  className="customers-listings-preset customers-listings-preset-green"
+                  onClick={() => setListingTarget('Clientes activos de Tenerife con contactos principales')}
+                >
+                  <ListingIcon tone="green" className="customers-listings-preset-icon" />
+                  <span>Clientes activos de Tenerife</span>
                 </button>
-                <button type="button" className="customers-listings-preset" onClick={() => setListingTarget('Clientes con actividad panadería y ventas del último mes')}>
-                  Clientes con actividad panadería
+                <button
+                  type="button"
+                  className="customers-listings-preset customers-listings-preset-amber"
+                  onClick={() => setListingTarget('Clientes con actividad panadería y ventas del último mes')}
+                >
+                  <ListingIcon tone="amber" className="customers-listings-preset-icon" />
+                  <span>Clientes con actividad panadería</span>
                 </button>
-                <button type="button" className="customers-listings-preset" onClick={() => setListingTarget('Clientes con contactos, ventas y recetas relacionadas')}>
-                  Clientes con contactos y ventas
+                <button
+                  type="button"
+                  className="customers-listings-preset customers-listings-preset-blue"
+                  onClick={() => setListingTarget('Clientes con contactos, ventas y recetas relacionadas')}
+                >
+                  <ListingIcon tone="blue" className="customers-listings-preset-icon" />
+                  <span>Clientes con contactos y ventas</span>
                 </button>
               </div>
 
@@ -1517,9 +1665,9 @@ export function CustomersPage() {
                 />
               </label>
 
-              <div className="customers-listings-help">
-                <strong>Incluye detalles útiles.</strong>
-                <span>Por ejemplo: filtros, columnas, orden, rango de fechas o tablas relacionadas como contactos, ventas o recetas.</span>
+              <div className="customers-listings-help-card">
+                <strong>Sugerencias útiles.</strong>
+                <span>Por ejemplo: filtros, columnas clave, orden, rango de fechas o tablas relacionadas como contactos, ventas o recetas.</span>
               </div>
 
               {listingResult && (
@@ -1529,12 +1677,11 @@ export function CustomersPage() {
                       <strong>{listingResult.title || 'Listado de clientes'}</strong>
                       <span>{listingResult.source || 'interprete local'}</span>
                     </div>
-                    <span className={`surface-chip ${listingResult.used_ai ? 'customers-status-chip is-active' : 'customers-status-chip is-inactive'}`}>
-                      {listingResult.used_ai ? 'ChatGPT' : 'Local'}
+                    <span className="surface-chip customers-status-chip is-active">
+                      <ListingIcon tone="check" className="customers-listings-status-icon" />
+                      Listo
                     </span>
                   </div>
-
-                  {listingResult.message && <p className="customers-listings-result-message">{listingResult.message}</p>}
 
                   {!!listingResult.headers.length && (
                     <div className="customers-listings-table-wrap">
@@ -1547,7 +1694,7 @@ export function CustomersPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {listingResult.rows.map((row, rowIndex) => (
+                          {listingResult.rows.slice(0, 5).map((row, rowIndex) => (
                             <tr key={rowIndex}>
                               {row.map((cell, cellIndex) => (
                                 <td key={`${rowIndex}-${cellIndex}`}>{cell === null || cell === undefined || cell === '' ? '-' : String(cell)}</td>
@@ -1558,6 +1705,13 @@ export function CustomersPage() {
                       </table>
                     </div>
                   )}
+
+                  <div className="customers-listings-result-footer">
+                    <span>
+                      {listingResult.rows.length ? `Mostrando ${Math.min(5, listingResult.rows.length)} de +${listingResult.rows.length} resultados` : 'Mostrando 0 resultados'}
+                    </span>
+                    <span>Los resultados completos se descargarán al generar el listado.</span>
+                  </div>
                 </div>
               )}
 
