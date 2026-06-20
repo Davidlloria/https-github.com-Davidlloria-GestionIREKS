@@ -57,6 +57,14 @@ const EMPTY_LIST: PaginatedList<CustomerListItem> = {
 }
 
 const CUSTOMER_TYPES = ['PANADERIA', 'PASTELERIA', 'HELADERIA', 'CAFETERIA', 'RESTAURANTE', 'HOTEL']
+const CUSTOMER_TYPE_TONES: Record<string, string> = {
+  PANADERIA: 'tone-panaderia',
+  PASTELERIA: 'tone-pasteleria',
+  HELADERIA: 'tone-heladeria',
+  CAFETERIA: 'tone-cafeteria',
+  RESTAURANTE: 'tone-restaurante',
+  HOTEL: 'tone-hotel',
+}
 
 const TABS: Array<{ key: CustomerTab; label: string }> = [
   { key: 'contacts', label: 'Contactos' },
@@ -108,6 +116,10 @@ function statusLabel(active?: boolean) {
     return 'Inactivo'
   }
   return '-'
+}
+
+function customerTypeToneClass(type: string) {
+  return CUSTOMER_TYPE_TONES[type.toUpperCase()] || 'tone-default'
 }
 
 function emptyCustomerDraft(): CustomerDraft {
@@ -706,7 +718,7 @@ export function CustomersPage() {
                   </div>
                 )}
 
-                {isCreating ? (
+                {isCreating || selectedDetail ? (
                   <form className="customers-field-grid" onSubmit={handleSubmit}>
                     <div className="customers-field-row customers-field-row-top">
                       <label className="customers-field-code">
@@ -1070,7 +1082,7 @@ export function CustomersPage() {
                   </div>
                 </div>
 
-                {isCreating ? (
+                {isCreating || selectedDetail ? (
                   <>
                     <div className="customers-type-grid">
                       {CUSTOMER_TYPES.map((type) => {
@@ -1079,9 +1091,10 @@ export function CustomersPage() {
                           <button
                             key={type}
                             type="button"
-                            className={`customer-type-pill ${isActive ? 'active' : ''}`}
+                            className={`customer-type-pill ${customerTypeToneClass(type)} ${isActive ? 'active' : ''}`}
                             aria-pressed={isActive}
-                            disabled
+                            disabled={saving}
+                            onClick={() => setDraftField('cliente_tipo', type)}
                           >
                             <span className="customer-type-pill-label">{type}</span>
                             {isActive && <span className="customer-type-pill-check">✓</span>}
@@ -1093,20 +1106,84 @@ export function CustomersPage() {
                     <div className="customers-type-fields">
                       <label>
                         <span>Tipo</span>
-                        <input className="input customers-field" readOnly value={valueOrDash(draft.cliente_tipo)} />
+                        <select
+                          className="select customers-field"
+                          value={draft.cliente_tipo}
+                          onChange={(event) => setDraftField('cliente_tipo', event.target.value)}
+                          disabled={saving}
+                        >
+                          <option value="">Selecciona tipo</option>
+                          {CUSTOMER_TYPES.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span>Grupo</span>
+                        <input
+                          className="input customers-field"
+                          value={draft.cliente_grupo}
+                          onChange={(event) => setDraftField('cliente_grupo', event.target.value)}
+                          placeholder="Grupo"
+                          disabled={saving}
+                        />
+                      </label>
+                      <label>
+                        <span>Distribuidor</span>
+                        <input
+                          className="input customers-field"
+                          value={draft.distribuidor_id}
+                          onChange={(event) => setDraftField('distribuidor_id', event.target.value)}
+                          placeholder="ID distribuidor"
+                          disabled={saving}
+                        />
                       </label>
                     </div>
 
                     <div className="customers-status-row">
-                      <span className={`customers-status-pill ${draft.activo ? 'is-active' : 'is-inactive'}`}>{draft.activo ? 'ACTIVO' : 'INACTIVO'}</span>
-                      <span className={`customers-status-pill ${draft.activo ? 'is-inactive' : 'is-active'}`}>{draft.activo ? 'INACTIVO' : 'ACTIVO'}</span>
+                      <button
+                        type="button"
+                        className={`customers-status-pill customers-status-pill-toggle ${draft.activo ? 'is-active selected' : 'is-inactive'}`}
+                        onClick={() => setDraftField('activo', true)}
+                        disabled={saving}
+                        aria-pressed={draft.activo}
+                      >
+                        ACTIVO
+                      </button>
+                      <button
+                        type="button"
+                        className={`customers-status-pill customers-status-pill-toggle ${!draft.activo ? 'is-active selected' : 'is-inactive'}`}
+                        onClick={() => setDraftField('activo', false)}
+                        disabled={saving}
+                        aria-pressed={!draft.activo}
+                      >
+                        INACTIVO
+                      </button>
                     </div>
 
                     <div className="customers-prospect-row">
                       <span>Prospeccion</span>
                       <div className="customers-radio-readonly">
-                        <span className={draft.cliente_prospeccion ? 'selected' : ''}>Si</span>
-                        <span className={!draft.cliente_prospeccion ? 'selected' : ''}>No</span>
+                        <button
+                          type="button"
+                          className={draft.cliente_prospeccion ? 'selected' : ''}
+                          onClick={() => setDraftField('cliente_prospeccion', true)}
+                          disabled={saving}
+                          aria-pressed={draft.cliente_prospeccion}
+                        >
+                          Si
+                        </button>
+                        <button
+                          type="button"
+                          className={!draft.cliente_prospeccion ? 'selected' : ''}
+                          onClick={() => setDraftField('cliente_prospeccion', false)}
+                          disabled={saving}
+                          aria-pressed={!draft.cliente_prospeccion}
+                        >
+                          No
+                        </button>
                       </div>
                     </div>
                   </>
@@ -1116,7 +1193,7 @@ export function CustomersPage() {
                       <>
                         <div className="customers-type-grid">
                           {CUSTOMER_TYPES.map((type) => {
-                            const isActive = selectedDetail.cliente_tipo.toUpperCase() === type
+                            const isActive = draft.cliente_tipo.toUpperCase() === type
                             return (
                               <button
                                 key={type}
