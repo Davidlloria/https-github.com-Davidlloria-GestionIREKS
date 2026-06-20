@@ -233,24 +233,54 @@ function PostalCodeField({
   options: AddressOption[]
 }) {
   const [open, setOpen] = useState(false)
+  const comboRef = useRef<HTMLDivElement | null>(null)
+  const toggleOpen = () => setOpen((current) => !current)
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (comboRef.current && !comboRef.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
 
   const visibleOptions = options.slice(0, 20)
 
   return (
     <label className="customers-field-postal">
       <span>C.P.</span>
-      <div className="customers-postal-combo">
+      <div ref={comboRef} className="customers-postal-combo">
         <input
           className="input customers-field"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder="C.P."
           onFocus={() => setOpen(true)}
-          onBlur={() => {
-            window.setTimeout(() => setOpen(false), 120)
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              setOpen(true)
+            }
+            if (event.key === 'Escape') {
+              setOpen(false)
+            }
           }}
           autoComplete="off"
         />
+        <button
+          type="button"
+          className="customers-postal-toggle"
+          aria-label={open ? 'Cerrar codigos postales' : 'Abrir codigos postales'}
+          aria-expanded={open}
+          onClick={toggleOpen}
+        >
+          <span className="customers-postal-toggle-icon" aria-hidden="true">
+            ▾
+          </span>
+        </button>
         {open && visibleOptions.length > 0 && (
           <div className="customers-postal-menu" role="listbox" aria-label="Codigos postales">
             {visibleOptions.map((option) => {

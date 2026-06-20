@@ -4313,6 +4313,46 @@ tbody tr:hover {
   min-width: 0;
 }
 
+.customers-postal-combo .customers-field {
+  padding-right: 38px;
+}
+
+.customers-postal-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #334155;
+  cursor: pointer;
+}
+
+.customers-postal-toggle:hover,
+.customers-postal-toggle:focus-visible {
+  background: #eaf1fb;
+  color: #0f172a;
+  outline: none;
+}
+
+.customers-postal-toggle-icon {
+  position: relative;
+  font-size: 0;
+  line-height: 0;
+}
+
+.customers-postal-toggle-icon::before {
+  content: '▾';
+  font-size: 16px;
+  line-height: 1;
+}
+
 .customers-field {
   min-width: 0;
   width: 100%;
