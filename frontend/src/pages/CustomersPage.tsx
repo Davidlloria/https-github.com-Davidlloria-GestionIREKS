@@ -57,6 +57,7 @@ const EMPTY_LIST: PaginatedList<CustomerListItem> = {
 }
 
 const CUSTOMER_TYPES = ['PANADERIA', 'PASTELERIA', 'HELADERIA', 'CAFETERIA', 'RESTAURANTE', 'HOTEL']
+const CUSTOMER_TYPE_OPTIONS = ['DIRECTO', 'INDIRECTO']
 const CUSTOMER_TYPE_TONES: Record<string, string> = {
   PANADERIA: 'tone-panaderia',
   PASTELERIA: 'tone-pasteleria',
@@ -1105,7 +1106,7 @@ export function CustomersPage() {
                           disabled={saving}
                         >
                           <option value="">Selecciona tipo</option>
-                          {CUSTOMER_TYPES.map((type) => (
+                          {CUSTOMER_TYPE_OPTIONS.map((type) => (
                             <option key={type} value={type}>
                               {type}
                             </option>
