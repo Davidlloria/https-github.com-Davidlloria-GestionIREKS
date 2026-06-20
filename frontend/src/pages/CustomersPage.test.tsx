@@ -97,7 +97,7 @@ describe('CustomersPage CRUD', () => {
     fireEvent.change(screen.getByLabelText('C.I.F.'), { target: { value: 'B999' } })
     fireEvent.change(screen.getByLabelText('Telefono'), { target: { value: '928000002' } })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+    fireEvent.submit(screen.getByLabelText('Nombre comercial').closest('form') as HTMLFormElement)
 
     expect(await screen.findByText('Cliente Dos')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Nuevo cliente' })).not.toBeInTheDocument()

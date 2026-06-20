@@ -876,14 +876,6 @@ export function CustomersPage() {
                       </label>
                     </div>
 
-                    <div className="customers-detail-actions">
-                      <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={saving}>
-                        Guardar
-                      </button>
-                      <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={saving} onClick={closeEditor}>
-                        Cancelar
-                      </button>
-                    </div>
                   </form>
                 ) : (
                   <>
