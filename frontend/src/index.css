@@ -5228,6 +5228,36 @@ tbody tr:hover {
   flex: 0 0 auto;
 }
 
+.app-data-table {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-data-table__wrap {
+  min-width: 0;
+}
+
+.app-data-table__table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.app-data-table__empty {
+  padding: 16px 14px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.app-data-table__footer {
+  color: #6b7280;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
 .customers-listings-footer-actions .customers-action-btn:not(:disabled):hover,
 .customers-listings-footer-actions .customers-action-btn:not(:disabled):focus-visible,
 .customers-listings-export-actions .customers-listings-export-btn:not(:disabled):hover,

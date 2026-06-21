@@ -13,6 +13,7 @@ import {
 } from '../api/customers'
 import { listContacts } from '../api/contacts'
 import { AppButton } from '../components/AppButton'
+import { AppDataTable } from '../components/AppDataTable'
 import { AppCard } from '../components/AppCard'
 import { AppChip } from '../components/AppChip'
 import { AppStateBox } from '../components/AppStateBox'
@@ -1767,30 +1768,18 @@ export function CustomersPage() {
                     />
 
                     {!!contactsQuery.data.items.length && (
-                      <div className="table-wrap customers-contacts-table">
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>Nombre</th>
-                              <th>Empresa</th>
-                              <th>Cargo</th>
-                              <th>Email</th>
-                              <th>Telefono</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {contactsQuery.data.items.map((contact) => (
-                              <tr key={contact.contacto_id}>
-                                <td>{contactLabel(contact)}</td>
-                                <td>{contact.cliente_nombre || '-'}</td>
-                                <td>{contact.cargo || '-'}</td>
-                                <td>{contact.email || '-'}</td>
-                                <td>{contact.telefono || '-'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      <AppDataTable<ContactListItem>
+                        className="customers-contacts-table"
+                        rows={contactsQuery.data.items}
+                        getRowKey={(contact) => contact.contacto_id}
+                        columns={[
+                          { key: 'name', header: 'Nombre', render: (contact) => contactLabel(contact) },
+                          { key: 'company', header: 'Empresa', render: (contact) => contact.cliente_nombre || '-' },
+                          { key: 'role', header: 'Cargo', render: (contact) => contact.cargo || '-' },
+                          { key: 'email', header: 'Email', render: (contact) => contact.email || '-' },
+                          { key: 'phone', header: 'Telefono', render: (contact) => contact.telefono || '-' },
+                        ]}
+                      />
                     )}
                   </div>
                 )}
@@ -1892,41 +1881,36 @@ export function CustomersPage() {
                 </div>
 
                 {listingResult?.rows.length ? (
-                  <div className="customers-listings-table-wrap">
-                    <table className="customers-listings-table">
-                      <thead>
-                        <tr>
-                          {listingResult.headers.map((header) => (
-                            <th key={header}>{header}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {listingResult.rows.slice(0, 5).map((row, rowIndex) => (
-                          <tr key={rowIndex}>
-                            {row.map((cell, cellIndex) => (
-                              <td key={`${rowIndex}-${cellIndex}`}>{cell === null || cell === undefined || cell === '' ? '-' : String(cell)}</td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <AppDataTable<CustomerListingCell[]>
+                    className="customers-listings-table-wrap"
+                    tableClassName="customers-listings-table"
+                    rows={listingResult.rows.slice(0, 5)}
+                    getRowKey={(_, rowIndex) => rowIndex}
+                    columns={listingResult.headers.map((header, columnIndex) => ({
+                      key: `${columnIndex}-${header}`,
+                      header,
+                      render: (row) => {
+                        const cell = row[columnIndex]
+                        return cell === null || cell === undefined || cell === '' ? '-' : String(cell)
+                      },
+                    }))}
+                    footer={
+                      <div className="customers-listings-result-footer">
+                        <span>
+                          {listingResult?.rows.length
+                            ? `Mostrando ${Math.min(5, listingResult.rows.length)} de +${listingResult.rows.length} resultados`
+                            : 'Todavía no se ha generado ningún listado'}
+                        </span>
+                        <span>Los resultados completos se descargarán al generar el listado.</span>
+                      </div>
+                    }
+                  />
                 ) : (
                   <div className="customers-listings-result-empty">
                     <ListingIcon tone="preview" className="customers-listings-help-note-icon" />
                     <p className="customers-listings-result-message">Aquí aparecerá el listado generado. Escribe una solicitud y pulsa Generar listado.</p>
                   </div>
                 )}
-
-                <div className="customers-listings-result-footer">
-                  <span>
-                    {listingResult?.rows.length
-                      ? `Mostrando ${Math.min(5, listingResult.rows.length)} de +${listingResult.rows.length} resultados`
-                      : 'Todavía no se ha generado ningún listado'}
-                  </span>
-                  <span>Los resultados completos se descargarán al generar el listado.</span>
-                </div>
               </AppCard>
 
               {listingError && (
