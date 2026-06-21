@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { ArrowRight, FileDown, FileSpreadsheet, FileText, List, Plus, Printer, Save, Trash2, X } from 'lucide-react'
 import {
   createCustomer,
   deleteCustomer,
@@ -12,6 +13,12 @@ import {
   type CustomerSavePayload,
 } from '../api/customers'
 import { listContacts } from '../api/contacts'
+import { AppButton } from '../components/AppButton'
+import { AppDataTable } from '../components/AppDataTable'
+import { AppCard } from '../components/AppCard'
+import { AppChip } from '../components/AppChip'
+import { AppStateBox } from '../components/AppStateBox'
+import { AppSectionHeader } from '../components/AppSectionHeader'
 import { BinaryToggleSelect } from '../components/BinaryToggleSelect'
 import { QueryState } from '../components/QueryState'
 import { useAsyncResource } from '../features/useAsyncResource'
@@ -1040,33 +1047,19 @@ export function CustomersPage() {
   return (
     <section className="customers-saas-page">
       <div className="customers-saas-workspace">
-        <aside className="customers-list-panel">
-          <div className="customers-list-head">
-            <div className="customers-list-head-copy">
-              <h2>Clientes</h2>
-            </div>
-            <span className="surface-chip">{sortedCustomerRows.length} visibles</span>
-          </div>
+        <AppCard as="aside" className="customers-list-panel">
+          <AppSectionHeader title="Clientes" titleAs="h2" rightSlot={<AppChip>{sortedCustomerRows.length} visibles</AppChip>} />
 
           <div className="customers-list-actions">
-            <button type="button" className="customers-action-btn customers-action-btn-primary" disabled={isCreating} onClick={openCreateForm}>
-              <span className="customers-action-btn-icon" aria-hidden="true">
-                +
-              </span>
-              <span>Nuevo</span>
-            </button>
-            <button type="button" className="customers-action-btn customers-action-btn-danger" disabled={isCreating || !selectedCustomerId} onClick={openDeleteConfirm}>
-              <span className="customers-action-btn-icon" aria-hidden="true">
-                🗑
-              </span>
-              <span>Eliminar</span>
-            </button>
-            <button type="button" className="customers-action-btn customers-action-btn-ghost" onClick={openListingsModal}>
-              <span className="customers-action-btn-icon" aria-hidden="true">
-                📄
-              </span>
-              <span>Listados</span>
-            </button>
+            <AppButton variant="primary" disabled={isCreating} onClick={openCreateForm} icon={<Plus size={18} strokeWidth={2.6} />}>
+              Nuevo
+            </AppButton>
+            <AppButton variant="danger" disabled={isCreating || !selectedCustomerId} onClick={openDeleteConfirm} icon={<Trash2 size={18} strokeWidth={2.4} />}>
+              Eliminar
+            </AppButton>
+            <AppButton variant="ghost" onClick={openListingsModal} icon={<List size={18} strokeWidth={2.4} />}>
+              Listados
+            </AppButton>
           </div>
 
           <div className="customers-list-filters">
@@ -1133,15 +1126,11 @@ export function CustomersPage() {
             )}
 
             {!listingAppliedRows && !customersQuery.loading && customersQuery.error && (
-              <div className="state state-error" role="alert">
-                Error: {customersQuery.error}
-              </div>
+              <AppStateBox kind="error" message={customersQuery.error} />
             )}
 
             {!listingAppliedRows && !customersQuery.loading && !customersQuery.error && !sortedCustomerRows.length && (
-              <div className="state state-empty" role="status">
-                No hay clientes para los filtros actuales.
-              </div>
+              <AppStateBox kind="empty" message="No hay clientes para los filtros actuales." />
             )}
 
             {!!sortedCustomerRows.length && (
@@ -1232,25 +1221,26 @@ export function CustomersPage() {
               </div>
             )}
           </div>
-        </aside>
+        </AppCard>
 
         <section className={`customers-detail-panel ${isCreating ? 'is-create-flow' : ''}`} hidden={isCreating}>
           <div className="customers-detail-body customers-detail-main">
             <div className="customers-detail-grid customers-detail-top">
-              <section className="customers-detail-card">
-                <div className="customers-section-head">
-                  <div>
-                    <h3>{isCreating ? 'Nuevo cliente' : 'Detalle de cliente'}</h3>
-                  </div>
-                  {!!selectedDetail && !isCreating && (
-                    <span
-                      className={`surface-chip customers-status-chip ${selectedDetail.activo ? 'is-active' : 'is-inactive'}`}
-                    >
-                      {saving ? 'Guardando...' : statusLabel(selectedDetail.activo)}
-                    </span>
-                  )}
-                  {isCreating && <span className="surface-chip">Alta activa</span>}
-                </div>
+              <AppCard as="section" className="customers-detail-card">
+                <AppSectionHeader
+                  title={isCreating ? 'Nuevo cliente' : 'Detalle de cliente'}
+                  rightSlot={
+                    !!selectedDetail && !isCreating ? (
+                      <AppChip tone={selectedDetail.activo ? 'success' : 'danger'} active={selectedDetail.activo}>
+                        {saving ? 'Guardando...' : statusLabel(selectedDetail.activo)}
+                      </AppChip>
+                    ) : isCreating ? (
+                      <AppChip tone="success" active>
+                        Alta activa
+                      </AppChip>
+                    ) : null
+                  }
+                />
 
                 {formError && (
                   <div className="state" role="alert">
@@ -1590,12 +1580,12 @@ export function CustomersPage() {
 
                             {isCreating && (
                               <div className="customers-detail-actions">
-                                <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={saving}>
+                                <AppButton type="submit" variant="primary" disabled={saving} icon={<Save size={18} strokeWidth={2.4} />}>
                                   Guardar
-                                </button>
-                                <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={saving} onClick={closeEditor}>
+                                </AppButton>
+                                <AppButton type="button" variant="secondary" disabled={saving} onClick={closeEditor} icon={<X size={18} strokeWidth={2.4} />}>
                                   Cancelar
-                                </button>
+                                </AppButton>
                               </div>
                             )}
                           </div>
@@ -1604,15 +1594,10 @@ export function CustomersPage() {
                     )}
                   </>
                 )}
-              </section>
+              </AppCard>
 
-              <aside className="customers-type-panel">
-                <div className="customers-section-head">
-                  <div>
-                    <h3>Clasificación del cliente</h3>
-                    <span className="customers-type-subhead">Actividad</span>
-                  </div>
-                </div>
+              <AppCard as="aside" className="customers-type-panel">
+                <AppSectionHeader title="Clasificacion del cliente" subtitle="Actividad" />
 
                 {isCreating || selectedDetail ? (
                   <>
@@ -1749,14 +1734,14 @@ export function CustomersPage() {
                         </div>
                       </>
                     ) : (
-                      <div className="state customers-empty-panel">Sin datos de cliente para mostrar.</div>
+                      <AppStateBox kind="empty" className="customers-empty-panel" message="Sin datos de cliente para mostrar." />
                     )}
                   </>
                 )}
-              </aside>
+              </AppCard>
             </div>
 
-            <section className="customers-tabs-panel">
+            <AppCard as="section" className="customers-tabs-panel">
               <div className="customers-tabs" role="tablist" aria-label="Secciones de cliente">
                 {TABS.map((tab) => (
                   <button
@@ -1775,12 +1760,7 @@ export function CustomersPage() {
               <div className="customers-tabs-content customers-tabs-body">
                 {activeTab === 'contacts' && (
                   <div className="customers-tab-scroll">
-                    <div className="customers-tab-head">
-                      <div>
-                        <h3>Contactos</h3>
-                      </div>
-                      <span className="surface-chip">{contactsQuery.data.items.length} contactos</span>
-                    </div>
+                    <AppSectionHeader title="Contactos" rightSlot={<AppChip>{contactsQuery.data.items.length} contactos</AppChip>} />
                     <QueryState
                       loading={contactsQuery.loading}
                       error={contactsQuery.error}
@@ -1789,39 +1769,27 @@ export function CustomersPage() {
                     />
 
                     {!!contactsQuery.data.items.length && (
-                      <div className="table-wrap customers-contacts-table">
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>Nombre</th>
-                              <th>Empresa</th>
-                              <th>Cargo</th>
-                              <th>Email</th>
-                              <th>Telefono</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {contactsQuery.data.items.map((contact) => (
-                              <tr key={contact.contacto_id}>
-                                <td>{contactLabel(contact)}</td>
-                                <td>{contact.cliente_nombre || '-'}</td>
-                                <td>{contact.cargo || '-'}</td>
-                                <td>{contact.email || '-'}</td>
-                                <td>{contact.telefono || '-'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      <AppDataTable<ContactListItem>
+                        className="customers-contacts-table"
+                        rows={contactsQuery.data.items}
+                        getRowKey={(contact) => contact.contacto_id}
+                        columns={[
+                          { key: 'name', header: 'Nombre', render: (contact) => contactLabel(contact) },
+                          { key: 'company', header: 'Empresa', render: (contact) => contact.cliente_nombre || '-' },
+                          { key: 'role', header: 'Cargo', render: (contact) => contact.cargo || '-' },
+                          { key: 'email', header: 'Email', render: (contact) => contact.email || '-' },
+                          { key: 'phone', header: 'Telefono', render: (contact) => contact.telefono || '-' },
+                        ]}
+                      />
                     )}
                   </div>
                 )}
 
-                {activeTab === 'sales' && <div className="state customers-empty-panel customers-tab-empty">Sin datos asociados a ventas.</div>}
-                {activeTab === 'recipes' && <div className="state customers-empty-panel customers-tab-empty">Sin datos asociados a recetas.</div>}
-                {activeTab === 'agenda' && <div className="state customers-empty-panel customers-tab-empty">Sin datos asociados a agenda.</div>}
+                {activeTab === 'sales' && <AppStateBox kind="empty" className="customers-empty-panel customers-tab-empty" message="Sin datos asociados a ventas." />}
+                {activeTab === 'recipes' && <AppStateBox kind="empty" className="customers-empty-panel customers-tab-empty" message="Sin datos asociados a recetas." />}
+                {activeTab === 'agenda' && <AppStateBox kind="empty" className="customers-empty-panel customers-tab-empty" message="Sin datos asociados a agenda." />}
               </div>
-            </section>
+            </AppCard>
           </div>
         </section>
       </div>
@@ -1840,10 +1808,14 @@ export function CustomersPage() {
                 <p>Describe el listado que necesitas y generaremos la consulta automáticamente.</p>
               </div>
               <div className="customers-listings-head-actions">
-                <span className="surface-chip customers-status-chip customers-listings-chatgpt-chip is-active">
-                  <ListingIcon tone="chatgpt" className="customers-listings-chatgpt-icon" />
+                <AppChip
+                  tone="success"
+                  active
+                  className="customers-listings-chatgpt-chip"
+                  icon={<ListingIcon tone="chatgpt" className="customers-listings-chatgpt-icon" />}
+                >
                   ChatGPT
-                </span>
+                </AppChip>
                 <button
                   type="button"
                   className="customers-listings-close"
@@ -1874,18 +1846,18 @@ export function CustomersPage() {
                   <span>Exportar listado</span>
                 </div>
                 <div className="customers-listings-export-actions customers-listings-export-actions-ribbon">
-                  <button type="button" className="customers-listings-export-btn" onClick={handleListingPrint} disabled={!listingResult?.rows.length}>
+                  <AppButton type="button" variant="secondary" className="customers-listings-export-btn" onClick={handleListingPrint} disabled={!listingResult?.rows.length} icon={<Printer size={17} strokeWidth={2.3} />}>
                     Imprimir
-                  </button>
-                  <button type="button" className="customers-listings-export-btn" onClick={handleListingPdfExport} disabled={!listingResult?.rows.length}>
+                  </AppButton>
+                  <AppButton type="button" variant="secondary" className="customers-listings-export-btn" onClick={handleListingPdfExport} disabled={!listingResult?.rows.length} icon={<FileDown size={17} strokeWidth={2.3} />}>
                     PDF
-                  </button>
-                  <button type="button" className="customers-listings-export-btn" onClick={handleListingExcelExport} disabled={!listingResult?.rows.length}>
+                  </AppButton>
+                  <AppButton type="button" variant="secondary" className="customers-listings-export-btn" onClick={handleListingExcelExport} disabled={!listingResult?.rows.length} icon={<FileSpreadsheet size={17} strokeWidth={2.3} />}>
                     Excel
-                  </button>
-                  <button type="button" className="customers-listings-export-btn" onClick={handleListingCsvExport} disabled={!listingResult?.rows.length}>
+                  </AppButton>
+                  <AppButton type="button" variant="secondary" className="customers-listings-export-btn" onClick={handleListingCsvExport} disabled={!listingResult?.rows.length} icon={<FileText size={17} strokeWidth={2.3} />}>
                     CSV
-                  </button>
+                  </AppButton>
                 </div>
               </div>
 
@@ -1894,87 +1866,75 @@ export function CustomersPage() {
                 <span>Puedes usar datos de clientes, contactos, ventas, recetas y más.</span>
               </div>
 
-              <div className="customers-listings-result">
+              <AppCard as="div" className="customers-listings-result">
                 <div className="customers-listings-result-head">
                   <div>
                     <strong>{listingResult?.title || 'Listado de clientes'}</strong>
                     <span>{listingResult?.source || 'Vista previa del listado'}</span>
                   </div>
-                  <span className={`surface-chip customers-status-chip ${listingResult ? 'is-active' : 'is-inactive'}`}>
-                    {listingResult ? (
-                      <>
-                        <ListingIcon tone="check" className="customers-listings-status-icon" />
-                        Listo
-                      </>
-                    ) : (
-                      <>
-                        <ListingIcon tone="info" className="customers-listings-status-icon" />
-                        Pendiente
-                      </>
-                    )}
-                  </span>
+                  <AppChip
+                    tone={listingResult ? 'success' : 'danger'}
+                    active={Boolean(listingResult)}
+                    icon={listingResult ? <ListingIcon tone="check" className="customers-listings-status-icon" /> : <ListingIcon tone="info" className="customers-listings-status-icon" />}
+                  >
+                    {listingResult ? 'Listo' : 'Pendiente'}
+                  </AppChip>
                 </div>
 
                 {listingResult?.rows.length ? (
-                  <div className="customers-listings-table-wrap">
-                    <table className="customers-listings-table">
-                      <thead>
-                        <tr>
-                          {listingResult.headers.map((header) => (
-                            <th key={header}>{header}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {listingResult.rows.slice(0, 5).map((row, rowIndex) => (
-                          <tr key={rowIndex}>
-                            {row.map((cell, cellIndex) => (
-                              <td key={`${rowIndex}-${cellIndex}`}>{cell === null || cell === undefined || cell === '' ? '-' : String(cell)}</td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <AppDataTable<CustomerListingCell[]>
+                    className="customers-listings-table-wrap"
+                    tableClassName="customers-listings-table"
+                    rows={listingResult.rows.slice(0, 5)}
+                    getRowKey={(_, rowIndex) => rowIndex}
+                    columns={listingResult.headers.map((header, columnIndex) => ({
+                      key: `${columnIndex}-${header}`,
+                      header,
+                      render: (row) => {
+                        const cell = row[columnIndex]
+                        return cell === null || cell === undefined || cell === '' ? '-' : String(cell)
+                      },
+                    }))}
+                    footer={
+                      <div className="customers-listings-result-footer">
+                        <span>
+                          {listingResult?.rows.length
+                            ? `Mostrando ${Math.min(5, listingResult.rows.length)} de +${listingResult.rows.length} resultados`
+                            : 'Todavía no se ha generado ningún listado'}
+                        </span>
+                        <span>Los resultados completos se descargarán al generar el listado.</span>
+                      </div>
+                    }
+                  />
                 ) : (
                   <div className="customers-listings-result-empty">
                     <ListingIcon tone="preview" className="customers-listings-help-note-icon" />
                     <p className="customers-listings-result-message">Aquí aparecerá el listado generado. Escribe una solicitud y pulsa Generar listado.</p>
                   </div>
                 )}
-
-                <div className="customers-listings-result-footer">
-                  <span>
-                    {listingResult?.rows.length
-                      ? `Mostrando ${Math.min(5, listingResult.rows.length)} de +${listingResult.rows.length} resultados`
-                      : 'Todavía no se ha generado ningún listado'}
-                  </span>
-                  <span>Los resultados completos se descargarán al generar el listado.</span>
-                </div>
-              </div>
+              </AppCard>
 
               {listingError && (
-                <div className="state" role="alert">
-                  {listingError}
-                </div>
+                <AppStateBox kind="error" message={listingError} />
               )}
 
               <div className="customers-listings-footer-actions">
                 <div className="customers-detail-actions customers-modal-actions customers-listings-actions">
-                  <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={listingSubmitting}>
+                  <AppButton type="submit" variant="primary" disabled={listingSubmitting} icon={<FileText size={18} strokeWidth={2.3} />}>
                     {listingSubmitting ? 'Preparando...' : 'Generar listado'}
-                  </button>
-                  <button
+                  </AppButton>
+                  <AppButton
                     type="button"
-                    className="customers-action-btn customers-action-btn-ghost"
+                    variant="ghost"
                     disabled={!listingResult?.rows.length || listingApplying}
                     onClick={handleApplyListingToMainList}
+                    icon={<ArrowRight size={18} strokeWidth={2.3} />}
                   >
                     {listingApplying ? 'Pasando...' : 'Pasar al listado'}
-                  </button>
-                  <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={listingSubmitting} onClick={closeListingsModal}>
+                  </AppButton>
+                  <AppButton type="button" variant="secondary" disabled={listingSubmitting} onClick={closeListingsModal} icon={<X size={18} strokeWidth={2.3} />}>
                     Cancelar
-                  </button>
+                  </AppButton>
                 </div>
               </div>
             </form>
@@ -1995,7 +1955,7 @@ export function CustomersPage() {
                 <h3 id="customers-delete-modal-title">Eliminar cliente</h3>
                 <p>Confirma si quieres borrar este registro de la base de datos.</p>
               </div>
-              <span className="surface-chip customers-status-chip is-inactive">Confirmación</span>
+              <AppChip tone="danger" active>Confirmación</AppChip>
             </div>
 
             <div className="customers-delete-summary">
@@ -2016,12 +1976,12 @@ export function CustomersPage() {
             )}
 
             <div className="customers-detail-actions customers-modal-actions customers-delete-actions">
-              <button type="button" className="customers-action-btn customers-action-btn-danger" disabled={deleting} onClick={handleDeleteConfirm}>
+              <AppButton type="button" variant="danger" disabled={deleting} onClick={handleDeleteConfirm} icon={<Trash2 size={18} strokeWidth={2.4} />}>
                 {deleting ? 'Eliminando...' : 'Eliminar'}
-              </button>
-              <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={deleting} onClick={closeDeleteConfirm}>
+              </AppButton>
+              <AppButton type="button" variant="secondary" disabled={deleting} onClick={closeDeleteConfirm} icon={<X size={18} strokeWidth={2.4} />}>
                 Cancelar
-              </button>
+              </AppButton>
             </div>
           </div>
         </div>
@@ -2040,7 +2000,7 @@ export function CustomersPage() {
                 <h3 id="customers-create-modal-title">Nuevo cliente</h3>
                 <p>Introduce los datos del cliente y guarda para crear el registro en la base de datos.</p>
               </div>
-              <span className="surface-chip">Alta activa</span>
+              <AppChip tone="success" active>Alta activa</AppChip>
             </div>
 
             <form className="customers-modal-body" onSubmit={handleSubmit}>
@@ -2050,7 +2010,7 @@ export function CustomersPage() {
                     <div>
                       <h3>Detalle de cliente</h3>
                     </div>
-                    <span className="surface-chip customers-status-chip is-active">Activo</span>
+                    <AppChip tone="success" active>Activo</AppChip>
                   </div>
 
                   {formError && (
@@ -2217,23 +2177,18 @@ export function CustomersPage() {
                     </div>
 
                     <div className="customers-detail-actions customers-modal-actions">
-                      <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={saving}>
+                      <AppButton type="submit" variant="primary" disabled={saving} icon={<Save size={18} strokeWidth={2.4} />}>
                         Guardar
-                      </button>
-                      <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={saving} onClick={closeEditor}>
+                      </AppButton>
+                      <AppButton type="button" variant="secondary" disabled={saving} onClick={closeEditor} icon={<X size={18} strokeWidth={2.4} />}>
                         Cancelar
-                      </button>
+                      </AppButton>
                     </div>
                   </div>
                 </section>
 
-                <aside className="customers-type-panel">
-                  <div className="customers-section-head">
-                    <div>
-                      <h3>Clasificación del cliente</h3>
-                      <span className="customers-type-subhead">Actividad</span>
-                    </div>
-                  </div>
+                <AppCard as="aside" className="customers-type-panel">
+                  <AppSectionHeader title="Clasificacion del cliente" subtitle="Actividad" />
 
                   <div className="customers-type-grid">
                     {CUSTOMER_ACTIVITIES.map((activity) => {
@@ -2314,7 +2269,7 @@ export function CustomersPage() {
                       className="binary-toggle-select--customer-prospect"
                     />
                   </div>
-                </aside>
+                </AppCard>
               </div>
             </form>
           </div>
@@ -2323,3 +2278,4 @@ export function CustomersPage() {
     </section>
   )
 }
+
