@@ -1904,39 +1904,6 @@ button {
   justify-content: flex-end;
 }
 
-.ireks-products-clear-filters {
-  flex: 0 0 auto;
-  height: 30px;
-  padding-inline: 10px;
-  border-color: #ef5d5d;
-  background: linear-gradient(180deg, #f26a6a, #e94b4b);
-  color: #fff;
-}
-
-.ireks-products-clear-filters:disabled {
-  border-color: #d3d6dc;
-  background: linear-gradient(180deg, #f4f5f7, #e9ecf1);
-  color: #9aa3ad;
-  box-shadow: var(--shadow-soft);
-}
-
-.ireks-products-clear-filters:not(:disabled) {
-  border-color: #ef5d5d;
-  background: linear-gradient(180deg, #f26a6a, #e94b4b);
-  color: #fff;
-}
-
-.ireks-products-clear-filters:not(:disabled):hover,
-.ireks-products-clear-filters:not(:disabled):focus-visible {
-  border-color: #efb3b3;
-  background: linear-gradient(180deg, #fff4f4, #fde8e8);
-  color: #b36d6d;
-}
-
-.ireks-products-clear-filters .app-button__icon {
-  color: currentColor;
-}
-
 .ireks-products-action-ribbon {
   display: flex;
   flex-wrap: wrap;

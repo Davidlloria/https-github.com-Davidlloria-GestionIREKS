@@ -411,7 +411,6 @@ export function IreksProductsPage() {
             <AppButton
               variant="danger"
               size="sm"
-              className="ireks-products-clear-filters"
               onClick={clearFilters}
               disabled={!search && !selectedFabricanteId && !selectedFamiliaId && !selectedSubfamiliaId}
               icon={<X size={16} strokeWidth={2.4} />}
