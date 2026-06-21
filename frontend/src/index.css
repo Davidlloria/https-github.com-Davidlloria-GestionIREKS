@@ -4954,13 +4954,14 @@ tbody tr:hover {
 .customers-action-btn-primary {
   background: #b9d9b1;
   border-color: #2c5f26;
-  color: #ffffff;
+  color: #1f4d1b;
 }
 
 .customers-action-btn-primary:not(:disabled):hover,
 .customers-action-btn-primary:not(:disabled):focus-visible {
   background: #acd1a3;
   border-color: #234d1f;
+  color: #173f14;
 }
 
 .customers-action-btn-outline {
