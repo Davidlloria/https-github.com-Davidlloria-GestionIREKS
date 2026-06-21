@@ -1089,25 +1089,25 @@ export function CustomersPage() {
                 }}
                 placeholder="Buscar cliente..."
               />
-              <button
+              <AppButton
                 type="button"
-                className="customers-clear"
-                aria-label="Limpiar busqueda"
+                variant="danger"
+                size="sm"
+                aria-label="Limpiar filtros"
                 disabled={!search && !islandFilter && !listingAppliedRows}
                 onClick={() => {
-                  setSearch('')
-                  setIslandFilter('')
-                  setSelectedCandidateId('')
+                  setSearch("")
+                  setIslandFilter("")
+                  setSelectedCandidateId("")
                   if (listingAppliedRows) {
                     setListingAppliedRows(null)
                     setRefreshTick((current) => current + 1)
                   }
                 }}
+                icon={<X size={16} strokeWidth={2.4} />}
               >
-                <span aria-hidden="true" className="customers-clear-icon">
-                  ↺
-                </span>
-              </button>
+                Limpiar
+              </AppButton>
             </div>
           </div>
 
@@ -2278,4 +2278,7 @@ export function CustomersPage() {
     </section>
   )
 }
+
+
+
 
