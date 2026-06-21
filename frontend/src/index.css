@@ -2016,14 +2016,16 @@ button {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  align-items: end;
+  gap: 8px 10px;
+  align-items: start;
   margin-top: 4px;
 }
 
 .ireks-products-page .ireks-products-toggle-field {
   display: grid;
+  grid-template-columns: minmax(78px, 92px) minmax(0, 1fr);
   gap: 6px;
+  align-items: center;
   min-width: 0;
 }
 
@@ -2033,6 +2035,13 @@ button {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  line-height: 1.15;
+}
+
+.ireks-products-page .ireks-products-toggle-field .yes-no-slider-toggle,
+.ireks-products-page .ireks-products-toggle-field .category-select {
+  width: 100%;
+  min-width: 0;
 }
 
 .ireks-products-page .ireks-products-tab-empty {

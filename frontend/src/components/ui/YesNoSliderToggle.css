@@ -1,8 +1,8 @@
 .yes-no-slider-toggle {
-  --toggle-width: 126px;
+  --toggle-width: 90px;
   --toggle-height: 31px;
   --toggle-padding: 2px;
-  --white-width: 42px;
+  --white-width: 28px;
   --yes-color: #9adce8;
   --yes-border: #82bfd0;
   --no-color: #e6acc7;
@@ -85,7 +85,7 @@
   justify-content: center;
   width: calc(var(--toggle-width) - var(--white-width) - calc(var(--toggle-padding) * 3));
   color: #ffffff;
-  font-size: 10px;
+  font-size: 8px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0.01em;
