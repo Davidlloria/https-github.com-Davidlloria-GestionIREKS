@@ -3,6 +3,7 @@ import { getIreksIngredientDetail, listIreksIngredients } from '../api/ingredien
 import { AppButton } from '../components/AppButton'
 import { AppListingGrid } from '../components/AppListingGrid'
 import { AppSectionHeader } from '../components/AppSectionHeader'
+import { CategorySelect } from '../components/CategorySelect'
 import { QueryState } from '../components/QueryState'
 import { YesNoSliderToggle } from '../components/ui/YesNoSliderToggle'
 import { FileDown, List, Plus, Trash2, X } from 'lucide-react'
@@ -101,7 +102,10 @@ function ReadonlyField({
 function ProductStatusFields({ detail }: { detail: IngredientIreksRead }) {
   const [statusActivo, setStatusActivo] = useState(detail.articulo_status_activo)
   const [statusEnLista, setStatusEnLista] = useState(detail.articulo_status_en_lista)
-  const [categoriaEsHarina, setCategoriaEsHarina] = useState((detail.categoria || '').toUpperCase() !== 'LIQUIDO')
+  const initialCategory = (detail.categoria || '').trim().toUpperCase()
+  const [categoria, setCategoria] = useState<'HARINA' | 'LIQUIDO' | null>(
+    initialCategory === 'HARINA' || initialCategory === 'LIQUIDO' ? initialCategory : null,
+  )
 
   return (
     <div className="ireks-products-toggle-grid">
@@ -127,13 +131,7 @@ function ProductStatusFields({ detail }: { detail: IngredientIreksRead }) {
       </label>
       <label className="ireks-products-toggle-field">
         <span>Categoría</span>
-        <YesNoSliderToggle
-          value={categoriaEsHarina}
-          onChange={setCategoriaEsHarina}
-          yesLabel="HARINA"
-          noLabel="LIQUIDO"
-          ariaLabel="Categoría del producto"
-        />
+        <CategorySelect value={categoria} onChange={setCategoria} noneLabel="NADA" ariaLabel="Categoría del producto" />
       </label>
     </div>
   )

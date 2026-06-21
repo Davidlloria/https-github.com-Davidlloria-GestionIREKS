@@ -36,6 +36,7 @@ Componentes compartidos actuales
 - `AppSectionHeader`
 - `AppShell`
 - `AppStateBox`
+- `CategorySelect`
 - `BinaryToggleSelect`
 - `QueryState`
 - `SidebarNav`
