@@ -139,12 +139,35 @@ export function IreksProductsPage() {
   const [activeTab, setActiveTab] = useState<IreksTab>('Datos')
   const [sortKey, setSortKey] = useState<IreksSortKey>('ref')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [selectedFabricanteId, setSelectedFabricanteId] = useState('')
+  const [selectedFamiliaId, setSelectedFamiliaId] = useState('')
+  const [selectedSubfamiliaId, setSelectedSubfamiliaId] = useState('')
 
   const query = useAsyncResource<LoadedIreksData>(() => loadAllIreksIngredients(search), EMPTY_DATA, [search, refreshTick])
   const rows = query.data.items
+  const catalogs = query.data.catalogs
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      if (selectedFabricanteId && row.fabricante_id !== selectedFabricanteId) {
+        return false
+      }
+      if (selectedFamiliaId && row.articulo_familia_id !== selectedFamiliaId) {
+        return false
+      }
+      if (selectedSubfamiliaId && row.articulo_subfamilia_id !== selectedSubfamiliaId) {
+        return false
+      }
+      return true
+    })
+  }, [rows, selectedFabricanteId, selectedFamiliaId, selectedSubfamiliaId])
+
+  const fabricanteOptions = useMemo(() => catalogs.fabricantes, [catalogs.fabricantes])
+  const familiaOptions = useMemo(() => catalogs.familias, [catalogs.familias])
+  const subfamiliaOptions = useMemo(() => catalogs.subfamilias, [catalogs.subfamilias])
 
   const sortedRows = useMemo(() => {
-    const sorted = [...rows]
+    const sorted = [...filteredRows]
 
     sorted.sort((left, right) => {
       let comparison = 0
@@ -179,7 +202,7 @@ export function IreksProductsPage() {
     })
 
     return sorted
-  }, [rows, checkedCandidateId, sortDirection, sortKey])
+  }, [filteredRows, checkedCandidateId, sortDirection, sortKey])
 
   const selectedRowId = useMemo(() => {
     if (!sortedRows.length) {
@@ -219,7 +242,6 @@ export function IreksProductsPage() {
     [selectedRowId],
   )
 
-  const catalogs = query.data.catalogs
   const fabricanteLookup = useMemo(() => buildLookup(catalogs.fabricantes), [catalogs.fabricantes])
   const familiaLookup = useMemo(() => buildLookup(catalogs.familias), [catalogs.familias])
   const subfamiliaLookup = useMemo(() => buildLookup(catalogs.subfamilias), [catalogs.subfamilias])
@@ -257,7 +279,7 @@ export function IreksProductsPage() {
         <section className="panel-section ireks-products-list-panel">
           <AppSectionHeader
             title="Productos IREKS"
-            rightSlot={<span className="surface-chip">{query.data.total} visibles</span>}
+            rightSlot={<span className="surface-chip">{filteredRows.length} visibles</span>}
             className="ireks-products-page__header"
           />
 
@@ -276,20 +298,56 @@ export function IreksProductsPage() {
           <div className="ireks-products-filters">
             <label className="ireks-filter">
               <span>Fabricante</span>
-              <select className="select" disabled defaultValue="">
+              <select
+                className="select"
+                value={selectedFabricanteId}
+                onChange={(event) => {
+                  const nextValue = event.target.value
+                  setSelectedFabricanteId(nextValue)
+                  setSelectedFamiliaId('')
+                  setSelectedSubfamiliaId('')
+                }}
+              >
                 <option value="">Todos</option>
+                {fabricanteOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="ireks-filter">
               <span>Familia</span>
-              <select className="select" disabled defaultValue="">
+              <select
+                className="select"
+                value={selectedFamiliaId}
+                onChange={(event) => {
+                  const nextValue = event.target.value
+                  setSelectedFamiliaId(nextValue)
+                  setSelectedSubfamiliaId('')
+                }}
+              >
                 <option value="">Todos</option>
+                {familiaOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="ireks-filter">
               <span>Subfamilia</span>
-              <select className="select" disabled defaultValue="">
+              <select
+                className="select"
+                value={selectedSubfamiliaId}
+                onChange={(event) => setSelectedSubfamiliaId(event.target.value)}
+              >
                 <option value="">Todos</option>
+                {subfamiliaOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
@@ -309,12 +367,12 @@ export function IreksProductsPage() {
           <QueryState
             loading={query.loading}
             error={query.error}
-            empty={!rows.length}
+            empty={!filteredRows.length}
             emptyMessage="No hay productos IREKS para los filtros actuales."
           />
 
           <div className="ireks-products-list-scroll">
-            {!!rows.length && (
+            {!!filteredRows.length && (
               <div className="table-wrap ireks-products-table-wrap">
                 <table>
                   <thead>
