@@ -432,8 +432,8 @@ export function IreksProductsPage() {
               <AppDataTable
                 rows={sortedRows}
                 getRowKey={(row, index) => row.id ?? row.articulo_id ?? index}
-                wrapClassName="ireks-products-table-wrap"
-                tableClassName="ireks-products-table"
+                wrapClassName="customers-listings-table-wrap ireks-products-table-wrap"
+                tableClassName="customers-listings-table ireks-products-table"
                 rowClassName={(row) => {
                   const rowId = row.id ?? null
                   return rowId !== null && rowId === selectedRowId ? 'row-selected' : undefined
