@@ -54,3 +54,15 @@ entire migration history first.
 - If a new chat resumes work, start from this snapshot and then consult the roadmap.
 - If the next task is functional, start from `docs/migration-roadmap.md` and
   `docs/migration-history.md` after reading this log.
+
+## Handoff Block
+
+```text
+Branch: main
+HEAD: 0dee56f
+Worktree: clean
+Focus: customer/listings flow, export buttons, and remaining migration tasks.
+Recent changes: PDF export backend-driven, Excel export is real .xlsx, customer button contrast improved.
+Pending: keep listados/ clean, review next functional block from roadmap/history.
+Reference: docs/progress-log.md, docs/migration-roadmap.md, docs/migration-history.md
+```
