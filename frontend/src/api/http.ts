@@ -40,6 +40,19 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   })
 }
 
+export async function apiPostBlob(path: string, body?: unknown): Promise<Blob> {
+  const response = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers: { Accept: 'application/pdf', 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || `Error HTTP ${response.status}`)
+  }
+  return response.blob()
+}
+
 export async function apiPostForm<T>(path: string, body: FormData): Promise<T> {
   return fetchJson<T>(buildUrl(path), {
     method: 'POST',

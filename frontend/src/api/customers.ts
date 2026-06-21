@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from './http'
+import { apiDelete, apiGet, apiPatch, apiPost, apiPostBlob } from './http'
 import type {
   CustomerAddressCatalogsPayload,
   CustomerDetail,
@@ -63,4 +63,8 @@ export function updateCustomer(customerId: string, payload: CustomerSavePayload)
 export function generateCustomerListing(prompt: string) {
   const payload: CustomerListingRequest = { prompt }
   return apiPost<CustomerListingResponse>('/customers/listings', payload)
+}
+
+export function exportCustomerListingPdf(payload: CustomerListingResponse) {
+  return apiPostBlob('/customers/listings/pdf', payload)
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   createCustomer,
   deleteCustomer,
+  exportCustomerListingPdf,
   generateCustomerListing,
   getCustomerAddressCatalogs,
   getCustomerDetail,
@@ -22,6 +23,7 @@ import type {
   CustomerListingResponse,
   PaginatedList,
 } from '../types/api'
+import type { CustomerListingCell } from '../types/customers'
 
 const PAGE_SIZE = 25
 
@@ -144,6 +146,20 @@ function rowsToCsv(headers: string[], rows: Array<Array<string | number | boolea
   return lines.join('\r\n')
 }
 
+function downloadListingBlob(filename: string, blob: Blob) {
+  if (typeof window === 'undefined') {
+    return
+  }
+  const url = window.URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  window.setTimeout(() => window.URL.revokeObjectURL(url), 1000)
+}
+
 function customerLabel(customer: { cliente_id: string; cliente_nombre_comercial: string; cliente_nombre_fiscal: string }) {
   return customer.cliente_nombre_comercial || customer.cliente_nombre_fiscal || customer.cliente_id
 }
@@ -165,6 +181,109 @@ function valueOrDash(value: string | number | boolean | null | undefined) {
   }
   const text = String(value).trim()
   return text || '-'
+}
+
+function normalizeComparableText(value: string) {
+  return value
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .toUpperCase()
+}
+
+function normalizeDigits(value: string) {
+  return value.replace(/\D+/g, '')
+}
+
+function listingCellText(cell: CustomerListingCell) {
+  if (cell === null || cell === undefined) {
+    return ''
+  }
+  if (typeof cell === 'boolean') {
+    return cell ? 'SI' : 'NO'
+  }
+  return String(cell).trim()
+}
+
+function indexCustomersByText(customers: CustomerListItem[], getter: (customer: CustomerListItem) => string | null | undefined) {
+  const index = new Map<string, CustomerListItem[]>()
+
+  customers.forEach((customer) => {
+    const key = getter(customer)
+    if (!key) {
+      return
+    }
+
+    const normalized = normalizeComparableText(String(key))
+    const bucket = index.get(normalized)
+    if (bucket) {
+      bucket.push(customer)
+    } else {
+      index.set(normalized, [customer])
+    }
+  })
+
+  return index
+}
+
+function resolveListingCustomers(listing: CustomerListingResponse, customers: CustomerListItem[]) {
+  const byCode = new Map(customers.map((customer) => [String(customer.cliente_codigo), customer]))
+  const byLabel = indexCustomersByText(customers, (customer) => customerLabel(customer))
+  const byFiscal = indexCustomersByText(customers, (customer) => customer.cliente_nombre_fiscal)
+  const byCif = indexCustomersByText(customers, (customer) => customer.cliente_cif)
+  const byPhone = new Map<string, CustomerListItem>()
+  customers.forEach((customer) => {
+    const phoneKey = normalizeDigits(String(customer.cliente_telefono || ''))
+    if (phoneKey) {
+      byPhone.set(phoneKey, customer)
+    }
+  })
+
+  const matched: CustomerListItem[] = []
+  const seen = new Set<string>()
+
+  const pushCustomer = (customer: CustomerListItem | undefined) => {
+    if (!customer || seen.has(customer.cliente_id)) {
+      return false
+    }
+    seen.add(customer.cliente_id)
+    matched.push(customer)
+    return true
+  }
+
+  listing.rows.forEach((row) => {
+    for (const cell of row) {
+      const text = listingCellText(cell)
+      if (!text || text === '-') {
+        continue
+      }
+
+      const normalizedText = normalizeComparableText(text)
+      const digits = normalizeDigits(text)
+
+      if (digits) {
+        const normalizedCode = digits.replace(/^0+/, '') || '0'
+        if (pushCustomer(byCode.get(normalizedCode) || byCode.get(digits) || byPhone.get(digits))) {
+          break
+        }
+      }
+
+      if (pushCustomer(byLabel.get(normalizedText)?.[0])) {
+        break
+      }
+
+      if (pushCustomer(byFiscal.get(normalizedText)?.[0])) {
+        break
+      }
+
+      if (pushCustomer(byCif.get(normalizedText)?.[0])) {
+        break
+      }
+    }
+  })
+
+  return matched
 }
 
 function normalizeLookupKey(value: string | null | undefined) {
@@ -488,10 +607,11 @@ export function CustomersPage() {
   const [listingTarget, setListingTarget] = useState('')
   const [listingError, setListingError] = useState('')
   const [listingResult, setListingResult] = useState<CustomerListingResponse | null>(null)
+  const [listingAppliedRows, setListingAppliedRows] = useState<CustomerListItem[] | null>(null)
   const [listingModalOpen, setListingModalOpen] = useState(false)
   const [listingSubmitting, setListingSubmitting] = useState(false)
+  const [listingApplying, setListingApplying] = useState(false)
   const autosaveTimerRef = useRef<number | null>(null)
-  const listingsPrintWindowRef = useRef<Window | null>(null)
   const invalidSignatureRef = useRef('')
 
   const catalogsQuery = useAsyncResource(
@@ -513,12 +633,17 @@ export function CustomersPage() {
     [customerCatalogs.islas],
   )
 
+  const customerRowsForDisplay = listingAppliedRows ?? customerRows
+
   const visibleCustomerRows = useMemo(() => {
-    if (!islandFilter) {
-      return customerRows
+    if (listingAppliedRows) {
+      return customerRowsForDisplay
     }
-    return customerRows.filter((customer) => normalizeLookupKey(customer.cliente_direccion_isla_id) === islandFilter)
-  }, [customerRows, islandFilter])
+    if (!islandFilter) {
+      return customerRowsForDisplay
+    }
+    return customerRowsForDisplay.filter((customer) => normalizeLookupKey(customer.cliente_direccion_isla_id) === islandFilter)
+  }, [customerRowsForDisplay, islandFilter, listingAppliedRows])
 
   const sortedCustomerRows = useMemo(() => {
     const rows = [...visibleCustomerRows]
@@ -731,15 +856,7 @@ export function CustomersPage() {
     if (typeof window === 'undefined') {
       return
     }
-    const blob = new Blob([content], { type: mimeType })
-    const url = window.URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = filename
-    document.body.appendChild(anchor)
-    anchor.click()
-    anchor.remove()
-    window.URL.revokeObjectURL(url)
+    downloadListingBlob(filename, new Blob([content], { type: mimeType }))
   }
 
   const handleListingCsvExport = () => {
@@ -759,57 +876,33 @@ export function CustomersPage() {
   }
 
   const handleListingPdfExport = () => {
-    if (!listingResult?.headers.length || !listingResult.rows.length || typeof window === 'undefined') {
+    if (!listingResult?.headers.length || !listingResult.rows.length) {
       return
     }
-
-    const tableRows = listingResult.rows
-      .map((row) => `<tr>${row.map((cell) => `<td>${cell === null || cell === undefined || cell === '' ? '-' : String(cell)}</td>`).join('')}</tr>`)
-      .join('')
-    const headers = listingResult.headers.map((header) => `<th>${header}</th>`).join('')
-    const html = `
-      <html>
-        <head>
-          <title>${listingResult.title || 'Listado de clientes'}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 24px; color: #1f2937; }
-            h1 { font-size: 20px; margin: 0 0 8px; }
-            p { margin: 0 0 16px; color: #64748b; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; }
-            th, td { border: 1px solid #dbe4f0; padding: 8px 10px; text-align: left; vertical-align: top; }
-            th { background: #eef4ff; color: #1d4ed8; }
-          </style>
-        </head>
-        <body>
-          <h1>${listingResult.title || 'Listado de clientes'}</h1>
-          <p>${listingResult.source || 'interprete local'}</p>
-          <table>
-            <thead><tr>${headers}</tr></thead>
-            <tbody>${tableRows}</tbody>
-          </table>
-        </body>
-      </html>
-    `
-
-    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=800')
-    if (!printWindow) {
-      return
-    }
-    listingsPrintWindowRef.current = printWindow
-    printWindow.document.open()
-    printWindow.document.write(html)
-    printWindow.document.close()
-    printWindow.focus()
-    setTimeout(() => {
-      printWindow.print()
-    }, 250)
+    exportCustomerListingPdf(listingResult)
+      .then((blob) => {
+        downloadListingBlob('listado-clientes.pdf', blob)
+      })
+      .catch((error) => {
+        setListingError(getErrorMessage(error))
+      })
   }
 
-  const handleListingPrint = () => {
+  const handleListingPrint = async () => {
     if (!listingResult?.headers.length || !listingResult.rows.length || typeof window === 'undefined') {
       return
     }
-    handleListingPdfExport()
+    try {
+      const blob = await exportCustomerListingPdf(listingResult)
+      const url = window.URL.createObjectURL(blob)
+      const preview = window.open(url, '_blank', 'noopener,noreferrer')
+      if (!preview) {
+        downloadListingBlob('listado-clientes.pdf', blob)
+      }
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 10_000)
+    } catch (error) {
+      setListingError(getErrorMessage(error))
+    }
   }
 
   const handleListingSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -854,6 +947,35 @@ export function CustomersPage() {
       setListingError(getErrorMessage(error))
     } finally {
       setListingSubmitting(false)
+    }
+  }
+
+  const handleApplyListingToMainList = async () => {
+    if (!listingResult?.rows.length || listingApplying) {
+      return
+    }
+
+    setListingApplying(true)
+    setListingError('')
+
+    try {
+      const allCustomers = await listAllCustomers('')
+      const matchedCustomers = resolveListingCustomers(listingResult, allCustomers.items)
+
+      if (!matchedCustomers.length) {
+        setListingError('No se han podido identificar clientes para pasar al listado.')
+        return
+      }
+
+      setListingAppliedRows(matchedCustomers)
+      setSearch('')
+      setIslandFilter('')
+      setSelectedCandidateId(matchedCustomers[0].cliente_id)
+      setListingModalOpen(false)
+    } catch (error) {
+      setListingError(getErrorMessage(error))
+    } finally {
+      setListingApplying(false)
     }
   }
 
@@ -972,11 +1094,15 @@ export function CustomersPage() {
                 type="button"
                 className="customers-clear"
                 aria-label="Limpiar busqueda"
-                disabled={!search && !islandFilter}
+                disabled={!search && !islandFilter && !listingAppliedRows}
                 onClick={() => {
                   setSearch('')
                   setIslandFilter('')
                   setSelectedCandidateId('')
+                  if (listingAppliedRows) {
+                    setListingAppliedRows(null)
+                    setRefreshTick((current) => current + 1)
+                  }
                 }}
               >
                 <span aria-hidden="true" className="customers-clear-icon">
@@ -987,7 +1113,7 @@ export function CustomersPage() {
           </div>
 
           <div className="customers-list-scroll">
-            {customersQuery.loading && (
+            {!listingAppliedRows && customersQuery.loading && (
               <div className="customers-loading-toast" role="status" aria-live="polite" aria-label="Cargando clientes">
                 <span className="customers-loading-spinner" aria-hidden="true" />
                 <div className="customers-loading-copy">
@@ -1000,13 +1126,13 @@ export function CustomersPage() {
               </div>
             )}
 
-            {!customersQuery.loading && customersQuery.error && (
+            {!listingAppliedRows && !customersQuery.loading && customersQuery.error && (
               <div className="state state-error" role="alert">
                 Error: {customersQuery.error}
               </div>
             )}
 
-            {!customersQuery.loading && !customersQuery.error && !sortedCustomerRows.length && (
+            {!listingAppliedRows && !customersQuery.loading && !customersQuery.error && !sortedCustomerRows.length && (
               <div className="state state-empty" role="status">
                 No hay clientes para los filtros actuales.
               </div>
@@ -1831,6 +1957,14 @@ export function CustomersPage() {
                 <div className="customers-detail-actions customers-modal-actions customers-listings-actions">
                   <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={listingSubmitting}>
                     {listingSubmitting ? 'Preparando...' : 'Generar listado'}
+                  </button>
+                  <button
+                    type="button"
+                    className="customers-action-btn customers-action-btn-ghost"
+                    disabled={!listingResult?.rows.length || listingApplying}
+                    onClick={handleApplyListingToMainList}
+                  >
+                    {listingApplying ? 'Pasando...' : 'Pasar al listado'}
                   </button>
                   <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={listingSubmitting} onClick={closeListingsModal}>
                     Cancelar

@@ -90,3 +90,19 @@ def test_customer_listings_endpoint_returns_report_data(api_client: TestClient) 
     payload_blank_island = response_blank_island.json()
     assert payload_blank_island["status"] == "ready"
     assert payload_blank_island["rows"]
+
+
+def test_customer_listings_pdf_export_returns_pdf_file(api_client: TestClient) -> None:
+    assert TEST_ENGINE is not None
+    with Session(TEST_ENGINE) as session:
+        _seed_customer_data(session)
+
+    listing_response = api_client.post("/customers/listings", json={"prompt": "clientes activos"})
+    assert listing_response.status_code == 200
+    listing_payload = listing_response.json()
+
+    pdf_response = api_client.post("/customers/listings/pdf", json=listing_payload)
+    assert pdf_response.status_code == 200
+    assert pdf_response.headers["content-type"].startswith("application/pdf")
+    assert pdf_response.content.startswith(b"%PDF")
+    assert len(pdf_response.content) > 100

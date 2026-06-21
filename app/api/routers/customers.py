@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_customer_service
@@ -13,6 +16,7 @@ from app.schemas.customers import (
     CustomerCreate,
     CustomerDetail,
     CustomerListingRequest,
+    CustomerListingPdfExportRequest,
     CustomerListingResponse,
     CustomerListResponse,
     CustomerUpdate,
@@ -20,9 +24,11 @@ from app.schemas.customers import (
 from app.api.deps import get_customer_report_flow_service
 from app.services.customer_report_flow_service import CustomerReportFlowService
 from app.services.customer_service import CustomerService
+from app.services.report_export_service import ReportExportService
 
 
 router = APIRouter(prefix="/customers", tags=["customers"])
+report_export_service = ReportExportService()
 
 
 @router.get("", response_model=CustomerListResponse)
@@ -67,6 +73,23 @@ def generate_listing(
         rows=report.rows,
         source=result.source,
         used_ai=result.used_ai,
+    )
+
+
+@router.post(
+    "/listings/pdf",
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+def export_listing_pdf(
+    payload: CustomerListingPdfExportRequest,
+) -> FileResponse:
+    path = report_export_service.default_path(payload.title or "Listado de clientes", "pdf")
+    report_export_service.export_pdf(path, payload.title or "Listado de clientes", payload.headers, payload.rows)
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=Path(path).name,
+        headers={"Content-Disposition": f'attachment; filename="{Path(path).name}"'},
     )
 
 

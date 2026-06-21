@@ -97,11 +97,16 @@ class CustomerListingResponse(AppSchema):
     used_ai: bool = False
 
 
+class CustomerListingPdfExportRequest(CustomerListingResponse):
+    pass
+
+
 __all__ = [
     "AddressOption",
     "CustomerAddressCatalogsPayload",
     "CustomerListingRequest",
     "CustomerListingResponse",
+    "CustomerListingPdfExportRequest",
     "CustomerBase",
     "CustomerCreate",
     "CustomerDetail",
