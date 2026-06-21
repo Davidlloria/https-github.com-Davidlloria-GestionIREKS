@@ -1918,104 +1918,6 @@ button {
   gap: 10px;
 }
 
-.ireks-products-page .ireks-products-list-scroll {
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-}
-
-.ireks-products-page .ireks-products-list-scroll .customers-listings-table-wrap {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.ireks-products-page .ireks-products-list-scroll .customers-listings-table {
-  width: 100%;
-  min-width: 0;
-  table-layout: fixed;
-}
-
-.ireks-products-page .ireks-products-list-scroll .customers-listings-table thead th {
-  background: linear-gradient(180deg, #f8fbff, #edf4ff);
-  color: var(--brand-strong);
-}
-
-.ireks-products-page .ireks-products-list-scroll .customers-listings-table thead th:nth-child(1) {
-  width: 28%;
-}
-
-.ireks-products-page .ireks-products-list-scroll .customers-listings-table thead th:nth-child(2) {
-  width: auto;
-}
-
-.ireks-products-page .ireks-products-list-scroll .customers-listings-table thead th:nth-child(3) {
-  width: 92px;
-}
-
-.ireks-products-page .ireks-products-list-scroll .customers-listings-table tbody td:nth-child(1),
-.ireks-products-page .ireks-products-list-scroll .customers-listings-table tbody td:nth-child(2) {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ireks-products-page .ireks-products-list-scroll .customers-listings-table tbody td:nth-child(3) {
-  text-align: center;
-}
-
-.ireks-products-page .ireks-products-list-scroll .customers-listings-table tbody tr {
-  cursor: pointer;
-}
-
-.ireks-products-page .ireks-products-list-scroll .customers-listings-table thead th,
-.ireks-products-page .ireks-products-list-scroll .customers-listings-table tbody td {
-  cursor: default;
-}
-
-.ireks-products-page .ireks-sort-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-weight: inherit;
-  text-transform: inherit;
-  letter-spacing: inherit;
-  cursor: pointer;
-}
-
-.ireks-products-page .ireks-sort-button-center {
-  justify-content: center;
-}
-
-.ireks-products-page .ireks-sort-indicator {
-  font-size: 10px;
-  line-height: 1;
-}
-
-.ireks-products-page .ireks-products-sel-cell {
-  text-align: center;
-}
-
-.ireks-products-page .ireks-products-sel-cell input[type='checkbox'] {
-  width: 16px;
-  height: 16px;
-  accent-color: #2563eb;
-  cursor: pointer;
-}
-
-.ireks-products-page .row-selected .ireks-products-sel-cell input[type='checkbox'] {
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
-  border-radius: 4px;
-}
-
 .ireks-products-page .ireks-products-right-stack {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -2132,7 +2034,6 @@ button {
   min-height: 38px;
 }
 
-.ireks-products-page .ireks-products-list-scroll .table-wrap,
 .ireks-products-page .ireks-products-detail-scroll {
   scrollbar-gutter: stable;
 }

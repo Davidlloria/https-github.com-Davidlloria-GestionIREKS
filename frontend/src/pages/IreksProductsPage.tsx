@@ -427,62 +427,57 @@ export function IreksProductsPage() {
             emptyMessage="No hay productos IREKS para los filtros actuales."
           />
 
-          <div className="ireks-products-list-scroll">
-            {!!filteredRows.length && (
-              <AppDataTable
-                rows={sortedRows}
-                getRowKey={(row, index) => row.id ?? row.articulo_id ?? index}
-                wrapClassName="customers-listings-table-wrap ireks-products-table-wrap"
-                tableClassName="customers-listings-table ireks-products-table"
-                rowClassName={(row) => {
-                  const rowId = row.id ?? null
-                  return rowId !== null && rowId === selectedRowId ? 'row-selected' : undefined
-                }}
-                onRowClick={(row) => {
-                  if (row.id !== null) {
-                    setSelectedCandidateId(row.id)
-                  }
-                }}
-                columns={[
-                  {
-                    key: 'ref',
-                    header: (
-                      <button type="button" className="ireks-sort-button" onClick={() => updateSort('ref')}>
-                        <span>Ref.</span>
-                        {sortKey === 'ref' && <span className="ireks-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
-                      </button>
-                    ),
-                    render: (row) => row.articulo_referencia_corta || row.articulo_referencia || row.articulo_id,
-                    headerCellProps: { 'aria-sort': sortAriaValue('ref') },
-                  },
-                  {
-                    key: 'name',
-                    header: (
-                      <button type="button" className="ireks-sort-button" onClick={() => updateSort('name')}>
-                        <span>Nombre</span>
-                        {sortKey === 'name' && <span className="ireks-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
-                      </button>
-                    ),
-                    render: (row) => row.articulo_descripcion || '-',
-                    headerCellProps: { 'aria-sort': sortAriaValue('name') },
-                  },
-                  {
-                    key: 'sel',
-                    header: (
-                      <button
-                        type="button"
-                        className="ireks-sort-button ireks-sort-button-center"
-                        onClick={() => updateSort('sel')}
-                      >
-                        <span>Sel.</span>
-                        {sortKey === 'sel' && <span className="ireks-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
-                      </button>
-                    ),
-                    cellClassName: 'ireks-products-sel-cell',
-                    render: (row) => {
-                      const rowId = row.id ?? null
-                      const isChecked = rowId !== null && rowId === checkedCandidateId
-                      return (
+          {!!filteredRows.length && (
+            <AppDataTable
+              rows={sortedRows}
+              getRowKey={(row, index) => row.id ?? row.articulo_id ?? index}
+              wrapClassName="customers-listings-table-wrap"
+              tableClassName="customers-listings-table"
+              rowClassName={(row) => {
+                const rowId = row.id ?? null
+                return rowId !== null && rowId === selectedRowId ? 'row-selected' : undefined
+              }}
+              onRowClick={(row) => {
+                if (row.id !== null) {
+                  setSelectedCandidateId(row.id)
+                }
+              }}
+              columns={[
+                {
+                  key: 'ref',
+                  header: (
+                    <button type="button" className="customers-list-header-cell" onClick={() => updateSort('ref')}>
+                      <span>Ref.</span>
+                      {sortKey === 'ref' && <span className="customers-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                    </button>
+                  ),
+                  render: (row) => row.articulo_referencia_corta || row.articulo_referencia || row.articulo_id,
+                  headerCellProps: { 'aria-sort': sortAriaValue('ref') },
+                },
+                {
+                  key: 'name',
+                  header: (
+                    <button type="button" className="customers-list-header-cell" onClick={() => updateSort('name')}>
+                      <span>Nombre</span>
+                      {sortKey === 'name' && <span className="customers-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                    </button>
+                  ),
+                  render: (row) => row.articulo_descripcion || '-',
+                  headerCellProps: { 'aria-sort': sortAriaValue('name') },
+                },
+                {
+                  key: 'sel',
+                  header: (
+                    <button type="button" className="customers-list-header-cell" onClick={() => updateSort('sel')}>
+                      <span>Sel.</span>
+                      {sortKey === 'sel' && <span className="customers-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                    </button>
+                  ),
+                  render: (row) => {
+                    const rowId = row.id ?? null
+                    const isChecked = rowId !== null && rowId === checkedCandidateId
+                    return (
+                      <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -495,14 +490,14 @@ export function IreksProductsPage() {
                             setCheckedCandidateId((currentId) => (currentId === rowId ? null : rowId))
                           }}
                         />
-                      )
-                    },
-                    headerCellProps: { 'aria-sort': sortAriaValue('sel') },
+                      </div>
+                    )
                   },
-                ]}
-              />
-            )}
-          </div>
+                  headerCellProps: { 'aria-sort': sortAriaValue('sel') },
+                },
+              ]}
+            />
+          )}
         </section>
 
         <div className="ireks-products-right-stack">
