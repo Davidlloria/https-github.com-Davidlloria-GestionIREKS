@@ -16,6 +16,7 @@ import { AppButton } from '../components/AppButton'
 import { AppCard } from '../components/AppCard'
 import { AppChip } from '../components/AppChip'
 import { AppStateBox } from '../components/AppStateBox'
+import { AppSectionHeader } from '../components/AppSectionHeader'
 import { BinaryToggleSelect } from '../components/BinaryToggleSelect'
 import { QueryState } from '../components/QueryState'
 import { useAsyncResource } from '../features/useAsyncResource'
@@ -1045,12 +1046,7 @@ export function CustomersPage() {
     <section className="customers-saas-page">
       <div className="customers-saas-workspace">
         <AppCard as="aside" className="customers-list-panel">
-          <div className="customers-list-head">
-            <div className="customers-list-head-copy">
-              <h2>Clientes</h2>
-            </div>
-            <AppChip>{sortedCustomerRows.length} visibles</AppChip>
-          </div>
+          <AppSectionHeader title="Clientes" titleAs="h2" rightSlot={<AppChip>{sortedCustomerRows.length} visibles</AppChip>} />
 
           <div className="customers-list-actions">
             <AppButton variant="primary" disabled={isCreating} onClick={openCreateForm} icon="+">
@@ -1229,17 +1225,20 @@ export function CustomersPage() {
           <div className="customers-detail-body customers-detail-main">
             <div className="customers-detail-grid customers-detail-top">
               <AppCard as="section" className="customers-detail-card">
-                <div className="customers-section-head">
-                  <div>
-                    <h3>{isCreating ? 'Nuevo cliente' : 'Detalle de cliente'}</h3>
-                  </div>
-                  {!!selectedDetail && !isCreating && (
-                    <AppChip tone={selectedDetail.activo ? 'success' : 'danger'} active={selectedDetail.activo}>
-                      {saving ? 'Guardando...' : statusLabel(selectedDetail.activo)}
-                    </AppChip>
-                  )}
-                  {isCreating && <AppChip tone="success" active>Alta activa</AppChip>}
-                </div>
+                <AppSectionHeader
+                  title={isCreating ? 'Nuevo cliente' : 'Detalle de cliente'}
+                  rightSlot={
+                    !!selectedDetail && !isCreating ? (
+                      <AppChip tone={selectedDetail.activo ? 'success' : 'danger'} active={selectedDetail.activo}>
+                        {saving ? 'Guardando...' : statusLabel(selectedDetail.activo)}
+                      </AppChip>
+                    ) : isCreating ? (
+                      <AppChip tone="success" active>
+                        Alta activa
+                      </AppChip>
+                    ) : null
+                  }
+                />
 
                 {formError && (
                   <div className="state" role="alert">
@@ -1595,13 +1594,8 @@ export function CustomersPage() {
                 )}
               </AppCard>
 
-              <aside className="customers-type-panel">
-                <div className="customers-section-head">
-                  <div>
-                    <h3>Clasificación del cliente</h3>
-                    <span className="customers-type-subhead">Actividad</span>
-                  </div>
-                </div>
+              <AppCard as="aside" className="customers-type-panel">
+                <AppSectionHeader title="Clasificacion del cliente" subtitle="Actividad" />
 
                 {isCreating || selectedDetail ? (
                   <>
@@ -1742,7 +1736,7 @@ export function CustomersPage() {
                     )}
                   </>
                 )}
-              </aside>
+              </AppCard>
             </div>
 
             <AppCard as="section" className="customers-tabs-panel">
@@ -1764,12 +1758,7 @@ export function CustomersPage() {
               <div className="customers-tabs-content customers-tabs-body">
                 {activeTab === 'contacts' && (
                   <div className="customers-tab-scroll">
-                    <div className="customers-tab-head">
-                      <div>
-                        <h3>Contactos</h3>
-                      </div>
-                      <AppChip>{contactsQuery.data.items.length} contactos</AppChip>
-                    </div>
+                    <AppSectionHeader title="Contactos" rightSlot={<AppChip>{contactsQuery.data.items.length} contactos</AppChip>} />
                     <QueryState
                       loading={contactsQuery.loading}
                       error={contactsQuery.error}
@@ -2213,12 +2202,7 @@ export function CustomersPage() {
                 </section>
 
                 <AppCard as="aside" className="customers-type-panel">
-                  <div className="customers-section-head">
-                    <div>
-                      <h3>Clasificación del cliente</h3>
-                      <span className="customers-type-subhead">Actividad</span>
-                    </div>
-                  </div>
+                  <AppSectionHeader title="Clasificacion del cliente" subtitle="Actividad" />
 
                   <div className="customers-type-grid">
                     {CUSTOMER_ACTIVITIES.map((activity) => {
@@ -2308,3 +2292,4 @@ export function CustomersPage() {
     </section>
   )
 }
+

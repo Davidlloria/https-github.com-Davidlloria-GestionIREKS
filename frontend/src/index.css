@@ -5198,6 +5198,36 @@ tbody tr:hover {
   color: #1d4ed8;
 }
 
+.app-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.app-section-header__copy {
+  min-width: 0;
+}
+
+.app-section-header__title {
+  margin: 0;
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.app-section-header__subtitle {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.app-section-header__right {
+  flex: 0 0 auto;
+}
+
 .customers-listings-footer-actions .customers-action-btn:not(:disabled):hover,
 .customers-listings-footer-actions .customers-action-btn:not(:disabled):focus-visible,
 .customers-listings-export-actions .customers-listings-export-btn:not(:disabled):hover,
