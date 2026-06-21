@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { HTMLAttributes, ReactNode } from 'react'
 
 export type AppDataTableColumn<T> = {
   key: string
@@ -6,12 +6,15 @@ export type AppDataTableColumn<T> = {
   render: (row: T, rowIndex: number) => ReactNode
   headerClassName?: string
   cellClassName?: string
+  headerCellProps?: HTMLAttributes<HTMLTableCellElement>
 }
 
 export type AppDataTableProps<T> = {
   columns: Array<AppDataTableColumn<T>>
   rows: T[]
   getRowKey?: (row: T, rowIndex: number) => string | number
+  onRowClick?: (row: T, rowIndex: number) => void
+  rowClassName?: (row: T, rowIndex: number) => string | undefined
   emptyState?: ReactNode
   footer?: ReactNode
   className?: string
@@ -23,6 +26,8 @@ export function AppDataTable<T>({
   columns,
   rows,
   getRowKey,
+  onRowClick,
+  rowClassName,
   emptyState = 'Sin datos para mostrar.',
   footer,
   className,
@@ -40,7 +45,7 @@ export function AppDataTable<T>({
           <thead>
             <tr>
               {columns.map((column) => (
-                <th key={column.key} className={column.headerClassName}>
+                <th key={column.key} className={column.headerClassName} {...column.headerCellProps}>
                   {column.header}
                 </th>
               ))}
@@ -49,7 +54,11 @@ export function AppDataTable<T>({
           <tbody>
             {rows.length ? (
               rows.map((row, rowIndex) => (
-                <tr key={getRowKey ? getRowKey(row, rowIndex) : rowIndex}>
+                <tr
+                  key={getRowKey ? getRowKey(row, rowIndex) : rowIndex}
+                  className={rowClassName ? rowClassName(row, rowIndex) : undefined}
+                  onClick={onRowClick ? () => onRowClick(row, rowIndex) : undefined}
+                >
                   {columns.map((column) => (
                     <td key={column.key} className={column.cellClassName}>
                       {column.render(row, rowIndex)}

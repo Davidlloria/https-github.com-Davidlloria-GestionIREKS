@@ -1,6 +1,7 @@
 ﻿import { useMemo, useState } from 'react'
 import { getIreksIngredientDetail, listIreksIngredients } from '../api/ingredients'
 import { AppButton } from '../components/AppButton'
+import { AppDataTable } from '../components/AppDataTable'
 import { AppSectionHeader } from '../components/AppSectionHeader'
 import { QueryState } from '../components/QueryState'
 import { List, Plus, Trash2, X } from 'lucide-react'
@@ -428,67 +429,78 @@ export function IreksProductsPage() {
 
           <div className="ireks-products-list-scroll">
             {!!filteredRows.length && (
-              <div className="table-wrap ireks-products-table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th aria-sort={sortAriaValue('ref')}>
-                        <button type="button" className="ireks-sort-button" onClick={() => updateSort('ref')}>
-                          <span>Ref.</span>
-                          {sortKey === 'ref' && <span className="ireks-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
-                        </button>
-                      </th>
-                      <th aria-sort={sortAriaValue('name')}>
-                        <button type="button" className="ireks-sort-button" onClick={() => updateSort('name')}>
-                          <span>Nombre</span>
-                          {sortKey === 'name' && <span className="ireks-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
-                        </button>
-                      </th>
-                      <th aria-sort={sortAriaValue('sel')}>
-                        <button type="button" className="ireks-sort-button ireks-sort-button-center" onClick={() => updateSort('sel')}>
-                          <span>Sel.</span>
-                          {sortKey === 'sel' && <span className="ireks-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
-                        </button>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedRows.map((row, index) => {
+              <AppDataTable
+                rows={sortedRows}
+                getRowKey={(row, index) => row.id ?? row.articulo_id ?? index}
+                wrapClassName="ireks-products-table-wrap"
+                tableClassName="ireks-products-table"
+                rowClassName={(row) => {
+                  const rowId = row.id ?? null
+                  return rowId !== null && rowId === selectedRowId ? 'row-selected' : undefined
+                }}
+                onRowClick={(row) => {
+                  if (row.id !== null) {
+                    setSelectedCandidateId(row.id)
+                  }
+                }}
+                columns={[
+                  {
+                    key: 'ref',
+                    header: (
+                      <button type="button" className="ireks-sort-button" onClick={() => updateSort('ref')}>
+                        <span>Ref.</span>
+                        {sortKey === 'ref' && <span className="ireks-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                      </button>
+                    ),
+                    render: (row) => row.articulo_referencia_corta || row.articulo_referencia || row.articulo_id,
+                    headerCellProps: { 'aria-sort': sortAriaValue('ref') },
+                  },
+                  {
+                    key: 'name',
+                    header: (
+                      <button type="button" className="ireks-sort-button" onClick={() => updateSort('name')}>
+                        <span>Nombre</span>
+                        {sortKey === 'name' && <span className="ireks-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                      </button>
+                    ),
+                    render: (row) => row.articulo_descripcion || '-',
+                    headerCellProps: { 'aria-sort': sortAriaValue('name') },
+                  },
+                  {
+                    key: 'sel',
+                    header: (
+                      <button
+                        type="button"
+                        className="ireks-sort-button ireks-sort-button-center"
+                        onClick={() => updateSort('sel')}
+                      >
+                        <span>Sel.</span>
+                        {sortKey === 'sel' && <span className="ireks-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                      </button>
+                    ),
+                    cellClassName: 'ireks-products-sel-cell',
+                    render: (row) => {
                       const rowId = row.id ?? null
-                      const isSelected = rowId !== null && rowId === selectedRowId
                       const isChecked = rowId !== null && rowId === checkedCandidateId
                       return (
-                        <tr
-                          key={rowId ?? row.articulo_id ?? index}
-                          className={isSelected ? 'row-selected' : ''}
-                          onClick={() => {
-                            if (rowId !== null) {
-                              setSelectedCandidateId(rowId)
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          aria-label={`Seleccionar ${row.articulo_descripcion || row.articulo_referencia || row.articulo_id}`}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={() => {
+                            if (rowId === null) {
+                              return
                             }
+                            setCheckedCandidateId((currentId) => (currentId === rowId ? null : rowId))
                           }}
-                        >
-                          <td>{row.articulo_referencia_corta || row.articulo_referencia || row.articulo_id}</td>
-                          <td>{row.articulo_descripcion || '-'}</td>
-                          <td className="ireks-products-sel-cell">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              aria-label={`Seleccionar ${row.articulo_descripcion || row.articulo_referencia || row.articulo_id}`}
-                              onClick={(event) => event.stopPropagation()}
-                              onChange={() => {
-                                if (rowId === null) {
-                                  return
-                                }
-                                setCheckedCandidateId((currentId) => (currentId === rowId ? null : rowId))
-                              }}
-                            />
-                          </td>
-                        </tr>
+                        />
                       )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                    },
+                    headerCellProps: { 'aria-sort': sortAriaValue('sel') },
+                  },
+                ]}
+              />
             )}
           </div>
         </section>
