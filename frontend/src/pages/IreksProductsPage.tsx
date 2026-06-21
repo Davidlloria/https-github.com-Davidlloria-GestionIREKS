@@ -312,9 +312,11 @@ export function IreksProductsPage() {
   )
 
   const clearFilters = () => {
+    setSearch('')
     setSelectedFabricanteId('')
     setSelectedFamiliaId('')
     setSelectedSubfamiliaId('')
+    setSelectedCandidateId(null)
   }
 
   return (
@@ -409,9 +411,9 @@ export function IreksProductsPage() {
             <AppButton
               variant="ghost"
               size="sm"
-              className="customers-toolbar-btn customers-toolbar-btn-red ireks-products-clear-filters"
+              className="ireks-products-clear-filters"
               onClick={clearFilters}
-              disabled={!selectedFabricanteId && !selectedFamiliaId && !selectedSubfamiliaId}
+              disabled={!search && !selectedFabricanteId && !selectedFamiliaId && !selectedSubfamiliaId}
               icon={<X size={16} strokeWidth={2.4} />}
             >
               Limpiar

@@ -1908,10 +1908,19 @@ button {
   flex: 0 0 auto;
   height: 30px;
   padding-inline: 10px;
+  border-color: #efb3b3;
+  background: linear-gradient(180deg, #fff3f3, #fde4e4);
+  color: #a63b3b;
 }
 
-.ireks-products-clear-filters,
 .ireks-products-clear-filters:disabled {
+  border-color: #efb3b3;
+  background: linear-gradient(180deg, #fff3f3, #fde4e4);
+  color: #c27a7a;
+  box-shadow: var(--shadow-soft);
+}
+
+.ireks-products-clear-filters:not(:disabled) {
   border-color: #ef5d5d;
   background: linear-gradient(180deg, #f26a6a, #e94b4b);
   color: #fff;
