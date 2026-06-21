@@ -1,7 +1,7 @@
 ﻿import { useMemo, useState } from 'react'
 import { getIreksIngredientDetail, listIreksIngredients } from '../api/ingredients'
 import { AppButton } from '../components/AppButton'
-import { AppDataTable } from '../components/AppDataTable'
+import { AppListingGrid } from '../components/AppListingGrid'
 import { AppSectionHeader } from '../components/AppSectionHeader'
 import { QueryState } from '../components/QueryState'
 import { List, Plus, Trash2, X } from 'lucide-react'
@@ -259,13 +259,6 @@ export function IreksProductsPage() {
     return sortedRows[0].id ?? null
   }, [selectedCandidateId, sortedRows])
 
-  const sortAriaValue = (key: IreksSortKey) => {
-    if (sortKey !== key) {
-      return 'none'
-    }
-    return sortDirection === 'asc' ? 'ascending' : 'descending'
-  }
-
   const updateSort = (nextKey: IreksSortKey) => {
     if (sortKey === nextKey) {
       setSortDirection((currentDirection) => (currentDirection === 'asc' ? 'desc' : 'asc'))
@@ -428,14 +421,12 @@ export function IreksProductsPage() {
           />
 
           {!!filteredRows.length && (
-            <AppDataTable
+            <AppListingGrid
               rows={sortedRows}
               getRowKey={(row, index) => row.id ?? row.articulo_id ?? index}
-              wrapClassName="customers-listings-table-wrap"
-              tableClassName="customers-listings-table"
               rowClassName={(row) => {
                 const rowId = row.id ?? null
-                return rowId !== null && rowId === selectedRowId ? 'row-selected' : undefined
+                return rowId !== null && rowId === selectedRowId ? 'is-selected' : undefined
               }}
               onRowClick={(row) => {
                 if (row.id !== null) {
@@ -452,7 +443,6 @@ export function IreksProductsPage() {
                     </button>
                   ),
                   render: (row) => row.articulo_referencia_corta || row.articulo_referencia || row.articulo_id,
-                  headerCellProps: { 'aria-sort': sortAriaValue('ref') },
                 },
                 {
                   key: 'name',
@@ -463,7 +453,6 @@ export function IreksProductsPage() {
                     </button>
                   ),
                   render: (row) => row.articulo_descripcion || '-',
-                  headerCellProps: { 'aria-sort': sortAriaValue('name') },
                 },
                 {
                   key: 'sel',
@@ -473,27 +462,26 @@ export function IreksProductsPage() {
                       {sortKey === 'sel' && <span className="customers-sort-indicator">{sortDirection === 'asc' ? '▲' : '▼'}</span>}
                     </button>
                   ),
+                  cellClassName: 'customers-list-cell-center',
                   render: (row) => {
                     const rowId = row.id ?? null
                     const isChecked = rowId !== null && rowId === checkedCandidateId
                     return (
-                      <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          aria-label={`Seleccionar ${row.articulo_descripcion || row.articulo_referencia || row.articulo_id}`}
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={() => {
-                            if (rowId === null) {
-                              return
-                            }
-                            setCheckedCandidateId((currentId) => (currentId === rowId ? null : rowId))
-                          }}
-                        />
-                      </div>
+                      <input
+                        type="checkbox"
+                        className="customers-list-cell-checkbox"
+                        checked={isChecked}
+                        aria-label={`Seleccionar ${row.articulo_descripcion || row.articulo_referencia || row.articulo_id}`}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => {
+                          if (rowId === null) {
+                            return
+                          }
+                          setCheckedCandidateId((currentId) => (currentId === rowId ? null : rowId))
+                        }}
+                      />
                     )
                   },
-                  headerCellProps: { 'aria-sort': sortAriaValue('sel') },
                 },
               ]}
             />

@@ -4193,6 +4193,11 @@ tbody tr:hover {
   background: #f8fbff;
 }
 
+.customers-list-row:focus-visible {
+  outline: 2px solid rgba(74, 95, 202, 0.28);
+  outline-offset: -2px;
+}
+
 .customers-list-row.is-selected {
   background: #eef4ff;
 }
@@ -4217,6 +4222,12 @@ tbody tr:hover {
   padding-right: 6px;
 }
 
+.customers-list-cell-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .customers-list-cell-icon {
   display: inline-grid;
   place-items: center;
@@ -4231,6 +4242,13 @@ tbody tr:hover {
   text-align: center;
   font-weight: 700;
   letter-spacing: 0.04em;
+}
+
+.customers-list-cell-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
+  cursor: pointer;
 }
 
 .customers-detail-panel {
