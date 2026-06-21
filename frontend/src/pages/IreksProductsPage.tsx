@@ -323,21 +323,7 @@ export function IreksProductsPage() {
         <section className="panel-section ireks-products-list-panel">
           <AppSectionHeader
             title="Productos IREKS"
-            rightSlot={
-              <div className="ireks-products-header-meta">
-                <span className="surface-chip">{filteredRows.length} visibles</span>
-                <AppButton
-                  variant="ghost"
-                  size="sm"
-                  className="ireks-products-clear-filters"
-                  onClick={clearFilters}
-                  disabled={!selectedFabricanteId && !selectedFamiliaId && !selectedSubfamiliaId}
-                  icon={<X size={14} strokeWidth={2.4} />}
-                >
-                  Limpiar filtros
-                </AppButton>
-              </div>
-            }
+            rightSlot={<span className="surface-chip">{filteredRows.length} visibles</span>}
             className="ireks-products-page__header"
           />
 
@@ -420,6 +406,16 @@ export function IreksProductsPage() {
               }}
               placeholder="Buscar producto por referencia o nombre"
             />
+            <AppButton
+              variant="ghost"
+              size="sm"
+              className="customers-toolbar-btn customers-toolbar-btn-red ireks-products-clear-filters"
+              onClick={clearFilters}
+              disabled={!selectedFabricanteId && !selectedFamiliaId && !selectedSubfamiliaId}
+              icon={<X size={16} strokeWidth={2.4} />}
+            >
+              Limpiar
+            </AppButton>
           </div>
 
           <QueryState
