@@ -66,7 +66,7 @@ CLIENTE_COLUMNS = [
     "cliente_direccion_provincia_id",
     "cliente_direccion_isla_id",
     "cliente_tipo",
-    "cliente_grupo",
+    "cliente_actividad",
     "cliente_prospeccion",
     "distribuidor_id",
     "activo",
@@ -425,6 +425,10 @@ def _migrate_client_table() -> None:
 
         info = conn.exec_driver_sql("PRAGMA table_info(clientes)").fetchall()
         columns = [row[1] for row in info]
+        if "cliente_grupo" in columns and "cliente_actividad" not in columns:
+            conn.exec_driver_sql("ALTER TABLE clientes RENAME COLUMN cliente_grupo TO cliente_actividad")
+            info = conn.exec_driver_sql("PRAGMA table_info(clientes)").fetchall()
+            columns = [row[1] for row in info]
         is_exact = set(columns) == set(CLIENTE_COLUMNS) and len(columns) == len(CLIENTE_COLUMNS)
         pk_ok = any(row[1] == "cliente_id" and int(row[5] or 0) == 1 for row in info)
         if is_exact and pk_ok:
@@ -473,7 +477,7 @@ def _migrate_client_table() -> None:
             cliente_direccion_provincia_id = _extract_cliente_value(row, idx, "cliente_direccion_provincia_id")
             cliente_direccion_isla_id = _extract_cliente_value(row, idx, "cliente_direccion_isla_id")
             cliente_tipo = _extract_cliente_value(row, idx, "cliente_tipo")
-            cliente_grupo = _extract_cliente_value(row, idx, "cliente_grupo")
+            cliente_actividad = _extract_cliente_value(row, idx, "cliente_actividad") or _extract_cliente_value(row, idx, "cliente_grupo")
             raw_prospeccion = _extract_cliente_value(row, idx, "cliente_prospeccion")
             cliente_prospeccion = 0 if raw_prospeccion.lower() in {"", "0", "false", "no", "n"} else 1
             distribuidor_id = _extract_cliente_value(row, idx, "distribuidor_id")
@@ -514,7 +518,7 @@ def _migrate_client_table() -> None:
                     cliente_direccion_provincia_id,
                     cliente_direccion_isla_id,
                     cliente_tipo,
-                    cliente_grupo,
+                    cliente_actividad,
                     cliente_prospeccion,
                     distribuidor_id,
                     activo,
@@ -551,7 +555,7 @@ def _migrate_client_table() -> None:
                 cliente_direccion_provincia_id TEXT NOT NULL DEFAULT '',
                 cliente_direccion_isla_id TEXT NOT NULL DEFAULT '',
                 cliente_tipo TEXT NOT NULL DEFAULT '',
-                cliente_grupo TEXT NOT NULL DEFAULT '',
+                cliente_actividad TEXT NOT NULL DEFAULT '',
                 cliente_prospeccion BOOLEAN NOT NULL DEFAULT 0,
                 distribuidor_id TEXT NOT NULL DEFAULT '',
                 activo BOOLEAN NOT NULL DEFAULT 1
@@ -565,7 +569,7 @@ def _migrate_client_table() -> None:
                     cliente_id, cliente_codigo, cliente_nombre_comercial, cliente_nombre_fiscal, cliente_nombre_interno, cliente_abreviatura,
                     cliente_cif, cliente_telefono, cliente_email, cliente_direccion, cliente_direccion_cp,
                     cliente_direccion_localidad_id, cliente_direccion_municipio_id, cliente_direccion_provincia_id,
-                    cliente_direccion_isla_id, cliente_tipo, cliente_grupo, cliente_prospeccion, distribuidor_id, activo
+                    cliente_direccion_isla_id, cliente_tipo, cliente_actividad, cliente_prospeccion, distribuidor_id, activo
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -1999,7 +2003,7 @@ def create_missing_clients_for_contact_links() -> int:
                     cliente_id, cliente_codigo, cliente_nombre_comercial, cliente_nombre_fiscal, cliente_nombre_interno, cliente_abreviatura,
                     cliente_cif, cliente_telefono, cliente_email, cliente_direccion, cliente_direccion_cp,
                     cliente_direccion_localidad_id, cliente_direccion_municipio_id, cliente_direccion_provincia_id,
-                    cliente_direccion_isla_id, cliente_tipo, cliente_grupo, cliente_prospeccion, distribuidor_id, activo
+                    cliente_direccion_isla_id, cliente_tipo, cliente_actividad, cliente_prospeccion, distribuidor_id, activo
                 )
                 VALUES (?, ?, ?, ?, '', '', '', '', '', '', '', '', '', '', '', '', '', 0, '', 0)
                 """,

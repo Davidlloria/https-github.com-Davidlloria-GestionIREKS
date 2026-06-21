@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlmodel import Field
 
 from .base import AppSchema, PaginatedResponse
@@ -20,7 +22,7 @@ class CustomerBase(AppSchema):
     cliente_direccion_provincia_id: str = ""
     cliente_direccion_isla_id: str = ""
     cliente_tipo: str = ""
-    cliente_grupo: str = ""
+    cliente_actividad: str = ""
     cliente_prospeccion: bool = False
     distribuidor_id: str = ""
     activo: bool = True
@@ -60,7 +62,7 @@ class CustomerUpdate(AppSchema):
     cliente_direccion_provincia_id: str | None = None
     cliente_direccion_isla_id: str | None = None
     cliente_tipo: str | None = None
-    cliente_grupo: str | None = None
+    cliente_actividad: str | None = None
     cliente_prospeccion: bool | None = None
     distribuidor_id: str | None = None
     activo: bool | None = None
@@ -81,9 +83,35 @@ class CustomerAddressCatalogsPayload(AppSchema):
     localidades: list[AddressOption] = Field(default_factory=list)
 
 
+class CustomerListingRequest(AppSchema):
+    prompt: str = ""
+
+
+class CustomerListingResponse(AppSchema):
+    status: str = ""
+    message: str = ""
+    title: str = ""
+    headers: list[str] = Field(default_factory=list)
+    rows: list[list[Any]] = Field(default_factory=list)
+    source: str = ""
+    used_ai: bool = False
+
+
+class CustomerListingPdfExportRequest(CustomerListingResponse):
+    pass
+
+
+class CustomerListingXlsxExportRequest(CustomerListingResponse):
+    pass
+
+
 __all__ = [
     "AddressOption",
     "CustomerAddressCatalogsPayload",
+    "CustomerListingRequest",
+    "CustomerListingResponse",
+    "CustomerListingPdfExportRequest",
+    "CustomerListingXlsxExportRequest",
     "CustomerBase",
     "CustomerCreate",
     "CustomerDetail",

@@ -6,6 +6,9 @@ from app.api.main import create_app
 EXPECTED_CUSTOMER_PATHS = {
     "/customers",
     "/customers/address-catalogs",
+    "/customers/listings",
+    "/customers/listings/pdf",
+    "/customers/listings/xlsx",
     "/customers/{customer_id}",
 }
 
@@ -40,6 +43,9 @@ def test_customers_openapi_contract_freezes_customers_and_contacts_surface() -> 
 
     customers = _operation(spec, "/customers")
     customer_catalogs = _operation(spec, "/customers/address-catalogs")
+    customer_listings = spec["paths"]["/customers/listings"]["post"]
+    customer_listings_pdf = spec["paths"]["/customers/listings/pdf"]["post"]
+    customer_listings_xlsx = spec["paths"]["/customers/listings/xlsx"]["post"]
     customer_detail = _operation(spec, "/customers/{customer_id}")
     contacts = _operation(spec, "/contacts")
     contact_detail = _operation(spec, "/contacts/{contact_id}")
@@ -54,6 +60,11 @@ def test_customers_openapi_contract_freezes_customers_and_contacts_surface() -> 
 
     assert _response_schema(customers) == {"$ref": "#/components/schemas/CustomerListResponse"}
     assert _response_schema(customer_catalogs) == {"$ref": "#/components/schemas/CustomerAddressCatalogsPayload"}
+    assert customer_listings["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/CustomerListingResponse"
+    }
+    assert "application/pdf" in customer_listings_pdf["responses"]["200"]["content"]
+    assert "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" in customer_listings_xlsx["responses"]["200"]["content"]
     assert _response_schema(customer_detail) == {"$ref": "#/components/schemas/CustomerDetail"}
     assert _response_schema(contacts) == {"$ref": "#/components/schemas/ContactListResponse"}
     assert _response_schema(contact_detail) == {"$ref": "#/components/schemas/ContactDetail"}

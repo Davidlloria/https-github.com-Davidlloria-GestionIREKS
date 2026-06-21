@@ -33,10 +33,14 @@ class Cliente(SQLModel, table=True):
     cliente_direccion_provincia_id: str = Field(default="", max_length=36)
     cliente_direccion_isla_id: str = Field(default="", max_length=36)
     cliente_tipo: str = Field(default="", max_length=100)
-    cliente_grupo: str = Field(default="", max_length=100)
+    cliente_actividad: str = Field(default="", max_length=100)
     cliente_prospeccion: bool = Field(default=False)
     distribuidor_id: str = Field(default="", max_length=36)
     activo: bool = Field(default=True)
+
+    @property
+    def cliente_grupo(self) -> str:
+        return self.cliente_actividad
 
 
 class Distribuidor(SQLModel, table=True):

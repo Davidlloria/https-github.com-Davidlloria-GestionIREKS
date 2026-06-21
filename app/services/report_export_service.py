@@ -9,7 +9,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, PatternFill
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core.config import DATA_DIR
@@ -50,15 +50,39 @@ class ReportExportService:
         out.parent.mkdir(parents=True, exist_ok=True)
         doc = SimpleDocTemplate(str(out), pagesize=landscape(A4), leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24)
         styles = getSampleStyleSheet()
-        story = [Paragraph(str(title or "Listado de clientes"), styles["Title"]), Spacer(1, 10)]
+        title_style = ParagraphStyle(
+            "ListingTitleLeft",
+            parent=styles["Title"],
+            alignment=0,
+        )
+        story = [Paragraph(str(title or "Listado de clientes"), title_style), Spacer(1, 10)]
         table_data = [headers] + [[str(value) for value in row] for row in rows]
-        table = Table(table_data, repeatRows=1)
+        column_count = max(1, len(headers))
+        content_widths = [0] * column_count
+        for row in table_data:
+            for index in range(column_count):
+                value = row[index] if index < len(row) else ""
+                text = str(value or "")
+                content_widths[index] = max(content_widths[index], len(text))
+        min_widths = [24] * column_count
+        max_widths = [max(40, min(220, width * 4 + 24)) for width in content_widths]
+        available_width = doc.width
+        scale = available_width / sum(max_widths)
+        if scale < 1:
+            col_widths = [max(min_widths[idx], width * scale) for idx, width in enumerate(max_widths)]
+        else:
+            col_widths = max_widths[:]
+        width_delta = available_width - sum(col_widths)
+        if width_delta != 0 and column_count:
+            col_widths[-1] = max(min_widths[-1], col_widths[-1] + width_delta)
+        table = Table(table_data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
         table.setStyle(
             TableStyle(
                 [
                     ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#3A78CF")),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
                     ("FONTSIZE", (0, 0), (-1, -1), 8),
                     ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D1D5DB")),
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),

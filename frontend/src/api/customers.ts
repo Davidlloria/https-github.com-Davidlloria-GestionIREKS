@@ -1,5 +1,12 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from './http'
-import type { CustomerAddressCatalogsPayload, CustomerDetail, CustomerListItem, PaginatedList } from '../types/api'
+import { apiDelete, apiGet, apiPatch, apiPost, apiPostBlob } from './http'
+import type {
+  CustomerAddressCatalogsPayload,
+  CustomerDetail,
+  CustomerListItem,
+  CustomerListingRequest,
+  CustomerListingResponse,
+  PaginatedList,
+} from '../types/api'
 
 export interface CustomerSavePayload {
   cliente_id?: string
@@ -18,6 +25,7 @@ export interface CustomerSavePayload {
   cliente_direccion_provincia_id?: string
   cliente_direccion_isla_id?: string
   cliente_tipo?: string
+  cliente_actividad?: string
   cliente_grupo?: string
   cliente_prospeccion?: boolean
   distribuidor_id?: string
@@ -50,4 +58,17 @@ export function createCustomer(payload: CustomerSavePayload) {
 
 export function updateCustomer(customerId: string, payload: CustomerSavePayload) {
   return apiPatch<CustomerDetail>(`/customers/${customerId}`, payload)
+}
+
+export function generateCustomerListing(prompt: string) {
+  const payload: CustomerListingRequest = { prompt }
+  return apiPost<CustomerListingResponse>('/customers/listings', payload)
+}
+
+export function exportCustomerListingPdf(payload: CustomerListingResponse) {
+  return apiPostBlob('/customers/listings/pdf', payload)
+}
+
+export function exportCustomerListingXlsx(payload: CustomerListingResponse) {
+  return apiPostBlob('/customers/listings/xlsx', payload)
 }

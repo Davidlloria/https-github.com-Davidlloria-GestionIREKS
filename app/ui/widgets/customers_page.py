@@ -1,4 +1,5 @@
 from pathlib import Path
+import unicodedata
 
 from PySide6.QtCore import QSize, QTimer, Qt
 from PySide6.QtGui import QTextDocument
@@ -69,7 +70,7 @@ class CustomersPage(QWidget):
             {"name": "cliente_direccion_provincia_id", "label": "Provincia_ID"},
             {"name": "cliente_direccion_isla_id", "label": "Isla_ID"},
             {"name": "cliente_tipo", "label": "Tipo", "default": "indirecto"},
-            {"name": "cliente_grupo", "label": "Grupo"},
+            {"name": "cliente_actividad", "label": "Actividad"},
             {"name": "cliente_prospeccion", "label": "Prospección", "type": "bool", "default": False},
             {"name": "distribuidor_id", "label": "Distribuidor_ID"},
             {"name": "activo", "label": "Activo", "type": "bool", "default": True},
@@ -251,7 +252,7 @@ class CustomersPage(QWidget):
         detail_title.setProperty("role", "sectionTitle")
         self.detail_title = detail_title
         self.detail_title.setGeometry(5, 0, 300, 24)
-        self.detail_tipo_header = QLabel("Tipo de cliente", detail_panel)
+        self.detail_tipo_header = QLabel("Clasificación del cliente", detail_panel)
         self.detail_tipo_header.setProperty("role", "sectionTitle")
         self.detail_tipo_header.setGeometry(550, 0, 300, 24)
 
@@ -610,7 +611,14 @@ class CustomersPage(QWidget):
         sectors_box.setFrameShape(QFrame.Shape.Box)
         sectors_box.setFixedHeight(128)
         self.tipo_checks: dict[str, QCheckBox] = {}
-        labels = ["PANADERIA", "PASTELERIA", "HELADERIA", "CAFETERIA", "RESTAURANTE", "HOTEL"]
+        labels = [
+            ("PANADERIA", "🥖"),
+            ("PASTELERIA", "🧁"),
+            ("HELADERIA", "🍦"),
+            ("CAFETERIA", "☕"),
+            ("RESTAURANTE", "🍽"),
+            ("HOTEL", "🏨"),
+        ]
         pill_name_by_label = {
             "PANADERIA": "sectorChipPillPanaderia",
             "PASTELERIA": "sectorChipPillPasteleria",
@@ -619,8 +627,8 @@ class CustomersPage(QWidget):
             "RESTAURANTE": "sectorChipPillRestaurante",
             "HOTEL": "sectorChipPillHotel",
         }
-        for idx, label in enumerate(labels):
-            checkbox = QCheckBox(label, sectors_box)
+        for idx, (label, icon) in enumerate(labels):
+            checkbox = QCheckBox(f"{icon} {label}", sectors_box)
             checkbox.setObjectName(pill_name_by_label[label])
             checkbox.setMinimumHeight(28)
             self.tipo_checks[label] = checkbox
@@ -919,24 +927,29 @@ class CustomersPage(QWidget):
     def _customer_icon(self, item: Cliente) -> str:
         text = ",".join(
             [
+                str(getattr(item, "cliente_actividad", "") or ""),
                 str(getattr(item, "cliente_tipo", "") or ""),
-                str(getattr(item, "cliente_grupo", "") or ""),
                 str(getattr(item, "cliente_nombre_comercial", "") or ""),
             ]
         ).upper()
-        if "PANADER" in text:
+        if self._activity_matches(text, "PANADERIA"):
             return "🍞"
-        if "PASTEL" in text:
+        if self._activity_matches(text, "PASTELERIA"):
             return "🧁"
-        if "HELADER" in text:
+        if self._activity_matches(text, "HELADERIA"):
             return "🍦"
-        if "CAFETER" in text:
+        if self._activity_matches(text, "CAFETERIA"):
             return "☕"
-        if "RESTAUR" in text:
+        if self._activity_matches(text, "RESTAURANTE"):
             return "🍽"
-        if "HOTEL" in text:
+        if self._activity_matches(text, "HOTEL"):
             return "🏨"
         return "•"
+
+    def _activity_matches(self, text: str, activity: str) -> bool:
+        normalized_text = unicodedata.normalize("NFD", text).encode("ascii", "ignore").decode("ascii").upper()
+        normalized_activity = unicodedata.normalize("NFD", activity).encode("ascii", "ignore").decode("ascii").upper()
+        return normalized_activity in normalized_text
 
     def _customer_subtext(self, item: Cliente) -> str:
         localidad_id = str(getattr(item, "cliente_direccion_localidad_id", "") or "").strip()
@@ -1011,7 +1024,7 @@ class CustomersPage(QWidget):
         self._populate_localidades(codigo_postal, localidad_id)
         self.detail_tipo.setCurrentIndex(0)
 
-        grupos = (getattr(row, "cliente_grupo", "") or "").upper()
+        grupos = (getattr(row, "cliente_actividad", "") or "").upper()
         for label, checkbox in self.tipo_checks.items():
             checkbox.setChecked(label in grupos)
 
@@ -1779,7 +1792,7 @@ class CustomersPage(QWidget):
             "cliente_direccion_municipio_id": municipio_id,
             "cliente_direccion_localidad_id": localidad_id,
             "cliente_tipo": (self.detail_tipo.currentText() or "").strip().lower(),
-            "cliente_grupo": ",".join(
+            "cliente_actividad": ",".join(
                 [label for label, checkbox in self.tipo_checks.items() if checkbox.isChecked()]
             ),
             "cliente_prospeccion": self.detail_prospeccion_si.isChecked(),

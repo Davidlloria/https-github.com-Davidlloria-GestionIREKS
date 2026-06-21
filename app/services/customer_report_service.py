@@ -4,7 +4,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 from app.core.database import engine
 from app.services.openai_settings_service import OpenAISettingsService
@@ -20,7 +20,8 @@ REPORT_COLUMNS: dict[str, tuple[str, str]] = {
     "municipio": ("Municipio", "COALESCE(m.municipio_nombre, '')"),
     "localidad": ("Localidad", "COALESCE(l.localidad_nombre, '')"),
     "tipo": ("Tipo", "c.cliente_tipo"),
-    "grupo": ("Grupo", "c.cliente_grupo"),
+    "actividad": ("Actividad", "c.cliente_actividad"),
+    "grupo": ("Actividad", "c.cliente_actividad"),
     "prospeccion": ("Prospeccion", "c.cliente_prospeccion"),
     "activo": ("Activo", "c.activo"),
     "nombre_contacto": (
@@ -50,6 +51,7 @@ TEXT_FIELDS = {
     "municipio",
     "localidad",
     "tipo",
+    "actividad",
     "grupo",
     "nombre_contacto",
 }
@@ -132,14 +134,17 @@ class CustomerReportIntentService:
             req.add_header("Authorization", f"Bearer {self.api_key}")
             req.add_header("Content-Type", "application/json")
             req.add_header("Accept", "application/json")
-            with urlopen(req, timeout=self.timeout) as resp:  # noqa: S310
+            # Ignore inherited proxy settings so local runs do not get routed
+            # through a broken system proxy like 127.0.0.1:9.
+            opener = build_opener(ProxyHandler({}))
+            with opener.open(req, timeout=self.timeout) as resp:
                 body = resp.read().decode("utf-8")
             data = json.loads(body or "{}")
             parsed = self._parse_json(self._extract_text(data))
             intent = self._intent_from_mapping(parsed, fallback)
             return ReportIntentResult(True, intent, "Generado con ChatGPT.", True)
         except Exception as exc:  # noqa: BLE001
-            return ReportIntentResult(True, fallback, f"ChatGPT no disponible; usado interprete local. Detalle: {exc}", False)
+            return ReportIntentResult(True, fallback, "Generado con interprete local. ChatGPT no disponible.", False)
 
     def _fallback_parse(self, text: str) -> CustomerReportIntent:
         t = self._normalize(text)
@@ -177,11 +182,17 @@ class CustomerReportIntentService:
         elif "receta" in t:
             columns.append("recetas")
 
-        for island in ("tenerife", "gran canaria", "lanzarote", "fuerteventura", "la palma", "la gomera", "el hierro"):
-            if island in t:
-                filters.append(ReportFilter("isla", "contiene", island))
-                if "isla" not in columns:
-                    columns.append("isla")
+        island_value = self._extract_named_value(t, "isla")
+        if island_value:
+            filters.append(ReportFilter("isla", "contiene", island_value))
+            if "isla" not in columns:
+                columns.append("isla")
+        else:
+            for island in ("tenerife", "gran canaria", "lanzarote", "fuerteventura", "la palma", "la gomera", "el hierro"):
+                if island in t:
+                    filters.append(ReportFilter("isla", "contiene", island))
+                    if "isla" not in columns:
+                        columns.append("isla")
 
         if "email" in t or "correo" in t:
             columns.append("email")
@@ -197,6 +208,19 @@ class CustomerReportIntentService:
         intent.filters = filters
         intent.columns = self._unique_valid(columns)
         return intent
+
+    def _extract_named_value(self, text: str, field: str) -> str:
+        pattern = rf"\b{re.escape(field)}\s*=\s*(?:\"([^\"]+)\"|'([^']+)'|([^\s,;]+))"
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if not match:
+            return ""
+        for group in match.groups():
+            if group is None:
+                continue
+            value = str(group).strip().strip('"').strip("'")
+            if value:
+                return value
+        return ""
 
     def _intent_from_mapping(self, data: dict[str, Any], fallback: CustomerReportIntent) -> CustomerReportIntent:
         intent = CustomerReportIntent()

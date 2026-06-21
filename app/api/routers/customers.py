@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_customer_service
@@ -12,13 +15,21 @@ from app.schemas.customers import (
     CustomerAddressCatalogsPayload,
     CustomerCreate,
     CustomerDetail,
+    CustomerListingRequest,
+    CustomerListingPdfExportRequest,
+    CustomerListingResponse,
+    CustomerListingXlsxExportRequest,
     CustomerListResponse,
     CustomerUpdate,
 )
+from app.api.deps import get_customer_report_flow_service
+from app.services.customer_report_flow_service import CustomerReportFlowService
 from app.services.customer_service import CustomerService
+from app.services.report_export_service import ReportExportService
 
 
 router = APIRouter(prefix="/customers", tags=["customers"])
+report_export_service = ReportExportService()
 
 
 @router.get("", response_model=CustomerListResponse)
@@ -36,6 +47,68 @@ def address_catalogs(
     service: CustomerService = Depends(get_customer_service),
 ) -> CustomerAddressCatalogsPayload:
     return service.address_catalogs_payload()
+
+
+@router.post("/listings", response_model=CustomerListingResponse)
+def generate_listing(
+    payload: CustomerListingRequest,
+    service: CustomerReportFlowService = Depends(get_customer_report_flow_service),
+) -> CustomerListingResponse:
+    result = service.generate_report(payload.prompt)
+    report = result.report
+    if report is None:
+        return CustomerListingResponse(
+            status=result.status,
+            message=result.message,
+            title="",
+            headers=[],
+            rows=[],
+            source=result.source,
+            used_ai=result.used_ai,
+        )
+    return CustomerListingResponse(
+        status=result.status,
+        message=result.message,
+        title=report.title,
+        headers=report.headers,
+        rows=report.rows,
+        source=result.source,
+        used_ai=result.used_ai,
+    )
+
+
+@router.post(
+    "/listings/pdf",
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+def export_listing_pdf(
+    payload: CustomerListingPdfExportRequest,
+) -> FileResponse:
+    path = report_export_service.default_path(payload.title or "Listado de clientes", "pdf")
+    report_export_service.export_pdf(path, payload.title or "Listado de clientes", payload.headers, payload.rows)
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=Path(path).name,
+        headers={"Content-Disposition": f'attachment; filename="{Path(path).name}"'},
+    )
+
+
+@router.post(
+    "/listings/xlsx",
+    responses={200: {"content": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}}}},
+)
+def export_listing_xlsx(
+    payload: CustomerListingXlsxExportRequest,
+) -> FileResponse:
+    path = report_export_service.default_path(payload.title or "Listado de clientes", "xlsx")
+    report_export_service.export_excel(path, payload.title or "Listado de clientes", payload.headers, payload.rows)
+    return FileResponse(
+        path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=Path(path).name,
+        headers={"Content-Disposition": f'attachment; filename="{Path(path).name}"'},
+    )
 
 
 @router.get("/{customer_id}", response_model=CustomerDetail)

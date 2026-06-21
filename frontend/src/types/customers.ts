@@ -13,13 +13,30 @@ export interface CustomerAddressCatalogsPayload {
   localidades: AddressOption[]
 }
 
+export type CustomerListingCell = string | number | boolean | null
+
+export interface CustomerListingRequest {
+  prompt: string
+}
+
+export interface CustomerListingResponse {
+  status: string
+  message: string
+  title: string
+  headers: string[]
+  rows: CustomerListingCell[][]
+  source: string
+  used_ai: boolean
+}
+
 export interface CustomerListItem {
   cliente_id: string
   cliente_codigo: number
   cliente_nombre_comercial: string
   cliente_nombre_fiscal: string
   cliente_cif: string
-  cliente_grupo: string
+  cliente_actividad: string
+  cliente_grupo?: string
   cliente_tipo: string
   cliente_direccion_isla_id?: string
   cliente_direccion_isla?: string
@@ -39,4 +56,5 @@ export interface CustomerDetail extends CustomerListItem {
   cliente_direccion_provincia_id: string
   cliente_direccion_isla_id: string
   distribuidor_id: string
+  cliente_grupo?: string
 }

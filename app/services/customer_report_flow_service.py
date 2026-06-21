@@ -48,7 +48,7 @@ class CustomerReportFlowService:
         try:
             report = self.report_service.run(intent_result.intent)
         except Exception as exc:  # noqa: BLE001
-            result = CustomerReportFlowResult(status="error", message=f"No se pudo generar el listado.\n{exc}")
+            result = CustomerReportFlowResult(status="error", message="No se pudo generar el listado.")
             self.last_report = None
             self.last_result = result
             return result

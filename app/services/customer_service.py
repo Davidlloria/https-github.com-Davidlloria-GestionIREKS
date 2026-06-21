@@ -217,7 +217,7 @@ class CustomerService:
             "cliente_direccion": ["domicilio", "direccion"],
             "cliente_direccion_cp": ["cp", "codigo_postal"],
             "cliente_tipo": ["tipo"],
-            "cliente_grupo": ["grupo"],
+            "cliente_actividad": ["actividad", "grupo"],
             "activo": ["estado", "habilitado"],
         }
         return self.import_service.import_with_schema(
