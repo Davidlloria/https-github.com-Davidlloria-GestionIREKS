@@ -14,30 +14,30 @@ entire migration history first.
 ## Current Snapshot
 
 - Date: 2026-06-21
-- Branch: `main`
-- HEAD: `0dee56f`
+- Branch: `feature/frontend-ui-system`
+- HEAD: `c0ad0a81`
 - Worktree: clean
 - App status: FastAPI + React customer/listings flow is working.
-- Recent state: PDF export is backend-driven and the Excel export now generates a real `.xlsx`.
-- Current UI note: the customers action buttons have a contrast fix committed and the button styling is stable.
-- Last published commit: `0dee56f` (`docs: add progress log for handoff context`).
+- Recent state: shared button, card, chip, state box, section header and data table components are in place.
+- Current UI note: standard action buttons use Lucide icons; customer activity icons remain custom SVG.
+- Last published commit: `c0ad0a81` (`fix: align customer header chip`).
 
 ## What Was Completed Recently
 
+- Shared UI primitives were added for buttons, cards, chips, state boxes, section headers and data tables.
 - Customer listing PDF export now comes from the backend and produces a real PDF.
 - Customer listing Excel export now comes from the backend and produces a real `.xlsx`.
-- Customer list actions were visually refined, including button contrast.
+- Customer action buttons and modal actions now use standard Lucide icons.
 - A local `listados/` folder exists in the repo for test artifacts, with `.gitkeep` tracked.
 - The repo now has a dedicated handoff file at `docs/progress-log.md`.
-- Documentation links now point readers from README, AGENTS, roadmap and history into this log.
 
 ## Recent Commits
 
-- `0dee56f` - `docs: add progress log for handoff context`
-- `011a436` - `fix: improve customers button contrast`
-- `750ff04` - `fix: export customer listings as xlsx`
-- `d232bcf` - `fix: stretch customer listing pdf table`
-- `ad40d22` - `fix: align listing pdf left and keep test folder`
+- `c0ad0a81` - `fix: align customer header chip`
+- `d6c477b4` - `fix: align shared section headers`
+- `3cf932eb` - `feat: add icons to customer modal actions`
+- `9b01c08e` - `feat: add standard icon set for customer actions`
+- `64c09c45` - `feat: add shared data table component`
 
 ## Important Files
 
@@ -49,7 +49,7 @@ entire migration history first.
 
 ## Next Useful Checks
 
-- Verify the customers listing export buttons on the React UI.
+- Verify the customers screen on the React UI after icon and header alignment changes.
 - Keep the `listados/` folder clean of generated artifacts before commits.
 - If a new chat resumes work, start from this snapshot and then consult the roadmap.
 - If the next task is functional, start from `docs/migration-roadmap.md` and
@@ -58,11 +58,11 @@ entire migration history first.
 ## Handoff Block
 
 ```text
-Branch: main
-HEAD: 0dee56f
+Branch: feature/frontend-ui-system
+HEAD: c0ad0a81
 Worktree: clean
-Focus: customer/listings flow, export buttons, and remaining migration tasks.
-Recent changes: PDF export backend-driven, Excel export is real .xlsx, customer button contrast improved.
+Focus: customer/listings flow, shared UI primitives, and remaining migration tasks.
+Recent changes: shared UI primitives added, standard button icons in place, header alignment fixed.
 Pending: keep listados/ clean, review next functional block from roadmap/history.
 Reference: docs/progress-log.md, docs/migration-roadmap.md, docs/migration-history.md
 ```
