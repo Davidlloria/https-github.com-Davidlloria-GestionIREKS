@@ -1878,6 +1878,23 @@ button {
   overflow: hidden;
 }
 
+.ireks-products-page__header {
+  align-items: center;
+  padding: 4px 2px 0;
+}
+
+.ireks-products-page__header .app-section-header__title {
+  color: #4358d1;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.ireks-products-page__header .app-section-header__right {
+  padding-top: 0;
+}
+
 .ireks-products-page .ireks-products-filters {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

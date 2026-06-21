@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { getIreksIngredientDetail, listIreksIngredients } from '../api/ingredients'
+import { AppSectionHeader } from '../components/AppSectionHeader'
 import { QueryState } from '../components/QueryState'
 import { useAsyncResource } from '../features/useAsyncResource'
 import type { IngredientIreksListPayload, IngredientIreksRead } from '../types/api'
@@ -252,13 +253,11 @@ export function IreksProductsPage() {
     <section className="page-grid ireks-products-page">
       <div className="ireks-products-workspace">
         <section className="panel-section ireks-products-list-panel">
-          <div className="section-heading">
-            <div>
-              <h3>Productos IREKS</h3>
-              <p>Catálogo read-only de productos IREKS.</p>
-            </div>
-            <span className="surface-chip">{query.data.total} visibles</span>
-          </div>
+          <AppSectionHeader
+            title="Productos IREKS"
+            rightSlot={<span className="surface-chip">{query.data.total} visibles</span>}
+            className="ireks-products-page__header"
+          />
 
           <div className="ireks-products-filters">
             <label className="ireks-filter">
@@ -486,3 +485,5 @@ function tabPlaceholder(tab: IreksTab) {
       return 'Datos del producto'
   }
 }
+
+
