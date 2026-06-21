@@ -57,7 +57,25 @@ class ReportExportService:
         )
         story = [Paragraph(str(title or "Listado de clientes"), title_style), Spacer(1, 10)]
         table_data = [headers] + [[str(value) for value in row] for row in rows]
-        table = Table(table_data, repeatRows=1, hAlign="LEFT")
+        column_count = max(1, len(headers))
+        content_widths = [0] * column_count
+        for row in table_data:
+            for index in range(column_count):
+                value = row[index] if index < len(row) else ""
+                text = str(value or "")
+                content_widths[index] = max(content_widths[index], len(text))
+        min_widths = [24] * column_count
+        max_widths = [max(40, min(220, width * 4 + 24)) for width in content_widths]
+        available_width = doc.width
+        scale = available_width / sum(max_widths)
+        if scale < 1:
+            col_widths = [max(min_widths[idx], width * scale) for idx, width in enumerate(max_widths)]
+        else:
+            col_widths = max_widths[:]
+        width_delta = available_width - sum(col_widths)
+        if width_delta != 0 and column_count:
+            col_widths[-1] = max(min_widths[-1], col_widths[-1] + width_delta)
+        table = Table(table_data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
         table.setStyle(
             TableStyle(
                 [
