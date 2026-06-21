@@ -409,7 +409,7 @@ export function IreksProductsPage() {
               placeholder="Buscar producto por referencia o nombre"
             />
             <AppButton
-              variant="ghost"
+              variant="danger"
               size="sm"
               className="ireks-products-clear-filters"
               onClick={clearFilters}
