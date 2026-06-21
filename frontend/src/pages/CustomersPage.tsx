@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { ArrowRight, FileDown, FileSpreadsheet, FileText, List, Plus, Printer, Trash2, X } from 'lucide-react'
 import {
   createCustomer,
   deleteCustomer,
@@ -1050,13 +1051,13 @@ export function CustomersPage() {
           <AppSectionHeader title="Clientes" titleAs="h2" rightSlot={<AppChip>{sortedCustomerRows.length} visibles</AppChip>} />
 
           <div className="customers-list-actions">
-            <AppButton variant="primary" disabled={isCreating} onClick={openCreateForm} icon="+">
+            <AppButton variant="primary" disabled={isCreating} onClick={openCreateForm} icon={<Plus size={18} strokeWidth={2.6} />}>
               Nuevo
             </AppButton>
-            <AppButton variant="danger" disabled={isCreating || !selectedCustomerId} onClick={openDeleteConfirm}>
+            <AppButton variant="danger" disabled={isCreating || !selectedCustomerId} onClick={openDeleteConfirm} icon={<Trash2 size={18} strokeWidth={2.4} />}>
               Eliminar
             </AppButton>
-            <AppButton variant="ghost" onClick={openListingsModal}>
+            <AppButton variant="ghost" onClick={openListingsModal} icon={<List size={18} strokeWidth={2.4} />}>
               Listados
             </AppButton>
           </div>
@@ -1845,18 +1846,18 @@ export function CustomersPage() {
                   <span>Exportar listado</span>
                 </div>
                 <div className="customers-listings-export-actions customers-listings-export-actions-ribbon">
-                  <button type="button" className="customers-listings-export-btn" onClick={handleListingPrint} disabled={!listingResult?.rows.length}>
+                  <AppButton type="button" variant="secondary" className="customers-listings-export-btn" onClick={handleListingPrint} disabled={!listingResult?.rows.length} icon={<Printer size={17} strokeWidth={2.3} />}>
                     Imprimir
-                  </button>
-                  <button type="button" className="customers-listings-export-btn" onClick={handleListingPdfExport} disabled={!listingResult?.rows.length}>
+                  </AppButton>
+                  <AppButton type="button" variant="secondary" className="customers-listings-export-btn" onClick={handleListingPdfExport} disabled={!listingResult?.rows.length} icon={<FileDown size={17} strokeWidth={2.3} />}>
                     PDF
-                  </button>
-                  <button type="button" className="customers-listings-export-btn" onClick={handleListingExcelExport} disabled={!listingResult?.rows.length}>
+                  </AppButton>
+                  <AppButton type="button" variant="secondary" className="customers-listings-export-btn" onClick={handleListingExcelExport} disabled={!listingResult?.rows.length} icon={<FileSpreadsheet size={17} strokeWidth={2.3} />}>
                     Excel
-                  </button>
-                  <button type="button" className="customers-listings-export-btn" onClick={handleListingCsvExport} disabled={!listingResult?.rows.length}>
+                  </AppButton>
+                  <AppButton type="button" variant="secondary" className="customers-listings-export-btn" onClick={handleListingCsvExport} disabled={!listingResult?.rows.length} icon={<FileText size={17} strokeWidth={2.3} />}>
                     CSV
-                  </button>
+                  </AppButton>
                 </div>
               </div>
 
@@ -1919,7 +1920,7 @@ export function CustomersPage() {
 
               <div className="customers-listings-footer-actions">
                 <div className="customers-detail-actions customers-modal-actions customers-listings-actions">
-                  <AppButton type="submit" variant="primary" disabled={listingSubmitting}>
+                  <AppButton type="submit" variant="primary" disabled={listingSubmitting} icon={<FileText size={18} strokeWidth={2.3} />}>
                     {listingSubmitting ? 'Preparando...' : 'Generar listado'}
                   </AppButton>
                   <AppButton
@@ -1927,10 +1928,11 @@ export function CustomersPage() {
                     variant="ghost"
                     disabled={!listingResult?.rows.length || listingApplying}
                     onClick={handleApplyListingToMainList}
+                    icon={<ArrowRight size={18} strokeWidth={2.3} />}
                   >
                     {listingApplying ? 'Pasando...' : 'Pasar al listado'}
                   </AppButton>
-                  <AppButton type="button" variant="secondary" disabled={listingSubmitting} onClick={closeListingsModal}>
+                  <AppButton type="button" variant="secondary" disabled={listingSubmitting} onClick={closeListingsModal} icon={<X size={18} strokeWidth={2.3} />}>
                     Cancelar
                   </AppButton>
                 </div>
