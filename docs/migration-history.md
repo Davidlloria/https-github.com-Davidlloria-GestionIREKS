@@ -1,5 +1,9 @@
 # Roadmap de migracion UI / servicios / API
 
+> Para retomar trabajo rapido, leer primero `docs/progress-log.md`.
+> Usa `docs/migration-roadmap.md` para la direccion general y este archivo
+> para el historial detallado de checkpoints y decisiones.
+
 ## Estado verificado
 
 Revision local: 2026-06-14.

@@ -210,6 +210,10 @@ Entorno local y runtime:
 - `docs/local-environment.md`
 - `scripts/check-local-env.ps1`
 
+Seguimiento corto de progreso y traspaso de contexto:
+
+- `docs/progress-log.md`
+
 ## Estado actual
 
 - Desktop PySide6 operativo como cliente principal legacy.
@@ -219,6 +223,7 @@ Entorno local y runtime:
 - Frontend React inicial con vistas de consulta para clientes, ingredientes y
   almacen.
 - La hoja de ruta vive en `docs/migration-roadmap.md`.
+- El resumen corto de avance vive en `docs/progress-log.md`.
 
 ## Datos y seguridad
 

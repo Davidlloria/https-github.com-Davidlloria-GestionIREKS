@@ -2,6 +2,9 @@
 
 ## Estado ejecutivo
 
+> Para retomadas rapidas, leer primero `docs/progress-log.md` y usar esta
+> roadmap como contexto estrategico de largo recorrido.
+
 - Fase actual: Fase 5 - Reducir dependencia del desktop.
 - Objetivo actual: mantener PySide6 estable mientras se extrae la logica que
   aun vive en widgets grandes y se consolida la paridad en React/FastAPI.
