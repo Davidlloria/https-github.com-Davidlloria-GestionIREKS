@@ -2038,30 +2038,6 @@ button {
   scrollbar-gutter: stable;
 }
 
-.ireks-products-page .ireks-action-btn-success {
-  background: linear-gradient(180deg, #6ac96d, #4ea753);
-  border-color: #5cae5f;
-  color: #ffffff;
-}
-
-.ireks-products-page .ireks-action-btn-danger {
-  background: linear-gradient(180deg, #ea7474, #d85c5c);
-  border-color: #d85c5c;
-  color: #ffffff;
-}
-
-.ireks-products-page .ireks-action-btn-primary {
-  background: linear-gradient(180deg, #3268f2, #2454d8);
-  border-color: #2b5ddf;
-  color: #ffffff;
-}
-
-.ireks-products-page .ireks-action-btn-outline {
-  background: linear-gradient(180deg, #ffffff, #f4f7fb);
-  border-color: var(--line);
-  color: var(--text);
-}
-
 .ireks-products-page .ireks-tabs {
   padding: 0 10px 0 10px;
   gap: 8px;

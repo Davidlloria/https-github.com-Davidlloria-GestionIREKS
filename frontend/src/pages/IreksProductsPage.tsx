@@ -113,24 +113,6 @@ function TabButton({
   )
 }
 
-function ActionButton({
-  children,
-  className = '',
-  disabled = true,
-  onClick,
-}: {
-  children: string
-  className?: string
-  disabled?: boolean
-  onClick?: () => void
-}) {
-  return (
-    <button type="button" className={`action-btn ireks-action-btn ${className}`.trim()} disabled={disabled} onClick={onClick}>
-      {children}
-    </button>
-  )
-}
-
 async function loadAllIreksIngredients(search: string): Promise<LoadedIreksData> {
   const items: IngredientIreksRead[] = []
   let offset = 0
@@ -324,13 +306,13 @@ export function IreksProductsPage() {
           />
 
           <div className="ireks-products-action-ribbon" aria-label="Acciones de productos IREKS">
-            <AppButton variant="primary" size="sm" disabled icon={<Plus size={16} strokeWidth={2.5} />}>
+            <AppButton variant="primary" disabled icon={<Plus size={18} strokeWidth={2.6} />}>
               Nuevo
             </AppButton>
-            <AppButton variant="danger" size="sm" disabled icon={<Trash2 size={16} strokeWidth={2.5} />}>
+            <AppButton variant="danger" disabled icon={<Trash2 size={18} strokeWidth={2.4} />}>
               Eliminar
             </AppButton>
-            <AppButton variant="ghost" size="sm" disabled icon={<List size={16} strokeWidth={2.5} />}>
+            <AppButton variant="ghost" disabled icon={<List size={18} strokeWidth={2.4} />}>
               Listados
             </AppButton>
           </div>
@@ -490,21 +472,30 @@ export function IreksProductsPage() {
 
         <div className="ireks-products-right-stack">
           <section className="panel-section ireks-products-detail-panel">
-            <div className="ireks-products-detail-toolbar">
-              <ActionButton className="ireks-action-btn-success">Nuevo</ActionButton>
-              <ActionButton className="ireks-action-btn-danger">Eliminar</ActionButton>
-              <ActionButton className="ireks-action-btn-outline">ID</ActionButton>
-              <ActionButton className="ireks-action-btn-outline">Importar Excel/CSV</ActionButton>
-              <ActionButton className="ireks-action-btn-primary">Listados</ActionButton>
-              <ActionButton
-                className="ireks-action-btn-outline"
-                disabled={false}
+          <div className="ireks-products-detail-toolbar">
+              <AppButton variant="primary" disabled>
+                Nuevo
+              </AppButton>
+              <AppButton variant="danger" disabled>
+                Eliminar
+              </AppButton>
+              <AppButton variant="secondary" disabled>
+                ID
+              </AppButton>
+              <AppButton variant="secondary" disabled>
+                Importar Excel/CSV
+              </AppButton>
+              <AppButton variant="ghost" disabled>
+                Listados
+              </AppButton>
+              <AppButton
+                variant="ghost"
                 onClick={() => {
                   setRefreshTick((prev) => prev + 1)
                 }}
               >
                 Refrescar
-              </ActionButton>
+              </AppButton>
             </div>
 
             <div className="section-heading section-heading-compact">
