@@ -15,11 +15,12 @@ entire migration history first.
 
 - Date: 2026-06-21
 - Branch: `main`
-- HEAD: `87975c3`
+- HEAD: `0dee56f`
 - Worktree: clean
 - App status: FastAPI + React customer/listings flow is working.
-- Recent state: PDF export was moved to backend and Excel export now generates a real `.xlsx`.
-- Current UI note: the customers action buttons were tweaked for contrast, and the latest text-color change is committed.
+- Recent state: PDF export is backend-driven and the Excel export now generates a real `.xlsx`.
+- Current UI note: the customers action buttons have a contrast fix committed and the button styling is stable.
+- Last published commit: `0dee56f` (`docs: add progress log for handoff context`).
 
 ## What Was Completed Recently
 
@@ -27,6 +28,16 @@ entire migration history first.
 - Customer listing Excel export now comes from the backend and produces a real `.xlsx`.
 - Customer list actions were visually refined, including button contrast.
 - A local `listados/` folder exists in the repo for test artifacts, with `.gitkeep` tracked.
+- The repo now has a dedicated handoff file at `docs/progress-log.md`.
+- Documentation links now point readers from README, AGENTS, roadmap and history into this log.
+
+## Recent Commits
+
+- `0dee56f` - `docs: add progress log for handoff context`
+- `011a436` - `fix: improve customers button contrast`
+- `750ff04` - `fix: export customer listings as xlsx`
+- `d232bcf` - `fix: stretch customer listing pdf table`
+- `ad40d22` - `fix: align listing pdf left and keep test folder`
 
 ## Important Files
 
@@ -41,3 +52,5 @@ entire migration history first.
 - Verify the customers listing export buttons on the React UI.
 - Keep the `listados/` folder clean of generated artifacts before commits.
 - If a new chat resumes work, start from this snapshot and then consult the roadmap.
+- If the next task is functional, start from `docs/migration-roadmap.md` and
+  `docs/migration-history.md` after reading this log.
