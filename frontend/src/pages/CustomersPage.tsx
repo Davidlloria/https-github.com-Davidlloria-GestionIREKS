@@ -13,7 +13,9 @@ import {
 } from '../api/customers'
 import { listContacts } from '../api/contacts'
 import { AppButton } from '../components/AppButton'
+import { AppCard } from '../components/AppCard'
 import { AppChip } from '../components/AppChip'
+import { AppStateBox } from '../components/AppStateBox'
 import { BinaryToggleSelect } from '../components/BinaryToggleSelect'
 import { QueryState } from '../components/QueryState'
 import { useAsyncResource } from '../features/useAsyncResource'
@@ -1042,7 +1044,7 @@ export function CustomersPage() {
   return (
     <section className="customers-saas-page">
       <div className="customers-saas-workspace">
-        <aside className="customers-list-panel">
+        <AppCard as="aside" className="customers-list-panel">
           <div className="customers-list-head">
             <div className="customers-list-head-copy">
               <h2>Clientes</h2>
@@ -1054,16 +1056,10 @@ export function CustomersPage() {
             <AppButton variant="primary" disabled={isCreating} onClick={openCreateForm} icon="+">
               Nuevo
             </AppButton>
-            <AppButton variant="danger" disabled={isCreating || !selectedCustomerId} onClick={openDeleteConfirm} icon="🗑">
-              <span className="customers-action-btn-icon" aria-hidden="true">
-                🗑
-              </span>
+            <AppButton variant="danger" disabled={isCreating || !selectedCustomerId} onClick={openDeleteConfirm}>
               Eliminar
             </AppButton>
-            <AppButton variant="ghost" onClick={openListingsModal} icon="📄">
-              <span className="customers-action-btn-icon" aria-hidden="true">
-                📄
-              </span>
+            <AppButton variant="ghost" onClick={openListingsModal}>
               Listados
             </AppButton>
           </div>
@@ -1132,15 +1128,11 @@ export function CustomersPage() {
             )}
 
             {!listingAppliedRows && !customersQuery.loading && customersQuery.error && (
-              <div className="state state-error" role="alert">
-                Error: {customersQuery.error}
-              </div>
+              <AppStateBox kind="error" message={customersQuery.error} />
             )}
 
             {!listingAppliedRows && !customersQuery.loading && !customersQuery.error && !sortedCustomerRows.length && (
-              <div className="state state-empty" role="status">
-                No hay clientes para los filtros actuales.
-              </div>
+              <AppStateBox kind="empty" message="No hay clientes para los filtros actuales." />
             )}
 
             {!!sortedCustomerRows.length && (
@@ -1231,12 +1223,12 @@ export function CustomersPage() {
               </div>
             )}
           </div>
-        </aside>
+        </AppCard>
 
         <section className={`customers-detail-panel ${isCreating ? 'is-create-flow' : ''}`} hidden={isCreating}>
           <div className="customers-detail-body customers-detail-main">
             <div className="customers-detail-grid customers-detail-top">
-              <section className="customers-detail-card">
+              <AppCard as="section" className="customers-detail-card">
                 <div className="customers-section-head">
                   <div>
                     <h3>{isCreating ? 'Nuevo cliente' : 'Detalle de cliente'}</h3>
@@ -1601,7 +1593,7 @@ export function CustomersPage() {
                     )}
                   </>
                 )}
-              </section>
+              </AppCard>
 
               <aside className="customers-type-panel">
                 <div className="customers-section-head">
@@ -1746,14 +1738,14 @@ export function CustomersPage() {
                         </div>
                       </>
                     ) : (
-                      <div className="state customers-empty-panel">Sin datos de cliente para mostrar.</div>
+                      <AppStateBox kind="empty" className="customers-empty-panel" message="Sin datos de cliente para mostrar." />
                     )}
                   </>
                 )}
               </aside>
             </div>
 
-            <section className="customers-tabs-panel">
+            <AppCard as="section" className="customers-tabs-panel">
               <div className="customers-tabs" role="tablist" aria-label="Secciones de cliente">
                 {TABS.map((tab) => (
                   <button
@@ -1814,11 +1806,11 @@ export function CustomersPage() {
                   </div>
                 )}
 
-                {activeTab === 'sales' && <div className="state customers-empty-panel customers-tab-empty">Sin datos asociados a ventas.</div>}
-                {activeTab === 'recipes' && <div className="state customers-empty-panel customers-tab-empty">Sin datos asociados a recetas.</div>}
-                {activeTab === 'agenda' && <div className="state customers-empty-panel customers-tab-empty">Sin datos asociados a agenda.</div>}
+                {activeTab === 'sales' && <AppStateBox kind="empty" className="customers-empty-panel customers-tab-empty" message="Sin datos asociados a ventas." />}
+                {activeTab === 'recipes' && <AppStateBox kind="empty" className="customers-empty-panel customers-tab-empty" message="Sin datos asociados a recetas." />}
+                {activeTab === 'agenda' && <AppStateBox kind="empty" className="customers-empty-panel customers-tab-empty" message="Sin datos asociados a agenda." />}
               </div>
-            </section>
+            </AppCard>
           </div>
         </section>
       </div>
@@ -1895,7 +1887,7 @@ export function CustomersPage() {
                 <span>Puedes usar datos de clientes, contactos, ventas, recetas y más.</span>
               </div>
 
-              <div className="customers-listings-result">
+              <AppCard as="div" className="customers-listings-result">
                 <div className="customers-listings-result-head">
                   <div>
                     <strong>{listingResult?.title || 'Listado de clientes'}</strong>
@@ -1946,12 +1938,10 @@ export function CustomersPage() {
                   </span>
                   <span>Los resultados completos se descargarán al generar el listado.</span>
                 </div>
-              </div>
+              </AppCard>
 
               {listingError && (
-                <div className="state" role="alert">
-                  {listingError}
-                </div>
+                <AppStateBox kind="error" message={listingError} />
               )}
 
               <div className="customers-listings-footer-actions">
@@ -2222,7 +2212,7 @@ export function CustomersPage() {
                   </div>
                 </section>
 
-                <aside className="customers-type-panel">
+                <AppCard as="aside" className="customers-type-panel">
                   <div className="customers-section-head">
                     <div>
                       <h3>Clasificación del cliente</h3>
@@ -2309,7 +2299,7 @@ export function CustomersPage() {
                       className="binary-toggle-select--customer-prospect"
                     />
                   </div>
-                </aside>
+                </AppCard>
               </div>
             </form>
           </div>

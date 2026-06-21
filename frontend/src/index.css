@@ -5079,6 +5079,125 @@ tbody tr:hover {
   border-color: #c3d1e5;
 }
 
+.app-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid #dbe4f0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  padding: 12px;
+}
+
+.app-card--scrollable {
+  overflow: auto;
+}
+
+.app-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.app-card__copy {
+  min-width: 0;
+}
+
+.app-card__title {
+  display: block;
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.app-card__subtitle {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.app-card__header-right,
+.app-card__footer {
+  min-width: 0;
+}
+
+.app-card__body {
+  min-width: 0;
+}
+
+.app-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(125, 140, 165, 0.22);
+  padding: 12px 14px;
+  color: #334155;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.app-state__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+}
+
+.app-state__copy {
+  min-width: 0;
+}
+
+.app-state__title {
+  display: block;
+  margin-bottom: 2px;
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.app-state__message {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.app-state--loading {
+  border-style: solid;
+  border-color: rgba(45, 122, 78, 0.25);
+  background: rgba(45, 122, 78, 0.08);
+  color: var(--brand-strong);
+}
+
+.app-state--error {
+  border-style: solid;
+  border-color: rgba(152, 42, 42, 0.2);
+  background: rgba(152, 42, 42, 0.08);
+  color: var(--danger);
+}
+
+.app-state--empty {
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.app-state--success {
+  border-color: rgba(45, 122, 78, 0.22);
+  background: rgba(45, 122, 78, 0.06);
+  color: var(--brand-strong);
+}
+
+.app-state--info {
+  border-color: rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.06);
+  color: #1d4ed8;
+}
+
 .customers-listings-footer-actions .customers-action-btn:not(:disabled):hover,
 .customers-listings-footer-actions .customers-action-btn:not(:disabled):focus-visible,
 .customers-listings-export-actions .customers-listings-export-btn:not(:disabled):hover,
