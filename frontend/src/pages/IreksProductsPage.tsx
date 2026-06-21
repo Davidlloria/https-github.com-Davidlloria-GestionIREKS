@@ -3,7 +3,7 @@ import { getIreksIngredientDetail, listIreksIngredients } from '../api/ingredien
 import { AppButton } from '../components/AppButton'
 import { AppSectionHeader } from '../components/AppSectionHeader'
 import { QueryState } from '../components/QueryState'
-import { List, Plus, Trash2 } from 'lucide-react'
+import { List, Plus, Trash2, X } from 'lucide-react'
 import { useAsyncResource } from '../features/useAsyncResource'
 import type { IngredientIreksListPayload, IngredientIreksRead } from '../types/api'
 
@@ -311,13 +311,33 @@ export function IreksProductsPage() {
     <div className="ireks-products-tab-empty">Selecciona un producto para ver los datos.</div>
   )
 
+  const clearFilters = () => {
+    setSelectedFabricanteId('')
+    setSelectedFamiliaId('')
+    setSelectedSubfamiliaId('')
+  }
+
   return (
     <section className="page-grid ireks-products-page">
       <div className="ireks-products-workspace">
         <section className="panel-section ireks-products-list-panel">
           <AppSectionHeader
             title="Productos IREKS"
-            rightSlot={<span className="surface-chip">{filteredRows.length} visibles</span>}
+            rightSlot={
+              <div className="ireks-products-header-meta">
+                <span className="surface-chip">{filteredRows.length} visibles</span>
+                <AppButton
+                  variant="ghost"
+                  size="sm"
+                  className="ireks-products-clear-filters"
+                  onClick={clearFilters}
+                  disabled={!selectedFabricanteId && !selectedFamiliaId && !selectedSubfamiliaId}
+                  icon={<X size={14} strokeWidth={2.4} />}
+                >
+                  Limpiar filtros
+                </AppButton>
+              </div>
+            }
             className="ireks-products-page__header"
           />
 

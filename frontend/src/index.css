@@ -1896,6 +1896,20 @@ button {
   margin-top: -3px;
 }
 
+.ireks-products-header-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ireks-products-clear-filters {
+  flex: 0 0 auto;
+  height: 30px;
+  padding-inline: 10px;
+}
+
 .ireks-products-action-ribbon {
   display: flex;
   flex-wrap: wrap;
