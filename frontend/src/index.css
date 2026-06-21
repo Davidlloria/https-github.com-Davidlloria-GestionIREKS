@@ -267,9 +267,11 @@ button {
   min-width: 0;
 }
 
-.surface-chip {
+.surface-chip,
+.app-chip {
   display: inline-flex;
   align-items: center;
+  gap: 8px;
   border-radius: 999px;
   border: 1px solid var(--line);
   background: var(--surface-2);
@@ -278,6 +280,47 @@ button {
   font-size: 12px;
   font-weight: 700;
   box-shadow: var(--shadow-soft);
+}
+
+.app-chip {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+
+.app-chip__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+.app-chip--success,
+.customers-status-chip.is-active {
+  border-color: #b7ebc6;
+  background: linear-gradient(180deg, #f0fdf4, #dcfce7);
+  color: #166534;
+}
+
+.app-chip--warning {
+  border-color: #f1c26b;
+  background: linear-gradient(180deg, #fffaf0, #fff3d9);
+  color: #b76a00;
+}
+
+.app-chip--info {
+  border-color: #a8c6ff;
+  background: linear-gradient(180deg, #f7fbff, #eef4ff);
+  color: #2858c7;
+}
+
+.app-chip--danger,
+.customers-status-chip.is-inactive {
+  border-color: #fecaca;
+  background: linear-gradient(180deg, #fef2f2, #fee2e2);
+  color: #991b1b;
+}
+
+.app-chip.is-active {
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.06);
 }
 
 .page-grid {
@@ -4912,6 +4955,7 @@ tbody tr:hover {
   justify-content: flex-end;
 }
 
+.app-button,
 .customers-action-btn {
   display: inline-flex;
   align-items: center;
@@ -4930,6 +4974,8 @@ tbody tr:hover {
   transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
 }
 
+.app-button:not(:disabled):hover,
+.app-button:not(:disabled):focus-visible,
 .customers-action-btn:not(:disabled):hover,
 .customers-action-btn:not(:disabled):focus-visible {
   transform: translateY(-1px) scale(1.01);
@@ -4937,10 +4983,12 @@ tbody tr:hover {
   box-shadow: 0 11px 20px rgba(15, 23, 42, 0.10);
 }
 
+.app-button:disabled,
 .customers-action-btn:disabled {
   cursor: not-allowed;
 }
 
+.app-button__icon,
 .customers-action-btn-icon {
   display: inline-grid;
   place-items: center;
@@ -4951,12 +4999,33 @@ tbody tr:hover {
   line-height: 1;
 }
 
+.app-button .customers-action-btn-icon {
+  display: none;
+}
+
+.app-button--sm,
+.customers-action-btn--sm {
+  min-height: 30px;
+  padding-inline: 10px;
+  font-size: 11px;
+}
+
+.app-button--lg,
+.customers-action-btn--lg {
+  min-height: 40px;
+  padding-inline: 14px;
+  font-size: 13px;
+}
+
+.app-button--primary,
 .customers-action-btn-primary {
   background: #b9d9b1;
   border-color: #2c5f26;
   color: #1f4d1b;
 }
 
+.app-button--primary:not(:disabled):hover,
+.app-button--primary:not(:disabled):focus-visible,
 .customers-action-btn-primary:not(:disabled):hover,
 .customers-action-btn-primary:not(:disabled):focus-visible {
   background: #acd1a3;
@@ -4964,12 +5033,15 @@ tbody tr:hover {
   color: #173f14;
 }
 
+.app-button--secondary,
 .customers-action-btn-outline {
   background: #ffffff;
   border-color: #93c5fd;
   color: #1d4ed8;
 }
 
+.app-button--secondary:not(:disabled):hover,
+.app-button--secondary:not(:disabled):focus-visible,
 .customers-action-btn-outline:not(:disabled):hover,
 .customers-action-btn-outline:not(:disabled):focus-visible {
   background: #eff6ff;
@@ -4977,24 +5049,30 @@ tbody tr:hover {
   color: #1d4ed8;
 }
 
+.app-button--danger,
 .customers-action-btn-danger {
   background: #fff5f5;
   border-color: #f3c1c1;
   color: #b91c1c;
 }
 
+.app-button--danger:not(:disabled):hover,
+.app-button--danger:not(:disabled):focus-visible,
 .customers-action-btn-danger:not(:disabled):hover,
 .customers-action-btn-danger:not(:disabled):focus-visible {
   background: #fdecec;
   border-color: #f2b3b3;
 }
 
+.app-button--ghost,
 .customers-action-btn-ghost {
   background: #eef3fb;
   border-color: #d3dcef;
   color: #334155;
 }
 
+.app-button--ghost:not(:disabled):hover,
+.app-button--ghost:not(:disabled):focus-visible,
 .customers-action-btn-ghost:not(:disabled):hover,
 .customers-action-btn-ghost:not(:disabled):focus-visible {
   background: #e5ecf8;

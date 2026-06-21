@@ -12,6 +12,8 @@ import {
   type CustomerSavePayload,
 } from '../api/customers'
 import { listContacts } from '../api/contacts'
+import { AppButton } from '../components/AppButton'
+import { AppChip } from '../components/AppChip'
 import { BinaryToggleSelect } from '../components/BinaryToggleSelect'
 import { QueryState } from '../components/QueryState'
 import { useAsyncResource } from '../features/useAsyncResource'
@@ -1045,28 +1047,25 @@ export function CustomersPage() {
             <div className="customers-list-head-copy">
               <h2>Clientes</h2>
             </div>
-            <span className="surface-chip">{sortedCustomerRows.length} visibles</span>
+            <AppChip>{sortedCustomerRows.length} visibles</AppChip>
           </div>
 
           <div className="customers-list-actions">
-            <button type="button" className="customers-action-btn customers-action-btn-primary" disabled={isCreating} onClick={openCreateForm}>
-              <span className="customers-action-btn-icon" aria-hidden="true">
-                +
-              </span>
-              <span>Nuevo</span>
-            </button>
-            <button type="button" className="customers-action-btn customers-action-btn-danger" disabled={isCreating || !selectedCustomerId} onClick={openDeleteConfirm}>
+            <AppButton variant="primary" disabled={isCreating} onClick={openCreateForm} icon="+">
+              Nuevo
+            </AppButton>
+            <AppButton variant="danger" disabled={isCreating || !selectedCustomerId} onClick={openDeleteConfirm} icon="🗑">
               <span className="customers-action-btn-icon" aria-hidden="true">
                 🗑
               </span>
-              <span>Eliminar</span>
-            </button>
-            <button type="button" className="customers-action-btn customers-action-btn-ghost" onClick={openListingsModal}>
+              Eliminar
+            </AppButton>
+            <AppButton variant="ghost" onClick={openListingsModal} icon="📄">
               <span className="customers-action-btn-icon" aria-hidden="true">
                 📄
               </span>
-              <span>Listados</span>
-            </button>
+              Listados
+            </AppButton>
           </div>
 
           <div className="customers-list-filters">
@@ -1243,13 +1242,11 @@ export function CustomersPage() {
                     <h3>{isCreating ? 'Nuevo cliente' : 'Detalle de cliente'}</h3>
                   </div>
                   {!!selectedDetail && !isCreating && (
-                    <span
-                      className={`surface-chip customers-status-chip ${selectedDetail.activo ? 'is-active' : 'is-inactive'}`}
-                    >
+                    <AppChip tone={selectedDetail.activo ? 'success' : 'danger'} active={selectedDetail.activo}>
                       {saving ? 'Guardando...' : statusLabel(selectedDetail.activo)}
-                    </span>
+                    </AppChip>
                   )}
-                  {isCreating && <span className="surface-chip">Alta activa</span>}
+                  {isCreating && <AppChip tone="success" active>Alta activa</AppChip>}
                 </div>
 
                 {formError && (
@@ -1590,12 +1587,12 @@ export function CustomersPage() {
 
                             {isCreating && (
                               <div className="customers-detail-actions">
-                                <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={saving}>
+                                <AppButton type="submit" variant="primary" disabled={saving}>
                                   Guardar
-                                </button>
-                                <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={saving} onClick={closeEditor}>
+                                </AppButton>
+                                <AppButton type="button" variant="secondary" disabled={saving} onClick={closeEditor}>
                                   Cancelar
-                                </button>
+                                </AppButton>
                               </div>
                             )}
                           </div>
@@ -1779,7 +1776,7 @@ export function CustomersPage() {
                       <div>
                         <h3>Contactos</h3>
                       </div>
-                      <span className="surface-chip">{contactsQuery.data.items.length} contactos</span>
+                      <AppChip>{contactsQuery.data.items.length} contactos</AppChip>
                     </div>
                     <QueryState
                       loading={contactsQuery.loading}
@@ -1840,10 +1837,14 @@ export function CustomersPage() {
                 <p>Describe el listado que necesitas y generaremos la consulta automáticamente.</p>
               </div>
               <div className="customers-listings-head-actions">
-                <span className="surface-chip customers-status-chip customers-listings-chatgpt-chip is-active">
-                  <ListingIcon tone="chatgpt" className="customers-listings-chatgpt-icon" />
+                <AppChip
+                  tone="success"
+                  active
+                  className="customers-listings-chatgpt-chip"
+                  icon={<ListingIcon tone="chatgpt" className="customers-listings-chatgpt-icon" />}
+                >
                   ChatGPT
-                </span>
+                </AppChip>
                 <button
                   type="button"
                   className="customers-listings-close"
@@ -1900,19 +1901,13 @@ export function CustomersPage() {
                     <strong>{listingResult?.title || 'Listado de clientes'}</strong>
                     <span>{listingResult?.source || 'Vista previa del listado'}</span>
                   </div>
-                  <span className={`surface-chip customers-status-chip ${listingResult ? 'is-active' : 'is-inactive'}`}>
-                    {listingResult ? (
-                      <>
-                        <ListingIcon tone="check" className="customers-listings-status-icon" />
-                        Listo
-                      </>
-                    ) : (
-                      <>
-                        <ListingIcon tone="info" className="customers-listings-status-icon" />
-                        Pendiente
-                      </>
-                    )}
-                  </span>
+                  <AppChip
+                    tone={listingResult ? 'success' : 'danger'}
+                    active={Boolean(listingResult)}
+                    icon={listingResult ? <ListingIcon tone="check" className="customers-listings-status-icon" /> : <ListingIcon tone="info" className="customers-listings-status-icon" />}
+                  >
+                    {listingResult ? 'Listo' : 'Pendiente'}
+                  </AppChip>
                 </div>
 
                 {listingResult?.rows.length ? (
@@ -1961,20 +1956,20 @@ export function CustomersPage() {
 
               <div className="customers-listings-footer-actions">
                 <div className="customers-detail-actions customers-modal-actions customers-listings-actions">
-                  <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={listingSubmitting}>
+                  <AppButton type="submit" variant="primary" disabled={listingSubmitting}>
                     {listingSubmitting ? 'Preparando...' : 'Generar listado'}
-                  </button>
-                  <button
+                  </AppButton>
+                  <AppButton
                     type="button"
-                    className="customers-action-btn customers-action-btn-ghost"
+                    variant="ghost"
                     disabled={!listingResult?.rows.length || listingApplying}
                     onClick={handleApplyListingToMainList}
                   >
                     {listingApplying ? 'Pasando...' : 'Pasar al listado'}
-                  </button>
-                  <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={listingSubmitting} onClick={closeListingsModal}>
+                  </AppButton>
+                  <AppButton type="button" variant="secondary" disabled={listingSubmitting} onClick={closeListingsModal}>
                     Cancelar
-                  </button>
+                  </AppButton>
                 </div>
               </div>
             </form>
@@ -1995,7 +1990,7 @@ export function CustomersPage() {
                 <h3 id="customers-delete-modal-title">Eliminar cliente</h3>
                 <p>Confirma si quieres borrar este registro de la base de datos.</p>
               </div>
-              <span className="surface-chip customers-status-chip is-inactive">Confirmación</span>
+              <AppChip tone="danger" active>Confirmación</AppChip>
             </div>
 
             <div className="customers-delete-summary">
@@ -2016,12 +2011,12 @@ export function CustomersPage() {
             )}
 
             <div className="customers-detail-actions customers-modal-actions customers-delete-actions">
-              <button type="button" className="customers-action-btn customers-action-btn-danger" disabled={deleting} onClick={handleDeleteConfirm}>
+              <AppButton type="button" variant="danger" disabled={deleting} onClick={handleDeleteConfirm}>
                 {deleting ? 'Eliminando...' : 'Eliminar'}
-              </button>
-              <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={deleting} onClick={closeDeleteConfirm}>
+              </AppButton>
+              <AppButton type="button" variant="secondary" disabled={deleting} onClick={closeDeleteConfirm}>
                 Cancelar
-              </button>
+              </AppButton>
             </div>
           </div>
         </div>
@@ -2040,7 +2035,7 @@ export function CustomersPage() {
                 <h3 id="customers-create-modal-title">Nuevo cliente</h3>
                 <p>Introduce los datos del cliente y guarda para crear el registro en la base de datos.</p>
               </div>
-              <span className="surface-chip">Alta activa</span>
+              <AppChip tone="success" active>Alta activa</AppChip>
             </div>
 
             <form className="customers-modal-body" onSubmit={handleSubmit}>
@@ -2050,7 +2045,7 @@ export function CustomersPage() {
                     <div>
                       <h3>Detalle de cliente</h3>
                     </div>
-                    <span className="surface-chip customers-status-chip is-active">Activo</span>
+                    <AppChip tone="success" active>Activo</AppChip>
                   </div>
 
                   {formError && (
@@ -2217,12 +2212,12 @@ export function CustomersPage() {
                     </div>
 
                     <div className="customers-detail-actions customers-modal-actions">
-                      <button type="submit" className="customers-action-btn customers-action-btn-primary" disabled={saving}>
+                      <AppButton type="submit" variant="primary" disabled={saving}>
                         Guardar
-                      </button>
-                      <button type="button" className="customers-action-btn customers-action-btn-outline" disabled={saving} onClick={closeEditor}>
+                      </AppButton>
+                      <AppButton type="button" variant="secondary" disabled={saving} onClick={closeEditor}>
                         Cancelar
-                      </button>
+                      </AppButton>
                     </div>
                   </div>
                 </section>
