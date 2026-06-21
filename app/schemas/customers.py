@@ -101,12 +101,17 @@ class CustomerListingPdfExportRequest(CustomerListingResponse):
     pass
 
 
+class CustomerListingXlsxExportRequest(CustomerListingResponse):
+    pass
+
+
 __all__ = [
     "AddressOption",
     "CustomerAddressCatalogsPayload",
     "CustomerListingRequest",
     "CustomerListingResponse",
     "CustomerListingPdfExportRequest",
+    "CustomerListingXlsxExportRequest",
     "CustomerBase",
     "CustomerCreate",
     "CustomerDetail",

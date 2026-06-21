@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 from sqlmodel import SQLModel, Session, create_engine
 
 import app.services.customer_report_service as customer_report_service_module
@@ -106,3 +107,28 @@ def test_customer_listings_pdf_export_returns_pdf_file(api_client: TestClient) -
     assert pdf_response.headers["content-type"].startswith("application/pdf")
     assert pdf_response.content.startswith(b"%PDF")
     assert len(pdf_response.content) > 100
+
+
+def test_customer_listings_xlsx_export_returns_workbook(api_client: TestClient) -> None:
+    assert TEST_ENGINE is not None
+    with Session(TEST_ENGINE) as session:
+        _seed_customer_data(session)
+
+    listing_response = api_client.post("/customers/listings", json={"prompt": "clientes activos"})
+    assert listing_response.status_code == 200
+    listing_payload = listing_response.json()
+
+    xlsx_response = api_client.post("/customers/listings/xlsx", json=listing_payload)
+    assert xlsx_response.status_code == 200
+    assert xlsx_response.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert xlsx_response.content[:2] == b"PK"
+
+    workbook_path = Path(TEST_ENGINE.url.database).with_name("listing-export.xlsx")
+    workbook_path.write_bytes(xlsx_response.content)
+    workbook = load_workbook(workbook_path)
+    sheet = workbook.active
+    assert sheet["A1"].value == listing_payload["title"]
+    assert sheet["A2"].value == "Cod."
+    assert sheet["B3"].value == "Cliente Uno"

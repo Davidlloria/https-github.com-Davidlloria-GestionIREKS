@@ -18,6 +18,7 @@ from app.schemas.customers import (
     CustomerListingRequest,
     CustomerListingPdfExportRequest,
     CustomerListingResponse,
+    CustomerListingXlsxExportRequest,
     CustomerListResponse,
     CustomerUpdate,
 )
@@ -88,6 +89,23 @@ def export_listing_pdf(
     return FileResponse(
         path,
         media_type="application/pdf",
+        filename=Path(path).name,
+        headers={"Content-Disposition": f'attachment; filename="{Path(path).name}"'},
+    )
+
+
+@router.post(
+    "/listings/xlsx",
+    responses={200: {"content": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}}}},
+)
+def export_listing_xlsx(
+    payload: CustomerListingXlsxExportRequest,
+) -> FileResponse:
+    path = report_export_service.default_path(payload.title or "Listado de clientes", "xlsx")
+    report_export_service.export_excel(path, payload.title or "Listado de clientes", payload.headers, payload.rows)
+    return FileResponse(
+        path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         filename=Path(path).name,
         headers={"Content-Disposition": f'attachment; filename="{Path(path).name}"'},
     )

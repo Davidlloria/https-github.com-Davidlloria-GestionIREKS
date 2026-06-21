@@ -3,6 +3,7 @@ import {
   createCustomer,
   deleteCustomer,
   exportCustomerListingPdf,
+  exportCustomerListingXlsx,
   generateCustomerListing,
   getCustomerAddressCatalogs,
   getCustomerDetail,
@@ -871,8 +872,13 @@ export function CustomersPage() {
     if (!listingResult?.headers.length || !listingResult.rows.length) {
       return
     }
-    const csv = rowsToCsv(listingResult.headers, listingResult.rows)
-    downloadListingFile('listado-clientes.xls', csv, 'application/vnd.ms-excel;charset=utf-8')
+    exportCustomerListingXlsx(listingResult)
+      .then((blob) => {
+        downloadListingBlob('listado-clientes.xlsx', blob)
+      })
+      .catch((error) => {
+        setListingError(getErrorMessage(error))
+      })
   }
 
   const handleListingPdfExport = () => {

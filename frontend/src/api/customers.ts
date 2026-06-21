@@ -68,3 +68,7 @@ export function generateCustomerListing(prompt: string) {
 export function exportCustomerListingPdf(payload: CustomerListingResponse) {
   return apiPostBlob('/customers/listings/pdf', payload)
 }
+
+export function exportCustomerListingXlsx(payload: CustomerListingResponse) {
+  return apiPostBlob('/customers/listings/xlsx', payload)
+}
