@@ -55,6 +55,25 @@ function buildLookup(options: Array<{ id: string; name: string }>) {
   return new Map(options.map((item) => [item.id, item.name]))
 }
 
+function buildUniqueCatalogOptions(
+  rows: IngredientIreksRead[],
+  key: 'fabricante_id' | 'articulo_familia_id' | 'articulo_subfamilia_id',
+  lookup: Map<string, string>,
+) {
+  const seen = new Set<string>()
+
+  return rows.reduce<Array<{ id: string; name: string }>>((options, row) => {
+    const id = row[key]
+    if (!id || seen.has(id)) {
+      return options
+    }
+
+    seen.add(id)
+    options.push({ id, name: lookup.get(id) || id })
+    return options
+  }, [])
+}
+
 function ReadonlyField({
   label,
   value,
@@ -162,9 +181,34 @@ export function IreksProductsPage() {
     })
   }, [rows, selectedFabricanteId, selectedFamiliaId, selectedSubfamiliaId])
 
-  const fabricanteOptions = useMemo(() => catalogs.fabricantes, [catalogs.fabricantes])
-  const familiaOptions = useMemo(() => catalogs.familias, [catalogs.familias])
-  const subfamiliaOptions = useMemo(() => catalogs.subfamilias, [catalogs.subfamilias])
+  const fabricanteLookup = useMemo(() => buildLookup(catalogs.fabricantes), [catalogs.fabricantes])
+  const familiaLookup = useMemo(() => buildLookup(catalogs.familias), [catalogs.familias])
+  const subfamiliaLookup = useMemo(() => buildLookup(catalogs.subfamilias), [catalogs.subfamilias])
+  const distribuidorLookup = useMemo(() => buildLookup(catalogs.distribuidores), [catalogs.distribuidores])
+  const envaseLookup = useMemo(() => buildLookup(catalogs.envases), [catalogs.envases])
+
+  const fabricanteOptions = useMemo(() => buildUniqueCatalogOptions(rows, 'fabricante_id', fabricanteLookup), [rows, fabricanteLookup])
+  const familyBaseRows = useMemo(
+    () => rows.filter((row) => !selectedFabricanteId || row.fabricante_id === selectedFabricanteId),
+    [rows, selectedFabricanteId],
+  )
+  const familiaOptions = useMemo(
+    () => buildUniqueCatalogOptions(familyBaseRows, 'articulo_familia_id', familiaLookup),
+    [familyBaseRows, familiaLookup],
+  )
+  const subfamilyBaseRows = useMemo(
+    () =>
+      rows.filter(
+        (row) =>
+          (!selectedFabricanteId || row.fabricante_id === selectedFabricanteId) &&
+          (!selectedFamiliaId || row.articulo_familia_id === selectedFamiliaId),
+      ),
+    [rows, selectedFabricanteId, selectedFamiliaId],
+  )
+  const subfamiliaOptions = useMemo(
+    () => buildUniqueCatalogOptions(subfamilyBaseRows, 'articulo_subfamilia_id', subfamiliaLookup),
+    [subfamilyBaseRows, subfamiliaLookup],
+  )
 
   const sortedRows = useMemo(() => {
     const sorted = [...filteredRows]
@@ -241,12 +285,6 @@ export function IreksProductsPage() {
     null as IngredientIreksRead | null,
     [selectedRowId],
   )
-
-  const fabricanteLookup = useMemo(() => buildLookup(catalogs.fabricantes), [catalogs.fabricantes])
-  const familiaLookup = useMemo(() => buildLookup(catalogs.familias), [catalogs.familias])
-  const subfamiliaLookup = useMemo(() => buildLookup(catalogs.subfamilias), [catalogs.subfamilias])
-  const distribuidorLookup = useMemo(() => buildLookup(catalogs.distribuidores), [catalogs.distribuidores])
-  const envaseLookup = useMemo(() => buildLookup(catalogs.envases), [catalogs.envases])
 
   const formatCatalog = (value: string, lookup: Map<string, string>) => lookup.get(value) || 'Pendiente de catálogo'
 
