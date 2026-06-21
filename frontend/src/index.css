@@ -1910,6 +1910,24 @@ button {
   padding-inline: 10px;
 }
 
+.ireks-products-clear-filters,
+.ireks-products-clear-filters:disabled {
+  border-color: #ef5d5d;
+  background: linear-gradient(180deg, #f26a6a, #e94b4b);
+  color: #fff;
+}
+
+.ireks-products-clear-filters:not(:disabled):hover,
+.ireks-products-clear-filters:not(:disabled):focus-visible {
+  border-color: #dd4d4d;
+  background: linear-gradient(180deg, #ef5d5d, #dc3f3f);
+  color: #fff;
+}
+
+.ireks-products-clear-filters .app-button__icon {
+  color: currentColor;
+}
+
 .ireks-products-action-ribbon {
   display: flex;
   flex-wrap: wrap;
