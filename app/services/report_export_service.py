@@ -9,7 +9,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, PatternFill
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core.config import DATA_DIR
@@ -50,9 +50,14 @@ class ReportExportService:
         out.parent.mkdir(parents=True, exist_ok=True)
         doc = SimpleDocTemplate(str(out), pagesize=landscape(A4), leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24)
         styles = getSampleStyleSheet()
-        story = [Paragraph(str(title or "Listado de clientes"), styles["Title"]), Spacer(1, 10)]
+        title_style = ParagraphStyle(
+            "ListingTitleLeft",
+            parent=styles["Title"],
+            alignment=0,
+        )
+        story = [Paragraph(str(title or "Listado de clientes"), title_style), Spacer(1, 10)]
         table_data = [headers] + [[str(value) for value in row] for row in rows]
-        table = Table(table_data, repeatRows=1)
+        table = Table(table_data, repeatRows=1, hAlign="LEFT")
         table.setStyle(
             TableStyle(
                 [
