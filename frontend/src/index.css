@@ -4797,30 +4797,6 @@ tbody tr:hover {
   gap: 8px;
 }
 
-.customers-listings-export-btn {
-  min-height: 34px;
-  border: 1px solid #cbdaf7;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #ffffff, #f7faff);
-  color: #3957b7;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.customers-listings-export-btn:hover:not(:disabled),
-.customers-listings-export-btn:focus-visible:not(:disabled) {
-  outline: none;
-  border-color: #6f8fe6;
-  background: linear-gradient(180deg, #ffffff, #f3f7ff);
-  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.10);
-  transform: translateY(-1px);
-}
-
-.customers-listings-export-btn:disabled {
-  opacity: 0.55;
-  color: #94a3b8;
-}
-
 .customers-listings-result {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -5042,6 +5018,10 @@ tbody tr:hover {
   min-height: 30px;
   padding-inline: 10px;
   font-size: 11px;
+}
+
+.app-button--wide {
+  min-width: 148px;
 }
 
 .app-button--lg,
@@ -5294,8 +5274,8 @@ tbody tr:hover {
 
 .customers-listings-footer-actions .customers-action-btn:not(:disabled):hover,
 .customers-listings-footer-actions .customers-action-btn:not(:disabled):focus-visible,
-.customers-listings-export-actions .customers-listings-export-btn:not(:disabled):hover,
-.customers-listings-export-actions .customers-listings-export-btn:not(:disabled):focus-visible {
+.customers-listings-export-actions .app-button:not(:disabled):hover,
+.customers-listings-export-actions .app-button:not(:disabled):focus-visible {
   position: relative;
   z-index: 1;
 }

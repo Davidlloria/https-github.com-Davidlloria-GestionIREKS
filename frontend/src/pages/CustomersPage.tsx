@@ -1846,16 +1846,16 @@ export function CustomersPage() {
                   <span>Exportar listado</span>
                 </div>
                 <div className="customers-listings-export-actions customers-listings-export-actions-ribbon">
-                  <AppButton type="button" variant="secondary" className="customers-listings-export-btn" onClick={handleListingPrint} disabled={!listingResult?.rows.length} icon={<Printer size={17} strokeWidth={2.3} />}>
+                  <AppButton type="button" variant="secondary" className="app-button--wide" onClick={handleListingPrint} disabled={!listingResult?.rows.length} icon={<Printer size={17} strokeWidth={2.3} />}>
                     Imprimir
                   </AppButton>
-                  <AppButton type="button" variant="secondary" className="customers-listings-export-btn" onClick={handleListingPdfExport} disabled={!listingResult?.rows.length} icon={<FileDown size={17} strokeWidth={2.3} />}>
+                  <AppButton type="button" variant="secondary" className="app-button--wide" onClick={handleListingPdfExport} disabled={!listingResult?.rows.length} icon={<FileDown size={17} strokeWidth={2.3} />}>
                     PDF
                   </AppButton>
-                  <AppButton type="button" variant="secondary" className="customers-listings-export-btn" onClick={handleListingExcelExport} disabled={!listingResult?.rows.length} icon={<FileSpreadsheet size={17} strokeWidth={2.3} />}>
+                  <AppButton type="button" variant="secondary" className="app-button--wide" onClick={handleListingExcelExport} disabled={!listingResult?.rows.length} icon={<FileSpreadsheet size={17} strokeWidth={2.3} />}>
                     Excel
                   </AppButton>
-                  <AppButton type="button" variant="secondary" className="customers-listings-export-btn" onClick={handleListingCsvExport} disabled={!listingResult?.rows.length} icon={<FileText size={17} strokeWidth={2.3} />}>
+                  <AppButton type="button" variant="secondary" className="app-button--wide" onClick={handleListingCsvExport} disabled={!listingResult?.rows.length} icon={<FileText size={17} strokeWidth={2.3} />}>
                     CSV
                   </AppButton>
                 </div>
