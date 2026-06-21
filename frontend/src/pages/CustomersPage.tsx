@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { ArrowRight, FileDown, FileSpreadsheet, FileText, List, Plus, Printer, Trash2, X } from 'lucide-react'
+import { ArrowRight, FileDown, FileSpreadsheet, FileText, List, Plus, Printer, Save, Trash2, X } from 'lucide-react'
 import {
   createCustomer,
   deleteCustomer,
@@ -1580,10 +1580,10 @@ export function CustomersPage() {
 
                             {isCreating && (
                               <div className="customers-detail-actions">
-                                <AppButton type="submit" variant="primary" disabled={saving}>
+                                <AppButton type="submit" variant="primary" disabled={saving} icon={<Save size={18} strokeWidth={2.4} />}>
                                   Guardar
                                 </AppButton>
-                                <AppButton type="button" variant="secondary" disabled={saving} onClick={closeEditor}>
+                                <AppButton type="button" variant="secondary" disabled={saving} onClick={closeEditor} icon={<X size={18} strokeWidth={2.4} />}>
                                   Cancelar
                                 </AppButton>
                               </div>
@@ -1976,10 +1976,10 @@ export function CustomersPage() {
             )}
 
             <div className="customers-detail-actions customers-modal-actions customers-delete-actions">
-              <AppButton type="button" variant="danger" disabled={deleting} onClick={handleDeleteConfirm}>
+              <AppButton type="button" variant="danger" disabled={deleting} onClick={handleDeleteConfirm} icon={<Trash2 size={18} strokeWidth={2.4} />}>
                 {deleting ? 'Eliminando...' : 'Eliminar'}
               </AppButton>
-              <AppButton type="button" variant="secondary" disabled={deleting} onClick={closeDeleteConfirm}>
+              <AppButton type="button" variant="secondary" disabled={deleting} onClick={closeDeleteConfirm} icon={<X size={18} strokeWidth={2.4} />}>
                 Cancelar
               </AppButton>
             </div>
@@ -2177,10 +2177,10 @@ export function CustomersPage() {
                     </div>
 
                     <div className="customers-detail-actions customers-modal-actions">
-                      <AppButton type="submit" variant="primary" disabled={saving}>
+                      <AppButton type="submit" variant="primary" disabled={saving} icon={<Save size={18} strokeWidth={2.4} />}>
                         Guardar
                       </AppButton>
-                      <AppButton type="button" variant="secondary" disabled={saving} onClick={closeEditor}>
+                      <AppButton type="button" variant="secondary" disabled={saving} onClick={closeEditor} icon={<X size={18} strokeWidth={2.4} />}>
                         Cancelar
                       </AppButton>
                     </div>
