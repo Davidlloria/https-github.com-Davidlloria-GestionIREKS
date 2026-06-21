@@ -5200,7 +5200,7 @@ tbody tr:hover {
 
 .app-section-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   min-width: 0;
@@ -5226,6 +5226,7 @@ tbody tr:hover {
 
 .app-section-header__right {
   flex: 0 0 auto;
+  padding-top: 1px;
 }
 
 .app-data-table {
