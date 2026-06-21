@@ -1,7 +1,9 @@
 ﻿import { useMemo, useState } from 'react'
 import { getIreksIngredientDetail, listIreksIngredients } from '../api/ingredients'
+import { AppButton } from '../components/AppButton'
 import { AppSectionHeader } from '../components/AppSectionHeader'
 import { QueryState } from '../components/QueryState'
+import { List, Plus, Trash2 } from 'lucide-react'
 import { useAsyncResource } from '../features/useAsyncResource'
 import type { IngredientIreksListPayload, IngredientIreksRead } from '../types/api'
 
@@ -258,6 +260,18 @@ export function IreksProductsPage() {
             rightSlot={<span className="surface-chip">{query.data.total} visibles</span>}
             className="ireks-products-page__header"
           />
+
+          <div className="ireks-products-action-ribbon" aria-label="Acciones de productos IREKS">
+            <AppButton variant="primary" size="sm" disabled icon={<Plus size={16} strokeWidth={2.5} />}>
+              Nuevo
+            </AppButton>
+            <AppButton variant="danger" size="sm" disabled icon={<Trash2 size={16} strokeWidth={2.5} />}>
+              Eliminar
+            </AppButton>
+            <AppButton variant="ghost" size="sm" disabled icon={<List size={16} strokeWidth={2.5} />}>
+              Listados
+            </AppButton>
+          </div>
 
           <div className="ireks-products-filters">
             <label className="ireks-filter">

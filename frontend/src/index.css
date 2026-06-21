@@ -1896,6 +1896,14 @@ button {
   margin-top: -3px;
 }
 
+.ireks-products-action-ribbon {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 2px 0 0;
+}
+
 .ireks-products-page .ireks-products-filters {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
