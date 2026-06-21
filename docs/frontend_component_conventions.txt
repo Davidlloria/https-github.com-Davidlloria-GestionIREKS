@@ -1,0 +1,67 @@
+GestionIREKS - Convencion de componentes frontend
+
+Objetivo
+- Mantener nombres consistentes al pedir cambios.
+- Evitar ambiguedades entre pantallas y componentes compartidos.
+- Reutilizar el mismo componente base siempre que sea posible.
+
+Regla general de nombres
+- `App*` para componentes compartidos de uso general.
+- `Customers*` para piezas especificas de la pantalla de clientes.
+- `Ireks*` para productos IREKS.
+- `Orders*`, `Ingredients*`, `Warehouse*`, etc. para modulos concretos.
+
+Como pedir cambios
+- Usar siempre el nombre del componente o modulo exacto.
+- Indicar una sola accion principal.
+- Si el cambio debe afectar solo una pantalla, decirlo explicitamente.
+- Si el cambio debe afectar a toda la app, pedirlo sobre el componente base `App*`.
+
+Formato recomendado
+- `<Componente>: <cambio>`
+
+Ejemplos
+- `AppButton: unificar hover y colores en toda la app`
+- `AppListingGrid: aplicar el patron visual de Clientes a Productos IREKS`
+- `AppSectionHeader: alinear el chip con la etiqueta`
+- `CustomersPage: reducir el alto del panel lateral`
+- `IreksProductsPage: usar el listado compartido sin overrides`
+
+Componentes compartidos actuales
+- `AppButton`
+- `AppChip`
+- `AppCard`
+- `AppDataTable`
+- `AppListingGrid`
+- `AppSectionHeader`
+- `AppShell`
+- `AppStateBox`
+- `BinaryToggleSelect`
+- `QueryState`
+- `SidebarNav`
+- `StatCard`
+
+Criterio practico
+- Si se busca una solucion reutilizable, tocar primero `App*`.
+- Si el cambio es solo visual en una pantalla, tocar el componente de esa pantalla.
+- Si hay duda, preferir el componente compartido y evitar duplicar estilos.
+
+Reglas para pedir cambios visuales
+- Para copiar dimensiones, indicar siempre: altura, padding, radio y tamaño de fuente si importa.
+- Para copiar un patron exacto, usar la frase: `usar exactamente el mismo aspecto que`.
+- Para limitar un cambio a una pantalla concreta, nombrar la pantalla al final.
+- Para botones, pedir primero el componente base y luego el alcance.
+- Para tablas o listados, pedir siempre si se quiere tabla HTML o listado tipo Clientes.
+- Si el cambio afecta a multiples pantallas, decirlo explicitamente.
+
+Plantillas utiles
+- `AppButton: en IreksProductsPage usar exactamente las mismas dimensiones que en CustomersPage`
+- `AppListingGrid: aplicar el patron visual de Clientes en IreksProductsPage`
+- `AppSectionHeader: alinear chip y etiqueta como en CustomersPage`
+- `BinaryToggleSelect: usar la misma altura que los toggles de Clientes`
+- `AppCard: unificar padding y borde en CustomersPage e IreksProductsPage`
+
+Notas
+- `AppListingGrid` se usa para pantallas que necesitan el patron visual de listado tipo Clientes.
+- `AppDataTable` se mantiene para tablas donde el formato de tabla HTML siga siendo suficiente.
+- Los cambios de estilo compartido pueden afectar a varias pantallas, asi que deben pedirse con claridad.

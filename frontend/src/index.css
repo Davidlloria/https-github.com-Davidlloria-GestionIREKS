@@ -2006,17 +2006,33 @@ button {
   max-width: none;
 }
 
-.ireks-products-page .ireks-products-status-row {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .ireks-products-page .ireks-products-data-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px 12px;
+}
+
+.ireks-products-page .ireks-products-toggle-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-top: 4px;
+}
+
+.ireks-products-page .ireks-products-toggle-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ireks-products-page .ireks-products-toggle-field span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .ireks-products-page .ireks-products-tab-empty {
@@ -2036,6 +2052,35 @@ button {
 
 .ireks-products-page .ireks-products-detail-scroll {
   scrollbar-gutter: stable;
+}
+
+.ireks-products-page .ireks-export-button {
+  background: linear-gradient(180deg, #fff8eb 0%, #fff1d7 100%);
+  border-color: #f1c26b;
+  color: #b76a00;
+}
+
+.ireks-products-page .ireks-export-button:not(:disabled):hover,
+.ireks-products-page .ireks-export-button:not(:disabled):focus-visible {
+  background: linear-gradient(180deg, #fff3d6 0%, #ffe6b3 100%);
+  border-color: #e5b44f;
+  color: #9a5900;
+}
+
+.ireks-products-page .ireks-export-button .app-button__icon {
+  color: #b76a00;
+}
+
+.ireks-products-page .ireks-field-inline-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  min-width: 0;
+}
+
+.ireks-products-page .ireks-inline-id-button {
+  align-self: end;
 }
 
 .ireks-products-page .ireks-tabs {

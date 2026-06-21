@@ -4,7 +4,8 @@ import { AppButton } from '../components/AppButton'
 import { AppListingGrid } from '../components/AppListingGrid'
 import { AppSectionHeader } from '../components/AppSectionHeader'
 import { QueryState } from '../components/QueryState'
-import { List, Plus, Trash2, X } from 'lucide-react'
+import { YesNoSliderToggle } from '../components/ui/YesNoSliderToggle'
+import { FileDown, List, Plus, Trash2, X } from 'lucide-react'
 import { useAsyncResource } from '../features/useAsyncResource'
 import type { IngredientIreksListPayload, IngredientIreksRead } from '../types/api'
 
@@ -97,6 +98,47 @@ function ReadonlyField({
   )
 }
 
+function ProductStatusFields({ detail }: { detail: IngredientIreksRead }) {
+  const [statusActivo, setStatusActivo] = useState(detail.articulo_status_activo)
+  const [statusEnLista, setStatusEnLista] = useState(detail.articulo_status_en_lista)
+  const [categoriaEsHarina, setCategoriaEsHarina] = useState((detail.categoria || '').toUpperCase() !== 'LIQUIDO')
+
+  return (
+    <div className="ireks-products-toggle-grid">
+      <label className="ireks-products-toggle-field">
+        <span>Status activo</span>
+        <YesNoSliderToggle
+          value={statusActivo}
+          onChange={setStatusActivo}
+          yesLabel="SI"
+          noLabel="NO"
+          ariaLabel="Status activo del producto"
+        />
+      </label>
+      <label className="ireks-products-toggle-field">
+        <span>Status en lista</span>
+        <YesNoSliderToggle
+          value={statusEnLista}
+          onChange={setStatusEnLista}
+          yesLabel="SI"
+          noLabel="NO"
+          ariaLabel="Status en lista del producto"
+        />
+      </label>
+      <label className="ireks-products-toggle-field">
+        <span>Categoría</span>
+        <YesNoSliderToggle
+          value={categoriaEsHarina}
+          onChange={setCategoriaEsHarina}
+          yesLabel="HARINA"
+          noLabel="LIQUIDO"
+          ariaLabel="Categoría del producto"
+        />
+      </label>
+    </div>
+  )
+}
+
 function TabButton({
   tab,
   active,
@@ -137,7 +179,6 @@ export function IreksProductsPage() {
   const [search, setSearch] = useState('')
   const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null)
   const [checkedCandidateId, setCheckedCandidateId] = useState<number | null>(null)
-  const [refreshTick, setRefreshTick] = useState(0)
   const [activeTab, setActiveTab] = useState<IreksTab>('Datos')
   const [sortKey, setSortKey] = useState<IreksSortKey>('ref')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -145,7 +186,7 @@ export function IreksProductsPage() {
   const [selectedFamiliaId, setSelectedFamiliaId] = useState('')
   const [selectedSubfamiliaId, setSelectedSubfamiliaId] = useState('')
 
-  const query = useAsyncResource<LoadedIreksData>(() => loadAllIreksIngredients(search), EMPTY_DATA, [search, refreshTick])
+  const query = useAsyncResource<LoadedIreksData>(() => loadAllIreksIngredients(search), EMPTY_DATA, [search])
   const rows = query.data.items
   const catalogs = query.data.catalogs
 
@@ -315,6 +356,9 @@ export function IreksProductsPage() {
             <AppButton variant="ghost" disabled icon={<List size={18} strokeWidth={2.4} />}>
               Listados
             </AppButton>
+            <AppButton variant="secondary" disabled className="ireks-export-button" icon={<FileDown size={18} strokeWidth={2.4} />}>
+              Exportar
+            </AppButton>
           </div>
 
           <div className="ireks-products-filters">
@@ -472,36 +516,9 @@ export function IreksProductsPage() {
 
         <div className="ireks-products-right-stack">
           <section className="panel-section ireks-products-detail-panel">
-          <div className="ireks-products-detail-toolbar">
-              <AppButton variant="primary" disabled>
-                Nuevo
-              </AppButton>
-              <AppButton variant="danger" disabled>
-                Eliminar
-              </AppButton>
-              <AppButton variant="secondary" disabled>
-                ID
-              </AppButton>
-              <AppButton variant="secondary" disabled>
-                Importar Excel/CSV
-              </AppButton>
-              <AppButton variant="ghost" disabled>
-                Listados
-              </AppButton>
-              <AppButton
-                variant="ghost"
-                onClick={() => {
-                  setRefreshTick((prev) => prev + 1)
-                }}
-              >
-                Refrescar
-              </AppButton>
-            </div>
-
             <div className="section-heading section-heading-compact">
               <div>
                 <h3>Detalle del producto</h3>
-                <p>Ficha read-only del producto IREKS seleccionado.</p>
               </div>
             </div>
 
@@ -515,11 +532,16 @@ export function IreksProductsPage() {
 
               {!!detailQuery.data && (
                 <div className="ireks-products-detail-grid">
-                  <ReadonlyField
-                    label="Ref."
-                    value={detailQuery.data.articulo_referencia || detailQuery.data.articulo_id}
-                    className="ireks-field--compact ireks-field--ref"
-                  />
+                  <div className="ireks-field-inline-group">
+                    <ReadonlyField
+                      label="Ref."
+                      value={detailQuery.data.articulo_referencia || detailQuery.data.articulo_id}
+                      className="ireks-field--compact ireks-field--ref"
+                    />
+                    <AppButton variant="secondary" disabled className="ireks-inline-id-button">
+                      ID
+                    </AppButton>
+                  </div>
                   <ReadonlyField
                     label="Ref. corta"
                     value={detailQuery.data.articulo_referencia_corta}
@@ -537,15 +559,7 @@ export function IreksProductsPage() {
                     className="ireks-field--compact ireks-field--distributor-reference"
                   />
                   <ReadonlyField label="Descripción comercial" value={detailQuery.data.articulo_descripcion} />
-                  <div className="ireks-products-status-row">
-                    <span className="surface-chip">{detailQuery.data.articulo_status_activo ? 'Status activo' : 'Status inactivo'}</span>
-                  </div>
-                  <div className="ireks-products-status-row">
-                    <span className="surface-chip">{detailQuery.data.articulo_status_en_lista ? 'Status en lista' : 'Fuera de lista'}</span>
-                  </div>
-                  <div className="ireks-products-status-row">
-                    <span className="surface-chip">{formatText(detailQuery.data.categoria)}</span>
-                  </div>
+                  <ProductStatusFields key={selectedRowId ?? 'empty'} detail={detailQuery.data} />
                 </div>
               )}
             </div>
