@@ -677,7 +677,7 @@ class SalesPage(QWidget):
                 border-radius: 8px;
                 color: #FFFFFF;
                 padding: 0 6px;
-                font-size: 9px;
+                font-size: 11px;
                 font-weight: 600;
             }
             QToolButton:hover {
@@ -713,7 +713,7 @@ class SalesPage(QWidget):
                 border-radius: 8px;
                 color: #FFFFFF;
                 padding: 0 6px;
-                font-size: 9px;
+                font-size: 11px;
                 font-weight: 600;
             }
             QToolButton:hover {
@@ -731,13 +731,6 @@ class SalesPage(QWidget):
         )
         self.sales_total_chart_btn.clicked.connect(self._open_total_monthly_sales_dialog)
         layout.addLayout(filters_bottom)
-
-        chart_band = QHBoxLayout()
-        chart_band.setContentsMargins(0, 0, 0, 0)
-        chart_band.setSpacing(4)
-        chart_band.addWidget(self.sales_chart_btn)
-        chart_band.addWidget(self.sales_total_chart_btn)
-        chart_band.addStretch(1)
 
         self.group_header = QTableWidget(1, 12)
         self.group_header.setObjectName("salesGroupHeader")
@@ -771,10 +764,18 @@ class SalesPage(QWidget):
             """
         )
 
+        self.chart_actions_widget = QWidget()
+        chart_band = QHBoxLayout(self.chart_actions_widget)
+        chart_band.setContentsMargins(0, 0, 0, 0)
+        chart_band.setSpacing(4)
+        chart_band.addWidget(self.sales_chart_btn)
+        chart_band.addWidget(self.sales_total_chart_btn)
+        chart_band.addStretch(1)
+
         header_band = QHBoxLayout()
         header_band.setContentsMargins(0, 0, 0, 0)
-        header_band.setSpacing(6)
-        header_band.addLayout(chart_band)
+        header_band.setSpacing(0)
+        header_band.addWidget(self.chart_actions_widget)
         header_band.addWidget(self.group_header, 1)
         layout.addLayout(header_band)
 
@@ -1205,11 +1206,17 @@ class SalesPage(QWidget):
         }
         for col, width in widths.items():
             self.sales_table_igsa.setColumnWidth(col, width)
-            self.group_header_igsa.setColumnWidth(col, width)
+            if col in {0, 1}:
+                self.group_header_igsa.setColumnWidth(col, 0)
+            else:
+                self.group_header_igsa.setColumnWidth(col, width)
             self.totals_table_igsa.setColumnWidth(col, width)
 
     def _sync_aux_column_width_igsa(self, logical_index: int, _old_size: int, new_size: int) -> None:
-        self.group_header_igsa.setColumnWidth(logical_index, new_size)
+        if logical_index in {0, 1}:
+            self.group_header_igsa.setColumnWidth(logical_index, 0)
+        else:
+            self.group_header_igsa.setColumnWidth(logical_index, new_size)
         self.totals_table_igsa.setColumnWidth(logical_index, new_size)
 
     def _set_group_item_igsa(self, column: int, text: str, color: str, span: int = 1) -> None:
@@ -1229,6 +1236,8 @@ class SalesPage(QWidget):
             else:
                 label.setStyleSheet("background-color: #F3F6FA; border: 1px solid #000000; border-radius: 0; padding: 0;")
             self.group_header_igsa.setCellWidget(0, col, label)
+        self.group_header_igsa.setColumnWidth(0, 0)
+        self.group_header_igsa.setColumnWidth(1, 0)
         self._set_group_item_igsa(2, str(year - 1), "#3E5064", 3)
         self._set_group_item_igsa(5, str(year), "#0F766E", 3)
         self._set_group_item_igsa(8, "Diferencias", "#111827", 4)
@@ -1375,14 +1384,29 @@ class SalesPage(QWidget):
         }
         for col, width in widths.items():
             self.sales_table.setColumnWidth(col, width)
-            self.group_header.setColumnWidth(col, width)
+            if col in {0, 1}:
+                self.group_header.setColumnWidth(col, 0)
+            else:
+                self.group_header.setColumnWidth(col, width)
             self.totals_table.setColumnWidth(col, width)
+        self._sync_chart_actions_width()
 
     def _sync_aux_column_width(self, logical_index: int, _old_size: int, new_size: int) -> None:
         if not hasattr(self, "group_header") or not hasattr(self, "totals_table"):
             return
-        self.group_header.setColumnWidth(logical_index, new_size)
+        if logical_index in {0, 1}:
+            self.group_header.setColumnWidth(logical_index, 0)
+        else:
+            self.group_header.setColumnWidth(logical_index, new_size)
         self.totals_table.setColumnWidth(logical_index, new_size)
+        if logical_index in {0, 1}:
+            self._sync_chart_actions_width()
+
+    def _sync_chart_actions_width(self) -> None:
+        if not hasattr(self, "chart_actions_widget") or not hasattr(self, "sales_table"):
+            return
+        left_width = self.sales_table.columnWidth(0) + self.sales_table.columnWidth(1)
+        self.chart_actions_widget.setFixedWidth(left_width)
 
     def _make_band_label(
         self,
@@ -1420,6 +1444,8 @@ class SalesPage(QWidget):
             else:
                 label.setStyleSheet("background-color: #F3F6FA; border: 1px solid #000000; border-radius: 0; padding: 0;")
             self.group_header.setCellWidget(0, col, label)
+        self.group_header.setColumnWidth(0, 0)
+        self.group_header.setColumnWidth(1, 0)
         self._set_group_item(2, str(year - 1), "#3E5064", 3)
         self._set_group_item(5, str(year), "#0F766E", 3)
         self._set_group_item(8, "Diferencias", "#111827", 4)
