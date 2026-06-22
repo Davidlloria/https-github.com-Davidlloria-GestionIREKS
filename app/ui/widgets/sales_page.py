@@ -94,11 +94,13 @@ class MonthlySalesChartWidget(QWidget):
         self._points: list[SalesMonthlyComparisonPoint] = []
         self._hover_regions: list[dict[str, float | int | str]] = []
         self._active_bar_key: tuple[int, str] | None = None
+        self._tooltip_text = ""
+        self._tooltip_global_pos = None
         self._hover_y_margin = 5.0
         self._chart_mode = "bar"
-        self._hover_hide_timer = QTimer(self)
-        self._hover_hide_timer.setSingleShot(True)
-        self._hover_hide_timer.timeout.connect(self._clear_hover_tooltip)
+        self._hover_refresh_timer = QTimer(self)
+        self._hover_refresh_timer.setInterval(250)
+        self._hover_refresh_timer.timeout.connect(self._refresh_hover_tooltip)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -135,7 +137,9 @@ class MonthlySalesChartWidget(QWidget):
         self._points = list(points or [])
         self._hover_regions = []
         self._active_bar_key = None
-        self._hover_hide_timer.stop()
+        self._tooltip_text = ""
+        self._tooltip_global_pos = None
+        self._hover_refresh_timer.stop()
         if self._plot is None:
             return
         self._plot.clear()
@@ -371,8 +375,6 @@ class MonthlySalesChartWidget(QWidget):
             if bar is not None:
                 self._show_bar_tooltip(bar, pos)
                 return
-            if self._active_bar_key is not None:
-                return
         self._clear_hover_tooltip()
 
     def _find_bar_at_pos(self, x_pos: float, y_pos: float, key: tuple[int, str] | None = None, expanded: bool = False):
@@ -399,13 +401,28 @@ class MonthlySalesChartWidget(QWidget):
         prev_value = value if series == "prev" else self._value_for_month(month, "prev")
         curr_value = value if series == "curr" else self._value_for_month(month, "curr")
         self._active_bar_key = (month, series)
-        self._hover_hide_timer.stop()
+        self._tooltip_text = self._build_tooltip(month, prev_value, curr_value)
         scene_pos = self._plot.mapFromScene(pos)
         if hasattr(scene_pos, "toPoint"):
             scene_pos = scene_pos.toPoint()
+        self._tooltip_global_pos = self._plot.mapToGlobal(scene_pos)
+        self._hover_refresh_timer.start()
         QToolTip.showText(
-            self._plot.mapToGlobal(scene_pos),
-            self._build_tooltip(month, prev_value, curr_value),
+            self._tooltip_global_pos,
+            self._tooltip_text,
+            self._plot,
+            self._plot.rect(),
+            10000,
+        )
+
+    def _refresh_hover_tooltip(self) -> None:
+        if self._plot is None or self._active_bar_key is None:
+            return
+        if not self._tooltip_text or self._tooltip_global_pos is None:
+            return
+        QToolTip.showText(
+            self._tooltip_global_pos,
+            self._tooltip_text,
             self._plot,
             self._plot.rect(),
             10000,
@@ -413,7 +430,9 @@ class MonthlySalesChartWidget(QWidget):
 
     def _clear_hover_tooltip(self) -> None:
         self._active_bar_key = None
-        self._hover_hide_timer.stop()
+        self._tooltip_text = ""
+        self._tooltip_global_pos = None
+        self._hover_refresh_timer.stop()
         QToolTip.hideText()
 
     def set_chart_mode(self, chart_mode: str) -> None:
