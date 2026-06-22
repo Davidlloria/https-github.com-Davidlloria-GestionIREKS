@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QSizePolicy,
-    QStyle,
     QToolButton,
     QTableWidget,
     QTableWidgetItem,
@@ -632,34 +631,6 @@ class SalesPage(QWidget):
         self.client_filter.setMinimumWidth(260)
         filters_top.addWidget(self.client_filter, 1)
 
-        chart_actions = QHBoxLayout()
-        chart_actions.setContentsMargins(0, 0, 0, 0)
-        chart_actions.setSpacing(4)
-
-        self.sales_chart_btn = QToolButton()
-        self.sales_chart_btn.setToolTip("Ver gráfico del producto")
-        self.sales_chart_btn.setIcon(QIcon(str(CHART_LINE_ICON_PATH)))
-        self.sales_chart_btn.setIconSize(QSize(16, 16))
-        self.sales_chart_btn.setAutoRaise(True)
-        self.sales_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sales_chart_btn.setFixedSize(28, 28)
-        self.sales_chart_btn.setEnabled(False)
-        self.sales_chart_btn.clicked.connect(self._open_selected_monthly_sales_dialog)
-        chart_actions.addWidget(self.sales_chart_btn)
-
-        self.sales_total_chart_btn = QToolButton()
-        self.sales_total_chart_btn.setToolTip("Ver gráfico total")
-        self.sales_total_chart_btn.setIcon(QIcon(str(CHART_LINE_ICON_PATH)))
-        self.sales_total_chart_btn.setIconSize(QSize(16, 16))
-        self.sales_total_chart_btn.setAutoRaise(True)
-        self.sales_total_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sales_total_chart_btn.setFixedSize(28, 28)
-        self.sales_total_chart_btn.setEnabled(False)
-        self.sales_total_chart_btn.clicked.connect(self._open_total_monthly_sales_dialog)
-        chart_actions.addWidget(self.sales_total_chart_btn)
-
-        filters_top.addLayout(chart_actions)
-
         layout.addLayout(filters_top)
 
         filters_bottom = QHBoxLayout()
@@ -687,6 +658,43 @@ class SalesPage(QWidget):
         self.product_filter.textChanged.connect(self._schedule_product_reload)
         self.product_filter.setMinimumWidth(300)
         filters_bottom.addWidget(self.product_filter, 1)
+
+        chart_actions = QHBoxLayout()
+        chart_actions.setContentsMargins(0, 0, 0, 0)
+        chart_actions.setSpacing(4)
+        button_height = max(
+            self.year_filter.sizeHint().height(),
+            self.month_filter.sizeHint().height(),
+            self.client_filter.sizeHint().height(),
+            self.manufacturer_filter.sizeHint().height(),
+            self.family_filter.sizeHint().height(),
+            self.subfamily_filter.sizeHint().height(),
+            self.product_filter.sizeHint().height(),
+        )
+
+        self.sales_chart_btn = QToolButton()
+        self.sales_chart_btn.setToolTip("Ver gráfico del producto")
+        self.sales_chart_btn.setIcon(QIcon(str(CHART_LINE_ICON_PATH)))
+        self.sales_chart_btn.setIconSize(QSize(max(14, button_height - 14), max(14, button_height - 14)))
+        self.sales_chart_btn.setAutoRaise(False)
+        self.sales_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sales_chart_btn.setFixedSize(button_height, button_height)
+        self.sales_chart_btn.setEnabled(False)
+        self.sales_chart_btn.clicked.connect(self._open_selected_monthly_sales_dialog)
+        chart_actions.addWidget(self.sales_chart_btn)
+
+        self.sales_total_chart_btn = QToolButton()
+        self.sales_total_chart_btn.setToolTip("Ver gráfico total")
+        self.sales_total_chart_btn.setIcon(QIcon(str(CHART_LINE_ICON_PATH)))
+        self.sales_total_chart_btn.setIconSize(QSize(max(14, button_height - 14), max(14, button_height - 14)))
+        self.sales_total_chart_btn.setAutoRaise(False)
+        self.sales_total_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sales_total_chart_btn.setFixedSize(button_height, button_height)
+        self.sales_total_chart_btn.setEnabled(False)
+        self.sales_total_chart_btn.clicked.connect(self._open_total_monthly_sales_dialog)
+        chart_actions.addWidget(self.sales_total_chart_btn)
+
+        filters_bottom.addLayout(chart_actions)
         layout.addLayout(filters_bottom)
 
         self.group_header = QTableWidget(1, 12)
