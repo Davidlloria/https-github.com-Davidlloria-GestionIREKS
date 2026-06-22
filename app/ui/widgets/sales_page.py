@@ -869,6 +869,41 @@ class SalesPage(QWidget):
             """
         )
         self.sales_total_chart_btn.clicked.connect(self._open_total_monthly_sales_dialog)
+
+        self.sales_analysis_btn = QToolButton()
+        self.sales_analysis_btn.setToolTip("Análisis")
+        self.sales_analysis_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "brain.svg")))
+        self.sales_analysis_btn.setIconSize(QSize(16, 16))
+        self.sales_analysis_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.sales_analysis_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sales_analysis_btn.setFixedHeight(36)
+        self.sales_analysis_btn.setFixedWidth(114)
+        self.sales_analysis_btn.setEnabled(False)
+        self.sales_analysis_btn.setText("Análisis")
+        self.sales_analysis_btn.setStyleSheet(
+            """
+            QToolButton {
+                background-color: #FDE68A;
+                border: 1px solid #F59E0B;
+                border-radius: 8px;
+                color: #111827;
+                padding: 0 6px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            QToolButton:hover {
+                background-color: #FCD34D;
+            }
+            QToolButton:pressed {
+                background-color: #FBBF24;
+            }
+            QToolButton:disabled {
+                background-color: #FBE7B1;
+                border-color: #F3C35A;
+                color: #6B7280;
+            }
+            """
+        )
         layout.addLayout(filters_bottom)
 
         self.group_header = QTableWidget(1, 12)
@@ -909,6 +944,7 @@ class SalesPage(QWidget):
         chart_band.setSpacing(4)
         chart_band.addWidget(self.sales_chart_btn)
         chart_band.addWidget(self.sales_total_chart_btn)
+        chart_band.addWidget(self.sales_analysis_btn)
         chart_band.addStretch(1)
 
         header_band = QHBoxLayout()
@@ -1757,6 +1793,7 @@ class SalesPage(QWidget):
         has_year = self._current_year() > 0
         self.sales_chart_btn.setEnabled(self._selected_sales_row() is not None and has_year)
         self.sales_total_chart_btn.setEnabled(has_year)
+        self.sales_analysis_btn.setEnabled(has_year)
 
     def _open_selected_monthly_sales_dialog(self) -> None:
         row = self._selected_sales_row()
