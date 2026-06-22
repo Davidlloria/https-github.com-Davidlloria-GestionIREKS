@@ -5,7 +5,7 @@ import math
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, Qt, QSize
-from PySide6.QtGui import QColor, QFont, QIcon
+from PySide6.QtGui import QColor, QCursor, QFont, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -15,7 +15,9 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMessageBox,
     QLineEdit,
+    QPlainTextEdit,
     QSizePolicy,
     QPushButton,
     QToolButton,
@@ -32,6 +34,7 @@ except ModuleNotFoundError:  # pragma: no cover - dependency guard
     pg = None
 
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow, SalesMonthlyComparisonPoint
+from app.services.openai_process_service import OpenAIProcessService
 from app.services.sales_reconciliation_service import SalesReconciliationService
 
 
@@ -556,6 +559,103 @@ class MonthlySalesDialog(QDialog):
         self._sync_chart_mode_button(chart)
 
 
+class SalesAnalysisDialog(QDialog):
+    def __init__(self, *, title: str, context_text: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._context_text = str(context_text or "").strip()
+        self._service = OpenAIProcessService()
+        self.setWindowTitle(title)
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            self.resize(min(920, max(760, available.width() - 120)), min(700, max(520, available.height() - 140)))
+            self.setMinimumSize(min(780, max(680, available.width() - 220)), min(560, max(420, available.height() - 260)))
+        else:
+            self.resize(860, 620)
+            self.setMinimumSize(720, 520)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+        title_label = QLabel("Análisis de ventas con ChatGPT")
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet("color: #111827;")
+        layout.addWidget(title_label)
+
+        context_label = QLabel("Escribe la consulta y pulsa Consultar. La respuesta aparecerá debajo.")
+        context_label.setWordWrap(True)
+        context_label.setStyleSheet("color: #6B7280;")
+        layout.addWidget(context_label)
+
+        question_label = QLabel("Consulta")
+        question_label.setStyleSheet("color: #374151; font-weight: 600;")
+        layout.addWidget(question_label)
+
+        self.question_edit = QPlainTextEdit()
+        self.question_edit.setPlaceholderText("Ejemplo: resume los productos con mayor crecimiento y detecta caídas relevantes.")
+        self.question_edit.setFixedHeight(120)
+        layout.addWidget(self.question_edit)
+
+        response_label = QLabel("Respuesta")
+        response_label.setStyleSheet("color: #374151; font-weight: 600;")
+        layout.addWidget(response_label)
+
+        self.response_edit = QPlainTextEdit()
+        self.response_edit.setReadOnly(True)
+        self.response_edit.setPlaceholderText("La respuesta de ChatGPT aparecerá aquí.")
+        layout.addWidget(self.response_edit, 1)
+
+        bottom_row = QHBoxLayout()
+        bottom_row.setContentsMargins(0, 0, 0, 0)
+        bottom_row.setSpacing(8)
+
+        self.consult_btn = QPushButton("Consultar")
+        self.consult_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.consult_btn.clicked.connect(self._consult)
+        bottom_row.addWidget(self.consult_btn)
+
+        bottom_row.addStretch(1)
+
+        close_btn = QPushButton("Cerrar")
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.clicked.connect(self.reject)
+        bottom_row.addWidget(close_btn)
+        layout.addLayout(bottom_row)
+
+    def _consult(self) -> None:
+        question = str(self.question_edit.toPlainText() or "").strip()
+        if not question:
+            QMessageBox.warning(self, "Análisis de ventas", "Escribe una consulta antes de consultar a ChatGPT.")
+            return
+        prompt = self._build_prompt(question)
+        self.consult_btn.setEnabled(False)
+        self.response_edit.setPlainText("Consultando ChatGPT...")
+        QApplication.setOverrideCursor(QCursor(Qt.CursorShape.WaitCursor))
+        try:
+            result = self._service.generate_process(prompt)
+        finally:
+            QApplication.restoreOverrideCursor()
+            self.consult_btn.setEnabled(True)
+        output = result.text.strip() if result.ok else result.message.strip()
+        if not output:
+            output = "Sin respuesta."
+        self.response_edit.setPlainText(output)
+
+    def _build_prompt(self, question: str) -> str:
+        return (
+            "Eres un analista de ventas experto en IREKS.\n"
+            "Responde en español, con foco práctico y directo.\n"
+            "Usa únicamente el contexto proporcionado y la pregunta del usuario.\n"
+            "Si faltan datos, dilo con claridad sin inventar cifras.\n\n"
+            f"Contexto de ventas:\n{self._context_text}\n\n"
+            f"Consulta del usuario:\n{question}\n"
+        )
+
+
 class SalesPage(QWidget):
     def __init__(self) -> None:
         super().__init__()
@@ -904,6 +1004,7 @@ class SalesPage(QWidget):
             }
             """
         )
+        self.sales_analysis_btn.clicked.connect(self._open_sales_analysis_dialog)
         layout.addLayout(filters_bottom)
 
         self.group_header = QTableWidget(1, 12)
@@ -1832,6 +1933,77 @@ class SalesPage(QWidget):
             parent=self,
         )
         dialog.exec()
+
+    def _open_sales_analysis_dialog(self) -> None:
+        year = self._current_year()
+        if year <= 0:
+            return
+        client_name = self._current_client_name() or "Todos los clientes"
+        dialog = SalesAnalysisDialog(
+            title=f"Análisis de ventas {year} | {client_name}",
+            context_text=self._build_sales_analysis_context(),
+            parent=self,
+        )
+        dialog.exec()
+
+    def _build_sales_analysis_context(self) -> str:
+        def combo_text(widget) -> str:
+            if widget is None:
+                return ""
+            try:
+                text = str(widget.currentText() or "").strip()
+            except Exception:
+                text = ""
+            return text
+
+        def line_edit_text(widget) -> str:
+            if widget is None:
+                return ""
+            try:
+                return str(widget.text() or "").strip()
+            except Exception:
+                return ""
+
+        lines = [
+            f"Año: {self._current_year()}",
+            f"Cliente: {self._current_client_name() or 'Todos los clientes'}",
+            f"Mes: {combo_text(getattr(self, 'month_filter', None))}",
+            f"Acumulado: {'Sí' if bool(getattr(self, 'acumulado_check', None) and self.acumulado_check.isChecked()) else 'No'}",
+            f"Fabricante: {combo_text(getattr(self, 'manufacturer_filter', None))}",
+            f"Familia: {combo_text(getattr(self, 'family_filter', None))}",
+            f"Subfamilia: {combo_text(getattr(self, 'subfamily_filter', None))}",
+            f"Producto filtrado: {line_edit_text(getattr(self, 'product_filter', None)) or 'Sin filtro'}",
+        ]
+        selected = self._selected_sales_row()
+        if selected is not None:
+            articulo_id, codigo, nombre = selected
+            lines.append(f"Producto seleccionado: {codigo} | {nombre} | ID {articulo_id}")
+
+        lines.append("")
+        lines.append("Resumen visible de ventas:")
+        row_count = self.sales_table.rowCount() if hasattr(self, "sales_table") else 0
+        limit = min(row_count, 12)
+        for row_idx in range(limit):
+            code_item = self.sales_table.item(row_idx, 0)
+            name_item = self.sales_table.item(row_idx, 1)
+            prev_sales_item = self.sales_table.item(row_idx, 4)
+            curr_sales_item = self.sales_table.item(row_idx, 7)
+            delta_kg_item = self.sales_table.item(row_idx, 8)
+            delta_sales_item = self.sales_table.item(row_idx, 10)
+            code = str(code_item.text() if code_item is not None else "").strip()
+            name = str(name_item.text() if name_item is not None else "").strip()
+            prev_sales = str(prev_sales_item.text() if prev_sales_item is not None else "").strip()
+            curr_sales = str(curr_sales_item.text() if curr_sales_item is not None else "").strip()
+            delta_kg = str(delta_kg_item.text() if delta_kg_item is not None else "").strip()
+            delta_sales = str(delta_sales_item.text() if delta_sales_item is not None else "").strip()
+            if not any([code, name, prev_sales, curr_sales, delta_kg, delta_sales]):
+                continue
+            lines.append(
+                f"- {code} | {name} | Ventas {self._current_year() - 1}: {prev_sales} | "
+                f"Ventas {self._current_year()}: {curr_sales} | Δ kg: {delta_kg} | Δ €: {delta_sales}"
+            )
+
+        return "\n".join(lines).strip()
 
     def _fmt_num(self, value) -> str:
         number = float(value or 0.0)
