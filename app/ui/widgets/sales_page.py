@@ -677,7 +677,7 @@ class SalesPage(QWidget):
                 border-radius: 8px;
                 color: #FFFFFF;
                 padding: 0 6px;
-                font-size: 11px;
+                font-size: 12px;
                 font-weight: 600;
             }
             QToolButton:hover {
@@ -687,9 +687,9 @@ class SalesPage(QWidget):
                 background-color: #2253B2;
             }
             QToolButton:disabled {
-                background-color: #C9D8F5;
-                border-color: #C9D8F5;
-                color: #F8FAFC;
+                background-color: #B9D4FF;
+                border-color: #A8C8FF;
+                color: #5C7DB8;
             }
             """
         )
@@ -713,7 +713,7 @@ class SalesPage(QWidget):
                 border-radius: 8px;
                 color: #FFFFFF;
                 padding: 0 6px;
-                font-size: 11px;
+                font-size: 12px;
                 font-weight: 600;
             }
             QToolButton:hover {
