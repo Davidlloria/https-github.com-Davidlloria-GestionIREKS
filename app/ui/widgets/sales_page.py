@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from datetime import date
+import math
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, Qt, QSize
@@ -361,10 +362,12 @@ class MonthlySalesChartWidget(QWidget):
     @staticmethod
     def _nice_step(max_value: float) -> float:
         raw = max(float(max_value or 0.0) / 5.0, 1.0)
-        for step in (1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0):
+        magnitude = 10.0 ** max(0, int(math.floor(math.log10(raw))))
+        for factor in (1.0, 2.0, 2.5, 5.0, 10.0):
+            step = magnitude * factor
             if raw <= step:
                 return step
-        return 1000.0
+        return magnitude * 10.0
 
 
 class MonthlySalesDialog(QDialog):
