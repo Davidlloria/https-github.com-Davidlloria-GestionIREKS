@@ -659,43 +659,83 @@ class SalesPage(QWidget):
         self.product_filter.setMinimumWidth(300)
         filters_bottom.addWidget(self.product_filter, 1)
 
-        chart_actions = QHBoxLayout()
-        chart_actions.setContentsMargins(0, 0, 0, 0)
-        chart_actions.setSpacing(4)
-        button_height = max(
-            self.year_filter.sizeHint().height(),
-            self.month_filter.sizeHint().height(),
-            self.client_filter.sizeHint().height(),
-            self.manufacturer_filter.sizeHint().height(),
-            self.family_filter.sizeHint().height(),
-            self.subfamily_filter.sizeHint().height(),
-            self.product_filter.sizeHint().height(),
-        )
-
         self.sales_chart_btn = QToolButton()
         self.sales_chart_btn.setToolTip("Ver gráfico del producto")
         self.sales_chart_btn.setIcon(QIcon(str(CHART_LINE_ICON_PATH)))
-        self.sales_chart_btn.setIconSize(QSize(max(14, button_height - 14), max(14, button_height - 14)))
-        self.sales_chart_btn.setAutoRaise(False)
+        self.sales_chart_btn.setIconSize(QSize(16, 16))
+        self.sales_chart_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.sales_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sales_chart_btn.setFixedSize(button_height, button_height)
+        self.sales_chart_btn.setFixedHeight(36)
+        self.sales_chart_btn.setMinimumWidth(188)
         self.sales_chart_btn.setEnabled(False)
+        self.sales_chart_btn.setText("Gráfico producto")
+        self.sales_chart_btn.setStyleSheet(
+            """
+            QToolButton {
+                background-color: #2F6FE4;
+                border: 1px solid #245FCC;
+                border-radius: 8px;
+                color: #FFFFFF;
+                padding: 0 14px;
+                font-weight: 600;
+            }
+            QToolButton:hover {
+                background-color: #3B7CF2;
+            }
+            QToolButton:pressed {
+                background-color: #2253B2;
+            }
+            QToolButton:disabled {
+                background-color: #C9D8F5;
+                border-color: #C9D8F5;
+                color: #F8FAFC;
+            }
+            """
+        )
         self.sales_chart_btn.clicked.connect(self._open_selected_monthly_sales_dialog)
-        chart_actions.addWidget(self.sales_chart_btn)
 
         self.sales_total_chart_btn = QToolButton()
         self.sales_total_chart_btn.setToolTip("Ver gráfico total")
         self.sales_total_chart_btn.setIcon(QIcon(str(CHART_LINE_ICON_PATH)))
-        self.sales_total_chart_btn.setIconSize(QSize(max(14, button_height - 14), max(14, button_height - 14)))
-        self.sales_total_chart_btn.setAutoRaise(False)
+        self.sales_total_chart_btn.setIconSize(QSize(16, 16))
+        self.sales_total_chart_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.sales_total_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sales_total_chart_btn.setFixedSize(button_height, button_height)
+        self.sales_total_chart_btn.setFixedHeight(36)
+        self.sales_total_chart_btn.setMinimumWidth(168)
         self.sales_total_chart_btn.setEnabled(False)
+        self.sales_total_chart_btn.setText("Gráfico total")
+        self.sales_total_chart_btn.setStyleSheet(
+            """
+            QToolButton {
+                background-color: #148A86;
+                border: 1px solid #11706D;
+                border-radius: 8px;
+                color: #FFFFFF;
+                padding: 0 14px;
+                font-weight: 600;
+            }
+            QToolButton:hover {
+                background-color: #1A9F99;
+            }
+            QToolButton:pressed {
+                background-color: #0F6763;
+            }
+            QToolButton:disabled {
+                background-color: #BDE6E4;
+                border-color: #BDE6E4;
+                color: #F8FAFC;
+            }
+            """
+        )
         self.sales_total_chart_btn.clicked.connect(self._open_total_monthly_sales_dialog)
-        chart_actions.addWidget(self.sales_total_chart_btn)
-
-        filters_bottom.addLayout(chart_actions)
         layout.addLayout(filters_bottom)
+
+        chart_band = QHBoxLayout()
+        chart_band.setContentsMargins(0, 0, 0, 0)
+        chart_band.setSpacing(12)
+        chart_band.addWidget(self.sales_chart_btn)
+        chart_band.addWidget(self.sales_total_chart_btn)
+        chart_band.addStretch(1)
 
         self.group_header = QTableWidget(1, 12)
         self.group_header.setObjectName("salesGroupHeader")
@@ -728,7 +768,13 @@ class SalesPage(QWidget):
             }
             """
         )
-        layout.addWidget(self.group_header)
+
+        header_band = QHBoxLayout()
+        header_band.setContentsMargins(0, 0, 0, 0)
+        header_band.setSpacing(12)
+        header_band.addLayout(chart_band)
+        header_band.addWidget(self.group_header, 1)
+        layout.addLayout(header_band)
 
         self.sales_table = QTableWidget(0, 12)
         self.sales_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
