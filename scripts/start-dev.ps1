@@ -21,9 +21,15 @@ if (-not (Test-Path $frontendDir)) {
     throw "No existe el directorio frontend: $frontendDir"
 }
 
-$python = Get-Command python -ErrorAction SilentlyContinue
-if (-not $python) {
-    throw "No se encontro python en PATH."
+$pythonVenv = Join-Path $projectRoot ".venv\Scripts\python.exe"
+if (Test-Path $pythonVenv) {
+    $python = $pythonVenv
+} else {
+    $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $pythonCmd) {
+        throw "No se encontro python en PATH ni en .venv."
+    }
+    $python = $pythonCmd.Source
 }
 
 $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
@@ -129,7 +135,7 @@ if ($Reload) {
 
 $apiProcess = Start-ManagedProcess `
     -Name "api" `
-    -FilePath "python" `
+    -FilePath $python `
     -ArgList $apiArgs `
     -WorkingDirectory $projectRoot
 
