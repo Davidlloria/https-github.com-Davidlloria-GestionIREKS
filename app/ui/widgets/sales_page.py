@@ -1,9 +1,10 @@
 ﻿from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 from PySide6.QtCore import QTimer, Qt, QSize
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QColor, QFont, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -33,6 +34,9 @@ except ModuleNotFoundError:  # pragma: no cover - dependency guard
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow, SalesMonthlyComparisonPoint
 from app.services.sales_reconciliation_service import SalesReconciliationService
 
+
+BASE_DIR = Path(__file__).resolve().parents[3]
+CHART_LINE_ICON_PATH = BASE_DIR / "assets" / "icons" / "chart-line.svg"
 
 MONTH_NAMES = [
     "Enero",
@@ -88,6 +92,11 @@ class MonthlySalesChartWidget(QWidget):
         self._subtitle = ""
         self._points: list[SalesMonthlyComparisonPoint] = []
         self._bar_regions: list[dict[str, float | int | str]] = []
+        self._active_bar_key: tuple[int, str] | None = None
+        self._hover_y_margin = 5.0
+        self._hover_hide_timer = QTimer(self)
+        self._hover_hide_timer.setSingleShot(True)
+        self._hover_hide_timer.timeout.connect(self._clear_hover_tooltip)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -123,6 +132,8 @@ class MonthlySalesChartWidget(QWidget):
         self._subtitle = str(subtitle or "").strip()
         self._points = list(points or [])
         self._bar_regions = []
+        self._active_bar_key = None
+        self._hover_hide_timer.stop()
         if self._plot is None:
             return
         self._plot.clear()
@@ -142,6 +153,7 @@ class MonthlySalesChartWidget(QWidget):
 
         values = [float(point.kilos_prev or 0.0) for point in self._points] + [float(point.kilos_curr or 0.0) for point in self._points]
         max_value = max(values) if values else 0.0
+        self._hover_y_margin = max(max_value * 0.035, 5.0)
         if max_value <= 0:
             plot_item.setLabel("left", "")
             plot_item.setLabel("bottom", "")
@@ -280,35 +292,62 @@ class MonthlySalesChartWidget(QWidget):
 
     def _on_scene_mouse_moved(self, pos) -> None:
         if self._plot is None or not self._bar_regions:
-            QToolTip.hideText()
+            self._clear_hover_tooltip()
             return
         view_box = self._plot.getPlotItem().vb
         if view_box.sceneBoundingRect().contains(pos):
             mouse_point = view_box.mapSceneToView(pos)
             x_pos = float(mouse_point.x())
             y_pos = float(mouse_point.y())
-            for bar in self._bar_regions:
-                x1 = float(bar["x1"])
-                x2 = float(bar["x2"])
-                y1 = float(bar["y1"])
-                y2 = float(bar["y2"])
-                if x1 <= x_pos <= x2 and y1 <= y_pos <= y2:
-                    month = int(bar["month"])
-                    series = str(bar["series"])
-                    value = float(bar["value"])
-                    prev_value = value if series == "prev" else self._value_for_month(month, "prev")
-                    curr_value = value if series == "curr" else self._value_for_month(month, "curr")
-                    scene_pos = self._plot.mapFromScene(pos)
-                    if hasattr(scene_pos, "toPoint"):
-                        scene_pos = scene_pos.toPoint()
-                    QToolTip.showText(
-                        self._plot.mapToGlobal(scene_pos),
-                        self._build_tooltip(month, prev_value, curr_value),
-                        self._plot,
-                        self._plot.rect(),
-                        10000,
-                    )
-                    return
+            bar = self._find_bar_at_pos(x_pos, y_pos)
+            if bar is None and self._active_bar_key is not None:
+                bar = self._find_bar_at_pos(x_pos, y_pos, key=self._active_bar_key, expanded=True)
+            if bar is not None:
+                self._show_bar_tooltip(bar, pos)
+                return
+            if self._active_bar_key is not None:
+                return
+        self._clear_hover_tooltip()
+
+    def _find_bar_at_pos(self, x_pos: float, y_pos: float, key: tuple[int, str] | None = None, expanded: bool = False):
+        x_margin = 0.12 if expanded else 0.02
+        y_margin = self._hover_y_margin if expanded else 0.0
+        for bar in self._bar_regions:
+            month = int(bar["month"])
+            series = str(bar["series"])
+            bar_key = (month, series)
+            if key is not None and bar_key != key:
+                continue
+            x1 = float(bar["x1"]) - x_margin
+            x2 = float(bar["x2"]) + x_margin
+            y1 = float(bar["y1"]) - y_margin
+            y2 = float(bar["y2"]) + y_margin
+            if x1 <= x_pos <= x2 and y1 <= y_pos <= y2:
+                return bar
+        return None
+
+    def _show_bar_tooltip(self, bar, pos) -> None:
+        month = int(bar["month"])
+        series = str(bar["series"])
+        value = float(bar["value"])
+        prev_value = value if series == "prev" else self._value_for_month(month, "prev")
+        curr_value = value if series == "curr" else self._value_for_month(month, "curr")
+        self._active_bar_key = (month, series)
+        self._hover_hide_timer.stop()
+        scene_pos = self._plot.mapFromScene(pos)
+        if hasattr(scene_pos, "toPoint"):
+            scene_pos = scene_pos.toPoint()
+        QToolTip.showText(
+            self._plot.mapToGlobal(scene_pos),
+            self._build_tooltip(month, prev_value, curr_value),
+            self._plot,
+            self._plot.rect(),
+            10000,
+        )
+
+    def _clear_hover_tooltip(self) -> None:
+        self._active_bar_key = None
+        self._hover_hide_timer.stop()
         QToolTip.hideText()
 
     def _value_for_month(self, month: int, series: str) -> float:
@@ -593,6 +632,34 @@ class SalesPage(QWidget):
         self.client_filter.setMinimumWidth(260)
         filters_top.addWidget(self.client_filter, 1)
 
+        chart_actions = QHBoxLayout()
+        chart_actions.setContentsMargins(0, 0, 0, 0)
+        chart_actions.setSpacing(4)
+
+        self.sales_chart_btn = QToolButton()
+        self.sales_chart_btn.setToolTip("Ver gráfico del producto")
+        self.sales_chart_btn.setIcon(QIcon(str(CHART_LINE_ICON_PATH)))
+        self.sales_chart_btn.setIconSize(QSize(16, 16))
+        self.sales_chart_btn.setAutoRaise(True)
+        self.sales_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sales_chart_btn.setFixedSize(28, 28)
+        self.sales_chart_btn.setEnabled(False)
+        self.sales_chart_btn.clicked.connect(self._open_selected_monthly_sales_dialog)
+        chart_actions.addWidget(self.sales_chart_btn)
+
+        self.sales_total_chart_btn = QToolButton()
+        self.sales_total_chart_btn.setToolTip("Ver gráfico total")
+        self.sales_total_chart_btn.setIcon(QIcon(str(CHART_LINE_ICON_PATH)))
+        self.sales_total_chart_btn.setIconSize(QSize(16, 16))
+        self.sales_total_chart_btn.setAutoRaise(True)
+        self.sales_total_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sales_total_chart_btn.setFixedSize(28, 28)
+        self.sales_total_chart_btn.setEnabled(False)
+        self.sales_total_chart_btn.clicked.connect(self._open_total_monthly_sales_dialog)
+        chart_actions.addWidget(self.sales_total_chart_btn)
+
+        filters_top.addLayout(chart_actions)
+
         layout.addLayout(filters_top)
 
         filters_bottom = QHBoxLayout()
@@ -620,16 +687,6 @@ class SalesPage(QWidget):
         self.product_filter.textChanged.connect(self._schedule_product_reload)
         self.product_filter.setMinimumWidth(300)
         filters_bottom.addWidget(self.product_filter, 1)
-        self.sales_chart_btn = QToolButton()
-        self.sales_chart_btn.setToolTip("Ver gráfico mensual")
-        self.sales_chart_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogInfoView))
-        self.sales_chart_btn.setIconSize(QSize(14, 14))
-        self.sales_chart_btn.setAutoRaise(True)
-        self.sales_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sales_chart_btn.setFixedSize(28, 28)
-        self.sales_chart_btn.setEnabled(False)
-        self.sales_chart_btn.clicked.connect(self._open_selected_monthly_sales_dialog)
-        filters_bottom.addWidget(self.sales_chart_btn)
         layout.addLayout(filters_bottom)
 
         self.group_header = QTableWidget(1, 12)
@@ -756,6 +813,17 @@ class SalesPage(QWidget):
 
     def _current_client_id(self) -> str:
         return str(self.client_filter.currentData() or "").strip()
+
+    def _current_client_name(self) -> str:
+        label = str(self.client_filter.currentText() or "").strip()
+        if not label:
+            return "Todos los clientes"
+        if label.lower() == "todos":
+            return "Todos los clientes"
+        if label.endswith(")") and " (" in label:
+            trimmed = label.rsplit(" (", 1)[0].strip()
+            return trimmed or label
+        return label
 
     def _current_product_text(self) -> str:
         return str(self.product_filter.text() or "").strip()
@@ -1458,7 +1526,9 @@ class SalesPage(QWidget):
         return articulo_id, codigo, nombre
 
     def _update_sales_chart_button_state(self) -> None:
-        self.sales_chart_btn.setEnabled(self._selected_sales_row() is not None and self._current_year() > 0)
+        has_year = self._current_year() > 0
+        self.sales_chart_btn.setEnabled(self._selected_sales_row() is not None and has_year)
+        self.sales_total_chart_btn.setEnabled(has_year)
 
     def _open_selected_monthly_sales_dialog(self) -> None:
         row = self._selected_sales_row()
@@ -1471,10 +1541,28 @@ class SalesPage(QWidget):
             articulo_id=articulo_id,
             cliente_id=self._current_client_id(),
         )
+        client_name = self._current_client_name()
         subtitle_parts = [part for part in [codigo, nombre, f"{year - 1} vs {year}"] if part]
         dialog = MonthlySalesDialog(
-            title=f"Ventas mensuales {year - 1} / {year}",
+            title=f"Ventas mensuales {year - 1} / {year} | {client_name}",
             subtitle=" | ".join(subtitle_parts),
+            points=points,
+            parent=self,
+        )
+        dialog.exec()
+
+    def _open_total_monthly_sales_dialog(self) -> None:
+        year = self._current_year()
+        if year <= 0:
+            return
+        points = self.sales_summary_service.listar_ventas_mensuales_ireks_totales_comparativa(
+            year=year,
+            cliente_id=self._current_client_id(),
+        )
+        client_name = self._current_client_name()
+        dialog = MonthlySalesDialog(
+            title=f"Ventas totales mensuales {year - 1} / {year} | {client_name}",
+            subtitle=f"Todos los productos | {year - 1} vs {year}",
             points=points,
             parent=self,
         )

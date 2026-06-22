@@ -519,6 +519,53 @@ class SalesAnnualComparisonService:
             for month in range(1, 13)
         ]
 
+    def listar_ventas_mensuales_ireks_totales_comparativa(
+        self,
+        year: int,
+        cliente_id: str = "",
+    ) -> list[SalesMonthlyComparisonPoint]:
+        current_year = int(year or 0)
+        if current_year <= 0:
+            return [SalesMonthlyComparisonPoint(month=month, kilos_prev=0.0, kilos_curr=0.0) for month in range(1, 13)]
+
+        clean_cliente_id = str(cliente_id or "").strip()
+        previous_year = current_year - 1
+        with Session(self._engine) as session:
+            prev_stmt = select(VentaMensualRaw).where(
+                col(VentaMensualRaw.fuente) == "ireks",
+                col(VentaMensualRaw.periodo).like(f"{previous_year:04d}-%"),
+            )
+            if clean_cliente_id:
+                prev_stmt = prev_stmt.where(col(VentaMensualRaw.cliente_id) == clean_cliente_id)
+            prev_rows = list(session.exec(prev_stmt))
+
+            curr_stmt = select(VentaMensualRaw).where(
+                col(VentaMensualRaw.fuente) == "ireks",
+                col(VentaMensualRaw.periodo).like(f"{current_year:04d}-%"),
+            )
+            if clean_cliente_id:
+                curr_stmt = curr_stmt.where(col(VentaMensualRaw.cliente_id) == clean_cliente_id)
+            curr_rows = list(session.exec(curr_stmt))
+
+        prev_totals = {month: 0.0 for month in range(1, 13)}
+        curr_totals = {month: 0.0 for month in range(1, 13)}
+        for row in prev_rows:
+            month = self._period_month(str(getattr(row, "periodo", "") or ""))
+            if 1 <= month <= 12:
+                prev_totals[month] += float(getattr(row, "venta_kilos", 0.0) or 0.0) + float(
+                    getattr(row, "venta_kilos_sc", 0.0) or 0.0
+                )
+        for row in curr_rows:
+            month = self._period_month(str(getattr(row, "periodo", "") or ""))
+            if 1 <= month <= 12:
+                curr_totals[month] += float(getattr(row, "venta_kilos", 0.0) or 0.0) + float(
+                    getattr(row, "venta_kilos_sc", 0.0) or 0.0
+                )
+        return [
+            SalesMonthlyComparisonPoint(month=month, kilos_prev=prev_totals[month], kilos_curr=curr_totals[month])
+            for month in range(1, 13)
+        ]
+
     def _build_rows(self, totals: dict[str, dict[str, float | str]]) -> list[SalesComparisonRow]:
         result: list[SalesComparisonRow] = []
         for values in totals.values():
