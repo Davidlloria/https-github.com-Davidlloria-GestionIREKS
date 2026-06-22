@@ -1,18 +1,23 @@
 ﻿from __future__ import annotations
 
 from datetime import date
+import math
 
-from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtCore import QTimer, Qt, QSize
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
     QSizePolicy,
+    QStyle,
+    QToolButton,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -20,7 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow
+from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow, SalesMonthlyPoint
 from app.services.sales_reconciliation_service import SalesReconciliationService
 
 
@@ -69,6 +74,154 @@ class CodeTableWidgetItem(QTableWidgetItem):
         if isinstance(left, tuple) and isinstance(right, tuple):
             return left < right
         return super().__lt__(other)
+
+
+class MonthlySalesChartWidget(QWidget):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._title = "Ventas mensuales"
+        self._subtitle = ""
+        self._points: list[SalesMonthlyPoint] = []
+        self.setMinimumSize(760, 360)
+
+    def set_series(self, title: str, subtitle: str, points: list[SalesMonthlyPoint]) -> None:
+        self._title = str(title or "Ventas mensuales").strip() or "Ventas mensuales"
+        self._subtitle = str(subtitle or "").strip()
+        self._points = list(points or [])
+        self.update()
+
+    def paintEvent(self, _event) -> None:  # type: ignore[override]
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.fillRect(self.rect(), QColor("#FFFFFF"))
+
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.setPen(QColor("#111827"))
+        painter.drawText(16, 24, self._title)
+
+        if self._subtitle:
+            subtitle_font = QFont()
+            subtitle_font.setPointSize(9)
+            painter.setFont(subtitle_font)
+            painter.setPen(QColor("#6B7280"))
+            painter.drawText(16, 42, self._subtitle)
+
+        if not self._points:
+            painter.setPen(QColor("#6B7280"))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Sin datos mensuales")
+            return
+
+        values = [float(point.kilos or 0.0) for point in self._points]
+        max_value = max(values) if values else 0.0
+        if max_value <= 0:
+            painter.setPen(QColor("#6B7280"))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Sin ventas mensuales")
+            return
+
+        left = 56
+        top = 62
+        right = 20
+        bottom = 42
+        plot_w = max(60, self.width() - left - right)
+        plot_h = max(60, self.height() - top - bottom)
+        plot_bottom = top + plot_h
+
+        step = self._nice_step(max_value)
+        y_max = max(step, math.ceil(max_value / step) * step)
+
+        axis_pen = QPen(QColor("#D5DCE8"))
+        axis_pen.setWidth(1)
+        painter.setPen(axis_pen)
+        painter.drawLine(left, top, left, plot_bottom)
+        painter.drawLine(left, plot_bottom, left + plot_w, plot_bottom)
+
+        grid_pen = QPen(QColor("#E8EDF5"))
+        grid_pen.setWidth(1)
+        painter.setPen(grid_pen)
+        tick_font = QFont()
+        tick_font.setPointSize(8)
+        painter.setFont(tick_font)
+        for idx in range(5):
+            ratio = idx / 4.0
+            y = int(plot_bottom - (ratio * plot_h))
+            painter.drawLine(left, y, left + plot_w, y)
+            tick_value = y_max * ratio
+            painter.setPen(QColor("#6B7280"))
+            painter.drawText(6, y + 4, f"{tick_value:.0f} kg")
+            painter.setPen(grid_pen)
+
+        bar_gap = 6.0
+        bar_width = max(10.0, (plot_w - (bar_gap * (len(self._points) - 1))) / max(len(self._points), 1))
+        bar_fill = QColor("#1E6FEA")
+        bar_fill_light = QColor("#77A9F5")
+        bar_pen = QPen(QColor("#1A5FCA"))
+        bar_pen.setWidth(1)
+
+        month_font = QFont()
+        month_font.setPointSize(8)
+        painter.setFont(month_font)
+        for idx, point in enumerate(self._points):
+            value = float(point.kilos or 0.0)
+            bar_height = 0.0 if y_max <= 0 else (value / y_max) * plot_h
+            x = left + idx * (bar_width + bar_gap)
+            y = plot_bottom - bar_height
+            rect_h = max(1.0, bar_height)
+            painter.fillRect(int(x), int(y), int(bar_width), int(rect_h), bar_fill)
+            painter.fillRect(int(x), int(y), max(2, int(bar_width * 0.22)), int(rect_h), bar_fill_light)
+            painter.setPen(bar_pen)
+            painter.drawRect(int(x), int(y), int(bar_width), int(rect_h))
+
+            label = MONTH_NAMES[point.month - 1][:3] if 1 <= point.month <= 12 else str(point.month)
+            painter.setPen(QColor("#4B5563"))
+            painter.drawText(int(x - 4), plot_bottom + 4, int(bar_width + 8), 14, Qt.AlignmentFlag.AlignHCenter, label)
+            if value > 0:
+                value_label = f"{value:.1f}".replace(".", ",")
+                painter.drawText(
+                    int(x - 6),
+                    int(max(top + 2, y - 14)),
+                    int(bar_width + 12),
+                    12,
+                    Qt.AlignmentFlag.AlignHCenter,
+                    value_label,
+                )
+
+    @staticmethod
+    def _nice_step(max_value: float) -> float:
+        raw = max(float(max_value or 0.0) / 5.0, 1.0)
+        for step in (1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0):
+            if raw <= step:
+                return step
+        return 1000.0
+
+
+class MonthlySalesDialog(QDialog):
+    def __init__(
+        self,
+        *,
+        title: str,
+        subtitle: str,
+        points: list[SalesMonthlyPoint],
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(860, 460)
+        self.setMinimumSize(820, 420)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        chart = MonthlySalesChartWidget(self)
+        chart.set_series(title, subtitle, points)
+        layout.addWidget(chart, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
 
 
 class SalesPage(QWidget):
@@ -312,6 +465,16 @@ class SalesPage(QWidget):
         self.product_filter.textChanged.connect(self._schedule_product_reload)
         self.product_filter.setMinimumWidth(300)
         filters_bottom.addWidget(self.product_filter, 1)
+        self.sales_chart_btn = QToolButton()
+        self.sales_chart_btn.setToolTip("Ver gráfico mensual")
+        self.sales_chart_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogInfoView))
+        self.sales_chart_btn.setIconSize(QSize(14, 14))
+        self.sales_chart_btn.setAutoRaise(True)
+        self.sales_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sales_chart_btn.setFixedSize(28, 28)
+        self.sales_chart_btn.setEnabled(False)
+        self.sales_chart_btn.clicked.connect(self._open_selected_monthly_sales_dialog)
+        filters_bottom.addWidget(self.sales_chart_btn)
         layout.addLayout(filters_bottom)
 
         self.group_header = QTableWidget(1, 12)
@@ -353,6 +516,7 @@ class SalesPage(QWidget):
         self.sales_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.sales_table.verticalHeader().setVisible(False)
         self.sales_table.setSortingEnabled(True)
+        self.sales_table.itemSelectionChanged.connect(self._update_sales_chart_button_state)
         self.sales_table.setHorizontalHeaderLabels(
             [
                 "Cod.",
@@ -1027,10 +1191,15 @@ class SalesPage(QWidget):
                 else:
                     item = QTableWidgetItem(str(value or ""))
                     item.setToolTip(str(value or ""))
+                    if col == 0:
+                        item.setData(Qt.ItemDataRole.UserRole, row.articulo_id)
+                    elif col == 1:
+                        item.setData(Qt.ItemDataRole.UserRole, row.nombre)
                 self.sales_table.setItem(idx, col, item)
 
         self.sales_table.setSortingEnabled(True)
         self._fill_totals_row(total_prev_kg, total_prev_sc, total_prev_sales, total_curr_kg, total_curr_sc, total_curr_sales)
+        self._update_sales_chart_button_state()
 
     def _fill_totals_row(
         self,
@@ -1116,6 +1285,45 @@ class SalesPage(QWidget):
             font.setStretch(QFont.Stretch.Condensed)
             item.setFont(font)
             self.totals_table.setItem(0, col, item)
+        self._update_sales_chart_button_state()
+
+    def _selected_sales_row(self) -> tuple[str, str, str] | None:
+        row_idx = self.sales_table.currentRow()
+        if row_idx < 0:
+            return None
+        code_item = self.sales_table.item(row_idx, 0)
+        name_item = self.sales_table.item(row_idx, 1)
+        if code_item is None:
+            return None
+        articulo_id = str(code_item.data(Qt.ItemDataRole.UserRole) or "").strip()
+        if not articulo_id:
+            return None
+        codigo = str(code_item.text() or "").strip()
+        nombre = str((name_item.text() if name_item is not None else "") or "").strip()
+        return articulo_id, codigo, nombre
+
+    def _update_sales_chart_button_state(self) -> None:
+        self.sales_chart_btn.setEnabled(self._selected_sales_row() is not None and self._current_year() > 0)
+
+    def _open_selected_monthly_sales_dialog(self) -> None:
+        row = self._selected_sales_row()
+        year = self._current_year()
+        if row is None or year <= 0:
+            return
+        articulo_id, codigo, nombre = row
+        points = self.sales_summary_service.listar_ventas_mensuales_ireks(
+            year=year,
+            articulo_id=articulo_id,
+            cliente_id=self._current_client_id(),
+        )
+        subtitle_parts = [part for part in [codigo, nombre, self._current_client_id()] if part]
+        dialog = MonthlySalesDialog(
+            title=f"Ventas mensuales {year}",
+            subtitle=" | ".join(subtitle_parts),
+            points=points,
+            parent=self,
+        )
+        dialog.exec()
 
     def _fmt_num(self, value) -> str:
         number = float(value or 0.0)
