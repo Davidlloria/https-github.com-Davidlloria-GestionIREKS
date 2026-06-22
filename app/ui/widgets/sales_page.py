@@ -25,7 +25,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow, SalesMonthlyPoint
+from app.services.sales_annual_comparison_service import (
+    SalesAnnualComparisonService,
+    SalesComparisonRow,
+    SalesMonthlyComparisonPoint,
+)
 from app.services.sales_reconciliation_service import SalesReconciliationService
 
 
@@ -81,10 +85,10 @@ class MonthlySalesChartWidget(QWidget):
         super().__init__(parent)
         self._title = "Ventas mensuales"
         self._subtitle = ""
-        self._points: list[SalesMonthlyPoint] = []
+        self._points: list[SalesMonthlyComparisonPoint] = []
         self.setMinimumSize(760, 360)
 
-    def set_series(self, title: str, subtitle: str, points: list[SalesMonthlyPoint]) -> None:
+    def set_series(self, title: str, subtitle: str, points: list[SalesMonthlyComparisonPoint]) -> None:
         self._title = str(title or "Ventas mensuales").strip() or "Ventas mensuales"
         self._subtitle = str(subtitle or "").strip()
         self._points = list(points or [])
@@ -114,12 +118,31 @@ class MonthlySalesChartWidget(QWidget):
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Sin datos mensuales")
             return
 
-        values = [float(point.kilos or 0.0) for point in self._points]
+        values = [float(point.kilos_prev or 0.0) for point in self._points] + [float(point.kilos_curr or 0.0) for point in self._points]
         max_value = max(values) if values else 0.0
         if max_value <= 0:
             painter.setPen(QColor("#6B7280"))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Sin ventas mensuales")
             return
+
+        legend_top = 54
+        legend_x = 16
+        legend_gap = 16
+        prev_color = QColor("#9CA3AF")
+        prev_light = QColor("#D1D5DB")
+        curr_color = QColor("#1E6FEA")
+        curr_light = QColor("#77A9F5")
+
+        legend_font = QFont()
+        legend_font.setPointSize(8)
+        painter.setFont(legend_font)
+        painter.setPen(QColor("#4B5563"))
+        painter.fillRect(legend_x, legend_top, 10, 10, prev_color)
+        painter.drawRect(legend_x, legend_top, 10, 10)
+        painter.drawText(legend_x + 14, legend_top + 10, "Año anterior")
+        painter.fillRect(legend_x + 96, legend_top, 10, 10, curr_color)
+        painter.drawRect(legend_x + 96, legend_top, 10, 10)
+        painter.drawText(legend_x + 110, legend_top + 10, "Año actual")
 
         left = 56
         top = 62
@@ -153,35 +176,57 @@ class MonthlySalesChartWidget(QWidget):
             painter.drawText(6, y + 4, f"{tick_value:.0f} kg")
             painter.setPen(grid_pen)
 
-        bar_gap = 6.0
-        bar_width = max(10.0, (plot_w - (bar_gap * (len(self._points) - 1))) / max(len(self._points), 1))
-        bar_fill = QColor("#1E6FEA")
-        bar_fill_light = QColor("#77A9F5")
+        group_gap = 8.0
+        bar_gap = 3.0
+        group_width = max(10.0, (plot_w - (group_gap * (len(self._points) - 1))) / max(len(self._points), 1))
+        bar_width = max(4.0, min(18.0, (group_width - bar_gap) / 2.0))
         bar_pen = QPen(QColor("#1A5FCA"))
         bar_pen.setWidth(1)
+        prev_pen = QPen(QColor("#8B95A7"))
+        prev_pen.setWidth(1)
 
         month_font = QFont()
         month_font.setPointSize(8)
         painter.setFont(month_font)
         for idx, point in enumerate(self._points):
-            value = float(point.kilos or 0.0)
-            bar_height = 0.0 if y_max <= 0 else (value / y_max) * plot_h
-            x = left + idx * (bar_width + bar_gap)
-            y = plot_bottom - bar_height
-            rect_h = max(1.0, bar_height)
-            painter.fillRect(int(x), int(y), int(bar_width), int(rect_h), bar_fill)
-            painter.fillRect(int(x), int(y), max(2, int(bar_width * 0.22)), int(rect_h), bar_fill_light)
+            prev_value = float(point.kilos_prev or 0.0)
+            curr_value = float(point.kilos_curr or 0.0)
+            prev_height = 0.0 if y_max <= 0 else (prev_value / y_max) * plot_h
+            curr_height = 0.0 if y_max <= 0 else (curr_value / y_max) * plot_h
+            group_x = left + idx * (group_width + group_gap)
+            prev_x = group_x
+            curr_x = group_x + bar_width + bar_gap
+            prev_y = plot_bottom - prev_height
+            curr_y = plot_bottom - curr_height
+            prev_rect_h = max(1.0, prev_height)
+            curr_rect_h = max(1.0, curr_height)
+            painter.fillRect(int(prev_x), int(prev_y), int(bar_width), int(prev_rect_h), prev_color)
+            painter.fillRect(int(prev_x), int(prev_y), max(2, int(bar_width * 0.22)), int(prev_rect_h), prev_light)
+            painter.setPen(prev_pen)
+            painter.drawRect(int(prev_x), int(prev_y), int(bar_width), int(prev_rect_h))
+            painter.fillRect(int(curr_x), int(curr_y), int(bar_width), int(curr_rect_h), curr_color)
+            painter.fillRect(int(curr_x), int(curr_y), max(2, int(bar_width * 0.22)), int(curr_rect_h), curr_light)
             painter.setPen(bar_pen)
-            painter.drawRect(int(x), int(y), int(bar_width), int(rect_h))
+            painter.drawRect(int(curr_x), int(curr_y), int(bar_width), int(curr_rect_h))
 
             label = MONTH_NAMES[point.month - 1][:3] if 1 <= point.month <= 12 else str(point.month)
             painter.setPen(QColor("#4B5563"))
-            painter.drawText(int(x - 4), plot_bottom + 4, int(bar_width + 8), 14, Qt.AlignmentFlag.AlignHCenter, label)
-            if value > 0:
-                value_label = f"{value:.1f}".replace(".", ",")
+            painter.drawText(int(group_x - 2), plot_bottom + 4, int((bar_width * 2) + bar_gap + 4), 14, Qt.AlignmentFlag.AlignHCenter, label)
+            if prev_value > 0:
+                value_label = f"{prev_value:.1f}".replace(".", ",")
                 painter.drawText(
-                    int(x - 6),
-                    int(max(top + 2, y - 14)),
+                    int(prev_x - 6),
+                    int(max(top + 2, prev_y - 14)),
+                    int(bar_width + 12),
+                    12,
+                    Qt.AlignmentFlag.AlignHCenter,
+                    value_label,
+                )
+            if curr_value > 0:
+                value_label = f"{curr_value:.1f}".replace(".", ",")
+                painter.drawText(
+                    int(curr_x - 6),
+                    int(max(top + 2, curr_y - 14)),
                     int(bar_width + 12),
                     12,
                     Qt.AlignmentFlag.AlignHCenter,
@@ -203,7 +248,7 @@ class MonthlySalesDialog(QDialog):
         *,
         title: str,
         subtitle: str,
-        points: list[SalesMonthlyPoint],
+        points: list[SalesMonthlyComparisonPoint],
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -1311,14 +1356,14 @@ class SalesPage(QWidget):
         if row is None or year <= 0:
             return
         articulo_id, codigo, nombre = row
-        points = self.sales_summary_service.listar_ventas_mensuales_ireks(
+        points = self.sales_summary_service.listar_ventas_mensuales_ireks_comparativa(
             year=year,
             articulo_id=articulo_id,
             cliente_id=self._current_client_id(),
         )
-        subtitle_parts = [part for part in [codigo, nombre, self._current_client_id()] if part]
+        subtitle_parts = [part for part in [codigo, nombre, self._current_client_id(), f"{year - 1} vs {year}"] if part]
         dialog = MonthlySalesDialog(
-            title=f"Ventas mensuales {year}",
+            title=f"Ventas mensuales {year - 1} / {year}",
             subtitle=" | ".join(subtitle_parts),
             points=points,
             parent=self,

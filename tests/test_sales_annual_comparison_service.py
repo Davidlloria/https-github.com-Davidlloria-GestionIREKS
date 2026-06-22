@@ -243,3 +243,48 @@ def test_listar_ventas_mensuales_ireks_returns_12_month_series(isolated_engine) 
     assert series[0].kilos == pytest.approx(16.0)
     assert series[1].kilos == pytest.approx(8.0)
     assert all(point.kilos == pytest.approx(0.0) for point in series[2:])
+
+
+def test_listar_ventas_mensuales_ireks_comparativa_returns_prev_and_curr_years(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        _cliente_id, _fabricante_id, _familia_id, _subfamilia_id = _seed_products(session)
+        session.add(
+            VentaMensualRaw(
+                raw_id="raw-8",
+                lote_id="lote-8",
+                fuente="ireks",
+                cliente_id="cli-1",
+                periodo="2025-03",
+                articulo_codigo_origen="D123",
+                articulo_id="art-1",
+                articulo_descripcion_origen="Producto IREKS",
+                venta_kilos=5.0,
+                venta_kilos_sc=1.0,
+                venta_euros=0.0,
+            )
+        )
+        session.add(
+            VentaMensualRaw(
+                raw_id="raw-9",
+                lote_id="lote-9",
+                fuente="ireks",
+                cliente_id="cli-1",
+                periodo="2026-03",
+                articulo_codigo_origen="D123",
+                articulo_id="art-1",
+                articulo_descripcion_origen="Producto IREKS",
+                venta_kilos=7.0,
+                venta_kilos_sc=2.0,
+                venta_euros=0.0,
+            )
+        )
+        session.commit()
+
+    service = SalesAnnualComparisonService()
+    series = service.listar_ventas_mensuales_ireks_comparativa(2026, "art-1", "cli-1")
+
+    assert len(series) == 12
+    assert series[2].kilos_prev == pytest.approx(6.0)
+    assert series[2].kilos_curr == pytest.approx(9.0)
+    assert all(point.kilos_prev == pytest.approx(0.0) for idx, point in enumerate(series) if idx != 2)
+    assert all(point.kilos_curr == pytest.approx(0.0) for idx, point in enumerate(series) if idx != 2)
