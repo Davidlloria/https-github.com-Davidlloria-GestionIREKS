@@ -1390,6 +1390,7 @@ class SalesPage(QWidget):
                 self.group_header.setColumnWidth(col, width)
             self.totals_table.setColumnWidth(col, width)
         self._sync_chart_actions_width()
+        QTimer.singleShot(0, self._sync_chart_actions_width)
 
     def _sync_aux_column_width(self, logical_index: int, _old_size: int, new_size: int) -> None:
         if not hasattr(self, "group_header") or not hasattr(self, "totals_table"):
@@ -1407,6 +1408,12 @@ class SalesPage(QWidget):
             return
         left_width = self.sales_table.columnWidth(0) + self.sales_table.columnWidth(1)
         self.chart_actions_widget.setFixedWidth(left_width)
+        self.chart_actions_widget.updateGeometry()
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._sync_chart_actions_width()
+        QTimer.singleShot(0, self._sync_chart_actions_width)
 
     def _make_band_label(
         self,
