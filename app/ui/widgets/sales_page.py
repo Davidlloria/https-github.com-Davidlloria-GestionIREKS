@@ -246,8 +246,30 @@ class MonthlySalesChartWidget(QWidget):
         legend.setLabelTextColor("#4B5563")
         legend.setBrush(QColor(255, 255, 255, 220))
         legend.setPen(QColor("#D5DCE8"))
-        legend.addItem(pg.PlotDataItem([], [], pen=pg.mkPen("#8B95A7"), symbolBrush="#A7B3C5", symbolSize=8), "Año anterior")
-        legend.addItem(pg.PlotDataItem([], [], pen=pg.mkPen("#1A5FCA"), symbolBrush="#1E6FEA", symbolSize=8), "Año actual")
+        legend.addItem(
+            pg.PlotDataItem(
+                [],
+                [],
+                pen=pg.mkPen("#475569", width=3),
+                symbol="o",
+                symbolBrush="#475569",
+                symbolPen="#475569",
+                symbolSize=10,
+            ),
+            "Año anterior",
+        )
+        legend.addItem(
+            pg.PlotDataItem(
+                [],
+                [],
+                pen=pg.mkPen("#2563EB", width=3),
+                symbol="o",
+                symbolBrush="#2563EB",
+                symbolPen="#2563EB",
+                symbolSize=10,
+            ),
+            "Año actual",
+        )
 
     @staticmethod
     def _build_tooltip(month: int, prev_value: float, curr_value: float) -> str:
@@ -282,6 +304,9 @@ class MonthlySalesChartWidget(QWidget):
                     QToolTip.showText(
                         self._plot.mapToGlobal(scene_pos),
                         self._build_tooltip(month, prev_value, curr_value),
+                        self._plot,
+                        self._plot.rect(),
+                        10000,
                     )
                     return
         QToolTip.hideText()
@@ -1446,7 +1471,7 @@ class SalesPage(QWidget):
             articulo_id=articulo_id,
             cliente_id=self._current_client_id(),
         )
-        subtitle_parts = [part for part in [codigo, nombre, self._current_client_id(), f"{year - 1} vs {year}"] if part]
+        subtitle_parts = [part for part in [codigo, nombre, f"{year - 1} vs {year}"] if part]
         dialog = MonthlySalesDialog(
             title=f"Ventas mensuales {year - 1} / {year}",
             subtitle=" | ".join(subtitle_parts),
