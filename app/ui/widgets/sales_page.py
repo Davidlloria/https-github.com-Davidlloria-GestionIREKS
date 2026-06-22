@@ -11,13 +11,13 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
-    QDialogButtonBox,
     QApplication,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
     QSizePolicy,
+    QPushButton,
     QToolButton,
     QTableWidget,
     QTableWidgetItem,
@@ -504,14 +504,25 @@ class MonthlySalesDialog(QDialog):
         self.chart_mode_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.chart_mode_btn.setIconSize(QSize(18, 18))
         self.chart_mode_btn.setFixedSize(40, 36)
+        self.chart_mode_btn.setStyleSheet(
+            "QToolButton {"
+            "background-color: #FDE68A;"
+            "border: 1px solid #F59E0B;"
+            "border-radius: 8px;"
+            "}"
+            "QToolButton:hover { background-color: #FCD34D; }"
+            "QToolButton:pressed { background-color: #FBBF24; }"
+        )
         self.chart_mode_btn.clicked.connect(lambda: self._toggle_chart_mode(chart))
         bottom_row.addWidget(self.chart_mode_btn)
 
         bottom_row.addStretch(1)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(self.reject)
-        bottom_row.addWidget(buttons)
+        close_btn = QPushButton("Close")
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setFixedSize(88, 36)
+        close_btn.clicked.connect(self.reject)
+        bottom_row.addWidget(close_btn)
         layout.addLayout(bottom_row)
         self._sync_chart_mode_button(chart)
 
