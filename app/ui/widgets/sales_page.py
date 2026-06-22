@@ -666,9 +666,9 @@ class SalesPage(QWidget):
         self.sales_chart_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.sales_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.sales_chart_btn.setFixedHeight(36)
-        self.sales_chart_btn.setFixedWidth(156)
+        self.sales_chart_btn.setFixedWidth(108)
         self.sales_chart_btn.setEnabled(False)
-        self.sales_chart_btn.setText("Gráfico producto")
+        self.sales_chart_btn.setText("Producto")
         self.sales_chart_btn.setStyleSheet(
             """
             QToolButton {
@@ -676,8 +676,8 @@ class SalesPage(QWidget):
                 border: 1px solid #245FCC;
                 border-radius: 8px;
                 color: #FFFFFF;
-                padding: 0 10px;
-                font-size: 11px;
+                padding: 0 6px;
+                font-size: 9px;
                 font-weight: 600;
             }
             QToolButton:hover {
@@ -702,9 +702,9 @@ class SalesPage(QWidget):
         self.sales_total_chart_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.sales_total_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.sales_total_chart_btn.setFixedHeight(36)
-        self.sales_total_chart_btn.setFixedWidth(138)
+        self.sales_total_chart_btn.setFixedWidth(108)
         self.sales_total_chart_btn.setEnabled(False)
-        self.sales_total_chart_btn.setText("Gráfico total")
+        self.sales_total_chart_btn.setText("Total")
         self.sales_total_chart_btn.setStyleSheet(
             """
             QToolButton {
@@ -712,8 +712,8 @@ class SalesPage(QWidget):
                 border: 1px solid #11706D;
                 border-radius: 8px;
                 color: #FFFFFF;
-                padding: 0 10px;
-                font-size: 11px;
+                padding: 0 6px;
+                font-size: 9px;
                 font-weight: 600;
             }
             QToolButton:hover {
@@ -734,7 +734,7 @@ class SalesPage(QWidget):
 
         chart_band = QHBoxLayout()
         chart_band.setContentsMargins(0, 0, 0, 0)
-        chart_band.setSpacing(8)
+        chart_band.setSpacing(4)
         chart_band.addWidget(self.sales_chart_btn)
         chart_band.addWidget(self.sales_total_chart_btn)
         chart_band.addStretch(1)
@@ -773,7 +773,7 @@ class SalesPage(QWidget):
 
         header_band = QHBoxLayout()
         header_band.setContentsMargins(0, 0, 0, 0)
-        header_band.setSpacing(10)
+        header_band.setSpacing(6)
         header_band.addLayout(chart_band)
         header_band.addWidget(self.group_header, 1)
         layout.addLayout(header_band)
