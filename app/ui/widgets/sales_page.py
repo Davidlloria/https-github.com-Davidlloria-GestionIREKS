@@ -805,7 +805,7 @@ class SalesPage(QWidget):
         self.sales_chart_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.sales_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.sales_chart_btn.setFixedHeight(36)
-        self.sales_chart_btn.setFixedWidth(108)
+        self.sales_chart_btn.setFixedWidth(96)
         self.sales_chart_btn.setEnabled(False)
         self.sales_chart_btn.setText("Producto")
         self.sales_chart_btn.setStyleSheet(
@@ -841,7 +841,7 @@ class SalesPage(QWidget):
         self.sales_total_chart_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.sales_total_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.sales_total_chart_btn.setFixedHeight(36)
-        self.sales_total_chart_btn.setFixedWidth(108)
+        self.sales_total_chart_btn.setFixedWidth(96)
         self.sales_total_chart_btn.setEnabled(False)
         self.sales_total_chart_btn.setText("Total")
         self.sales_total_chart_btn.setStyleSheet(
@@ -877,7 +877,7 @@ class SalesPage(QWidget):
         self.sales_analysis_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.sales_analysis_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.sales_analysis_btn.setFixedHeight(36)
-        self.sales_analysis_btn.setFixedWidth(114)
+        self.sales_analysis_btn.setFixedWidth(100)
         self.sales_analysis_btn.setEnabled(False)
         self.sales_analysis_btn.setText("Análisis")
         self.sales_analysis_btn.setStyleSheet(
