@@ -2,8 +2,8 @@
 
 from datetime import date
 
-from PySide6.QtCore import QTimer, Qt, QSize, QRectF
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtCore import QTimer, Qt, QSize
+from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -81,144 +81,59 @@ class CodeTableWidgetItem(QTableWidgetItem):
         return super().__lt__(other)
 
 
-class MonthlySalesBarSeriesItem(pg.GraphicsObject if pg is not None else object):
-    def __init__(
-        self,
-        points: list[SalesMonthlyComparisonPoint],
-        *,
-        prev_color: str,
-        prev_edge: str,
-        curr_color: str,
-        curr_edge: str,
-        hover_tooltip,
-    ) -> None:
-        super().__init__()
-        self._points = list(points)
-        self._prev_brush = QColor(prev_color)
-        self._prev_pen = QPen(QColor(prev_edge))
-        self._curr_brush = QColor(curr_color)
-        self._curr_pen = QPen(QColor(curr_edge))
-        self._hover_tooltip = hover_tooltip
-        self._bars: list[dict[str, object]] = []
-        self._bounds = QRectF(0.5, 0.0, 12.0, 1.0)
-        if pg is not None:
-            self.setAcceptHoverEvents(True)
-        self._rebuild_geometry()
-
-    def _rebuild_geometry(self) -> None:
-        self.prepareGeometryChange()
-        self._bars = []
-        max_value = max(
-            [float(point.kilos_prev or 0.0) for point in self._points] + [float(point.kilos_curr or 0.0) for point in self._points] + [0.0]
-        )
-        if max_value <= 0:
-            max_value = 1.0
-        top_padding = max_value * 0.18
-        self._bounds = QRectF(0.5, 0.0, 12.0, max_value + top_padding)
-        for point in self._points:
-            month = int(point.month or 0)
-            prev_value = float(point.kilos_prev or 0.0)
-            curr_value = float(point.kilos_curr or 0.0)
-            prev_rect = QRectF(month - 0.36, 0.0, 0.28, prev_value)
-            curr_rect = QRectF(month + 0.08, 0.0, 0.28, curr_value)
-            self._bars.append(
-                {
-                    "month": month,
-                    "prev_value": prev_value,
-                    "curr_value": curr_value,
-                    "prev_rect": prev_rect,
-                    "curr_rect": curr_rect,
-                }
-            )
-
-    def boundingRect(self) -> QRectF:  # type: ignore[override]
-        return self._bounds
-
-    def paint(self, painter: QPainter, _option, _widget=None) -> None:  # type: ignore[override]
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
-        for bar in self._bars:
-            prev_rect = bar["prev_rect"]
-            curr_rect = bar["curr_rect"]
-            prev_value = float(bar["prev_value"])
-            curr_value = float(bar["curr_value"])
-
-            if prev_value > 0:
-                painter.fillRect(prev_rect, self._prev_brush)
-                painter.setPen(self._prev_pen)
-                painter.drawRect(prev_rect)
-            if curr_value > 0:
-                painter.fillRect(curr_rect, self._curr_brush)
-                painter.setPen(self._curr_pen)
-                painter.drawRect(curr_rect)
-
-    def hoverEvent(self, event) -> None:  # type: ignore[override]
-        if pg is None:
-            return
-        if event.isExit():
-            QToolTip.hideText()
-            event.accept()
-            return
-        pos = event.pos()
-        for bar in self._bars:
-            month = int(bar["month"])
-            prev_rect: QRectF = bar["prev_rect"]
-            curr_rect: QRectF = bar["curr_rect"]
-            prev_value = float(bar["prev_value"])
-            curr_value = float(bar["curr_value"])
-            if prev_rect.contains(pos) or curr_rect.contains(pos):
-                screen_pos = event.screenPos().toPoint()
-                text = self._hover_tooltip(month, prev_value, curr_value)
-                QToolTip.showText(screen_pos, text)
-                event.accept()
-                return
-        QToolTip.hideText()
-        event.ignore()
-
-
 class MonthlySalesChartWidget(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._title = "Ventas mensuales"
         self._subtitle = ""
         self._points: list[SalesMonthlyComparisonPoint] = []
+        self._bar_regions: list[dict[str, float | int | str]] = []
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         if pg is None:
             placeholder = QLabel("pyqtgraph no esta instalado")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            placeholder.setMinimumSize(760, 360)
+            placeholder.setMinimumSize(520, 260)
             placeholder.setStyleSheet("color: #6B7280; background: #FFFFFF;")
             layout.addWidget(placeholder)
             self._plot = None
         else:
             self._plot = pg.PlotWidget(parent=self)
             self._plot.setBackground("#FFFFFF")
-            self._plot.showGrid(x=False, y=True, alpha=0.22)
+            self._plot.showGrid(x=False, y=True, alpha=0.18)
             self._plot.setMenuEnabled(False)
             self._plot.setMouseEnabled(x=False, y=False)
             self._plot.setAntialiasing(True)
             self._plot.hideButtons()
+            self._plot.hideAxis("top")
+            self._plot.hideAxis("right")
             plot_item = self._plot.getPlotItem()
-            plot_item.layout.setContentsMargins(4, 4, 4, 4)
-            plot_item.getAxis("left").setWidth(46)
-            plot_item.getAxis("bottom").setHeight(28)
-            self._plot.setMinimumSize(640, 300)
+            plot_item.layout.setContentsMargins(2, 2, 2, 2)
+            plot_item.getAxis("left").setWidth(42)
+            plot_item.getAxis("bottom").setHeight(24)
+            plot_item.getAxis("left").setStyle(tickTextOffset=4)
+            plot_item.getAxis("bottom").setStyle(tickTextOffset=4)
+            self._plot.setMinimumSize(560, 260)
+            self._plot.scene().sigMouseMoved.connect(self._on_scene_mouse_moved)
             layout.addWidget(self._plot)
 
     def set_series(self, title: str, subtitle: str, points: list[SalesMonthlyComparisonPoint]) -> None:
         self._title = str(title or "Ventas mensuales").strip() or "Ventas mensuales"
         self._subtitle = str(subtitle or "").strip()
         self._points = list(points or [])
+        self._bar_regions = []
         if self._plot is None:
             return
         self._plot.clear()
         plot_item = self._plot.getPlotItem()
-        plot_item.setTitle(f"<span style='font-size:12pt;font-weight:600;color:#111827'>{self._title}</span>")
-        plot_item.setLabel("top", "")
+        plot_item.setTitle("")
+        plot_item.showAxis("top", False)
+        plot_item.showAxis("right", False)
 
         if not self._points:
             plot_item.setLabel("left", "")
+            plot_item.setLabel("bottom", "")
             plot_item.showGrid(x=False, y=False)
             text = pg.TextItem("Sin datos mensuales", color="#6B7280", anchor=(0.5, 0.5))
             text.setPos(5.5, 0.0)
@@ -229,6 +144,7 @@ class MonthlySalesChartWidget(QWidget):
         max_value = max(values) if values else 0.0
         if max_value <= 0:
             plot_item.setLabel("left", "")
+            plot_item.setLabel("bottom", "")
             plot_item.showGrid(x=False, y=False)
             text = pg.TextItem("Sin ventas mensuales", color="#6B7280", anchor=(0.5, 0.5))
             text.setPos(5.5, 0.0)
@@ -236,19 +152,70 @@ class MonthlySalesChartWidget(QWidget):
             return
 
         plot_item.setLabel("left", "<span style='color:#4B5563'>Kg</span>")
+        plot_item.setLabel("bottom", "")
         plot_item.showGrid(x=False, y=True, alpha=0.18)
         plot_item.setMenuEnabled(False)
 
-        self._plot.addItem(
-            MonthlySalesBarSeriesItem(
-                self._points,
-                prev_color="#A7B3C5",
-                prev_edge="#8B95A7",
-                curr_color="#1E6FEA",
-                curr_edge="#1A5FCA",
-                hover_tooltip=self._build_tooltip,
+        prev_x = []
+        prev_h = []
+        curr_x = []
+        curr_h = []
+        bar_width = 0.28
+        prev_offset = -0.18
+        curr_offset = 0.18
+        for point in self._points:
+            month = int(point.month or 0)
+            prev_value = float(point.kilos_prev or 0.0)
+            curr_value = float(point.kilos_curr or 0.0)
+            if prev_value > 0:
+                prev_x.append(month + prev_offset)
+                prev_h.append(prev_value)
+                self._bar_regions.append(
+                    {
+                        "month": month,
+                        "series": "prev",
+                        "x1": month + prev_offset - bar_width / 2.0,
+                        "x2": month + prev_offset + bar_width / 2.0,
+                        "y1": 0.0,
+                        "y2": prev_value,
+                        "value": prev_value,
+                    }
+                )
+            if curr_value > 0:
+                curr_x.append(month + curr_offset)
+                curr_h.append(curr_value)
+                self._bar_regions.append(
+                    {
+                        "month": month,
+                        "series": "curr",
+                        "x1": month + curr_offset - bar_width / 2.0,
+                        "x2": month + curr_offset + bar_width / 2.0,
+                        "y1": 0.0,
+                        "y2": curr_value,
+                        "value": curr_value,
+                    }
+                )
+
+        if prev_x:
+            self._plot.addItem(
+                pg.BarGraphItem(
+                    x=prev_x,
+                    height=prev_h,
+                    width=bar_width,
+                    brush=QColor("#A7B3C5"),
+                    pen=QColor("#8B95A7"),
+                )
             )
-        )
+        if curr_x:
+            self._plot.addItem(
+                pg.BarGraphItem(
+                    x=curr_x,
+                    height=curr_h,
+                    width=bar_width,
+                    brush=QColor("#1E6FEA"),
+                    pen=QColor("#1A5FCA"),
+                )
+            )
 
         value_font = QFont()
         value_font.setPointSize(8)
@@ -256,12 +223,12 @@ class MonthlySalesChartWidget(QWidget):
             if float(point.kilos_prev or 0.0) > 0:
                 prev_label = pg.TextItem(f"{float(point.kilos_prev or 0.0):.1f}".replace(".", ","), color="#4B5563", anchor=(0.5, 1.0))
                 prev_label.setFont(value_font)
-                prev_label.setPos(point.month - 0.22, float(point.kilos_prev or 0.0) + max_value * 0.03)
+                prev_label.setPos(point.month + prev_offset, float(point.kilos_prev or 0.0) + max_value * 0.04)
                 self._plot.addItem(prev_label)
             if float(point.kilos_curr or 0.0) > 0:
                 curr_label = pg.TextItem(f"{float(point.kilos_curr or 0.0):.1f}".replace(".", ","), color="#4B5563", anchor=(0.5, 1.0))
                 curr_label.setFont(value_font)
-                curr_label.setPos(point.month + 0.22, float(point.kilos_curr or 0.0) + max_value * 0.03)
+                curr_label.setPos(point.month + curr_offset, float(point.kilos_curr or 0.0) + max_value * 0.04)
                 self._plot.addItem(curr_label)
 
         axis = self._plot.getAxis("bottom")
@@ -270,12 +237,15 @@ class MonthlySalesChartWidget(QWidget):
         axis.setPen("#D5DCE8")
         self._plot.getAxis("left").setPen("#D5DCE8")
         y_max = self._nice_step(max_value) * 5
-        self._plot.setYRange(0, y_max, padding=0.04)
-        self._plot.setXRange(0.5, 12.5, padding=0.02)
-        self._plot.showGrid(x=False, y=True, alpha=0.2)
+        self._plot.setYRange(0, y_max, padding=0.08)
+        self._plot.setXRange(0.5, 12.5, padding=0.03)
+        self._plot.showGrid(x=False, y=True, alpha=0.18)
 
         legend = pg.LegendItem(offset=(16, 16))
         legend.setParentItem(plot_item.vb)
+        legend.setLabelTextColor("#4B5563")
+        legend.setBrush(QColor(255, 255, 255, 220))
+        legend.setPen(QColor("#D5DCE8"))
         legend.addItem(pg.PlotDataItem([], [], pen=pg.mkPen("#8B95A7"), symbolBrush="#A7B3C5", symbolSize=8), "Año anterior")
         legend.addItem(pg.PlotDataItem([], [], pen=pg.mkPen("#1A5FCA"), symbolBrush="#1E6FEA", symbolSize=8), "Año actual")
 
@@ -285,6 +255,45 @@ class MonthlySalesChartWidget(QWidget):
         prev_text = f"{prev_value:.1f}".replace(".", ",")
         curr_text = f"{curr_value:.1f}".replace(".", ",")
         return f"{label}\nAño anterior: {prev_text} kg\nAño actual: {curr_text} kg"
+
+    def _on_scene_mouse_moved(self, pos) -> None:
+        if self._plot is None or not self._bar_regions:
+            QToolTip.hideText()
+            return
+        view_box = self._plot.getPlotItem().vb
+        if view_box.sceneBoundingRect().contains(pos):
+            mouse_point = view_box.mapSceneToView(pos)
+            x_pos = float(mouse_point.x())
+            y_pos = float(mouse_point.y())
+            for bar in self._bar_regions:
+                x1 = float(bar["x1"])
+                x2 = float(bar["x2"])
+                y1 = float(bar["y1"])
+                y2 = float(bar["y2"])
+                if x1 <= x_pos <= x2 and y1 <= y_pos <= y2:
+                    month = int(bar["month"])
+                    series = str(bar["series"])
+                    value = float(bar["value"])
+                    prev_value = value if series == "prev" else self._value_for_month(month, "prev")
+                    curr_value = value if series == "curr" else self._value_for_month(month, "curr")
+                    scene_pos = self._plot.mapFromScene(pos)
+                    if hasattr(scene_pos, "toPoint"):
+                        scene_pos = scene_pos.toPoint()
+                    QToolTip.showText(
+                        self._plot.mapToGlobal(scene_pos),
+                        self._build_tooltip(month, prev_value, curr_value),
+                    )
+                    return
+        QToolTip.hideText()
+
+    def _value_for_month(self, month: int, series: str) -> float:
+        for point in self._points:
+            if int(point.month or 0) != month:
+                continue
+            if series == "prev":
+                return float(point.kilos_prev or 0.0)
+            return float(point.kilos_curr or 0.0)
+        return 0.0
 
     @staticmethod
     def _nice_step(max_value: float) -> float:
@@ -309,15 +318,15 @@ class MonthlySalesDialog(QDialog):
         screen = self.screen() or QApplication.primaryScreen()
         if screen is not None:
             available = screen.availableGeometry()
-            self.resize(min(920, max(700, available.width() - 80)), min(520, max(380, available.height() - 120)))
-            self.setMinimumSize(min(760, max(640, available.width() - 160)), min(380, max(320, available.height() - 200)))
+            self.resize(min(880, max(680, available.width() - 64)), min(500, max(360, available.height() - 96)))
+            self.setMinimumSize(min(700, max(600, available.width() - 180)), min(340, max(300, available.height() - 220)))
         else:
-            self.resize(820, 420)
-            self.setMinimumSize(680, 360)
+            self.resize(780, 420)
+            self.setMinimumSize(640, 320)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
 
         header = QVBoxLayout()
         title_label = QLabel(title)
