@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QLineEdit,
     QPlainTextEdit,
-    QFrame,
     QSizePolicy,
     QPushButton,
     QToolButton,
@@ -770,7 +769,19 @@ class SalesPage(QWidget):
         igsa_layout = QVBoxLayout(igsa_tab)
         igsa_filters_top = QHBoxLayout()
         igsa_filters_top.setContentsMargins(0, 0, 0, 0)
-        igsa_filters_top.setSpacing(12)
+        igsa_filters_top.setSpacing(18)
+
+        def create_igsa_filter_group(label_text: str, combo: QComboBox) -> QWidget:
+            group = QWidget()
+            group_layout = QHBoxLayout(group)
+            group_layout.setContentsMargins(0, 0, 0, 0)
+            group_layout.setSpacing(4)
+            group_label = QLabel(label_text)
+            group_label.setStyleSheet("padding-right: 2px;")
+            group_layout.addWidget(group_label)
+            group_layout.addWidget(combo)
+            group.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            return group
 
         igsa_year_group = QWidget()
         igsa_year_layout = QHBoxLayout(igsa_year_group)
@@ -813,46 +824,20 @@ class SalesPage(QWidget):
         igsa_acumulado_group.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         igsa_filters_top.addWidget(igsa_acumulado_group)
 
-        igsa_separator = QFrame()
-        igsa_separator.setFrameShape(QFrame.Shape.VLine)
-        igsa_separator.setFrameShadow(QFrame.Shadow.Plain)
-        igsa_separator.setStyleSheet("color: #CBD5E1; background: #CBD5E1;")
-        igsa_separator.setFixedWidth(1)
-        igsa_separator.setFixedHeight(26)
-        igsa_filters_top.addWidget(igsa_separator)
-
-        igsa_manufacturer_group = QWidget()
-        igsa_manufacturer_layout = QHBoxLayout(igsa_manufacturer_group)
-        igsa_manufacturer_layout.setContentsMargins(0, 0, 0, 0)
-        igsa_manufacturer_layout.setSpacing(4)
-        igsa_manufacturer_layout.addWidget(QLabel("Fabricante"))
         self.manufacturer_filter_igsa = QComboBox()
         self.manufacturer_filter_igsa.currentIndexChanged.connect(self._on_manufacturer_changed_igsa)
         self.manufacturer_filter_igsa.setMinimumWidth(190)
-        igsa_manufacturer_layout.addWidget(self.manufacturer_filter_igsa)
-        igsa_filters_top.addWidget(igsa_manufacturer_group)
+        igsa_filters_top.addWidget(create_igsa_filter_group("Fabricante", self.manufacturer_filter_igsa))
 
-        igsa_family_group = QWidget()
-        igsa_family_layout = QHBoxLayout(igsa_family_group)
-        igsa_family_layout.setContentsMargins(0, 0, 0, 0)
-        igsa_family_layout.setSpacing(4)
-        igsa_family_layout.addWidget(QLabel("Familia"))
         self.family_filter_igsa = QComboBox()
         self.family_filter_igsa.currentIndexChanged.connect(self._on_family_changed_igsa)
         self.family_filter_igsa.setMinimumWidth(190)
-        igsa_family_layout.addWidget(self.family_filter_igsa)
-        igsa_filters_top.addWidget(igsa_family_group)
+        igsa_filters_top.addWidget(create_igsa_filter_group("Familia", self.family_filter_igsa))
 
-        igsa_subfamily_group = QWidget()
-        igsa_subfamily_layout = QHBoxLayout(igsa_subfamily_group)
-        igsa_subfamily_layout.setContentsMargins(0, 0, 0, 0)
-        igsa_subfamily_layout.setSpacing(4)
-        igsa_subfamily_layout.addWidget(QLabel("Subfamilia"))
         self.subfamily_filter_igsa = QComboBox()
         self.subfamily_filter_igsa.currentIndexChanged.connect(self.reload_igsa)
         self.subfamily_filter_igsa.setMinimumWidth(190)
-        igsa_subfamily_layout.addWidget(self.subfamily_filter_igsa)
-        igsa_filters_top.addWidget(igsa_subfamily_group)
+        igsa_filters_top.addWidget(create_igsa_filter_group("Subfamilia", self.subfamily_filter_igsa))
         igsa_layout.addLayout(igsa_filters_top)
 
         igsa_filters_bottom = QHBoxLayout()
@@ -977,7 +962,19 @@ class SalesPage(QWidget):
 
         filters_top = QHBoxLayout()
         filters_top.setContentsMargins(0, 0, 0, 0)
-        filters_top.setSpacing(12)
+        filters_top.setSpacing(18)
+
+        def create_filter_group(label_text: str, combo: QComboBox) -> QWidget:
+            group = QWidget()
+            group_layout = QHBoxLayout(group)
+            group_layout.setContentsMargins(0, 0, 0, 0)
+            group_layout.setSpacing(4)
+            group_label = QLabel(label_text)
+            group_label.setStyleSheet("padding-right: 2px;")
+            group_layout.addWidget(group_label)
+            group_layout.addWidget(combo)
+            group.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            return group
 
         year_group = QWidget()
         year_layout = QHBoxLayout(year_group)
@@ -1020,46 +1017,20 @@ class SalesPage(QWidget):
         acumulado_group.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         filters_top.addWidget(acumulado_group)
 
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.VLine)
-        separator.setFrameShadow(QFrame.Shadow.Plain)
-        separator.setStyleSheet("color: #CBD5E1; background: #CBD5E1;")
-        separator.setFixedWidth(1)
-        separator.setFixedHeight(26)
-        filters_top.addWidget(separator)
-
-        manufacturer_group = QWidget()
-        manufacturer_layout = QHBoxLayout(manufacturer_group)
-        manufacturer_layout.setContentsMargins(0, 0, 0, 0)
-        manufacturer_layout.setSpacing(4)
-        manufacturer_layout.addWidget(QLabel("Fabricante"))
         self.manufacturer_filter = QComboBox()
         self.manufacturer_filter.currentIndexChanged.connect(self._on_manufacturer_changed)
         self.manufacturer_filter.setMinimumWidth(190)
-        manufacturer_layout.addWidget(self.manufacturer_filter)
-        filters_top.addWidget(manufacturer_group)
+        filters_top.addWidget(create_filter_group("Fabricante", self.manufacturer_filter))
 
-        family_group = QWidget()
-        family_layout = QHBoxLayout(family_group)
-        family_layout.setContentsMargins(0, 0, 0, 0)
-        family_layout.setSpacing(4)
-        family_layout.addWidget(QLabel("Familia"))
         self.family_filter = QComboBox()
         self.family_filter.currentIndexChanged.connect(self._on_family_changed)
         self.family_filter.setMinimumWidth(190)
-        family_layout.addWidget(self.family_filter)
-        filters_top.addWidget(family_group)
+        filters_top.addWidget(create_filter_group("Familia", self.family_filter))
 
-        subfamily_group = QWidget()
-        subfamily_layout = QHBoxLayout(subfamily_group)
-        subfamily_layout.setContentsMargins(0, 0, 0, 0)
-        subfamily_layout.setSpacing(4)
-        subfamily_layout.addWidget(QLabel("Subfamilia"))
         self.subfamily_filter = QComboBox()
         self.subfamily_filter.currentIndexChanged.connect(self.reload)
         self.subfamily_filter.setMinimumWidth(190)
-        subfamily_layout.addWidget(self.subfamily_filter)
-        filters_top.addWidget(subfamily_group)
+        filters_top.addWidget(create_filter_group("Subfamilia", self.subfamily_filter))
 
         layout.addLayout(filters_top)
 
