@@ -33,8 +33,8 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - dependency guard
     pg = None
 
+from app.services.sales_ai_assistant_service import SalesQueryAssistantService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow, SalesMonthlyComparisonPoint
-from app.services.openai_process_service import OpenAIProcessService
 from app.services.sales_reconciliation_service import SalesReconciliationService
 
 
@@ -560,10 +560,17 @@ class MonthlySalesDialog(QDialog):
 
 
 class SalesAnalysisDialog(QDialog):
-    def __init__(self, *, title: str, context_text: str, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        title: str,
+        defaults: dict[str, object],
+        sales_service: SalesAnnualComparisonService,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
-        self._context_text = str(context_text or "").strip()
-        self._service = OpenAIProcessService()
+        self._defaults = dict(defaults or {})
+        self._assistant = SalesQueryAssistantService(sales_service=sales_service)
         self.setWindowTitle(title)
         screen = self.screen() or QApplication.primaryScreen()
         if screen is not None:
@@ -631,12 +638,11 @@ class SalesAnalysisDialog(QDialog):
         if not question:
             QMessageBox.warning(self, "Análisis de ventas", "Escribe una consulta antes de consultar a ChatGPT.")
             return
-        prompt = self._build_prompt(question)
         self.consult_btn.setEnabled(False)
         self.response_edit.setPlainText("Consultando ChatGPT...")
         QApplication.setOverrideCursor(QCursor(Qt.CursorShape.WaitCursor))
         try:
-            result = self._service.generate_process(prompt)
+            result = self._assistant.answer(question, self._defaults)
         finally:
             QApplication.restoreOverrideCursor()
             self.consult_btn.setEnabled(True)
@@ -644,17 +650,6 @@ class SalesAnalysisDialog(QDialog):
         if not output:
             output = "Sin respuesta."
         self.response_edit.setPlainText(output)
-
-    def _build_prompt(self, question: str) -> str:
-        return (
-            "Eres un analista de ventas experto en IREKS.\n"
-            "Responde en español, con foco práctico y directo.\n"
-            "Usa únicamente el contexto proporcionado y la pregunta del usuario.\n"
-            "No limites el análisis a una fila concreta: analiza la tabla completa de ventas cargada.\n"
-            "Si faltan datos, dilo con claridad sin inventar cifras.\n\n"
-            f"Contexto de ventas:\n{self._context_text}\n\n"
-            f"Consulta del usuario:\n{question}\n"
-        )
 
 
 class SalesPage(QWidget):
@@ -1942,79 +1937,38 @@ class SalesPage(QWidget):
         client_name = self._current_client_name() or "Todos los clientes"
         dialog = SalesAnalysisDialog(
             title=f"Análisis de ventas {year} | {client_name}",
-            context_text=self._build_sales_analysis_context(),
+            defaults=self._build_sales_analysis_defaults(),
+            sales_service=self.sales_summary_service,
             parent=self,
         )
         dialog.exec()
 
-    def _build_sales_analysis_context(self) -> str:
-        def combo_text(widget) -> str:
-            if widget is None:
-                return ""
-            try:
-                text = str(widget.currentText() or "").strip()
-            except Exception:
-                text = ""
-            return text
-
-        def line_edit_text(widget) -> str:
-            if widget is None:
-                return ""
-            try:
-                return str(widget.text() or "").strip()
-            except Exception:
-                return ""
-
-        year = self._current_year()
-        month = self._current_month()
-        acumulado = bool(getattr(self, "acumulado_check", None) and self.acumulado_check.isChecked())
-        cliente_id = self._current_client_id()
-        fabricante_id = self._current_manufacturer_id()
+    def _build_sales_analysis_defaults(self) -> dict[str, object]:
+        selected = self._selected_sales_row()
+        client_id = self._current_client_id()
+        client_name = self._current_client_name()
+        product_text = self._current_product_text()
+        manufacturer_id = self._current_manufacturer_id()
         family_id = self._current_family_id()
         subfamily_id = self._current_subfamily_id()
-        product_texto = self._current_product_text()
-
-        rows = self.sales_summary_service.listar_resumen_anual(
-            year=year,
-            month=month,
-            acumulado=acumulado,
-            cliente_id=cliente_id,
-            producto_texto=product_texto,
-            fabricante_id=fabricante_id,
-            familia_id=family_id,
-            subfamilia_id=subfamily_id,
-        )
-
-        lines = [
-            "Datos obtenidos directamente de la base de datos de ventas.",
-            "El análisis debe considerar toda la tabla resultante del servicio, no solo lo visible en pantalla.",
-            f"Año: {year}",
-            f"Cliente: {self._current_client_name() or 'Todos los clientes'}",
-            f"Mes: {combo_text(getattr(self, 'month_filter', None))}",
-            f"Acumulado: {'Sí' if acumulado else 'No'}",
-            f"Fabricante: {combo_text(getattr(self, 'manufacturer_filter', None))}",
-            f"Familia: {combo_text(getattr(self, 'family_filter', None))}",
-            f"Subfamilia: {combo_text(getattr(self, 'subfamily_filter', None))}",
-            f"Producto filtrado: {line_edit_text(getattr(self, 'product_filter', None)) or 'Sin filtro'}",
-            f"Filas analizadas desde DB: {len(rows)}",
-        ]
-        selected = self._selected_sales_row()
-        if selected is not None:
-            articulo_id, codigo, nombre = selected
-            lines.append(f"Producto seleccionado: {codigo} | {nombre} | ID {articulo_id}")
-
-        lines.append("")
-        lines.append("Tabla completa devuelta por el servicio:")
-        for row in rows:
-            lines.append(
-                f"- {row.codigo} | {row.nombre} | "
-                f"Kg {year - 1}: {self._fmt_num(row.kilos_prev)} | S/C {year - 1}: {self._fmt_num(row.sc_prev)} | Ventas {year - 1}: {self._fmt_money(row.ventas_prev)} | "
-                f"Kg {year}: {self._fmt_num(row.kilos_curr)} | S/C {year}: {self._fmt_num(row.sc_curr)} | Ventas {year}: {self._fmt_money(row.ventas_curr)} | "
-                f"Δ kg: {self._fmt_num(row.delta_kg)} | Δ kg %: {self._fmt_pct(row.delta_kg_pct)} | "
-                f"Δ €: {self._fmt_money(row.delta_ventas)} | Δ € %: {self._fmt_pct(row.delta_ventas_pct)}"
-            )
-
-        return "\n".join(lines).strip()
+        defaults: dict[str, object] = {
+            "year": self._current_year(),
+            "month": self._current_month(),
+            "acumulado": bool(getattr(self, "acumulado_check", None) and self.acumulado_check.isChecked()),
+            "cliente_id": client_id,
+            "cliente_texto": client_name if client_id else "",
+            "articulo_id": selected[0] if selected is not None else "",
+            "producto_texto": product_text,
+            "fabricante_id": manufacturer_id,
+            "familia_id": family_id,
+            "subfamilia_id": subfamily_id,
+            "limit": 200,
+        }
+        if client_name == "Todos los clientes":
+            defaults["cliente_texto"] = ""
+        if not product_text:
+            defaults["producto_texto"] = ""
+        return defaults
 
     def _fmt_num(self, value) -> str:
         number = float(value or 0.0)

@@ -47,6 +47,22 @@ class SalesMonthlyComparisonPoint:
     kilos_curr: float
 
 
+@dataclass
+class SalesDetailRow:
+    periodo: str
+    cliente_id: str
+    cliente_nombre: str
+    articulo_id: str
+    codigo: str
+    nombre: str
+    fabricante_id: str
+    familia_id: str
+    subfamilia_id: str
+    kilos: float
+    sc: float
+    ventas: float
+
+
 class SalesAnnualComparisonService:
     def __init__(self, db_engine=None) -> None:
         self._engine = db_engine if db_engine is not None else engine
@@ -434,6 +450,184 @@ class SalesAnnualComparisonService:
             bucket[f"ventas_{suffix}"] = float(bucket[f"ventas_{suffix}"] or 0.0) + float(row.venta_euros or 0.0)
 
         return self._build_rows(totals)
+
+    def listar_detalle_ventas(
+        self,
+        year: int,
+        month: int = 0,
+        acumulado: bool = False,
+        cliente_id: str = "",
+        cliente_texto: str = "",
+        articulo_id: str = "",
+        producto_texto: str = "",
+        fabricante_id: str = "",
+        familia_id: str = "",
+        subfamilia_id: str = "",
+        limit: int = 200,
+    ) -> list[SalesDetailRow]:
+        current_year = int(year or 0)
+        if current_year <= 0:
+            return []
+        clean_month = int(month or 0)
+        if 1 <= clean_month <= 12:
+            months = list(range(1, clean_month + 1)) if bool(acumulado) else [clean_month]
+        else:
+            months = list(range(1, 13))
+        periods = [f"{current_year:04d}-{m:02d}" for m in months]
+        clean_cliente_id = str(cliente_id or "").strip()
+        clean_cliente_text = self._normalize_search_text(cliente_texto)
+        clean_articulo_id = str(articulo_id or "").strip()
+        clean_producto_text = self._normalize_search_text(producto_texto)
+        clean_fabricante_id = str(fabricante_id or "").strip()
+        clean_familia_id = str(familia_id or "").strip()
+        clean_subfamilia_id = str(subfamilia_id or "").strip()
+        clean_limit = max(int(limit or 0), 0)
+
+        with Session(self._engine) as session:
+            stmt = select(VentaMensualRaw).where(
+                col(VentaMensualRaw.fuente) == "ireks",
+                col(VentaMensualRaw.periodo).in_(periods),
+            )
+            if clean_cliente_id:
+                stmt = stmt.where(col(VentaMensualRaw.cliente_id) == clean_cliente_id)
+            raw_rows = list(session.exec(stmt))
+            products = list(session.exec(select(IngredienteIreks)))
+            clients = list(session.exec(select(Cliente)))
+
+        client_by_id: dict[str, tuple[str, str]] = {}
+        client_search: list[tuple[str, str, str]] = []
+        for client in clients:
+            cid = str(client.cliente_id or "").strip()
+            label = str(client.cliente_nombre_comercial or client.cliente_nombre_fiscal or cid).strip()
+            searchable = self._normalize_search_text(
+                " ".join(
+                    [
+                        str(getattr(client, "cliente_codigo", "") or ""),
+                        str(client.cliente_nombre_comercial or ""),
+                        str(client.cliente_nombre_fiscal or ""),
+                        str(client.cliente_abreviatura or ""),
+                    ]
+                )
+            )
+            if cid:
+                client_by_id[cid] = (cid, label or cid)
+                client_search.append((cid, label or cid, searchable))
+
+        product_by_id: dict[str, tuple[str, str, str, str, str, str, str]] = {}
+        product_by_code: dict[str, tuple[str, str, str, str, str, str, str]] = {}
+        for product in products:
+            aid = str(product.articulo_id or "").strip()
+            short_ref = str(product.articulo_referencia_corta or "").strip()
+            full_ref = str(product.articulo_referencia or "").strip()
+            display_code = short_ref or full_ref
+            display_name = str(product.articulo_descripcion or "").strip()
+            fabricante = str(product.fabricante_id or "").strip()
+            familia = str(product.articulo_familia_id or "").strip()
+            subfamilia = str(product.articulo_subfamilia_id or "").strip()
+            searchable = self._normalize_search_text(" ".join([display_code, display_name, short_ref, full_ref]))
+            if aid:
+                product_by_id[aid] = (aid, display_code, display_name, fabricante, familia, subfamilia, searchable)
+            for candidate in (short_ref, full_ref):
+                norm = self._normalize_code(candidate)
+                if norm:
+                    product_by_code[norm] = (
+                        aid,
+                        display_code or str(candidate or "").strip(),
+                        display_name,
+                        fabricante,
+                        familia,
+                        subfamilia,
+                        searchable,
+                    )
+
+        grouped: dict[tuple[str, str, str], dict[str, str | float]] = defaultdict(
+            lambda: {
+                "periodo": "",
+                "cliente_id": "",
+                "cliente_nombre": "",
+                "articulo_id": "",
+                "codigo": "",
+                "nombre": "",
+                "fabricante_id": "",
+                "familia_id": "",
+                "subfamilia_id": "",
+                "kilos": 0.0,
+                "sc": 0.0,
+                "ventas": 0.0,
+            }
+        )
+
+        for row in raw_rows:
+            row_periodo = str(getattr(row, "periodo", "") or "").strip()
+            row_cliente_id = str(getattr(row, "cliente_id", "") or "").strip()
+            row_articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+            row_code = self._normalize_code(getattr(row, "articulo_codigo_origen", ""))
+            product = product_by_id.get(row_articulo_id) if row_articulo_id else None
+            if product is None and row_code:
+                product = product_by_code.get(row_code)
+            product_id = str(product[0] if product else row_articulo_id).strip()
+            product_code = str(product[1] if product else row_code).strip()
+            product_name = str(product[2] if product else getattr(row, "articulo_descripcion_origen", "") or "").strip()
+            product_fabricante_id = str(product[3] if product else "").strip()
+            product_familia_id = str(product[4] if product else "").strip()
+            product_subfamilia_id = str(product[5] if product else "").strip()
+            product_searchable = str(product[6] if product else self._normalize_search_text(product_name)).strip()
+
+            client = client_by_id.get(row_cliente_id)
+            client_name = str(client[1] if client else row_cliente_id).strip()
+            client_searchable = next((search for cid, _label, search in client_search if cid == row_cliente_id), "")
+
+            if clean_cliente_id and row_cliente_id != clean_cliente_id:
+                continue
+            if clean_cliente_text and clean_cliente_text not in client_searchable:
+                continue
+            if clean_articulo_id and product_id != clean_articulo_id:
+                continue
+            if clean_producto_text and clean_producto_text not in product_searchable:
+                continue
+            if clean_fabricante_id and product_fabricante_id != clean_fabricante_id:
+                continue
+            if clean_familia_id and product_familia_id != clean_familia_id:
+                continue
+            if clean_subfamilia_id and product_subfamilia_id != clean_subfamilia_id:
+                continue
+
+            key = (row_periodo, row_cliente_id or client_name, product_id or product_code or product_name)
+            bucket = grouped[key]
+            bucket["periodo"] = row_periodo
+            bucket["cliente_id"] = row_cliente_id
+            bucket["cliente_nombre"] = client_name
+            bucket["articulo_id"] = product_id
+            bucket["codigo"] = product_code
+            bucket["nombre"] = product_name
+            bucket["fabricante_id"] = product_fabricante_id
+            bucket["familia_id"] = product_familia_id
+            bucket["subfamilia_id"] = product_subfamilia_id
+            bucket["kilos"] = float(bucket["kilos"] or 0.0) + float(getattr(row, "venta_kilos", 0.0) or 0.0)
+            bucket["sc"] = float(bucket["sc"] or 0.0) + float(getattr(row, "venta_kilos_sc", 0.0) or 0.0)
+            bucket["ventas"] = float(bucket["ventas"] or 0.0) + float(getattr(row, "venta_euros", 0.0) or 0.0)
+
+        rows = [
+            SalesDetailRow(
+                periodo=str(values["periodo"] or ""),
+                cliente_id=str(values["cliente_id"] or ""),
+                cliente_nombre=str(values["cliente_nombre"] or ""),
+                articulo_id=str(values["articulo_id"] or ""),
+                codigo=str(values["codigo"] or ""),
+                nombre=str(values["nombre"] or ""),
+                fabricante_id=str(values["fabricante_id"] or ""),
+                familia_id=str(values["familia_id"] or ""),
+                subfamilia_id=str(values["subfamilia_id"] or ""),
+                kilos=float(values["kilos"] or 0.0),
+                sc=float(values["sc"] or 0.0),
+                ventas=float(values["ventas"] or 0.0),
+            )
+            for values in grouped.values()
+        ]
+        rows.sort(key=lambda row: (row.periodo, row.cliente_nombre.lower(), row.nombre.lower(), row.codigo.lower()))
+        if clean_limit > 0:
+            return rows[:clean_limit]
+        return rows
 
     def listar_ventas_mensuales_ireks(self, year: int, articulo_id: str, cliente_id: str = "") -> list[SalesMonthlyPoint]:
         current_year = int(year or 0)
