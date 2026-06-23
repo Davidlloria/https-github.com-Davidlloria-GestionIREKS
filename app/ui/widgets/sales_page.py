@@ -1205,9 +1205,15 @@ class SalesPage(QWidget):
         header_band = QHBoxLayout()
         header_band.setContentsMargins(0, 0, 0, 0)
         header_band.setSpacing(0)
-        header_band.addWidget(self.chart_actions_widget)
         header_band.addWidget(self.group_header, 1)
         layout.addLayout(header_band)
+
+        actions_band = QHBoxLayout()
+        actions_band.setContentsMargins(0, 0, 0, 0)
+        actions_band.setSpacing(8)
+        actions_band.addWidget(self.chart_actions_widget)
+        actions_band.addStretch(1)
+        layout.addLayout(actions_band)
 
         self.sales_table = QTableWidget(0, 12)
         self.sales_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
