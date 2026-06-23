@@ -642,7 +642,8 @@ class SalesAnalysisDialog(QDialog):
         self.response_edit.setPlainText("Consultando ChatGPT...")
         QApplication.setOverrideCursor(QCursor(Qt.CursorShape.WaitCursor))
         try:
-            result = self._assistant.answer(question, self._defaults)
+            # The analysis query must not inherit the visible sales-page filters.
+            result = self._assistant.answer(question, {})
         finally:
             QApplication.restoreOverrideCursor()
             self.consult_btn.setEnabled(True)
