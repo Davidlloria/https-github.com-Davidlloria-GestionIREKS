@@ -110,9 +110,8 @@ class SalesReconciliationService:
             data = self._read_json(file_path)
         except ValueError as exc:
             return SalesOpResult(False, str(exc))
-        if not isinstance(data, list):
-            return SalesOpResult(False, "El JSON de IREKS debe ser una lista de filas.")
-        if not data:
+        rows_data, default_year, default_month, default_cliente_id = self._normalize_ireks_json_payload(data)
+        if not rows_data:
             return SalesOpResult(False, "El JSON de IREKS no contiene filas.")
 
         file_hash = self._file_hash(file_path)
@@ -149,13 +148,17 @@ class SalesReconciliationService:
                     norm_name = self._normalize_search_text(raw_name)
                     if norm_name:
                         allowed_by_name[norm_name] = cliente_id_val
-            for item in data:
+            for item in rows_data:
                 if not isinstance(item, dict):
                     skipped += 1
                     continue
 
                 year = self._to_int(self._get_any(item, "venta_Anio", "venta_Anio".lower(), "anio", "año"))
                 month = self._parse_month(self._get_any(item, "venta_Mes", "mes", "venta_Mes".lower()))
+                if year <= 0:
+                    year = default_year
+                if month < 1 or month > 12:
+                    month = default_month
                 if year <= 0 or month < 1 or month > 12:
                     skipped += 1
                     continue
@@ -164,6 +167,8 @@ class SalesReconciliationService:
                 if not first_period:
                     first_period = periodo
                 cliente_id = str(self._get_any(item, "Cliente_ID", "cliente_id", "ClienteId", "clienteid") or "").strip()
+                if not cliente_id:
+                    cliente_id = default_cliente_id
                 if cliente_id and not first_cliente_id:
                     first_cliente_id = cliente_id
 
@@ -666,6 +671,44 @@ class SalesReconciliationService:
         if raw_name and raw_name in allowed_by_name:
             return allowed_by_name[raw_name]
         return raw_id
+
+    def _normalize_ireks_json_payload(self, data: object) -> tuple[list[dict[str, object]], int, int, str]:
+        default_year = 0
+        default_month = 0
+        default_cliente_id = ""
+        rows_source: list[object] | None = None
+
+        if isinstance(data, list):
+            rows_source = data
+        elif isinstance(data, dict):
+            for key in ("articulos", "items", "filas", "rows", "lineas"):
+                value = data.get(key)
+                if isinstance(value, list):
+                    rows_source = value
+                    break
+            cliente = data.get("cliente")
+            if isinstance(cliente, dict):
+                default_cliente_id = str(self._get_any(cliente, "id", "cliente_id", "Cliente_ID", "ClienteId") or "").strip()
+            if not default_cliente_id:
+                default_cliente_id = str(
+                    self._get_any(data, "cliente_id", "Cliente_ID", "ClienteId", "distribuidor_uuid") or ""
+                ).strip()
+            periodo = data.get("periodo")
+            if isinstance(periodo, dict):
+                default_year = self._to_int(self._get_any(periodo, "anio", "año", "year"))
+                default_month = self._parse_month(self._get_any(periodo, "mes", "month"))
+                if default_month < 1:
+                    default_month = self._to_int(self._get_any(periodo, "mes_numero", "numero_mes"))
+            elif isinstance(periodo, str):
+                raw_periodo = str(periodo or "").strip()
+                match = re.fullmatch(r"(\d{4})[-/](\d{1,2})", raw_periodo)
+                if match is not None:
+                    default_year = self._to_int(match.group(1))
+                    default_month = self._to_int(match.group(2))
+
+        if rows_source is None:
+            return [], default_year, default_month, default_cliente_id
+        return [item for item in rows_source if isinstance(item, dict)], default_year, default_month, default_cliente_id
 
     def _sync_igsa_sales_to_warehouse(self, session: Session, raw_rows: list[VentaMensualRaw]) -> None:
         article_ids = sorted(

@@ -1,28 +1,46 @@
 ﻿from __future__ import annotations
 
 from datetime import date
+import math
+from pathlib import Path
 
-from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtCore import QTimer, Qt, QSize
+from PySide6.QtGui import QColor, QCursor, QFont, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QComboBox,
+    QDialog,
+    QApplication,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMessageBox,
     QLineEdit,
+    QPlainTextEdit,
     QSizePolicy,
+    QPushButton,
+    QToolButton,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
     QVBoxLayout,
+    QToolTip,
     QWidget,
 )
+try:
+    import pyqtgraph as pg
+except ModuleNotFoundError:  # pragma: no cover - dependency guard
+    pg = None
 
-from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow
+from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow, SalesMonthlyComparisonPoint
+from app.services.openai_process_service import OpenAIProcessService
 from app.services.sales_reconciliation_service import SalesReconciliationService
 
+
+BASE_DIR = Path(__file__).resolve().parents[3]
+CHART_COLUMN_ICON_PATH = BASE_DIR / "assets" / "icons" / "chart-column.svg"
+CHART_LINE_ICON_PATH = BASE_DIR / "assets" / "icons" / "chart-line.svg"
 
 MONTH_NAMES = [
     "Enero",
@@ -69,6 +87,574 @@ class CodeTableWidgetItem(QTableWidgetItem):
         if isinstance(left, tuple) and isinstance(right, tuple):
             return left < right
         return super().__lt__(other)
+
+
+class MonthlySalesChartWidget(QWidget):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._title = "Ventas mensuales"
+        self._subtitle = ""
+        self._points: list[SalesMonthlyComparisonPoint] = []
+        self._hover_regions: list[dict[str, float | int | str]] = []
+        self._active_bar_key: tuple[int, str] | None = None
+        self._tooltip_text = ""
+        self._tooltip_global_pos = None
+        self._hover_y_margin = 5.0
+        self._chart_mode = "bar"
+        self._hover_refresh_timer = QTimer(self)
+        self._hover_refresh_timer.setInterval(250)
+        self._hover_refresh_timer.timeout.connect(self._refresh_hover_tooltip)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        if pg is None:
+            placeholder = QLabel("pyqtgraph no esta instalado")
+            placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            placeholder.setMinimumSize(520, 260)
+            placeholder.setStyleSheet("color: #6B7280; background: #FFFFFF;")
+            layout.addWidget(placeholder)
+            self._plot = None
+        else:
+            self._plot = pg.PlotWidget(parent=self)
+            self._plot.setBackground("#FFFFFF")
+            self._plot.showGrid(x=False, y=True, alpha=0.18)
+            self._plot.setMenuEnabled(False)
+            self._plot.setMouseEnabled(x=False, y=False)
+            self._plot.setAntialiasing(True)
+            self._plot.hideButtons()
+            self._plot.hideAxis("top")
+            self._plot.hideAxis("right")
+            plot_item = self._plot.getPlotItem()
+            plot_item.layout.setContentsMargins(2, 2, 2, 2)
+            plot_item.getAxis("left").setWidth(42)
+            plot_item.getAxis("bottom").setHeight(24)
+            plot_item.getAxis("left").setStyle(tickTextOffset=4)
+            plot_item.getAxis("bottom").setStyle(tickTextOffset=4)
+            self._plot.setMinimumSize(560, 260)
+            self._plot.scene().sigMouseMoved.connect(self._on_scene_mouse_moved)
+            layout.addWidget(self._plot)
+
+    def set_series(self, title: str, subtitle: str, points: list[SalesMonthlyComparisonPoint]) -> None:
+        self._title = str(title or "Ventas mensuales").strip() or "Ventas mensuales"
+        self._subtitle = str(subtitle or "").strip()
+        self._points = list(points or [])
+        self._hover_regions = []
+        self._active_bar_key = None
+        self._tooltip_text = ""
+        self._tooltip_global_pos = None
+        self._hover_refresh_timer.stop()
+        if self._plot is None:
+            return
+        self._plot.clear()
+        plot_item = self._plot.getPlotItem()
+        plot_item.setTitle("")
+        plot_item.showAxis("top", False)
+        plot_item.showAxis("right", False)
+
+        if not self._points:
+            plot_item.setLabel("left", "")
+            plot_item.setLabel("bottom", "")
+            plot_item.showGrid(x=False, y=False)
+            text = pg.TextItem("Sin datos mensuales", color="#6B7280", anchor=(0.5, 0.5))
+            text.setPos(5.5, 0.0)
+            self._plot.addItem(text)
+            return
+
+        values = [float(point.kilos_prev or 0.0) for point in self._points] + [float(point.kilos_curr or 0.0) for point in self._points]
+        max_value = max(values) if values else 0.0
+        self._hover_y_margin = max(max_value * 0.035, 5.0)
+        if max_value <= 0:
+            plot_item.setLabel("left", "")
+            plot_item.setLabel("bottom", "")
+            plot_item.showGrid(x=False, y=False)
+            text = pg.TextItem("Sin ventas mensuales", color="#6B7280", anchor=(0.5, 0.5))
+            text.setPos(5.5, 0.0)
+            self._plot.addItem(text)
+            return
+
+        plot_item.setLabel("left", "<span style='color:#4B5563'>Kg</span>")
+        plot_item.setLabel("bottom", "")
+        plot_item.showGrid(x=False, y=True, alpha=0.18)
+        plot_item.setMenuEnabled(False)
+
+        value_font = QFont()
+        value_font.setPointSize(8)
+        if self._chart_mode == "line":
+            prev_x = [int(point.month or 0) for point in self._points]
+            prev_y = [float(point.kilos_prev or 0.0) for point in self._points]
+            curr_x = [int(point.month or 0) for point in self._points]
+            curr_y = [float(point.kilos_curr or 0.0) for point in self._points]
+            self._plot.addItem(
+                pg.PlotDataItem(
+                    prev_x,
+                    prev_y,
+                    pen=pg.mkPen("#8B95A7", width=2.4),
+                    symbol="o",
+                    symbolBrush="#A7B3C5",
+                    symbolPen="#7B8794",
+                    symbolSize=8,
+                )
+            )
+            self._plot.addItem(
+                pg.PlotDataItem(
+                    curr_x,
+                    curr_y,
+                    pen=pg.mkPen("#1A5FCA", width=2.4),
+                    symbol="o",
+                    symbolBrush="#1E6FEA",
+                    symbolPen="#1A5FCA",
+                    symbolSize=8,
+                )
+            )
+            for point in self._points:
+                month = int(point.month or 0)
+                prev_value = float(point.kilos_prev or 0.0)
+                curr_value = float(point.kilos_curr or 0.0)
+                self._hover_regions.append(
+                    {
+                        "month": month,
+                        "series": "prev",
+                        "x1": month - 0.16,
+                        "x2": month + 0.16,
+                        "y1": prev_value - self._hover_y_margin,
+                        "y2": prev_value + self._hover_y_margin,
+                        "value": prev_value,
+                    }
+                )
+                self._hover_regions.append(
+                    {
+                        "month": month,
+                        "series": "curr",
+                        "x1": month - 0.16,
+                        "x2": month + 0.16,
+                        "y1": curr_value - self._hover_y_margin,
+                        "y2": curr_value + self._hover_y_margin,
+                        "value": curr_value,
+                    }
+                )
+                if prev_value > 0:
+                    prev_label = pg.TextItem(f"{prev_value:.1f}".replace(".", ","), color="#4B5563", anchor=(0.5, 1.0))
+                    prev_label.setFont(value_font)
+                    prev_label.setPos(month, prev_value + max_value * 0.04)
+                    self._plot.addItem(prev_label)
+                if curr_value > 0:
+                    curr_label = pg.TextItem(f"{curr_value:.1f}".replace(".", ","), color="#4B5563", anchor=(0.5, 1.0))
+                    curr_label.setFont(value_font)
+                    curr_label.setPos(month, curr_value + max_value * 0.04)
+                    self._plot.addItem(curr_label)
+        else:
+            prev_x = []
+            prev_h = []
+            curr_x = []
+            curr_h = []
+            bar_width = 0.28
+            prev_offset = -0.18
+            curr_offset = 0.18
+            for point in self._points:
+                month = int(point.month or 0)
+                prev_value = float(point.kilos_prev or 0.0)
+                curr_value = float(point.kilos_curr or 0.0)
+                if prev_value > 0:
+                    prev_x.append(month + prev_offset)
+                    prev_h.append(prev_value)
+                    self._hover_regions.append(
+                        {
+                            "month": month,
+                            "series": "prev",
+                            "x1": month + prev_offset - bar_width / 2.0,
+                            "x2": month + prev_offset + bar_width / 2.0,
+                            "y1": 0.0,
+                            "y2": prev_value,
+                            "value": prev_value,
+                        }
+                    )
+                if curr_value > 0:
+                    curr_x.append(month + curr_offset)
+                    curr_h.append(curr_value)
+                    self._hover_regions.append(
+                        {
+                            "month": month,
+                            "series": "curr",
+                            "x1": month + curr_offset - bar_width / 2.0,
+                            "x2": month + curr_offset + bar_width / 2.0,
+                            "y1": 0.0,
+                            "y2": curr_value,
+                            "value": curr_value,
+                        }
+                    )
+
+            if prev_x:
+                self._plot.addItem(
+                    pg.BarGraphItem(
+                        x=prev_x,
+                        height=prev_h,
+                        width=bar_width,
+                        brush=QColor("#A7B3C5"),
+                        pen=QColor("#8B95A7"),
+                    )
+                )
+            if curr_x:
+                self._plot.addItem(
+                    pg.BarGraphItem(
+                        x=curr_x,
+                        height=curr_h,
+                        width=bar_width,
+                        brush=QColor("#1E6FEA"),
+                        pen=QColor("#1A5FCA"),
+                    )
+                )
+
+            for point in self._points:
+                if float(point.kilos_prev or 0.0) > 0:
+                    prev_label = pg.TextItem(f"{float(point.kilos_prev or 0.0):.1f}".replace(".", ","), color="#4B5563", anchor=(0.5, 1.0))
+                    prev_label.setFont(value_font)
+                    prev_label.setPos(point.month + prev_offset, float(point.kilos_prev or 0.0) + max_value * 0.04)
+                    self._plot.addItem(prev_label)
+                if float(point.kilos_curr or 0.0) > 0:
+                    curr_label = pg.TextItem(f"{float(point.kilos_curr or 0.0):.1f}".replace(".", ","), color="#4B5563", anchor=(0.5, 1.0))
+                    curr_label.setFont(value_font)
+                    curr_label.setPos(point.month + curr_offset, float(point.kilos_curr or 0.0) + max_value * 0.04)
+                    self._plot.addItem(curr_label)
+
+        axis = self._plot.getAxis("bottom")
+        axis.setTicks([[(point.month, MONTH_NAMES[point.month - 1][:3]) for point in self._points]])
+        axis.setStyle(tickTextOffset=6)
+        axis.setPen("#D5DCE8")
+        self._plot.getAxis("left").setPen("#D5DCE8")
+        y_max = self._nice_step(max_value) * 5
+        self._plot.setYRange(0, y_max, padding=0.08)
+        self._plot.setXRange(0.5, 12.5, padding=0.03)
+        self._plot.showGrid(x=False, y=True, alpha=0.18)
+
+        legend = pg.LegendItem(offset=(16, 16))
+        legend.setParentItem(plot_item.vb)
+        legend.setLabelTextColor("#4B5563")
+        legend.setBrush(QColor(255, 255, 255, 220))
+        legend.setPen(QColor("#D5DCE8"))
+        legend.addItem(
+            pg.PlotDataItem(
+                [],
+                [],
+                pen=pg.mkPen("#475569", width=3),
+                symbol="o",
+                symbolBrush="#475569",
+                symbolPen="#475569",
+                symbolSize=10,
+            ),
+            "Año anterior",
+        )
+        legend.addItem(
+            pg.PlotDataItem(
+                [],
+                [],
+                pen=pg.mkPen("#2563EB", width=3),
+                symbol="o",
+                symbolBrush="#2563EB",
+                symbolPen="#2563EB",
+                symbolSize=10,
+            ),
+            "Año actual",
+        )
+
+    @staticmethod
+    def _build_tooltip(month: int, prev_value: float, curr_value: float) -> str:
+        label = MONTH_NAMES[month - 1] if 1 <= month <= 12 else str(month)
+        prev_text = f"{prev_value:.1f}".replace(".", ",")
+        curr_text = f"{curr_value:.1f}".replace(".", ",")
+        return f"{label}\nAño anterior: {prev_text} kg\nAño actual: {curr_text} kg"
+
+    def _on_scene_mouse_moved(self, pos) -> None:
+        if self._plot is None or not self._hover_regions:
+            self._clear_hover_tooltip()
+            return
+        view_box = self._plot.getPlotItem().vb
+        if view_box.sceneBoundingRect().contains(pos):
+            mouse_point = view_box.mapSceneToView(pos)
+            x_pos = float(mouse_point.x())
+            y_pos = float(mouse_point.y())
+            bar = self._find_bar_at_pos(x_pos, y_pos)
+            if bar is None and self._active_bar_key is not None:
+                bar = self._find_bar_at_pos(x_pos, y_pos, key=self._active_bar_key, expanded=True)
+            if bar is not None:
+                self._show_bar_tooltip(bar, pos)
+                return
+        self._clear_hover_tooltip()
+
+    def _find_bar_at_pos(self, x_pos: float, y_pos: float, key: tuple[int, str] | None = None, expanded: bool = False):
+        x_margin = 0.12 if expanded else 0.02
+        y_margin = self._hover_y_margin if expanded else 0.0
+        for bar in self._hover_regions:
+            month = int(bar["month"])
+            series = str(bar["series"])
+            bar_key = (month, series)
+            if key is not None and bar_key != key:
+                continue
+            x1 = float(bar["x1"]) - x_margin
+            x2 = float(bar["x2"]) + x_margin
+            y1 = float(bar["y1"]) - y_margin
+            y2 = float(bar["y2"]) + y_margin
+            if x1 <= x_pos <= x2 and y1 <= y_pos <= y2:
+                return bar
+        return None
+
+    def _show_bar_tooltip(self, bar, pos) -> None:
+        month = int(bar["month"])
+        series = str(bar["series"])
+        value = float(bar["value"])
+        prev_value = value if series == "prev" else self._value_for_month(month, "prev")
+        curr_value = value if series == "curr" else self._value_for_month(month, "curr")
+        self._active_bar_key = (month, series)
+        self._tooltip_text = self._build_tooltip(month, prev_value, curr_value)
+        scene_pos = self._plot.mapFromScene(pos)
+        if hasattr(scene_pos, "toPoint"):
+            scene_pos = scene_pos.toPoint()
+        self._tooltip_global_pos = self._plot.mapToGlobal(scene_pos)
+        self._hover_refresh_timer.start()
+        QToolTip.showText(
+            self._tooltip_global_pos,
+            self._tooltip_text,
+            self._plot,
+            self._plot.rect(),
+            10000,
+        )
+
+    def _refresh_hover_tooltip(self) -> None:
+        if self._plot is None or self._active_bar_key is None:
+            return
+        if not self._tooltip_text or self._tooltip_global_pos is None:
+            return
+        QToolTip.showText(
+            self._tooltip_global_pos,
+            self._tooltip_text,
+            self._plot,
+            self._plot.rect(),
+            10000,
+        )
+
+    def _clear_hover_tooltip(self) -> None:
+        self._active_bar_key = None
+        self._tooltip_text = ""
+        self._tooltip_global_pos = None
+        self._hover_refresh_timer.stop()
+        QToolTip.hideText()
+
+    def set_chart_mode(self, chart_mode: str) -> None:
+        normalized = str(chart_mode or "").strip().lower()
+        if normalized not in {"bar", "line"}:
+            normalized = "bar"
+        if normalized == self._chart_mode:
+            return
+        self._chart_mode = normalized
+        if self._points:
+            self.set_series(self._title, self._subtitle, self._points)
+
+    def chart_mode(self) -> str:
+        return self._chart_mode
+
+    def _value_for_month(self, month: int, series: str) -> float:
+        for point in self._points:
+            if int(point.month or 0) != month:
+                continue
+            if series == "prev":
+                return float(point.kilos_prev or 0.0)
+            return float(point.kilos_curr or 0.0)
+        return 0.0
+
+    @staticmethod
+    def _nice_step(max_value: float) -> float:
+        raw = max(float(max_value or 0.0) / 5.0, 1.0)
+        magnitude = 10.0 ** max(0, int(math.floor(math.log10(raw))))
+        for factor in (1.0, 2.0, 2.5, 5.0, 10.0):
+            step = magnitude * factor
+            if raw <= step:
+                return step
+        return magnitude * 10.0
+
+
+class MonthlySalesDialog(QDialog):
+    def __init__(
+        self,
+        *,
+        title: str,
+        subtitle: str,
+        points: list[SalesMonthlyComparisonPoint],
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._chart_mode = "bar"
+        self.setWindowTitle(title)
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            self.resize(min(880, max(680, available.width() - 64)), min(500, max(360, available.height() - 96)))
+            self.setMinimumSize(min(700, max(600, available.width() - 180)), min(340, max(300, available.height() - 220)))
+        else:
+            self.resize(780, 420)
+            self.setMinimumSize(640, 320)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
+
+        header = QVBoxLayout()
+        title_label = QLabel(title)
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet("color: #111827;")
+        header.addWidget(title_label)
+        if subtitle:
+            subtitle_label = QLabel(subtitle)
+            subtitle_font = QFont()
+            subtitle_font.setPointSize(9)
+            subtitle_label.setFont(subtitle_font)
+            subtitle_label.setStyleSheet("color: #6B7280;")
+            header.addWidget(subtitle_label)
+        layout.addLayout(header)
+
+        chart = MonthlySalesChartWidget(self)
+        chart.set_series(title, subtitle, points)
+        layout.addWidget(chart, 1)
+
+        bottom_row = QHBoxLayout()
+        bottom_row.setContentsMargins(0, 0, 0, 0)
+        bottom_row.setSpacing(8)
+
+        self.chart_mode_btn = QToolButton()
+        self.chart_mode_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chart_mode_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.chart_mode_btn.setIconSize(QSize(18, 18))
+        self.chart_mode_btn.setFixedSize(40, 36)
+        self.chart_mode_btn.setStyleSheet(
+            "QToolButton {"
+            "background-color: #FDE68A;"
+            "border: 1px solid #F59E0B;"
+            "border-radius: 8px;"
+            "}"
+            "QToolButton:hover { background-color: #FCD34D; }"
+            "QToolButton:pressed { background-color: #FBBF24; }"
+        )
+        self.chart_mode_btn.clicked.connect(lambda: self._toggle_chart_mode(chart))
+        bottom_row.addWidget(self.chart_mode_btn)
+
+        bottom_row.addStretch(1)
+
+        close_btn = QPushButton("Close")
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setFixedSize(88, 36)
+        close_btn.clicked.connect(self.reject)
+        bottom_row.addWidget(close_btn)
+        layout.addLayout(bottom_row)
+        self._sync_chart_mode_button(chart)
+
+    def _sync_chart_mode_button(self, chart: MonthlySalesChartWidget) -> None:
+        is_bar = chart.chart_mode() == "bar"
+        self.chart_mode_btn.setIcon(QIcon(str(CHART_COLUMN_ICON_PATH if is_bar else CHART_LINE_ICON_PATH)))
+        self.chart_mode_btn.setToolTip("Cambiar a gráfico de líneas" if is_bar else "Cambiar a gráfico de barras")
+
+    def _toggle_chart_mode(self, chart: MonthlySalesChartWidget) -> None:
+        next_mode = "line" if chart.chart_mode() == "bar" else "bar"
+        chart.set_chart_mode(next_mode)
+        self._sync_chart_mode_button(chart)
+
+
+class SalesAnalysisDialog(QDialog):
+    def __init__(self, *, title: str, context_text: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._context_text = str(context_text or "").strip()
+        self._service = OpenAIProcessService()
+        self.setWindowTitle(title)
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            self.resize(min(920, max(760, available.width() - 120)), min(700, max(520, available.height() - 140)))
+            self.setMinimumSize(min(780, max(680, available.width() - 220)), min(560, max(420, available.height() - 260)))
+        else:
+            self.resize(860, 620)
+            self.setMinimumSize(720, 520)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+        title_label = QLabel("Análisis de ventas con ChatGPT")
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet("color: #111827;")
+        layout.addWidget(title_label)
+
+        context_label = QLabel("Escribe la consulta y pulsa Consultar. La respuesta aparecerá debajo.")
+        context_label.setWordWrap(True)
+        context_label.setStyleSheet("color: #6B7280;")
+        layout.addWidget(context_label)
+
+        question_label = QLabel("Consulta")
+        question_label.setStyleSheet("color: #374151; font-weight: 600;")
+        layout.addWidget(question_label)
+
+        self.question_edit = QPlainTextEdit()
+        self.question_edit.setPlaceholderText("Ejemplo: resume los productos con mayor crecimiento y detecta caídas relevantes.")
+        self.question_edit.setFixedHeight(120)
+        layout.addWidget(self.question_edit)
+
+        response_label = QLabel("Respuesta")
+        response_label.setStyleSheet("color: #374151; font-weight: 600;")
+        layout.addWidget(response_label)
+
+        self.response_edit = QPlainTextEdit()
+        self.response_edit.setReadOnly(True)
+        self.response_edit.setPlaceholderText("La respuesta de ChatGPT aparecerá aquí.")
+        layout.addWidget(self.response_edit, 1)
+
+        bottom_row = QHBoxLayout()
+        bottom_row.setContentsMargins(0, 0, 0, 0)
+        bottom_row.setSpacing(8)
+
+        self.consult_btn = QPushButton("Consultar")
+        self.consult_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.consult_btn.clicked.connect(self._consult)
+        bottom_row.addWidget(self.consult_btn)
+
+        bottom_row.addStretch(1)
+
+        close_btn = QPushButton("Cerrar")
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.clicked.connect(self.reject)
+        bottom_row.addWidget(close_btn)
+        layout.addLayout(bottom_row)
+
+    def _consult(self) -> None:
+        question = str(self.question_edit.toPlainText() or "").strip()
+        if not question:
+            QMessageBox.warning(self, "Análisis de ventas", "Escribe una consulta antes de consultar a ChatGPT.")
+            return
+        prompt = self._build_prompt(question)
+        self.consult_btn.setEnabled(False)
+        self.response_edit.setPlainText("Consultando ChatGPT...")
+        QApplication.setOverrideCursor(QCursor(Qt.CursorShape.WaitCursor))
+        try:
+            result = self._service.generate_process(prompt)
+        finally:
+            QApplication.restoreOverrideCursor()
+            self.consult_btn.setEnabled(True)
+        output = result.text.strip() if result.ok else result.message.strip()
+        if not output:
+            output = "Sin respuesta."
+        self.response_edit.setPlainText(output)
+
+    def _build_prompt(self, question: str) -> str:
+        return (
+            "Eres un analista de ventas experto en IREKS.\n"
+            "Responde en español, con foco práctico y directo.\n"
+            "Usa únicamente el contexto proporcionado y la pregunta del usuario.\n"
+            "No limites el análisis a una fila concreta: analiza la tabla completa de ventas cargada.\n"
+            "Si faltan datos, dilo con claridad sin inventar cifras.\n\n"
+            f"Contexto de ventas:\n{self._context_text}\n\n"
+            f"Consulta del usuario:\n{question}\n"
+        )
 
 
 class SalesPage(QWidget):
@@ -312,6 +898,114 @@ class SalesPage(QWidget):
         self.product_filter.textChanged.connect(self._schedule_product_reload)
         self.product_filter.setMinimumWidth(300)
         filters_bottom.addWidget(self.product_filter, 1)
+
+        self.sales_chart_btn = QToolButton()
+        self.sales_chart_btn.setToolTip("Ver gráfico del producto")
+        self.sales_chart_btn.setIcon(QIcon(str(CHART_LINE_ICON_PATH)))
+        self.sales_chart_btn.setIconSize(QSize(16, 16))
+        self.sales_chart_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.sales_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sales_chart_btn.setFixedHeight(36)
+        self.sales_chart_btn.setFixedWidth(96)
+        self.sales_chart_btn.setEnabled(False)
+        self.sales_chart_btn.setText("Producto")
+        self.sales_chart_btn.setStyleSheet(
+            """
+            QToolButton {
+                background-color: #2F6FE4;
+                border: 1px solid #245FCC;
+                border-radius: 8px;
+                color: #FFFFFF;
+                padding: 0 6px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            QToolButton:hover {
+                background-color: #3B7CF2;
+            }
+            QToolButton:pressed {
+                background-color: #2253B2;
+            }
+            QToolButton:disabled {
+                background-color: #B9D4FF;
+                border-color: #A8C8FF;
+                color: #5C7DB8;
+            }
+            """
+        )
+        self.sales_chart_btn.clicked.connect(self._open_selected_monthly_sales_dialog)
+
+        self.sales_total_chart_btn = QToolButton()
+        self.sales_total_chart_btn.setToolTip("Ver gráfico total")
+        self.sales_total_chart_btn.setIcon(QIcon(str(CHART_LINE_ICON_PATH)))
+        self.sales_total_chart_btn.setIconSize(QSize(16, 16))
+        self.sales_total_chart_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.sales_total_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sales_total_chart_btn.setFixedHeight(36)
+        self.sales_total_chart_btn.setFixedWidth(96)
+        self.sales_total_chart_btn.setEnabled(False)
+        self.sales_total_chart_btn.setText("Total")
+        self.sales_total_chart_btn.setStyleSheet(
+            """
+            QToolButton {
+                background-color: #148A86;
+                border: 1px solid #11706D;
+                border-radius: 8px;
+                color: #FFFFFF;
+                padding: 0 6px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            QToolButton:hover {
+                background-color: #1A9F99;
+            }
+            QToolButton:pressed {
+                background-color: #0F6763;
+            }
+            QToolButton:disabled {
+                background-color: #BDE6E4;
+                border-color: #BDE6E4;
+                color: #F8FAFC;
+            }
+            """
+        )
+        self.sales_total_chart_btn.clicked.connect(self._open_total_monthly_sales_dialog)
+
+        self.sales_analysis_btn = QToolButton()
+        self.sales_analysis_btn.setToolTip("Análisis")
+        self.sales_analysis_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "brain.svg")))
+        self.sales_analysis_btn.setIconSize(QSize(16, 16))
+        self.sales_analysis_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.sales_analysis_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sales_analysis_btn.setFixedHeight(36)
+        self.sales_analysis_btn.setFixedWidth(100)
+        self.sales_analysis_btn.setEnabled(False)
+        self.sales_analysis_btn.setText("Análisis")
+        self.sales_analysis_btn.setStyleSheet(
+            """
+            QToolButton {
+                background-color: #FDE68A;
+                border: 1px solid #F59E0B;
+                border-radius: 8px;
+                color: #111827;
+                padding: 0 6px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            QToolButton:hover {
+                background-color: #FCD34D;
+            }
+            QToolButton:pressed {
+                background-color: #FBBF24;
+            }
+            QToolButton:disabled {
+                background-color: #FBE7B1;
+                border-color: #F3C35A;
+                color: #6B7280;
+            }
+            """
+        )
+        self.sales_analysis_btn.clicked.connect(self._open_sales_analysis_dialog)
         layout.addLayout(filters_bottom)
 
         self.group_header = QTableWidget(1, 12)
@@ -345,7 +1039,22 @@ class SalesPage(QWidget):
             }
             """
         )
-        layout.addWidget(self.group_header)
+
+        self.chart_actions_widget = QWidget()
+        chart_band = QHBoxLayout(self.chart_actions_widget)
+        chart_band.setContentsMargins(0, 0, 0, 0)
+        chart_band.setSpacing(4)
+        chart_band.addWidget(self.sales_chart_btn)
+        chart_band.addWidget(self.sales_total_chart_btn)
+        chart_band.addWidget(self.sales_analysis_btn)
+        chart_band.addStretch(1)
+
+        header_band = QHBoxLayout()
+        header_band.setContentsMargins(0, 0, 0, 0)
+        header_band.setSpacing(0)
+        header_band.addWidget(self.chart_actions_widget)
+        header_band.addWidget(self.group_header, 1)
+        layout.addLayout(header_band)
 
         self.sales_table = QTableWidget(0, 12)
         self.sales_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -353,6 +1062,7 @@ class SalesPage(QWidget):
         self.sales_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.sales_table.verticalHeader().setVisible(False)
         self.sales_table.setSortingEnabled(True)
+        self.sales_table.itemSelectionChanged.connect(self._update_sales_chart_button_state)
         self.sales_table.setHorizontalHeaderLabels(
             [
                 "Cod.",
@@ -437,6 +1147,17 @@ class SalesPage(QWidget):
 
     def _current_client_id(self) -> str:
         return str(self.client_filter.currentData() or "").strip()
+
+    def _current_client_name(self) -> str:
+        label = str(self.client_filter.currentText() or "").strip()
+        if not label:
+            return "Todos los clientes"
+        if label.lower() == "todos":
+            return "Todos los clientes"
+        if label.endswith(")") and " (" in label:
+            trimmed = label.rsplit(" (", 1)[0].strip()
+            return trimmed or label
+        return label
 
     def _current_product_text(self) -> str:
         return str(self.product_filter.text() or "").strip()
@@ -762,11 +1483,17 @@ class SalesPage(QWidget):
         }
         for col, width in widths.items():
             self.sales_table_igsa.setColumnWidth(col, width)
-            self.group_header_igsa.setColumnWidth(col, width)
+            if col in {0, 1}:
+                self.group_header_igsa.setColumnWidth(col, 0)
+            else:
+                self.group_header_igsa.setColumnWidth(col, width)
             self.totals_table_igsa.setColumnWidth(col, width)
 
     def _sync_aux_column_width_igsa(self, logical_index: int, _old_size: int, new_size: int) -> None:
-        self.group_header_igsa.setColumnWidth(logical_index, new_size)
+        if logical_index in {0, 1}:
+            self.group_header_igsa.setColumnWidth(logical_index, 0)
+        else:
+            self.group_header_igsa.setColumnWidth(logical_index, new_size)
         self.totals_table_igsa.setColumnWidth(logical_index, new_size)
 
     def _set_group_item_igsa(self, column: int, text: str, color: str, span: int = 1) -> None:
@@ -786,6 +1513,8 @@ class SalesPage(QWidget):
             else:
                 label.setStyleSheet("background-color: #F3F6FA; border: 1px solid #000000; border-radius: 0; padding: 0;")
             self.group_header_igsa.setCellWidget(0, col, label)
+        self.group_header_igsa.setColumnWidth(0, 0)
+        self.group_header_igsa.setColumnWidth(1, 0)
         self._set_group_item_igsa(2, str(year - 1), "#3E5064", 3)
         self._set_group_item_igsa(5, str(year), "#0F766E", 3)
         self._set_group_item_igsa(8, "Diferencias", "#111827", 4)
@@ -932,14 +1661,36 @@ class SalesPage(QWidget):
         }
         for col, width in widths.items():
             self.sales_table.setColumnWidth(col, width)
-            self.group_header.setColumnWidth(col, width)
+            if col in {0, 1}:
+                self.group_header.setColumnWidth(col, 0)
+            else:
+                self.group_header.setColumnWidth(col, width)
             self.totals_table.setColumnWidth(col, width)
+        self._sync_chart_actions_width()
+        QTimer.singleShot(0, self._sync_chart_actions_width)
 
     def _sync_aux_column_width(self, logical_index: int, _old_size: int, new_size: int) -> None:
         if not hasattr(self, "group_header") or not hasattr(self, "totals_table"):
             return
-        self.group_header.setColumnWidth(logical_index, new_size)
+        if logical_index in {0, 1}:
+            self.group_header.setColumnWidth(logical_index, 0)
+        else:
+            self.group_header.setColumnWidth(logical_index, new_size)
         self.totals_table.setColumnWidth(logical_index, new_size)
+        if logical_index in {0, 1}:
+            self._sync_chart_actions_width()
+
+    def _sync_chart_actions_width(self) -> None:
+        if not hasattr(self, "chart_actions_widget") or not hasattr(self, "sales_table"):
+            return
+        left_width = self.sales_table.columnWidth(0) + self.sales_table.columnWidth(1)
+        self.chart_actions_widget.setFixedWidth(left_width)
+        self.chart_actions_widget.updateGeometry()
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._sync_chart_actions_width()
+        QTimer.singleShot(0, self._sync_chart_actions_width)
 
     def _make_band_label(
         self,
@@ -977,6 +1728,8 @@ class SalesPage(QWidget):
             else:
                 label.setStyleSheet("background-color: #F3F6FA; border: 1px solid #000000; border-radius: 0; padding: 0;")
             self.group_header.setCellWidget(0, col, label)
+        self.group_header.setColumnWidth(0, 0)
+        self.group_header.setColumnWidth(1, 0)
         self._set_group_item(2, str(year - 1), "#3E5064", 3)
         self._set_group_item(5, str(year), "#0F766E", 3)
         self._set_group_item(8, "Diferencias", "#111827", 4)
@@ -1027,10 +1780,15 @@ class SalesPage(QWidget):
                 else:
                     item = QTableWidgetItem(str(value or ""))
                     item.setToolTip(str(value or ""))
+                    if col == 0:
+                        item.setData(Qt.ItemDataRole.UserRole, row.articulo_id)
+                    elif col == 1:
+                        item.setData(Qt.ItemDataRole.UserRole, row.nombre)
                 self.sales_table.setItem(idx, col, item)
 
         self.sales_table.setSortingEnabled(True)
         self._fill_totals_row(total_prev_kg, total_prev_sc, total_prev_sales, total_curr_kg, total_curr_sc, total_curr_sales)
+        self._update_sales_chart_button_state()
 
     def _fill_totals_row(
         self,
@@ -1116,6 +1874,147 @@ class SalesPage(QWidget):
             font.setStretch(QFont.Stretch.Condensed)
             item.setFont(font)
             self.totals_table.setItem(0, col, item)
+        self._update_sales_chart_button_state()
+
+    def _selected_sales_row(self) -> tuple[str, str, str] | None:
+        row_idx = self.sales_table.currentRow()
+        if row_idx < 0:
+            return None
+        code_item = self.sales_table.item(row_idx, 0)
+        name_item = self.sales_table.item(row_idx, 1)
+        if code_item is None:
+            return None
+        articulo_id = str(code_item.data(Qt.ItemDataRole.UserRole) or "").strip()
+        if not articulo_id:
+            return None
+        codigo = str(code_item.text() or "").strip()
+        nombre = str((name_item.text() if name_item is not None else "") or "").strip()
+        return articulo_id, codigo, nombre
+
+    def _update_sales_chart_button_state(self) -> None:
+        has_year = self._current_year() > 0
+        self.sales_chart_btn.setEnabled(self._selected_sales_row() is not None and has_year)
+        self.sales_total_chart_btn.setEnabled(has_year)
+        self.sales_analysis_btn.setEnabled(has_year)
+
+    def _open_selected_monthly_sales_dialog(self) -> None:
+        row = self._selected_sales_row()
+        year = self._current_year()
+        if row is None or year <= 0:
+            return
+        articulo_id, codigo, nombre = row
+        points = self.sales_summary_service.listar_ventas_mensuales_ireks_comparativa(
+            year=year,
+            articulo_id=articulo_id,
+            cliente_id=self._current_client_id(),
+        )
+        client_name = self._current_client_name()
+        subtitle_parts = [part for part in [codigo, nombre, f"{year - 1} vs {year}"] if part]
+        dialog = MonthlySalesDialog(
+            title=f"Ventas mensuales {year - 1} / {year} | {client_name}",
+            subtitle=" | ".join(subtitle_parts),
+            points=points,
+            parent=self,
+        )
+        dialog.exec()
+
+    def _open_total_monthly_sales_dialog(self) -> None:
+        year = self._current_year()
+        if year <= 0:
+            return
+        points = self.sales_summary_service.listar_ventas_mensuales_ireks_totales_comparativa(
+            year=year,
+            cliente_id=self._current_client_id(),
+        )
+        client_name = self._current_client_name()
+        dialog = MonthlySalesDialog(
+            title=f"Ventas totales mensuales {year - 1} / {year} | {client_name}",
+            subtitle=f"Todos los productos | {year - 1} vs {year}",
+            points=points,
+            parent=self,
+        )
+        dialog.exec()
+
+    def _open_sales_analysis_dialog(self) -> None:
+        year = self._current_year()
+        if year <= 0:
+            return
+        client_name = self._current_client_name() or "Todos los clientes"
+        dialog = SalesAnalysisDialog(
+            title=f"Análisis de ventas {year} | {client_name}",
+            context_text=self._build_sales_analysis_context(),
+            parent=self,
+        )
+        dialog.exec()
+
+    def _build_sales_analysis_context(self) -> str:
+        def combo_text(widget) -> str:
+            if widget is None:
+                return ""
+            try:
+                text = str(widget.currentText() or "").strip()
+            except Exception:
+                text = ""
+            return text
+
+        def line_edit_text(widget) -> str:
+            if widget is None:
+                return ""
+            try:
+                return str(widget.text() or "").strip()
+            except Exception:
+                return ""
+
+        year = self._current_year()
+        month = self._current_month()
+        acumulado = bool(getattr(self, "acumulado_check", None) and self.acumulado_check.isChecked())
+        cliente_id = self._current_client_id()
+        fabricante_id = self._current_manufacturer_id()
+        family_id = self._current_family_id()
+        subfamily_id = self._current_subfamily_id()
+        product_texto = self._current_product_text()
+
+        rows = self.sales_summary_service.listar_resumen_anual(
+            year=year,
+            month=month,
+            acumulado=acumulado,
+            cliente_id=cliente_id,
+            producto_texto=product_texto,
+            fabricante_id=fabricante_id,
+            familia_id=family_id,
+            subfamilia_id=subfamily_id,
+        )
+
+        lines = [
+            "Datos obtenidos directamente de la base de datos de ventas.",
+            "El análisis debe considerar toda la tabla resultante del servicio, no solo lo visible en pantalla.",
+            f"Año: {year}",
+            f"Cliente: {self._current_client_name() or 'Todos los clientes'}",
+            f"Mes: {combo_text(getattr(self, 'month_filter', None))}",
+            f"Acumulado: {'Sí' if acumulado else 'No'}",
+            f"Fabricante: {combo_text(getattr(self, 'manufacturer_filter', None))}",
+            f"Familia: {combo_text(getattr(self, 'family_filter', None))}",
+            f"Subfamilia: {combo_text(getattr(self, 'subfamily_filter', None))}",
+            f"Producto filtrado: {line_edit_text(getattr(self, 'product_filter', None)) or 'Sin filtro'}",
+            f"Filas analizadas desde DB: {len(rows)}",
+        ]
+        selected = self._selected_sales_row()
+        if selected is not None:
+            articulo_id, codigo, nombre = selected
+            lines.append(f"Producto seleccionado: {codigo} | {nombre} | ID {articulo_id}")
+
+        lines.append("")
+        lines.append("Tabla completa devuelta por el servicio:")
+        for row in rows:
+            lines.append(
+                f"- {row.codigo} | {row.nombre} | "
+                f"Kg {year - 1}: {self._fmt_num(row.kilos_prev)} | S/C {year - 1}: {self._fmt_num(row.sc_prev)} | Ventas {year - 1}: {self._fmt_money(row.ventas_prev)} | "
+                f"Kg {year}: {self._fmt_num(row.kilos_curr)} | S/C {year}: {self._fmt_num(row.sc_curr)} | Ventas {year}: {self._fmt_money(row.ventas_curr)} | "
+                f"Δ kg: {self._fmt_num(row.delta_kg)} | Δ kg %: {self._fmt_pct(row.delta_kg_pct)} | "
+                f"Δ €: {self._fmt_money(row.delta_ventas)} | Δ € %: {self._fmt_pct(row.delta_ventas_pct)}"
+            )
+
+        return "\n".join(lines).strip()
 
     def _fmt_num(self, value) -> str:
         number = float(value or 0.0)
