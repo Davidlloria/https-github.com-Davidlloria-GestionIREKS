@@ -32,6 +32,7 @@ def _seed_sales(session: Session) -> tuple[str, str, str, str, str]:
     familia_id = "fam-1"
     subfamilia_id = "sub-1"
     articulo_id = "art-mella"
+    articulo_id_plus = "art-plus"
     session.add(Cliente(cliente_id=cliente_id, cliente_codigo=91, cliente_nombre_comercial="IGSA", cliente_tipo="distribuidor"))
     session.add(Fabricante(fabricante_id=fabricante_id, fabricante_codigo=1, fabricante_nombre="Fabricante"))
     session.add(
@@ -58,6 +59,20 @@ def _seed_sales(session: Session) -> tuple[str, str, str, str, str]:
             articulo_referencia="MM01",
             articulo_referencia_corta="MM01",
             articulo_descripcion="MELLA MUFFIN",
+            articulo_envase_peso=1.0,
+            articulo_envase_peso_total=1.0,
+            articulo_familia_id=familia_id,
+            articulo_subfamilia_id=subfamilia_id,
+        )
+    )
+    session.add(
+        IngredienteIreks(
+            articulo_id=articulo_id_plus,
+            almacen_id="alm-1",
+            fabricante_id=fabricante_id,
+            articulo_referencia="MP01",
+            articulo_referencia_corta="MP01",
+            articulo_descripcion="MUFFIN PLUS",
             articulo_envase_peso=1.0,
             articulo_envase_peso_total=1.0,
             articulo_familia_id=familia_id,
@@ -92,6 +107,36 @@ def _seed_sales(session: Session) -> tuple[str, str, str, str, str]:
             venta_kilos=18.5,
             venta_kilos_sc=1.5,
             venta_euros=31.0,
+        )
+    )
+    session.add(
+        VentaMensualRaw(
+            raw_id="raw-3",
+            lote_id="lote-3",
+            fuente="ireks",
+            cliente_id=cliente_id,
+            periodo="2026-07",
+            articulo_codigo_origen="MP01",
+            articulo_id=articulo_id_plus,
+            articulo_descripcion_origen="MUFFIN PLUS",
+            venta_kilos=25.0,
+            venta_kilos_sc=2.0,
+            venta_euros=41.0,
+        )
+    )
+    session.add(
+        VentaMensualRaw(
+            raw_id="raw-4",
+            lote_id="lote-4",
+            fuente="ireks",
+            cliente_id=cliente_id,
+            periodo="2025-07",
+            articulo_codigo_origen="MP01",
+            articulo_id=articulo_id_plus,
+            articulo_descripcion_origen="MUFFIN PLUS",
+            venta_kilos=10.0,
+            venta_kilos_sc=1.0,
+            venta_euros=16.0,
         )
     )
     session.commit()
@@ -224,3 +269,33 @@ def test_sales_assistant_fallback_marks_comparative_queries(isolated_engine) -> 
     assert intent_result.intent.year == 2025
     assert intent_result.intent.year_compare == 2026
     assert intent_result.intent.month == 7
+
+
+def test_listar_ranking_anual_orders_by_current_year_kilos(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        _seed_sales(session)
+
+    service = SalesAnnualComparisonService()
+    rows = service.listar_ranking_anual(year=2026, acumulado=True, cliente_id="cli-igsa", limit=10)
+
+    assert len(rows) >= 2
+    assert rows[0].nombre == "MUFFIN PLUS"
+    assert rows[1].nombre == "MELLA MUFFIN"
+    assert (rows[0].kilos_curr + rows[0].sc_curr) > (rows[1].kilos_curr + rows[1].sc_curr)
+
+
+def test_sales_assistant_returns_deterministic_ranking(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        _seed_sales(session)
+
+    assistant = SalesQueryAssistantService(sales_service=SalesAnnualComparisonService(), api_key="")
+    result = assistant.answer(
+        "dame el ranking de ventas en kg acumulado del 2026, del cliente igsa, ordenados de mayor a menos",
+        defaults={"year": 2026, "acumulado": True, "cliente_texto": "IGSA"},
+    )
+
+    assert result.ok is True
+    assert "Ranking de ventas en kg acumulado 2026" in result.text
+    assert "MUFFIN PLUS" in result.text
+    assert "MELLA MUFFIN" in result.text
+    assert result.text.index("1. MUFFIN PLUS") < result.text.index("2. MELLA MUFFIN")

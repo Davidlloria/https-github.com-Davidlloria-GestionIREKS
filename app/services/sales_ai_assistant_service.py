@@ -67,6 +67,29 @@ class SalesQueryAssistantService:
         intent = intent_result.intent
         defaults = dict(defaults or {})
 
+        if self._ranking_requested(question, intent):
+            rows = self.sales_service.listar_ranking_anual(
+                year=self._effective_int(defaults, "year", intent.year),
+                month=self._effective_int(defaults, "month", intent.month),
+                acumulado=self._effective_bool(defaults, "acumulado", intent.acumulado),
+                cliente_id=self._effective_text(defaults, "cliente_id", intent.cliente_id),
+                articulo_id=self._effective_text(defaults, "articulo_id", intent.articulo_id),
+                producto_texto=self._effective_text(defaults, "producto_texto", intent.producto_texto),
+                fabricante_id=self._effective_text(defaults, "fabricante_id", intent.fabricante_id),
+                familia_id=self._effective_text(defaults, "familia_id", intent.familia_id),
+                subfamilia_id=self._effective_text(defaults, "subfamilia_id", intent.subfamilia_id),
+                limit=max(intent.limit, 1),
+            )
+            if not rows:
+                return SalesQueryResult(
+                    True,
+                    "No se han encontrado ventas que coincidan con el ranking solicitado y los filtros disponibles.",
+                    "Sin datos de ranking.",
+                    intent,
+                )
+            text = self._build_ranking_answer(question, intent, rows, defaults)
+            return SalesQueryResult(True, text, "Ranking de ventas calculado.", intent)
+
         if self._comparative_detail_requested(intent):
             blocks = self._fetch_comparative_detail_blocks(intent, defaults)
             if not blocks:
@@ -143,14 +166,14 @@ class SalesQueryAssistantService:
                     "content": (
                         "Convierte consultas libres sobre ventas en JSON estricto. "
                         "No generes SQL ni texto adicional. "
-                        "Devuelve solo estas claves: "
-                        "query_type, year, year_compare, month, acumulado, cliente_id, cliente_texto, articulo_id, producto_texto, "
-                        "fabricante_id, familia_id, subfamilia_id, limit. "
-                        "query_type debe ser uno de: detalle, mensual, anual, comparativa, ranking, tendencia, general. "
-                        "Si la consulta menciona un producto, un cliente o un mes concreto, usa query_type detalle. "
-                        "Si pide top, ranking o evolución, usa ranking, tendencia o comparativa según corresponda. "
-                        "Los valores year y month deben ser enteros; acumulado debe ser booleano; limit entero."
-                    ),
+            "Devuelve solo estas claves: "
+            "query_type, year, year_compare, month, acumulado, cliente_id, cliente_texto, articulo_id, producto_texto, "
+            "fabricante_id, familia_id, subfamilia_id, limit. "
+            "query_type debe ser uno de: detalle, mensual, anual, comparativa, ranking, tendencia, general. "
+            "Si la consulta menciona un producto, un cliente o un mes concreto, usa query_type detalle. "
+            "Si pide top, ranking o evolución, usa ranking, tendencia o comparativa según corresponda. "
+            "Los valores year y month deben ser enteros; acumulado debe ser booleano; limit entero."
+        ),
                 },
                 {"role": "user", "content": text},
             ],
@@ -176,6 +199,8 @@ class SalesQueryAssistantService:
     def _detail_requested(self, intent: SalesQueryIntent) -> bool:
         if self._comparative_detail_requested(intent):
             return False
+        if self._ranking_requested("", intent):
+            return False
         if intent.query_type == "detalle":
             return True
         if intent.producto_texto or intent.cliente_texto or intent.articulo_id or intent.cliente_id:
@@ -183,6 +208,26 @@ class SalesQueryAssistantService:
         if 1 <= int(intent.month or 0) <= 12:
             return True
         return False
+
+    def _ranking_requested(self, question: str, intent: SalesQueryIntent) -> bool:
+        if intent.query_type == "ranking":
+            return True
+        normalized = self._normalize_search_text(question)
+        return any(
+            token in normalized
+            for token in (
+                "ranking",
+                "top ",
+                "top10",
+                "top 10",
+                "ordenado de mayor a menor",
+                "ordenados de mayor a menor",
+                "ordenar de mayor a menor",
+                "mayores ventas",
+                "mas vendidos",
+                "más vendidos",
+            )
+        )
 
     def _comparative_detail_requested(self, intent: SalesQueryIntent) -> bool:
         if intent.year <= 0 or intent.year_compare <= 0:
@@ -340,6 +385,33 @@ class SalesQueryAssistantService:
             lines.append("")
             lines.append(
                 f"Diferencia {year_b} vs {year_a}: {self._fmt_num(delta)} kg ({self._fmt_num(pct)} %)."
+            )
+        lines.append("")
+        lines.append("Pregunta original:")
+        lines.append(question)
+        return "\n".join(lines).strip()
+
+    def _build_ranking_answer(
+        self,
+        question: str,
+        intent: SalesQueryIntent,
+        rows: list[SalesComparisonRow],
+        defaults: dict[str, Any],
+    ) -> str:
+        year = self._effective_int(defaults, "year", intent.year)
+        month = self._effective_int(defaults, "month", intent.month)
+        month_suffix = f" {self._month_name(month)}" if 1 <= month <= 12 else ""
+        client_label = self._effective_text(defaults, "cliente_texto", intent.cliente_texto) or self._effective_text(
+            defaults, "cliente_id", intent.cliente_id
+        )
+        lines = [f"Ranking de ventas en kg acumulado {year}{month_suffix} ordenado de mayor a menor:"]
+        if client_label:
+            lines[0] = f"Ranking de ventas en kg acumulado {year}{month_suffix} para cliente {client_label.upper()} ordenado de mayor a menor:"
+        for index, row in enumerate(rows, start=1):
+            total_kilos = float(row.kilos_curr or 0.0) + float(row.sc_curr or 0.0)
+            lines.append(
+                f"{index}. {row.nombre} - {self._fmt_num(total_kilos)} kg "
+                f"(Kilos {self._fmt_num(row.kilos_curr)}, S/C {self._fmt_num(row.sc_curr)})"
             )
         lines.append("")
         lines.append("Pregunta original:")
