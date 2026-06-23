@@ -67,6 +67,29 @@ class SalesQueryAssistantService:
         intent = intent_result.intent
         defaults = dict(defaults or {})
 
+        if self._negative_delta_requested(question, intent):
+            rows = self.sales_service.listar_diferenciales_negativos_anual(
+                year=self._effective_int(defaults, "year", intent.year),
+                month=self._effective_int(defaults, "month", intent.month),
+                acumulado=self._effective_bool(defaults, "acumulado", intent.acumulado),
+                cliente_id=self._effective_text(defaults, "cliente_id", intent.cliente_id),
+                articulo_id=self._effective_text(defaults, "articulo_id", intent.articulo_id),
+                producto_texto=self._effective_text(defaults, "producto_texto", intent.producto_texto),
+                fabricante_id=self._effective_text(defaults, "fabricante_id", intent.fabricante_id),
+                familia_id=self._effective_text(defaults, "familia_id", intent.familia_id),
+                subfamilia_id=self._effective_text(defaults, "subfamilia_id", intent.subfamilia_id),
+                limit=max(intent.limit, 1),
+            )
+            if not rows:
+                return SalesQueryResult(
+                    True,
+                    "No se han encontrado diferenciales negativos para los filtros solicitados.",
+                    "Sin datos de diferencial negativo.",
+                    intent,
+                )
+            text = self._build_negative_delta_answer(question, intent, rows, defaults)
+            return SalesQueryResult(True, text, "Listado de diferenciales negativos calculado.", intent)
+
         if self._ranking_requested(question, intent):
             rows = self.sales_service.listar_ranking_anual(
                 year=self._effective_int(defaults, "year", intent.year),
@@ -201,6 +224,8 @@ class SalesQueryAssistantService:
             return False
         if self._ranking_requested("", intent):
             return False
+        if self._negative_delta_requested("", intent):
+            return False
         if intent.query_type == "detalle":
             return True
         if intent.producto_texto or intent.cliente_texto or intent.articulo_id or intent.cliente_id:
@@ -208,6 +233,25 @@ class SalesQueryAssistantService:
         if 1 <= int(intent.month or 0) <= 12:
             return True
         return False
+
+    def _negative_delta_requested(self, question: str, intent: SalesQueryIntent) -> bool:
+        normalized = self._normalize_search_text(question)
+        return any(
+            token in normalized
+            for token in (
+                "diferencial",
+                "diferenciales",
+                "delta kg",
+                "delta de kg",
+                "desfavorable",
+                "negativo",
+                "negativos",
+                "caidas",
+                "caídas",
+                "bajadas",
+                "descensos",
+            )
+        )
 
     def _ranking_requested(self, question: str, intent: SalesQueryIntent) -> bool:
         if intent.query_type == "ranking":
@@ -404,14 +448,58 @@ class SalesQueryAssistantService:
         client_label = self._effective_text(defaults, "cliente_texto", intent.cliente_texto) or self._effective_text(
             defaults, "cliente_id", intent.cliente_id
         )
+        manufacturer_names = {str(item.fabricante_id or "").strip(): str(item.fabricante_nombre or "").strip() for item in self.sales_service.list_filter_manufacturers()}
+        grouped: dict[str, list[SalesComparisonRow]] = {}
+        for row in rows:
+            grouped.setdefault(str(row.fabricante_id or "").strip(), []).append(row)
         lines = [f"Ranking de ventas en kg acumulado {year}{month_suffix} ordenado de mayor a menor:"]
         if client_label:
             lines[0] = f"Ranking de ventas en kg acumulado {year}{month_suffix} para cliente {client_label.upper()} ordenado de mayor a menor:"
+        for fabricante_id in sorted(grouped.keys(), key=lambda value: manufacturer_names.get(value, value).lower() or value.lower()):
+            fabricante_name = manufacturer_names.get(fabricante_id, "").strip() or fabricante_id or "Sin fabricante"
+            lines.append("")
+            lines.append(f"{fabricante_name}:")
+            group_rows = sorted(
+                grouped[fabricante_id],
+                key=lambda row: (
+                    -(float(row.kilos_curr or 0.0) + float(row.sc_curr or 0.0)),
+                    -(float(row.ventas_curr or 0.0)),
+                    row.nombre.lower(),
+                    row.codigo.lower(),
+                ),
+            )
+            for index, row in enumerate(group_rows, start=1):
+                total_kilos = float(row.kilos_curr or 0.0) + float(row.sc_curr or 0.0)
+                lines.append(
+                    f"{index}. {row.nombre} - {self._fmt_num(total_kilos)} kg "
+                    f"(Kilos {self._fmt_num(row.kilos_curr)}, S/C {self._fmt_num(row.sc_curr)})"
+                )
+        lines.append("")
+        lines.append("Pregunta original:")
+        lines.append(question)
+        return "\n".join(lines).strip()
+
+    def _build_negative_delta_answer(
+        self,
+        question: str,
+        intent: SalesQueryIntent,
+        rows: list[SalesComparisonRow],
+        defaults: dict[str, Any],
+    ) -> str:
+        year = self._effective_int(defaults, "year", intent.year)
+        month = self._effective_int(defaults, "month", intent.month)
+        month_suffix = f" {self._month_name(month)}" if 1 <= month <= 12 else ""
+        client_label = self._effective_text(defaults, "cliente_texto", intent.cliente_texto) or self._effective_text(
+            defaults, "cliente_id", intent.cliente_id
+        )
+        lines = [f"Listado de los {min(len(rows), max(intent.limit, 1))} productos con mayores diferenciales negativos en kg {year}{month_suffix}:"]
+        if client_label:
+            lines[0] = f"Listado de los {min(len(rows), max(intent.limit, 1))} productos con mayores diferenciales negativos en kg {year}{month_suffix} para cliente {client_label.upper()}:"
         for index, row in enumerate(rows, start=1):
-            total_kilos = float(row.kilos_curr or 0.0) + float(row.sc_curr or 0.0)
             lines.append(
-                f"{index}. {row.nombre} - {self._fmt_num(total_kilos)} kg "
-                f"(Kilos {self._fmt_num(row.kilos_curr)}, S/C {self._fmt_num(row.sc_curr)})"
+                f"{index}. {row.nombre} - Δ kg {self._fmt_num(row.delta_kg)} "
+                f"(Kilos {self._fmt_num(row.kilos_prev)} -> {self._fmt_num(row.kilos_curr)}, "
+                f"S/C {self._fmt_num(row.sc_prev)} -> {self._fmt_num(row.sc_curr)})"
             )
         lines.append("")
         lines.append("Pregunta original:")

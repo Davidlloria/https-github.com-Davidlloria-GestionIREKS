@@ -488,6 +488,44 @@ class SalesAnnualComparisonService:
             return rows[:clean_limit]
         return rows
 
+    def listar_diferenciales_negativos_anual(
+        self,
+        year: int,
+        month: int = 0,
+        acumulado: bool = False,
+        cliente_id: str = "",
+        articulo_id: str = "",
+        producto_texto: str = "",
+        fabricante_id: str = "",
+        familia_id: str = "",
+        subfamilia_id: str = "",
+        limit: int = 20,
+    ) -> list[SalesComparisonRow]:
+        rows = self.listar_resumen_anual(
+            year=year,
+            month=month,
+            acumulado=acumulado,
+            cliente_id=cliente_id,
+            articulo_id=articulo_id,
+            producto_texto=producto_texto,
+            fabricante_id=fabricante_id,
+            familia_id=familia_id,
+            subfamilia_id=subfamilia_id,
+        )
+        rows = [row for row in rows if float(row.delta_kg or 0.0) < 0.0]
+        rows.sort(
+            key=lambda row: (
+                float(row.delta_kg or 0.0),
+                float(row.delta_kg_pct or 0.0),
+                row.nombre.lower(),
+                row.codigo.lower(),
+            )
+        )
+        clean_limit = max(int(limit or 0), 0)
+        if clean_limit > 0:
+            return rows[:clean_limit]
+        return rows
+
     def listar_detalle_ventas(
         self,
         year: int,

@@ -29,12 +29,17 @@ def isolated_engine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 def _seed_sales(session: Session) -> tuple[str, str, str, str, str]:
     cliente_id = "cli-igsa"
     fabricante_id = "fab-1"
+    fabricante_id_2 = "fab-2"
     familia_id = "fam-1"
     subfamilia_id = "sub-1"
     articulo_id = "art-mella"
     articulo_id_plus = "art-plus"
+    articulo_id_rustico = "art-rustico"
+    articulo_id_drop1 = "art-drop-1"
+    articulo_id_drop2 = "art-drop-2"
     session.add(Cliente(cliente_id=cliente_id, cliente_codigo=91, cliente_nombre_comercial="IGSA", cliente_tipo="distribuidor"))
     session.add(Fabricante(fabricante_id=fabricante_id, fabricante_codigo=1, fabricante_nombre="Fabricante"))
+    session.add(Fabricante(fabricante_id=fabricante_id_2, fabricante_codigo=2, fabricante_nombre="Otro fabricante"))
     session.add(
         Familia(
             articulo_familia_id=familia_id,
@@ -73,6 +78,48 @@ def _seed_sales(session: Session) -> tuple[str, str, str, str, str]:
             articulo_referencia="MP01",
             articulo_referencia_corta="MP01",
             articulo_descripcion="MUFFIN PLUS",
+            articulo_envase_peso=1.0,
+            articulo_envase_peso_total=1.0,
+            articulo_familia_id=familia_id,
+            articulo_subfamilia_id=subfamilia_id,
+        )
+    )
+    session.add(
+        IngredienteIreks(
+            articulo_id=articulo_id_rustico,
+            almacen_id="alm-1",
+            fabricante_id=fabricante_id_2,
+            articulo_referencia="RR01",
+            articulo_referencia_corta="RR01",
+            articulo_descripcion="REX RUSTICO",
+            articulo_envase_peso=1.0,
+            articulo_envase_peso_total=1.0,
+            articulo_familia_id=familia_id,
+            articulo_subfamilia_id=subfamilia_id,
+        )
+    )
+    session.add(
+        IngredienteIreks(
+            articulo_id=articulo_id_drop1,
+            almacen_id="alm-1",
+            fabricante_id=fabricante_id,
+            articulo_referencia="DN01",
+            articulo_referencia_corta="DN01",
+            articulo_descripcion="DIF NEGATIVO UNO",
+            articulo_envase_peso=1.0,
+            articulo_envase_peso_total=1.0,
+            articulo_familia_id=familia_id,
+            articulo_subfamilia_id=subfamilia_id,
+        )
+    )
+    session.add(
+        IngredienteIreks(
+            articulo_id=articulo_id_drop2,
+            almacen_id="alm-1",
+            fabricante_id=fabricante_id_2,
+            articulo_referencia="DN02",
+            articulo_referencia_corta="DN02",
+            articulo_descripcion="DIF NEGATIVO DOS",
             articulo_envase_peso=1.0,
             articulo_envase_peso_total=1.0,
             articulo_familia_id=familia_id,
@@ -137,6 +184,96 @@ def _seed_sales(session: Session) -> tuple[str, str, str, str, str]:
             venta_kilos=10.0,
             venta_kilos_sc=1.0,
             venta_euros=16.0,
+        )
+    )
+    session.add(
+        VentaMensualRaw(
+            raw_id="raw-5",
+            lote_id="lote-5",
+            fuente="ireks",
+            cliente_id=cliente_id,
+            periodo="2026-07",
+            articulo_codigo_origen="RR01",
+            articulo_id=articulo_id_rustico,
+            articulo_descripcion_origen="REX RUSTICO",
+            venta_kilos=30.0,
+            venta_kilos_sc=3.0,
+            venta_euros=48.0,
+        )
+    )
+    session.add(
+        VentaMensualRaw(
+            raw_id="raw-6",
+            lote_id="lote-6",
+            fuente="ireks",
+            cliente_id=cliente_id,
+            periodo="2025-07",
+            articulo_codigo_origen="RR01",
+            articulo_id=articulo_id_rustico,
+            articulo_descripcion_origen="REX RUSTICO",
+            venta_kilos=18.0,
+            venta_kilos_sc=2.0,
+            venta_euros=30.0,
+        )
+    )
+    session.add(
+        VentaMensualRaw(
+            raw_id="raw-7",
+            lote_id="lote-7",
+            fuente="ireks",
+            cliente_id=cliente_id,
+            periodo="2025-07",
+            articulo_codigo_origen="DN01",
+            articulo_id=articulo_id_drop1,
+            articulo_descripcion_origen="DIF NEGATIVO UNO",
+            venta_kilos=45.0,
+            venta_kilos_sc=5.0,
+            venta_euros=70.0,
+        )
+    )
+    session.add(
+        VentaMensualRaw(
+            raw_id="raw-8",
+            lote_id="lote-8",
+            fuente="ireks",
+            cliente_id=cliente_id,
+            periodo="2026-07",
+            articulo_codigo_origen="DN01",
+            articulo_id=articulo_id_drop1,
+            articulo_descripcion_origen="DIF NEGATIVO UNO",
+            venta_kilos=15.0,
+            venta_kilos_sc=2.0,
+            venta_euros=24.0,
+        )
+    )
+    session.add(
+        VentaMensualRaw(
+            raw_id="raw-9",
+            lote_id="lote-9",
+            fuente="ireks",
+            cliente_id=cliente_id,
+            periodo="2025-07",
+            articulo_codigo_origen="DN02",
+            articulo_id=articulo_id_drop2,
+            articulo_descripcion_origen="DIF NEGATIVO DOS",
+            venta_kilos=30.0,
+            venta_kilos_sc=0.0,
+            venta_euros=45.0,
+        )
+    )
+    session.add(
+        VentaMensualRaw(
+            raw_id="raw-10",
+            lote_id="lote-10",
+            fuente="ireks",
+            cliente_id=cliente_id,
+            periodo="2026-07",
+            articulo_codigo_origen="DN02",
+            articulo_id=articulo_id_drop2,
+            articulo_descripcion_origen="DIF NEGATIVO DOS",
+            venta_kilos=12.0,
+            venta_kilos_sc=1.0,
+            venta_euros=18.0,
         )
     )
     session.commit()
@@ -278,10 +415,12 @@ def test_listar_ranking_anual_orders_by_current_year_kilos(isolated_engine) -> N
     service = SalesAnnualComparisonService()
     rows = service.listar_ranking_anual(year=2026, acumulado=True, cliente_id="cli-igsa", limit=10)
 
-    assert len(rows) >= 2
-    assert rows[0].nombre == "MUFFIN PLUS"
-    assert rows[1].nombre == "MELLA MUFFIN"
+    assert len(rows) >= 3
+    assert rows[0].nombre == "REX RUSTICO"
+    assert rows[1].nombre == "MUFFIN PLUS"
+    assert rows[2].nombre == "MELLA MUFFIN"
     assert (rows[0].kilos_curr + rows[0].sc_curr) > (rows[1].kilos_curr + rows[1].sc_curr)
+    assert (rows[1].kilos_curr + rows[1].sc_curr) > (rows[2].kilos_curr + rows[2].sc_curr)
 
 
 def test_sales_assistant_returns_deterministic_ranking(isolated_engine) -> None:
@@ -296,6 +435,39 @@ def test_sales_assistant_returns_deterministic_ranking(isolated_engine) -> None:
 
     assert result.ok is True
     assert "Ranking de ventas en kg acumulado 2026" in result.text
-    assert "MUFFIN PLUS" in result.text
-    assert "MELLA MUFFIN" in result.text
-    assert result.text.index("1. MUFFIN PLUS") < result.text.index("2. MELLA MUFFIN")
+    assert "Fabricante:" in result.text
+    assert "Otro fabricante:" in result.text
+    assert result.text.index("Fabricante:") < result.text.index("Otro fabricante:")
+    assert "1. MUFFIN PLUS" in result.text
+    assert "2. MELLA MUFFIN" in result.text
+    assert "1. REX RUSTICO" in result.text
+
+
+def test_listar_diferenciales_negativos_anual_orders_by_most_negative_delta(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        _seed_sales(session)
+
+    service = SalesAnnualComparisonService()
+    rows = service.listar_diferenciales_negativos_anual(year=2026, acumulado=True, cliente_id="cli-igsa", limit=20)
+
+    assert len(rows) >= 2
+    assert rows[0].nombre == "DIF NEGATIVO UNO"
+    assert rows[1].nombre == "DIF NEGATIVO DOS"
+    assert rows[0].delta_kg < rows[1].delta_kg < 0
+
+
+def test_sales_assistant_returns_negative_delta_listing(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        _seed_sales(session)
+
+    assistant = SalesQueryAssistantService(sales_service=SalesAnnualComparisonService(), api_key="")
+    result = assistant.answer(
+        "dame un listado de los 20 productos con los mayores diferenciales negativos en kg en el 2026, del cliente igsa, oredenado de mayor a menor",
+        defaults={"year": 2026, "acumulado": True, "cliente_texto": "IGSA"},
+    )
+
+    assert result.ok is True
+    assert "diferenciales negativos" in result.text.lower()
+    assert "DIF NEGATIVO UNO" in result.text
+    assert "DIF NEGATIVO DOS" in result.text
+    assert result.text.index("1. DIF NEGATIVO UNO") < result.text.index("2. DIF NEGATIVO DOS")
