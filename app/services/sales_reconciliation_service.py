@@ -23,6 +23,7 @@ from app.services.igsa_sales_pdf_flow_service import IgsaSalesPdfFlowService
 from app.services.igsa_sales_workbook_flow_service import IgsaSalesWorkbookFlowService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
 from app.services.sales_annual_comparison_service import SalesComparisonRow
+from app.services.sales_text_normalizer import normalize_search_text
 
 
 SALES_CLIENT_TYPES = {"distribuidor", "directo", "cliente directo", "cliente_directo"}
@@ -555,10 +556,7 @@ class SalesReconciliationService:
         return re.sub(r"[^a-z0-9]+", "", normalized)
 
     def _normalize_search_text(self, value) -> str:
-        text = str(value or "").strip().lower()
-        normalized = unicodedata.normalize("NFD", text)
-        normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
-        return re.sub(r"\s+", " ", normalized)
+        return normalize_search_text(value)
 
     def _normalize_code(self, value) -> str:
         text = str(value or "").strip().upper()
