@@ -650,6 +650,7 @@ class SalesAnalysisDialog(QDialog):
             "Eres un analista de ventas experto en IREKS.\n"
             "Responde en español, con foco práctico y directo.\n"
             "Usa únicamente el contexto proporcionado y la pregunta del usuario.\n"
+            "No limites el análisis a una fila concreta: analiza la tabla completa de ventas cargada.\n"
             "Si faltan datos, dilo con claridad sin inventar cifras.\n\n"
             f"Contexto de ventas:\n{self._context_text}\n\n"
             f"Consulta del usuario:\n{question}\n"
@@ -1980,10 +1981,9 @@ class SalesPage(QWidget):
             lines.append(f"Producto seleccionado: {codigo} | {nombre} | ID {articulo_id}")
 
         lines.append("")
-        lines.append("Resumen visible de ventas:")
+        lines.append("Tabla completa de ventas cargada:")
         row_count = self.sales_table.rowCount() if hasattr(self, "sales_table") else 0
-        limit = min(row_count, 12)
-        for row_idx in range(limit):
+        for row_idx in range(row_count):
             code_item = self.sales_table.item(row_idx, 0)
             name_item = self.sales_table.item(row_idx, 1)
             prev_sales_item = self.sales_table.item(row_idx, 4)
