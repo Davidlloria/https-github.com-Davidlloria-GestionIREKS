@@ -5,13 +5,14 @@ import math
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, Qt, QSize
-from PySide6.QtGui import QColor, QCursor, QFont, QIcon
+from PySide6.QtGui import QColor, QCursor, QFont, QIcon, QTextDocument
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QComboBox,
     QDialog,
     QApplication,
+    QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -28,6 +29,7 @@ from PySide6.QtWidgets import (
     QToolTip,
     QWidget,
 )
+from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 try:
     import pyqtgraph as pg
 except ModuleNotFoundError:  # pragma: no cover - dependency guard
@@ -35,6 +37,7 @@ except ModuleNotFoundError:  # pragma: no cover - dependency guard
 
 from app.services.sales_ai_assistant_service import SalesQueryAssistantService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow, SalesMonthlyComparisonPoint
+from app.services.report_export_service import ReportExportService
 from app.services.sales_reconciliation_service import SalesReconciliationService
 
 
@@ -571,6 +574,7 @@ class SalesAnalysisDialog(QDialog):
         super().__init__(parent)
         self._defaults = dict(defaults or {})
         self._assistant = SalesQueryAssistantService(sales_service=sales_service)
+        self._report_export_service = ReportExportService()
         self.setWindowTitle(title)
         screen = self.screen() or QApplication.primaryScreen()
         if screen is not None:
@@ -620,6 +624,21 @@ class SalesAnalysisDialog(QDialog):
         bottom_row.setContentsMargins(0, 0, 0, 0)
         bottom_row.setSpacing(8)
 
+        self.print_btn = QPushButton("Imprimir")
+        self.print_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.print_btn.clicked.connect(self._print_response)
+        bottom_row.addWidget(self.print_btn)
+
+        self.export_excel_btn = QPushButton("Excel")
+        self.export_excel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_excel_btn.clicked.connect(self._export_response_excel)
+        bottom_row.addWidget(self.export_excel_btn)
+
+        self.export_pdf_btn = QPushButton("PDF")
+        self.export_pdf_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_pdf_btn.clicked.connect(self._export_response_pdf)
+        bottom_row.addWidget(self.export_pdf_btn)
+
         self.consult_btn = QPushButton("Consultar")
         self.consult_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.consult_btn.clicked.connect(self._consult)
@@ -651,6 +670,53 @@ class SalesAnalysisDialog(QDialog):
         if not output:
             output = "Sin respuesta."
         self.response_edit.setPlainText(output)
+
+    def _response_text(self) -> str:
+        return str(self.response_edit.toPlainText() or "").strip()
+
+    def _response_lines(self) -> list[str]:
+        text = self._response_text()
+        if not text:
+            return []
+        return [line.rstrip() for line in text.splitlines() if line.strip()]
+
+    def _export_response_excel(self) -> None:
+        lines = self._response_lines()
+        if not lines:
+            QMessageBox.warning(self, "Análisis de ventas", "No hay respuesta para exportar.")
+            return
+        default = str(self._report_export_service.default_path(self.windowTitle(), "xlsx", folder="sales_analysis"))
+        path, _ = QFileDialog.getSaveFileName(self, "Exportar respuesta a Excel", default, "Excel (*.xlsx)")
+        if not path:
+            return
+        out = self._report_export_service.export_excel(path, self.windowTitle(), ["Respuesta"], [[line] for line in lines], sheet_title="Analisis ventas")
+        QMessageBox.information(self, "Análisis de ventas", f"Excel exportado:\n{out}")
+
+    def _export_response_pdf(self) -> None:
+        lines = self._response_lines()
+        if not lines:
+            QMessageBox.warning(self, "Análisis de ventas", "No hay respuesta para exportar.")
+            return
+        default = str(self._report_export_service.default_path(self.windowTitle(), "pdf", folder="sales_analysis"))
+        path, _ = QFileDialog.getSaveFileName(self, "Exportar respuesta a PDF", default, "PDF (*.pdf)")
+        if not path:
+            return
+        out = self._report_export_service.export_pdf(path, self.windowTitle(), ["Respuesta"], [[line] for line in lines])
+        QMessageBox.information(self, "Análisis de ventas", f"PDF exportado:\n{out}")
+
+    def _print_response(self) -> None:
+        text = self._response_text()
+        if not text:
+            QMessageBox.warning(self, "Análisis de ventas", "No hay respuesta para imprimir.")
+            return
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        printer.setPageOrientation(QPrinter.Orientation.Portrait)
+        dialog = QPrintDialog(printer, self)
+        if dialog.exec() != QPrintDialog.DialogCode.Accepted:
+            return
+        document = QTextDocument()
+        document.setPlainText(text)
+        document.print_(printer)
 
 
 class SalesPage(QWidget):
