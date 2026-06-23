@@ -754,17 +754,13 @@ class SalesPage(QWidget):
         root_layout = QVBoxLayout(self)
         root_layout.setSpacing(4)
 
-        title = QLabel("Ventas")
-        title.setProperty("role", "pageTitle")
-        root_layout.addWidget(title)
-
         tabs = QTabWidget()
         root_layout.addWidget(tabs)
 
         ireks_tab = QWidget()
-        tabs.addTab(ireks_tab, "IREKS")
+        tabs.addTab(ireks_tab, "VENTAS IREKS")
         igsa_tab = QWidget()
-        tabs.addTab(igsa_tab, "IGSA")
+        tabs.addTab(igsa_tab, "VENTAS IGSA")
 
         igsa_layout = QVBoxLayout(igsa_tab)
         igsa_filters_top = QHBoxLayout()
