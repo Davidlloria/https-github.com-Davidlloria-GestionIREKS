@@ -1965,15 +1965,38 @@ class SalesPage(QWidget):
             except Exception:
                 return ""
 
+        year = self._current_year()
+        month = self._current_month()
+        acumulado = bool(getattr(self, "acumulado_check", None) and self.acumulado_check.isChecked())
+        cliente_id = self._current_client_id()
+        fabricante_id = self._current_manufacturer_id()
+        family_id = self._current_family_id()
+        subfamily_id = self._current_subfamily_id()
+        product_texto = self._current_product_text()
+
+        rows = self.sales_summary_service.listar_resumen_anual(
+            year=year,
+            month=month,
+            acumulado=acumulado,
+            cliente_id=cliente_id,
+            producto_texto=product_texto,
+            fabricante_id=fabricante_id,
+            familia_id=family_id,
+            subfamilia_id=subfamily_id,
+        )
+
         lines = [
-            f"Año: {self._current_year()}",
+            "Datos obtenidos directamente de la base de datos de ventas.",
+            "El análisis debe considerar toda la tabla resultante del servicio, no solo lo visible en pantalla.",
+            f"Año: {year}",
             f"Cliente: {self._current_client_name() or 'Todos los clientes'}",
             f"Mes: {combo_text(getattr(self, 'month_filter', None))}",
-            f"Acumulado: {'Sí' if bool(getattr(self, 'acumulado_check', None) and self.acumulado_check.isChecked()) else 'No'}",
+            f"Acumulado: {'Sí' if acumulado else 'No'}",
             f"Fabricante: {combo_text(getattr(self, 'manufacturer_filter', None))}",
             f"Familia: {combo_text(getattr(self, 'family_filter', None))}",
             f"Subfamilia: {combo_text(getattr(self, 'subfamily_filter', None))}",
             f"Producto filtrado: {line_edit_text(getattr(self, 'product_filter', None)) or 'Sin filtro'}",
+            f"Filas analizadas desde DB: {len(rows)}",
         ]
         selected = self._selected_sales_row()
         if selected is not None:
@@ -1981,26 +2004,14 @@ class SalesPage(QWidget):
             lines.append(f"Producto seleccionado: {codigo} | {nombre} | ID {articulo_id}")
 
         lines.append("")
-        lines.append("Tabla completa de ventas cargada:")
-        row_count = self.sales_table.rowCount() if hasattr(self, "sales_table") else 0
-        for row_idx in range(row_count):
-            code_item = self.sales_table.item(row_idx, 0)
-            name_item = self.sales_table.item(row_idx, 1)
-            prev_sales_item = self.sales_table.item(row_idx, 4)
-            curr_sales_item = self.sales_table.item(row_idx, 7)
-            delta_kg_item = self.sales_table.item(row_idx, 8)
-            delta_sales_item = self.sales_table.item(row_idx, 10)
-            code = str(code_item.text() if code_item is not None else "").strip()
-            name = str(name_item.text() if name_item is not None else "").strip()
-            prev_sales = str(prev_sales_item.text() if prev_sales_item is not None else "").strip()
-            curr_sales = str(curr_sales_item.text() if curr_sales_item is not None else "").strip()
-            delta_kg = str(delta_kg_item.text() if delta_kg_item is not None else "").strip()
-            delta_sales = str(delta_sales_item.text() if delta_sales_item is not None else "").strip()
-            if not any([code, name, prev_sales, curr_sales, delta_kg, delta_sales]):
-                continue
+        lines.append("Tabla completa devuelta por el servicio:")
+        for row in rows:
             lines.append(
-                f"- {code} | {name} | Ventas {self._current_year() - 1}: {prev_sales} | "
-                f"Ventas {self._current_year()}: {curr_sales} | Δ kg: {delta_kg} | Δ €: {delta_sales}"
+                f"- {row.codigo} | {row.nombre} | "
+                f"Kg {year - 1}: {self._fmt_num(row.kilos_prev)} | S/C {year - 1}: {self._fmt_num(row.sc_prev)} | Ventas {year - 1}: {self._fmt_money(row.ventas_prev)} | "
+                f"Kg {year}: {self._fmt_num(row.kilos_curr)} | S/C {year}: {self._fmt_num(row.sc_curr)} | Ventas {year}: {self._fmt_money(row.ventas_curr)} | "
+                f"Δ kg: {self._fmt_num(row.delta_kg)} | Δ kg %: {self._fmt_pct(row.delta_kg_pct)} | "
+                f"Δ €: {self._fmt_money(row.delta_ventas)} | Δ € %: {self._fmt_pct(row.delta_ventas_pct)}"
             )
 
         return "\n".join(lines).strip()
