@@ -241,16 +241,16 @@ class SalesQueryAssistantService:
         normalized = self._normalize_search_text(text)
         intent = SalesQueryIntent(
             query_type="general",
-            year=self._pick_int(defaults, "year", 0),
-            month=self._pick_int(defaults, "month", 0),
-            acumulado=self._pick_bool(defaults, "acumulado", False),
-            cliente_id=self._pick_text(defaults, "cliente_id", ""),
-            cliente_texto=self._pick_text(defaults, "cliente_texto", ""),
-            articulo_id=self._pick_text(defaults, "articulo_id", ""),
-            producto_texto=self._pick_text(defaults, "producto_texto", ""),
-            fabricante_id=self._pick_text(defaults, "fabricante_id", ""),
-            familia_id=self._pick_text(defaults, "familia_id", ""),
-            subfamilia_id=self._pick_text(defaults, "subfamilia_id", ""),
+            year=self._effective_int(defaults, "year", 0),
+            month=self._effective_int(defaults, "month", 0),
+            acumulado=self._effective_bool(defaults, "acumulado", False),
+            cliente_id=self._effective_text(defaults, "cliente_id", ""),
+            cliente_texto=self._effective_text(defaults, "cliente_texto", ""),
+            articulo_id=self._effective_text(defaults, "articulo_id", ""),
+            producto_texto=self._effective_text(defaults, "producto_texto", ""),
+            fabricante_id=self._effective_text(defaults, "fabricante_id", ""),
+            familia_id=self._effective_text(defaults, "familia_id", ""),
+            subfamilia_id=self._effective_text(defaults, "subfamilia_id", ""),
             limit=200,
         )
         year_match = re.search(r"\b(20\d{2})\b", normalized)
