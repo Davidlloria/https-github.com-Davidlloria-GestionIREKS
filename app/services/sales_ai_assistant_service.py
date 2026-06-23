@@ -76,7 +76,8 @@ class SalesQueryAssistantService:
                     "Sin datos de comparativa.",
                     intent,
                 )
-            context = self._format_comparative_detail_context(question, intent, blocks, defaults)
+            text = self._build_comparative_detail_answer(question, intent, blocks, defaults)
+            return SalesQueryResult(True, text, "Comparativa de detalle calculada.", intent)
         elif self._detail_requested(intent):
             rows = self.sales_service.listar_detalle_ventas(
                 year=self._effective_int(defaults, "year", intent.year),
@@ -184,11 +185,11 @@ class SalesQueryAssistantService:
         return False
 
     def _comparative_detail_requested(self, intent: SalesQueryIntent) -> bool:
-        if intent.query_type != "comparativa":
-            return False
         if intent.year <= 0 or intent.year_compare <= 0:
             return False
-        return bool(intent.producto_texto or intent.cliente_texto or intent.articulo_id or intent.cliente_id or intent.month)
+        if not (intent.producto_texto or intent.cliente_texto or intent.articulo_id or intent.cliente_id):
+            return False
+        return bool(intent.month or intent.query_type == "comparativa")
 
     def _fetch_comparative_detail_blocks(
         self,
@@ -306,6 +307,70 @@ class SalesQueryAssistantService:
                 )
         return "\n".join(lines).strip()
 
+    def _build_comparative_detail_answer(
+        self,
+        question: str,
+        intent: SalesQueryIntent,
+        blocks: list[dict[str, Any]],
+        defaults: dict[str, Any],
+    ) -> str:
+        month = self._effective_int(defaults, "month", intent.month)
+        month_label = self._month_name(month)
+        lines = [f"Comparativa de ventas en kg para {month_label}."]
+        if intent.cliente_texto or intent.cliente_id:
+            lines.append(f"Cliente: {intent.cliente_texto or intent.cliente_id}")
+        if intent.producto_texto or intent.articulo_id:
+            lines.append(f"Producto: {intent.producto_texto or intent.articulo_id}")
+        lines.append("")
+
+        totals: list[tuple[int, float, float]] = []
+        for block in blocks:
+            year = int(block.get("year") or 0)
+            rows = list(block.get("rows") or [])
+            kilos = sum(float(row.kilos or 0.0) for row in rows)
+            totals.append((year, kilos, float(len(rows))))
+            lines.append(f"Año {year}: {self._fmt_num(kilos)} kg")
+            if not rows:
+                lines.append("  Sin datos para este año.")
+        if len(totals) >= 2:
+            year_a, kilos_a, _ = totals[0]
+            year_b, kilos_b, _ = totals[1]
+            delta = kilos_b - kilos_a
+            pct = self._pct(delta, kilos_a)
+            lines.append("")
+            lines.append(
+                f"Diferencia {year_b} vs {year_a}: {self._fmt_num(delta)} kg ({self._fmt_num(pct)} %)."
+            )
+        lines.append("")
+        lines.append("Pregunta original:")
+        lines.append(question)
+        return "\n".join(lines).strip()
+
+    @staticmethod
+    def _month_name(month: int) -> str:
+        month_names = {
+            1: "enero",
+            2: "febrero",
+            3: "marzo",
+            4: "abril",
+            5: "mayo",
+            6: "junio",
+            7: "julio",
+            8: "agosto",
+            9: "septiembre",
+            10: "octubre",
+            11: "noviembre",
+            12: "diciembre",
+        }
+        return month_names.get(int(month or 0), f"mes {month}")
+
+    @staticmethod
+    def _pct(delta: float, base: float) -> float:
+        base_value = float(base or 0.0)
+        if abs(base_value) <= 1e-9:
+            return 0.0
+        return (float(delta or 0.0) / base_value) * 100.0
+
     def _format_summary_context(
         self,
         question: str,
@@ -385,7 +450,23 @@ class SalesQueryAssistantService:
             if re.search(rf"\b{name}\b", normalized):
                 intent.month = value
                 break
-        if any(token in normalized for token in ("detalle", "venta de", "ventas de", "dime las ventas", "dime la venta")):
+        comparative_markers = (
+            "comparar",
+            "comparado con",
+            "comparadas con",
+            "comparados con",
+            "comparada con",
+            "comparado",
+            "comparada",
+            " vs ",
+            " contra ",
+            "respecto a",
+            "en comparacion con",
+            "en comparación con",
+        )
+        if any(token in normalized for token in comparative_markers) or len(year_matches) > 1:
+            intent.query_type = "comparativa"
+        elif any(token in normalized for token in ("detalle", "venta de", "ventas de", "dime las ventas", "dime la venta")):
             intent.query_type = "detalle"
         elif any(token in normalized for token in ("top ", "top10", "ranking", "mayores", "más vendidos", "mas vendidos")):
             intent.query_type = "ranking"
@@ -414,6 +495,8 @@ class SalesQueryAssistantService:
             intent.acumulado = True
         if intent.query_type != "comparativa" and (intent.producto_texto or intent.cliente_texto or intent.month):
             intent.query_type = "detalle"
+        if intent.year > 0 and intent.year_compare > 0 and (intent.producto_texto or intent.cliente_texto or intent.month):
+            intent.query_type = "comparativa"
         if "top 10" in normalized or "top10" in normalized:
             intent.limit = 10
         return intent

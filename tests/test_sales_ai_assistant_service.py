@@ -203,8 +203,24 @@ def test_sales_assistant_uses_comparative_detail_rows_for_years(isolated_engine,
     )
 
     assert result.ok is True
-    assert result.text == "Comparativa final"
-    assert "Año 2025" in captured["prompt"]
-    assert "Año 2026" in captured["prompt"]
-    assert "2025-07" in captured["prompt"]
-    assert "2026-07" in captured["prompt"]
+    assert "Año 2025" in result.text
+    assert "Año 2026" in result.text
+    assert "Diferencia 2026 vs 2025" in result.text
+
+
+def test_sales_assistant_fallback_marks_comparative_queries(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        _seed_sales(session)
+
+    assistant = SalesQueryAssistantService(sales_service=SalesAnnualComparisonService(), api_key="")
+    assistant.api_key = ""
+    intent_result = assistant.interpret(
+        "dime las ventas en kg de mella muffin de julio de 2025 comparadas con las de 2026 del mismo mes del cliente igsa",
+        defaults={"year": 2026, "month": 7},
+    )
+
+    assert intent_result.ok is True
+    assert intent_result.intent.query_type == "comparativa"
+    assert intent_result.intent.year == 2025
+    assert intent_result.intent.year_compare == 2026
+    assert intent_result.intent.month == 7
