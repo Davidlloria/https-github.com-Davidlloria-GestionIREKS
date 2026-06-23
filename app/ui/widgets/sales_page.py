@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QLineEdit,
     QPlainTextEdit,
+    QFrame,
     QSizePolicy,
     QPushButton,
     QToolButton,
@@ -812,6 +813,14 @@ class SalesPage(QWidget):
         igsa_acumulado_group.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         igsa_filters_top.addWidget(igsa_acumulado_group)
 
+        igsa_separator = QFrame()
+        igsa_separator.setFrameShape(QFrame.Shape.VLine)
+        igsa_separator.setFrameShadow(QFrame.Shadow.Plain)
+        igsa_separator.setStyleSheet("color: #CBD5E1; background: #CBD5E1;")
+        igsa_separator.setFixedWidth(1)
+        igsa_separator.setFixedHeight(26)
+        igsa_filters_top.addWidget(igsa_separator)
+
         igsa_manufacturer_group = QWidget()
         igsa_manufacturer_layout = QHBoxLayout(igsa_manufacturer_group)
         igsa_manufacturer_layout.setContentsMargins(0, 0, 0, 0)
@@ -1010,6 +1019,14 @@ class SalesPage(QWidget):
         acumulado_layout.addWidget(self.acumulado_check)
         acumulado_group.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         filters_top.addWidget(acumulado_group)
+
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.VLine)
+        separator.setFrameShadow(QFrame.Shadow.Plain)
+        separator.setStyleSheet("color: #CBD5E1; background: #CBD5E1;")
+        separator.setFixedWidth(1)
+        separator.setFixedHeight(26)
+        filters_top.addWidget(separator)
 
         manufacturer_group = QWidget()
         manufacturer_layout = QHBoxLayout(manufacturer_group)
