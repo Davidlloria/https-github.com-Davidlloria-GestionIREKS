@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QLineEdit,
     QPlainTextEdit,
+    QFrame,
     QSizePolicy,
     QPushButton,
     QToolButton,
