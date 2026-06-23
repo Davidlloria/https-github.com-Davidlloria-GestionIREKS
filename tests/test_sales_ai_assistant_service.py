@@ -408,6 +408,22 @@ def test_sales_assistant_fallback_marks_comparative_queries(isolated_engine) -> 
     assert intent_result.intent.month == 7
 
 
+def test_sales_assistant_fallback_detects_acumulado_typo(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        _seed_sales(session)
+
+    assistant = SalesQueryAssistantService(sales_service=SalesAnnualComparisonService(), api_key="")
+    intent_result = assistant.interpret(
+        "dame un listado de los 20 productos con los mayores diferenciales negativos en kg en el aculmulado hasta mayo de 2026, del cliente igsa",
+        defaults={"year": 2026, "month": 5},
+    )
+
+    assert intent_result.ok is True
+    assert intent_result.intent.acumulado is True
+    assert intent_result.intent.year == 2026
+    assert intent_result.intent.month == 5
+
+
 def test_listar_ranking_anual_orders_by_current_year_kilos(isolated_engine) -> None:
     with Session(isolated_engine) as session:
         _seed_sales(session)

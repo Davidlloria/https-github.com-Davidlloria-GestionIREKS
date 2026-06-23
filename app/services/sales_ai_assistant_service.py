@@ -651,7 +651,7 @@ class SalesQueryAssistantService:
             intent.producto_texto = producto
         if cliente:
             intent.cliente_texto = cliente
-        if any(token in normalized for token in ("acumulado", "acumular", "acumulada")):
+        if self._mentions_acumulado(normalized):
             intent.acumulado = True
         if intent.query_type != "comparativa" and (intent.producto_texto or intent.cliente_texto or intent.month):
             intent.query_type = "detalle"
@@ -790,6 +790,25 @@ class SalesQueryAssistantService:
         normalized = unicodedata.normalize("NFD", text)
         normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
         return re.sub(r"\s+", " ", normalized)
+
+    def _mentions_acumulado(self, text: str) -> bool:
+        normalized = self._normalize_search_text(text)
+        if not normalized:
+            return False
+        if any(token in normalized for token in ("acumulado", "acumular", "acumulada")):
+            return True
+        words = normalized.split()
+        if any(word in {"acumulado", "acumulada", "acumulados", "acumuladas"} for word in words):
+            return True
+        return any(
+            re.fullmatch(pattern, word or "") is not None
+            for word in words
+            for pattern in (
+                r"acu.?mulad[oa]s?",
+                r"aculmulad[oa]s?",
+                r"acumlad[oa]s?",
+            )
+        )
 
     def _fmt_num(self, value: float) -> str:
         return f"{float(value or 0.0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
