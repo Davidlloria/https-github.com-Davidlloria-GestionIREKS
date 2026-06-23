@@ -12,7 +12,7 @@ from app.services.sales_ai_assistant_service import (
     SalesQueryIntent,
     SalesQueryIntentResult,
 )
-from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
+from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow
 
 
 @pytest.fixture()
@@ -422,6 +422,53 @@ def test_sales_assistant_fallback_detects_acumulado_typo(isolated_engine) -> Non
     assert intent_result.intent.acumulado is True
     assert intent_result.intent.year == 2026
     assert intent_result.intent.month == 5
+
+
+def test_sales_assistant_routes_negative_differences_query_with_business_typos(isolated_engine, monkeypatch: pytest.MonkeyPatch) -> None:
+    with Session(isolated_engine) as session:
+        _seed_sales(session)
+
+    assistant = SalesQueryAssistantService(sales_service=SalesAnnualComparisonService(), api_key="")
+    captured: dict[str, object] = {}
+
+    def fake_negative_delta(**kwargs):
+        captured.update(kwargs)
+        return [
+            SalesComparisonRow(
+                articulo_id="art-1",
+                fabricante_id="fab-1",
+                familia_id="fam-1",
+                subfamilia_id="sub-1",
+                codigo="2682",
+                nombre="IREKS TOAST PLUS 10%",
+                kilos_prev=13100.0,
+                sc_prev=900.0,
+                ventas_prev=31335.2,
+                kilos_curr=9962.5,
+                sc_curr=775.0,
+                ventas_curr=23830.3,
+                delta_kg=-3262.5,
+                delta_kg_pct=-23.3,
+                delta_ventas=-7504.9,
+                delta_ventas_pct=-23.95,
+            )
+        ]
+
+    monkeypatch.setattr(assistant.sales_service, "listar_diferenciales_negativos_anual", fake_negative_delta)
+
+    result = assistant.answer(
+        "dame los 20 articulos con diferencias negativas en kg acumuladas hasta mayo de 2026, del cliente igsa, oredenados de mayor a menos",
+        defaults={},
+    )
+
+    assert result.ok is True
+    assert captured["year"] == 2026
+    assert captured["month"] == 5
+    assert captured["acumulado"] is True
+    assert captured["cliente_texto"] == "igsa"
+    assert captured["limit"] == 20
+    assert "IREKS TOAST PLUS 10%" in result.text
+    assert "diferenciales negativos" in result.text.lower()
 
 
 def test_listar_ranking_anual_orders_by_current_year_kilos(isolated_engine) -> None:

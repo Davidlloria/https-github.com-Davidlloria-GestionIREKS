@@ -326,6 +326,7 @@ class SalesAnnualComparisonService:
         month: int = 0,
         acumulado: bool = False,
         cliente_id: str = "",
+        cliente_texto: str = "",
         articulo_id: str = "",
         producto_texto: str = "",
         fabricante_id: str = "",
@@ -343,6 +344,7 @@ class SalesAnnualComparisonService:
             months = list(range(1, 13))
         periods = [f"{previous_year:04d}-{m:02d}" for m in months] + [f"{current_year:04d}-{m:02d}" for m in months]
         clean_cliente_id = str(cliente_id or "").strip()
+        clean_cliente_text = self._normalize_search_text(cliente_texto)
         clean_articulo_id = str(articulo_id or "").strip()
         clean_producto_texto = self._normalize_search_text(producto_texto)
         clean_fabricante_id = str(fabricante_id or "").strip()
@@ -358,6 +360,25 @@ class SalesAnnualComparisonService:
                 stmt = stmt.where(col(VentaMensualRaw.cliente_id) == clean_cliente_id)
             raw_rows = list(session.exec(stmt))
             products = list(session.exec(select(IngredienteIreks)))
+
+        client_search_by_id: dict[str, str] = {}
+        if clean_cliente_text:
+            with Session(self._engine) as session:
+                clients = list(session.exec(select(Cliente)))
+            for client in clients:
+                cid = str(client.cliente_id or "").strip()
+                if not cid:
+                    continue
+                client_search_by_id[cid] = self._normalize_search_text(
+                    " ".join(
+                        [
+                            str(getattr(client, "cliente_codigo", "") or ""),
+                            str(client.cliente_nombre_comercial or ""),
+                            str(client.cliente_nombre_fiscal or ""),
+                            str(client.cliente_abreviatura or ""),
+                        ]
+                    )
+                )
 
         product_by_id: dict[str, tuple[str, str, str, str, str, str]] = {}
         product_by_code: dict[str, tuple[str, str, str, str, str, str]] = {}
@@ -410,6 +431,10 @@ class SalesAnnualComparisonService:
             product_subfamilia_id = product[5] if product else ""
             if clean_articulo_id and product_articulo_id != clean_articulo_id:
                 continue
+            if clean_cliente_text:
+                client_searchable = client_search_by_id.get(str(row.cliente_id or "").strip(), "")
+                if clean_cliente_text not in client_searchable:
+                    continue
             if clean_producto_texto:
                 searchable = self._normalize_search_text(
                     " ".join(
@@ -457,6 +482,7 @@ class SalesAnnualComparisonService:
         month: int = 0,
         acumulado: bool = False,
         cliente_id: str = "",
+        cliente_texto: str = "",
         articulo_id: str = "",
         producto_texto: str = "",
         fabricante_id: str = "",
@@ -469,6 +495,7 @@ class SalesAnnualComparisonService:
             month=month,
             acumulado=acumulado,
             cliente_id=cliente_id,
+            cliente_texto=cliente_texto,
             articulo_id=articulo_id,
             producto_texto=producto_texto,
             fabricante_id=fabricante_id,
@@ -494,6 +521,7 @@ class SalesAnnualComparisonService:
         month: int = 0,
         acumulado: bool = False,
         cliente_id: str = "",
+        cliente_texto: str = "",
         articulo_id: str = "",
         producto_texto: str = "",
         fabricante_id: str = "",
@@ -506,6 +534,7 @@ class SalesAnnualComparisonService:
             month=month,
             acumulado=acumulado,
             cliente_id=cliente_id,
+            cliente_texto=cliente_texto,
             articulo_id=articulo_id,
             producto_texto=producto_texto,
             fabricante_id=fabricante_id,
@@ -567,7 +596,24 @@ class SalesAnnualComparisonService:
                 stmt = stmt.where(col(VentaMensualRaw.cliente_id) == clean_cliente_id)
             raw_rows = list(session.exec(stmt))
             products = list(session.exec(select(IngredienteIreks)))
-            clients = list(session.exec(select(Cliente)))
+            clients = list(session.exec(select(Cliente))) if clean_cliente_text else []
+
+        client_search_by_id: dict[str, str] = {}
+        if clean_cliente_text:
+            for client in clients:
+                cid = str(client.cliente_id or "").strip()
+                if not cid:
+                    continue
+                client_search_by_id[cid] = self._normalize_search_text(
+                    " ".join(
+                        [
+                            str(getattr(client, "cliente_codigo", "") or ""),
+                            str(client.cliente_nombre_comercial or ""),
+                            str(client.cliente_nombre_fiscal or ""),
+                            str(client.cliente_abreviatura or ""),
+                        ]
+                    )
+                )
 
         client_by_id: dict[str, tuple[str, str]] = {}
         client_search: list[tuple[str, str, str]] = []
