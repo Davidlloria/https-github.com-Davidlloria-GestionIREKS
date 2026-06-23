@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import re
-import unicodedata
 from dataclasses import dataclass
 from typing import Any
 from urllib.request import ProxyHandler, Request, build_opener
@@ -10,6 +9,7 @@ from urllib.request import ProxyHandler, Request, build_opener
 from app.services.openai_process_service import OpenAIProcessService
 from app.services.openai_settings_service import OpenAISettingsService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesDetailRow, SalesComparisonRow
+from app.services.sales_text_normalizer import mentions_acumulado, normalize_query_text, normalize_search_text
 
 
 @dataclass
@@ -47,18 +47,6 @@ class SalesQueryResult:
 
 class SalesQueryAssistantService:
     BASE_URL = "https://api.openai.com/v1/responses"
-    _QUERY_NORMALIZATION_RULES: tuple[tuple[str, str], ...] = (
-        (r"\baculmulado\b", "acumulado"),
-        (r"\baculmulada\b", "acumulada"),
-        (r"\baculmulados\b", "acumulados"),
-        (r"\baculmuladas\b", "acumuladas"),
-        (r"\bdiferencias negativas\b", "diferenciales negativos"),
-        (r"\bdiferencia negativa\b", "diferencial negativo"),
-        (r"\bdiferencias negativas en kg\b", "diferenciales negativos en kg"),
-        (r"\bmayor a menos\b", "mayor a menor"),
-        (r"\bordenados de mayor a menos\b", "ordenados de mayor a menor"),
-        (r"\bordenado de mayor a menos\b", "ordenado de mayor a menor"),
-    )
 
     def __init__(
         self,
@@ -250,7 +238,7 @@ class SalesQueryAssistantService:
         return False
 
     def _negative_delta_requested(self, question: str, intent: SalesQueryIntent) -> bool:
-        normalized = self._normalize_query_text(question)
+        normalized = normalize_query_text(question)
         return any(
             token in normalized
             for token in (
@@ -273,7 +261,7 @@ class SalesQueryAssistantService:
     def _ranking_requested(self, question: str, intent: SalesQueryIntent) -> bool:
         if intent.query_type == "ranking":
             return True
-        normalized = self._normalize_query_text(question)
+        normalized = normalize_query_text(question)
         return any(
             token in normalized
             for token in (
@@ -588,7 +576,7 @@ class SalesQueryAssistantService:
         )
 
     def _fallback_intent(self, text: str, defaults: dict[str, Any]) -> SalesQueryIntent:
-        normalized = self._normalize_query_text(text)
+        normalized = normalize_query_text(text)
         intent = SalesQueryIntent(
             query_type="general",
             year=self._effective_int(defaults, "year", 0),
@@ -668,7 +656,7 @@ class SalesQueryAssistantService:
             intent.producto_texto = producto
         if cliente:
             intent.cliente_texto = cliente
-        if self._mentions_acumulado(normalized):
+        if mentions_acumulado(normalized):
             intent.acumulado = True
         if intent.query_type != "comparativa" and (intent.producto_texto or intent.cliente_texto or intent.month):
             intent.query_type = "detalle"
@@ -803,35 +791,7 @@ class SalesQueryAssistantService:
         return self._coerce_bool(value, False)
 
     def _normalize_search_text(self, value) -> str:
-        text = str(value or "").strip().lower()
-        normalized = unicodedata.normalize("NFD", text)
-        normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
-        return re.sub(r"\s+", " ", normalized)
-
-    def _normalize_query_text(self, value: Any) -> str:
-        normalized = self._normalize_search_text(value)
-        for pattern, replacement in self._QUERY_NORMALIZATION_RULES:
-            normalized = re.sub(pattern, replacement, normalized)
-        return normalized
-
-    def _mentions_acumulado(self, text: str) -> bool:
-        normalized = self._normalize_search_text(text)
-        if not normalized:
-            return False
-        if any(token in normalized for token in ("acumulado", "acumular", "acumulada")):
-            return True
-        words = normalized.split()
-        if any(word in {"acumulado", "acumulada", "acumulados", "acumuladas"} for word in words):
-            return True
-        return any(
-            re.fullmatch(pattern, word or "") is not None
-            for word in words
-            for pattern in (
-                r"acu.?mulad[oa]s?",
-                r"aculmulad[oa]s?",
-                r"acumlad[oa]s?",
-            )
-        )
+        return normalize_search_text(value)
 
     def _fmt_num(self, value: float) -> str:
         return f"{float(value or 0.0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")

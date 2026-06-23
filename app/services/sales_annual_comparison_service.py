@@ -9,6 +9,7 @@ from sqlmodel import Session, col, select
 
 from app.core.database import engine
 from app.models import Cliente, Distribuidor, Fabricante, Familia, IngredienteIreks, Subfamilia, VentaMensualRaw
+from app.services.sales_text_normalizer import normalize_search_text
 
 
 SALES_CLIENT_TYPES = {"distribuidor", "directo", "cliente directo", "cliente_directo"}
@@ -937,10 +938,7 @@ class SalesAnnualComparisonService:
         return (float(delta or 0.0) / float(base)) * 100.0
 
     def _normalize_search_text(self, value) -> str:
-        text = str(value or "").strip().lower()
-        normalized = unicodedata.normalize("NFD", text)
-        normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
-        return re.sub(r"\s+", " ", normalized)
+        return normalize_search_text(value)
 
     def _normalize_code(self, value) -> str:
         text = str(value or "").strip().upper()
