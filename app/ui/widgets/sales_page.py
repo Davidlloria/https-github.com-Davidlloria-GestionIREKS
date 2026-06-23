@@ -624,29 +624,43 @@ class SalesAnalysisDialog(QDialog):
         bottom_row.setContentsMargins(0, 0, 0, 0)
         bottom_row.setSpacing(8)
 
-        self.print_btn = QPushButton("Imprimir")
-        self.print_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.print_btn.clicked.connect(self._print_response)
-        bottom_row.addWidget(self.print_btn)
-
-        self.export_excel_btn = QPushButton("Excel")
-        self.export_excel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.export_excel_btn.clicked.connect(self._export_response_excel)
-        bottom_row.addWidget(self.export_excel_btn)
-
-        self.export_pdf_btn = QPushButton("PDF")
-        self.export_pdf_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.export_pdf_btn.clicked.connect(self._export_response_pdf)
-        bottom_row.addWidget(self.export_pdf_btn)
-
         self.consult_btn = QPushButton("Consultar")
+        self.consult_btn.setProperty("btnRole", "warning")
         self.consult_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.consult_btn.clicked.connect(self._consult)
         bottom_row.addWidget(self.consult_btn)
 
         bottom_row.addStretch(1)
 
+        center_actions = QWidget()
+        center_actions_layout = QHBoxLayout(center_actions)
+        center_actions_layout.setContentsMargins(0, 0, 0, 0)
+        center_actions_layout.setSpacing(8)
+
+        self.print_btn = QPushButton("Imprimir")
+        self.print_btn.setProperty("btnRole", "secondary")
+        self.print_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.print_btn.clicked.connect(self._print_response)
+        center_actions_layout.addWidget(self.print_btn)
+
+        self.export_excel_btn = QPushButton("Excel")
+        self.export_excel_btn.setProperty("btnRole", "secondary")
+        self.export_excel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_excel_btn.clicked.connect(self._export_response_excel)
+        center_actions_layout.addWidget(self.export_excel_btn)
+
+        self.export_pdf_btn = QPushButton("PDF")
+        self.export_pdf_btn.setProperty("btnRole", "secondary")
+        self.export_pdf_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_pdf_btn.clicked.connect(self._export_response_pdf)
+        center_actions_layout.addWidget(self.export_pdf_btn)
+
+        bottom_row.addWidget(center_actions)
+
+        bottom_row.addStretch(1)
+
         close_btn = QPushButton("Cerrar")
+        close_btn.setProperty("btnRole", "danger")
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.clicked.connect(self.reject)
         bottom_row.addWidget(close_btn)
