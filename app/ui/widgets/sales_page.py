@@ -1151,7 +1151,30 @@ class SalesPage(QWidget):
             """
         )
         self.sales_analysis_btn.clicked.connect(self._open_sales_analysis_dialog)
+
+        self.chart_actions_widget = QWidget()
+        chart_band = QHBoxLayout(self.chart_actions_widget)
+        chart_band.setContentsMargins(0, 0, 0, 0)
+        chart_band.setSpacing(4)
+        chart_band.addWidget(self.sales_chart_btn)
+        chart_band.addWidget(self.sales_total_chart_btn)
+        chart_band.addWidget(self.sales_analysis_btn)
+
         layout.addLayout(filters_bottom)
+
+        actions_band = QHBoxLayout()
+        actions_band.setContentsMargins(0, 0, 0, 0)
+        actions_band.setSpacing(8)
+        actions_band.addWidget(self.chart_actions_widget)
+        actions_band.addStretch(1)
+        layout.addLayout(actions_band)
+
+        separator_line = QFrame()
+        separator_line.setFrameShape(QFrame.Shape.HLine)
+        separator_line.setFrameShadow(QFrame.Shadow.Plain)
+        separator_line.setStyleSheet("color: #D8E0EC; background: #D8E0EC;")
+        separator_line.setFixedHeight(1)
+        layout.addWidget(separator_line)
 
         self.group_header = QTableWidget(1, 12)
         self.group_header.setObjectName("salesGroupHeader")
@@ -1184,22 +1207,7 @@ class SalesPage(QWidget):
             }
             """
         )
-
-        self.chart_actions_widget = QWidget()
-        chart_band = QHBoxLayout(self.chart_actions_widget)
-        chart_band.setContentsMargins(0, 0, 0, 0)
-        chart_band.setSpacing(4)
-        chart_band.addWidget(self.sales_chart_btn)
-        chart_band.addWidget(self.sales_total_chart_btn)
-        chart_band.addWidget(self.sales_analysis_btn)
-        chart_band.addStretch(1)
-
-        header_band = QHBoxLayout()
-        header_band.setContentsMargins(0, 0, 0, 0)
-        header_band.setSpacing(0)
-        header_band.addWidget(self.chart_actions_widget)
-        header_band.addWidget(self.group_header, 1)
-        layout.addLayout(header_band)
+        layout.addWidget(self.group_header)
 
         self.sales_table = QTableWidget(0, 12)
         self.sales_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
