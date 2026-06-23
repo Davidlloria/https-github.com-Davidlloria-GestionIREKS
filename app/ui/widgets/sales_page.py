@@ -768,6 +768,8 @@ class SalesPage(QWidget):
 
         igsa_layout = QVBoxLayout(igsa_tab)
         igsa_filters_top = QHBoxLayout()
+        igsa_filters_top.setContentsMargins(0, 0, 0, 0)
+        igsa_filters_top.setSpacing(6)
         igsa_filters_top.addWidget(QLabel("Año"))
         self.year_filter_igsa = QComboBox()
         self.year_filter_igsa.currentIndexChanged.connect(self.reload_igsa)
@@ -925,6 +927,8 @@ class SalesPage(QWidget):
         layout.setSpacing(4)
 
         filters_top = QHBoxLayout()
+        filters_top.setContentsMargins(0, 0, 0, 0)
+        filters_top.setSpacing(6)
         filters_top.addWidget(QLabel("Año"))
         self.year_filter = QComboBox()
         self.year_filter.currentIndexChanged.connect(self.reload)
