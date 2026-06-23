@@ -16,6 +16,7 @@ from app.services.sales_annual_comparison_service import SalesAnnualComparisonSe
 class SalesQueryIntent:
     query_type: str = "general"
     year: int = 0
+    year_compare: int = 0
     month: int = 0
     acumulado: bool = False
     cliente_id: str = ""
@@ -66,7 +67,17 @@ class SalesQueryAssistantService:
         intent = intent_result.intent
         defaults = dict(defaults or {})
 
-        if self._detail_requested(intent):
+        if self._comparative_detail_requested(intent):
+            blocks = self._fetch_comparative_detail_blocks(intent, defaults)
+            if not blocks:
+                return SalesQueryResult(
+                    True,
+                    "No se han encontrado ventas que coincidan con la comparativa solicitada y los filtros disponibles.",
+                    "Sin datos de comparativa.",
+                    intent,
+                )
+            context = self._format_comparative_detail_context(question, intent, blocks, defaults)
+        elif self._detail_requested(intent):
             rows = self.sales_service.listar_detalle_ventas(
                 year=self._effective_int(defaults, "year", intent.year),
                 month=self._effective_int(defaults, "month", intent.month),
@@ -132,7 +143,7 @@ class SalesQueryAssistantService:
                         "Convierte consultas libres sobre ventas en JSON estricto. "
                         "No generes SQL ni texto adicional. "
                         "Devuelve solo estas claves: "
-                        "query_type, year, month, acumulado, cliente_id, cliente_texto, articulo_id, producto_texto, "
+                        "query_type, year, year_compare, month, acumulado, cliente_id, cliente_texto, articulo_id, producto_texto, "
                         "fabricante_id, familia_id, subfamilia_id, limit. "
                         "query_type debe ser uno de: detalle, mensual, anual, comparativa, ranking, tendencia, general. "
                         "Si la consulta menciona un producto, un cliente o un mes concreto, usa query_type detalle. "
@@ -162,6 +173,8 @@ class SalesQueryAssistantService:
             return SalesQueryIntentResult(True, fallback, f"Interpretación local. ChatGPT no disponible: {exc}", False)
 
     def _detail_requested(self, intent: SalesQueryIntent) -> bool:
+        if self._comparative_detail_requested(intent):
+            return False
         if intent.query_type == "detalle":
             return True
         if intent.producto_texto or intent.cliente_texto or intent.articulo_id or intent.cliente_id:
@@ -169,6 +182,67 @@ class SalesQueryAssistantService:
         if 1 <= int(intent.month or 0) <= 12:
             return True
         return False
+
+    def _comparative_detail_requested(self, intent: SalesQueryIntent) -> bool:
+        if intent.query_type != "comparativa":
+            return False
+        if intent.year <= 0 or intent.year_compare <= 0:
+            return False
+        return bool(intent.producto_texto or intent.cliente_texto or intent.articulo_id or intent.cliente_id or intent.month)
+
+    def _fetch_comparative_detail_blocks(
+        self,
+        intent: SalesQueryIntent,
+        defaults: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        year_a = self._effective_int(defaults, "year", intent.year)
+        year_b = self._effective_int(defaults, "year_compare", intent.year_compare)
+        if year_a <= 0 or year_b <= 0:
+            return []
+        month = self._effective_int(defaults, "month", intent.month)
+        acumulado = self._effective_bool(defaults, "acumulado", intent.acumulado)
+        cliente_id = self._effective_text(defaults, "cliente_id", intent.cliente_id)
+        cliente_texto = self._effective_text(defaults, "cliente_texto", intent.cliente_texto)
+        articulo_id = self._effective_text(defaults, "articulo_id", intent.articulo_id)
+        producto_texto = self._effective_text(defaults, "producto_texto", intent.producto_texto)
+        fabricante_id = self._effective_text(defaults, "fabricante_id", intent.fabricante_id)
+        familia_id = self._effective_text(defaults, "familia_id", intent.familia_id)
+        subfamilia_id = self._effective_text(defaults, "subfamilia_id", intent.subfamilia_id)
+        limit = max(intent.limit, 1)
+        return [
+            {
+                "year": year_a,
+                "rows": self.sales_service.listar_detalle_ventas(
+                    year=year_a,
+                    month=month,
+                    acumulado=acumulado,
+                    cliente_id=cliente_id,
+                    cliente_texto=cliente_texto,
+                    articulo_id=articulo_id,
+                    producto_texto=producto_texto,
+                    fabricante_id=fabricante_id,
+                    familia_id=familia_id,
+                    subfamilia_id=subfamilia_id,
+                    limit=limit,
+                ),
+            },
+            {
+                "year": year_b,
+                "rows": self.sales_service.listar_detalle_ventas(
+                    year=year_b,
+                    month=month,
+                    acumulado=acumulado,
+                    cliente_id=cliente_id,
+                    cliente_texto=cliente_texto,
+                    articulo_id=articulo_id,
+                    producto_texto=producto_texto,
+                    fabricante_id=fabricante_id,
+                    familia_id=familia_id,
+                    subfamilia_id=subfamilia_id,
+                    limit=limit,
+                ),
+            },
+        ]
 
     def _format_detail_context(
         self,
@@ -196,6 +270,40 @@ class SalesQueryAssistantService:
                 f"- {row.periodo} | {row.cliente_nombre} | {row.codigo} | {row.nombre} | "
                 f"Kg: {self._fmt_num(row.kilos)} | S/C: {self._fmt_num(row.sc)} | Ventas: {self._fmt_money(row.ventas)}"
             )
+        return "\n".join(lines).strip()
+
+    def _format_comparative_detail_context(
+        self,
+        question: str,
+        intent: SalesQueryIntent,
+        blocks: list[dict[str, Any]],
+        defaults: dict[str, Any],
+    ) -> str:
+        month = self._effective_int(defaults, "month", intent.month)
+        lines = [
+            "Comparativa de detalle de ventas obtenida directamente de la base de datos.",
+            f"Pregunta: {question}",
+            f"Intención detectada: {intent.query_type}",
+            f"Filas comparadas: {len(blocks)} bloques",
+            f"Filtros efectivos: mes={month}, acumulado={'sí' if self._effective_bool(defaults, 'acumulado', intent.acumulado) else 'no'}",
+        ]
+        if intent.cliente_texto or intent.cliente_id:
+            lines.append(f"Cliente consultado: {intent.cliente_texto or intent.cliente_id}")
+        if intent.producto_texto or intent.articulo_id:
+            lines.append(f"Producto consultado: {intent.producto_texto or intent.articulo_id}")
+        lines.append("")
+        for block in blocks:
+            year = int(block.get("year") or 0)
+            rows = list(block.get("rows") or [])
+            lines.append(f"Año {year}:")
+            if not rows:
+                lines.append("- Sin filas para este año.")
+                continue
+            for row in rows[: max(1, min(intent.limit, 120))]:
+                lines.append(
+                    f"- {row.periodo} | {row.cliente_nombre} | {row.codigo} | {row.nombre} | "
+                    f"Kg: {self._fmt_num(row.kilos)} | S/C: {self._fmt_num(row.sc)} | Ventas: {self._fmt_money(row.ventas)}"
+                )
         return "\n".join(lines).strip()
 
     def _format_summary_context(
@@ -253,9 +361,11 @@ class SalesQueryAssistantService:
             subfamilia_id=self._effective_text(defaults, "subfamilia_id", ""),
             limit=200,
         )
-        year_match = re.search(r"\b(20\d{2})\b", normalized)
-        if year_match:
-            intent.year = int(year_match.group(1))
+        year_matches = [int(value) for value in re.findall(r"\b(20\d{2})\b", normalized)]
+        if year_matches:
+            intent.year = year_matches[0]
+        if len(year_matches) > 1:
+            intent.year_compare = year_matches[1]
         month_map = {
             "enero": 1,
             "febrero": 2,
@@ -302,7 +412,7 @@ class SalesQueryAssistantService:
             intent.cliente_texto = cliente
         if any(token in normalized for token in ("acumulado", "acumular", "acumulada")):
             intent.acumulado = True
-        if intent.producto_texto or intent.cliente_texto or intent.month:
+        if intent.query_type != "comparativa" and (intent.producto_texto or intent.cliente_texto or intent.month):
             intent.query_type = "detalle"
         if "top 10" in normalized or "top10" in normalized:
             intent.limit = 10
@@ -314,6 +424,7 @@ class SalesQueryAssistantService:
         intent = SalesQueryIntent(
             query_type=self._normalize_query_type(payload.get("query_type"), fallback.query_type),
             year=self._coerce_int(payload.get("year"), fallback.year),
+            year_compare=self._coerce_int(payload.get("year_compare"), fallback.year_compare),
             month=self._coerce_int(payload.get("month"), fallback.month),
             acumulado=self._coerce_bool(payload.get("acumulado"), fallback.acumulado),
             cliente_id=self._coerce_text(payload.get("cliente_id"), fallback.cliente_id),
@@ -327,6 +438,8 @@ class SalesQueryAssistantService:
         )
         if intent.producto_texto or intent.cliente_texto or intent.articulo_id or intent.cliente_id:
             intent.query_type = "detalle"
+        if intent.query_type == "comparativa" and intent.year_compare <= 0:
+            intent.year_compare = fallback.year_compare
         return intent
 
     def _parse_json(self, value: str) -> dict[str, Any]:

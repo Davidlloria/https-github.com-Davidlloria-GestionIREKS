@@ -79,6 +79,21 @@ def _seed_sales(session: Session) -> tuple[str, str, str, str, str]:
             venta_euros=25.0,
         )
     )
+    session.add(
+        VentaMensualRaw(
+            raw_id="raw-2",
+            lote_id="lote-2",
+            fuente="ireks",
+            cliente_id=cliente_id,
+            periodo="2026-07",
+            articulo_codigo_origen="MM01",
+            articulo_id=articulo_id,
+            articulo_descripcion_origen="MELLA MUFFIN",
+            venta_kilos=18.5,
+            venta_kilos_sc=1.5,
+            venta_euros=31.0,
+        )
+    )
     session.commit()
     return cliente_id, fabricante_id, familia_id, subfamilia_id, articulo_id
 
@@ -149,3 +164,47 @@ def test_sales_assistant_uses_detail_rows_for_specific_query(isolated_engine, mo
     assert "MELLA MUFFIN" in captured["prompt"]
     assert "IGSA" in captured["prompt"]
     assert "2025-07" in captured["prompt"]
+
+
+def test_sales_assistant_uses_comparative_detail_rows_for_years(isolated_engine, monkeypatch: pytest.MonkeyPatch) -> None:
+    with Session(isolated_engine) as session:
+        _seed_sales(session)
+
+    assistant = SalesQueryAssistantService(sales_service=SalesAnnualComparisonService(), api_key="")
+    captured: dict[str, str] = {}
+
+    def fake_generate(prompt: str):
+        captured["prompt"] = prompt
+        return type("Result", (), {"ok": True, "text": "Comparativa final", "message": "ok"})()
+
+    monkeypatch.setattr(assistant.answer_service, "generate_process", fake_generate)
+    monkeypatch.setattr(
+        assistant,
+        "interpret",
+        lambda question, defaults=None: SalesQueryIntentResult(
+            True,
+            SalesQueryIntent(
+                query_type="comparativa",
+                year=2025,
+                year_compare=2026,
+                month=7,
+                cliente_texto="IGSA",
+                producto_texto="MELLA MUFFIN",
+                limit=20,
+            ),
+            "ok",
+            False,
+        ),
+    )
+
+    result = assistant.answer(
+        "dime las ventas en kg de mella muffin de julio de 2025 comparadas con las de 2026 del mismo mes del cliente igsa",
+        defaults={"year": 2026, "month": 7, "acumulado": False},
+    )
+
+    assert result.ok is True
+    assert result.text == "Comparativa final"
+    assert "Año 2025" in captured["prompt"]
+    assert "Año 2026" in captured["prompt"]
+    assert "2025-07" in captured["prompt"]
+    assert "2026-07" in captured["prompt"]
