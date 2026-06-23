@@ -139,7 +139,10 @@ def test_sales_assistant_uses_detail_rows_for_specific_query(isolated_engine, mo
         ),
     )
 
-    result = assistant.answer("dime las ventas de mella muffin de julio de 2025 del cliente igsa", defaults={})
+    result = assistant.answer(
+        "dime las ventas de mella muffin de julio de 2025 del cliente igsa",
+        defaults={"year": 2026, "month": 5, "acumulado": False},
+    )
 
     assert result.ok is True
     assert result.text == "Respuesta final"

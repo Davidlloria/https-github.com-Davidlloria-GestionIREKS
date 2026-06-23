@@ -68,16 +68,16 @@ class SalesQueryAssistantService:
 
         if self._detail_requested(intent):
             rows = self.sales_service.listar_detalle_ventas(
-                year=self._pick_int(defaults, "year", intent.year),
-                month=self._pick_int(defaults, "month", intent.month),
-                acumulado=self._pick_bool(defaults, "acumulado", intent.acumulado),
-                cliente_id=self._pick_text(defaults, "cliente_id", intent.cliente_id),
-                cliente_texto=self._pick_text(defaults, "cliente_texto", intent.cliente_texto),
-                articulo_id=self._pick_text(defaults, "articulo_id", intent.articulo_id),
-                producto_texto=self._pick_text(defaults, "producto_texto", intent.producto_texto),
-                fabricante_id=self._pick_text(defaults, "fabricante_id", intent.fabricante_id),
-                familia_id=self._pick_text(defaults, "familia_id", intent.familia_id),
-                subfamilia_id=self._pick_text(defaults, "subfamilia_id", intent.subfamilia_id),
+                year=self._effective_int(defaults, "year", intent.year),
+                month=self._effective_int(defaults, "month", intent.month),
+                acumulado=self._effective_bool(defaults, "acumulado", intent.acumulado),
+                cliente_id=self._effective_text(defaults, "cliente_id", intent.cliente_id),
+                cliente_texto=self._effective_text(defaults, "cliente_texto", intent.cliente_texto),
+                articulo_id=self._effective_text(defaults, "articulo_id", intent.articulo_id),
+                producto_texto=self._effective_text(defaults, "producto_texto", intent.producto_texto),
+                fabricante_id=self._effective_text(defaults, "fabricante_id", intent.fabricante_id),
+                familia_id=self._effective_text(defaults, "familia_id", intent.familia_id),
+                subfamilia_id=self._effective_text(defaults, "subfamilia_id", intent.subfamilia_id),
                 limit=max(intent.limit, 1),
             )
             if not rows:
@@ -90,14 +90,14 @@ class SalesQueryAssistantService:
             context = self._format_detail_context(question, intent, rows, defaults)
         else:
             rows = self.sales_service.listar_resumen_anual(
-                year=self._pick_int(defaults, "year", intent.year),
-                month=self._pick_int(defaults, "month", intent.month),
-                acumulado=self._pick_bool(defaults, "acumulado", intent.acumulado),
-                cliente_id=self._pick_text(defaults, "cliente_id", intent.cliente_id),
-                producto_texto=self._pick_text(defaults, "producto_texto", intent.producto_texto),
-                fabricante_id=self._pick_text(defaults, "fabricante_id", intent.fabricante_id),
-                familia_id=self._pick_text(defaults, "familia_id", intent.familia_id),
-                subfamilia_id=self._pick_text(defaults, "subfamilia_id", intent.subfamilia_id),
+                year=self._effective_int(defaults, "year", intent.year),
+                month=self._effective_int(defaults, "month", intent.month),
+                acumulado=self._effective_bool(defaults, "acumulado", intent.acumulado),
+                cliente_id=self._effective_text(defaults, "cliente_id", intent.cliente_id),
+                producto_texto=self._effective_text(defaults, "producto_texto", intent.producto_texto),
+                fabricante_id=self._effective_text(defaults, "fabricante_id", intent.fabricante_id),
+                familia_id=self._effective_text(defaults, "familia_id", intent.familia_id),
+                subfamilia_id=self._effective_text(defaults, "subfamilia_id", intent.subfamilia_id),
             )
             if not rows:
                 return SalesQueryResult(
@@ -177,13 +177,13 @@ class SalesQueryAssistantService:
         rows: list[SalesDetailRow],
         defaults: dict[str, Any],
     ) -> str:
-        year = self._pick_int(defaults, "year", intent.year)
+        year = self._effective_int(defaults, "year", intent.year)
         lines = [
             "Consulta de detalle de ventas obtenida directamente de la base de datos.",
             f"Pregunta: {question}",
             f"Intención detectada: {intent.query_type}",
             f"Filas recuperadas: {len(rows)}",
-            f"Filtros efectivos: año={year}, mes={self._pick_int(defaults, 'month', intent.month)}, acumulado={'sí' if self._pick_bool(defaults, 'acumulado', intent.acumulado) else 'no'}",
+            f"Filtros efectivos: año={year}, mes={self._effective_int(defaults, 'month', intent.month)}, acumulado={'sí' if self._effective_bool(defaults, 'acumulado', intent.acumulado) else 'no'}",
         ]
         if intent.cliente_texto or intent.cliente_id:
             lines.append(f"Cliente consultado: {intent.cliente_texto or intent.cliente_id}")
@@ -205,14 +205,14 @@ class SalesQueryAssistantService:
         rows: list[SalesComparisonRow],
         defaults: dict[str, Any],
     ) -> str:
-        year = self._pick_int(defaults, "year", intent.year)
-        month = self._pick_int(defaults, "month", intent.month)
+        year = self._effective_int(defaults, "year", intent.year)
+        month = self._effective_int(defaults, "month", intent.month)
         lines = [
             "Resumen de ventas obtenido directamente de la base de datos.",
             f"Pregunta: {question}",
             f"Intención detectada: {intent.query_type}",
             f"Filas recuperadas: {len(rows)}",
-            f"Filtros efectivos: año={year}, mes={month}, acumulado={'sí' if self._pick_bool(defaults, 'acumulado', intent.acumulado) else 'no'}",
+            f"Filtros efectivos: año={year}, mes={month}, acumulado={'sí' if self._effective_bool(defaults, 'acumulado', intent.acumulado) else 'no'}",
             "",
             "Filas devueltas:",
         ]
@@ -398,26 +398,36 @@ class SalesQueryAssistantService:
         text = str(value or "").strip()
         return text if text else str(default or "").strip()
 
-    def _pick_text(self, defaults: dict[str, Any], key: str, fallback: str) -> str:
-        text = str(defaults.get(key, "") or "").strip()
-        return text or str(fallback or "").strip()
+    def _effective_text(self, defaults: dict[str, Any], key: str, fallback: str) -> str:
+        text = str(fallback or "").strip()
+        if text:
+            return text
+        return str(defaults.get(key, "") or "").strip()
 
-    def _pick_int(self, defaults: dict[str, Any], key: str, fallback: int) -> int:
+    def _effective_int(self, defaults: dict[str, Any], key: str, fallback: int) -> int:
+        try:
+            value = int(fallback or 0)
+            if value:
+                return value
+        except Exception:
+            pass
         value = defaults.get(key, None)
         try:
             if value is None:
-                return int(fallback or 0)
+                return 0
             return int(value)
         except Exception:
-            return int(fallback or 0)
+            return 0
 
-    def _pick_bool(self, defaults: dict[str, Any], key: str, fallback: bool) -> bool:
+    def _effective_bool(self, defaults: dict[str, Any], key: str, fallback: bool) -> bool:
+        if isinstance(fallback, bool):
+            return fallback
         value = defaults.get(key, None)
         if isinstance(value, bool):
             return value
         if value is None:
-            return bool(fallback)
-        return self._coerce_bool(value, fallback)
+            return False
+        return self._coerce_bool(value, False)
 
     def _normalize_search_text(self, value) -> str:
         text = str(value or "").strip().lower()
