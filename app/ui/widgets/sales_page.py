@@ -870,6 +870,10 @@ class SalesExcelExportDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Ok)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        ok_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        if ok_button is not None:
+            ok_button.setDefault(True)
+            ok_button.setAutoDefault(True)
         layout.addWidget(buttons)
 
         note = QLabel("Cliente solo aparece si el filtro Cliente está en Todos.")
@@ -1567,19 +1571,23 @@ class SalesPage(QWidget):
             path = f"{path}.xlsx"
         QApplication.setOverrideCursor(QCursor(Qt.CursorShape.WaitCursor))
         try:
-            out = self._write_sales_export_workbook_v2(
-                path=path,
-                title=title,
-                subtitle=subtitle,
-                sections=sections,
-                grand_rows=grand_rows,
-                grand_total_label=grand_total_label,
-                sort_by=str(options["sort_by"]),
-                direction=str(options["direction"]),
-                group_levels=list(options["group_levels"]),
-                include_subtotals=bool(options["subtotals"]),
-                state=state,
-            )
+            try:
+                out = self._write_sales_export_workbook_v2(
+                    path=path,
+                    title=title,
+                    subtitle=subtitle,
+                    sections=sections,
+                    grand_rows=grand_rows,
+                    grand_total_label=grand_total_label,
+                    sort_by=str(options["sort_by"]),
+                    direction=str(options["direction"]),
+                    group_levels=list(options["group_levels"]),
+                    include_subtotals=bool(options["subtotals"]),
+                    state=state,
+                )
+            except Exception as exc:  # pragma: no cover - GUI safeguard
+                QMessageBox.critical(self, "Ventas", f"No se pudo exportar a Excel:\n{exc}")
+                return
         finally:
             QApplication.restoreOverrideCursor()
         QMessageBox.information(self, "Ventas", f"Excel exportado:\n{out}")
