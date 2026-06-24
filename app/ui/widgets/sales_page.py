@@ -2574,7 +2574,15 @@ class SalesPage(QWidget):
 
         def write_group_rows(rows: list[SalesExportRow], levels: list[str]) -> list[SalesExportRow]:
             if not levels:
-                write_column_header()
+                header_row = ws.max_row + 1
+                ws.append(headers)
+                update_widths(headers)
+                for col_idx in range(1, 13):
+                    cell = ws.cell(row=header_row, column=col_idx)
+                    cell.border = border
+                    cell.fill = header_fill
+                    cell.font = Font(bold=True, color="FF111827")
+                    cell.alignment = Alignment(horizontal="left" if col_idx <= 2 else "right", vertical="center")
                 self._sales_export_sort_rows(rows, sort_by, direction)
                 for row in rows:
                     write_data_row(row)
