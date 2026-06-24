@@ -918,8 +918,8 @@ class SalesToolsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Herramientas de ventas - IREKS")
         self.setModal(True)
-        self.resize(1260, 780)
-        self.setMinimumSize(1060, 680)
+        self.resize(1120, 700)
+        self.setMinimumSize(960, 600)
         self._on_import_completed = on_import_completed
         self._export_service = DbExportService()
         self._import_service = SettingsSalesImportService()
@@ -930,44 +930,45 @@ class SalesToolsDialog(QDialog):
     def _build_ui(self) -> None:
         self.setObjectName("salesToolsDialog")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 18, 20, 18)
-        layout.setSpacing(16)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(12)
 
         title = QLabel("Herramientas de ventas - IREKS")
         title.setProperty("role", "pageTitle")
+        title.setStyleSheet("font-size: 22px; font-weight: 700; color: #14213D;")
         layout.addWidget(title)
 
         subtitle = QLabel("Acceso rápido a exportación, importación e histórico de IREKS.")
         subtitle.setWordWrap(True)
-        subtitle.setStyleSheet("color: #4B5F7A; font-size: 14px;")
+        subtitle.setStyleSheet("color: #4B5F7A; font-size: 12px;")
         layout.addWidget(subtitle)
 
         export_card = QFrame()
         export_card.setObjectName("salesToolsCard")
         export_layout = QHBoxLayout(export_card)
-        export_layout.setContentsMargins(18, 18, 18, 18)
-        export_layout.setSpacing(18)
+        export_layout.setContentsMargins(14, 14, 14, 14)
+        export_layout.setSpacing(14)
 
         export_left = QHBoxLayout()
-        export_left.setSpacing(16)
+        export_left.setSpacing(12)
         export_icon = self._make_icon_label(SALES_IREKS_ICON_PATH, "#EAF2FF")
         export_left.addWidget(export_icon, 0, Qt.AlignmentFlag.AlignTop)
 
         export_text = QVBoxLayout()
-        export_text.setSpacing(8)
+        export_text.setSpacing(4)
         export_title = QLabel("Ventas IREKS")
-        export_title.setStyleSheet("font-size: 28px; font-weight: 700; color: #14213D;")
+        export_title.setStyleSheet("font-size: 22px; font-weight: 700; color: #14213D;")
         export_text.addWidget(export_title)
         export_desc = QLabel("Gestiona exportación e importación de ventas IREKS.")
         export_desc.setWordWrap(True)
-        export_desc.setStyleSheet("font-size: 18px; color: #4B5F7A;")
+        export_desc.setStyleSheet("font-size: 13px; color: #4B5F7A;")
         export_text.addWidget(export_desc)
         export_text.addStretch(1)
         export_left.addLayout(export_text, 1)
         export_layout.addLayout(export_left, 1)
 
         button_row = QHBoxLayout()
-        button_row.setSpacing(14)
+        button_row.setSpacing(10)
         self.export_btn = self._make_action_button(
             "Exportar",
             EXPORT_ICON_PATH,
@@ -993,27 +994,27 @@ class SalesToolsDialog(QDialog):
         history_card = QFrame()
         history_card.setObjectName("salesToolsCard")
         history_layout = QVBoxLayout(history_card)
-        history_layout.setContentsMargins(18, 18, 18, 18)
-        history_layout.setSpacing(12)
+        history_layout.setContentsMargins(14, 14, 14, 14)
+        history_layout.setSpacing(10)
 
         history_header = QHBoxLayout()
-        history_header.setSpacing(14)
+        history_header.setSpacing(10)
         history_icon = self._make_icon_label(HISTORY_ICON_PATH, "#EFE9FF")
         history_header.addWidget(history_icon, 0, Qt.AlignmentFlag.AlignTop)
 
         header_text = QVBoxLayout()
-        header_text.setSpacing(6)
+        header_text.setSpacing(3)
         header_title = QLabel("Histórico IREKS")
-        header_title.setStyleSheet("font-size: 24px; font-weight: 700; color: #14213D;")
+        header_title.setStyleSheet("font-size: 20px; font-weight: 700; color: #14213D;")
         header_text.addWidget(header_title)
         header_desc = QLabel("Últimas operaciones de exportación e importación.")
         header_desc.setWordWrap(True)
-        header_desc.setStyleSheet("font-size: 15px; color: #5E708A;")
+        header_desc.setStyleSheet("font-size: 12px; color: #5E708A;")
         header_text.addWidget(header_desc)
         history_header.addLayout(header_text, 1)
 
         history_filter_panel = QHBoxLayout()
-        history_filter_panel.setSpacing(8)
+        history_filter_panel.setSpacing(6)
         filter_icon = self._make_small_icon_label(FILTER_ICON_PATH, "#EEF2FF")
         history_filter_panel.addWidget(filter_icon)
         self.history_filter_combo = QComboBox()
@@ -1027,10 +1028,10 @@ class SalesToolsDialog(QDialog):
             QComboBox {
                 background: #FFFFFF;
                 border: 1px solid #D7E0EC;
-                border-radius: 12px;
-                padding: 10px 14px;
+                border-radius: 10px;
+                padding: 8px 12px;
                 color: #14213D;
-                min-height: 44px;
+                min-height: 36px;
             }
             QComboBox::drop-down {
                 border: none;
@@ -1059,11 +1060,11 @@ class SalesToolsDialog(QDialog):
             QTableWidget#salesToolsHistoryTable {
                 background: #FFFFFF;
                 border: 1px solid #D7E0EC;
-                border-radius: 14px;
+                border-radius: 12px;
                 gridline-color: #E5ECF5;
             }
             QTableWidget#salesToolsHistoryTable::item {
-                padding: 10px 12px;
+                padding: 6px 10px;
                 border: none;
             }
             QTableWidget#salesToolsHistoryTable::item:selected {
@@ -1079,14 +1080,14 @@ class SalesToolsDialog(QDialog):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        self.history_table.setColumnWidth(0, 170)
-        self.history_table.setColumnWidth(1, 165)
-        self.history_table.setColumnWidth(3, 170)
-        self.history_table.verticalHeader().setDefaultSectionSize(46)
+        self.history_table.setColumnWidth(0, 160)
+        self.history_table.setColumnWidth(1, 150)
+        self.history_table.setColumnWidth(3, 160)
+        self.history_table.verticalHeader().setDefaultSectionSize(36)
         history_layout.addWidget(self.history_table, 1)
 
         self.history_empty_label = QLabel("Sin operaciones registradas todavía.")
-        self.history_empty_label.setStyleSheet("color: #6B7280; font-style: italic; padding: 6px 2px 0 2px;")
+        self.history_empty_label.setStyleSheet("color: #6B7280; font-style: italic; padding: 2px 2px 0 2px;")
         history_layout.addWidget(self.history_empty_label)
 
         layout.addWidget(history_card, 1)
@@ -1094,16 +1095,16 @@ class SalesToolsDialog(QDialog):
         footer = QHBoxLayout()
         footer.addStretch(1)
         close_btn = QPushButton("Cerrar")
-        close_btn.setMinimumWidth(150)
-        close_btn.setMinimumHeight(48)
+        close_btn.setMinimumWidth(138)
+        close_btn.setMinimumHeight(42)
         close_btn.setStyleSheet(
             """
             QPushButton {
                 background: #FFFFFF;
                 color: #14213D;
                 border: 1px solid #C9D6E5;
-                border-radius: 12px;
-                font-size: 16px;
+                border-radius: 10px;
+                font-size: 14px;
                 font-weight: 600;
                 padding: 0 18px;
             }
@@ -1124,26 +1125,26 @@ class SalesToolsDialog(QDialog):
             QFrame#salesToolsCard {
                 background: #FFFFFF;
                 border: 1px solid #D7E0EC;
-                border-radius: 18px;
+                border-radius: 14px;
             }
             """
         )
 
     def _make_icon_label(self, icon_path: Path, background: str) -> QLabel:
         label = QLabel()
-        label.setFixedSize(72, 72)
+        label.setFixedSize(54, 54)
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setStyleSheet(f"background: {background}; border-radius: 36px;")
-        pixmap = QIcon(str(icon_path)).pixmap(36, 36)
+        label.setStyleSheet(f"background: {background}; border-radius: 27px;")
+        pixmap = QIcon(str(icon_path)).pixmap(28, 28)
         label.setPixmap(pixmap)
         return label
 
     def _make_small_icon_label(self, icon_path: Path, background: str) -> QLabel:
         label = QLabel()
-        label.setFixedSize(44, 44)
+        label.setFixedSize(32, 32)
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setStyleSheet(f"background: {background}; border-radius: 22px;")
-        pixmap = QIcon(str(icon_path)).pixmap(20, 20)
+        label.setStyleSheet(f"background: {background}; border-radius: 16px;")
+        pixmap = QIcon(str(icon_path)).pixmap(16, 16)
         label.setPixmap(pixmap)
         return label
 
@@ -1158,19 +1159,19 @@ class SalesToolsDialog(QDialog):
     ) -> QPushButton:
         button = QPushButton(text)
         button.setIcon(QIcon(str(icon_path)))
-        button.setIconSize(QSize(22, 22))
+        button.setIconSize(QSize(18, 18))
         button.setCursor(Qt.CursorShape.PointingHandCursor)
-        button.setMinimumSize(250, 72)
+        button.setMinimumSize(228, 84)
         button.setStyleSheet(
             f"""
             QPushButton {{
                 background: {background};
                 border: 1px solid {border};
-                border-radius: 16px;
+                border-radius: 12px;
                 color: {foreground};
-                font-size: 22px;
+                font-size: 18px;
                 font-weight: 700;
-                padding: 0 20px;
+                padding: 0 16px;
                 text-align: left;
             }}
             QPushButton:hover {{
