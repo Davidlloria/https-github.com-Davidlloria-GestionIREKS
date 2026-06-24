@@ -2574,6 +2574,8 @@ class SalesPage(QWidget):
                     cell.number_format = '0.00"%"'
 
         def write_group_rows(rows: list[SalesExportRow], levels: list[str]) -> list[SalesExportRow]:
+            while levels and levels[0] == "month":
+                levels = levels[1:]
             if not levels:
                 header_row = ws.max_row + 1
                 ws.append(headers)
@@ -2604,6 +2606,10 @@ class SalesPage(QWidget):
 
             total_rows: list[SalesExportRow] = []
             for label in sorted(order, key=sort_label):
+                if not str(label or "").strip():
+                    child_rows = write_group_rows(grouped[label], levels[1:])
+                    total_rows.extend(child_rows)
+                    continue
                 write_spanned_row(f"{level_titles.get(level, level.title())}: {label}", section_fill, True, "FF111827")
                 child_rows = write_group_rows(grouped[label], levels[1:])
                 total_rows.extend(child_rows)
