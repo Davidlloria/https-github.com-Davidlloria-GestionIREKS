@@ -2,12 +2,12 @@
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 import math
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, Qt, QSize
-from PySide6.QtGui import QColor, QCursor, QFont, QIcon, QTextDocument
+from PySide6.QtGui import QColor, QCursor, QFont, QIcon, QTextDocument, QBrush
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -50,14 +50,25 @@ from app.services.sales_annual_comparison_service import (
     SalesDetailRow,
     SalesMonthlyComparisonPoint,
 )
+from app.services.db_export_service import DbExportService
 from app.services.report_export_service import ReportExportService
 from app.services.sales_reconciliation_service import SalesReconciliationService
-from app.ui.widgets.db_export_console_tab import DbExportConsoleTab
-from app.ui.widgets.db_import_console_tab import DbImportConsoleTab
+from app.services.settings_sales_import_service import SettingsSalesImportService
+from app.core.config import DATA_DIR
+from app.core.database import engine
 
 
 BASE_DIR = Path(__file__).resolve().parents[3]
+ALERT_ICON_PATH = BASE_DIR / "assets" / "icons" / "alert.svg"
+ARROW_DOWN_ICON_PATH = BASE_DIR / "assets" / "icons" / "arrow-down.svg"
+ARROW_UP_ICON_PATH = BASE_DIR / "assets" / "icons" / "arrow-up.svg"
 CHART_COLUMN_ICON_PATH = BASE_DIR / "assets" / "icons" / "chart-column.svg"
+SALES_IREKS_ICON_PATH = BASE_DIR / "assets" / "icons" / "chart-no-axes-column-increasing.svg"
+CHECK_ICON_PATH = BASE_DIR / "assets" / "icons" / "check.svg"
+ERROR_ICON_PATH = BASE_DIR / "assets" / "icons" / "error.svg"
+EXPORT_ICON_PATH = BASE_DIR / "assets" / "icons" / "export.svg"
+IMPORT_ICON_PATH = BASE_DIR / "assets" / "icons" / "import.svg"
+HISTORY_ICON_PATH = BASE_DIR / "assets" / "icons" / "history.svg"
 CHART_LINE_ICON_PATH = BASE_DIR / "assets" / "icons" / "chart-line.svg"
 PRINTER_ICON_PATH = BASE_DIR / "assets" / "icons" / "printer.svg"
 FILE_TEXT_ICON_PATH = BASE_DIR / "assets" / "icons" / "file-text.svg"
@@ -892,91 +903,532 @@ class SalesExcelExportDialog(QDialog):
         }
 
 
+@dataclass(frozen=True)
+class SalesToolsHistoryRow:
+    created_at: str
+    action: str
+    detail: str
+    status: str
+    message: str
+
+
 class SalesToolsDialog(QDialog):
     def __init__(self, *, on_import_completed=None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Herramientas - Ventas")
+        self.setWindowTitle("Herramientas de ventas - IREKS")
         self.setModal(True)
-        self.setMinimumSize(980, 680)
-        self.resize(1120, 760)
+        self.resize(1260, 780)
+        self.setMinimumSize(1060, 680)
         self._on_import_completed = on_import_completed
+        self._export_service = DbExportService()
+        self._import_service = SettingsSalesImportService()
+        self._history_limit = 40
         self._build_ui()
+        self._refresh_history()
 
     def _build_ui(self) -> None:
+        self.setObjectName("salesToolsDialog")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(12)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(16)
 
-        title = QLabel("Herramientas de ventas")
+        title = QLabel("Herramientas de ventas - IREKS")
         title.setProperty("role", "pageTitle")
         layout.addWidget(title)
 
-        subtitle = QLabel(
-            "Acceso directo a Configuración > Exportación BD > Ventas y "
-            "Configuración > Importación BD > Ventas."
-        )
+        subtitle = QLabel("Acceso rápido a exportación, importación e histórico de IREKS.")
         subtitle.setWordWrap(True)
-        subtitle.setStyleSheet("color: #6B7280;")
+        subtitle.setStyleSheet("color: #4B5F7A; font-size: 14px;")
         layout.addWidget(subtitle)
 
-        tabs = QTabWidget()
-        tabs.addTab(self._build_export_tab(), "Exportación BD")
-        tabs.addTab(self._build_import_tab(), "Importación BD")
-        layout.addWidget(tabs, 1)
+        export_card = QFrame()
+        export_card.setObjectName("salesToolsCard")
+        export_layout = QHBoxLayout(export_card)
+        export_layout.setContentsMargins(18, 18, 18, 18)
+        export_layout.setSpacing(18)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(self.reject)
-        buttons.accepted.connect(self.accept)
-        layout.addWidget(buttons)
+        export_left = QHBoxLayout()
+        export_left.setSpacing(16)
+        export_icon = self._make_icon_label(SALES_IREKS_ICON_PATH, "#EAF2FF")
+        export_left.addWidget(export_icon, 0, Qt.AlignmentFlag.AlignTop)
 
-    def _build_export_tab(self) -> QWidget:
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        export_text = QVBoxLayout()
+        export_text.setSpacing(8)
+        export_title = QLabel("Ventas IREKS")
+        export_title.setStyleSheet("font-size: 28px; font-weight: 700; color: #14213D;")
+        export_text.addWidget(export_title)
+        export_desc = QLabel("Gestiona exportación e importación de ventas IREKS.")
+        export_desc.setWordWrap(True)
+        export_desc.setStyleSheet("font-size: 18px; color: #4B5F7A;")
+        export_text.addWidget(export_desc)
+        export_text.addStretch(1)
+        export_left.addLayout(export_text, 1)
+        export_layout.addLayout(export_left, 1)
 
-        section = QLabel("Ventas")
-        section.setProperty("role", "sectionTitle")
-        layout.addWidget(section)
-
-        note = QLabel("Exporta las tablas de ventas desde la consola de exportación de mantenimiento.")
-        note.setWordWrap(True)
-        note.setStyleSheet("color: #6B7280;")
-        layout.addWidget(note)
-
-        layout.addWidget(
-            DbExportConsoleTab(
-                title="Consola de exportacion - Ventas",
-                allowed_table_names=["ventas_import_lotes", "ventas_mensuales_raw"],
-            ),
-            1,
+        button_column = QVBoxLayout()
+        button_column.setSpacing(14)
+        self.export_btn = self._make_action_button(
+            "Exportar",
+            ARROW_DOWN_ICON_PATH,
+            background="#E5EEFF",
+            border="#AFC8F7",
+            foreground="#214EAA",
         )
-        return panel
+        self.export_btn.clicked.connect(self._export_ireks_sales)
+        button_column.addWidget(self.export_btn)
 
-    def _build_import_tab(self) -> QWidget:
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
-
-        section = QLabel("Ventas")
-        section.setProperty("role", "sectionTitle")
-        layout.addWidget(section)
-
-        note = QLabel("Importa datos de ventas desde la consola de importación de mantenimiento.")
-        note.setWordWrap(True)
-        note.setStyleSheet("color: #6B7280;")
-        layout.addWidget(note)
-
-        layout.addWidget(
-            DbImportConsoleTab(
-                on_import_completed=self._on_import_completed,
-                allowed_profile_keys=["ventas_import_lotes", "ventas_mensuales_raw"],
-                title="Importacion de Ventas",
-            ),
-            1,
+        self.import_btn = self._make_action_button(
+            "Importar",
+            ARROW_UP_ICON_PATH,
+            background="#E6F7E9",
+            border="#AAD9B4",
+            foreground="#1D7D4D",
         )
-        return panel
+        self.import_btn.clicked.connect(self._import_ireks_sales)
+        button_column.addWidget(self.import_btn)
+        button_column.addStretch(1)
+        export_layout.addLayout(button_column)
+        layout.addWidget(export_card)
+
+        history_card = QFrame()
+        history_card.setObjectName("salesToolsCard")
+        history_layout = QVBoxLayout(history_card)
+        history_layout.setContentsMargins(18, 18, 18, 18)
+        history_layout.setSpacing(12)
+
+        history_header = QHBoxLayout()
+        history_header.setSpacing(14)
+        history_icon = self._make_icon_label(HISTORY_ICON_PATH, "#EFE9FF")
+        history_header.addWidget(history_icon, 0, Qt.AlignmentFlag.AlignTop)
+
+        header_text = QVBoxLayout()
+        header_text.setSpacing(6)
+        header_title = QLabel("Histórico IREKS")
+        header_title.setStyleSheet("font-size: 24px; font-weight: 700; color: #14213D;")
+        header_text.addWidget(header_title)
+        header_desc = QLabel("Últimas operaciones de exportación e importación.")
+        header_desc.setWordWrap(True)
+        header_desc.setStyleSheet("font-size: 15px; color: #5E708A;")
+        header_text.addWidget(header_desc)
+        history_header.addLayout(header_text, 1)
+
+        history_filter_panel = QHBoxLayout()
+        history_filter_panel.setSpacing(8)
+        filter_label = QLabel("Filtrar")
+        filter_label.setStyleSheet("font-size: 13px; color: #5E708A;")
+        history_filter_panel.addWidget(filter_label)
+        self.history_filter_combo = QComboBox()
+        self.history_filter_combo.addItem("Todos", "all")
+        self.history_filter_combo.addItem("Exportaciones", "export")
+        self.history_filter_combo.addItem("Importaciones", "import")
+        self.history_filter_combo.currentIndexChanged.connect(lambda *_: self._refresh_history())
+        self.history_filter_combo.setMinimumWidth(190)
+        self.history_filter_combo.setStyleSheet(
+            """
+            QComboBox {
+                background: #FFFFFF;
+                border: 1px solid #D7E0EC;
+                border-radius: 12px;
+                padding: 10px 14px;
+                color: #14213D;
+                min-height: 44px;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 26px;
+            }
+            """
+        )
+        history_filter_panel.addWidget(self.history_filter_combo)
+        history_header.addLayout(history_filter_panel, 0)
+        history_layout.addLayout(history_header)
+
+        self.history_table = QTableWidget(0, 4)
+        self.history_table.setObjectName("salesToolsHistoryTable")
+        self.history_table.setHorizontalHeaderLabels(["Fecha", "Acción", "Detalle", "Estado"])
+        self.history_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.history_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.history_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.history_table.verticalHeader().setVisible(False)
+        self.history_table.setAlternatingRowColors(True)
+        self.history_table.setShowGrid(False)
+        self.history_table.setWordWrap(False)
+        self.history_table.setFrameShape(QFrame.Shape.NoFrame)
+        self.history_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.history_table.setStyleSheet(
+            """
+            QTableWidget#salesToolsHistoryTable {
+                background: #FFFFFF;
+                border: 1px solid #D7E0EC;
+                border-radius: 14px;
+                gridline-color: #E5ECF5;
+            }
+            QTableWidget#salesToolsHistoryTable::item {
+                padding: 10px 12px;
+                border: none;
+            }
+            QTableWidget#salesToolsHistoryTable::item:selected {
+                background: #F6FAFF;
+                color: #14213D;
+            }
+            """
+        )
+        header = self.history_table.horizontalHeader()
+        header.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self.history_table.setColumnWidth(0, 170)
+        self.history_table.setColumnWidth(1, 165)
+        self.history_table.setColumnWidth(3, 170)
+        self.history_table.verticalHeader().setDefaultSectionSize(46)
+        history_layout.addWidget(self.history_table, 1)
+
+        self.history_empty_label = QLabel("Sin operaciones registradas todavía.")
+        self.history_empty_label.setStyleSheet("color: #6B7280; font-style: italic; padding: 6px 2px 0 2px;")
+        history_layout.addWidget(self.history_empty_label)
+
+        layout.addWidget(history_card, 1)
+
+        footer = QHBoxLayout()
+        footer.addStretch(1)
+        close_btn = QPushButton("Cerrar")
+        close_btn.setMinimumWidth(150)
+        close_btn.setMinimumHeight(48)
+        close_btn.setStyleSheet(
+            """
+            QPushButton {
+                background: #FFFFFF;
+                color: #14213D;
+                border: 1px solid #C9D6E5;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: 600;
+                padding: 0 18px;
+            }
+            QPushButton:hover {
+                background: #F6FAFF;
+            }
+            """
+        )
+        close_btn.clicked.connect(self.reject)
+        footer.addWidget(close_btn)
+        layout.addLayout(footer)
+
+        self.setStyleSheet(
+            """
+            QDialog#salesToolsDialog {
+                background: #F8FBFF;
+            }
+            QFrame#salesToolsCard {
+                background: #FFFFFF;
+                border: 1px solid #D7E0EC;
+                border-radius: 18px;
+            }
+            """
+        )
+
+    def _make_icon_label(self, icon_path: Path, background: str) -> QLabel:
+        label = QLabel()
+        label.setFixedSize(72, 72)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setStyleSheet(f"background: {background}; border-radius: 36px;")
+        pixmap = QIcon(str(icon_path)).pixmap(36, 36)
+        label.setPixmap(pixmap)
+        return label
+
+    def _make_action_button(
+        self,
+        text: str,
+        icon_path: Path,
+        *,
+        background: str,
+        border: str,
+        foreground: str,
+    ) -> QPushButton:
+        button = QPushButton(text)
+        button.setIcon(QIcon(str(icon_path)))
+        button.setIconSize(QSize(22, 22))
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.setMinimumSize(250, 72)
+        button.setStyleSheet(
+            f"""
+            QPushButton {{
+                background: {background};
+                border: 1px solid {border};
+                border-radius: 16px;
+                color: {foreground};
+                font-size: 22px;
+                font-weight: 700;
+                padding: 0 20px;
+                text-align: left;
+            }}
+            QPushButton:hover {{
+                background: {'#DCE9FF' if background == '#E5EEFF' else '#DDF3E4'};
+            }}
+            QPushButton:pressed {{
+                background: {'#CBDDFA' if background == '#E5EEFF' else '#C8E8D1'};
+            }}
+            """
+        )
+        return button
+
+    def _history_status_def(self, status: str) -> tuple[str, Path, str, str]:
+        clean = str(status or "").strip().lower()
+        if clean == "error":
+            return "Error", ERROR_ICON_PATH, "#B42318", "#FEF3F2"
+        if clean == "warning":
+            return "Con advertencias", ALERT_ICON_PATH, "#B54708", "#FFFAEB"
+        return "Completado", CHECK_ICON_PATH, "#067647", "#ECFDF3"
+
+    def _action_label(self, action: str) -> tuple[str, Path]:
+        clean = str(action or "").strip().lower()
+        if clean == "export":
+            return "Exportación", EXPORT_ICON_PATH
+        return "Importación", IMPORT_ICON_PATH
+
+    def _ensure_history_table(self) -> None:
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS sales_tools_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    detail TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    message TEXT NOT NULL DEFAULT ''
+                )
+                """
+            )
+            conn.exec_driver_sql(
+                """
+                CREATE INDEX IF NOT EXISTS idx_sales_tools_history_created_at
+                ON sales_tools_history (created_at DESC, id DESC)
+                """
+            )
+
+    def _record_history(self, *, action: str, detail: str, status: str, message: str) -> None:
+        self._ensure_history_table()
+        created_at = datetime.now().isoformat(timespec="seconds")
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                """
+                INSERT INTO sales_tools_history (created_at, action, detail, status, message)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (created_at, action, detail, status, message),
+            )
+
+    def _load_history_rows(self, limit: int | None = None) -> list[SalesToolsHistoryRow]:
+        self._ensure_history_table()
+        safe_limit = self._history_limit if limit is None else max(1, min(int(limit), 200))
+        action_filter = str(self.history_filter_combo.currentData() or "all").strip().lower()
+        where_clause = ""
+        params: list[object] = [safe_limit]
+        if action_filter in {"export", "import"}:
+            where_clause = "WHERE action = ?"
+            params = [action_filter, safe_limit]
+        query = f"""
+            SELECT created_at, action, detail, status, message
+            FROM sales_tools_history
+            {where_clause}
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+        """
+        with engine.begin() as conn:
+            rows = conn.exec_driver_sql(query, tuple(params)).fetchall()
+        return [
+            SalesToolsHistoryRow(
+                created_at=str(row[0] or ""),
+                action=str(row[1] or ""),
+                detail=str(row[2] or ""),
+                status=str(row[3] or ""),
+                message=str(row[4] or ""),
+            )
+            for row in rows
+        ]
+
+    def _refresh_history(self) -> None:
+        rows = self._load_history_rows()
+        self.history_table.setRowCount(len(rows))
+        self.history_empty_label.setVisible(not rows)
+
+        for row_idx, row in enumerate(rows):
+            created_at = row.created_at.replace("T", " ")
+            try:
+                created_at = datetime.fromisoformat(row.created_at).strftime("%d/%m/%Y %H:%M")
+            except Exception:  # noqa: BLE001
+                pass
+
+            action_label, action_icon = self._action_label(row.action)
+            status_label, status_icon, status_color, status_bg = self._history_status_def(row.status)
+            detail_text = row.detail or "-"
+            detail_note = row.message or ""
+
+            created_item = QTableWidgetItem(created_at)
+            action_item = QTableWidgetItem(action_label)
+            action_item.setIcon(QIcon(str(action_icon)))
+            detail_item = QTableWidgetItem(detail_text)
+            status_item = QTableWidgetItem(status_label)
+            status_item.setIcon(QIcon(str(status_icon)))
+
+            for item in (created_item, action_item, detail_item, status_item):
+                item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                item.setForeground(QBrush(QColor("#14213D")))
+
+            detail_item.setToolTip(detail_note or detail_text)
+            status_item.setForeground(QBrush(QColor(status_color)))
+            status_item.setBackground(QBrush(QColor(status_bg)))
+            action_item.setForeground(QBrush(QColor("#214EAA" if row.action == "export" else "#1D7D4D")))
+
+            self.history_table.setItem(row_idx, 0, created_item)
+            self.history_table.setItem(row_idx, 1, action_item)
+            self.history_table.setItem(row_idx, 2, detail_item)
+            self.history_table.setItem(row_idx, 3, status_item)
+
+        self.history_table.resizeRowsToContents()
+
+    def _export_ireks_sales(self) -> None:
+        default_name = f"ventas_ireks_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        default_path = DATA_DIR / "exports" / "sales" / default_name
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Exportar ventas IREKS",
+            str(default_path),
+            "Excel (*.xlsx)",
+        )
+        if not file_path:
+            return
+        destination = Path(file_path)
+        if destination.suffix.lower() != ".xlsx":
+            destination = destination.with_suffix(".xlsx")
+        try:
+            rows_exported, tables = self._write_ireks_sales_workbook(destination)
+        except Exception as exc:  # noqa: BLE001
+            self._record_history(
+                action="export",
+                detail=destination.name,
+                status="error",
+                message=str(exc),
+            )
+            self._refresh_history()
+            QMessageBox.warning(self, "Exportación IREKS", f"No se pudo exportar las ventas IREKS:\n{exc}")
+            return
+
+        status = "warning" if rows_exported == 0 else "ok"
+        self._record_history(
+            action="export",
+            detail=f"{destination.name} | {', '.join(tables)}",
+            status=status,
+            message=f"{rows_exported} filas exportadas | Tablas: {', '.join(tables)}",
+        )
+        self._refresh_history()
+        QMessageBox.information(
+            self,
+            "Exportación IREKS",
+            f"Ventas IREKS exportadas:\n{destination}\n\nFilas exportadas: {rows_exported}",
+        )
+
+    def _import_ireks_sales(self) -> None:
+        view = self._import_service.build_import_view()
+        file_path, _ = QFileDialog.getOpenFileName(self, view.ireks_json_title, "", view.ireks_json_filter)
+        if not file_path:
+            return
+        source = Path(file_path)
+        try:
+            outcome = self._import_service.import_ireks_json(source)
+        except Exception as exc:  # noqa: BLE001
+            self._record_history(
+                action="import",
+                detail=source.name,
+                status="error",
+                message=str(exc),
+            )
+            self._refresh_history()
+            QMessageBox.warning(self, "Importación IREKS", f"No se pudo importar el JSON IREKS:\n{exc}")
+            return
+
+        status = "warning" if int(outcome.incidencias or 0) > 0 else "ok"
+        if not outcome.ok:
+            status = "error"
+        self._record_history(
+            action="import",
+            detail=f"{source.name} | JSON IREKS",
+            status=status,
+            message=outcome.message.replace("\n", " | "),
+        )
+        self._refresh_history()
+        if outcome.ok and self._on_import_completed is not None:
+            self._on_import_completed()
+
+        if outcome.ok and status == "ok":
+            QMessageBox.information(self, outcome.title, outcome.message)
+        else:
+            QMessageBox.warning(self, outcome.title, outcome.message)
+
+    def _write_ireks_sales_workbook(self, destination: Path) -> tuple[int, list[str]]:
+        tables = [
+            ("ventas_import_lotes", "Ventas import lotes"),
+            ("ventas_mensuales_raw", "Ventas mensuales raw"),
+        ]
+        workbook = Workbook()
+        total_rows = 0
+        used_tables: list[str] = []
+        first_sheet = True
+        for table_name, sheet_title in tables:
+            columns = self._export_service.list_columns(table_name)
+            if not columns:
+                continue
+            ws = workbook.active if first_sheet else workbook.create_sheet()
+            first_sheet = False
+            ws.title = sheet_title[:31]
+            used_tables.append(table_name)
+            ws.append(columns)
+            header_row = ws.max_row
+            for col_idx, header in enumerate(columns, start=1):
+                cell = ws.cell(row=header_row, column=col_idx)
+                cell.font = Font(bold=True, color="FF14213D")
+                cell.fill = PatternFill("solid", fgColor="E8EEF7")
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+            query = self._build_export_query(table_name, columns)
+            with engine.begin() as conn:
+                result = conn.exec_driver_sql(query)
+                for row in result:
+                    ws.append([self._normalize_export_value(value) for value in row])
+                    total_rows += 1
+            ws.freeze_panes = "A2"
+            self._fit_export_sheet(ws)
+        if not used_tables:
+            raise ValueError("No se encontraron tablas de ventas IREKS para exportar.")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        workbook.save(destination)
+        return total_rows, used_tables
+
+    def _build_export_query(self, table_name: str, columns: list[str]) -> str:
+        quoted_cols = ", ".join(self._quote_identifier(col) for col in columns)
+        return f"SELECT {quoted_cols} FROM {self._quote_identifier(table_name)}"
+
+    def _quote_identifier(self, value: str) -> str:
+        return '"' + str(value).replace('"', '""') + '"'
+
+    def _normalize_export_value(self, value):
+        if isinstance(value, (date, datetime)):
+            return value.isoformat()
+        if isinstance(value, bytes):
+            try:
+                return value.decode("utf-8", errors="replace")
+            except Exception:  # noqa: BLE001
+                return str(value)
+        return value
+
+    def _fit_export_sheet(self, ws) -> None:
+        for col_idx, column_cells in enumerate(ws.iter_cols(1, ws.max_column), start=1):
+            values = [str(cell.value or "") for cell in column_cells]
+            width = max([len(str(cell.value or "")) for cell in column_cells] + [10])
+            ws.column_dimensions[get_column_letter(col_idx)].width = min(width + 2, 42)
 
 
 class SalesPage(QWidget):
