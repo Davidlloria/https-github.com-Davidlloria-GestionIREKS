@@ -52,6 +52,8 @@ from app.services.sales_annual_comparison_service import (
 )
 from app.services.report_export_service import ReportExportService
 from app.services.sales_reconciliation_service import SalesReconciliationService
+from app.ui.widgets.db_export_console_tab import DbExportConsoleTab
+from app.ui.widgets.db_import_console_tab import DbImportConsoleTab
 
 
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -890,6 +892,93 @@ class SalesExcelExportDialog(QDialog):
         }
 
 
+class SalesToolsDialog(QDialog):
+    def __init__(self, *, on_import_completed=None, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Herramientas - Ventas")
+        self.setModal(True)
+        self.setMinimumSize(980, 680)
+        self.resize(1120, 760)
+        self._on_import_completed = on_import_completed
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(12)
+
+        title = QLabel("Herramientas de ventas")
+        title.setProperty("role", "pageTitle")
+        layout.addWidget(title)
+
+        subtitle = QLabel(
+            "Acceso directo a Configuración > Exportación BD > Ventas y "
+            "Configuración > Importación BD > Ventas."
+        )
+        subtitle.setWordWrap(True)
+        subtitle.setStyleSheet("color: #6B7280;")
+        layout.addWidget(subtitle)
+
+        tabs = QTabWidget()
+        tabs.addTab(self._build_export_tab(), "Exportación BD")
+        tabs.addTab(self._build_import_tab(), "Importación BD")
+        layout.addWidget(tabs, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        buttons.accepted.connect(self.accept)
+        layout.addWidget(buttons)
+
+    def _build_export_tab(self) -> QWidget:
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+
+        section = QLabel("Ventas")
+        section.setProperty("role", "sectionTitle")
+        layout.addWidget(section)
+
+        note = QLabel("Exporta las tablas de ventas desde la consola de exportación de mantenimiento.")
+        note.setWordWrap(True)
+        note.setStyleSheet("color: #6B7280;")
+        layout.addWidget(note)
+
+        layout.addWidget(
+            DbExportConsoleTab(
+                title="Consola de exportacion - Ventas",
+                allowed_table_names=["ventas_import_lotes", "ventas_mensuales_raw"],
+            ),
+            1,
+        )
+        return panel
+
+    def _build_import_tab(self) -> QWidget:
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+
+        section = QLabel("Ventas")
+        section.setProperty("role", "sectionTitle")
+        layout.addWidget(section)
+
+        note = QLabel("Importa datos de ventas desde la consola de importación de mantenimiento.")
+        note.setWordWrap(True)
+        note.setStyleSheet("color: #6B7280;")
+        layout.addWidget(note)
+
+        layout.addWidget(
+            DbImportConsoleTab(
+                on_import_completed=self._on_import_completed,
+                allowed_profile_keys=["ventas_import_lotes", "ventas_mensuales_raw"],
+                title="Importacion de Ventas",
+            ),
+            1,
+        )
+        return panel
+
+
 class SalesPage(QWidget):
     def __init__(self) -> None:
         super().__init__()
@@ -1394,6 +1483,7 @@ class SalesPage(QWidget):
             hover_background="#E3D2F7",
             pressed_background="#CBB2ED",
         )
+        self.sales_tools_btn.clicked.connect(self._open_sales_tools_dialog)
         self.sales_excel_btn.clicked.connect(self._export_sales_excel)
 
         self.chart_actions_widget = QWidget()
@@ -1598,6 +1688,10 @@ class SalesPage(QWidget):
         finally:
             QApplication.restoreOverrideCursor()
         QMessageBox.information(self, "Ventas", f"Excel exportado:\n{out}")
+
+    def _open_sales_tools_dialog(self) -> None:
+        dialog = SalesToolsDialog(on_import_completed=self.reload, parent=self)
+        dialog.exec()
 
     def _sales_export_state(self) -> dict[str, object] | None:
         if not hasattr(self, "sales_tabs"):
