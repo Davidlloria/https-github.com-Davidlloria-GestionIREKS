@@ -1765,10 +1765,12 @@ class SalesPage(QWidget):
             manufacturers = self.sales_summary_service.list_filter_manufacturers_igsa()
             families = self.sales_summary_service.list_filter_families_igsa("")
             subfamilies = self.sales_summary_service.list_filter_subfamilies_igsa("")
+            clients = []
         else:
             manufacturers = self.sales_summary_service.list_filter_manufacturers()
             families = self.sales_summary_service.list_filter_families("")
             subfamilies = self.sales_summary_service.list_filter_subfamilies("")
+            clients = self.sales_summary_service.list_filter_clients()
 
         def build_map(rows, id_attr: str, label_attr: str) -> dict[str, str]:
             result: dict[str, str] = {}
@@ -1780,7 +1782,20 @@ class SalesPage(QWidget):
                 result[key] = label
             return result
 
+        def build_client_map(rows) -> dict[str, str]:
+            result: dict[str, str] = {}
+            for row in rows:
+                key = str(getattr(row, "cliente_id", "") or "").strip()
+                if not key:
+                    continue
+                label = str(
+                    getattr(row, "cliente_nombre_comercial", "") or getattr(row, "cliente_nombre_fiscal", "") or key
+                ).strip()
+                result[key] = label or key
+            return result
+
         return {
+            "client": build_client_map(clients),
             "manufacturer": build_map(manufacturers, "fabricante_id", "fabricante_nombre"),
             "family": build_map(families, "articulo_familia_id", "articulo_familia_nombre"),
             "subfamily": build_map(subfamilies, "articulo_subfamilia_id", "articulo_subfamilia_nombre"),
@@ -1946,6 +1961,17 @@ class SalesPage(QWidget):
         def update_widths(values: list[str]) -> None:
             for idx, value in enumerate(values):
                 text_widths[idx] = max(text_widths[idx], len(str(value or "")))
+
+        def write_column_header() -> None:
+            header_row = ws.max_row + 1
+            ws.append(headers)
+            update_widths(headers)
+            for col_idx in range(1, 13):
+                cell = ws.cell(row=header_row, column=col_idx)
+                cell.border = border
+                cell.fill = header_fill
+                cell.font = Font(bold=True, color="FF111827")
+                cell.alignment = Alignment(horizontal="left" if col_idx <= 2 else "right", vertical="center")
 
         def write_data_row(row: SalesComparisonRow) -> None:
             row_idx = ws.max_row + 1
@@ -2117,7 +2143,9 @@ class SalesPage(QWidget):
         group_maps: dict[str, dict[str, str]],
     ) -> str:
         if level == "client":
-            return str(row.cliente_nombre or row.cliente_id or "Sin cliente").strip() or "Sin cliente"
+            raw = str(row.cliente_id or "").strip()
+            label = str(row.cliente_nombre or "").strip() or group_maps.get("client", {}).get(raw, "")
+            return str(label or raw or "Sin cliente").strip() or "Sin cliente"
         if level == "manufacturer":
             raw = str(row.fabricante_id or "").strip()
             return group_maps["manufacturer"].get(raw, raw or "Sin fabricante")
@@ -2201,6 +2229,13 @@ class SalesPage(QWidget):
             **filters,
         )
         buckets: dict[tuple[str, str], dict[str, object]] = {}
+        client_map = {
+            str(client.cliente_id or "").strip(): str(
+                client.cliente_nombre_comercial or client.cliente_nombre_fiscal or client.cliente_id or ""
+            ).strip()
+            for client in self.sales_summary_service.list_filter_clients()
+            if str(client.cliente_id or "").strip()
+        }
 
         def ensure_bucket(row: SalesDetailRow, suffix: str) -> dict[str, object]:
             client_id = str(row.cliente_id or "").strip() if include_client else ""
@@ -2210,7 +2245,7 @@ class SalesPage(QWidget):
                 key,
                 {
                     "cliente_id": client_id,
-                    "cliente_nombre": str(row.cliente_nombre or "").strip() if include_client else "",
+                    "cliente_nombre": str(row.cliente_nombre or client_map.get(client_id, "") or "").strip() if include_client else "",
                     "articulo_id": product_id,
                     "codigo": str(row.codigo or "").strip(),
                     "nombre": str(row.nombre or "").strip(),
@@ -2226,7 +2261,7 @@ class SalesPage(QWidget):
                 },
             )
             if include_client and not str(bucket["cliente_nombre"] or "").strip():
-                bucket["cliente_nombre"] = str(row.cliente_nombre or row.cliente_id or "").strip()
+                bucket["cliente_nombre"] = str(row.cliente_nombre or client_map.get(client_id, "") or row.cliente_id or "").strip()
             if not str(bucket["codigo"] or "").strip():
                 bucket["codigo"] = str(row.codigo or "").strip()
             if not str(bucket["nombre"] or "").strip():
@@ -2252,6 +2287,13 @@ class SalesPage(QWidget):
             bucket["ventas_curr"] = float(bucket["ventas_curr"] or 0.0) + float(row.ventas or 0.0)
 
         result: list[SalesExportRow] = []
+        client_map = {
+            str(client.cliente_id or "").strip(): str(
+                client.cliente_nombre_comercial or client.cliente_nombre_fiscal or client.cliente_id or ""
+            ).strip()
+            for client in self.sales_summary_service.list_filter_clients()
+            if str(client.cliente_id or "").strip()
+        }
         for values in buckets.values():
             kilos_prev = float(values["kilos_prev"] or 0.0)
             sc_prev = float(values["sc_prev"] or 0.0)
@@ -2266,7 +2308,7 @@ class SalesPage(QWidget):
             result.append(
                 SalesExportRow(
                     cliente_id=str(values["cliente_id"] or ""),
-                    cliente_nombre=str(values["cliente_nombre"] or ""),
+                    cliente_nombre=str(values["cliente_nombre"] or client_map.get(str(values["cliente_id"] or "").strip(), "") or ""),
                     articulo_id=str(values["articulo_id"] or ""),
                     codigo=str(values["codigo"] or ""),
                     nombre=str(values["nombre"] or ""),
@@ -2320,7 +2362,9 @@ class SalesPage(QWidget):
             for month in months:
                 rows = self._sales_export_rows_v2(state, month, group_levels)
                 self._sales_export_sort_rows(rows, str(options["sort_by"] or "ventas_curr"), str(options["direction"] or "desc"))
-                sections.append((f"{self._sales_export_month_label(month)}" + (" (acumulado)" if bool(state["acumulado"]) else ""), rows))
+                sections.append(
+                    (f"Mes: {self._sales_export_month_label(month)}" + (" (acumulado)" if bool(state["acumulado"]) else ""), rows)
+                )
             if months:
                 if bool(state["acumulado"]):
                     grand_rows = list(sections[-1][1])
@@ -2530,6 +2574,7 @@ class SalesPage(QWidget):
 
         def write_group_rows(rows: list[SalesExportRow], levels: list[str]) -> list[SalesExportRow]:
             if not levels:
+                write_column_header()
                 self._sales_export_sort_rows(rows, sort_by, direction)
                 for row in rows:
                     write_data_row(row)
@@ -2565,15 +2610,6 @@ class SalesPage(QWidget):
             if not rows:
                 continue
             write_spanned_row(section_title, section_fill, True, "FF111827")
-            header_row = ws.max_row + 1
-            ws.append(headers)
-            update_widths(headers)
-            for col_idx in range(1, 13):
-                cell = ws.cell(row=header_row, column=col_idx)
-                cell.border = border
-                cell.fill = header_fill
-                cell.font = Font(bold=True, color="FF111827")
-                cell.alignment = Alignment(horizontal="left" if col_idx <= 2 else "right", vertical="center")
             section_leaf_rows = write_group_rows(rows, group_levels)
             if include_subtotals and group_levels:
                 write_totals_row(f"TOTAL {section_title}", section_leaf_rows, subtotal_fill)
