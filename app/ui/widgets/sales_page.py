@@ -1564,7 +1564,14 @@ class SalesPage(QWidget):
         title = f"Ventas {state['source_label']} {state['year']}"
         subtitle = self._sales_export_subtitle_v2(state, options)
         default = str(self._report_export_service.default_path(title, "xlsx", folder="sales"))
-        path, _ = QFileDialog.getSaveFileName(self, "Exportar ventas a Excel", default, "Excel (*.xlsx)")
+        save_options = QFileDialog.Option.DontUseNativeDialog
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Exportar ventas a Excel",
+            default,
+            "Excel (*.xlsx)",
+            options=save_options,
+        )
         if not path:
             return
         if not path.lower().endswith(".xlsx"):
