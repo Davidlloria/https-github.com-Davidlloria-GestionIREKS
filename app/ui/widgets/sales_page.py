@@ -2444,6 +2444,20 @@ class SalesPage(QWidget):
             "family": "Familia",
             "subfamily": "Subfamilia",
         }
+        level_fills = {
+            "month": PatternFill("solid", fgColor="DDEEFF"),
+            "client": PatternFill("solid", fgColor="E4F4E8"),
+            "manufacturer": PatternFill("solid", fgColor="FDECD7"),
+            "family": PatternFill("solid", fgColor="F1E3FA"),
+            "subfamily": PatternFill("solid", fgColor="FFE5D8"),
+        }
+        level_subtotal_fills = {
+            "month": PatternFill("solid", fgColor="CFE3FF"),
+            "client": PatternFill("solid", fgColor="D4EFD9"),
+            "manufacturer": PatternFill("solid", fgColor="FBDDBF"),
+            "family": PatternFill("solid", fgColor="E9D6F6"),
+            "subfamily": PatternFill("solid", fgColor="FFD6C4"),
+        }
 
         def write_spanned_row(text: str, fill: PatternFill, bold: bool = True, font_color: str = "FF111827") -> None:
             row_idx = ws.max_row + 1
@@ -2618,11 +2632,13 @@ class SalesPage(QWidget):
                     child_rows = write_group_rows(grouped[label], levels[1:])
                     total_rows.extend(child_rows)
                     continue
-                write_spanned_row(f"{level_titles.get(level, level.title())}: {label}", section_fill, True, "FF111827")
+                level_fill = level_fills.get(level, section_fill)
+                subtotal_level_fill = level_subtotal_fills.get(level, subtotal_fill)
+                write_spanned_row(f"{level_titles.get(level, level.title())}: {label}", level_fill, True, "FF111827")
                 child_rows = write_group_rows(grouped[label], levels[1:])
                 total_rows.extend(child_rows)
                 if include_subtotals:
-                    write_totals_row(f"TOTAL {level_titles.get(level, level.title())}: {label}", child_rows, subtotal_fill)
+                    write_totals_row(f"TOTAL {level_titles.get(level, level.title())}: {label}", child_rows, subtotal_level_fill)
             return total_rows
 
         write_spanned_row(title, title_fill, True, "FFFFFFFF")
