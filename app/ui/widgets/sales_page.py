@@ -63,7 +63,8 @@ ALERT_ICON_PATH = BASE_DIR / "assets" / "icons" / "alert.svg"
 ARROW_DOWN_ICON_PATH = BASE_DIR / "assets" / "icons" / "arrow-down.svg"
 ARROW_UP_ICON_PATH = BASE_DIR / "assets" / "icons" / "arrow-up.svg"
 CHART_COLUMN_ICON_PATH = BASE_DIR / "assets" / "icons" / "chart-column.svg"
-SALES_IREKS_ICON_PATH = BASE_DIR / "assets" / "icons" / "chart-no-axes-column-increasing.svg"
+FILTER_ICON_PATH = BASE_DIR / "assets" / "icons" / "filtro.svg"
+SALES_IREKS_ICON_PATH = BASE_DIR / "assets" / "icons" / "chart-no-axes-combined.svg"
 CHECK_ICON_PATH = BASE_DIR / "assets" / "icons" / "check.svg"
 ERROR_ICON_PATH = BASE_DIR / "assets" / "icons" / "error.svg"
 EXPORT_ICON_PATH = BASE_DIR / "assets" / "icons" / "export.svg"
@@ -965,29 +966,28 @@ class SalesToolsDialog(QDialog):
         export_left.addLayout(export_text, 1)
         export_layout.addLayout(export_left, 1)
 
-        button_column = QVBoxLayout()
-        button_column.setSpacing(14)
+        button_row = QHBoxLayout()
+        button_row.setSpacing(14)
         self.export_btn = self._make_action_button(
             "Exportar",
-            ARROW_DOWN_ICON_PATH,
+            EXPORT_ICON_PATH,
             background="#E5EEFF",
             border="#AFC8F7",
             foreground="#214EAA",
         )
         self.export_btn.clicked.connect(self._export_ireks_sales)
-        button_column.addWidget(self.export_btn)
+        button_row.addWidget(self.export_btn)
 
         self.import_btn = self._make_action_button(
             "Importar",
-            ARROW_UP_ICON_PATH,
+            IMPORT_ICON_PATH,
             background="#E6F7E9",
             border="#AAD9B4",
             foreground="#1D7D4D",
         )
         self.import_btn.clicked.connect(self._import_ireks_sales)
-        button_column.addWidget(self.import_btn)
-        button_column.addStretch(1)
-        export_layout.addLayout(button_column)
+        button_row.addWidget(self.import_btn)
+        export_layout.addLayout(button_row)
         layout.addWidget(export_card)
 
         history_card = QFrame()
@@ -1014,9 +1014,8 @@ class SalesToolsDialog(QDialog):
 
         history_filter_panel = QHBoxLayout()
         history_filter_panel.setSpacing(8)
-        filter_label = QLabel("Filtrar")
-        filter_label.setStyleSheet("font-size: 13px; color: #5E708A;")
-        history_filter_panel.addWidget(filter_label)
+        filter_icon = self._make_small_icon_label(FILTER_ICON_PATH, "#EEF2FF")
+        history_filter_panel.addWidget(filter_icon)
         self.history_filter_combo = QComboBox()
         self.history_filter_combo.addItem("Todos", "all")
         self.history_filter_combo.addItem("Exportaciones", "export")
@@ -1136,6 +1135,15 @@ class SalesToolsDialog(QDialog):
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label.setStyleSheet(f"background: {background}; border-radius: 36px;")
         pixmap = QIcon(str(icon_path)).pixmap(36, 36)
+        label.setPixmap(pixmap)
+        return label
+
+    def _make_small_icon_label(self, icon_path: Path, background: str) -> QLabel:
+        label = QLabel()
+        label.setFixedSize(44, 44)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setStyleSheet(f"background: {background}; border-radius: 22px;")
+        pixmap = QIcon(str(icon_path)).pixmap(20, 20)
         label.setPixmap(pixmap)
         return label
 
