@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
+    QFormLayout,
+    QDialogButtonBox,
     QLabel,
     QMessageBox,
     QLineEdit,
@@ -31,6 +33,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 try:
     import pyqtgraph as pg
 except ModuleNotFoundError:  # pragma: no cover - dependency guard
@@ -45,6 +50,10 @@ from app.services.sales_reconciliation_service import SalesReconciliationService
 BASE_DIR = Path(__file__).resolve().parents[3]
 CHART_COLUMN_ICON_PATH = BASE_DIR / "assets" / "icons" / "chart-column.svg"
 CHART_LINE_ICON_PATH = BASE_DIR / "assets" / "icons" / "chart-line.svg"
+PRINTER_ICON_PATH = BASE_DIR / "assets" / "icons" / "printer.svg"
+FILE_TEXT_ICON_PATH = BASE_DIR / "assets" / "icons" / "file-text.svg"
+SHEET_ICON_PATH = BASE_DIR / "assets" / "icons" / "sheet.svg"
+TOOLBOX_ICON_PATH = BASE_DIR / "assets" / "icons" / "toolbox.svg"
 
 MONTH_NAMES = [
     "Enero",
@@ -734,11 +743,95 @@ class SalesAnalysisDialog(QDialog):
         document.print_(printer)
 
 
+class SalesExcelExportDialog(QDialog):
+    def __init__(self, source_label: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(f"Exportar ventas a Excel - {source_label}")
+        self.setModal(True)
+        self.setMinimumWidth(420)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        title = QLabel("Configurar exportación")
+        title_font = QFont()
+        title_font.setPointSize(11)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        layout.addWidget(title)
+
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(10)
+
+        self.group_combo = QComboBox()
+        self.group_combo.addItem("Sin agrupar", "none")
+        self.group_combo.addItem("Mes", "month")
+        self.group_combo.addItem("Fabricante", "manufacturer")
+        self.group_combo.addItem("Familia", "family")
+        self.group_combo.addItem("Subfamilia", "subfamily")
+        self.group_combo.setCurrentIndex(self.group_combo.findData("month"))
+        form.addRow("Agrupar por", self.group_combo)
+
+        self.sort_combo = QComboBox()
+        self.sort_combo.addItem("Código", "codigo")
+        self.sort_combo.addItem("Producto", "nombre")
+        self.sort_combo.addItem("Kilos anterior", "kilos_prev")
+        self.sort_combo.addItem("S/C anterior", "sc_prev")
+        self.sort_combo.addItem("Ventas anterior", "ventas_prev")
+        self.sort_combo.addItem("Kilos actual", "kilos_curr")
+        self.sort_combo.addItem("S/C actual", "sc_curr")
+        self.sort_combo.addItem("Ventas actual", "ventas_curr")
+        self.sort_combo.addItem("Delta kg", "delta_kg")
+        self.sort_combo.addItem("Delta kg %", "delta_kg_pct")
+        self.sort_combo.addItem("Delta €", "delta_ventas")
+        self.sort_combo.addItem("Delta € %", "delta_ventas_pct")
+        self.sort_combo.setCurrentIndex(self.sort_combo.findData("ventas_curr"))
+        form.addRow("Ordenar por", self.sort_combo)
+
+        self.direction_combo = QComboBox()
+        self.direction_combo.addItem("Ascendente", "asc")
+        self.direction_combo.addItem("Descendente", "desc")
+        self.direction_combo.setCurrentIndex(self.direction_combo.findData("desc"))
+        form.addRow("Dirección", self.direction_combo)
+
+        self.subtotals_check = QCheckBox("Incluir subtotales por grupo")
+        self.subtotals_check.setChecked(True)
+        form.addRow("", self.subtotals_check)
+
+        layout.addLayout(form)
+
+        hint = QLabel(
+            "Si eliges Mes, se exportan los meses hasta el filtro seleccionado. "
+            "Con Acumulado activado, cada mes usa el acumulado correspondiente."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #6B7280;")
+        layout.addWidget(hint)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Ok)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def export_options(self) -> dict[str, object]:
+        return {
+            "group_by": str(self.group_combo.currentData() or "none"),
+            "sort_by": str(self.sort_combo.currentData() or "ventas_curr"),
+            "direction": str(self.direction_combo.currentData() or "desc"),
+            "subtotals": bool(self.subtotals_check.isChecked()),
+        }
+
+
 class SalesPage(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.sales_service = SalesReconciliationService()
         self.sales_summary_service = SalesAnnualComparisonService()
+        self._report_export_service = ReportExportService()
         self._building = False
         self._building_igsa = False
         self._product_filter_timer = QTimer(self)
@@ -755,13 +848,13 @@ class SalesPage(QWidget):
         root_layout = QVBoxLayout(self)
         root_layout.setSpacing(4)
 
-        tabs = QTabWidget()
-        root_layout.addWidget(tabs)
+        self.sales_tabs = QTabWidget()
+        root_layout.addWidget(self.sales_tabs)
 
         ireks_tab = QWidget()
-        tabs.addTab(ireks_tab, "VENTAS IREKS")
+        self.sales_tabs.addTab(ireks_tab, "VENTAS IREKS")
         igsa_tab = QWidget()
-        tabs.addTab(igsa_tab, "VENTAS IGSA")
+        self.sales_tabs.addTab(igsa_tab, "VENTAS IGSA")
 
         igsa_layout = QVBoxLayout(igsa_tab)
         igsa_filters_top = QHBoxLayout()
@@ -1045,37 +1138,84 @@ class SalesPage(QWidget):
         self.product_filter.setMinimumWidth(300)
         filters_bottom.addWidget(self.product_filter, 1)
 
+        action_button_width = 110
+        action_button_height = 36
+
+        def make_action_button(
+            *,
+            text: str,
+            tooltip: str,
+            icon_path: Path,
+            background: str,
+            border: str,
+            hover_background: str,
+            pressed_background: str,
+            foreground: str = "#1F2937",
+        ) -> QToolButton:
+            button = QToolButton()
+            button.setToolTip(tooltip)
+            button.setIcon(QIcon(str(icon_path)))
+            button.setIconSize(QSize(16, 16))
+            button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setFixedSize(action_button_width, action_button_height)
+            button.setText(text)
+            button.setStyleSheet(
+                f"""
+                QToolButton {{
+                    background-color: {background};
+                    border: 1px solid {border};
+                    border-radius: 8px;
+                    color: {foreground};
+                    padding: 0 8px;
+                    font-size: 12px;
+                    font-weight: 600;
+                }}
+                QToolButton:hover {{
+                    background-color: {hover_background};
+                }}
+                QToolButton:pressed {{
+                    background-color: {pressed_background};
+                }}
+                QToolButton:disabled {{
+                    background-color: {background};
+                    border-color: {border};
+                    color: #6B7280;
+                }}
+                """
+            )
+            return button
+
         self.sales_chart_btn = QToolButton()
         self.sales_chart_btn.setToolTip("Ver gráfico del producto")
         self.sales_chart_btn.setIcon(QIcon(str(CHART_LINE_ICON_PATH)))
         self.sales_chart_btn.setIconSize(QSize(16, 16))
         self.sales_chart_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.sales_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sales_chart_btn.setFixedHeight(36)
-        self.sales_chart_btn.setFixedWidth(96)
+        self.sales_chart_btn.setFixedSize(action_button_width, action_button_height)
         self.sales_chart_btn.setEnabled(False)
         self.sales_chart_btn.setText("Producto")
         self.sales_chart_btn.setStyleSheet(
             """
             QToolButton {
-                background-color: #2F6FE4;
-                border: 1px solid #245FCC;
+                background-color: #9CC9F5;
+                border: 1px solid #7AAEE3;
                 border-radius: 8px;
-                color: #FFFFFF;
-                padding: 0 6px;
+                color: #1F2937;
+                padding: 0 8px;
                 font-size: 12px;
                 font-weight: 600;
             }
             QToolButton:hover {
-                background-color: #3B7CF2;
+                background-color: #B0D4F8;
             }
             QToolButton:pressed {
-                background-color: #2253B2;
+                background-color: #8AB8E6;
             }
             QToolButton:disabled {
-                background-color: #B9D4FF;
-                border-color: #A8C8FF;
-                color: #5C7DB8;
+                background-color: #C7DFF5;
+                border-color: #B1CBE5;
+                color: #6B7280;
             }
             """
         )
@@ -1087,31 +1227,30 @@ class SalesPage(QWidget):
         self.sales_total_chart_btn.setIconSize(QSize(16, 16))
         self.sales_total_chart_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.sales_total_chart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sales_total_chart_btn.setFixedHeight(36)
-        self.sales_total_chart_btn.setFixedWidth(96)
+        self.sales_total_chart_btn.setFixedSize(action_button_width, action_button_height)
         self.sales_total_chart_btn.setEnabled(False)
         self.sales_total_chart_btn.setText("Total")
         self.sales_total_chart_btn.setStyleSheet(
             """
             QToolButton {
-                background-color: #148A86;
-                border: 1px solid #11706D;
+                background-color: #A7E3D1;
+                border: 1px solid #83CBB5;
                 border-radius: 8px;
-                color: #FFFFFF;
-                padding: 0 6px;
+                color: #1F2937;
+                padding: 0 8px;
                 font-size: 12px;
                 font-weight: 600;
             }
             QToolButton:hover {
-                background-color: #1A9F99;
+                background-color: #B8E8DA;
             }
             QToolButton:pressed {
-                background-color: #0F6763;
+                background-color: #91D2BE;
             }
             QToolButton:disabled {
-                background-color: #BDE6E4;
-                border-color: #BDE6E4;
-                color: #F8FAFC;
+                background-color: #CDEFE4;
+                border-color: #B8DCCD;
+                color: #6B7280;
             }
             """
         )
@@ -1123,35 +1262,75 @@ class SalesPage(QWidget):
         self.sales_analysis_btn.setIconSize(QSize(16, 16))
         self.sales_analysis_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.sales_analysis_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sales_analysis_btn.setFixedHeight(36)
-        self.sales_analysis_btn.setFixedWidth(100)
+        self.sales_analysis_btn.setFixedSize(action_button_width, action_button_height)
         self.sales_analysis_btn.setEnabled(False)
         self.sales_analysis_btn.setText("Análisis")
         self.sales_analysis_btn.setStyleSheet(
             """
             QToolButton {
-                background-color: #FDE68A;
-                border: 1px solid #F59E0B;
+                background-color: #F6E3A1;
+                border: 1px solid #E3C56D;
                 border-radius: 8px;
                 color: #111827;
-                padding: 0 6px;
+                padding: 0 8px;
                 font-size: 12px;
                 font-weight: 600;
             }
             QToolButton:hover {
-                background-color: #FCD34D;
+                background-color: #F8E8B6;
             }
             QToolButton:pressed {
-                background-color: #FBBF24;
+                background-color: #EED88B;
             }
             QToolButton:disabled {
-                background-color: #FBE7B1;
-                border-color: #F3C35A;
+                background-color: #FAEDC5;
+                border-color: #E8D79C;
                 color: #6B7280;
             }
             """
         )
         self.sales_analysis_btn.clicked.connect(self._open_sales_analysis_dialog)
+
+        self.sales_print_btn = make_action_button(
+            text="Imprimir",
+            tooltip="Imprimir",
+            icon_path=PRINTER_ICON_PATH,
+            background="#D6D0C8",
+            border="#B8B1A8",
+            hover_background="#E2DDD6",
+            pressed_background="#C8C1B7",
+        )
+
+        self.sales_pdf_btn = make_action_button(
+            text="PDF",
+            tooltip="Exportar a PDF",
+            icon_path=FILE_TEXT_ICON_PATH,
+            background="#F4B2A8",
+            border="#D98E83",
+            hover_background="#F7C0B8",
+            pressed_background="#E89A8F",
+        )
+
+        self.sales_excel_btn = make_action_button(
+            text="Excel",
+            tooltip="Exportar a Excel",
+            icon_path=SHEET_ICON_PATH,
+            background="#CBEA8B",
+            border="#AFD268",
+            hover_background="#D7F09D",
+            pressed_background="#B9DE72",
+        )
+
+        self.sales_tools_btn = make_action_button(
+            text="Tools",
+            tooltip="Herramientas",
+            icon_path=TOOLBOX_ICON_PATH,
+            background="#D9C3F3",
+            border="#BA9EE7",
+            hover_background="#E3D2F7",
+            pressed_background="#CBB2ED",
+        )
+        self.sales_excel_btn.clicked.connect(self._export_sales_excel)
 
         self.chart_actions_widget = QWidget()
         chart_band = QHBoxLayout(self.chart_actions_widget)
@@ -1160,6 +1339,10 @@ class SalesPage(QWidget):
         chart_band.addWidget(self.sales_chart_btn)
         chart_band.addWidget(self.sales_total_chart_btn)
         chart_band.addWidget(self.sales_analysis_btn)
+        chart_band.addWidget(self.sales_print_btn)
+        chart_band.addWidget(self.sales_pdf_btn)
+        chart_band.addWidget(self.sales_excel_btn)
+        chart_band.addWidget(self.sales_tools_btn)
 
         layout.addLayout(filters_bottom)
 
@@ -1293,6 +1476,544 @@ class SalesPage(QWidget):
         self.sales_table_igsa.horizontalScrollBar().valueChanged.connect(self.group_header_igsa.horizontalScrollBar().setValue)
         self.sales_table_igsa.horizontalScrollBar().valueChanged.connect(self.totals_table_igsa.horizontalScrollBar().setValue)
         self._apply_column_widths_igsa()
+
+    def _export_sales_excel(self) -> None:
+        state = self._sales_export_state()
+        if state is None:
+            QMessageBox.warning(self, "Ventas", "No hay datos disponibles para exportar a Excel.")
+            return
+
+        dialog = SalesExcelExportDialog(str(state["source_label"]), self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        options = dialog.export_options()
+        sections, grand_rows, grand_total_label = self._sales_export_sections(state, options)
+        if not sections or all(not rows for _title, rows in sections):
+            QMessageBox.warning(self, "Ventas", "No hay datos para exportar con los filtros seleccionados.")
+            return
+
+        title = f"Ventas {state['source_label']} {state['year']}"
+        subtitle = self._sales_export_subtitle(state, options)
+        default = str(self._report_export_service.default_path(title, "xlsx", folder="sales"))
+        path, _ = QFileDialog.getSaveFileName(self, "Exportar ventas a Excel", default, "Excel (*.xlsx)")
+        if not path:
+            return
+        if not path.lower().endswith(".xlsx"):
+            path = f"{path}.xlsx"
+        QApplication.setOverrideCursor(QCursor(Qt.CursorShape.WaitCursor))
+        try:
+            out = self._write_sales_export_workbook(
+                path=path,
+                title=title,
+                subtitle=subtitle,
+                sections=sections,
+                grand_rows=grand_rows,
+                grand_total_label=grand_total_label,
+                group_by=str(options["group_by"]),
+                sort_by=str(options["sort_by"]),
+                direction=str(options["direction"]),
+                include_subtotals=bool(options["subtotals"]),
+            )
+        finally:
+            QApplication.restoreOverrideCursor()
+        QMessageBox.information(self, "Ventas", f"Excel exportado:\n{out}")
+
+    def _sales_export_state(self) -> dict[str, object] | None:
+        if not hasattr(self, "sales_tabs"):
+            return None
+        tab_index = self.sales_tabs.currentIndex()
+        if tab_index == 1:
+            year = self._current_year_igsa()
+            if year <= 0:
+                return None
+            return {
+                "source_key": "igsa",
+                "source_label": "IGSA",
+                "year": year,
+                "month": self._current_month_igsa(),
+                "acumulado": bool(self.acumulado_check_igsa.isChecked()),
+                "cliente_id": "",
+                "cliente_texto": "",
+                "producto_texto": self._current_product_text_igsa(),
+                "fabricante_id": self._current_manufacturer_id_igsa(),
+                "familia_id": self._current_family_id_igsa(),
+                "subfamilia_id": self._current_subfamily_id_igsa(),
+            }
+        year = self._current_year()
+        if year <= 0:
+            return None
+        return {
+            "source_key": "ireks",
+            "source_label": "IREKS",
+            "year": year,
+            "month": self._current_month(),
+            "acumulado": bool(self.acumulado_check.isChecked()),
+            "cliente_id": self._current_client_id(),
+            "cliente_texto": self._current_client_name() if self._current_client_id() else "",
+            "producto_texto": self._current_product_text(),
+            "fabricante_id": self._current_manufacturer_id(),
+            "familia_id": self._current_family_id(),
+            "subfamilia_id": self._current_subfamily_id(),
+        }
+
+    def _sales_export_subtitle(self, state: dict[str, object], options: dict[str, object]) -> str:
+        parts = [
+            f"Año: {state['year']}",
+            f"Mes: {self._sales_export_month_label(int(state['month'] or 0))}",
+            f"Acumulado: {'Sí' if bool(state['acumulado']) else 'No'}",
+            f"Agrupar por: {self._sales_export_group_label(str(options['group_by']))}",
+            f"Ordenar por: {self._sales_export_sort_label(str(options['sort_by']))}",
+            f"Dirección: {'Descendente' if str(options['direction']) == 'desc' else 'Ascendente'}",
+        ]
+        if state["source_key"] == "ireks":
+            cliente = str(state.get("cliente_texto") or "").strip()
+            if cliente:
+                parts.append(f"Cliente: {cliente}")
+        producto = str(state.get("producto_texto") or "").strip()
+        if producto:
+            parts.append(f"Producto: {producto}")
+        fabricante = str(state.get("fabricante_id") or "").strip()
+        family = str(state.get("familia_id") or "").strip()
+        subfamily = str(state.get("subfamilia_id") or "").strip()
+        if fabricante:
+            parts.append(f"Fabricante ID: {fabricante}")
+        if family:
+            parts.append(f"Familia ID: {family}")
+        if subfamily:
+            parts.append(f"Subfamilia ID: {subfamily}")
+        return " | ".join(parts)
+
+    def _sales_export_month_label(self, month: int) -> str:
+        if 1 <= month <= 12:
+            return MONTH_NAMES[month - 1]
+        return "Todos"
+
+    def _sales_export_group_label(self, group_by: str) -> str:
+        return {
+            "none": "Sin agrupar",
+            "month": "Mes",
+            "manufacturer": "Fabricante",
+            "family": "Familia",
+            "subfamily": "Subfamilia",
+        }.get(group_by, "Sin agrupar")
+
+    def _sales_export_sort_label(self, sort_by: str) -> str:
+        return {
+            "codigo": "Código",
+            "nombre": "Producto",
+            "kilos_prev": "Kilos anterior",
+            "sc_prev": "S/C anterior",
+            "ventas_prev": "Ventas anterior",
+            "kilos_curr": "Kilos actual",
+            "sc_curr": "S/C actual",
+            "ventas_curr": "Ventas actual",
+            "delta_kg": "Delta kg",
+            "delta_kg_pct": "Delta kg %",
+            "delta_ventas": "Delta €",
+            "delta_ventas_pct": "Delta € %",
+        }.get(sort_by, "Ventas actual")
+
+    def _sales_export_months(self, month: int, acumulado: bool) -> list[int]:
+        clean_month = int(month or 0)
+        if 1 <= clean_month <= 12:
+            return list(range(1, clean_month + 1)) if acumulado else [clean_month]
+        return list(range(1, 13))
+
+    def _sales_export_load_rows(
+        self,
+        state: dict[str, object],
+        *,
+        month: int,
+    ) -> list[SalesComparisonRow]:
+        year = int(state["year"] or 0)
+        acumulado = bool(state["acumulado"])
+        source_key = str(state["source_key"] or "")
+        if source_key == "igsa":
+            return self.sales_summary_service.listar_resumen_anual_igsa(
+                year=year,
+                month=month,
+                acumulado=acumulado,
+                producto_texto=str(state["producto_texto"] or ""),
+                fabricante_id=str(state["fabricante_id"] or ""),
+                familia_id=str(state["familia_id"] or ""),
+                subfamilia_id=str(state["subfamilia_id"] or ""),
+            )
+        return self.sales_summary_service.listar_resumen_anual(
+            year=year,
+            month=month,
+            acumulado=acumulado,
+            cliente_id=str(state["cliente_id"] or ""),
+            cliente_texto="",
+            articulo_id="",
+            producto_texto=str(state["producto_texto"] or ""),
+            fabricante_id=str(state["fabricante_id"] or ""),
+            familia_id=str(state["familia_id"] or ""),
+            subfamilia_id=str(state["subfamilia_id"] or ""),
+        )
+
+    def _sales_export_sort_rows(self, rows: list[SalesComparisonRow], sort_by: str, direction: str) -> None:
+        reverse = direction == "desc"
+        metric_map = {
+            "codigo": lambda row: str(row.codigo or "").strip().lower(),
+            "nombre": lambda row: str(row.nombre or "").strip().lower(),
+            "kilos_prev": lambda row: float(row.kilos_prev or 0.0),
+            "sc_prev": lambda row: float(row.sc_prev or 0.0),
+            "ventas_prev": lambda row: float(row.ventas_prev or 0.0),
+            "kilos_curr": lambda row: float(row.kilos_curr or 0.0),
+            "sc_curr": lambda row: float(row.sc_curr or 0.0),
+            "ventas_curr": lambda row: float(row.ventas_curr or 0.0),
+            "delta_kg": lambda row: float(row.delta_kg or 0.0),
+            "delta_kg_pct": lambda row: float(row.delta_kg_pct or 0.0),
+            "delta_ventas": lambda row: float(row.delta_ventas or 0.0),
+            "delta_ventas_pct": lambda row: float(row.delta_ventas_pct or 0.0),
+        }
+        primary = metric_map.get(sort_by, metric_map["ventas_curr"])
+        rows.sort(
+            key=lambda row: (
+                primary(row),
+                str(row.nombre or "").strip().lower(),
+                str(row.codigo or "").strip().lower(),
+            ),
+            reverse=reverse,
+        )
+
+    def _sales_export_group_maps(self, source_key: str) -> dict[str, dict[str, str]]:
+        if source_key == "igsa":
+            manufacturers = self.sales_summary_service.list_filter_manufacturers_igsa()
+            families = self.sales_summary_service.list_filter_families_igsa("")
+            subfamilies = self.sales_summary_service.list_filter_subfamilies_igsa("")
+        else:
+            manufacturers = self.sales_summary_service.list_filter_manufacturers()
+            families = self.sales_summary_service.list_filter_families("")
+            subfamilies = self.sales_summary_service.list_filter_subfamilies("")
+
+        def build_map(rows, id_attr: str, label_attr: str) -> dict[str, str]:
+            result: dict[str, str] = {}
+            for row in rows:
+                key = str(getattr(row, id_attr, "") or "").strip()
+                if not key:
+                    continue
+                label = str(getattr(row, label_attr, "") or "").strip() or key
+                result[key] = label
+            return result
+
+        return {
+            "manufacturer": build_map(manufacturers, "fabricante_id", "fabricante_nombre"),
+            "family": build_map(families, "articulo_familia_id", "articulo_familia_nombre"),
+            "subfamily": build_map(subfamilies, "articulo_subfamilia_id", "articulo_subfamilia_nombre"),
+        }
+
+    def _sales_export_group_section_title(self, group_by: str, label: str, month: int | None = None, acumulado: bool = False) -> str:
+        if group_by == "month" and month is not None:
+            month_label = self._sales_export_month_label(month)
+            return f"{month_label} (acumulado)" if acumulado else month_label
+        prefix = self._sales_export_group_label(group_by)
+        return f"{prefix}: {label}" if label else prefix
+
+    def _sales_export_sections(
+        self,
+        state: dict[str, object],
+        options: dict[str, object],
+    ) -> tuple[list[tuple[str, list[SalesComparisonRow]]], list[SalesComparisonRow], str]:
+        group_by = str(options["group_by"] or "none")
+        sort_by = str(options["sort_by"] or "ventas_curr")
+        direction = str(options["direction"] or "desc")
+        acumulado = bool(state["acumulado"])
+        source_key = str(state["source_key"] or "")
+        sections: list[tuple[str, list[SalesComparisonRow]]] = []
+        grand_rows: list[SalesComparisonRow] = []
+        grand_total_label = "TOTAL GENERAL"
+        maps = self._sales_export_group_maps(source_key)
+
+        if group_by == "month":
+            months = self._sales_export_months(int(state["month"] or 0), acumulado)
+            for month in months:
+                rows = self._sales_export_load_rows(state, month=month)
+                self._sales_export_sort_rows(rows, sort_by, direction)
+                sections.append((self._sales_export_group_section_title("month", "", month, acumulado), rows))
+            if months:
+                if acumulado:
+                    grand_rows = list(sections[-1][1])
+                    grand_total_label = f"TOTAL HASTA {self._sales_export_month_label(months[-1]).upper()}"
+                else:
+                    for _section_title, rows in sections:
+                        grand_rows.extend(rows)
+                    grand_total_label = "TOTAL GENERAL"
+            return sections, grand_rows, grand_total_label
+
+        rows = self._sales_export_load_rows(state, month=int(state["month"] or 0))
+        self._sales_export_sort_rows(rows, sort_by, direction)
+        grand_rows = list(rows)
+
+        if group_by in {"manufacturer", "family", "subfamily"}:
+            grouped: dict[str, list[SalesComparisonRow]] = {}
+            for row in rows:
+                if group_by == "manufacturer":
+                    raw_id = str(row.fabricante_id or "").strip()
+                    label = maps["manufacturer"].get(raw_id, raw_id or "Sin fabricante")
+                elif group_by == "family":
+                    raw_id = str(row.familia_id or "").strip()
+                    label = maps["family"].get(raw_id, raw_id or "Sin familia")
+                else:
+                    raw_id = str(row.subfamilia_id or "").strip()
+                    label = maps["subfamily"].get(raw_id, raw_id or "Sin subfamilia")
+                grouped.setdefault(label, []).append(row)
+
+            def sort_label(label: str) -> tuple[int, str]:
+                fallback = label.startswith("Sin ")
+                return (1 if fallback else 0, label.casefold())
+
+            for label in sorted(grouped.keys(), key=sort_label):
+                group_rows = grouped[label]
+                self._sales_export_sort_rows(group_rows, sort_by, direction)
+                sections.append((self._sales_export_group_section_title(group_by, label), group_rows))
+        else:
+            sections.append(("Resultados", rows))
+
+        return sections, grand_rows, grand_total_label
+
+    def _sales_export_totals(self, rows: list[SalesComparisonRow]) -> dict[str, float]:
+        totals = {
+            "kilos_prev": 0.0,
+            "sc_prev": 0.0,
+            "ventas_prev": 0.0,
+            "kilos_curr": 0.0,
+            "sc_curr": 0.0,
+            "ventas_curr": 0.0,
+        }
+        for row in rows:
+            totals["kilos_prev"] += float(row.kilos_prev or 0.0)
+            totals["sc_prev"] += float(row.sc_prev or 0.0)
+            totals["ventas_prev"] += float(row.ventas_prev or 0.0)
+            totals["kilos_curr"] += float(row.kilos_curr or 0.0)
+            totals["sc_curr"] += float(row.sc_curr or 0.0)
+            totals["ventas_curr"] += float(row.ventas_curr or 0.0)
+        return totals
+
+    def _write_sales_export_workbook(
+        self,
+        *,
+        path: str,
+        title: str,
+        subtitle: str,
+        sections: list[tuple[str, list[SalesComparisonRow]]],
+        grand_rows: list[SalesComparisonRow],
+        grand_total_label: str,
+        group_by: str,
+        sort_by: str,
+        direction: str,
+        include_subtotals: bool,
+    ) -> Path:
+        headers = [
+            "Cod.",
+            "Producto",
+            "Kilos",
+            "S/C",
+            "Ventas",
+            "Kilos",
+            "S/C",
+            "Ventas",
+            "Δ kg",
+            "Δ kg %",
+            "Δ €",
+            "Δ € %",
+        ]
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"{self._sales_export_group_label(group_by)} {str(title.split()[-1]) if title.split() else ''}"[:31]
+        ws.sheet_view.showGridLines = False
+
+        title_fill = PatternFill("solid", fgColor="1F3A5F")
+        section_fill = PatternFill("solid", fgColor="E8EEF7")
+        header_fill = PatternFill("solid", fgColor="D9E5F4")
+        subtotal_fill = PatternFill("solid", fgColor="F3F7FC")
+        grand_fill = PatternFill("solid", fgColor="D7E3F4")
+        border = Border(
+            left=Side(style="thin", color="C9D1DC"),
+            right=Side(style="thin", color="C9D1DC"),
+            top=Side(style="thin", color="C9D1DC"),
+            bottom=Side(style="thin", color="C9D1DC"),
+        )
+
+        text_widths = [len(header) for header in headers]
+
+        def set_row_style(row_idx: int, *, fill: PatternFill | None = None, bold: bool = False, font_color: str = "FF111827") -> None:
+            for col_idx in range(1, 13):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.border = border
+                if fill is not None:
+                    cell.fill = fill
+                cell.font = Font(bold=bold, color=font_color)
+                if col_idx >= 3:
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+                else:
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+
+        def write_spanned_row(text: str, fill: PatternFill, bold: bool = True, font_color: str = "111827") -> None:
+            row_idx = ws.max_row + 1
+            ws.append([text] + [""] * 11)
+            ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=12)
+            cell = ws.cell(row=row_idx, column=1)
+            cell.fill = fill
+            cell.border = border
+            cell.font = Font(bold=bold, color=font_color)
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+            text_widths[0] = max(text_widths[0], len(text))
+
+        def update_widths(values: list[str]) -> None:
+            for idx, value in enumerate(values):
+                text_widths[idx] = max(text_widths[idx], len(str(value or "")))
+
+        def write_data_row(row: SalesComparisonRow) -> None:
+            row_idx = ws.max_row + 1
+            values = [
+                str(row.codigo or ""),
+                str(row.nombre or ""),
+                float(row.kilos_prev or 0.0),
+                float(row.sc_prev or 0.0),
+                float(row.ventas_prev or 0.0),
+                float(row.kilos_curr or 0.0),
+                float(row.sc_curr or 0.0),
+                float(row.ventas_curr or 0.0),
+                float(row.delta_kg or 0.0),
+                float(row.delta_kg_pct or 0.0),
+                float(row.delta_ventas or 0.0),
+                float(row.delta_ventas_pct or 0.0),
+            ]
+            display_values = [
+                values[0],
+                values[1],
+                self._fmt_num(values[2]),
+                self._fmt_num(values[3]),
+                self._fmt_money(values[4]),
+                self._fmt_num(values[5]),
+                self._fmt_num(values[6]),
+                self._fmt_money(values[7]),
+                self._fmt_num(values[8]),
+                self._fmt_pct(values[9]),
+                self._fmt_money(values[10]),
+                self._fmt_pct(values[11]),
+            ]
+            ws.append(values)
+            update_widths(display_values)
+            for col_idx, _display in enumerate(display_values, start=1):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.border = border
+                if col_idx <= 2:
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+                else:
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+                if col_idx == 9 and float(row.delta_kg or 0.0) != 0.0:
+                    cell.font = Font(color="FF067647")
+                elif col_idx == 10 and float(row.delta_kg_pct or 0.0) != 0.0:
+                    cell.font = Font(color="FF067647" if float(row.delta_kg_pct or 0.0) > 0 else "FFB42318")
+                elif col_idx == 11 and float(row.delta_ventas or 0.0) != 0.0:
+                    cell.font = Font(color="FF067647" if float(row.delta_ventas or 0.0) > 0 else "FFB42318")
+                elif col_idx == 12 and float(row.delta_ventas_pct or 0.0) != 0.0:
+                    cell.font = Font(color="FF067647" if float(row.delta_ventas_pct or 0.0) > 0 else "FFB42318")
+                else:
+                    cell.font = Font(color="FF111827")
+                if col_idx == 3:
+                    cell.number_format = '#,##0.00'
+                elif col_idx == 4:
+                    cell.number_format = '#,##0.00'
+                elif col_idx == 5:
+                    cell.number_format = '#,##0.00 "€"'
+                elif col_idx == 6:
+                    cell.number_format = '#,##0.00'
+                elif col_idx == 7:
+                    cell.number_format = '#,##0.00'
+                elif col_idx == 8:
+                    cell.number_format = '#,##0.00 "€"'
+                elif col_idx == 9:
+                    cell.number_format = '#,##0.00'
+                elif col_idx in {10, 12}:
+                    cell.number_format = '0.00"%"'
+                elif col_idx == 11:
+                    cell.number_format = '#,##0.00 "€"'
+
+        def write_totals_row(label: str, rows: list[SalesComparisonRow], fill: PatternFill) -> None:
+            totals = self._sales_export_totals(rows)
+            prev_total_kg = totals["kilos_prev"] + totals["sc_prev"]
+            curr_total_kg = totals["kilos_curr"] + totals["sc_curr"]
+            delta_kg = curr_total_kg - prev_total_kg
+            delta_sales = totals["ventas_curr"] - totals["ventas_prev"]
+            delta_kg_pct = 0.0 if abs(prev_total_kg) <= 1e-9 else delta_kg / prev_total_kg * 100.0
+            delta_sales_pct = 0.0 if abs(totals["ventas_prev"]) <= 1e-9 else delta_sales / totals["ventas_prev"] * 100.0
+            row_idx = ws.max_row + 1
+            values = [
+                label,
+                "",
+                totals["kilos_prev"],
+                totals["sc_prev"],
+                totals["ventas_prev"],
+                totals["kilos_curr"],
+                totals["sc_curr"],
+                totals["ventas_curr"],
+                delta_kg,
+                delta_kg_pct,
+                delta_sales,
+                delta_sales_pct,
+            ]
+            display_values = [
+                label,
+                "",
+                self._fmt_num(values[2]),
+                self._fmt_num(values[3]),
+                self._fmt_money(values[4]),
+                self._fmt_num(values[5]),
+                self._fmt_num(values[6]),
+                self._fmt_money(values[7]),
+                self._fmt_num(values[8]),
+                self._fmt_pct(values[9]),
+                self._fmt_money(values[10]),
+                self._fmt_pct(values[11]),
+            ]
+            ws.append(values)
+            update_widths(display_values)
+            for col_idx in range(1, 13):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.border = border
+                cell.fill = fill
+                cell.font = Font(bold=True, color="FF111827")
+                cell.alignment = Alignment(horizontal="right" if col_idx >= 3 else "left", vertical="center")
+                if col_idx in {3, 4, 6, 7, 9}:
+                    cell.number_format = '#,##0.00'
+                elif col_idx in {5, 8, 11}:
+                    cell.number_format = '#,##0.00 "€"'
+                elif col_idx in {10, 12}:
+                    cell.number_format = '0.00"%"'
+
+        write_spanned_row(title, title_fill, True, "FFFFFFFF")
+        write_spanned_row(subtitle, PatternFill("solid", fgColor="F8FAFC"), False, "FF4B5563")
+        ws.append([""] * 12)
+
+        for section_title, rows in sections:
+            if not rows:
+                continue
+            write_spanned_row(section_title, section_fill, True, "FF111827")
+            header_row = ws.max_row + 1
+            ws.append(headers)
+            update_widths(headers)
+            set_row_style(header_row, fill=header_fill, bold=True, font_color="FF111827")
+            for row in rows:
+                write_data_row(row)
+            if include_subtotals and group_by != "none":
+                write_totals_row(f"TOTAL {section_title}", rows, subtotal_fill)
+            ws.append([""] * 12)
+
+        if grand_rows:
+            write_totals_row(grand_total_label, grand_rows, grand_fill)
+
+        for idx, width in enumerate(text_widths, start=1):
+            ws.column_dimensions[get_column_letter(idx)].width = min(max(width + 2, 10), 42 if idx != 2 else 48)
+
+        ws.freeze_panes = "A4"
+        out = Path(path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        wb.save(out)
+        return out
 
     def _current_year(self) -> int:
         return int(self.year_filter.currentData() or 0)
@@ -1639,16 +2360,17 @@ class SalesPage(QWidget):
         for col, width in widths.items():
             self.sales_table_igsa.setColumnWidth(col, width)
             if col in {0, 1}:
-                self.group_header_igsa.setColumnWidth(col, 0)
+                self.group_header_igsa.setColumnWidth(col, self.sales_table_igsa.columnWidth(col))
             else:
                 self.group_header_igsa.setColumnWidth(col, width)
             self.totals_table_igsa.setColumnWidth(col, width)
+        self.group_header_igsa.setColumnWidth(0, self.sales_table_igsa.columnWidth(0))
+        self.group_header_igsa.setColumnWidth(1, self.sales_table_igsa.columnWidth(1))
+        self.totals_table_igsa.setColumnWidth(0, self.sales_table_igsa.columnWidth(0))
+        self.totals_table_igsa.setColumnWidth(1, self.sales_table_igsa.columnWidth(1))
 
     def _sync_aux_column_width_igsa(self, logical_index: int, _old_size: int, new_size: int) -> None:
-        if logical_index in {0, 1}:
-            self.group_header_igsa.setColumnWidth(logical_index, 0)
-        else:
-            self.group_header_igsa.setColumnWidth(logical_index, new_size)
+        self.group_header_igsa.setColumnWidth(logical_index, new_size)
         self.totals_table_igsa.setColumnWidth(logical_index, new_size)
 
     def _set_group_item_igsa(self, column: int, text: str, color: str, span: int = 1) -> None:
@@ -1668,8 +2390,6 @@ class SalesPage(QWidget):
             else:
                 label.setStyleSheet("background-color: #F3F6FA; border: 1px solid #000000; border-radius: 0; padding: 0;")
             self.group_header_igsa.setCellWidget(0, col, label)
-        self.group_header_igsa.setColumnWidth(0, 0)
-        self.group_header_igsa.setColumnWidth(1, 0)
         self._set_group_item_igsa(2, str(year - 1), "#3E5064", 3)
         self._set_group_item_igsa(5, str(year), "#0F766E", 3)
         self._set_group_item_igsa(8, "Diferencias", "#111827", 4)
@@ -1817,20 +2537,21 @@ class SalesPage(QWidget):
         for col, width in widths.items():
             self.sales_table.setColumnWidth(col, width)
             if col in {0, 1}:
-                self.group_header.setColumnWidth(col, 0)
+                self.group_header.setColumnWidth(col, self.sales_table.columnWidth(col))
             else:
                 self.group_header.setColumnWidth(col, width)
             self.totals_table.setColumnWidth(col, width)
+        self.group_header.setColumnWidth(0, self.sales_table.columnWidth(0))
+        self.group_header.setColumnWidth(1, self.sales_table.columnWidth(1))
+        self.totals_table.setColumnWidth(0, self.sales_table.columnWidth(0))
+        self.totals_table.setColumnWidth(1, self.sales_table.columnWidth(1))
         self._sync_chart_actions_width()
         QTimer.singleShot(0, self._sync_chart_actions_width)
 
     def _sync_aux_column_width(self, logical_index: int, _old_size: int, new_size: int) -> None:
         if not hasattr(self, "group_header") or not hasattr(self, "totals_table"):
             return
-        if logical_index in {0, 1}:
-            self.group_header.setColumnWidth(logical_index, 0)
-        else:
-            self.group_header.setColumnWidth(logical_index, new_size)
+        self.group_header.setColumnWidth(logical_index, new_size)
         self.totals_table.setColumnWidth(logical_index, new_size)
         if logical_index in {0, 1}:
             self._sync_chart_actions_width()
@@ -1839,6 +2560,8 @@ class SalesPage(QWidget):
         if not hasattr(self, "chart_actions_widget") or not hasattr(self, "sales_table"):
             return
         left_width = self.sales_table.columnWidth(0) + self.sales_table.columnWidth(1)
+        widget_width = self.chart_actions_widget.sizeHint().width()
+        left_width = max(left_width, widget_width)
         self.chart_actions_widget.setFixedWidth(left_width)
         self.chart_actions_widget.updateGeometry()
 
@@ -1883,8 +2606,6 @@ class SalesPage(QWidget):
             else:
                 label.setStyleSheet("background-color: #F3F6FA; border: 1px solid #000000; border-radius: 0; padding: 0;")
             self.group_header.setCellWidget(0, col, label)
-        self.group_header.setColumnWidth(0, 0)
-        self.group_header.setColumnWidth(1, 0)
         self._set_group_item(2, str(year - 1), "#3E5064", 3)
         self._set_group_item(5, str(year), "#0F766E", 3)
         self._set_group_item(8, "Diferencias", "#111827", 4)
