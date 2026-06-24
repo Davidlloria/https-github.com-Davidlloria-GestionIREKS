@@ -1,5 +1,7 @@
 ﻿from __future__ import annotations
 
+from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date
 import math
 from pathlib import Path
@@ -42,7 +44,12 @@ except ModuleNotFoundError:  # pragma: no cover - dependency guard
     pg = None
 
 from app.services.sales_ai_assistant_service import SalesQueryAssistantService
-from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow, SalesMonthlyComparisonPoint
+from app.services.sales_annual_comparison_service import (
+    SalesAnnualComparisonService,
+    SalesComparisonRow,
+    SalesDetailRow,
+    SalesMonthlyComparisonPoint,
+)
 from app.services.report_export_service import ReportExportService
 from app.services.sales_reconciliation_service import SalesReconciliationService
 
@@ -69,6 +76,28 @@ MONTH_NAMES = [
     "Noviembre",
     "Diciembre",
 ]
+
+
+@dataclass
+class SalesExportRow:
+    cliente_id: str
+    cliente_nombre: str
+    articulo_id: str
+    codigo: str
+    nombre: str
+    fabricante_id: str
+    familia_id: str
+    subfamilia_id: str
+    kilos_prev: float
+    sc_prev: float
+    ventas_prev: float
+    kilos_curr: float
+    sc_curr: float
+    ventas_curr: float
+    delta_kg: float
+    delta_kg_pct: float
+    delta_ventas: float
+    delta_ventas_pct: float
 
 
 class NumericTableWidgetItem(QTableWidgetItem):
@@ -744,11 +773,11 @@ class SalesAnalysisDialog(QDialog):
 
 
 class SalesExcelExportDialog(QDialog):
-    def __init__(self, source_label: str, parent: QWidget | None = None) -> None:
+    def __init__(self, source_label: str, *, client_groupable: bool, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(f"Exportar ventas a Excel - {source_label}")
         self.setModal(True)
-        self.setMinimumWidth(420)
+        self.setMinimumWidth(520)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 14, 14, 14)
@@ -761,20 +790,46 @@ class SalesExcelExportDialog(QDialog):
         title.setFont(title_font)
         layout.addWidget(title)
 
+        group_box = QWidget()
+        group_layout = QVBoxLayout(group_box)
+        group_layout.setContentsMargins(0, 0, 0, 0)
+        group_layout.setSpacing(8)
+
+        group_hint = QLabel("Selecciona una o varias agrupaciones. Se aplican en cascada, no se sustituyen.")
+        group_hint.setWordWrap(True)
+        group_hint.setStyleSheet("color: #6B7280;")
+        group_layout.addWidget(group_hint)
+
+        self.group_checks: list[tuple[str, QCheckBox]] = []
+
+        def add_group_check(label: str, key: str, checked: bool = False, enabled: bool = True, tooltip: str = "") -> None:
+            check = QCheckBox(label)
+            check.setChecked(checked)
+            check.setEnabled(enabled)
+            if tooltip:
+                check.setToolTip(tooltip)
+            self.group_checks.append((key, check))
+            group_layout.addWidget(check)
+
+        add_group_check("Mes", "month", checked=True)
+        add_group_check(
+            "Cliente",
+            "client",
+            checked=False,
+            enabled=client_groupable,
+            tooltip="Solo disponible cuando el filtro Cliente está en Todos.",
+        )
+        add_group_check("Fabricante", "manufacturer", checked=False)
+        add_group_check("Familia", "family", checked=False)
+        add_group_check("Subfamilia", "subfamily", checked=False)
+
+        layout.addWidget(group_box)
+
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
         form.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         form.setHorizontalSpacing(12)
         form.setVerticalSpacing(10)
-
-        self.group_combo = QComboBox()
-        self.group_combo.addItem("Sin agrupar", "none")
-        self.group_combo.addItem("Mes", "month")
-        self.group_combo.addItem("Fabricante", "manufacturer")
-        self.group_combo.addItem("Familia", "family")
-        self.group_combo.addItem("Subfamilia", "subfamily")
-        self.group_combo.setCurrentIndex(self.group_combo.findData("month"))
-        form.addRow("Agrupar por", self.group_combo)
 
         self.sort_combo = QComboBox()
         self.sort_combo.addItem("Código", "codigo")
@@ -817,9 +872,14 @@ class SalesExcelExportDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+        note = QLabel("Cliente solo aparece si el filtro Cliente está en Todos.")
+        note.setWordWrap(True)
+        note.setStyleSheet("color: #6B7280;")
+        layout.addWidget(note)
+
     def export_options(self) -> dict[str, object]:
         return {
-            "group_by": str(self.group_combo.currentData() or "none"),
+            "group_levels": [key for key, check in self.group_checks if check.isEnabled() and check.isChecked()],
             "sort_by": str(self.sort_combo.currentData() or "ventas_curr"),
             "direction": str(self.direction_combo.currentData() or "desc"),
             "subtotals": bool(self.subtotals_check.isChecked()),
@@ -1483,18 +1543,22 @@ class SalesPage(QWidget):
             QMessageBox.warning(self, "Ventas", "No hay datos disponibles para exportar a Excel.")
             return
 
-        dialog = SalesExcelExportDialog(str(state["source_label"]), self)
+        dialog = SalesExcelExportDialog(
+            str(state["source_label"]),
+            client_groupable=bool(state.get("customer_groupable", False)),
+            parent=self,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
         options = dialog.export_options()
-        sections, grand_rows, grand_total_label = self._sales_export_sections(state, options)
+        sections, grand_rows, grand_total_label = self._sales_export_sections_v2(state, options)
         if not sections or all(not rows for _title, rows in sections):
             QMessageBox.warning(self, "Ventas", "No hay datos para exportar con los filtros seleccionados.")
             return
 
         title = f"Ventas {state['source_label']} {state['year']}"
-        subtitle = self._sales_export_subtitle(state, options)
+        subtitle = self._sales_export_subtitle_v2(state, options)
         default = str(self._report_export_service.default_path(title, "xlsx", folder="sales"))
         path, _ = QFileDialog.getSaveFileName(self, "Exportar ventas a Excel", default, "Excel (*.xlsx)")
         if not path:
@@ -1503,17 +1567,18 @@ class SalesPage(QWidget):
             path = f"{path}.xlsx"
         QApplication.setOverrideCursor(QCursor(Qt.CursorShape.WaitCursor))
         try:
-            out = self._write_sales_export_workbook(
+            out = self._write_sales_export_workbook_v2(
                 path=path,
                 title=title,
                 subtitle=subtitle,
                 sections=sections,
                 grand_rows=grand_rows,
                 grand_total_label=grand_total_label,
-                group_by=str(options["group_by"]),
                 sort_by=str(options["sort_by"]),
                 direction=str(options["direction"]),
+                group_levels=list(options["group_levels"]),
                 include_subtotals=bool(options["subtotals"]),
+                state=state,
             )
         finally:
             QApplication.restoreOverrideCursor()
@@ -1539,6 +1604,7 @@ class SalesPage(QWidget):
                 "fabricante_id": self._current_manufacturer_id_igsa(),
                 "familia_id": self._current_family_id_igsa(),
                 "subfamilia_id": self._current_subfamily_id_igsa(),
+                "customer_groupable": False,
             }
         year = self._current_year()
         if year <= 0:
@@ -1555,14 +1621,15 @@ class SalesPage(QWidget):
             "fabricante_id": self._current_manufacturer_id(),
             "familia_id": self._current_family_id(),
             "subfamilia_id": self._current_subfamily_id(),
+            "customer_groupable": not bool(self._current_client_id()),
         }
 
-    def _sales_export_subtitle(self, state: dict[str, object], options: dict[str, object]) -> str:
+    def _sales_export_subtitle_v2(self, state: dict[str, object], options: dict[str, object]) -> str:
         parts = [
             f"Año: {state['year']}",
             f"Mes: {self._sales_export_month_label(int(state['month'] or 0))}",
             f"Acumulado: {'Sí' if bool(state['acumulado']) else 'No'}",
-            f"Agrupar por: {self._sales_export_group_label(str(options['group_by']))}",
+            f"Agrupar por: {self._sales_export_group_levels_label(list(options['group_levels']))}",
             f"Ordenar por: {self._sales_export_sort_label(str(options['sort_by']))}",
             f"Dirección: {'Descendente' if str(options['direction']) == 'desc' else 'Ascendente'}",
         ]
@@ -2001,6 +2068,495 @@ class SalesPage(QWidget):
                 write_data_row(row)
             if include_subtotals and group_by != "none":
                 write_totals_row(f"TOTAL {section_title}", rows, subtotal_fill)
+            ws.append([""] * 12)
+
+        if grand_rows:
+            write_totals_row(grand_total_label, grand_rows, grand_fill)
+
+        for idx, width in enumerate(text_widths, start=1):
+            ws.column_dimensions[get_column_letter(idx)].width = min(max(width + 2, 10), 42 if idx != 2 else 48)
+
+        ws.freeze_panes = "A4"
+        out = Path(path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        wb.save(out)
+        return out
+
+    def _sales_export_group_level_label(self, key: str) -> str:
+        return {
+            "month": "Mes",
+            "client": "Cliente",
+            "manufacturer": "Fabricante",
+            "family": "Familia",
+            "subfamily": "Subfamilia",
+        }.get(key, key)
+
+    def _sales_export_group_levels_label(self, keys: list[str]) -> str:
+        levels = [self._sales_export_group_level_label(key) for key in keys if str(key or "").strip()]
+        return " > ".join(levels) if levels else "Sin agrupar"
+
+    def _sales_export_group_value_label(
+        self,
+        level: str,
+        row: SalesExportRow,
+        group_maps: dict[str, dict[str, str]],
+    ) -> str:
+        if level == "client":
+            return str(row.cliente_nombre or row.cliente_id or "Sin cliente").strip() or "Sin cliente"
+        if level == "manufacturer":
+            raw = str(row.fabricante_id or "").strip()
+            return group_maps["manufacturer"].get(raw, raw or "Sin fabricante")
+        if level == "family":
+            raw = str(row.familia_id or "").strip()
+            return group_maps["family"].get(raw, raw or "Sin familia")
+        if level == "subfamily":
+            raw = str(row.subfamilia_id or "").strip()
+            return group_maps["subfamily"].get(raw, raw or "Sin subfamilia")
+        return ""
+
+    def _sales_export_selected_levels(self, state: dict[str, object], levels: list[str]) -> list[str]:
+        allowed = {"month", "manufacturer", "family", "subfamily"}
+        if bool(state.get("customer_groupable", False)):
+            allowed.add("client")
+        ordered = ["month", "client", "manufacturer", "family", "subfamily"]
+        requested = {str(level or "").strip() for level in levels}
+        return [level for level in ordered if level in requested and level in allowed]
+
+    def _sales_export_rows_igsa_v2(self, state: dict[str, object], month: int) -> list[SalesExportRow]:
+        rows = self.sales_summary_service.listar_resumen_anual_igsa(
+            year=int(state["year"] or 0),
+            month=month,
+            acumulado=bool(state["acumulado"]),
+            producto_texto=str(state["producto_texto"] or ""),
+            fabricante_id=str(state["fabricante_id"] or ""),
+            familia_id=str(state["familia_id"] or ""),
+            subfamilia_id=str(state["subfamilia_id"] or ""),
+        )
+        result: list[SalesExportRow] = []
+        for row in rows:
+            result.append(
+                SalesExportRow(
+                    cliente_id="",
+                    cliente_nombre="",
+                    articulo_id=str(row.articulo_id or ""),
+                    codigo=str(row.codigo or ""),
+                    nombre=str(row.nombre or ""),
+                    fabricante_id=str(row.fabricante_id or ""),
+                    familia_id=str(row.familia_id or ""),
+                    subfamilia_id=str(row.subfamilia_id or ""),
+                    kilos_prev=float(row.kilos_prev or 0.0),
+                    sc_prev=float(row.sc_prev or 0.0),
+                    ventas_prev=float(row.ventas_prev or 0.0),
+                    kilos_curr=float(row.kilos_curr or 0.0),
+                    sc_curr=float(row.sc_curr or 0.0),
+                    ventas_curr=float(row.ventas_curr or 0.0),
+                    delta_kg=float(row.delta_kg or 0.0),
+                    delta_kg_pct=float(row.delta_kg_pct or 0.0),
+                    delta_ventas=float(row.delta_ventas or 0.0),
+                    delta_ventas_pct=float(row.delta_ventas_pct or 0.0),
+                )
+            )
+        return result
+
+    def _sales_export_rows_ireks_v2(self, state: dict[str, object], month: int, selected_levels: list[str]) -> list[SalesExportRow]:
+        year = int(state["year"] or 0)
+        if year <= 0:
+            return []
+        include_client = "client" in selected_levels
+        cliente_id = str(state["cliente_id"] or "")
+        filters = {
+            "cliente_id": cliente_id,
+            "cliente_texto": "",
+            "articulo_id": "",
+            "producto_texto": str(state["producto_texto"] or ""),
+            "fabricante_id": str(state["fabricante_id"] or ""),
+            "familia_id": str(state["familia_id"] or ""),
+            "subfamilia_id": str(state["subfamilia_id"] or ""),
+        }
+        prev_rows = self.sales_summary_service.listar_detalle_ventas(
+            year=year - 1,
+            month=month,
+            acumulado=bool(state["acumulado"]),
+            **filters,
+        )
+        curr_rows = self.sales_summary_service.listar_detalle_ventas(
+            year=year,
+            month=month,
+            acumulado=bool(state["acumulado"]),
+            **filters,
+        )
+        buckets: dict[tuple[str, str], dict[str, object]] = {}
+
+        def ensure_bucket(row: SalesDetailRow, suffix: str) -> dict[str, object]:
+            client_id = str(row.cliente_id or "").strip() if include_client else ""
+            product_id = str(row.articulo_id or "").strip() or str(row.codigo or "").strip() or str(row.nombre or "").strip()
+            key = (client_id, product_id)
+            bucket = buckets.setdefault(
+                key,
+                {
+                    "cliente_id": client_id,
+                    "cliente_nombre": str(row.cliente_nombre or "").strip() if include_client else "",
+                    "articulo_id": product_id,
+                    "codigo": str(row.codigo or "").strip(),
+                    "nombre": str(row.nombre or "").strip(),
+                    "fabricante_id": str(row.fabricante_id or "").strip(),
+                    "familia_id": str(row.familia_id or "").strip(),
+                    "subfamilia_id": str(row.subfamilia_id or "").strip(),
+                    "kilos_prev": 0.0,
+                    "sc_prev": 0.0,
+                    "ventas_prev": 0.0,
+                    "kilos_curr": 0.0,
+                    "sc_curr": 0.0,
+                    "ventas_curr": 0.0,
+                },
+            )
+            if include_client and not str(bucket["cliente_nombre"] or "").strip():
+                bucket["cliente_nombre"] = str(row.cliente_nombre or row.cliente_id or "").strip()
+            if not str(bucket["codigo"] or "").strip():
+                bucket["codigo"] = str(row.codigo or "").strip()
+            if not str(bucket["nombre"] or "").strip():
+                bucket["nombre"] = str(row.nombre or "").strip()
+            if not str(bucket["fabricante_id"] or "").strip():
+                bucket["fabricante_id"] = str(row.fabricante_id or "").strip()
+            if not str(bucket["familia_id"] or "").strip():
+                bucket["familia_id"] = str(row.familia_id or "").strip()
+            if not str(bucket["subfamilia_id"] or "").strip():
+                bucket["subfamilia_id"] = str(row.subfamilia_id or "").strip()
+            return bucket
+
+        for row in prev_rows:
+            bucket = ensure_bucket(row, "prev")
+            bucket["kilos_prev"] = float(bucket["kilos_prev"] or 0.0) + float(row.kilos or 0.0)
+            bucket["sc_prev"] = float(bucket["sc_prev"] or 0.0) + float(row.sc or 0.0)
+            bucket["ventas_prev"] = float(bucket["ventas_prev"] or 0.0) + float(row.ventas or 0.0)
+
+        for row in curr_rows:
+            bucket = ensure_bucket(row, "curr")
+            bucket["kilos_curr"] = float(bucket["kilos_curr"] or 0.0) + float(row.kilos or 0.0)
+            bucket["sc_curr"] = float(bucket["sc_curr"] or 0.0) + float(row.sc or 0.0)
+            bucket["ventas_curr"] = float(bucket["ventas_curr"] or 0.0) + float(row.ventas or 0.0)
+
+        result: list[SalesExportRow] = []
+        for values in buckets.values():
+            kilos_prev = float(values["kilos_prev"] or 0.0)
+            sc_prev = float(values["sc_prev"] or 0.0)
+            ventas_prev = float(values["ventas_prev"] or 0.0)
+            kilos_curr = float(values["kilos_curr"] or 0.0)
+            sc_curr = float(values["sc_curr"] or 0.0)
+            ventas_curr = float(values["ventas_curr"] or 0.0)
+            total_prev = kilos_prev + sc_prev
+            total_curr = kilos_curr + sc_curr
+            delta_kg = total_curr - total_prev
+            delta_ventas = ventas_curr - ventas_prev
+            result.append(
+                SalesExportRow(
+                    cliente_id=str(values["cliente_id"] or ""),
+                    cliente_nombre=str(values["cliente_nombre"] or ""),
+                    articulo_id=str(values["articulo_id"] or ""),
+                    codigo=str(values["codigo"] or ""),
+                    nombre=str(values["nombre"] or ""),
+                    fabricante_id=str(values["fabricante_id"] or ""),
+                    familia_id=str(values["familia_id"] or ""),
+                    subfamilia_id=str(values["subfamilia_id"] or ""),
+                    kilos_prev=kilos_prev,
+                    sc_prev=sc_prev,
+                    ventas_prev=ventas_prev,
+                    kilos_curr=kilos_curr,
+                    sc_curr=sc_curr,
+                    ventas_curr=ventas_curr,
+                    delta_kg=delta_kg,
+                    delta_kg_pct=self._pct(delta_kg, total_prev),
+                    delta_ventas=delta_ventas,
+                    delta_ventas_pct=self._pct(delta_ventas, ventas_prev),
+                )
+            )
+
+        result.sort(
+            key=lambda row: (
+                str(row.cliente_nombre or "").strip().lower(),
+                str(row.nombre or "").strip().lower(),
+                str(row.codigo or "").strip().lower(),
+            )
+        )
+        return result
+
+    def _sales_export_rows_v2(self, state: dict[str, object], month: int, selected_levels: list[str]) -> list[SalesExportRow]:
+        if str(state["source_key"] or "") == "igsa":
+            return self._sales_export_rows_igsa_v2(state, month)
+        return self._sales_export_rows_ireks_v2(state, month, selected_levels)
+
+    def _sales_export_sections_v2(
+        self,
+        state: dict[str, object],
+        options: dict[str, object],
+    ) -> tuple[list[tuple[str, list[SalesExportRow]]], list[SalesExportRow], str]:
+        selected_levels = self._sales_export_selected_levels(state, list(options.get("group_levels") or []))
+        group_levels = [level for level in selected_levels if level != "month"]
+        sections: list[tuple[str, list[SalesExportRow]]] = []
+        grand_rows: list[SalesExportRow] = []
+        grand_total_label = "TOTAL GENERAL"
+        if "month" in selected_levels:
+            months = self._sales_export_months(int(state["month"] or 0), bool(state["acumulado"]))
+            for month in months:
+                rows = self._sales_export_rows_v2(state, month, group_levels)
+                self._sales_export_sort_rows(rows, str(options["sort_by"] or "ventas_curr"), str(options["direction"] or "desc"))
+                sections.append((f"{self._sales_export_month_label(month)}" + (" (acumulado)" if bool(state["acumulado"]) else ""), rows))
+            if months:
+                if bool(state["acumulado"]):
+                    grand_rows = list(sections[-1][1])
+                    grand_total_label = f"TOTAL HASTA {self._sales_export_month_label(months[-1]).upper()}"
+                else:
+                    for _section_title, rows in sections:
+                        grand_rows.extend(rows)
+                    grand_total_label = "TOTAL GENERAL"
+            return sections, grand_rows, grand_total_label
+
+        rows = self._sales_export_rows_v2(state, int(state["month"] or 0), group_levels)
+        self._sales_export_sort_rows(rows, str(options["sort_by"] or "ventas_curr"), str(options["direction"] or "desc"))
+        sections.append(("Resultados", rows))
+        grand_rows = list(rows)
+        return sections, grand_rows, grand_total_label
+
+    def _write_sales_export_workbook_v2(
+        self,
+        *,
+        path: str,
+        title: str,
+        subtitle: str,
+        sections: list[tuple[str, list[SalesExportRow]]],
+        grand_rows: list[SalesExportRow],
+        grand_total_label: str,
+        sort_by: str,
+        direction: str,
+        group_levels: list[str],
+        include_subtotals: bool,
+        state: dict[str, object],
+    ) -> Path:
+        headers = [
+            "Cod.",
+            "Producto",
+            "Kilos",
+            "S/C",
+            "Ventas",
+            "Kilos",
+            "S/C",
+            "Ventas",
+            "Δ kg",
+            "Δ kg %",
+            "Δ €",
+            "Δ € %",
+        ]
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"{state['source_label']} {state['year']}"[:31]
+        ws.sheet_view.showGridLines = False
+
+        title_fill = PatternFill("solid", fgColor="1F3A5F")
+        section_fill = PatternFill("solid", fgColor="E8EEF7")
+        header_fill = PatternFill("solid", fgColor="D9E5F4")
+        subtotal_fill = PatternFill("solid", fgColor="F3F7FC")
+        grand_fill = PatternFill("solid", fgColor="D7E3F4")
+        border = Border(
+            left=Side(style="thin", color="C9D1DC"),
+            right=Side(style="thin", color="C9D1DC"),
+            top=Side(style="thin", color="C9D1DC"),
+            bottom=Side(style="thin", color="C9D1DC"),
+        )
+
+        text_widths = [len(header) for header in headers]
+        group_maps = self._sales_export_group_maps(str(state["source_key"] or ""))
+        level_titles = {
+            "client": "Cliente",
+            "manufacturer": "Fabricante",
+            "family": "Familia",
+            "subfamily": "Subfamilia",
+        }
+
+        def write_spanned_row(text: str, fill: PatternFill, bold: bool = True, font_color: str = "FF111827") -> None:
+            row_idx = ws.max_row + 1
+            ws.append([text] + [""] * 11)
+            ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=12)
+            cell = ws.cell(row=row_idx, column=1)
+            cell.fill = fill
+            cell.border = border
+            cell.font = Font(bold=bold, color=font_color)
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+            text_widths[0] = max(text_widths[0], len(str(text or "")))
+
+        def update_widths(values: list[str]) -> None:
+            for idx, value in enumerate(values):
+                text_widths[idx] = max(text_widths[idx], len(str(value or "")))
+
+        def write_data_row(row: SalesExportRow) -> None:
+            row_idx = ws.max_row + 1
+            values = [
+                str(row.codigo or ""),
+                str(row.nombre or ""),
+                float(row.kilos_prev or 0.0),
+                float(row.sc_prev or 0.0),
+                float(row.ventas_prev or 0.0),
+                float(row.kilos_curr or 0.0),
+                float(row.sc_curr or 0.0),
+                float(row.ventas_curr or 0.0),
+                float(row.delta_kg or 0.0),
+                float(row.delta_kg_pct or 0.0),
+                float(row.delta_ventas or 0.0),
+                float(row.delta_ventas_pct or 0.0),
+            ]
+            display_values = [
+                values[0],
+                values[1],
+                self._fmt_num(values[2]),
+                self._fmt_num(values[3]),
+                self._fmt_money(values[4]),
+                self._fmt_num(values[5]),
+                self._fmt_num(values[6]),
+                self._fmt_money(values[7]),
+                self._fmt_num(values[8]),
+                self._fmt_pct(values[9]),
+                self._fmt_money(values[10]),
+                self._fmt_pct(values[11]),
+            ]
+            ws.append(values)
+            update_widths(display_values)
+            for col_idx in range(1, 13):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.border = border
+                cell.alignment = Alignment(horizontal="left" if col_idx <= 2 else "right", vertical="center")
+                if col_idx == 9:
+                    metric = float(row.delta_kg or 0.0)
+                    cell.font = Font(color="FF067647" if metric > 0 else "FFB42318" if metric < 0 else "FF111827")
+                elif col_idx == 10:
+                    metric = float(row.delta_kg_pct or 0.0)
+                    cell.font = Font(color="FF067647" if metric > 0 else "FFB42318" if metric < 0 else "FF111827")
+                elif col_idx == 11:
+                    metric = float(row.delta_ventas or 0.0)
+                    cell.font = Font(color="FF067647" if metric > 0 else "FFB42318" if metric < 0 else "FF111827")
+                elif col_idx == 12:
+                    metric = float(row.delta_ventas_pct or 0.0)
+                    cell.font = Font(color="FF067647" if metric > 0 else "FFB42318" if metric < 0 else "FF111827")
+                else:
+                    cell.font = Font(color="FF111827")
+                if col_idx in {3, 4, 6, 7, 9}:
+                    cell.number_format = '#,##0.00'
+                elif col_idx in {5, 8, 11}:
+                    cell.number_format = '#,##0.00 "€"'
+                elif col_idx in {10, 12}:
+                    cell.number_format = '0.00"%"'
+
+        def write_totals_row(label: str, rows: list[SalesExportRow], fill: PatternFill) -> None:
+            totals = self._sales_export_totals(rows)
+            prev_total_kg = totals["kilos_prev"] + totals["sc_prev"]
+            curr_total_kg = totals["kilos_curr"] + totals["sc_curr"]
+            delta_kg = curr_total_kg - prev_total_kg
+            delta_sales = totals["ventas_curr"] - totals["ventas_prev"]
+            delta_kg_pct = 0.0 if abs(prev_total_kg) <= 1e-9 else delta_kg / prev_total_kg * 100.0
+            delta_sales_pct = 0.0 if abs(totals["ventas_prev"]) <= 1e-9 else delta_sales / totals["ventas_prev"] * 100.0
+            row_idx = ws.max_row + 1
+            values = [
+                label,
+                "",
+                totals["kilos_prev"],
+                totals["sc_prev"],
+                totals["ventas_prev"],
+                totals["kilos_curr"],
+                totals["sc_curr"],
+                totals["ventas_curr"],
+                delta_kg,
+                delta_kg_pct,
+                delta_sales,
+                delta_sales_pct,
+            ]
+            display_values = [
+                label,
+                "",
+                self._fmt_num(values[2]),
+                self._fmt_num(values[3]),
+                self._fmt_money(values[4]),
+                self._fmt_num(values[5]),
+                self._fmt_num(values[6]),
+                self._fmt_money(values[7]),
+                self._fmt_num(values[8]),
+                self._fmt_pct(values[9]),
+                self._fmt_money(values[10]),
+                self._fmt_pct(values[11]),
+            ]
+            ws.append(values)
+            update_widths(display_values)
+            for col_idx in range(1, 13):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.border = border
+                cell.fill = fill
+                cell.font = Font(bold=True, color="FF111827")
+                cell.alignment = Alignment(horizontal="left" if col_idx <= 2 else "right", vertical="center")
+                if col_idx == 9:
+                    metric = float(delta_kg or 0.0)
+                    cell.font = Font(bold=True, color="FF067647" if metric > 0 else "FFB42318" if metric < 0 else "FF111827")
+                elif col_idx == 10:
+                    metric = float(delta_kg_pct or 0.0)
+                    cell.font = Font(bold=True, color="FF067647" if metric > 0 else "FFB42318" if metric < 0 else "FF111827")
+                elif col_idx == 11:
+                    metric = float(delta_sales or 0.0)
+                    cell.font = Font(bold=True, color="FF067647" if metric > 0 else "FFB42318" if metric < 0 else "FF111827")
+                elif col_idx == 12:
+                    metric = float(delta_sales_pct or 0.0)
+                    cell.font = Font(bold=True, color="FF067647" if metric > 0 else "FFB42318" if metric < 0 else "FF111827")
+                if col_idx in {3, 4, 6, 7, 9}:
+                    cell.number_format = '#,##0.00'
+                elif col_idx in {5, 8, 11}:
+                    cell.number_format = '#,##0.00 "€"'
+                elif col_idx in {10, 12}:
+                    cell.number_format = '0.00"%"'
+
+        def write_group_rows(rows: list[SalesExportRow], levels: list[str]) -> list[SalesExportRow]:
+            if not levels:
+                self._sales_export_sort_rows(rows, sort_by, direction)
+                for row in rows:
+                    write_data_row(row)
+                return rows
+
+            level = levels[0]
+            grouped: dict[str, list[SalesExportRow]] = {}
+            order: list[str] = []
+            for row in rows:
+                label = self._sales_export_group_value_label(level, row, group_maps)
+                if label not in grouped:
+                    grouped[label] = []
+                    order.append(label)
+                grouped[label].append(row)
+
+            def sort_label(label: str) -> tuple[int, str]:
+                return (1 if str(label or "").startswith("Sin ") else 0, str(label or "").casefold())
+
+            total_rows: list[SalesExportRow] = []
+            for label in sorted(order, key=sort_label):
+                write_spanned_row(f"{level_titles.get(level, level.title())}: {label}", section_fill, True, "FF111827")
+                child_rows = write_group_rows(grouped[label], levels[1:])
+                total_rows.extend(child_rows)
+                if include_subtotals:
+                    write_totals_row(f"TOTAL {level_titles.get(level, level.title())}: {label}", child_rows, subtotal_fill)
+            return total_rows
+
+        write_spanned_row(title, title_fill, True, "FFFFFFFF")
+        write_spanned_row(subtitle, PatternFill("solid", fgColor="F8FAFC"), False, "FF4B5563")
+        ws.append([""] * 12)
+
+        for section_title, rows in sections:
+            if not rows:
+                continue
+            write_spanned_row(section_title, section_fill, True, "FF111827")
+            header_row = ws.max_row + 1
+            ws.append(headers)
+            update_widths(headers)
+            for col_idx in range(1, 13):
+                cell = ws.cell(row=header_row, column=col_idx)
+                cell.border = border
+                cell.fill = header_fill
+                cell.font = Font(bold=True, color="FF111827")
+                cell.alignment = Alignment(horizontal="left" if col_idx <= 2 else "right", vertical="center")
+            section_leaf_rows = write_group_rows(rows, group_levels)
+            if include_subtotals and group_levels:
+                write_totals_row(f"TOTAL {section_title}", section_leaf_rows, subtotal_fill)
             ws.append([""] * 12)
 
         if grand_rows:
