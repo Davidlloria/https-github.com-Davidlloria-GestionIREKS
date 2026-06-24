@@ -1640,9 +1640,17 @@ class SalesPage(QWidget):
         }
 
     def _sales_export_subtitle_v2(self, state: dict[str, object], options: dict[str, object]) -> str:
+        month_value = int(state["month"] or 0)
+        if bool(state["acumulado"]):
+            if 1 <= month_value <= 12:
+                month_text = f"Enero a {self._sales_export_month_label(month_value)}"
+            else:
+                month_text = "Enero a Diciembre"
+        else:
+            month_text = self._sales_export_month_label(month_value)
         parts = [
             f"Año: {state['year']}",
-            f"Mes: {self._sales_export_month_label(int(state['month'] or 0))}",
+            f"Mes: {month_text}",
             f"Acumulado: {'Sí' if bool(state['acumulado']) else 'No'}",
             f"Agrupar por: {self._sales_export_group_levels_label(list(options['group_levels']))}",
             f"Ordenar por: {self._sales_export_sort_label(str(options['sort_by']))}",
