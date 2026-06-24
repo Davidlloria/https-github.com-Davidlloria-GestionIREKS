@@ -2280,9 +2280,9 @@ class SalesPage(QWidget):
                     sc_curr=sc_curr,
                     ventas_curr=ventas_curr,
                     delta_kg=delta_kg,
-                    delta_kg_pct=self._pct(delta_kg, total_prev),
+                    delta_kg_pct=self._sales_export_pct(delta_kg, total_prev),
                     delta_ventas=delta_ventas,
-                    delta_ventas_pct=self._pct(delta_ventas, ventas_prev),
+                    delta_ventas_pct=self._sales_export_pct(delta_ventas, ventas_prev),
                 )
             )
 
@@ -2294,6 +2294,11 @@ class SalesPage(QWidget):
             )
         )
         return result
+
+    def _sales_export_pct(self, delta: float, base: float) -> float:
+        if abs(float(base or 0.0)) <= 1e-9:
+            return 0.0
+        return float(delta or 0.0) / float(base or 0.0) * 100.0
 
     def _sales_export_rows_v2(self, state: dict[str, object], month: int, selected_levels: list[str]) -> list[SalesExportRow]:
         if str(state["source_key"] or "") == "igsa":
