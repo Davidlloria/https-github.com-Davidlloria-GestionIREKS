@@ -2308,7 +2308,7 @@ class SalesPage(QWidget):
             result.append(
                 SalesExportRow(
                     cliente_id=str(values["cliente_id"] or ""),
-                    cliente_nombre=str(values["cliente_nombre"] or client_map.get(str(values["cliente_id"] or "").strip(), "") or ""),
+                    cliente_nombre=str(client_map.get(str(values["cliente_id"] or "").strip(), "") or values["cliente_nombre"] or ""),
                     articulo_id=str(values["articulo_id"] or ""),
                     codigo=str(values["codigo"] or ""),
                     nombre=str(values["nombre"] or ""),
@@ -2430,6 +2430,7 @@ class SalesPage(QWidget):
         text_widths = [len(header) for header in headers]
         group_maps = self._sales_export_group_maps(str(state["source_key"] or ""))
         level_titles = {
+            "month": "Mes",
             "client": "Cliente",
             "manufacturer": "Fabricante",
             "family": "Familia",
