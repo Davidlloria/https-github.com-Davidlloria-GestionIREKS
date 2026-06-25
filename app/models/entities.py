@@ -254,6 +254,36 @@ class TarifaPrecioIreks(SQLModel, table=True):
     descuento_pct: float = Field(default=0.0, nullable=False)
 
 
+class VentaClientesImportLote(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "ventas_clientes_import_lotes"
+
+    lote_id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True, max_length=36)
+    fuente: str = Field(default="clientes", nullable=False, max_length=20, index=True)
+    anio: int = Field(default=0, nullable=False, index=True)
+    archivo_nombre: str = Field(default="", max_length=255)
+    archivo_hash: str = Field(default="", max_length=128, index=True)
+    estado: str = Field(default="importado", nullable=False, max_length=30, index=True)
+    creado_en: datetime = Field(default_factory=datetime.utcnow, nullable=False, index=True)
+
+
+class VentaClientesRaw(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "ventas_clientes_raw"
+
+    raw_id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True, max_length=36)
+    lote_id: str = Field(default="", nullable=False, max_length=36, index=True)
+    cliente_id: str = Field(default="", nullable=False, max_length=36, index=True)
+    anio: int = Field(default=0, nullable=False, index=True)
+    articulo_codigo_origen: str = Field(default="", max_length=120, index=True)
+    articulo_id: str = Field(default="", max_length=36, index=True)
+    articulo_descripcion_origen: str = Field(default="", max_length=255)
+    envase: float = Field(default=0.0, nullable=False)
+    unidades: float = Field(default=0.0, nullable=False)
+    kg: float = Field(default=0.0, nullable=False)
+    precio_kg: float = Field(default=0.0, nullable=False)
+    euros: float = Field(default=0.0, nullable=False)
+    payload_json: str = Field(default="")
+
+
 class MateriaPrimaPrecio(SQLModel, table=True):
     __tablename__: ClassVar[str] = "materias_primas_precios"
 

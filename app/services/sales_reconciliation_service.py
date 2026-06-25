@@ -18,7 +18,21 @@ from sqlmodel import Session, col, select
 
 from app.core.config import BASE_DIR
 from app.core.database import engine
-from app.models import AlmacenMovimiento, Cliente, Distribuidor, Fabricante, Familia, IngredienteIreks, ReferenciaDistribuidor, Subfamilia, VentaImportLote, VentaMensualRaw
+from app.models import (
+    AlmacenMovimiento,
+    Cliente,
+    Distribuidor,
+    Fabricante,
+    Familia,
+    IngredienteIreks,
+    ReferenciaDistribuidor,
+    Subfamilia,
+    TarifaPrecioIreks,
+    VentaClientesImportLote,
+    VentaClientesRaw,
+    VentaImportLote,
+    VentaMensualRaw,
+)
 from app.services.igsa_sales_pdf_flow_service import IgsaSalesPdfFlowService
 from app.services.igsa_sales_workbook_flow_service import IgsaSalesWorkbookFlowService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
@@ -27,6 +41,7 @@ from app.services.sales_text_normalizer import normalize_search_text
 
 
 SALES_CLIENT_TYPES = {"distribuidor", "directo", "cliente directo", "cliente_directo"}
+SALES_CLIENT_EXCLUDED_TYPES = SALES_CLIENT_TYPES
 
 
 @dataclass
@@ -72,6 +87,21 @@ class IgsaWorkbookParsedLine:
     lote: str
     es_sc: bool
     suma_cantidad_lotes: float
+
+
+@dataclass
+class ClientesWorkbookParsedLine:
+    source_row: int
+    cliente_id: str
+    cliente_codigo: str
+    cliente_nombre: str
+    articulo_id: str
+    articulo_descripcion: str
+    envase: float
+    unidades: float
+    kg: float
+    precio_kg: float
+    euros: float
 
 
 class SalesReconciliationService:
@@ -401,6 +431,113 @@ class SalesReconciliationService:
             sync_warehouse_callback=self._sync_igsa_sales_to_warehouse,
         )
 
+    def import_clientes_excel(self, file_path: Path) -> SalesOpResult:
+        try:
+            parsed_rows, year = self._parse_clientes_workbook(file_path)
+        except ValueError as exc:
+            return SalesOpResult(False, str(exc))
+        if not parsed_rows:
+            return SalesOpResult(False, "El Excel de ventas de clientes no contiene filas validas.")
+
+        file_hash = self._file_hash(file_path)
+        with Session(engine) as session:
+            existing = session.exec(
+                select(VentaClientesImportLote).where(
+                    VentaClientesImportLote.fuente == "clientes",
+                    VentaClientesImportLote.archivo_hash == file_hash,
+                )
+            ).first()
+            if existing is not None:
+                return SalesOpResult(True, "El archivo ya estaba importado.", imported=0, incidencias=0)
+
+            indirect_clients = {
+                str(row.cliente_id or "").strip(): row
+                for row in session.exec(select(Cliente)).all()
+                if self._is_indirect_client(row)
+            }
+            products = {
+                str(row.articulo_id or "").strip(): row
+                for row in session.exec(select(IngredienteIreks)).all()
+                if str(row.articulo_id or "").strip()
+            }
+
+            lote = VentaClientesImportLote(
+                lote_id=str(uuid4()),
+                fuente="clientes",
+                anio=year,
+                archivo_nombre=file_path.name,
+                archivo_hash=file_hash,
+                estado="procesado",
+            )
+            session.add(lote)
+            session.flush()
+
+            rows: list[VentaClientesRaw] = []
+            skipped = 0
+            warnings_count = 0
+
+            for item in parsed_rows:
+                cliente = indirect_clients.get(item.cliente_id)
+                if cliente is None:
+                    skipped += 1
+                    continue
+                product = products.get(item.articulo_id)
+                if product is None:
+                    skipped += 1
+                    continue
+
+                precio_kg = self._resolve_tarifa_precio_kg(session, item.articulo_id, year)
+                if precio_kg <= 0:
+                    warnings_count += 1
+                kg_calc = self._to_float(item.envase) * self._to_float(item.unidades)
+                if item.kg > 0 and abs(kg_calc - item.kg) > 0.01:
+                    warnings_count += 1
+                    kg_calc = item.kg
+                euros = kg_calc * precio_kg if precio_kg > 0 else 0.0
+
+                row = VentaClientesRaw(
+                    raw_id=str(uuid4()),
+                    lote_id=lote.lote_id,
+                    cliente_id=item.cliente_id,
+                    anio=year,
+                    articulo_codigo_origen=item.articulo_id,
+                    articulo_id=item.articulo_id,
+                    articulo_descripcion_origen=item.articulo_descripcion,
+                    envase=float(item.envase or 0.0),
+                    unidades=float(item.unidades or 0.0),
+                    kg=float(kg_calc or 0.0),
+                    precio_kg=float(precio_kg or 0.0),
+                    euros=float(euros or 0.0),
+                    payload_json=json.dumps(
+                        {
+                            "cliente_id": item.cliente_id,
+                            "cliente_codigo": item.cliente_codigo,
+                            "cliente_nombre": item.cliente_nombre,
+                            "articulo_id": item.articulo_id,
+                            "articulo_descripcion": item.articulo_descripcion,
+                            "envase": item.envase,
+                            "unidades": item.unidades,
+                            "kg": item.kg,
+                            "precio_kg": precio_kg,
+                            "euros": euros,
+                        },
+                        ensure_ascii=False,
+                    ),
+                )
+                rows.append(row)
+                session.add(row)
+
+            if not rows:
+                session.rollback()
+                return SalesOpResult(False, "No se pudo importar ninguna fila valida.", imported=0, incidencias=skipped)
+
+            session.commit()
+
+        message = "Importacion de ventas de clientes completada."
+        if warnings_count:
+            message = f"{message} Con {warnings_count} advertencias de precio o conversion."
+        return SalesOpResult(True, message, imported=len(rows), incidencias=skipped + warnings_count)
+
     def rebuild_igsa_warehouse_movements(self, periodo: str = "") -> SalesOpResult:
         clean_periodo = str(periodo or "").strip()
         if clean_periodo and not re.fullmatch(r"\d{4}-\d{2}", clean_periodo):
@@ -428,8 +565,14 @@ class SalesReconciliationService:
     def list_years_igsa(self) -> list[int]:
         return self._sales_annual_comparison_service.list_years_igsa()
 
+    def list_years_clientes(self) -> list[int]:
+        return self._sales_annual_comparison_service.list_years_clientes()
+
     def list_filter_clients(self) -> list[Cliente]:
         return self._sales_annual_comparison_service.list_filter_clients()
+
+    def list_filter_clients_indirect(self) -> list[Cliente]:
+        return self._sales_annual_comparison_service.list_filter_clients_indirect()
 
     def list_filter_products(self) -> list[IngredienteIreks]:
         return self._sales_annual_comparison_service.list_filter_products()
@@ -495,6 +638,138 @@ class SalesReconciliationService:
             familia_id=familia_id,
             subfamilia_id=subfamilia_id,
         )
+
+    def listar_resumen_anual_clientes(
+        self,
+        year: int,
+        cliente_id: str = "",
+        producto_texto: str = "",
+        fabricante_id: str = "",
+        familia_id: str = "",
+        subfamilia_id: str = "",
+    ):
+        return self._sales_annual_comparison_service.listar_resumen_anual_clientes(
+            year=year,
+            cliente_id=cliente_id,
+            producto_texto=producto_texto,
+            fabricante_id=fabricante_id,
+            familia_id=familia_id,
+            subfamilia_id=subfamilia_id,
+        )
+
+    def _parse_clientes_workbook(self, file_path: Path) -> tuple[list[ClientesWorkbookParsedLine], int]:
+        try:
+            workbook = load_workbook(file_path, read_only=True, data_only=True)
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError(f"No se pudo abrir el Excel de ventas de clientes: {exc}") from exc
+        if not workbook.sheetnames:
+            raise ValueError("El Excel de ventas de clientes no contiene hojas.")
+
+        sheet = workbook[workbook.sheetnames[0]]
+        rows = list(sheet.iter_rows(values_only=True))
+        if len(rows) < 2:
+            return [], 0
+
+        header = [str(cell or "").strip().lower() for cell in rows[0]]
+        year = 0
+        for cell in rows[0]:
+            if isinstance(cell, int) and 1900 <= cell <= 2100:
+                year = int(cell)
+                break
+            if isinstance(cell, float) and cell.is_integer() and 1900 <= int(cell) <= 2100:
+                year = int(cell)
+                break
+            text = str(cell or "").strip()
+            if text.isdigit() and 1900 <= int(text) <= 2100:
+                year = int(text)
+                break
+        if year <= 0:
+            match = re.search(r"(19|20)\d{2}", str(sheet.title or ""))
+            if match:
+                year = int(match.group(0))
+        if year <= 0:
+            raise ValueError("No se pudo determinar el año del Excel de ventas de clientes.")
+
+        def find_index(*names: str) -> int:
+            norm_names = {self._normalize_key(name) for name in names}
+            for idx, cell in enumerate(header):
+                if self._normalize_key(cell) in norm_names:
+                    return idx
+            return -1
+
+        idx_cliente_id = find_index("cliente_id")
+        idx_cliente_codigo = find_index("codigo")
+        idx_cliente_nombre = find_index("cliente")
+        idx_articulo = find_index("articulo")
+        idx_descripcion = find_index("descripcion art.")
+        idx_envase = find_index("envase")
+        idx_unidades = find_index(str(year))
+        idx_kg = find_index("kg", "kg2")
+        if min(idx_cliente_id, idx_cliente_codigo, idx_cliente_nombre, idx_articulo, idx_descripcion, idx_envase, idx_unidades, idx_kg) < 0:
+            raise ValueError("El Excel de ventas de clientes no tiene el formato esperado.")
+
+        parsed_rows: list[ClientesWorkbookParsedLine] = []
+        for source_row, row in enumerate(rows[1:], start=2):
+            cliente_id = str(row[idx_cliente_id] or "").strip()
+            articulo_id = self._normalize_code(row[idx_articulo])
+            if not cliente_id or not articulo_id:
+                continue
+            cliente_nombre = str(row[idx_cliente_nombre] or "").strip()
+            cliente_codigo = str(row[idx_cliente_codigo] or "").strip()
+            articulo_descripcion = str(row[idx_descripcion] or "").strip()
+            envase = self._to_float(row[idx_envase])
+            unidades = self._to_float(row[idx_unidades])
+            kg = self._to_float(row[idx_kg])
+            if unidades <= 0 and kg <= 0:
+                continue
+            parsed_rows.append(
+                ClientesWorkbookParsedLine(
+                    source_row=source_row,
+                    cliente_id=cliente_id,
+                    cliente_codigo=cliente_codigo,
+                    cliente_nombre=cliente_nombre,
+                    articulo_id=articulo_id,
+                    articulo_descripcion=articulo_descripcion,
+                    envase=envase,
+                    unidades=unidades,
+                    kg=kg,
+                    precio_kg=0.0,
+                    euros=0.0,
+                )
+            )
+        return parsed_rows, year
+
+    def _resolve_tarifa_precio_kg(self, session: Session, articulo_id: str, year: int) -> float:
+        clean_articulo_id = str(articulo_id or "").strip()
+        if not clean_articulo_id or year <= 0:
+            return 0.0
+        tarifa = session.exec(
+            select(TarifaPrecioIreks)
+            .where(TarifaPrecioIreks.articulo_id == clean_articulo_id, TarifaPrecioIreks.tarifa_ano == year)
+            .order_by(col(TarifaPrecioIreks.id).desc())
+        ).first()
+        if tarifa is None:
+            tarifa = session.exec(
+                select(TarifaPrecioIreks)
+                .where(TarifaPrecioIreks.articulo_id == clean_articulo_id, TarifaPrecioIreks.tarifa_ano <= year)
+                .order_by(col(TarifaPrecioIreks.tarifa_ano).desc(), col(TarifaPrecioIreks.id).desc())
+            ).first()
+        if tarifa is None:
+            tarifa = session.exec(
+                select(TarifaPrecioIreks)
+                .where(TarifaPrecioIreks.articulo_id == clean_articulo_id)
+                .order_by(col(TarifaPrecioIreks.tarifa_ano).desc(), col(TarifaPrecioIreks.id).desc())
+            ).first()
+        if tarifa is None:
+            return 0.0
+        precio = float(getattr(tarifa, "precio_distribuidor", 0.0) or 0.0)
+        if precio <= 0:
+            precio = float(getattr(tarifa, "precio_fabricante", 0.0) or 0.0)
+        return precio
+
+    def _is_indirect_client(self, client: Cliente) -> bool:
+        tipo = str(getattr(client, "cliente_tipo", "") or "").strip().lower()
+        return tipo not in SALES_CLIENT_EXCLUDED_TYPES
 
     def _read_json(self, file_path: Path):
         try:

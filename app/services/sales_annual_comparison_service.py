@@ -8,7 +8,16 @@ import unicodedata
 from sqlmodel import Session, col, select
 
 from app.core.database import engine
-from app.models import Cliente, Distribuidor, Fabricante, Familia, IngredienteIreks, Subfamilia, VentaMensualRaw
+from app.models import (
+    Cliente,
+    Distribuidor,
+    Fabricante,
+    Familia,
+    IngredienteIreks,
+    Subfamilia,
+    VentaClientesRaw,
+    VentaMensualRaw,
+)
 from app.services.sales_text_normalizer import normalize_search_text
 
 
@@ -64,6 +73,28 @@ class SalesDetailRow:
     ventas: float
 
 
+@dataclass
+class SalesClientsComparisonRow:
+    articulo_id: str
+    fabricante_id: str
+    familia_id: str
+    subfamilia_id: str
+    codigo: str
+    nombre: str
+    unidades_prev: float
+    kg_prev: float
+    euros_prev: float
+    unidades_curr: float
+    kg_curr: float
+    euros_curr: float
+    delta_unidades: float
+    delta_unidades_pct: float
+    delta_kg: float
+    delta_kg_pct: float
+    delta_euros: float
+    delta_euros_pct: float
+
+
 class SalesAnnualComparisonService:
     def __init__(self, db_engine=None) -> None:
         self._engine = db_engine if db_engine is not None else engine
@@ -108,6 +139,18 @@ class SalesAnnualComparisonService:
             reverse=True,
         )
 
+    def list_years_clientes(self) -> list[int]:
+        with Session(self._engine) as session:
+            years = list(session.exec(select(VentaClientesRaw.anio)))
+        return sorted(
+            {
+                int(year or 0)
+                for year in years
+                if int(year or 0) > 0
+            },
+            reverse=True,
+        )
+
     def list_filter_clients(self) -> list[Cliente]:
         with Session(self._engine) as session:
             rows = list(session.exec(select(Cliente).order_by(Cliente.cliente_nombre_comercial, Cliente.cliente_nombre_fiscal)))
@@ -115,6 +158,17 @@ class SalesAnnualComparisonService:
         for row in rows:
             tipo = str(getattr(row, "cliente_tipo", "") or "").strip().lower()
             if tipo in SALES_CLIENT_TYPES:
+                result.append(row)
+        return result
+
+    def list_filter_clients_indirect(self) -> list[Cliente]:
+        with Session(self._engine) as session:
+            rows = list(session.exec(select(Cliente).order_by(Cliente.cliente_nombre_comercial, Cliente.cliente_nombre_fiscal)))
+        excluded = SALES_CLIENT_TYPES
+        result: list[Cliente] = []
+        for row in rows:
+            tipo = str(getattr(row, "cliente_tipo", "") or "").strip().lower()
+            if tipo not in excluded:
                 result.append(row)
         return result
 
@@ -476,6 +530,135 @@ class SalesAnnualComparisonService:
             bucket[f"ventas_{suffix}"] = float(bucket[f"ventas_{suffix}"] or 0.0) + float(row.venta_euros or 0.0)
 
         return self._build_rows(totals)
+
+    def listar_resumen_anual_clientes(
+        self,
+        year: int,
+        cliente_id: str = "",
+        producto_texto: str = "",
+        fabricante_id: str = "",
+        familia_id: str = "",
+        subfamilia_id: str = "",
+    ) -> list[SalesClientsComparisonRow]:
+        current_year = int(year or 0)
+        if current_year <= 0:
+            return []
+        previous_year = current_year - 1
+        clean_cliente_id = str(cliente_id or "").strip()
+        clean_producto_texto = self._normalize_search_text(producto_texto)
+        clean_fabricante_id = str(fabricante_id or "").strip()
+        clean_familia_id = str(familia_id or "").strip()
+        clean_subfamilia_id = str(subfamilia_id or "").strip()
+
+        with Session(self._engine) as session:
+            stmt = select(VentaClientesRaw).where(col(VentaClientesRaw.anio).in_([previous_year, current_year]))
+            if clean_cliente_id:
+                stmt = stmt.where(col(VentaClientesRaw.cliente_id) == clean_cliente_id)
+            raw_rows = list(session.exec(stmt))
+            products = list(session.exec(select(IngredienteIreks)))
+
+        product_by_id: dict[str, tuple[str, str, str, str, str, str, str]] = {}
+        product_by_code: dict[str, tuple[str, str, str, str, str, str, str]] = {}
+        for product in products:
+            aid = str(product.articulo_id or "").strip()
+            short_ref = str(product.articulo_referencia_corta or "").strip()
+            full_ref = str(product.articulo_referencia or "").strip()
+            display_code = short_ref or full_ref
+            display_name = str(product.articulo_descripcion or "").strip()
+            fabricante = str(product.fabricante_id or "").strip()
+            family = str(product.articulo_familia_id or "").strip()
+            subfamily = str(product.articulo_subfamilia_id or "").strip()
+            searchable = self._normalize_search_text(" ".join([display_code, display_name, short_ref, full_ref]))
+            if aid:
+                product_by_id[aid] = (aid, display_code, display_name, fabricante, family, subfamily, searchable)
+            for candidate in (short_ref, full_ref):
+                norm = self._normalize_code(candidate)
+                if norm:
+                    product_by_code[norm] = (
+                        aid,
+                        display_code or str(candidate or "").strip(),
+                        display_name,
+                        fabricante,
+                        family,
+                        subfamily,
+                        searchable,
+                    )
+
+        totals: dict[str, dict[str, float | str]] = defaultdict(
+            lambda: {
+                "codigo": "",
+                "nombre": "",
+                "articulo_id": "",
+                "fabricante_id": "",
+                "familia_id": "",
+                "subfamilia_id": "",
+                "unidades_prev": 0.0,
+                "kg_prev": 0.0,
+                "euros_prev": 0.0,
+                "unidades_curr": 0.0,
+                "kg_curr": 0.0,
+                "euros_curr": 0.0,
+            }
+        )
+
+        for row in raw_rows:
+            row_year = int(getattr(row, "anio", 0) or 0)
+            if row_year not in {previous_year, current_year}:
+                continue
+            product = product_by_id.get(str(getattr(row, "articulo_id", "") or "").strip())
+            if product is None:
+                for cand in self._code_candidates(getattr(row, "articulo_codigo_origen", "")):
+                    product = product_by_code.get(cand)
+                    if product is not None:
+                        break
+            key = product[0] if product and product[0] else self._normalize_code(getattr(row, "articulo_codigo_origen", ""))
+            if not key:
+                continue
+            product_articulo_id = product[0] if product else str(getattr(row, "articulo_id", "") or "").strip()
+            product_fabricante_id = product[3] if product else ""
+            product_familia_id = product[4] if product else ""
+            product_subfamilia_id = product[5] if product else ""
+
+            if clean_producto_texto:
+                searchable = self._normalize_search_text(
+                    " ".join(
+                        [
+                            product[1] if product else self._normalize_code(getattr(row, "articulo_codigo_origen", "")),
+                            product[2] if product else str(getattr(row, "articulo_descripcion_origen", "") or ""),
+                            str(getattr(row, "articulo_codigo_origen", "") or ""),
+                            str(getattr(row, "articulo_descripcion_origen", "") or ""),
+                        ]
+                    )
+                )
+                if clean_producto_texto not in searchable:
+                    continue
+            if clean_fabricante_id and product_fabricante_id != clean_fabricante_id:
+                continue
+            if clean_familia_id and product_familia_id != clean_familia_id:
+                continue
+            if clean_subfamilia_id and product_subfamilia_id != clean_subfamilia_id:
+                continue
+
+            bucket = totals[key]
+            if not str(bucket["codigo"]):
+                bucket["codigo"] = product[1] if product else self._normalize_code(getattr(row, "articulo_codigo_origen", ""))
+            if not str(bucket["nombre"]):
+                bucket["nombre"] = product[2] if product else str(getattr(row, "articulo_descripcion_origen", "") or "").strip()
+            if not str(bucket["articulo_id"]):
+                bucket["articulo_id"] = product_articulo_id
+            if not str(bucket["fabricante_id"]):
+                bucket["fabricante_id"] = product_fabricante_id
+            if not str(bucket["familia_id"]):
+                bucket["familia_id"] = product_familia_id
+            if not str(bucket["subfamilia_id"]):
+                bucket["subfamilia_id"] = product_subfamilia_id
+
+            suffix = "curr" if row_year == current_year else "prev"
+            bucket[f"unidades_{suffix}"] = float(bucket[f"unidades_{suffix}"] or 0.0) + float(getattr(row, "unidades", 0.0) or 0.0)
+            bucket[f"kg_{suffix}"] = float(bucket[f"kg_{suffix}"] or 0.0) + float(getattr(row, "kg", 0.0) or 0.0)
+            bucket[f"euros_{suffix}"] = float(bucket[f"euros_{suffix}"] or 0.0) + float(getattr(row, "euros", 0.0) or 0.0)
+
+        return self._build_client_rows(totals)
 
     def listar_ranking_anual(
         self,
@@ -913,6 +1096,43 @@ class SalesAnnualComparisonService:
                     delta_kg_pct=self._pct(delta_kg, total_prev),
                     delta_ventas=delta_ventas,
                     delta_ventas_pct=self._pct(delta_ventas, ventas_prev),
+                )
+            )
+        result.sort(key=lambda x: (x.nombre.lower(), x.codigo.lower()))
+        return result
+
+    def _build_client_rows(self, totals: dict[str, dict[str, float | str]]) -> list[SalesClientsComparisonRow]:
+        result: list[SalesClientsComparisonRow] = []
+        for values in totals.values():
+            unidades_prev = float(values["unidades_prev"] or 0.0)
+            kg_prev = float(values["kg_prev"] or 0.0)
+            euros_prev = float(values["euros_prev"] or 0.0)
+            unidades_curr = float(values["unidades_curr"] or 0.0)
+            kg_curr = float(values["kg_curr"] or 0.0)
+            euros_curr = float(values["euros_curr"] or 0.0)
+            delta_unidades = unidades_curr - unidades_prev
+            delta_kg = kg_curr - kg_prev
+            delta_euros = euros_curr - euros_prev
+            result.append(
+                SalesClientsComparisonRow(
+                    articulo_id=str(values["articulo_id"] or ""),
+                    fabricante_id=str(values["fabricante_id"] or ""),
+                    familia_id=str(values["familia_id"] or ""),
+                    subfamilia_id=str(values["subfamilia_id"] or ""),
+                    codigo=str(values["codigo"] or ""),
+                    nombre=str(values["nombre"] or ""),
+                    unidades_prev=unidades_prev,
+                    kg_prev=kg_prev,
+                    euros_prev=euros_prev,
+                    unidades_curr=unidades_curr,
+                    kg_curr=kg_curr,
+                    euros_curr=euros_curr,
+                    delta_unidades=delta_unidades,
+                    delta_unidades_pct=self._pct(delta_unidades, unidades_prev),
+                    delta_kg=delta_kg,
+                    delta_kg_pct=self._pct(delta_kg, kg_prev),
+                    delta_euros=delta_euros,
+                    delta_euros_pct=self._pct(delta_euros, euros_prev),
                 )
             )
         result.sort(key=lambda x: (x.nombre.lower(), x.codigo.lower()))

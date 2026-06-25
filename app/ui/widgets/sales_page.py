@@ -918,8 +918,8 @@ class SalesToolsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Herramientas de ventas - IREKS")
         self.setModal(True)
-        self.resize(1120, 700)
-        self.setMinimumSize(960, 600)
+        self.resize(980, 620)
+        self.setMinimumSize(900, 560)
         self._on_import_completed = on_import_completed
         self._export_service = DbExportService()
         self._import_service = SettingsSalesImportService()
@@ -1156,32 +1156,33 @@ class SalesToolsDialog(QDialog):
         background: str,
         border: str,
         foreground: str,
-    ) -> QPushButton:
-        button = QPushButton(text)
+    ) -> QToolButton:
+        button = QToolButton()
         button.setIcon(QIcon(str(icon_path)))
-        button.setIconSize(QSize(18, 18))
+        button.setIconSize(QSize(22, 22))
+        button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
-        button.setMinimumSize(228, 84)
+        button.setMinimumSize(194, 104)
         button.setStyleSheet(
             f"""
-            QPushButton {{
+            QToolButton {{
                 background: {background};
                 border: 1px solid {border};
                 border-radius: 12px;
                 color: {foreground};
-                font-size: 18px;
+                font-size: 17px;
                 font-weight: 700;
-                padding: 0 16px;
-                text-align: left;
+                padding: 10px 14px 12px;
             }}
-            QPushButton:hover {{
+            QToolButton:hover {{
                 background: {'#DCE9FF' if background == '#E5EEFF' else '#DDF3E4'};
             }}
-            QPushButton:pressed {{
+            QToolButton:pressed {{
                 background: {'#CBDDFA' if background == '#E5EEFF' else '#C8E8D1'};
             }}
             """
         )
+        button.setText(text)
         return button
 
     def _history_status_def(self, status: str) -> tuple[str, Path, str, str]:
@@ -1448,15 +1449,20 @@ class SalesPage(QWidget):
         self._report_export_service = ReportExportService()
         self._building = False
         self._building_igsa = False
+        self._building_clientes = False
         self._product_filter_timer = QTimer(self)
         self._product_filter_timer.setSingleShot(True)
         self._product_filter_timer.timeout.connect(self.reload)
         self._product_filter_timer_igsa = QTimer(self)
         self._product_filter_timer_igsa.setSingleShot(True)
         self._product_filter_timer_igsa.timeout.connect(self.reload_igsa)
+        self._product_filter_timer_clientes = QTimer(self)
+        self._product_filter_timer_clientes.setSingleShot(True)
+        self._product_filter_timer_clientes.timeout.connect(self.reload_clientes)
         self._build_ui()
         self.reload()
         self.reload_igsa()
+        self.reload_clientes()
 
     def _build_ui(self) -> None:
         root_layout = QVBoxLayout(self)
@@ -1660,6 +1666,430 @@ class SalesPage(QWidget):
         self.totals_table_igsa.setStyleSheet(totals_table_style)
         self.totals_table_igsa.viewport().setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         igsa_layout.addWidget(self.totals_table_igsa)
+
+        clientes_tab = QWidget()
+        self.sales_tabs.addTab(clientes_tab, "VENTAS CLIENTES")
+
+        clientes_layout = QVBoxLayout(clientes_tab)
+        clientes_layout.setSpacing(4)
+
+        clientes_filters_top = QHBoxLayout()
+        clientes_filters_top.setContentsMargins(0, 0, 0, 0)
+        clientes_filters_top.setSpacing(18)
+
+        def create_clientes_filter_group(label_text: str, combo: QComboBox) -> QWidget:
+            group = QWidget()
+            group_layout = QHBoxLayout(group)
+            group_layout.setContentsMargins(0, 0, 0, 0)
+            group_layout.setSpacing(4)
+            group_label = QLabel(label_text)
+            group_label.setStyleSheet("padding-right: 2px;")
+            group_layout.addWidget(group_label)
+            group_layout.addWidget(combo)
+            group.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            return group
+
+        clientes_year_group = QWidget()
+        clientes_year_layout = QHBoxLayout(clientes_year_group)
+        clientes_year_layout.setContentsMargins(0, 0, 0, 0)
+        clientes_year_layout.setSpacing(4)
+        clientes_year_label = QLabel("Año")
+        clientes_year_label.setStyleSheet("padding-right: 2px;")
+        clientes_year_layout.addWidget(clientes_year_label)
+        self.year_filter_clientes = QComboBox()
+        self.year_filter_clientes.currentIndexChanged.connect(self.reload_clientes)
+        self.year_filter_clientes.setMinimumWidth(90)
+        clientes_year_layout.addWidget(self.year_filter_clientes)
+        clientes_year_group.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        clientes_filters_top.addWidget(clientes_year_group)
+
+        clientes_month_group = QWidget()
+        clientes_month_layout = QHBoxLayout(clientes_month_group)
+        clientes_month_layout.setContentsMargins(0, 0, 0, 0)
+        clientes_month_layout.setSpacing(4)
+        clientes_month_label = QLabel("Mes")
+        clientes_month_label.setStyleSheet("padding-right: 2px;")
+        clientes_month_layout.addWidget(clientes_month_label)
+        self.month_filter_clientes = QComboBox()
+        self.month_filter_clientes.setEnabled(False)
+        self.month_filter_clientes.setMinimumWidth(125)
+        clientes_month_layout.addWidget(self.month_filter_clientes)
+        clientes_month_group.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        clientes_filters_top.addWidget(clientes_month_group)
+
+        clientes_acumulado_group = QWidget()
+        clientes_acumulado_layout = QHBoxLayout(clientes_acumulado_group)
+        clientes_acumulado_layout.setContentsMargins(0, 0, 0, 0)
+        clientes_acumulado_layout.setSpacing(4)
+        clientes_acumulado_label = QLabel("Acumulado")
+        clientes_acumulado_label.setStyleSheet("padding-right: 2px;")
+        clientes_acumulado_layout.addWidget(clientes_acumulado_label)
+        self.acumulado_check_clientes = QCheckBox()
+        self.acumulado_check_clientes.toggled.connect(self.reload_clientes)
+        clientes_acumulado_layout.addWidget(self.acumulado_check_clientes)
+        clientes_acumulado_group.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        clientes_filters_top.addWidget(clientes_acumulado_group)
+
+        self.manufacturer_filter_clientes = QComboBox()
+        self.manufacturer_filter_clientes.currentIndexChanged.connect(self._on_manufacturer_changed_clientes)
+        self.manufacturer_filter_clientes.setMinimumWidth(190)
+        clientes_filters_top.addWidget(create_clientes_filter_group("Fabricante", self.manufacturer_filter_clientes))
+
+        self.family_filter_clientes = QComboBox()
+        self.family_filter_clientes.currentIndexChanged.connect(self._on_family_changed_clientes)
+        self.family_filter_clientes.setMinimumWidth(190)
+        clientes_filters_top.addWidget(create_clientes_filter_group("Familia", self.family_filter_clientes))
+
+        self.subfamily_filter_clientes = QComboBox()
+        self.subfamily_filter_clientes.currentIndexChanged.connect(self.reload_clientes)
+        self.subfamily_filter_clientes.setMinimumWidth(190)
+        clientes_filters_top.addWidget(create_clientes_filter_group("Subfamilia", self.subfamily_filter_clientes))
+        clientes_layout.addLayout(clientes_filters_top)
+
+        clientes_filters_bottom = QHBoxLayout()
+        clientes_filters_bottom.addWidget(QLabel("Cliente"))
+        self.client_filter_clientes = QComboBox()
+        self.client_filter_clientes.currentIndexChanged.connect(self.reload_clientes)
+        self.client_filter_clientes.setMinimumWidth(260)
+        clientes_filters_bottom.addWidget(self.client_filter_clientes, 1)
+
+        clientes_filters_bottom.addWidget(QLabel("Producto"))
+        self.product_filter_clientes = QLineEdit()
+        self.product_filter_clientes.setPlaceholderText("Buscar por código o descripción...")
+        self.product_filter_clientes.textChanged.connect(self._schedule_product_reload_clientes)
+        self.product_filter_clientes.setMinimumWidth(300)
+        clientes_filters_bottom.addWidget(self.product_filter_clientes, 1)
+
+        clientes_action_button_width = 110
+        clientes_action_button_height = 36
+
+        def make_clientes_action_button(
+            *,
+            text: str,
+            tooltip: str,
+            icon_path: Path,
+            background: str,
+            border: str,
+            hover_background: str,
+            pressed_background: str,
+            foreground: str = "#1F2937",
+        ) -> QToolButton:
+            button = QToolButton()
+            button.setToolTip(tooltip)
+            button.setIcon(QIcon(str(icon_path)))
+            button.setIconSize(QSize(16, 16))
+            button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setFixedSize(clientes_action_button_width, clientes_action_button_height)
+            button.setText(text)
+            button.setStyleSheet(
+                f"""
+                QToolButton {{
+                    background-color: {background};
+                    border: 1px solid {border};
+                    border-radius: 8px;
+                    color: {foreground};
+                    padding: 0 8px;
+                    font-size: 12px;
+                    font-weight: 600;
+                }}
+                QToolButton:hover {{
+                    background-color: {hover_background};
+                }}
+                QToolButton:pressed {{
+                    background-color: {pressed_background};
+                }}
+                QToolButton:disabled {{
+                    background-color: {background};
+                    border-color: {border};
+                    color: #6B7280;
+                }}
+                """
+            )
+            return button
+
+        self.sales_chart_btn_clientes = QToolButton()
+        self.sales_chart_btn_clientes.setToolTip("Ver gráfico del producto")
+        self.sales_chart_btn_clientes.setIcon(QIcon(str(CHART_LINE_ICON_PATH)))
+        self.sales_chart_btn_clientes.setIconSize(QSize(16, 16))
+        self.sales_chart_btn_clientes.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.sales_chart_btn_clientes.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sales_chart_btn_clientes.setFixedSize(clientes_action_button_width, clientes_action_button_height)
+        self.sales_chart_btn_clientes.setEnabled(False)
+        self.sales_chart_btn_clientes.setText("Producto")
+        self.sales_chart_btn_clientes.setStyleSheet(
+            """
+            QToolButton {
+                background-color: #9CC9F5;
+                border: 1px solid #7AAEE3;
+                border-radius: 8px;
+                color: #1F2937;
+                padding: 0 8px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            QToolButton:hover {
+                background-color: #B0D4F8;
+            }
+            QToolButton:pressed {
+                background-color: #8AB8E6;
+            }
+            QToolButton:disabled {
+                background-color: #C7DFF5;
+                border-color: #B1CBE5;
+                color: #6B7280;
+            }
+            """
+        )
+
+        self.sales_total_chart_btn_clientes = QToolButton()
+        self.sales_total_chart_btn_clientes.setToolTip("Ver gráfico total")
+        self.sales_total_chart_btn_clientes.setIcon(QIcon(str(CHART_LINE_ICON_PATH)))
+        self.sales_total_chart_btn_clientes.setIconSize(QSize(16, 16))
+        self.sales_total_chart_btn_clientes.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.sales_total_chart_btn_clientes.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sales_total_chart_btn_clientes.setFixedSize(clientes_action_button_width, clientes_action_button_height)
+        self.sales_total_chart_btn_clientes.setEnabled(False)
+        self.sales_total_chart_btn_clientes.setText("Total")
+        self.sales_total_chart_btn_clientes.setStyleSheet(
+            """
+            QToolButton {
+                background-color: #A7E3D1;
+                border: 1px solid #83CBB5;
+                border-radius: 8px;
+                color: #1F2937;
+                padding: 0 8px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            QToolButton:hover {
+                background-color: #B8E8DA;
+            }
+            QToolButton:pressed {
+                background-color: #91D2BE;
+            }
+            QToolButton:disabled {
+                background-color: #CDEFE4;
+                border-color: #B8DCCD;
+                color: #6B7280;
+            }
+            """
+        )
+
+        self.sales_analysis_btn_clientes = QToolButton()
+        self.sales_analysis_btn_clientes.setToolTip("Análisis")
+        self.sales_analysis_btn_clientes.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "brain.svg")))
+        self.sales_analysis_btn_clientes.setIconSize(QSize(16, 16))
+        self.sales_analysis_btn_clientes.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.sales_analysis_btn_clientes.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sales_analysis_btn_clientes.setFixedSize(clientes_action_button_width, clientes_action_button_height)
+        self.sales_analysis_btn_clientes.setEnabled(False)
+        self.sales_analysis_btn_clientes.setText("Análisis")
+        self.sales_analysis_btn_clientes.setStyleSheet(
+            """
+            QToolButton {
+                background-color: #F6E3A1;
+                border: 1px solid #E3C56D;
+                border-radius: 8px;
+                color: #111827;
+                padding: 0 8px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            QToolButton:hover {
+                background-color: #F8E8B6;
+            }
+            QToolButton:pressed {
+                background-color: #EED88B;
+            }
+            QToolButton:disabled {
+                background-color: #FAEDC5;
+                border-color: #E8D79C;
+                color: #6B7280;
+            }
+            """
+        )
+
+        self.sales_print_btn_clientes = make_clientes_action_button(
+            text="Imprimir",
+            tooltip="Imprimir",
+            icon_path=PRINTER_ICON_PATH,
+            background="#D6D0C8",
+            border="#B8B1A8",
+            hover_background="#E2DDD6",
+            pressed_background="#C8C1B7",
+        )
+        self.sales_print_btn_clientes.setEnabled(False)
+
+        self.sales_pdf_btn_clientes = make_clientes_action_button(
+            text="PDF",
+            tooltip="Exportar a PDF",
+            icon_path=FILE_TEXT_ICON_PATH,
+            background="#F4B2A8",
+            border="#D98E83",
+            hover_background="#F7C0B8",
+            pressed_background="#E89A8F",
+        )
+        self.sales_pdf_btn_clientes.setEnabled(False)
+
+        self.sales_excel_btn_clientes = make_clientes_action_button(
+            text="Excel",
+            tooltip="Exportar a Excel",
+            icon_path=SHEET_ICON_PATH,
+            background="#CBEA8B",
+            border="#AFD268",
+            hover_background="#D7F09D",
+            pressed_background="#B9DE72",
+        )
+        self.sales_excel_btn_clientes.clicked.connect(self._export_sales_excel)
+
+        self.sales_tools_btn_clientes = make_clientes_action_button(
+            text="Tools",
+            tooltip="Herramientas",
+            icon_path=TOOLBOX_ICON_PATH,
+            background="#D9C3F3",
+            border="#BA9EE7",
+            hover_background="#E3D2F7",
+            pressed_background="#CBB2ED",
+        )
+        self.sales_tools_btn_clientes.setEnabled(False)
+
+        clientes_chart_actions_widget = QWidget()
+        clientes_chart_band = QHBoxLayout(clientes_chart_actions_widget)
+        clientes_chart_band.setContentsMargins(0, 0, 0, 0)
+        clientes_chart_band.setSpacing(4)
+        clientes_chart_band.addWidget(self.sales_chart_btn_clientes)
+        clientes_chart_band.addWidget(self.sales_total_chart_btn_clientes)
+        clientes_chart_band.addWidget(self.sales_analysis_btn_clientes)
+        clientes_chart_band.addWidget(self.sales_print_btn_clientes)
+        clientes_chart_band.addWidget(self.sales_pdf_btn_clientes)
+        clientes_chart_band.addWidget(self.sales_excel_btn_clientes)
+        clientes_chart_band.addWidget(self.sales_tools_btn_clientes)
+
+        clientes_layout.addLayout(clientes_filters_bottom)
+
+        clientes_actions_band = QHBoxLayout()
+        clientes_actions_band.setContentsMargins(0, 0, 0, 0)
+        clientes_actions_band.setSpacing(8)
+        clientes_actions_band.addWidget(clientes_chart_actions_widget)
+        clientes_actions_band.addStretch(1)
+        clientes_layout.addLayout(clientes_actions_band)
+
+        clientes_separator_line = QFrame()
+        clientes_separator_line.setFrameShape(QFrame.Shape.HLine)
+        clientes_separator_line.setFrameShadow(QFrame.Shadow.Plain)
+        clientes_separator_line.setStyleSheet("color: #D8E0EC; background: #D8E0EC;")
+        clientes_separator_line.setFixedHeight(1)
+        clientes_layout.addWidget(clientes_separator_line)
+
+        self.group_header_clientes = QTableWidget(1, 12)
+        self.group_header_clientes.setObjectName("salesGroupHeaderClientes")
+        self.group_header_clientes.setFixedHeight(36)
+        self.group_header_clientes.horizontalHeader().setVisible(False)
+        self.group_header_clientes.verticalHeader().setVisible(False)
+        self.group_header_clientes.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.group_header_clientes.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.group_header_clientes.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.group_header_clientes.setShowGrid(False)
+        self.group_header_clientes.verticalHeader().setDefaultSectionSize(34)
+        self.group_header_clientes.setRowHeight(0, 34)
+        self.group_header_clientes.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.group_header_clientes.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.group_header_clientes.viewport().setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.group_header_clientes.setStyleSheet(
+            """
+            QTableWidget#salesGroupHeaderClientes {
+                border: none;
+                background: transparent;
+                selection-background-color: transparent;
+            }
+            QTableWidget#salesGroupHeaderClientes::item,
+            QTableWidget#salesGroupHeaderClientes::item:hover,
+            QTableWidget#salesGroupHeaderClientes::item:selected,
+            QTableWidget#salesGroupHeaderClientes::item:focus {
+                border: none;
+                background: transparent;
+                outline: none;
+            }
+            """
+        )
+
+        clientes_layout.addWidget(self.group_header_clientes)
+
+        self.sales_table_clientes = QTableWidget(0, 12)
+        self.sales_table_clientes.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.sales_table_clientes.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.sales_table_clientes.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.sales_table_clientes.verticalHeader().setVisible(False)
+        self.sales_table_clientes.setSortingEnabled(True)
+        self.sales_table_clientes.setHorizontalHeaderLabels(
+            [
+                "Cod.",
+                "Producto",
+                "Kilos",
+                "S/C",
+                "Ventas",
+                "Kilos",
+                "S/C",
+                "Ventas",
+                "Δ kg",
+                "Δ kg %",
+                "Δ €",
+                "Δ € %",
+            ]
+        )
+        clientes_header = self.sales_table_clientes.horizontalHeader()
+        clientes_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        clientes_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        for idx in range(2, 12):
+            clientes_header.setSectionResizeMode(idx, QHeaderView.ResizeMode.Fixed)
+        clientes_header.sectionResized.connect(self._sync_aux_column_width_clientes)
+        clientes_layout.addWidget(self.sales_table_clientes, 1)
+
+        self.totals_table_clientes = QTableWidget(1, 12)
+        self.totals_table_clientes.setObjectName("salesTotalsTableClientes")
+        self.totals_table_clientes.horizontalHeader().setVisible(False)
+        self.totals_table_clientes.verticalHeader().setVisible(False)
+        self.totals_table_clientes.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.totals_table_clientes.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.totals_table_clientes.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.totals_table_clientes.setFrameShape(QTableWidget.Shape.NoFrame)
+        self.totals_table_clientes.setFixedHeight(36)
+        self.totals_table_clientes.verticalHeader().setDefaultSectionSize(36)
+        self.totals_table_clientes.setRowHeight(0, 36)
+        self.totals_table_clientes.setShowGrid(True)
+        self.totals_table_clientes.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.totals_table_clientes.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.totals_table_clientes.setStyleSheet(
+            """
+            QTableWidget#salesTotalsTableClientes {
+                border: 1px solid #C9D1DC;
+                border-radius: 0;
+                background: #FFFFFF;
+                gridline-color: #C9D1DC;
+                selection-background-color: transparent;
+            }
+            QTableWidget#salesTotalsTableClientes::viewport {
+                border: none;
+                border-radius: 0;
+                background: #FFFFFF;
+            }
+            QTableWidget#salesTotalsTableClientes::item,
+            QTableWidget#salesTotalsTableClientes::item:hover,
+            QTableWidget#salesTotalsTableClientes::item:selected,
+            QTableWidget#salesTotalsTableClientes::item:focus {
+                border: none;
+                background: #FFFFFF;
+                outline: none;
+                padding: 2px 6px;
+            }
+            QTableWidget#salesTotalsTableClientes::item:selected:!active {
+                background: #FFFFFF;
+            }
+            """
+        )
+        self.totals_table_clientes.viewport().setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        clientes_layout.addWidget(self.totals_table_clientes)
 
         layout = QVBoxLayout(ireks_tab)
         layout.setSpacing(4)
@@ -2090,7 +2520,10 @@ class SalesPage(QWidget):
         self.sales_table.horizontalScrollBar().valueChanged.connect(self.totals_table.horizontalScrollBar().setValue)
         self.sales_table_igsa.horizontalScrollBar().valueChanged.connect(self.group_header_igsa.horizontalScrollBar().setValue)
         self.sales_table_igsa.horizontalScrollBar().valueChanged.connect(self.totals_table_igsa.horizontalScrollBar().setValue)
+        self.sales_table_clientes.horizontalScrollBar().valueChanged.connect(self.group_header_clientes.horizontalScrollBar().setValue)
+        self.sales_table_clientes.horizontalScrollBar().valueChanged.connect(self.totals_table_clientes.horizontalScrollBar().setValue)
         self._apply_column_widths_igsa()
+        self._apply_column_widths_clientes()
 
     def _export_sales_excel(self) -> None:
         state = self._sales_export_state()
@@ -2176,6 +2609,24 @@ class SalesPage(QWidget):
                 "subfamilia_id": self._current_subfamily_id_igsa(),
                 "customer_groupable": False,
             }
+        if tab_index == 2:
+            year = self._current_year_clientes()
+            if year <= 0:
+                return None
+            return {
+                "source_key": "clientes",
+                "source_label": "CLIENTES",
+                "year": year,
+                "month": self._current_month_clientes(),
+                "acumulado": bool(self.acumulado_check_clientes.isChecked()),
+                "cliente_id": self._current_client_id_clientes(),
+                "cliente_texto": self._current_client_name_clientes() if self._current_client_id_clientes() else "",
+                "producto_texto": self._current_product_text_clientes(),
+                "fabricante_id": self._current_manufacturer_id_clientes(),
+                "familia_id": self._current_family_id_clientes(),
+                "subfamilia_id": self._current_subfamily_id_clientes(),
+                "customer_groupable": False,
+            }
         year = self._current_year()
         if year <= 0:
             return None
@@ -2211,7 +2662,7 @@ class SalesPage(QWidget):
             f"Ordenar por: {self._sales_export_sort_label(str(options['sort_by']))}",
             f"Dirección: {'Descendente' if str(options['direction']) == 'desc' else 'Ascendente'}",
         ]
-        if state["source_key"] == "ireks":
+        if state["source_key"] in {"ireks", "clientes"}:
             cliente = str(state.get("cliente_texto") or "").strip()
             if cliente:
                 parts.append(f"Cliente: {cliente}")
@@ -2284,12 +2735,21 @@ class SalesPage(QWidget):
                 familia_id=str(state["familia_id"] or ""),
                 subfamilia_id=str(state["subfamilia_id"] or ""),
             )
+        if source_key == "clientes":
+            return self.sales_summary_service.listar_resumen_anual_clientes(
+                year=year,
+                cliente_id=str(state["cliente_id"] or ""),
+                producto_texto=str(state["producto_texto"] or ""),
+                fabricante_id=str(state["fabricante_id"] or ""),
+                familia_id=str(state["familia_id"] or ""),
+                subfamilia_id=str(state["subfamilia_id"] or ""),
+            )
         return self.sales_summary_service.listar_resumen_anual(
             year=year,
             month=month,
             acumulado=acumulado,
             cliente_id=str(state["cliente_id"] or ""),
-            cliente_texto="",
+            cliente_texto=str(state["cliente_texto"] or ""),
             articulo_id="",
             producto_texto=str(state["producto_texto"] or ""),
             fabricante_id=str(state["fabricante_id"] or ""),
@@ -2329,6 +2789,11 @@ class SalesPage(QWidget):
             families = self.sales_summary_service.list_filter_families_igsa("")
             subfamilies = self.sales_summary_service.list_filter_subfamilies_igsa("")
             clients = []
+        elif source_key == "clientes":
+            manufacturers = self.sales_summary_service.list_filter_manufacturers()
+            families = self.sales_summary_service.list_filter_families("")
+            subfamilies = self.sales_summary_service.list_filter_subfamilies("")
+            clients = self.sales_summary_service.list_filter_clients_indirect()
         else:
             manufacturers = self.sales_summary_service.list_filter_manufacturers()
             families = self.sales_summary_service.list_filter_families("")
@@ -3725,6 +4190,365 @@ class SalesPage(QWidget):
             font.setStretch(QFont.Stretch.Condensed)
             item.setFont(font)
             self.totals_table_igsa.setItem(0, col, item)
+
+    def _current_year_clientes(self) -> int:
+        return int(self.year_filter_clientes.currentData() or 0)
+
+    def _current_month_clientes(self) -> int:
+        return int(self.month_filter_clientes.currentData() or 0)
+
+    def _current_client_id_clientes(self) -> str:
+        return str(self.client_filter_clientes.currentData() or "").strip()
+
+    def _current_client_name_clientes(self) -> str:
+        label = str(self.client_filter_clientes.currentText() or "").strip()
+        if not label:
+            return "Todos los clientes"
+        if label.lower() == "todos":
+            return "Todos los clientes"
+        if label.endswith(")") and " (" in label:
+            trimmed = label.rsplit(" (", 1)[0].strip()
+            return trimmed or label
+        return label
+
+    def _current_product_text_clientes(self) -> str:
+        return str(self.product_filter_clientes.text() or "").strip()
+
+    def _current_manufacturer_id_clientes(self) -> str:
+        return str(self.manufacturer_filter_clientes.currentData() or "").strip()
+
+    def _current_family_id_clientes(self) -> str:
+        return str(self.family_filter_clientes.currentData() or "").strip()
+
+    def _current_subfamily_id_clientes(self) -> str:
+        return str(self.subfamily_filter_clientes.currentData() or "").strip()
+
+    def _on_manufacturer_changed_clientes(self) -> None:
+        if self._building_clientes:
+            return
+        self.family_filter_clientes.blockSignals(True)
+        self.family_filter_clientes.setCurrentIndex(0 if self.family_filter_clientes.count() else -1)
+        self.family_filter_clientes.blockSignals(False)
+        self.subfamily_filter_clientes.blockSignals(True)
+        self.subfamily_filter_clientes.setCurrentIndex(0 if self.subfamily_filter_clientes.count() else -1)
+        self.subfamily_filter_clientes.blockSignals(False)
+        self.product_filter_clientes.blockSignals(True)
+        self.product_filter_clientes.clear()
+        self.product_filter_clientes.blockSignals(False)
+        self.reload_clientes()
+
+    def _on_family_changed_clientes(self) -> None:
+        if self._building_clientes:
+            return
+        self.subfamily_filter_clientes.blockSignals(True)
+        self.subfamily_filter_clientes.setCurrentIndex(0 if self.subfamily_filter_clientes.count() else -1)
+        self.subfamily_filter_clientes.blockSignals(False)
+        self.product_filter_clientes.blockSignals(True)
+        self.product_filter_clientes.clear()
+        self.product_filter_clientes.blockSignals(False)
+        self.reload_clientes()
+
+    def _schedule_product_reload_clientes(self) -> None:
+        if self._building_clientes:
+            return
+        self._product_filter_timer_clientes.start(250)
+
+    def reload_clientes(self) -> None:
+        if self._building_clientes:
+            return
+        self._building_clientes = True
+        try:
+            self._reload_filters_clientes()
+            year = self._current_year_clientes()
+            if year <= 0:
+                self.sales_table_clientes.setRowCount(0)
+                self._fill_group_headers_clientes(date.today().year)
+                self._fill_totals_row_clientes(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+                return
+            rows = self.sales_summary_service.listar_resumen_anual_clientes(
+                year=year,
+                month=self._current_month_clientes(),
+                acumulado=bool(self.acumulado_check_clientes.isChecked()),
+                cliente_id=self._current_client_id_clientes(),
+                producto_texto=self._current_product_text_clientes(),
+                fabricante_id=self._current_manufacturer_id_clientes(),
+                familia_id=self._current_family_id_clientes(),
+                subfamilia_id=self._current_subfamily_id_clientes(),
+            )
+            self._fill_sales_clientes(rows, year)
+        finally:
+            self._building_clientes = False
+
+    def _reload_filters_clientes(self) -> None:
+        current_year = self._current_year_clientes()
+        current_client_id = self._current_client_id_clientes()
+        current_manufacturer_id = self._current_manufacturer_id_clientes()
+        current_family_id = self._current_family_id_clientes()
+        current_subfamily_id = self._current_subfamily_id_clientes()
+
+        years = self.sales_summary_service.list_years_clientes()
+        if not years:
+            years = [date.today().year]
+        clients = self.sales_summary_service.list_filter_clients_indirect()
+        manufacturers = self.sales_summary_service.list_filter_manufacturers()
+        families = self.sales_summary_service.list_filter_families(current_manufacturer_id)
+        family_ids = {str(getattr(row, "articulo_familia_id", "") or "").strip() for row in families}
+        effective_family_id = current_family_id if current_family_id in family_ids else ""
+        subfamilies = self.sales_summary_service.list_filter_subfamilies(effective_family_id)
+        subfamily_ids = {str(getattr(row, "articulo_subfamilia_id", "") or "").strip() for row in subfamilies}
+        effective_subfamily_id = current_subfamily_id if current_subfamily_id in subfamily_ids else ""
+
+        self.year_filter_clientes.blockSignals(True)
+        self.year_filter_clientes.clear()
+        for year in years:
+            self.year_filter_clientes.addItem(str(year), int(year))
+        idx = self.year_filter_clientes.findData(current_year if current_year else years[0])
+        self.year_filter_clientes.setCurrentIndex(idx if idx >= 0 else 0)
+        self.year_filter_clientes.blockSignals(False)
+
+        self.month_filter_clientes.blockSignals(True)
+        self.month_filter_clientes.clear()
+        self.month_filter_clientes.addItem("Todos", 0)
+        for month, label in enumerate(MONTH_NAMES, start=1):
+            self.month_filter_clientes.addItem(label, month)
+        self.month_filter_clientes.setCurrentIndex(0)
+        self.month_filter_clientes.blockSignals(False)
+
+        self.client_filter_clientes.blockSignals(True)
+        self.client_filter_clientes.clear()
+        self.client_filter_clientes.addItem("Todos", "")
+        for client in clients:
+            cliente_id = str(getattr(client, "cliente_id", "") or "").strip()
+            if not cliente_id:
+                continue
+            label = str(getattr(client, "cliente_nombre_comercial", "") or "").strip() or str(
+                getattr(client, "cliente_nombre_fiscal", "") or ""
+            ).strip()
+            tipo = str(getattr(client, "cliente_tipo", "") or "").strip()
+            display = f"{label or cliente_id} ({tipo})" if tipo else label or cliente_id
+            self.client_filter_clientes.addItem(display, cliente_id)
+        c_idx = self.client_filter_clientes.findData(current_client_id)
+        self.client_filter_clientes.setCurrentIndex(c_idx if c_idx >= 0 else 0)
+        self.client_filter_clientes.blockSignals(False)
+
+        self.manufacturer_filter_clientes.blockSignals(True)
+        self.manufacturer_filter_clientes.clear()
+        self.manufacturer_filter_clientes.addItem("Todos", "")
+        for manufacturer in manufacturers:
+            manufacturer_id = str(getattr(manufacturer, "fabricante_id", "") or "").strip()
+            if not manufacturer_id:
+                continue
+            label = str(getattr(manufacturer, "fabricante_nombre", "") or "").strip() or manufacturer_id
+            self.manufacturer_filter_clientes.addItem(label, manufacturer_id)
+        mfg_idx = self.manufacturer_filter_clientes.findData(current_manufacturer_id)
+        self.manufacturer_filter_clientes.setCurrentIndex(mfg_idx if mfg_idx >= 0 else 0)
+        self.manufacturer_filter_clientes.blockSignals(False)
+
+        self.family_filter_clientes.blockSignals(True)
+        self.family_filter_clientes.clear()
+        self.family_filter_clientes.addItem("Todas", "")
+        for family in families:
+            family_id = str(getattr(family, "articulo_familia_id", "") or "").strip()
+            if not family_id:
+                continue
+            label = str(getattr(family, "articulo_familia_nombre", "") or "").strip() or family_id
+            self.family_filter_clientes.addItem(label, family_id)
+        f_idx = self.family_filter_clientes.findData(effective_family_id)
+        self.family_filter_clientes.setCurrentIndex(f_idx if f_idx >= 0 else 0)
+        self.family_filter_clientes.blockSignals(False)
+
+        self.subfamily_filter_clientes.blockSignals(True)
+        self.subfamily_filter_clientes.clear()
+        self.subfamily_filter_clientes.addItem("Todas", "")
+        for subfamily in subfamilies:
+            subfamily_id = str(getattr(subfamily, "articulo_subfamilia_id", "") or "").strip()
+            if not subfamily_id:
+                continue
+            label = str(getattr(subfamily, "articulo_subfamilia_nombre", "") or "").strip() or subfamily_id
+            self.subfamily_filter_clientes.addItem(label, subfamily_id)
+        s_idx = self.subfamily_filter_clientes.findData(effective_subfamily_id)
+        self.subfamily_filter_clientes.setCurrentIndex(s_idx if s_idx >= 0 else 0)
+        self.subfamily_filter_clientes.blockSignals(False)
+
+    def _sync_aux_column_width_clientes(self, logical_index: int, _old_size: int, new_size: int) -> None:
+        self.group_header_clientes.setColumnWidth(logical_index, new_size)
+        self.totals_table_clientes.setColumnWidth(logical_index, new_size)
+
+    def _set_group_item_clientes(self, column: int, text: str, color: str, span: int = 1) -> None:
+        if span > 1:
+            self.group_header_clientes.setSpan(0, column, 1, span)
+        self.group_header_clientes.setCellWidget(0, column, self._make_band_label(text, color))
+
+    def _fill_group_headers_clientes(self, year: int) -> None:
+        self.group_header_clientes.clearSpans()
+        self.group_header_clientes.clearContents()
+        for col in range(12):
+            self.group_header_clientes.removeCellWidget(0, col)
+            label = QLabel("")
+            label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            if col in {0, 1}:
+                label.setStyleSheet("background-color: transparent; border: none; padding: 0;")
+            else:
+                label.setStyleSheet("background-color: #F3F6FA; border: 1px solid #000000; border-radius: 0; padding: 0;")
+            self.group_header_clientes.setCellWidget(0, col, label)
+        self._set_group_item_clientes(2, str(year - 1), "#3E5064", 3)
+        self._set_group_item_clientes(5, str(year), "#0F766E", 3)
+        self._set_group_item_clientes(8, "Diferencias", "#111827", 4)
+
+    def _fill_sales_clientes(self, rows: list[SalesComparisonRow], year: int) -> None:
+        self._fill_group_headers_clientes(year)
+        self.sales_table_clientes.setSortingEnabled(False)
+        self.sales_table_clientes.setRowCount(len(rows))
+        total_prev_kg = 0.0
+        total_prev_sc = 0.0
+        total_curr_kg = 0.0
+        total_curr_sc = 0.0
+        total_prev_sales = 0.0
+        total_curr_sales = 0.0
+
+        for idx, row in enumerate(rows):
+            total_prev_kg += row.kilos_prev
+            total_prev_sc += row.sc_prev
+            total_curr_kg += row.kilos_curr
+            total_curr_sc += row.sc_curr
+            total_prev_sales += row.ventas_prev
+            total_curr_sales += row.ventas_curr
+
+            values = [
+                row.codigo,
+                row.nombre,
+                (self._fmt_num(row.kilos_prev), row.kilos_prev),
+                (self._fmt_num(row.sc_prev), row.sc_prev),
+                (self._fmt_money(row.ventas_prev), row.ventas_prev),
+                (self._fmt_num(row.kilos_curr), row.kilos_curr),
+                (self._fmt_num(row.sc_curr), row.sc_curr),
+                (self._fmt_money(row.ventas_curr), row.ventas_curr),
+                (self._fmt_num(row.delta_kg), row.delta_kg),
+                (self._fmt_pct(row.delta_kg_pct), row.delta_kg_pct),
+                (self._fmt_money(row.delta_ventas), row.delta_ventas),
+                (self._fmt_pct(row.delta_ventas_pct), row.delta_ventas_pct),
+            ]
+            for col, value in enumerate(values):
+                if isinstance(value, tuple):
+                    item = NumericTableWidgetItem(value[0], value[1])
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                    item.setToolTip(value[0])
+                    if col in {8, 9, 10, 11}:
+                        if value[1] > 0:
+                            item.setForeground(QColor("#067647"))
+                        elif value[1] < 0:
+                            item.setForeground(QColor("#B42318"))
+                else:
+                    item = QTableWidgetItem(str(value or ""))
+                    item.setToolTip(str(value or ""))
+                    if col == 0:
+                        item.setData(Qt.ItemDataRole.UserRole, row.articulo_id)
+                    elif col == 1:
+                        item.setData(Qt.ItemDataRole.UserRole, row.nombre)
+                self.sales_table_clientes.setItem(idx, col, item)
+
+        self.sales_table_clientes.setSortingEnabled(True)
+        self._fill_totals_row_clientes(total_prev_kg, total_prev_sc, total_prev_sales, total_curr_kg, total_curr_sc, total_curr_sales)
+
+    def _fill_totals_row_clientes(
+        self,
+        prev_kg: float,
+        prev_sc: float,
+        prev_sales: float,
+        curr_kg: float,
+        curr_sc: float,
+        curr_sales: float,
+    ) -> None:
+        self.totals_table_clientes.clearSpans()
+        self.totals_table_clientes.clearContents()
+        for col in range(12):
+            self.totals_table_clientes.removeCellWidget(0, col)
+
+        prev_total_kg = prev_kg + prev_sc
+        curr_total_kg = curr_kg + curr_sc
+        delta_kg = curr_total_kg - prev_total_kg
+        delta_sales = curr_sales - prev_sales
+        delta_kg_pct = 0.0 if abs(prev_total_kg) <= 1e-9 else delta_kg / prev_total_kg * 100.0
+        delta_sales_pct = 0.0 if abs(prev_sales) <= 1e-9 else delta_sales / prev_sales * 100.0
+        self.totals_table_clientes.setSpan(0, 0, 1, 2)
+        values = {
+            2: (self._fmt_num(prev_kg), float(prev_kg or 0.0)),
+            3: (self._fmt_num(prev_sc), float(prev_sc or 0.0)),
+            4: (self._fmt_money(prev_sales), float(prev_sales or 0.0)),
+            5: (self._fmt_num(curr_kg), float(curr_kg or 0.0)),
+            6: (self._fmt_num(curr_sc), float(curr_sc or 0.0)),
+            7: (self._fmt_money(curr_sales), float(curr_sales or 0.0)),
+            8: (self._fmt_num(delta_kg), float(delta_kg or 0.0)),
+            9: (self._fmt_pct(delta_kg_pct), float(delta_kg_pct or 0.0)),
+            10: (self._fmt_money(delta_sales), float(delta_sales or 0.0)),
+            11: (self._fmt_pct(delta_sales_pct), float(delta_sales_pct or 0.0)),
+        }
+        total_label = QLabel("TOTAL")
+        total_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        total_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        total_font = QFont()
+        total_font.setBold(True)
+        total_font.setPointSize(12)
+        total_font.setFamilies(["Arial Narrow", "Bahnschrift Condensed", "Roboto Condensed", "Segoe UI", "Arial"])
+        total_font.setStretch(QFont.Stretch.Condensed)
+        total_label.setFont(total_font)
+        total_label.setStyleSheet(
+            "background-color: #FFFFFF; color: #111827; border: none; border-radius: 0; padding: 2px 6px;"
+        )
+        self.totals_table_clientes.setCellWidget(0, 0, total_label)
+        self.totals_table_clientes.setCurrentCell(-1, -1)
+        self.totals_table_clientes.clearSelection()
+        self.totals_table_clientes.clearFocus()
+        self.totals_table_clientes.viewport().clearFocus()
+
+        for col, (value_text, numeric_value) in values.items():
+            item = QTableWidgetItem(value_text)
+            item.setBackground(QColor("#FFFFFF"))
+            metric = float(numeric_value or 0.0)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            item.setToolTip(value_text)
+            if col in {8, 9, 10, 11}:
+                if metric > 0:
+                    item.setForeground(QColor("#067647"))
+                elif metric < 0:
+                    item.setForeground(QColor("#B42318"))
+                else:
+                    item.setForeground(QColor("#111827"))
+            else:
+                item.setForeground(QColor("#111827"))
+            font = item.font()
+            font.setBold(True)
+            font.setPointSize(12)
+            font.setFamilies(["Arial Narrow", "Bahnschrift Condensed", "Roboto Condensed", "Segoe UI", "Arial"])
+            font.setStretch(QFont.Stretch.Condensed)
+            item.setFont(font)
+            self.totals_table_clientes.setItem(0, col, item)
+
+    def _apply_column_widths_clientes(self) -> None:
+        widths = {
+            0: 84,
+            2: 95,
+            3: 78,
+            4: 118,
+            5: 95,
+            6: 78,
+            7: 118,
+            8: 95,
+            9: 88,
+            10: 118,
+            11: 84,
+        }
+        for col, width in widths.items():
+            self.sales_table_clientes.setColumnWidth(col, width)
+            if col in {0, 1}:
+                self.group_header_clientes.setColumnWidth(col, self.sales_table_clientes.columnWidth(col))
+            else:
+                self.group_header_clientes.setColumnWidth(col, width)
+            self.totals_table_clientes.setColumnWidth(col, width)
+        self.group_header_clientes.setColumnWidth(0, self.sales_table_clientes.columnWidth(0))
+        self.group_header_clientes.setColumnWidth(1, self.sales_table_clientes.columnWidth(1))
+        self.totals_table_clientes.setColumnWidth(0, self.sales_table_clientes.columnWidth(0))
+        self.totals_table_clientes.setColumnWidth(1, self.sales_table_clientes.columnWidth(1))
 
     def _apply_column_widths(self) -> None:
         widths = {
