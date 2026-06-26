@@ -1920,7 +1920,7 @@ class SalesPage(QWidget):
             }
             """
         )
-        button_height = self.client_filter_clientes_clear_btn.sizeHint().height()
+        button_height = 32
         self.client_filter_clientes_clear_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.client_filter_clientes_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.client_filter_clientes_clear_btn.setFixedHeight(button_height)
