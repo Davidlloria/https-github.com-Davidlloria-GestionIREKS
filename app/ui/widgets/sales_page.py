@@ -1897,7 +1897,6 @@ class SalesPage(QWidget):
         self.product_filter_clientes.setMinimumWidth(300)
         clientes_filters_bottom.addWidget(self.product_filter_clientes, 1)
         button_height = self.product_filter_clientes.sizeHint().height()
-        self.client_filter_clientes_btn.setFixedHeight(button_height)
         self.client_filter_clientes_clear_btn.setFixedHeight(button_height)
         self.client_filter_clientes_clear_btn.setStyleSheet(
             """
@@ -1922,6 +1921,7 @@ class SalesPage(QWidget):
             }
             """
         )
+        self.client_filter_clientes_btn.setFixedHeight(self.client_filter_clientes_clear_btn.sizeHint().height())
 
         clientes_action_button_width = 110
         clientes_action_button_height = 36
