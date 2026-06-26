@@ -1888,6 +1888,7 @@ class SalesPage(QWidget):
         self.client_filter_clientes_clear_btn.clicked.connect(self._clear_clientes_client_selection)
         self.client_filter_clientes_clear_btn.setEnabled(False)
         client_selector_layout.addWidget(self.client_filter_clientes_clear_btn)
+        self.client_selector_widget_clientes = client_selector_widget
         clientes_filters_bottom.addWidget(client_selector_widget, 1)
 
         clientes_filters_bottom.addWidget(QLabel("Producto"))
@@ -1924,6 +1925,8 @@ class SalesPage(QWidget):
         self.client_filter_clientes_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.client_filter_clientes_clear_btn.setFixedHeight(button_height)
         self.client_filter_clientes_btn.setFixedHeight(button_height)
+        self.client_selector_widget_clientes.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.client_selector_widget_clientes.setFixedHeight(button_height)
 
         clientes_action_button_width = 110
         clientes_action_button_height = 36
