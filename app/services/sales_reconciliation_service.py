@@ -455,11 +455,7 @@ class SalesReconciliationService:
                 for row in session.exec(select(Cliente)).all()
                 if self._is_indirect_client(row)
             }
-            products = {
-                str(row.articulo_id or "").strip(): row
-                for row in session.exec(select(IngredienteIreks)).all()
-                if str(row.articulo_id or "").strip()
-            }
+            product_refs = self._build_clientes_product_reference_lookup(session)
 
             lote = VentaClientesImportLote(
                 lote_id=str(uuid4()),
@@ -481,12 +477,12 @@ class SalesReconciliationService:
                 if cliente is None:
                     skipped += 1
                     continue
-                product = products.get(item.articulo_id)
-                if product is None:
+                product_id = self._resolve_clientes_product_id(item.articulo_id, product_refs)
+                if not product_id:
                     skipped += 1
                     continue
 
-                precio_kg = self._resolve_tarifa_precio_kg(session, item.articulo_id, year)
+                precio_kg = self._resolve_tarifa_precio_kg(session, product_id, year)
                 if precio_kg <= 0:
                     warnings_count += 1
                 kg_calc = self._to_float(item.envase) * self._to_float(item.unidades)
@@ -501,7 +497,7 @@ class SalesReconciliationService:
                     cliente_id=item.cliente_id,
                     anio=year,
                     articulo_codigo_origen=item.articulo_id,
-                    articulo_id=item.articulo_id,
+                    articulo_id=product_id,
                     articulo_descripcion_origen=item.articulo_descripcion,
                     envase=float(item.envase or 0.0),
                     unidades=float(item.unidades or 0.0),
@@ -514,6 +510,7 @@ class SalesReconciliationService:
                             "cliente_codigo": item.cliente_codigo,
                             "cliente_nombre": item.cliente_nombre,
                             "articulo_id": item.articulo_id,
+                            "articulo_id_interno": product_id,
                             "articulo_descripcion": item.articulo_descripcion,
                             "envase": item.envase,
                             "unidades": item.unidades,
@@ -767,6 +764,25 @@ class SalesReconciliationService:
             precio = float(getattr(tarifa, "precio_fabricante", 0.0) or 0.0)
         return precio
 
+    def _build_clientes_product_reference_lookup(self, session: Session) -> dict[str, str]:
+        lookup: dict[str, str] = {}
+        rows = list(session.exec(select(ReferenciaDistribuidor)))
+        for row in rows:
+            articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+            reference = str(getattr(row, "articulo_referencia_distribuidor", "") or "").strip()
+            if not articulo_id or not reference:
+                continue
+            for candidate in self._code_candidates(reference):
+                lookup[candidate] = articulo_id
+        return lookup
+
+    def _resolve_clientes_product_id(self, articulo_code: object, lookup: dict[str, str]) -> str:
+        for candidate in self._code_candidates(articulo_code):
+            product_id = lookup.get(candidate, "")
+            if product_id:
+                return product_id
+        return ""
+
     def _is_indirect_client(self, client: Cliente) -> bool:
         tipo = str(getattr(client, "cliente_tipo", "") or "").strip().lower()
         return tipo not in SALES_CLIENT_EXCLUDED_TYPES
@@ -840,6 +856,18 @@ class SalesReconciliationService:
         if re.fullmatch(r"\d+(\.0+)?", text):
             return str(int(float(text)))
         return text
+
+    def _code_candidates(self, code: object) -> list[str]:
+        base = self._normalize_code(code)
+        clean = re.sub(r"\s+", "", str(base or "").upper())
+        if not clean:
+            return []
+        out = [clean]
+        if clean.startswith("D") and clean[1:].isdigit():
+            out.append(clean[1:])
+        elif clean.isdigit():
+            out.append(f"D{clean}")
+        return list(dict.fromkeys(out))
 
     def _is_total_row(self, code: str) -> bool:
         return self._normalize_code(code) == "TOTAL"
