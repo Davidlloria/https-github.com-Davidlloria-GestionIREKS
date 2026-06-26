@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 import math
 from pathlib import Path
+import unicodedata
 
 from PySide6.QtCore import QTimer, Qt, QSize
 from PySide6.QtGui import QColor, QCursor, QFont, QIcon, QTextDocument, QBrush
@@ -905,6 +906,136 @@ class SalesExcelExportDialog(QDialog):
 
 
 @dataclass(frozen=True)
+class SalesClientSelectionRow:
+    cliente_id: str
+    cliente_nombre: str
+    cliente_tipo: str
+    search_text: str
+
+
+class SalesClientSelectDialog(QDialog):
+    def __init__(
+        self,
+        clients: list[SalesClientSelectionRow],
+        *,
+        selected_client_id: str = "",
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Seleccionar cliente")
+        self.setModal(True)
+        self.resize(760, 560)
+        self.setMinimumSize(680, 480)
+        self._clients = clients
+        self._selected_client_id = str(selected_client_id or "").strip()
+        self._selected_client_name = ""
+        self._build_ui()
+        self._refresh_table()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        title = QLabel("Seleccionar cliente")
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        layout.addWidget(title)
+
+        hint = QLabel("Escribe una ocurrencia para filtrar la lista. Haz doble clic sobre un cliente para seleccionarlo.")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #6B7280;")
+        layout.addWidget(hint)
+
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("Filtrar por nombre, código o fiscal...")
+        self.search_edit.textChanged.connect(self._refresh_table)
+        layout.addWidget(self.search_edit)
+
+        self.clients_table = QTableWidget(0, 3)
+        self.clients_table.setHorizontalHeaderLabels(["Cliente", "Código", "Tipo"])
+        self.clients_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.clients_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.clients_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.clients_table.verticalHeader().setVisible(False)
+        self.clients_table.setAlternatingRowColors(True)
+        self.clients_table.setSortingEnabled(False)
+        self.clients_table.cellDoubleClicked.connect(self._accept_row)
+        header = self.clients_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        self.clients_table.setColumnWidth(1, 130)
+        self.clients_table.setColumnWidth(2, 110)
+        layout.addWidget(self.clients_table, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Seleccionar")
+        buttons.accepted.connect(self._accept_selected)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _normalize(self, text: str) -> str:
+        cleaned = unicodedata.normalize("NFKD", str(text or ""))
+        return "".join(ch for ch in cleaned if not unicodedata.combining(ch)).casefold().strip()
+
+    def _refresh_table(self) -> None:
+        needle = self._normalize(self.search_edit.text())
+        filtered: list[SalesClientSelectionRow] = []
+        for client in self._clients:
+            if not needle or needle in client.search_text:
+                filtered.append(client)
+
+        self.clients_table.setRowCount(len(filtered))
+        match_row = -1
+        for row_idx, client in enumerate(filtered):
+            name_item = QTableWidgetItem(client.cliente_nombre)
+            code_item = QTableWidgetItem(client.cliente_id)
+            type_item = QTableWidgetItem(client.cliente_tipo or "")
+            name_item.setToolTip(client.cliente_nombre)
+            code_item.setToolTip(client.cliente_id)
+            type_item.setToolTip(client.cliente_tipo or "")
+            name_item.setData(Qt.ItemDataRole.UserRole, client.cliente_id)
+            name_item.setData(Qt.ItemDataRole.UserRole + 1, client.cliente_nombre)
+            for item in (name_item, code_item, type_item):
+                item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            self.clients_table.setItem(row_idx, 0, name_item)
+            self.clients_table.setItem(row_idx, 1, code_item)
+            self.clients_table.setItem(row_idx, 2, type_item)
+            if client.cliente_id == self._selected_client_id:
+                match_row = row_idx
+
+        if match_row >= 0:
+            self.clients_table.selectRow(match_row)
+            self.clients_table.scrollToItem(self.clients_table.item(match_row, 0))
+        self.clients_table.resizeRowsToContents()
+
+    def _accept_row(self, row: int, _column: int) -> None:
+        item = self.clients_table.item(row, 0)
+        if item is None:
+            return
+        self._selected_client_id = str(item.data(Qt.ItemDataRole.UserRole) or "").strip()
+        self._selected_client_name = str(item.data(Qt.ItemDataRole.UserRole + 1) or item.text() or "").strip()
+        if not self._selected_client_id:
+            return
+        self.accept()
+
+    def _accept_selected(self) -> None:
+        current_row = self.clients_table.currentRow()
+        if current_row < 0:
+            selected_rows = self.clients_table.selectionModel().selectedRows() if self.clients_table.selectionModel() else []
+            if not selected_rows:
+                return
+            current_row = int(selected_rows[0].row())
+        self._accept_row(current_row, 0)
+
+    def selected_client(self) -> tuple[str, str]:
+        return self._selected_client_id, self._selected_client_name
+
+
+@dataclass(frozen=True)
 class SalesToolsHistoryRow:
     created_at: str
     action: str
@@ -1450,6 +1581,8 @@ class SalesPage(QWidget):
         self._building = False
         self._building_igsa = False
         self._building_clientes = False
+        self._clientes_selected_client_id = ""
+        self._clientes_selected_client_name = "Todos los clientes"
         self._product_filter_timer = QTimer(self)
         self._product_filter_timer.setSingleShot(True)
         self._product_filter_timer.timeout.connect(self.reload)
@@ -1748,10 +1881,25 @@ class SalesPage(QWidget):
 
         clientes_filters_bottom = QHBoxLayout()
         clientes_filters_bottom.addWidget(QLabel("Cliente"))
-        self.client_filter_clientes = QComboBox()
-        self.client_filter_clientes.currentIndexChanged.connect(self.reload_clientes)
-        self.client_filter_clientes.setMinimumWidth(260)
-        clientes_filters_bottom.addWidget(self.client_filter_clientes, 1)
+        client_selector_widget = QWidget()
+        client_selector_layout = QHBoxLayout(client_selector_widget)
+        client_selector_layout.setContentsMargins(0, 0, 0, 0)
+        client_selector_layout.setSpacing(6)
+        self.client_filter_clientes_btn = QPushButton()
+        self.client_filter_clientes_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.client_filter_clientes_btn.setMinimumWidth(260)
+        self.client_filter_clientes_btn.setToolTip("Seleccionar cliente")
+        self.client_filter_clientes_btn.clicked.connect(self._open_clientes_client_dialog)
+        self.client_filter_clientes_btn.setText("Todos los clientes")
+        client_selector_layout.addWidget(self.client_filter_clientes_btn, 1)
+        self.client_filter_clientes_clear_btn = QPushButton("Todos")
+        self.client_filter_clientes_clear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.client_filter_clientes_clear_btn.setFixedWidth(72)
+        self.client_filter_clientes_clear_btn.setToolTip("Limpiar cliente seleccionado")
+        self.client_filter_clientes_clear_btn.clicked.connect(self._clear_clientes_client_selection)
+        self.client_filter_clientes_clear_btn.setEnabled(False)
+        client_selector_layout.addWidget(self.client_filter_clientes_clear_btn)
+        clientes_filters_bottom.addWidget(client_selector_widget, 1)
 
         clientes_filters_bottom.addWidget(QLabel("Producto"))
         self.product_filter_clientes = QLineEdit()
@@ -4198,18 +4346,11 @@ class SalesPage(QWidget):
         return int(self.month_filter_clientes.currentData() or 0)
 
     def _current_client_id_clientes(self) -> str:
-        return str(self.client_filter_clientes.currentData() or "").strip()
+        return str(self._clientes_selected_client_id or "").strip()
 
     def _current_client_name_clientes(self) -> str:
-        label = str(self.client_filter_clientes.currentText() or "").strip()
-        if not label:
-            return "Todos los clientes"
-        if label.lower() == "todos":
-            return "Todos los clientes"
-        if label.endswith(")") and " (" in label:
-            trimmed = label.rsplit(" (", 1)[0].strip()
-            return trimmed or label
-        return label
+        label = str(self._clientes_selected_client_name or "").strip()
+        return label or "Todos los clientes"
 
     def _current_product_text_clientes(self) -> str:
         return str(self.product_filter_clientes.text() or "").strip()
@@ -4253,6 +4394,71 @@ class SalesPage(QWidget):
             return
         self._product_filter_timer_clientes.start(250)
 
+    def _set_clientes_client_selection(self, cliente_id: str, cliente_name: str, *, reload: bool = True) -> None:
+        self._clientes_selected_client_id = str(cliente_id or "").strip()
+        self._clientes_selected_client_name = str(cliente_name or "").strip() or "Todos los clientes"
+        if hasattr(self, "client_filter_clientes_btn"):
+            label = self._clientes_selected_client_name if self._clientes_selected_client_id else "Todos los clientes"
+            self.client_filter_clientes_btn.setText(label)
+            self.client_filter_clientes_btn.setToolTip(label)
+        if hasattr(self, "client_filter_clientes_clear_btn"):
+            self.client_filter_clientes_clear_btn.setEnabled(bool(self._clientes_selected_client_id))
+        if reload and not self._building_clientes:
+            self.reload_clientes()
+
+    def _open_clientes_client_dialog(self) -> None:
+        clients = self._build_clientes_selection_rows()
+        dialog = SalesClientSelectDialog(
+            clients,
+            selected_client_id=self._current_client_id_clientes(),
+            parent=self,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        cliente_id, cliente_name = dialog.selected_client()
+        self._set_clientes_client_selection(cliente_id, cliente_name)
+
+    def _clear_clientes_client_selection(self) -> None:
+        self._set_clientes_client_selection("", "Todos los clientes")
+
+    def _build_clientes_selection_rows(self) -> list[SalesClientSelectionRow]:
+        clients = self.sales_summary_service.list_filter_clients_indirect()
+        rows: list[SalesClientSelectionRow] = []
+        for client in clients:
+            cliente_id = str(getattr(client, "cliente_id", "") or "").strip()
+            if not cliente_id:
+                continue
+            cliente_nombre = str(getattr(client, "cliente_nombre_comercial", "") or "").strip() or str(
+                getattr(client, "cliente_nombre_fiscal", "") or ""
+            ).strip()
+            cliente_tipo = str(getattr(client, "cliente_tipo", "") or "").strip()
+            search_text = self._normalize_clientes_search_text(
+                " ".join(
+                    [
+                        cliente_id,
+                        cliente_nombre,
+                        cliente_tipo,
+                        str(getattr(client, "cliente_nombre_fiscal", "") or ""),
+                        str(getattr(client, "cliente_abreviatura", "") or ""),
+                        str(getattr(client, "cliente_codigo", "") or ""),
+                    ]
+                )
+            )
+            rows.append(
+                SalesClientSelectionRow(
+                    cliente_id=cliente_id,
+                    cliente_nombre=cliente_nombre or cliente_id,
+                    cliente_tipo=cliente_tipo,
+                    search_text=search_text,
+                )
+            )
+        rows.sort(key=lambda row: (row.cliente_nombre.casefold(), row.cliente_id.casefold()))
+        return rows
+
+    def _normalize_clientes_search_text(self, text: str) -> str:
+        cleaned = unicodedata.normalize("NFKD", str(text or ""))
+        return "".join(ch for ch in cleaned if not unicodedata.combining(ch)).casefold().strip()
+
     def reload_clientes(self) -> None:
         if self._building_clientes:
             return
@@ -4267,8 +4473,6 @@ class SalesPage(QWidget):
                 return
             rows = self.sales_summary_service.listar_resumen_anual_clientes(
                 year=year,
-                month=self._current_month_clientes(),
-                acumulado=bool(self.acumulado_check_clientes.isChecked()),
                 cliente_id=self._current_client_id_clientes(),
                 producto_texto=self._current_product_text_clientes(),
                 fabricante_id=self._current_manufacturer_id_clientes(),
@@ -4290,6 +4494,14 @@ class SalesPage(QWidget):
         if not years:
             years = [date.today().year]
         clients = self.sales_summary_service.list_filter_clients_indirect()
+        client_ids = {
+            str(getattr(client, "cliente_id", "") or "").strip()
+            for client in clients
+            if str(getattr(client, "cliente_id", "") or "").strip()
+        }
+        if current_client_id and current_client_id not in client_ids:
+            current_client_id = ""
+            self._set_clientes_client_selection("", "Todos los clientes", reload=False)
         manufacturers = self.sales_summary_service.list_filter_manufacturers()
         families = self.sales_summary_service.list_filter_families(current_manufacturer_id)
         family_ids = {str(getattr(row, "articulo_familia_id", "") or "").strip() for row in families}
@@ -4313,23 +4525,6 @@ class SalesPage(QWidget):
             self.month_filter_clientes.addItem(label, month)
         self.month_filter_clientes.setCurrentIndex(0)
         self.month_filter_clientes.blockSignals(False)
-
-        self.client_filter_clientes.blockSignals(True)
-        self.client_filter_clientes.clear()
-        self.client_filter_clientes.addItem("Todos", "")
-        for client in clients:
-            cliente_id = str(getattr(client, "cliente_id", "") or "").strip()
-            if not cliente_id:
-                continue
-            label = str(getattr(client, "cliente_nombre_comercial", "") or "").strip() or str(
-                getattr(client, "cliente_nombre_fiscal", "") or ""
-            ).strip()
-            tipo = str(getattr(client, "cliente_tipo", "") or "").strip()
-            display = f"{label or cliente_id} ({tipo})" if tipo else label or cliente_id
-            self.client_filter_clientes.addItem(display, cliente_id)
-        c_idx = self.client_filter_clientes.findData(current_client_id)
-        self.client_filter_clientes.setCurrentIndex(c_idx if c_idx >= 0 else 0)
-        self.client_filter_clientes.blockSignals(False)
 
         self.manufacturer_filter_clientes.blockSignals(True)
         self.manufacturer_filter_clientes.clear()
@@ -4369,6 +4564,11 @@ class SalesPage(QWidget):
         s_idx = self.subfamily_filter_clientes.findData(effective_subfamily_id)
         self.subfamily_filter_clientes.setCurrentIndex(s_idx if s_idx >= 0 else 0)
         self.subfamily_filter_clientes.blockSignals(False)
+        if hasattr(self, "client_filter_clientes_btn"):
+            self.client_filter_clientes_btn.setText(self._current_client_name_clientes())
+            self.client_filter_clientes_btn.setToolTip(self._current_client_name_clientes())
+        if hasattr(self, "client_filter_clientes_clear_btn"):
+            self.client_filter_clientes_clear_btn.setEnabled(bool(self._current_client_id_clientes()))
 
     def _sync_aux_column_width_clientes(self, logical_index: int, _old_size: int, new_size: int) -> None:
         self.group_header_clientes.setColumnWidth(logical_index, new_size)
