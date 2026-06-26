@@ -1034,18 +1034,56 @@ class SalesToolsHistoryRow:
 
 
 class SalesToolsDialog(QDialog):
-    def __init__(self, *, on_import_completed=None, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        mode: str = "ireks",
+        on_import_completed=None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Herramientas de ventas - IREKS")
+        self._mode = mode if mode in {"ireks", "clientes"} else "ireks"
+        self.setWindowTitle(self._dialog_title())
         self.setModal(True)
         self.resize(980, 620)
         self.setMinimumSize(900, 560)
         self._on_import_completed = on_import_completed
         self._export_service = DbExportService()
         self._import_service = SettingsSalesImportService()
+        self._sales_reconciliation_service = SalesReconciliationService()
         self._history_limit = 40
         self._build_ui()
         self._refresh_history()
+
+    def _dialog_title(self) -> str:
+        if self._mode == "clientes":
+            return "Herramienta de ventas - clientes"
+        return "Herramientas de ventas - IREKS"
+
+    def _subtitle_text(self) -> str:
+        if self._mode == "clientes":
+            return "Acceso rápido a importación e histórico de ventas clientes."
+        return "Acceso rápido a exportación, importación e histórico de IREKS."
+
+    def _export_card_title(self) -> str:
+        if self._mode == "clientes":
+            return "Ventas clientes"
+        return "Ventas IREKS"
+
+    def _export_card_description(self) -> str:
+        if self._mode == "clientes":
+            return "Gestión de ventas clientes."
+        return "Gestiona exportación e importación de ventas IREKS."
+
+    def _history_title(self) -> str:
+        if self._mode == "clientes":
+            return "Histórico clientes"
+        return "Histórico IREKS"
+
+    def _history_description(self) -> str:
+        if self._mode == "clientes":
+            return "Últimas operaciones de importación de ventas clientes."
+        return "Últimas operaciones de exportación e importación."
 
     def _build_ui(self) -> None:
         self.setObjectName("salesToolsDialog")
@@ -1053,12 +1091,12 @@ class SalesToolsDialog(QDialog):
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(12)
 
-        title = QLabel("Herramientas de ventas - IREKS")
+        title = QLabel(self._dialog_title())
         title.setProperty("role", "pageTitle")
         title.setStyleSheet("font-size: 22px; font-weight: 700; color: #14213D;")
         layout.addWidget(title)
 
-        subtitle = QLabel("Acceso rápido a exportación, importación e histórico de IREKS.")
+        subtitle = QLabel(self._subtitle_text())
         subtitle.setWordWrap(True)
         subtitle.setStyleSheet("color: #4B5F7A; font-size: 12px;")
         layout.addWidget(subtitle)
@@ -1076,10 +1114,10 @@ class SalesToolsDialog(QDialog):
 
         export_text = QVBoxLayout()
         export_text.setSpacing(4)
-        export_title = QLabel("Ventas IREKS")
+        export_title = QLabel(self._export_card_title())
         export_title.setStyleSheet("font-size: 22px; font-weight: 700; color: #14213D;")
         export_text.addWidget(export_title)
-        export_desc = QLabel("Gestiona exportación e importación de ventas IREKS.")
+        export_desc = QLabel(self._export_card_description())
         export_desc.setWordWrap(True)
         export_desc.setStyleSheet("font-size: 13px; color: #4B5F7A;")
         export_text.addWidget(export_desc)
@@ -1096,7 +1134,11 @@ class SalesToolsDialog(QDialog):
             border="#AFC8F7",
             foreground="#214EAA",
         )
-        self.export_btn.clicked.connect(self._export_ireks_sales)
+        if self._mode == "ireks":
+            self.export_btn.clicked.connect(self._export_ireks_sales)
+        else:
+            self.export_btn.setEnabled(False)
+            self.export_btn.setToolTip("Exportación pendiente.")
         button_row.addWidget(self.export_btn)
 
         self.import_btn = self._make_action_button(
@@ -1124,10 +1166,10 @@ class SalesToolsDialog(QDialog):
 
         header_text = QVBoxLayout()
         header_text.setSpacing(3)
-        header_title = QLabel("Histórico IREKS")
+        header_title = QLabel(self._history_title())
         header_title.setStyleSheet("font-size: 20px; font-weight: 700; color: #14213D;")
         header_text.addWidget(header_title)
-        header_desc = QLabel("Últimas operaciones de exportación e importación.")
+        header_desc = QLabel(self._history_description())
         header_desc.setWordWrap(True)
         header_desc.setStyleSheet("font-size: 12px; color: #5E708A;")
         header_text.addWidget(header_desc)
@@ -1463,6 +1505,9 @@ class SalesToolsDialog(QDialog):
         )
 
     def _import_ireks_sales(self) -> None:
+        if self._mode == "clientes":
+            self._import_clientes_sales()
+            return
         view = self._import_service.build_import_view()
         file_path, _ = QFileDialog.getOpenFileName(self, view.ireks_json_title, "", view.ireks_json_filter)
         if not file_path:
@@ -1498,6 +1543,47 @@ class SalesToolsDialog(QDialog):
             QMessageBox.information(self, outcome.title, outcome.message)
         else:
             QMessageBox.warning(self, outcome.title, outcome.message)
+
+    def _import_clientes_sales(self) -> None:
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Seleccionar Excel ventas clientes",
+            "",
+            "Excel (*.xlsx *.xlsm *.xls)",
+        )
+        if not file_path:
+            return
+        source = Path(file_path)
+        try:
+            result = self._sales_reconciliation_service.import_clientes_excel(source)
+        except Exception as exc:  # noqa: BLE001
+            self._record_history(
+                action="import",
+                detail=source.name,
+                status="error",
+                message=str(exc),
+            )
+            self._refresh_history()
+            QMessageBox.warning(self, "Importación clientes", f"No se pudo importar el Excel de ventas clientes:\n{exc}")
+            return
+
+        status = "ok" if bool(getattr(result, "ok", False)) else "error"
+        if int(getattr(result, "incidencias", 0) or 0) > 0:
+            status = "warning" if status == "ok" else status
+        self._record_history(
+            action="import",
+            detail=f"{source.name} | Excel clientes",
+            status=status,
+            message=str(getattr(result, "message", "") or "").replace("\n", " | "),
+        )
+        self._refresh_history()
+        if bool(getattr(result, "ok", False)) and self._on_import_completed is not None:
+            self._on_import_completed()
+
+        if bool(getattr(result, "ok", False)) and status == "ok":
+            QMessageBox.information(self, "Importación clientes", str(getattr(result, "message", "") or ""))
+        else:
+            QMessageBox.warning(self, "Importación clientes", str(getattr(result, "message", "") or ""))
 
     def _write_ireks_sales_workbook(self, destination: Path) -> tuple[int, list[str]]:
         tables = [
@@ -2147,7 +2233,7 @@ class SalesPage(QWidget):
             hover_background="#E3D2F7",
             pressed_background="#CBB2ED",
         )
-        self.sales_tools_btn_clientes.setEnabled(False)
+        self.sales_tools_btn_clientes.clicked.connect(self._open_clientes_sales_tools_dialog)
 
         clientes_chart_actions_widget = QWidget()
         clientes_chart_band = QHBoxLayout(clientes_chart_actions_widget)
@@ -2780,6 +2866,10 @@ class SalesPage(QWidget):
 
     def _open_sales_tools_dialog(self) -> None:
         dialog = SalesToolsDialog(on_import_completed=self.reload, parent=self)
+        dialog.exec()
+
+    def _open_clientes_sales_tools_dialog(self) -> None:
+        dialog = SalesToolsDialog(mode="clientes", on_import_completed=self.reload_clientes, parent=self)
         dialog.exec()
 
     def _sales_export_state(self) -> dict[str, object] | None:
