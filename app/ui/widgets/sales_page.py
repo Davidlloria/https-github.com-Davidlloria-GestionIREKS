@@ -1897,6 +1897,31 @@ class SalesPage(QWidget):
         self.product_filter_clientes.textChanged.connect(self._schedule_product_reload_clientes)
         self.product_filter_clientes.setMinimumWidth(300)
         clientes_filters_bottom.addWidget(self.product_filter_clientes, 1)
+        self.client_filter_clientes_btn.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #FFFFFF;
+                color: #253041;
+                border: 1px solid #CCD6E2;
+                border-radius: 6px;
+                padding: 0 12px;
+                min-height: 33px;
+                max-height: 33px;
+            }
+            QPushButton:hover {
+                background-color: #F7FAFD;
+                border-color: #BFD0E0;
+            }
+            QPushButton:pressed {
+                background-color: #EEF4F9;
+            }
+            QPushButton:disabled {
+                background-color: #F5F7FA;
+                color: #A7B1BD;
+                border-color: #E1E7EE;
+            }
+            """
+        )
         self.client_filter_clientes_clear_btn.setStyleSheet(
             """
             QPushButton {
@@ -1905,6 +1930,8 @@ class SalesPage(QWidget):
                 border: 1px solid #F5B5B1;
                 border-radius: 6px;
                 padding: 0 12px;
+                min-height: 33px;
+                max-height: 33px;
             }
             QPushButton:hover {
                 background-color: #FAD8D5;
@@ -1920,7 +1947,7 @@ class SalesPage(QWidget):
             }
             """
         )
-        button_height = 32
+        button_height = 35
         self.client_filter_clientes_clear_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.client_filter_clientes_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.client_filter_clientes_clear_btn.setFixedHeight(button_height)
