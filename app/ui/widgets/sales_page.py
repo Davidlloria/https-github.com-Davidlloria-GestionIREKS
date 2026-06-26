@@ -1922,7 +1922,6 @@ class SalesPage(QWidget):
             }
             """
         )
-        self.client_filter_clientes_btn.setFixedHeight(self.client_filter_clientes_clear_btn.sizeHint().height())
 
         clientes_action_button_width = 110
         clientes_action_button_height = 36
