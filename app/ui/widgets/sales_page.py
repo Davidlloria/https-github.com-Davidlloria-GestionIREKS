@@ -1876,7 +1876,7 @@ class SalesPage(QWidget):
         client_selector_layout.setSpacing(6)
         self.client_filter_clientes_btn = QPushButton()
         self.client_filter_clientes_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.client_filter_clientes_btn.setMinimumWidth(260)
+        self.client_filter_clientes_btn.setMinimumWidth(290)
         self.client_filter_clientes_btn.setToolTip("Seleccionar cliente")
         self.client_filter_clientes_btn.clicked.connect(self._open_clientes_client_dialog)
         self.client_filter_clientes_btn.setText("Todos los clientes")
@@ -1895,7 +1895,7 @@ class SalesPage(QWidget):
         self.product_filter_clientes = QLineEdit()
         self.product_filter_clientes.setPlaceholderText("Buscar por código o descripción...")
         self.product_filter_clientes.textChanged.connect(self._schedule_product_reload_clientes)
-        self.product_filter_clientes.setMinimumWidth(300)
+        self.product_filter_clientes.setMinimumWidth(280)
         clientes_filters_bottom.addWidget(self.product_filter_clientes, 1)
         self.client_filter_clientes_btn.setStyleSheet(
             """
