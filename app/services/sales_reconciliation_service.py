@@ -557,6 +557,7 @@ class SalesReconciliationService:
 
         preview_rows: list[dict[str, object]] = []
         issues: list[str] = []
+        valid_rows = 0
 
         with Session(engine) as session:
             indirect_clients = {
@@ -577,30 +578,92 @@ class SalesReconciliationService:
             for item in parsed_rows:
                 cliente = indirect_clients.get(item.cliente_id)
                 if cliente is None:
-                    issues.append(f"Fila {item.source_row}: cliente no valido o no indirecto ({item.cliente_id}).")
+                    message = f"Cliente no valido o no indirecto ({item.cliente_id})."
+                    issues.append(f"Fila {item.source_row}: {message}")
+                    preview_rows.append(
+                        {
+                            "source_row": item.source_row,
+                            "cliente_id": item.cliente_id,
+                            "cliente_codigo": item.cliente_codigo,
+                            "cliente_nombre": item.cliente_nombre,
+                            "articulo_codigo": item.articulo_id,
+                            "articulo_id": "",
+                            "articulo_descripcion": item.articulo_descripcion,
+                            "envase": item.envase,
+                            "unidades": item.unidades,
+                            "kg": item.kg,
+                            "precio_kg": 0.0,
+                            "euros": 0.0,
+                            "status": "error",
+                            "issue_text": message,
+                        }
+                    )
                     continue
                 product_id = self._resolve_clientes_product_id(item.articulo_id, product_refs)
                 if not product_id:
-                    issues.append(
-                        f"Fila {item.source_row}: articulo sin referencia IREKS para codigo distribuidor {item.articulo_id}."
+                    message = f"Articulo sin referencia IREKS para codigo distribuidor {item.articulo_id}."
+                    issues.append(f"Fila {item.source_row}: {message}")
+                    preview_rows.append(
+                        {
+                            "source_row": item.source_row,
+                            "cliente_id": item.cliente_id,
+                            "cliente_codigo": item.cliente_codigo,
+                            "cliente_nombre": item.cliente_nombre,
+                            "articulo_codigo": item.articulo_id,
+                            "articulo_id": "",
+                            "articulo_descripcion": item.articulo_descripcion,
+                            "envase": item.envase,
+                            "unidades": item.unidades,
+                            "kg": item.kg,
+                            "precio_kg": 0.0,
+                            "euros": 0.0,
+                            "status": "error",
+                            "issue_text": message,
+                        }
                     )
                     continue
 
                 product = products.get(product_id)
                 precio_kg = self._resolve_tarifa_precio_kg(session, product_id, year)
                 kg_calc = self._to_float(item.envase) * self._to_float(item.unidades)
+                issue_bits: list[str] = []
                 if item.kg > 0 and abs(kg_calc - item.kg) > 0.01:
+                    issue_bits.append(
+                        f"kg calculado ({kg_calc:.3f}) difiere del archivo ({item.kg:.3f}); se usara el valor del archivo"
+                    )
                     issues.append(
                         f"Fila {item.source_row}: kg calculado ({kg_calc:.3f}) difiere del archivo ({item.kg:.3f}); se usara el valor del archivo."
                     )
                     kg_calc = item.kg
                 if precio_kg <= 0:
+                    issue_bits.append(f"sin tarifa valida para el producto IREKS {product_id}")
                     issues.append(f"Fila {item.source_row}: sin tarifa valida para el producto IREKS {product_id}.")
                 if kg_calc <= 0:
+                    issue_bits.append("sin cantidad valida (envase/unidades/kg)")
                     issues.append(f"Fila {item.source_row}: sin cantidad valida (envase/unidades/kg).")
+                    preview_rows.append(
+                        {
+                            "source_row": item.source_row,
+                            "cliente_id": item.cliente_id,
+                            "cliente_codigo": item.cliente_codigo,
+                            "cliente_nombre": item.cliente_nombre,
+                            "articulo_codigo": item.articulo_id,
+                            "articulo_id": product_id,
+                            "articulo_descripcion": str(getattr(product, "articulo_descripcion", "") or item.articulo_descripcion),
+                            "envase": item.envase,
+                            "unidades": item.unidades,
+                            "kg": kg_calc,
+                            "precio_kg": precio_kg,
+                            "euros": 0.0,
+                            "status": "error",
+                            "issue_text": "; ".join(issue_bits),
+                        }
+                    )
                     continue
 
                 euros = kg_calc * precio_kg if precio_kg > 0 else 0.0
+                status = "warning" if issue_bits else "ok"
+                valid_rows += 1
                 preview_rows.append(
                     {
                         "source_row": item.source_row,
@@ -615,13 +678,15 @@ class SalesReconciliationService:
                         "kg": kg_calc,
                         "precio_kg": precio_kg,
                         "euros": euros,
+                        "status": status,
+                        "issue_text": "; ".join(issue_bits),
                     }
                 )
 
         return ClientesImportPreview(
             total_rows=len(parsed_rows),
-            valid_rows=len(preview_rows),
-            invalid_rows=max(len(parsed_rows) - len(preview_rows), 0),
+            valid_rows=valid_rows,
+            invalid_rows=max(len(parsed_rows) - valid_rows, 0),
             preview_rows=preview_rows,
             issues=issues,
         )

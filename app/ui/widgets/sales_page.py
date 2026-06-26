@@ -1630,7 +1630,7 @@ class SalesToolsDialog(QDialog):
             issues.setPlainText("\n".join(str(item) for item in list(preview.issues)[:120]))
             root.addWidget(issues)
 
-        table = QTableWidget(0, 10)
+        table = QTableWidget(0, 12)
         table.setHorizontalHeaderLabels(
             [
                 "Fila",
@@ -1638,6 +1638,8 @@ class SalesToolsDialog(QDialog):
                 "Codigo",
                 "Articulo distribuidor",
                 "Producto IREKS",
+                "Estado",
+                "Incidencia",
                 "Envase",
                 "Unidades",
                 "Kg",
@@ -1658,18 +1660,21 @@ class SalesToolsDialog(QDialog):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(7, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(8, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(9, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(10, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(11, QHeaderView.ResizeMode.Fixed)
         table.setColumnWidth(0, 70)
         table.setColumnWidth(2, 110)
         table.setColumnWidth(3, 150)
-        table.setColumnWidth(5, 80)
-        table.setColumnWidth(6, 90)
-        table.setColumnWidth(7, 90)
-        table.setColumnWidth(8, 100)
-        table.setColumnWidth(9, 110)
+        table.setColumnWidth(5, 84)
+        table.setColumnWidth(7, 80)
+        table.setColumnWidth(8, 90)
+        table.setColumnWidth(9, 90)
+        table.setColumnWidth(10, 100)
+        table.setColumnWidth(11, 110)
         table.verticalHeader().setDefaultSectionSize(34)
 
         for row_idx, row in enumerate(list(getattr(preview, "preview_rows", []) or [])):
@@ -1680,6 +1685,8 @@ class SalesToolsDialog(QDialog):
                 str(row.get("cliente_codigo") or ""),
                 str(row.get("articulo_codigo") or ""),
                 str(row.get("articulo_descripcion") or ""),
+                str(row.get("status") or ""),
+                str(row.get("issue_text") or ""),
                 f"{float(row.get('envase') or 0.0):.3f}",
                 f"{float(row.get('unidades') or 0.0):.3f}",
                 f"{float(row.get('kg') or 0.0):.3f}",
@@ -1688,8 +1695,13 @@ class SalesToolsDialog(QDialog):
             ]
             for col_idx, value in enumerate(values):
                 item = QTableWidgetItem(str(value))
-                if col_idx in {0, 5, 6, 7, 8, 9}:
+                if col_idx in {0, 7, 8, 9, 10, 11}:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                status = str(row.get("status") or "").lower()
+                if status == "error":
+                    item.setBackground(QColor("#FDECEC"))
+                elif status == "warning":
+                    item.setBackground(QColor("#FFF6D8"))
                 table.setItem(row_idx, col_idx, item)
         root.addWidget(table, 1)
 
