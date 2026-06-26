@@ -1555,6 +1555,21 @@ class SalesToolsDialog(QDialog):
             return
         source = Path(file_path)
         try:
+            preview = self._sales_reconciliation_service.preview_clientes_excel(source)
+        except Exception as exc:  # noqa: BLE001
+            self._record_history(
+                action="import",
+                detail=source.name,
+                status="error",
+                message=str(exc),
+            )
+            self._refresh_history()
+            QMessageBox.warning(self, "Previsualización clientes", f"No se pudo previsualizar el Excel de ventas clientes:\n{exc}")
+            return
+        self._show_clientes_sales_preview_dialog(source, preview)
+
+    def _execute_clientes_sales_import(self, source: Path, *, close_dialog: QDialog | None = None) -> None:
+        try:
             result = self._sales_reconciliation_service.import_clientes_excel(source)
         except Exception as exc:  # noqa: BLE001
             self._record_history(
@@ -1584,6 +1599,114 @@ class SalesToolsDialog(QDialog):
             QMessageBox.information(self, "Importación clientes", str(getattr(result, "message", "") or ""))
         else:
             QMessageBox.warning(self, "Importación clientes", str(getattr(result, "message", "") or ""))
+        if bool(getattr(result, "ok", False)) and close_dialog is not None:
+            close_dialog.accept()
+
+    def _show_clientes_sales_preview_dialog(self, source: Path, preview) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Previsualización - {source.name}")
+        dialog.resize(1220, 760)
+        root = QVBoxLayout(dialog)
+        root.setContentsMargins(14, 14, 14, 14)
+        root.setSpacing(10)
+
+        title = QLabel("Previsualización de ventas clientes")
+        title.setStyleSheet("font-size: 20px; font-weight: 700; color: #14213D;")
+        root.addWidget(title)
+
+        summary = QLabel(
+            f"Filas detectadas: {int(getattr(preview, 'total_rows', 0) or 0)}"
+            f" | Válidas: {int(getattr(preview, 'valid_rows', 0) or 0)}"
+            f" | Con incidencias: {len(getattr(preview, 'issues', []) or [])}"
+        )
+        summary.setWordWrap(True)
+        summary.setStyleSheet("color: #4B5F7A;")
+        root.addWidget(summary)
+
+        if getattr(preview, "issues", None):
+            issues = QPlainTextEdit()
+            issues.setReadOnly(True)
+            issues.setMaximumHeight(160)
+            issues.setPlainText("\n".join(str(item) for item in list(preview.issues)[:120]))
+            root.addWidget(issues)
+
+        table = QTableWidget(0, 10)
+        table.setHorizontalHeaderLabels(
+            [
+                "Fila",
+                "Cliente",
+                "Codigo",
+                "Articulo distribuidor",
+                "Producto IREKS",
+                "Envase",
+                "Unidades",
+                "Kg",
+                "Precio/kg",
+                "Euros",
+            ]
+        )
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.setAlternatingRowColors(True)
+        table.setShowGrid(False)
+        table.setWordWrap(False)
+        header = table.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(8, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(9, QHeaderView.ResizeMode.Fixed)
+        table.setColumnWidth(0, 70)
+        table.setColumnWidth(2, 110)
+        table.setColumnWidth(3, 150)
+        table.setColumnWidth(5, 80)
+        table.setColumnWidth(6, 90)
+        table.setColumnWidth(7, 90)
+        table.setColumnWidth(8, 100)
+        table.setColumnWidth(9, 110)
+        table.verticalHeader().setDefaultSectionSize(34)
+
+        for row_idx, row in enumerate(list(getattr(preview, "preview_rows", []) or [])):
+            table.insertRow(row_idx)
+            values = [
+                str(row.get("source_row") or ""),
+                str(row.get("cliente_nombre") or ""),
+                str(row.get("cliente_codigo") or ""),
+                str(row.get("articulo_codigo") or ""),
+                str(row.get("articulo_descripcion") or ""),
+                f"{float(row.get('envase') or 0.0):.3f}",
+                f"{float(row.get('unidades') or 0.0):.3f}",
+                f"{float(row.get('kg') or 0.0):.3f}",
+                f"{float(row.get('precio_kg') or 0.0):.4f}",
+                f"{float(row.get('euros') or 0.0):.2f}",
+            ]
+            for col_idx, value in enumerate(values):
+                item = QTableWidgetItem(str(value))
+                if col_idx in {0, 5, 6, 7, 8, 9}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                table.setItem(row_idx, col_idx, item)
+        root.addWidget(table, 1)
+
+        actions = QHBoxLayout()
+        actions.addStretch(1)
+        import_btn = QPushButton("Importar")
+        import_btn.setProperty("btnRole", "success")
+        import_btn.setEnabled(bool(getattr(preview, "valid_rows", 0) or 0))
+        import_btn.clicked.connect(lambda: self._execute_clientes_sales_import(source, close_dialog=dialog))
+        actions.addWidget(import_btn)
+        close_btn = QPushButton("Cerrar")
+        close_btn.setProperty("btnRole", "secondary")
+        close_btn.clicked.connect(dialog.reject)
+        actions.addWidget(close_btn)
+        root.addLayout(actions)
+
+        dialog.exec()
 
     def _write_ireks_sales_workbook(self, destination: Path) -> tuple[int, list[str]]:
         tables = [

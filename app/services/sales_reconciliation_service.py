@@ -104,6 +104,15 @@ class ClientesWorkbookParsedLine:
     euros: float
 
 
+@dataclass
+class ClientesImportPreview:
+    total_rows: int
+    valid_rows: int
+    invalid_rows: int
+    preview_rows: list[dict[str, object]]
+    issues: list[str]
+
+
 class SalesReconciliationService:
     def __init__(self) -> None:
         self._igsa_unit_codes = {"LPAO", "LPAOP", "555", "777"}
@@ -534,6 +543,88 @@ class SalesReconciliationService:
         if warnings_count:
             message = f"{message} Con {warnings_count} advertencias de precio o conversion."
         return SalesOpResult(True, message, imported=len(rows), incidencias=skipped + warnings_count)
+
+    def preview_clientes_excel(self, file_path: Path) -> ClientesImportPreview:
+        parsed_rows, year = self._parse_clientes_workbook(file_path)
+        if not parsed_rows or year <= 0:
+            return ClientesImportPreview(
+                total_rows=len(parsed_rows),
+                valid_rows=0,
+                invalid_rows=len(parsed_rows),
+                preview_rows=[],
+                issues=["No se encontraron filas validas para previsualizar."],
+            )
+
+        preview_rows: list[dict[str, object]] = []
+        issues: list[str] = []
+
+        with Session(engine) as session:
+            indirect_clients = {
+                str(row.cliente_id or "").strip(): row
+                for row in session.exec(select(Cliente)).all()
+                if self._is_indirect_client(row)
+            }
+            product_refs = self._build_clientes_product_reference_lookup(session)
+            product_ids = sorted({product_id for product_id in product_refs.values() if product_id})
+            products = {}
+            if product_ids:
+                products = {
+                    str(row.articulo_id or "").strip(): row
+                    for row in session.exec(select(IngredienteIreks).where(col(IngredienteIreks.articulo_id).in_(product_ids))).all()
+                    if str(row.articulo_id or "").strip()
+                }
+
+            for item in parsed_rows:
+                cliente = indirect_clients.get(item.cliente_id)
+                if cliente is None:
+                    issues.append(f"Fila {item.source_row}: cliente no valido o no indirecto ({item.cliente_id}).")
+                    continue
+                product_id = self._resolve_clientes_product_id(item.articulo_id, product_refs)
+                if not product_id:
+                    issues.append(
+                        f"Fila {item.source_row}: articulo sin referencia IREKS para codigo distribuidor {item.articulo_id}."
+                    )
+                    continue
+
+                product = products.get(product_id)
+                precio_kg = self._resolve_tarifa_precio_kg(session, product_id, year)
+                kg_calc = self._to_float(item.envase) * self._to_float(item.unidades)
+                if item.kg > 0 and abs(kg_calc - item.kg) > 0.01:
+                    issues.append(
+                        f"Fila {item.source_row}: kg calculado ({kg_calc:.3f}) difiere del archivo ({item.kg:.3f}); se usara el valor del archivo."
+                    )
+                    kg_calc = item.kg
+                if precio_kg <= 0:
+                    issues.append(f"Fila {item.source_row}: sin tarifa valida para el producto IREKS {product_id}.")
+                if kg_calc <= 0:
+                    issues.append(f"Fila {item.source_row}: sin cantidad valida (envase/unidades/kg).")
+                    continue
+
+                euros = kg_calc * precio_kg if precio_kg > 0 else 0.0
+                preview_rows.append(
+                    {
+                        "source_row": item.source_row,
+                        "cliente_id": item.cliente_id,
+                        "cliente_codigo": item.cliente_codigo,
+                        "cliente_nombre": item.cliente_nombre,
+                        "articulo_codigo": item.articulo_id,
+                        "articulo_id": product_id,
+                        "articulo_descripcion": str(getattr(product, "articulo_descripcion", "") or item.articulo_descripcion),
+                        "envase": item.envase,
+                        "unidades": item.unidades,
+                        "kg": kg_calc,
+                        "precio_kg": precio_kg,
+                        "euros": euros,
+                    }
+                )
+
+        return ClientesImportPreview(
+            total_rows=len(parsed_rows),
+            valid_rows=len(preview_rows),
+            invalid_rows=max(len(parsed_rows) - len(preview_rows), 0),
+            preview_rows=preview_rows,
+            issues=issues,
+        )
 
     def rebuild_igsa_warehouse_movements(self, periodo: str = "") -> SalesOpResult:
         clean_periodo = str(periodo or "").strip()
