@@ -954,8 +954,8 @@ class SalesClientSelectDialog(QDialog):
         self.search_edit.textChanged.connect(self._refresh_table)
         layout.addWidget(self.search_edit)
 
-        self.clients_table = QTableWidget(0, 3)
-        self.clients_table.setHorizontalHeaderLabels(["Cliente", "Código", "Tipo"])
+        self.clients_table = QTableWidget(0, 1)
+        self.clients_table.setHorizontalHeaderLabels(["Cliente"])
         self.clients_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.clients_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.clients_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -965,10 +965,6 @@ class SalesClientSelectDialog(QDialog):
         self.clients_table.cellDoubleClicked.connect(self._accept_row)
         header = self.clients_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        self.clients_table.setColumnWidth(1, 130)
-        self.clients_table.setColumnWidth(2, 110)
         layout.addWidget(self.clients_table, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -992,18 +988,11 @@ class SalesClientSelectDialog(QDialog):
         match_row = -1
         for row_idx, client in enumerate(filtered):
             name_item = QTableWidgetItem(client.cliente_nombre)
-            code_item = QTableWidgetItem(client.cliente_id)
-            type_item = QTableWidgetItem(client.cliente_tipo or "")
             name_item.setToolTip(client.cliente_nombre)
-            code_item.setToolTip(client.cliente_id)
-            type_item.setToolTip(client.cliente_tipo or "")
             name_item.setData(Qt.ItemDataRole.UserRole, client.cliente_id)
             name_item.setData(Qt.ItemDataRole.UserRole + 1, client.cliente_nombre)
-            for item in (name_item, code_item, type_item):
-                item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            name_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
             self.clients_table.setItem(row_idx, 0, name_item)
-            self.clients_table.setItem(row_idx, 1, code_item)
-            self.clients_table.setItem(row_idx, 2, type_item)
             if client.cliente_id == self._selected_client_id:
                 match_row = row_idx
 
@@ -1907,6 +1896,32 @@ class SalesPage(QWidget):
         self.product_filter_clientes.textChanged.connect(self._schedule_product_reload_clientes)
         self.product_filter_clientes.setMinimumWidth(300)
         clientes_filters_bottom.addWidget(self.product_filter_clientes, 1)
+        button_height = self.product_filter_clientes.sizeHint().height()
+        self.client_filter_clientes_btn.setFixedHeight(button_height)
+        self.client_filter_clientes_clear_btn.setFixedHeight(button_height)
+        self.client_filter_clientes_clear_btn.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #FDECEC;
+                color: #B42318;
+                border: 1px solid #F5B5B1;
+                border-radius: 6px;
+                padding: 0 12px;
+            }
+            QPushButton:hover {
+                background-color: #FAD8D5;
+                border-color: #EAA4A0;
+            }
+            QPushButton:pressed {
+                background-color: #F6C7C2;
+            }
+            QPushButton:disabled {
+                background-color: #F7F1F0;
+                color: #D08A84;
+                border-color: #E8D8D6;
+            }
+            """
+        )
 
         clientes_action_button_width = 110
         clientes_action_button_height = 36
