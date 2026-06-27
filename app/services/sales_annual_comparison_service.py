@@ -1130,6 +1130,66 @@ class SalesAnnualComparisonService:
         if current_year > 1:
             years.add(current_year - 1)
 
+        selected_product_text = " ".join(
+            part
+            for part in [
+                str(articulo_codigo or "").strip(),
+                str(articulo_nombre or "").strip(),
+                str(articulo_id or "").strip(),
+            ]
+            if part
+        ).strip()
+
+        summary_rows = self.listar_resumen_anual_clientes(
+            current_year,
+            producto_texto=selected_product_text,
+        )
+        if summary_rows:
+            totals_summary: dict[str, dict[str, float | str]] = defaultdict(
+                lambda: {
+                    "cliente_id": "",
+                    "cliente_codigo": "",
+                    "cliente_nombre": "",
+                    "kilos": 0.0,
+                    "euros": 0.0,
+                }
+            )
+            for row in summary_rows:
+                row_articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+                row_code = self._normalize_code(getattr(row, "codigo", "") or "")
+                row_name = str(getattr(row, "nombre", "") or "").strip()
+                row_searchable = self._normalize_search_text(" ".join([row_code, row_name, row_articulo_id]))
+                if clean_articulo_id or clean_articulo_codigo or clean_articulo_nombre:
+                    matches_id = bool(clean_articulo_id and row_articulo_id == clean_articulo_id)
+                    matches_code = bool(clean_articulo_codigo and row_code == clean_articulo_codigo)
+                    matches_name = bool(clean_articulo_nombre and clean_articulo_nombre in row_searchable)
+                    if not matches_id and not matches_code and not matches_name:
+                        continue
+                cliente_id_value = str(getattr(row, "cliente_id", "") or "").strip()
+                bucket = totals_summary[cliente_id_value or str(getattr(row, "cliente_nombre", "") or "").strip()]
+                bucket["cliente_id"] = cliente_id_value
+                if not str(bucket["cliente_codigo"]):
+                    bucket["cliente_codigo"] = str(getattr(row, "cliente_codigo", "") or "").strip()
+                if not str(bucket["cliente_nombre"]):
+                    bucket["cliente_nombre"] = str(getattr(row, "cliente_nombre", "") or "").strip()
+                bucket["kilos"] = float(bucket["kilos"] or 0.0) + float(getattr(row, "kg_prev", 0.0) or 0.0) + float(getattr(row, "kg_curr", 0.0) or 0.0)
+                bucket["euros"] = float(bucket["euros"] or 0.0) + float(getattr(row, "euros_prev", 0.0) or 0.0) + float(getattr(row, "euros_curr", 0.0) or 0.0)
+
+            summary_result = [
+                SalesClientProductConsumerRow(
+                    cliente_id=str(values["cliente_id"] or ""),
+                    cliente_codigo=str(values["cliente_codigo"] or ""),
+                    cliente_nombre=str(values["cliente_nombre"] or ""),
+                    kilos=float(values["kilos"] or 0.0),
+                    euros=float(values["euros"] or 0.0),
+                )
+                for values in totals_summary.values()
+                if float(values["kilos"] or 0.0) > 0 or float(values["euros"] or 0.0) > 0
+            ]
+            summary_result.sort(key=lambda row: (-row.euros, -row.kilos, row.cliente_nombre.lower(), row.cliente_codigo.lower()))
+            if summary_result:
+                return summary_result
+
         with Session(self._engine) as session:
             stmt = select(VentaClientesRaw).where(col(VentaClientesRaw.anio).in_(years))
             raw_rows = list(session.exec(stmt))
