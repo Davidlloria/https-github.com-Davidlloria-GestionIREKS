@@ -1805,7 +1805,7 @@ class SalesToolsDialog(QDialog):
         correction_note.setStyleSheet("color: #8A5A00; font-size: 12px;")
         root.addWidget(correction_note)
 
-        leve_note = QLabel("Las filas marcadas como leves se importan con Kg 0. Cliente y producto siguen siendo críticos.")
+        leve_note = QLabel("La cantidad se calcula como unidades por el peso del envase del producto. Si no existe tarifa para el año, la fila se importa con precio 0 y advertencia.")
         leve_note.setWordWrap(True)
         leve_note.setStyleSheet("color: #5E708A; font-size: 12px;")
         root.addWidget(leve_note)

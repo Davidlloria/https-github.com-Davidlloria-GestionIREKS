@@ -105,16 +105,13 @@ class IgsaWorkbookParsedLine:
 @dataclass
 class ClientesWorkbookParsedLine:
     source_row: int
+    anio: int
     cliente_id: str
     cliente_codigo: str
     cliente_nombre: str
     articulo_id: str
     articulo_descripcion: str
-    envase: float
     unidades: float
-    kg: float
-    precio_kg: float
-    euros: float
 
 
 @dataclass
@@ -499,7 +496,7 @@ class SalesReconciliationService:
                     product_id = self._resolve_clientes_product_id(item.articulo_id, product_refs)
                     if not product_id:
                         continue
-                    replacement_keys.add((item.cliente_id, year, product_id))
+                    replacement_keys.add((item.cliente_id, int(item.anio or year or 0), product_id))
                 for cliente_id, anio, articulo_id in replacement_keys:
                     for raw_row in session.exec(
                         select(VentaClientesRaw).where(
@@ -510,10 +507,11 @@ class SalesReconciliationService:
                     ).all():
                         session.delete(raw_row)
 
+            lote_year = next((int(item.anio or 0) for item in parsed_rows if int(item.anio or 0) > 0), year)
             lote = VentaClientesImportLote(
                 lote_id=str(uuid4()),
                 fuente="clientes",
-                anio=year,
+                anio=lote_year,
                 archivo_nombre=file_path.name,
                 archivo_hash=file_hash,
                 estado="procesado",
@@ -536,41 +534,39 @@ class SalesReconciliationService:
                     skipped += 1
                     continue
                 product = session.get(IngredienteIreks, product_id)
+                product_weight = float(getattr(product, "articulo_envase_peso", 0.0) or 0.0)
+                if product_weight <= 0:
+                    skipped += 1
+                    warning_messages.append(
+                        f"Fila {item.source_row}: sin peso de envase en la ficha del producto IREKS {product_id}."
+                    )
+                    continue
 
-                precio_kg = self._resolve_tarifa_precio_kg(session, product_id, year)
+                row_year = int(item.anio or lote_year or 0)
+                precio_kg = self._resolve_tarifa_precio_kg(session, product_id, row_year)
                 if precio_kg <= 0:
                     warnings_count += 1
                     warning_messages.append(
-                        f"Fila {item.source_row}: sin tarifa valida para el producto IREKS {product_id}."
+                        f"Fila {item.source_row}: sin tarifa valida para el año {row_year} del producto IREKS {product_id}; se importara con precio 0."
                     )
-                kg_calc = self._to_float(item.envase) * self._to_float(item.unidades)
-                if item.kg > 0 and abs(kg_calc - item.kg) > 0.01:
-                    warnings_count += 1
-                    warning_messages.append(
-                        f"Fila {item.source_row}: kg calculado ({kg_calc:.3f}) difiere del archivo ({item.kg:.3f}); se usara el valor del archivo."
-                    )
-                    kg_calc = item.kg
+                kg_calc = self._to_float(item.unidades) * product_weight
                 if kg_calc <= 0:
-                    if item.source_row in allowed_leve_rows:
-                        warnings_count += 1
-                        warning_messages.append(
-                            f"Fila {item.source_row}: sin cantidad valida (envase/unidades/kg); se importara como leve con kg 0."
-                        )
-                        kg_calc = 0.0
-                    else:
-                        skipped += 1
-                        continue
+                    skipped += 1
+                    warning_messages.append(
+                        f"Fila {item.source_row}: sin cantidad valida en unidades; no se pudo calcular kg con el peso del envase."
+                    )
+                    continue
                 euros = kg_calc * precio_kg if precio_kg > 0 else 0.0
 
                 row = VentaClientesRaw(
                     raw_id=str(uuid4()),
                     lote_id=lote.lote_id,
                     cliente_id=item.cliente_id,
-                    anio=year,
+                    anio=row_year,
                     articulo_codigo_origen=item.articulo_id,
                     articulo_id=product_id,
                     articulo_descripcion_origen=item.articulo_descripcion,
-                    envase=float(item.envase or 0.0),
+                    envase=float(product_weight or 0.0),
                     unidades=float(item.unidades or 0.0),
                     kg=float(kg_calc or 0.0),
                     precio_kg=float(precio_kg or 0.0),
@@ -587,9 +583,9 @@ class SalesReconciliationService:
                                 getattr(product, "articulo_referencia_corta", "") or getattr(product, "articulo_referencia", "") or ""
                             ).strip(),
                             "articulo_descripcion": item.articulo_descripcion,
-                            "envase": item.envase,
+                            "anio": row_year,
+                            "articulo_envase_peso": product_weight,
                             "unidades": item.unidades,
-                            "kg": item.kg,
                             "precio_kg": precio_kg,
                             "euros": euros,
                         },
@@ -609,7 +605,7 @@ class SalesReconciliationService:
         if replace_existing:
             message = f"{message} Modo correccion aplicado."
         if warnings_count:
-            message = f"{message} Con {warnings_count} advertencias de precio o conversion."
+            message = f"{message} Con {warnings_count} advertencias de tarifa o calculo."
         return SalesOpResult(
             True,
             message,
@@ -663,9 +659,9 @@ class SalesReconciliationService:
                             "articulo_codigo": item.articulo_id,
                             "articulo_id": "",
                             "articulo_descripcion": item.articulo_descripcion,
-                            "envase": item.envase,
+                            "envase": 0.0,
                             "unidades": item.unidades,
-                            "kg": item.kg,
+                            "kg": 0.0,
                             "precio_kg": 0.0,
                             "euros": 0.0,
                             "status": "error",
@@ -687,9 +683,9 @@ class SalesReconciliationService:
                             "articulo_codigo": item.articulo_id,
                             "articulo_id": "",
                             "articulo_descripcion": item.articulo_descripcion,
-                            "envase": item.envase,
+                            "envase": 0.0,
                             "unidades": item.unidades,
-                            "kg": item.kg,
+                            "kg": 0.0,
                             "precio_kg": 0.0,
                             "euros": 0.0,
                             "status": "error",
@@ -700,23 +696,10 @@ class SalesReconciliationService:
                     continue
 
                 product = products.get(product_id)
-                precio_kg = self._resolve_tarifa_precio_kg(session, product_id, year)
-                kg_calc = self._to_float(item.envase) * self._to_float(item.unidades)
-                issue_bits: list[str] = []
-                if item.kg > 0 and abs(kg_calc - item.kg) > 0.01:
-                    issue_bits.append(
-                        f"kg calculado ({kg_calc:.3f}) difiere del archivo ({item.kg:.3f}); se usara el valor del archivo"
-                    )
-                    issues.append(
-                        f"Fila {item.source_row}: kg calculado ({kg_calc:.3f}) difiere del archivo ({item.kg:.3f}); se usara el valor del archivo."
-                    )
-                    kg_calc = item.kg
-                if precio_kg <= 0:
-                    issue_bits.append(f"sin tarifa valida para el producto IREKS {product_id}")
-                    issues.append(f"Fila {item.source_row}: sin tarifa valida para el producto IREKS {product_id}.")
-                if kg_calc <= 0:
-                    issue_bits.append("sin cantidad valida (envase/unidades/kg)")
-                    issues.append(f"Fila {item.source_row}: sin cantidad valida (envase/unidades/kg).")
+                product_weight = float(getattr(product, "articulo_envase_peso", 0.0) or 0.0)
+                if product_weight <= 0:
+                    message = f"Producto sin peso de envase en la ficha IREKS ({product_id})."
+                    issues.append(f"Fila {item.source_row}: {message}")
                     preview_rows.append(
                         {
                             "source_row": item.source_row,
@@ -726,14 +709,45 @@ class SalesReconciliationService:
                             "articulo_codigo": item.articulo_id,
                             "articulo_id": product_id,
                             "articulo_descripcion": str(getattr(product, "articulo_descripcion", "") or item.articulo_descripcion),
-                            "envase": item.envase,
+                            "envase": 0.0,
+                            "unidades": item.unidades,
+                            "kg": 0.0,
+                            "precio_kg": 0.0,
+                            "euros": 0.0,
+                            "status": "error",
+                            "issue_text": message,
+                            "can_force_import": False,
+                        }
+                    )
+                    continue
+
+                row_year = int(item.anio or year or 0)
+                precio_kg = self._resolve_tarifa_precio_kg(session, product_id, row_year)
+                kg_calc = self._to_float(item.unidades) * product_weight
+                issue_bits: list[str] = []
+                if precio_kg <= 0:
+                    issue_bits.append(f"sin tarifa valida para el año {row_year}")
+                    issues.append(f"Fila {item.source_row}: sin tarifa valida para el año {row_year} del producto IREKS {product_id}.")
+                if kg_calc <= 0:
+                    issue_bits.append("sin cantidad valida en unidades")
+                    issues.append(f"Fila {item.source_row}: sin cantidad valida en unidades.")
+                    preview_rows.append(
+                        {
+                            "source_row": item.source_row,
+                            "cliente_id": item.cliente_id,
+                            "cliente_codigo": item.cliente_codigo,
+                            "cliente_nombre": item.cliente_nombre,
+                            "articulo_codigo": item.articulo_id,
+                            "articulo_id": product_id,
+                            "articulo_descripcion": str(getattr(product, "articulo_descripcion", "") or item.articulo_descripcion),
+                            "envase": product_weight,
                             "unidades": item.unidades,
                             "kg": kg_calc,
                             "precio_kg": precio_kg,
                             "euros": 0.0,
                             "status": "error",
                             "issue_text": "; ".join(issue_bits),
-                            "can_force_import": True,
+                            "can_force_import": False,
                         }
                     )
                     continue
@@ -750,7 +764,7 @@ class SalesReconciliationService:
                         "articulo_codigo": item.articulo_id,
                         "articulo_id": product_id,
                         "articulo_descripcion": str(getattr(product, "articulo_descripcion", "") or item.articulo_descripcion),
-                        "envase": item.envase,
+                        "envase": product_weight,
                         "unidades": item.unidades,
                         "kg": kg_calc,
                         "precio_kg": precio_kg,
@@ -1075,47 +1089,42 @@ class SalesReconciliationService:
                     return idx
             return -1
 
+        idx_anio = find_index("año", "anio", "year")
         idx_cliente_id = find_index("cliente_id")
         idx_cliente_codigo = find_index("codigo")
         idx_cliente_nombre = find_index("cliente")
         idx_articulo = find_index("articulo")
         idx_descripcion = find_index("descripcion art.")
-        idx_envase = find_index("envase")
-        idx_unidades = find_index(str(year))
-        idx_kg = find_index("kg", "kg2")
-        if min(idx_cliente_id, idx_cliente_codigo, idx_cliente_nombre, idx_articulo, idx_descripcion, idx_envase, idx_unidades, idx_kg) < 0:
+        idx_unidades = find_index("unidades")
+        if idx_unidades < 0:
+            idx_unidades = find_index(str(year))
+        if min(idx_anio, idx_cliente_id, idx_cliente_codigo, idx_cliente_nombre, idx_articulo, idx_descripcion, idx_unidades) < 0:
             raise ValueError("El Excel de ventas de clientes no tiene el formato esperado.")
 
         parsed_rows: list[ClientesWorkbookParsedLine] = []
         for source_row, row in enumerate(rows[1:], start=2):
+            row_year = self._to_int(row[idx_anio])
             cliente_id = str(row[idx_cliente_id] or "").strip()
             articulo_id = self._normalize_code(row[idx_articulo])
-            if not cliente_id or not articulo_id:
+            unidades = self._to_float(row[idx_unidades])
+            if row_year <= 0 or not cliente_id or not articulo_id or unidades <= 0:
                 continue
             cliente_nombre = str(row[idx_cliente_nombre] or "").strip()
             cliente_codigo = str(row[idx_cliente_codigo] or "").strip()
             articulo_descripcion = str(row[idx_descripcion] or "").strip()
-            envase = self._to_float(row[idx_envase])
-            unidades = self._to_float(row[idx_unidades])
-            kg = self._to_float(row[idx_kg])
-            if unidades <= 0 and kg <= 0:
-                continue
             parsed_rows.append(
                 ClientesWorkbookParsedLine(
                     source_row=source_row,
+                    anio=row_year,
                     cliente_id=cliente_id,
                     cliente_codigo=cliente_codigo,
                     cliente_nombre=cliente_nombre,
                     articulo_id=articulo_id,
                     articulo_descripcion=articulo_descripcion,
-                    envase=envase,
                     unidades=unidades,
-                    kg=kg,
-                    precio_kg=0.0,
-                    euros=0.0,
                 )
             )
-        return parsed_rows, year
+        return parsed_rows, parsed_rows[0].anio if parsed_rows else year
 
     def _resolve_tarifa_precio_kg(self, session: Session, articulo_id: str, year: int) -> float:
         clean_articulo_id = str(articulo_id or "").strip()
