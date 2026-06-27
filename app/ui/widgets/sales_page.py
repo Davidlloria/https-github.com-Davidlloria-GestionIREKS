@@ -1585,6 +1585,21 @@ class SalesToolsDialog(QDialog):
             return row_value, client_value, code_value, message.strip()
         return "", "", "", text
 
+    def _collect_clientes_leve_rows(self, table: QTableWidget) -> set[int]:
+        leve_rows: set[int] = set()
+        for row_idx in range(table.rowCount()):
+            item = table.item(row_idx, 12)
+            if item is None:
+                continue
+            if not (item.flags() & Qt.ItemFlag.ItemIsUserCheckable):
+                continue
+            if item.checkState() != Qt.CheckState.Checked:
+                continue
+            source_row = int(item.data(Qt.ItemDataRole.UserRole) or 0)
+            if source_row > 0:
+                leve_rows.add(source_row)
+        return leve_rows
+
     def _copy_history_warning_table_to_clipboard(self, table: QTableWidget) -> None:
         lines: list[str] = []
         for row_idx in range(table.rowCount()):
@@ -1706,12 +1721,14 @@ class SalesToolsDialog(QDialog):
         source: Path,
         *,
         replace_existing: bool = False,
+        force_leve_rows: set[int] | None = None,
         close_dialog: QDialog | None = None,
     ) -> None:
         try:
             result = self._sales_reconciliation_service.import_clientes_excel(
                 source,
                 replace_existing=replace_existing,
+                force_leve_rows=force_leve_rows,
             )
         except Exception as exc:  # noqa: BLE001
             self._record_history(
@@ -1773,6 +1790,11 @@ class SalesToolsDialog(QDialog):
         correction_note.setStyleSheet("color: #8A5A00; font-size: 12px;")
         root.addWidget(correction_note)
 
+        leve_note = QLabel("Las filas marcadas como leves se importan con Kg 0. Cliente y producto siguen siendo críticos.")
+        leve_note.setWordWrap(True)
+        leve_note.setStyleSheet("color: #5E708A; font-size: 12px;")
+        root.addWidget(leve_note)
+
         if getattr(preview, "issues", None):
             issues = QPlainTextEdit()
             issues.setReadOnly(True)
@@ -1780,7 +1802,10 @@ class SalesToolsDialog(QDialog):
             issues.setPlainText("\n".join(str(item) for item in list(preview.issues)[:120]))
             root.addWidget(issues)
 
-        table = QTableWidget(0, 12)
+        preview_rows = list(getattr(preview, "preview_rows", []) or [])
+        forceable_rows_count = sum(1 for row in preview_rows if bool(row.get("can_force_import")))
+
+        table = QTableWidget(0, 13)
         table.setHorizontalHeaderLabels(
             [
                 "Fila",
@@ -1795,6 +1820,7 @@ class SalesToolsDialog(QDialog):
                 "Kg",
                 "Precio/kg",
                 "Euros",
+                "Leve",
             ]
         )
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -1816,6 +1842,7 @@ class SalesToolsDialog(QDialog):
         header.setSectionResizeMode(9, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(10, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(11, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(12, QHeaderView.ResizeMode.Fixed)
         table.setColumnWidth(0, 70)
         table.setColumnWidth(2, 110)
         table.setColumnWidth(3, 150)
@@ -1825,9 +1852,10 @@ class SalesToolsDialog(QDialog):
         table.setColumnWidth(9, 90)
         table.setColumnWidth(10, 100)
         table.setColumnWidth(11, 110)
+        table.setColumnWidth(12, 70)
         table.verticalHeader().setDefaultSectionSize(34)
 
-        for row_idx, row in enumerate(list(getattr(preview, "preview_rows", []) or [])):
+        for row_idx, row in enumerate(preview_rows):
             table.insertRow(row_idx)
             values = [
                 str(row.get("source_row") or ""),
@@ -1853,21 +1881,44 @@ class SalesToolsDialog(QDialog):
                 elif status == "warning":
                     item.setBackground(QColor("#FFF6D8"))
                 table.setItem(row_idx, col_idx, item)
+            leve_item = QTableWidgetItem("")
+            leve_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            leve_item.setData(Qt.ItemDataRole.UserRole, int(row.get("source_row") or 0))
+            if bool(row.get("can_force_import")):
+                leve_item.setFlags(
+                    Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsUserCheckable
+                )
+                leve_item.setCheckState(Qt.CheckState.Checked)
+            else:
+                leve_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                leve_item.setToolTip("No se puede marcar como leve.")
+            table.setItem(row_idx, 12, leve_item)
         root.addWidget(table, 1)
 
         actions = QHBoxLayout()
         actions.addStretch(1)
         import_btn = QPushButton("Importar")
         import_btn.setProperty("btnRole", "success")
-        import_btn.setEnabled(bool(getattr(preview, "valid_rows", 0) or 0))
-        import_btn.clicked.connect(lambda: self._execute_clientes_sales_import(source, close_dialog=dialog))
+        import_btn.setEnabled(bool(getattr(preview, "valid_rows", 0) or forceable_rows_count))
+        import_btn.clicked.connect(
+            lambda: self._execute_clientes_sales_import(
+                source,
+                force_leve_rows=self._collect_clientes_leve_rows(table),
+                close_dialog=dialog,
+            )
+        )
         actions.addWidget(import_btn)
 
         correction_btn = QPushButton("Importar corrección")
         correction_btn.setProperty("btnRole", "warning")
-        correction_btn.setEnabled(bool(getattr(preview, "valid_rows", 0) or 0))
+        correction_btn.setEnabled(bool(getattr(preview, "valid_rows", 0) or forceable_rows_count))
         correction_btn.clicked.connect(
-            lambda: self._execute_clientes_sales_import(source, replace_existing=True, close_dialog=dialog)
+            lambda: self._execute_clientes_sales_import(
+                source,
+                replace_existing=True,
+                force_leve_rows=self._collect_clientes_leve_rows(table),
+                close_dialog=dialog,
+            )
         )
         actions.addWidget(correction_btn)
         close_btn = QPushButton("Cerrar")

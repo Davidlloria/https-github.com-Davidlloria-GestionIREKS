@@ -441,7 +441,13 @@ class SalesReconciliationService:
             sync_warehouse_callback=self._sync_igsa_sales_to_warehouse,
         )
 
-    def import_clientes_excel(self, file_path: Path, *, replace_existing: bool = False) -> SalesOpResult:
+    def import_clientes_excel(
+        self,
+        file_path: Path,
+        *,
+        replace_existing: bool = False,
+        force_leve_rows: set[int] | None = None,
+    ) -> SalesOpResult:
         try:
             parsed_rows, year = self._parse_clientes_workbook(file_path)
         except ValueError as exc:
@@ -450,6 +456,11 @@ class SalesReconciliationService:
             return SalesOpResult(False, "El Excel de ventas de clientes no contiene filas validas.")
 
         file_hash = self._file_hash(file_path)
+        allowed_leve_rows = {
+            int(value)
+            for value in (force_leve_rows or set())
+            if isinstance(value, int) or str(value).strip().isdigit()
+        }
         with Session(engine) as session:
             if not replace_existing:
                 existing = session.exec(
@@ -527,6 +538,16 @@ class SalesReconciliationService:
                         f"Fila {item.source_row}: kg calculado ({kg_calc:.3f}) difiere del archivo ({item.kg:.3f}); se usara el valor del archivo."
                     )
                     kg_calc = item.kg
+                if kg_calc <= 0:
+                    if item.source_row in allowed_leve_rows:
+                        warnings_count += 1
+                        warning_messages.append(
+                            f"Fila {item.source_row}: sin cantidad valida (envase/unidades/kg); se importara como leve con kg 0."
+                        )
+                        kg_calc = 0.0
+                    else:
+                        skipped += 1
+                        continue
                 euros = kg_calc * precio_kg if precio_kg > 0 else 0.0
 
                 row = VentaClientesRaw(
@@ -637,6 +658,7 @@ class SalesReconciliationService:
                             "euros": 0.0,
                             "status": "error",
                             "issue_text": message,
+                            "can_force_import": False,
                         }
                     )
                     continue
@@ -660,6 +682,7 @@ class SalesReconciliationService:
                             "euros": 0.0,
                             "status": "error",
                             "issue_text": message,
+                            "can_force_import": False,
                         }
                     )
                     continue
@@ -698,6 +721,7 @@ class SalesReconciliationService:
                             "euros": 0.0,
                             "status": "error",
                             "issue_text": "; ".join(issue_bits),
+                            "can_force_import": True,
                         }
                     )
                     continue
@@ -721,6 +745,7 @@ class SalesReconciliationService:
                         "euros": euros,
                         "status": status,
                         "issue_text": "; ".join(issue_bits),
+                        "can_force_import": False,
                     }
                 )
 
