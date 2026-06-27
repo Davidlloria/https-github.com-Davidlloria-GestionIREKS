@@ -727,6 +727,46 @@ class SalesReconciliationService:
             issues=issues,
         )
 
+    def get_clientes_import_warning_details(self, archivo_nombre: str) -> list[str]:
+        clean_name = str(archivo_nombre or "").strip()
+        if not clean_name:
+            return []
+
+        with Session(engine) as session:
+            lote = session.exec(
+                select(VentaClientesImportLote)
+                .where(
+                    VentaClientesImportLote.fuente == "clientes",
+                    VentaClientesImportLote.archivo_nombre == clean_name,
+                )
+                .order_by(VentaClientesImportLote.creado_en.desc())
+            ).first()
+            if lote is None:
+                return []
+
+            rows = list(
+                session.exec(
+                    select(VentaClientesRaw).where(VentaClientesRaw.lote_id == lote.lote_id)
+                ).all()
+            )
+            if not rows:
+                return []
+
+            warnings: list[str] = []
+            for row in rows:
+                payload = self._safe_json_dict(row.payload_json)
+                original_kg = self._to_float(payload.get("kg", row.kg))
+                envase = self._to_float(row.envase)
+                unidades = self._to_float(row.unidades)
+                kg_calc = envase * unidades
+                if row.precio_kg <= 0:
+                    warnings.append(f"Fila cliente {row.cliente_id}: sin tarifa valida para el producto IREKS {row.articulo_id}.")
+                if original_kg > 0 and abs(kg_calc - original_kg) > 0.01:
+                    warnings.append(
+                        f"Fila cliente {row.cliente_id}: kg calculado ({kg_calc:.3f}) difiere del archivo ({original_kg:.3f}); se usara el valor del archivo."
+                    )
+            return warnings
+
     def rebuild_igsa_warehouse_movements(self, periodo: str = "") -> SalesOpResult:
         clean_periodo = str(periodo or "").strip()
         if clean_periodo and not re.fullmatch(r"\d{4}-\d{2}", clean_periodo):

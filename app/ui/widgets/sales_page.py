@@ -1490,6 +1490,9 @@ class SalesToolsDialog(QDialog):
             return
         warnings = self._parse_history_warnings(history_row)
         if not warnings:
+            file_name = str(history_row.detail or "").split(" | ", 1)[0].strip()
+            warnings = self._sales_reconciliation_service.get_clientes_import_warning_details(file_name)
+        if not warnings:
             warnings = [history_row.message or "No se almacenaron advertencias detalladas para este registro."]
         self._show_history_warning_dialog(history_row, warnings)
 
