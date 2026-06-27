@@ -1778,7 +1778,7 @@ class SalesToolsDialog(QDialog):
             self._on_import_completed()
 
         if bool(getattr(result, "ok", False)) and close_dialog is not None:
-            close_dialog.accept()
+            QTimer.singleShot(0, close_dialog.accept)
 
         if bool(getattr(result, "ok", False)) and status == "ok":
             QMessageBox.information(self, "Importación clientes", str(getattr(result, "message", "") or ""))
