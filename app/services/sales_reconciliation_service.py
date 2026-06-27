@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 import hashlib
 import json
@@ -50,6 +50,7 @@ class SalesOpResult:
     message: str
     imported: int = 0
     incidencias: int = 0
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -480,6 +481,7 @@ class SalesReconciliationService:
             rows: list[VentaClientesRaw] = []
             skipped = 0
             warnings_count = 0
+            warning_messages: list[str] = []
 
             for item in parsed_rows:
                 cliente = indirect_clients.get(item.cliente_id)
@@ -494,9 +496,15 @@ class SalesReconciliationService:
                 precio_kg = self._resolve_tarifa_precio_kg(session, product_id, year)
                 if precio_kg <= 0:
                     warnings_count += 1
+                    warning_messages.append(
+                        f"Fila {item.source_row}: sin tarifa valida para el producto IREKS {product_id}."
+                    )
                 kg_calc = self._to_float(item.envase) * self._to_float(item.unidades)
                 if item.kg > 0 and abs(kg_calc - item.kg) > 0.01:
                     warnings_count += 1
+                    warning_messages.append(
+                        f"Fila {item.source_row}: kg calculado ({kg_calc:.3f}) difiere del archivo ({item.kg:.3f}); se usara el valor del archivo."
+                    )
                     kg_calc = item.kg
                 euros = kg_calc * precio_kg if precio_kg > 0 else 0.0
 
@@ -542,7 +550,13 @@ class SalesReconciliationService:
         message = "Importacion de ventas de clientes completada."
         if warnings_count:
             message = f"{message} Con {warnings_count} advertencias de precio o conversion."
-        return SalesOpResult(True, message, imported=len(rows), incidencias=skipped + warnings_count)
+        return SalesOpResult(
+            True,
+            message,
+            imported=len(rows),
+            incidencias=skipped + warnings_count,
+            warnings=warning_messages,
+        )
 
     def preview_clientes_excel(self, file_path: Path) -> ClientesImportPreview:
         parsed_rows, year = self._parse_clientes_workbook(file_path)

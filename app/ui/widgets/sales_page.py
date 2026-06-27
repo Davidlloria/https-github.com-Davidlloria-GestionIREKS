@@ -3,6 +3,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime
+import json
 import math
 from pathlib import Path
 import unicodedata
@@ -1031,6 +1032,7 @@ class SalesToolsHistoryRow:
     detail: str
     status: str
     message: str
+    warnings_json: str
 
 
 class SalesToolsDialog(QDialog):
@@ -1052,6 +1054,7 @@ class SalesToolsDialog(QDialog):
         self._import_service = SettingsSalesImportService()
         self._sales_reconciliation_service = SalesReconciliationService()
         self._history_limit = 40
+        self._history_rows_cache: list[SalesToolsHistoryRow] = []
         self._build_ui()
         self._refresh_history()
 
@@ -1246,6 +1249,7 @@ class SalesToolsDialog(QDialog):
         self.history_table.setColumnWidth(1, 150)
         self.history_table.setColumnWidth(3, 160)
         self.history_table.verticalHeader().setDefaultSectionSize(36)
+        self.history_table.cellDoubleClicked.connect(self._on_history_cell_double_clicked)
         history_layout.addWidget(self.history_table, 1)
 
         self.history_empty_label = QLabel("Sin operaciones registradas todavía.")
@@ -1371,10 +1375,14 @@ class SalesToolsDialog(QDialog):
                     action TEXT NOT NULL,
                     detail TEXT NOT NULL,
                     status TEXT NOT NULL,
-                    message TEXT NOT NULL DEFAULT ''
+                    message TEXT NOT NULL DEFAULT '',
+                    warnings_json TEXT NOT NULL DEFAULT '[]'
                 )
                 """
             )
+            columns = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(sales_tools_history)").fetchall()}
+            if "warnings_json" not in columns:
+                conn.exec_driver_sql("ALTER TABLE sales_tools_history ADD COLUMN warnings_json TEXT NOT NULL DEFAULT '[]'")
             conn.exec_driver_sql(
                 """
                 CREATE INDEX IF NOT EXISTS idx_sales_tools_history_created_at
@@ -1382,16 +1390,25 @@ class SalesToolsDialog(QDialog):
                 """
             )
 
-    def _record_history(self, *, action: str, detail: str, status: str, message: str) -> None:
+    def _record_history(
+        self,
+        *,
+        action: str,
+        detail: str,
+        status: str,
+        message: str,
+        warnings: list[str] | None = None,
+    ) -> None:
         self._ensure_history_table()
         created_at = datetime.now().isoformat(timespec="seconds")
+        warnings_json = json.dumps(list(warnings or []), ensure_ascii=False)
         with engine.begin() as conn:
             conn.exec_driver_sql(
                 """
-                INSERT INTO sales_tools_history (created_at, action, detail, status, message)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO sales_tools_history (created_at, action, detail, status, message, warnings_json)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (created_at, action, detail, status, message),
+                (created_at, action, detail, status, message, warnings_json),
             )
 
     def _load_history_rows(self, limit: int | None = None) -> list[SalesToolsHistoryRow]:
@@ -1404,7 +1421,7 @@ class SalesToolsDialog(QDialog):
             where_clause = "WHERE action = ?"
             params = [action_filter, safe_limit]
         query = f"""
-            SELECT created_at, action, detail, status, message
+            SELECT created_at, action, detail, status, message, warnings_json
             FROM sales_tools_history
             {where_clause}
             ORDER BY created_at DESC, id DESC
@@ -1419,12 +1436,14 @@ class SalesToolsDialog(QDialog):
                 detail=str(row[2] or ""),
                 status=str(row[3] or ""),
                 message=str(row[4] or ""),
+                warnings_json=str(row[5] or "[]"),
             )
             for row in rows
         ]
 
     def _refresh_history(self) -> None:
         rows = self._load_history_rows()
+        self._history_rows_cache = rows
         self.history_table.setRowCount(len(rows))
         self.history_empty_label.setVisible(not rows)
 
@@ -1462,6 +1481,62 @@ class SalesToolsDialog(QDialog):
             self.history_table.setItem(row_idx, 3, status_item)
 
         self.history_table.resizeRowsToContents()
+
+    def _on_history_cell_double_clicked(self, row: int, _column: int) -> None:
+        if row < 0 or row >= len(self._history_rows_cache):
+            return
+        history_row = self._history_rows_cache[row]
+        if str(history_row.status or "").strip().lower() != "warning":
+            return
+        warnings = self._parse_history_warnings(history_row)
+        if not warnings:
+            warnings = [history_row.message or "No se almacenaron advertencias detalladas para este registro."]
+        self._show_history_warning_dialog(history_row, warnings)
+
+    def _parse_history_warnings(self, history_row: SalesToolsHistoryRow) -> list[str]:
+        raw = str(history_row.warnings_json or "").strip()
+        if not raw:
+            return []
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+        if isinstance(data, list):
+            return [str(item).strip() for item in data if str(item).strip()]
+        return []
+
+    def _show_history_warning_dialog(self, history_row: SalesToolsHistoryRow, warnings: list[str]) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Advertencias de importación")
+        dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        dialog.resize(780, 520)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        title = QLabel("Lista de advertencias")
+        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #14213D;")
+        layout.addWidget(title)
+
+        meta = QLabel(f"{history_row.created_at.replace('T', ' ')} | {history_row.detail or '-'}")
+        meta.setWordWrap(True)
+        meta.setStyleSheet("color: #5E708A;")
+        layout.addWidget(meta)
+
+        text = QPlainTextEdit()
+        text.setReadOnly(True)
+        text.setPlainText("\n".join(f"- {item}" for item in warnings))
+        layout.addWidget(text, 1)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch(1)
+        close_btn = QPushButton("Cerrar")
+        close_btn.setMinimumWidth(120)
+        close_btn.clicked.connect(dialog.accept)
+        btn_row.addWidget(close_btn)
+        layout.addLayout(btn_row)
+
+        dialog.exec()
 
     def _export_ireks_sales(self) -> None:
         default_name = f"ventas_ireks_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
@@ -1590,6 +1665,7 @@ class SalesToolsDialog(QDialog):
             detail=f"{source.name} | Excel clientes",
             status=status,
             message=str(getattr(result, "message", "") or "").replace("\n", " | "),
+            warnings=list(getattr(result, "warnings", []) or []),
         )
         self._refresh_history()
         if bool(getattr(result, "ok", False)) and self._on_import_completed is not None:
