@@ -543,6 +543,7 @@ class SalesReconciliationService:
                     euros=float(euros or 0.0),
                     payload_json=json.dumps(
                         {
+                            "source_row": item.source_row,
                             "cliente_id": item.cliente_id,
                             "cliente_codigo": item.cliente_codigo,
                             "cliente_nombre": item.cliente_nombre,
@@ -755,15 +756,21 @@ class SalesReconciliationService:
             warnings: list[str] = []
             for row in rows:
                 payload = self._safe_json_dict(row.payload_json)
+                source_row = int(self._to_float(payload.get("source_row", 0)) or 0) or None
+                cliente_nombre = str(payload.get("cliente_nombre", "") or "").strip() or row.cliente_id
                 original_kg = self._to_float(payload.get("kg", row.kg))
                 envase = self._to_float(row.envase)
                 unidades = self._to_float(row.unidades)
                 kg_calc = envase * unidades
                 if row.precio_kg <= 0:
-                    warnings.append(f"Fila cliente {row.cliente_id}: sin tarifa valida para el producto IREKS {row.articulo_id}.")
-                if original_kg > 0 and abs(kg_calc - original_kg) > 0.01:
+                    prefix = f"Fila {source_row}" if source_row else "Fila desconocida"
                     warnings.append(
-                        f"Fila cliente {row.cliente_id}: kg calculado ({kg_calc:.3f}) difiere del archivo ({original_kg:.3f}); se usara el valor del archivo."
+                        f"{prefix} - {cliente_nombre}: sin tarifa valida para el producto IREKS {row.articulo_id}."
+                    )
+                if original_kg > 0 and abs(kg_calc - original_kg) > 0.01:
+                    prefix = f"Fila {source_row}" if source_row else "Fila desconocida"
+                    warnings.append(
+                        f"{prefix} - {cliente_nombre}: kg calculado ({kg_calc:.3f}) difiere del archivo ({original_kg:.3f}); se usara el valor del archivo."
                     )
             return warnings
 
