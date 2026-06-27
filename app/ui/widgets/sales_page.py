@@ -1605,6 +1605,8 @@ class SalesToolsDialog(QDialog):
     def _show_clientes_sales_preview_dialog(self, source: Path, preview) -> None:
         dialog = QDialog(self)
         dialog.setWindowTitle(f"Previsualización - {source.name}")
+        dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        dialog.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         dialog.resize(1220, 760)
         root = QVBoxLayout(dialog)
         root.setContentsMargins(14, 14, 14, 14)
@@ -1718,6 +1720,9 @@ class SalesToolsDialog(QDialog):
         actions.addWidget(close_btn)
         root.addLayout(actions)
 
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
         dialog.exec()
 
     def _write_ireks_sales_workbook(self, destination: Path) -> tuple[int, list[str]]:
