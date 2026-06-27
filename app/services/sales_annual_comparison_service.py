@@ -1196,12 +1196,15 @@ class SalesAnnualComparisonService:
                 row_product = product_by_code.get(row_code)
             row_product_id = str(row_product[0] if row_product else str(getattr(row, "articulo_id", "") or "").strip()).strip()
             row_product_code = str(row_product[1] if row_product else row_code).strip()
+            row_product_code_norm = self._normalize_code(row_product_code)
 
-            if clean_articulo_id:
-                if row_product_id != clean_articulo_id:
-                    continue
-            elif clean_articulo_codigo:
-                if self._normalize_code(row_product_code) != clean_articulo_codigo and row_code != clean_articulo_codigo:
+            if clean_articulo_id or clean_articulo_codigo:
+                matches_id = bool(clean_articulo_id and row_product_id == clean_articulo_id)
+                matches_code = bool(
+                    clean_articulo_codigo
+                    and (row_product_code_norm == clean_articulo_codigo or row_code == clean_articulo_codigo)
+                )
+                if not matches_id and not matches_code:
                     continue
 
             if clean_cliente_text:

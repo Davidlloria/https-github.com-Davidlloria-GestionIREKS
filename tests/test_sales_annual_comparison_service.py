@@ -353,6 +353,7 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
 
     service = SalesAnnualComparisonService()
     rows = service.listar_clientes_consumidores_producto(2026, "art-1", "D123")
+    rows_by_code_only = service.listar_clientes_consumidores_producto(2026, "wrong-id", "D123")
 
     assert len(rows) == 2
     assert rows[0].cliente_codigo == "1"
@@ -363,3 +364,4 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
     assert rows[1].cliente_nombre == "Cliente Dos"
     assert rows[1].kilos == pytest.approx(5.0)
     assert rows[1].euros == pytest.approx(16.8)
+    assert len(rows_by_code_only) == 2
