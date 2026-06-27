@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPlainTextEdit,
     QFrame,
+    QMenu,
     QSizePolicy,
     QPushButton,
     QToolButton,
@@ -2811,6 +2812,8 @@ class SalesPage(QWidget):
         self.sales_table_clientes.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.sales_table_clientes.verticalHeader().setVisible(False)
         self.sales_table_clientes.setSortingEnabled(True)
+        self.sales_table_clientes.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.sales_table_clientes.customContextMenuRequested.connect(self._open_clientes_sales_context_menu)
         self.sales_table_clientes.setHorizontalHeaderLabels(
             [
                 "Cod.",
@@ -5366,6 +5369,119 @@ class SalesPage(QWidget):
             font.setStretch(QFont.Stretch.Condensed)
             item.setFont(font)
             self.totals_table_clientes.setItem(0, col, item)
+
+    def _open_clientes_sales_context_menu(self, pos) -> None:
+        table = self.sales_table_clientes
+        item = table.itemAt(pos)
+        if item is None:
+            return
+        row = item.row()
+        product_id_item = table.item(row, 0)
+        product_name_item = table.item(row, 1)
+        if product_id_item is None:
+            return
+        product_id = str(product_id_item.data(Qt.ItemDataRole.UserRole) or "").strip()
+        product_code = str(product_id_item.text() or "").strip()
+        product_name = str(product_name_item.text() if product_name_item is not None else "").strip()
+        if not product_id:
+            return
+
+        menu = QMenu(self)
+        action = menu.addAction("Ver clientes que consumen este producto")
+        selected = menu.exec(table.viewport().mapToGlobal(pos))
+        if selected != action:
+            return
+        self._show_clientes_product_consumers_dialog(product_id, product_code, product_name)
+
+    def _show_clientes_product_consumers_dialog(self, articulo_id: str, articulo_codigo: str, articulo_nombre: str) -> None:
+        year = self._current_year_clientes()
+        rows = self.sales_summary_service.listar_clientes_consumidores_producto(year, articulo_id)
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Clientes que consumen el producto")
+        dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        dialog.resize(900, 560)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        title = QLabel("Clientes que consumen el producto")
+        title.setStyleSheet("font-size: 20px; font-weight: 700; color: #14213D;")
+        layout.addWidget(title)
+
+        subtitle = QLabel(
+            f"Año {year} | {articulo_codigo or articulo_id}"
+            f"{' - ' + articulo_nombre if articulo_nombre else ''}"
+        )
+        subtitle.setWordWrap(True)
+        subtitle.setStyleSheet("color: #5E708A; font-size: 12px;")
+        layout.addWidget(subtitle)
+
+        if not rows:
+            empty = QLabel("No hay clientes con ventas registradas para este producto en el año seleccionado.")
+            empty.setWordWrap(True)
+            empty.setStyleSheet("color: #6B7280; font-style: italic; padding: 8px 2px;")
+            layout.addWidget(empty)
+        else:
+            table = QTableWidget(0, 4)
+            table.setHorizontalHeaderLabels(["Código", "Cliente", "Kilos", "Ventas"])
+            table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+            table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+            table.verticalHeader().setVisible(False)
+            table.setAlternatingRowColors(True)
+            table.setShowGrid(False)
+            table.setWordWrap(False)
+            header = table.horizontalHeader()
+            header.setStretchLastSection(False)
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+            table.setColumnWidth(0, 110)
+            table.setColumnWidth(2, 120)
+            table.setColumnWidth(3, 140)
+            table.verticalHeader().setDefaultSectionSize(34)
+
+            total_kilos = 0.0
+            total_sales = 0.0
+            for row_idx, row in enumerate(rows):
+                total_kilos += float(getattr(row, "kilos", 0.0) or 0.0)
+                total_sales += float(getattr(row, "euros", 0.0) or 0.0)
+                codigo_item = QTableWidgetItem(str(getattr(row, "cliente_codigo", "") or ""))
+                cliente_item = QTableWidgetItem(str(getattr(row, "cliente_nombre", "") or ""))
+                kilos_item = NumericTableWidgetItem(self._fmt_num(getattr(row, "kilos", 0.0)), float(getattr(row, "kilos", 0.0) or 0.0))
+                euros_item = NumericTableWidgetItem(self._fmt_money(getattr(row, "euros", 0.0)), float(getattr(row, "euros", 0.0) or 0.0))
+                codigo_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                cliente_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                kilos_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                euros_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                for item_widget in (codigo_item, cliente_item, kilos_item, euros_item):
+                    item_widget.setForeground(QColor("#14213D"))
+                    item_widget.setToolTip(item_widget.text())
+                kilos_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                euros_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                table.setItem(row_idx, 0, codigo_item)
+                table.setItem(row_idx, 1, cliente_item)
+                table.setItem(row_idx, 2, kilos_item)
+                table.setItem(row_idx, 3, euros_item)
+
+            layout.addWidget(table, 1)
+
+            footer = QHBoxLayout()
+            footer.addStretch(1)
+            total_label = QLabel(f"Total kilos: {self._fmt_num(total_kilos)} | Total ventas: {self._fmt_money(total_sales)}")
+            total_label.setStyleSheet("color: #14213D; font-weight: 600;")
+            footer.addWidget(total_label)
+            layout.addLayout(footer)
+
+        close_btn = QPushButton("Cerrar")
+        close_btn.clicked.connect(dialog.accept)
+        close_row = QHBoxLayout()
+        close_row.addStretch(1)
+        close_row.addWidget(close_btn)
+        layout.addLayout(close_row)
+
+        dialog.exec()
 
     def _apply_column_widths_clientes(self) -> None:
         widths = {

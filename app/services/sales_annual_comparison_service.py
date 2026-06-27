@@ -95,6 +95,15 @@ class SalesClientsComparisonRow:
     delta_euros_pct: float
 
 
+@dataclass
+class SalesClientProductConsumerRow:
+    cliente_id: str
+    cliente_codigo: str
+    cliente_nombre: str
+    kilos: float
+    euros: float
+
+
 class SalesAnnualComparisonService:
     def __init__(self, db_engine=None) -> None:
         self._engine = db_engine if db_engine is not None else engine
@@ -1099,6 +1108,88 @@ class SalesAnnualComparisonService:
                 )
             )
         result.sort(key=lambda x: (x.nombre.lower(), x.codigo.lower()))
+        return result
+
+    def listar_clientes_consumidores_producto(
+        self,
+        year: int,
+        articulo_id: str,
+        cliente_texto: str = "",
+    ) -> list[SalesClientProductConsumerRow]:
+        current_year = int(year or 0)
+        clean_articulo_id = str(articulo_id or "").strip()
+        clean_cliente_text = self._normalize_search_text(cliente_texto)
+        if current_year <= 0 or not clean_articulo_id:
+            return []
+
+        with Session(self._engine) as session:
+            stmt = select(VentaClientesRaw).where(
+                col(VentaClientesRaw.anio) == current_year,
+                col(VentaClientesRaw.articulo_id) == clean_articulo_id,
+            )
+            raw_rows = list(session.exec(stmt))
+            clients = list(session.exec(select(Cliente)))
+
+        client_by_id: dict[str, tuple[str, str, str]] = {}
+        client_search_by_id: dict[str, str] = {}
+        for client in clients:
+            cid = str(client.cliente_id or "").strip()
+            if not cid:
+                continue
+            codigo = str(getattr(client, "cliente_codigo", "") or "").strip()
+            nombre = str(client.cliente_nombre_comercial or client.cliente_nombre_fiscal or cid).strip()
+            search_text = self._normalize_search_text(
+                " ".join(
+                    [
+                        codigo,
+                        str(client.cliente_nombre_comercial or ""),
+                        str(client.cliente_nombre_fiscal or ""),
+                        str(client.cliente_abreviatura or ""),
+                    ]
+                )
+            )
+            client_by_id[cid] = (codigo, nombre, search_text)
+            client_search_by_id[cid] = search_text
+
+        totals: dict[str, dict[str, float | str]] = defaultdict(
+            lambda: {
+                "cliente_id": "",
+                "cliente_codigo": "",
+                "cliente_nombre": "",
+                "kilos": 0.0,
+                "euros": 0.0,
+            }
+        )
+        for row in raw_rows:
+            cliente_id_raw = str(getattr(row, "cliente_id", "") or "").strip()
+            client_info = client_by_id.get(cliente_id_raw)
+            if clean_cliente_text:
+                searchable = client_search_by_id.get(cliente_id_raw, "")
+                if clean_cliente_text not in searchable:
+                    continue
+            cliente_codigo = str(client_info[0] if client_info else "").strip()
+            cliente_nombre = str(client_info[1] if client_info else cliente_id_raw).strip()
+            bucket = totals[cliente_id_raw or cliente_nombre]
+            bucket["cliente_id"] = cliente_id_raw
+            if not str(bucket["cliente_codigo"]):
+                bucket["cliente_codigo"] = cliente_codigo
+            if not str(bucket["cliente_nombre"]):
+                bucket["cliente_nombre"] = cliente_nombre
+            bucket["kilos"] = float(bucket["kilos"] or 0.0) + float(getattr(row, "kg", 0.0) or 0.0)
+            bucket["euros"] = float(bucket["euros"] or 0.0) + float(getattr(row, "euros", 0.0) or 0.0)
+
+        result = [
+            SalesClientProductConsumerRow(
+                cliente_id=str(values["cliente_id"] or ""),
+                cliente_codigo=str(values["cliente_codigo"] or ""),
+                cliente_nombre=str(values["cliente_nombre"] or ""),
+                kilos=float(values["kilos"] or 0.0),
+                euros=float(values["euros"] or 0.0),
+            )
+            for values in totals.values()
+            if float(values["kilos"] or 0.0) > 0 or float(values["euros"] or 0.0) > 0
+        ]
+        result.sort(key=lambda row: (-row.euros, -row.kilos, row.cliente_nombre.lower(), row.cliente_codigo.lower()))
         return result
 
     def _build_client_rows(self, totals: dict[str, dict[str, float | str]]) -> list[SalesClientsComparisonRow]:

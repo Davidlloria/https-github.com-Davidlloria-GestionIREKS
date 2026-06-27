@@ -6,7 +6,7 @@ import pytest
 from sqlmodel import SQLModel, Session, create_engine
 
 import app.services.sales_annual_comparison_service as sales_annual_service_module
-from app.models import Cliente, Fabricante, Familia, IngredienteIreks, Subfamilia, VentaMensualRaw
+from app.models import Cliente, Fabricante, Familia, IngredienteIreks, Subfamilia, VentaClientesRaw, VentaMensualRaw
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
 
 
@@ -288,3 +288,78 @@ def test_listar_ventas_mensuales_ireks_comparativa_returns_prev_and_curr_years(i
     assert series[2].kilos_curr == pytest.approx(9.0)
     assert all(point.kilos_prev == pytest.approx(0.0) for idx, point in enumerate(series) if idx != 2)
     assert all(point.kilos_curr == pytest.approx(0.0) for idx, point in enumerate(series) if idx != 2)
+
+
+def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        cliente_id, _fabricante_id, _familia_id, _subfamilia_id = _seed_products(session)
+        session.add(
+            Cliente(
+                cliente_id="cli-2",
+                cliente_codigo=2,
+                cliente_nombre_comercial="Cliente Dos",
+                cliente_tipo="distribuidor",
+            )
+        )
+        session.add(
+            VentaClientesRaw(
+                raw_id="raw-10",
+                lote_id="lote-10",
+                cliente_id=cliente_id,
+                anio=2026,
+                articulo_codigo_origen="D123",
+                articulo_id="art-1",
+                articulo_descripcion_origen="Producto IREKS",
+                envase=1.0,
+                unidades=4.0,
+                kg=10.0,
+                precio_kg=3.0,
+                euros=30.0,
+            )
+        )
+        session.add(
+            VentaClientesRaw(
+                raw_id="raw-11",
+                lote_id="lote-11",
+                cliente_id=cliente_id,
+                anio=2026,
+                articulo_codigo_origen="D123",
+                articulo_id="art-1",
+                articulo_descripcion_origen="Producto IREKS",
+                envase=1.0,
+                unidades=1.0,
+                kg=2.5,
+                precio_kg=4.8,
+                euros=12.0,
+            )
+        )
+        session.add(
+            VentaClientesRaw(
+                raw_id="raw-12",
+                lote_id="lote-12",
+                cliente_id="cli-2",
+                anio=2026,
+                articulo_codigo_origen="D123",
+                articulo_id="art-1",
+                articulo_descripcion_origen="Producto IREKS",
+                envase=1.0,
+                unidades=2.0,
+                kg=5.0,
+                precio_kg=3.36,
+                euros=16.8,
+            )
+        )
+        session.commit()
+
+    service = SalesAnnualComparisonService()
+    rows = service.listar_clientes_consumidores_producto(2026, "art-1")
+
+    assert len(rows) == 2
+    assert rows[0].cliente_codigo == "1"
+    assert rows[0].cliente_nombre == "Cliente"
+    assert rows[0].kilos == pytest.approx(12.5)
+    assert rows[0].euros == pytest.approx(42.0)
+    assert rows[1].cliente_codigo == "2"
+    assert rows[1].cliente_nombre == "Cliente Dos"
+    assert rows[1].kilos == pytest.approx(5.0)
+    assert rows[1].euros == pytest.approx(16.8)
