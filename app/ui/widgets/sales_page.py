@@ -5395,7 +5395,12 @@ class SalesPage(QWidget):
 
     def _show_clientes_product_consumers_dialog(self, articulo_id: str, articulo_codigo: str, articulo_nombre: str) -> None:
         year = self._current_year_clientes()
-        rows = self.sales_summary_service.listar_clientes_consumidores_producto(year, articulo_id, articulo_codigo)
+        rows = self.sales_summary_service.listar_clientes_consumidores_producto(
+            year,
+            articulo_id,
+            articulo_codigo,
+            articulo_nombre,
+        )
         dialog = QDialog(self)
         dialog.setWindowTitle("Clientes que consumen el producto")
         dialog.setWindowModality(Qt.WindowModality.ApplicationModal)

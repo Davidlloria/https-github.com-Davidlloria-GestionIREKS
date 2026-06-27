@@ -1115,13 +1115,15 @@ class SalesAnnualComparisonService:
         year: int,
         articulo_id: str,
         articulo_codigo: str = "",
+        articulo_nombre: str = "",
         cliente_texto: str = "",
     ) -> list[SalesClientProductConsumerRow]:
         current_year = int(year or 0)
         clean_articulo_id = str(articulo_id or "").strip()
         clean_articulo_codigo = self._normalize_code(articulo_codigo)
+        clean_articulo_nombre = self._normalize_search_text(articulo_nombre)
         clean_cliente_text = self._normalize_search_text(cliente_texto)
-        if current_year <= 0 or (not clean_articulo_id and not clean_articulo_codigo):
+        if current_year <= 0 or (not clean_articulo_id and not clean_articulo_codigo and not clean_articulo_nombre):
             return []
         years = {current_year}
         if current_year > 1:
@@ -1200,14 +1202,17 @@ class SalesAnnualComparisonService:
             row_product_id = str(row_product[0] if row_product else str(getattr(row, "articulo_id", "") or "").strip()).strip()
             row_product_code = str(row_product[1] if row_product else row_code).strip()
             row_product_code_norm = self._normalize_code(row_product_code)
+            row_product_name = str(row_product[2] if row_product else getattr(row, "articulo_descripcion_origen", "") or "").strip()
+            row_searchable = self._normalize_search_text(" ".join([row_product_code, row_product_name, row_code]))
 
-            if clean_articulo_id or clean_articulo_codigo:
+            if clean_articulo_id or clean_articulo_codigo or clean_articulo_nombre:
                 matches_id = bool(clean_articulo_id and row_product_id == clean_articulo_id)
                 matches_code = bool(
                     clean_articulo_codigo
                     and (row_product_code_norm == clean_articulo_codigo or row_code == clean_articulo_codigo)
                 )
-                if not matches_id and not matches_code:
+                matches_name = bool(clean_articulo_nombre and clean_articulo_nombre in row_searchable)
+                if not matches_id and not matches_code and not matches_name:
                     continue
 
             if clean_cliente_text:
