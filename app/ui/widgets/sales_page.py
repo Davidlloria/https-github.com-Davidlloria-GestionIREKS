@@ -1880,11 +1880,11 @@ class SalesToolsDialog(QDialog):
                 str(row.get("articulo_descripcion") or ""),
                 str(row.get("status") or ""),
                 str(row.get("issue_text") or ""),
-                f"{float(row.get('envase') or 0.0):.3f}",
-                f"{float(row.get('unidades') or 0.0):.3f}",
-                f"{float(row.get('kg') or 0.0):.3f}",
-                f"{float(row.get('precio_kg') or 0.0):.4f}",
-                f"{float(row.get('euros') or 0.0):.2f}",
+                self._fmt_num3(row.get("envase")),
+                self._fmt_num3(row.get("unidades")),
+                self._fmt_num3(row.get("kg")),
+                f"{float(row.get('precio_kg') or 0.0):,.4f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                self._fmt_num(row.get("euros")),
             ]
             for col_idx, value in enumerate(values):
                 item = QTableWidgetItem(str(value))
@@ -5734,6 +5734,10 @@ class SalesPage(QWidget):
     def _fmt_num(self, value) -> str:
         number = float(value or 0.0)
         return f"{number:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def _fmt_num3(self, value) -> str:
+        number = float(value or 0.0)
+        return f"{number:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     def _fmt_money(self, value) -> str:
         return f"{self._fmt_num(value)} €"
