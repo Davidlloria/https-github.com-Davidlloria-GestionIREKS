@@ -1773,13 +1773,16 @@ class SalesToolsDialog(QDialog):
             message=str(getattr(result, "message", "") or "").replace("\n", " | "),
             warnings=list(getattr(result, "warnings", []) or []),
         )
+        if bool(getattr(result, "ok", False)) and close_dialog is not None:
+            close_dialog.accept()
+            if self._on_import_completed is not None:
+                QTimer.singleShot(0, self._on_import_completed)
+            QTimer.singleShot(0, self._refresh_history)
+            return
+
         self._refresh_history()
         if bool(getattr(result, "ok", False)) and self._on_import_completed is not None:
             self._on_import_completed()
-
-        if bool(getattr(result, "ok", False)) and close_dialog is not None:
-            close_dialog.accept()
-            return
 
         if bool(getattr(result, "ok", False)) and status == "ok":
             QMessageBox.information(self, "Importación clientes", str(getattr(result, "message", "") or ""))
