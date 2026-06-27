@@ -67,6 +67,7 @@ ARROW_UP_ICON_PATH = BASE_DIR / "assets" / "icons" / "arrow-up.svg"
 CHART_COLUMN_ICON_PATH = BASE_DIR / "assets" / "icons" / "chart-column.svg"
 FILTER_ICON_PATH = BASE_DIR / "assets" / "icons" / "filtro.svg"
 SALES_IREKS_ICON_PATH = BASE_DIR / "assets" / "icons" / "chart-no-axes-combined.svg"
+DATABASE_DOWN_ICON_PATH = BASE_DIR / "assets" / "icons" / "database-down.svg"
 CHECK_ICON_PATH = BASE_DIR / "assets" / "icons" / "check.svg"
 ERROR_ICON_PATH = BASE_DIR / "assets" / "icons" / "error.svg"
 EXPORT_ICON_PATH = BASE_DIR / "assets" / "icons" / "export.svg"
@@ -1153,6 +1154,16 @@ class SalesToolsDialog(QDialog):
         )
         self.import_btn.clicked.connect(self._import_ireks_sales)
         button_row.addWidget(self.import_btn)
+        if self._mode == "clientes":
+            self.manage_imports_btn = self._make_action_button(
+                "Importaciones",
+                DATABASE_DOWN_ICON_PATH,
+                background="#F2ECFF",
+                border="#C8B6E8",
+                foreground="#6C4AA3",
+            )
+            self.manage_imports_btn.clicked.connect(self._open_clientes_import_management_dialog)
+            button_row.addWidget(self.manage_imports_btn)
         export_layout.addLayout(button_row)
         layout.addWidget(export_card)
 
@@ -1186,6 +1197,7 @@ class SalesToolsDialog(QDialog):
         self.history_filter_combo.addItem("Todos", "all")
         self.history_filter_combo.addItem("Exportaciones", "export")
         self.history_filter_combo.addItem("Importaciones", "import")
+        self.history_filter_combo.addItem("Reversiones", "revert")
         self.history_filter_combo.currentIndexChanged.connect(lambda *_: self._refresh_history())
         self.history_filter_combo.setMinimumWidth(190)
         self.history_filter_combo.setStyleSheet(
@@ -1363,6 +1375,8 @@ class SalesToolsDialog(QDialog):
         clean = str(action or "").strip().lower()
         if clean == "export":
             return "Exportación", EXPORT_ICON_PATH
+        if clean in {"revert", "undo", "delete", "cleanup"}:
+            return "Reversión", DATABASE_DOWN_ICON_PATH
         return "Importación", IMPORT_ICON_PATH
 
     def _ensure_history_table(self) -> None:
@@ -1417,7 +1431,7 @@ class SalesToolsDialog(QDialog):
         action_filter = str(self.history_filter_combo.currentData() or "all").strip().lower()
         where_clause = ""
         params: list[object] = [safe_limit]
-        if action_filter in {"export", "import"}:
+        if action_filter in {"export", "import", "revert"}:
             where_clause = "WHERE action = ?"
             params = [action_filter, safe_limit]
         query = f"""
@@ -1930,6 +1944,159 @@ class SalesToolsDialog(QDialog):
         dialog.show()
         dialog.raise_()
         dialog.activateWindow()
+        dialog.exec()
+
+    def _open_clientes_import_management_dialog(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Importaciones clientes")
+        dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        dialog.resize(980, 560)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        title = QLabel("Gestión de importaciones de clientes")
+        title.setStyleSheet("font-size: 20px; font-weight: 700; color: #14213D;")
+        layout.addWidget(title)
+
+        subtitle = QLabel("Selecciona un lote importado para revertirlo o elimina todas las importaciones de clientes.")
+        subtitle.setWordWrap(True)
+        subtitle.setStyleSheet("color: #5E708A; font-size: 12px;")
+        layout.addWidget(subtitle)
+
+        table = QTableWidget(0, 5)
+        table.setHorizontalHeaderLabels(["Fecha", "Archivo", "Año", "Filas", "Estado"])
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.setAlternatingRowColors(True)
+        table.setShowGrid(False)
+        header = table.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        table.setColumnWidth(0, 160)
+        table.setColumnWidth(2, 90)
+        table.setColumnWidth(3, 90)
+        table.setColumnWidth(4, 150)
+        table.verticalHeader().setDefaultSectionSize(34)
+
+        def format_datetime(value: str) -> str:
+            created_at = str(value or "").replace("T", " ")
+            try:
+                return datetime.fromisoformat(str(value or "")).strftime("%d/%m/%Y %H:%M")
+            except Exception:  # noqa: BLE001
+                return created_at
+
+        def load_rows() -> list[object]:
+            rows = list(self._sales_reconciliation_service.list_clientes_import_lotes())
+            table.setRowCount(len(rows))
+            for row_idx, row in enumerate(rows):
+                created_item = QTableWidgetItem(format_datetime(getattr(row, "creado_en", "")))
+                file_item = QTableWidgetItem(str(getattr(row, "archivo_nombre", "") or "-"))
+                year_item = QTableWidgetItem(str(getattr(row, "anio", "") or ""))
+                rows_item = QTableWidgetItem(str(getattr(row, "filas", 0) or 0))
+                state_item = QTableWidgetItem(str(getattr(row, "estado", "") or ""))
+                lote_id = str(getattr(row, "lote_id", "") or "")
+                for item in (created_item, file_item, year_item, rows_item, state_item):
+                    item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                    item.setData(Qt.ItemDataRole.UserRole, lote_id)
+                    item.setForeground(QBrush(QColor("#14213D")))
+                year_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                rows_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                state_item.setForeground(QBrush(QColor("#1D7D4D")))
+                table.setItem(row_idx, 0, created_item)
+                table.setItem(row_idx, 1, file_item)
+                table.setItem(row_idx, 2, year_item)
+                table.setItem(row_idx, 3, rows_item)
+                table.setItem(row_idx, 4, state_item)
+            return rows
+
+        load_rows()
+        layout.addWidget(table, 1)
+
+        def selected_lote_id() -> str:
+            current_row = table.currentRow()
+            if current_row < 0:
+                return ""
+            item = table.item(current_row, 0) or table.item(current_row, 1)
+            return str(item.data(Qt.ItemDataRole.UserRole) or "") if item is not None else ""
+
+        def refresh_after_change() -> None:
+            load_rows()
+            if self._on_import_completed is not None:
+                self._on_import_completed()
+            self._refresh_history()
+
+        def undo_selected() -> None:
+            lote_id = selected_lote_id()
+            if not lote_id:
+                QMessageBox.information(dialog, "Importaciones clientes", "Selecciona un lote para revertir.")
+                return
+            selected_index = table.currentRow()
+            file_name = str(table.item(selected_index, 1).text() if table.item(selected_index, 1) is not None else "")
+            rows_count = str(table.item(selected_index, 3).text() if table.item(selected_index, 3) is not None else "0")
+            confirm = QMessageBox.question(
+                dialog,
+                "Revertir lote",
+                f"Vas a revertir el lote:\n{file_name}\n\nFilas a eliminar: {rows_count}\n\n¿Continuar?",
+            )
+            if confirm != QMessageBox.StandardButton.Yes:
+                return
+            result = self._sales_reconciliation_service.delete_clientes_import_lote(lote_id)
+            self._record_history(
+                action="revert",
+                detail=f"{file_name} | Lote clientes",
+                status="ok" if bool(getattr(result, "ok", False)) else "error",
+                message=str(getattr(result, "message", "") or ""),
+            )
+            refresh_after_change()
+            if bool(getattr(result, "ok", False)):
+                QMessageBox.information(dialog, "Importaciones clientes", str(getattr(result, "message", "") or ""))
+            else:
+                QMessageBox.warning(dialog, "Importaciones clientes", str(getattr(result, "message", "") or ""))
+
+        def clear_all() -> None:
+            confirm = QMessageBox.question(
+                dialog,
+                "Vaciar importaciones",
+                "Vas a eliminar todas las importaciones de clientes.\n\n¿Estás seguro?",
+            )
+            if confirm != QMessageBox.StandardButton.Yes:
+                return
+            result = self._sales_reconciliation_service.delete_all_clientes_imports()
+            self._record_history(
+                action="cleanup",
+                detail="Vaciar importaciones clientes",
+                status="ok" if bool(getattr(result, "ok", False)) else "error",
+                message=str(getattr(result, "message", "") or ""),
+            )
+            refresh_after_change()
+            if bool(getattr(result, "ok", False)):
+                QMessageBox.information(dialog, "Importaciones clientes", str(getattr(result, "message", "") or ""))
+            else:
+                QMessageBox.warning(dialog, "Importaciones clientes", str(getattr(result, "message", "") or ""))
+
+        table.cellDoubleClicked.connect(lambda *_: undo_selected())
+
+        actions = QHBoxLayout()
+        actions.addStretch(1)
+        undo_btn = QPushButton("Deshacer lote")
+        undo_btn.clicked.connect(undo_selected)
+        actions.addWidget(undo_btn)
+        clear_btn = QPushButton("Vaciar todo")
+        clear_btn.clicked.connect(clear_all)
+        actions.addWidget(clear_btn)
+        close_btn = QPushButton("Cerrar")
+        close_btn.clicked.connect(dialog.accept)
+        actions.addWidget(close_btn)
+        layout.addLayout(actions)
+
         dialog.exec()
 
     def _write_ireks_sales_workbook(self, destination: Path) -> tuple[int, list[str]]:

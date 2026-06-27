@@ -15,6 +15,7 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 from sqlmodel import Session, col, select
+from sqlalchemy import func
 
 from app.core.config import BASE_DIR
 from app.core.database import engine
@@ -51,6 +52,17 @@ class SalesOpResult:
     imported: int = 0
     incidencias: int = 0
     warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ClientesImportLoteRow:
+    lote_id: str
+    creado_en: str
+    archivo_nombre: str
+    anio: int
+    estado: str
+    archivo_hash: str
+    filas: int
 
 
 @dataclass
@@ -820,6 +832,89 @@ class SalesReconciliationService:
                         f"{prefix} - {cliente_nombre} - {product_code}: kg calculado ({kg_calc:.3f}) difiere del archivo ({original_kg:.3f}); se usara el valor del archivo."
                     )
             return warnings
+
+    def list_clientes_import_lotes(self, limit: int | None = None) -> list[ClientesImportLoteRow]:
+        safe_limit = 200 if limit is None else max(1, min(int(limit), 500))
+        with Session(engine) as session:
+            lotes = list(
+                session.exec(
+                    select(VentaClientesImportLote)
+                    .where(VentaClientesImportLote.fuente == "clientes")
+                    .order_by(VentaClientesImportLote.creado_en.desc())
+                    .limit(safe_limit)
+                ).all()
+            )
+            if not lotes:
+                return []
+            lote_ids = [str(lote.lote_id or "").strip() for lote in lotes if str(lote.lote_id or "").strip()]
+            row_counts: dict[str, int] = {}
+            if lote_ids:
+                count_rows = session.exec(
+                    select(VentaClientesRaw.lote_id, func.count(VentaClientesRaw.raw_id))
+                    .where(VentaClientesRaw.lote_id.in_(lote_ids))
+                    .group_by(VentaClientesRaw.lote_id)
+                ).all()
+                row_counts = {str(row[0] or "").strip(): int(row[1] or 0) for row in count_rows}
+        return [
+            ClientesImportLoteRow(
+                lote_id=str(lote.lote_id or ""),
+                creado_en=lote.creado_en.isoformat(timespec="seconds") if getattr(lote, "creado_en", None) else "",
+                archivo_nombre=str(lote.archivo_nombre or ""),
+                anio=int(lote.anio or 0),
+                estado=str(lote.estado or ""),
+                archivo_hash=str(lote.archivo_hash or ""),
+                filas=int(row_counts.get(str(lote.lote_id or "").strip(), 0)),
+            )
+            for lote in lotes
+        ]
+
+    def delete_clientes_import_lote(self, lote_id: str) -> SalesOpResult:
+        clean_lote_id = str(lote_id or "").strip()
+        if not clean_lote_id:
+            return SalesOpResult(False, "No se indicó un lote de importación válido.")
+
+        with Session(engine) as session:
+            lote = session.get(VentaClientesImportLote, clean_lote_id)
+            if lote is None or str(getattr(lote, "fuente", "") or "") != "clientes":
+                return SalesOpResult(False, "No se encontró el lote de importación de clientes.")
+            rows = list(session.exec(select(VentaClientesRaw).where(VentaClientesRaw.lote_id == clean_lote_id)).all())
+            for row in rows:
+                session.delete(row)
+            session.delete(lote)
+            session.commit()
+
+        return SalesOpResult(
+            True,
+            f"Lote de clientes revertido: {str(getattr(lote, 'archivo_nombre', '') or clean_lote_id)}.",
+            imported=len(rows),
+            incidencias=0,
+        )
+
+    def delete_all_clientes_imports(self) -> SalesOpResult:
+        with Session(engine) as session:
+            lotes = list(
+                session.exec(
+                    select(VentaClientesImportLote).where(VentaClientesImportLote.fuente == "clientes")
+                ).all()
+            )
+            if not lotes:
+                return SalesOpResult(True, "No hay importaciones de clientes para eliminar.", imported=0, incidencias=0)
+            lote_ids = [str(lote.lote_id or "").strip() for lote in lotes if str(lote.lote_id or "").strip()]
+            rows = list(
+                session.exec(select(VentaClientesRaw).where(VentaClientesRaw.lote_id.in_(lote_ids))).all()
+            )
+            for row in rows:
+                session.delete(row)
+            for lote in lotes:
+                session.delete(lote)
+            session.commit()
+
+        return SalesOpResult(
+            True,
+            f"Importaciones de clientes eliminadas: {len(lotes)} lotes y {len(rows)} filas.",
+            imported=len(rows),
+            incidencias=0,
+        )
 
     def rebuild_igsa_warehouse_movements(self, periodo: str = "") -> SalesOpResult:
         clean_periodo = str(periodo or "").strip()
