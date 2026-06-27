@@ -121,6 +121,9 @@ class ClientesImportPreview:
     invalid_rows: int
     preview_rows: list[dict[str, object]]
     issues: list[str]
+    anio: int = 0
+    duplicate_rows: int = 0
+    import_rows: list[dict[str, object]] = field(default_factory=list)
 
 
 class SalesReconciliationService:
@@ -456,7 +459,14 @@ class SalesReconciliationService:
         *,
         replace_existing: bool = False,
         force_leve_rows: set[int] | None = None,
+        preview: ClientesImportPreview | None = None,
     ) -> SalesOpResult:
+        try:
+            if preview is None:
+                preview = self._build_clientes_import_preview(file_path)
+            return self._import_clientes_from_preview(file_path, preview, replace_existing=replace_existing)
+        except ValueError as exc:
+            return SalesOpResult(False, str(exc))
         try:
             parsed_rows, year = self._parse_clientes_workbook(file_path)
         except ValueError as exc:
@@ -615,6 +625,7 @@ class SalesReconciliationService:
         )
 
     def preview_clientes_excel(self, file_path: Path) -> ClientesImportPreview:
+        return self._build_clientes_import_preview(file_path)
         parsed_rows, year = self._parse_clientes_workbook(file_path)
         if not parsed_rows or year <= 0:
             return ClientesImportPreview(
@@ -782,6 +793,452 @@ class SalesReconciliationService:
             preview_rows=preview_rows,
             issues=issues,
         )
+
+    def _build_clientes_import_preview(self, file_path: Path) -> ClientesImportPreview:
+        parsed_rows, year = self._parse_clientes_workbook(file_path)
+        if not parsed_rows or year <= 0:
+            return ClientesImportPreview(
+                total_rows=len(parsed_rows),
+                valid_rows=0,
+                invalid_rows=len(parsed_rows),
+                preview_rows=[],
+                issues=["No se encontraron filas validas para previsualizar."],
+                anio=year,
+                duplicate_rows=0,
+                import_rows=[],
+            )
+
+        preview_rows: list[dict[str, object]] = []
+        import_rows: list[dict[str, object]] = []
+        issues: list[str] = []
+        valid_rows = 0
+        invalid_rows = 0
+        duplicate_rows = 0
+
+        def append_row(
+            *,
+            item: ClientesWorkbookParsedLine,
+            cliente_nombre: str,
+            cliente_codigo: str,
+            articulo_codigo: str,
+            articulo_id: str,
+            articulo_codigo_corto: str,
+            articulo_descripcion: str,
+            articulo_label: str,
+            envase: float,
+            unidades: float,
+            kg: float,
+            precio_kg: float,
+            euros: float,
+            status: str,
+            issue_text: str,
+            can_import: bool,
+        ) -> dict[str, object]:
+            row = {
+                "source_row": item.source_row,
+                "anio": int(item.anio or year or 0),
+                "cliente_id": item.cliente_id,
+                "cliente_codigo": cliente_codigo,
+                "cliente_nombre": cliente_nombre,
+                "articulo_codigo": articulo_codigo,
+                "articulo_id": articulo_id,
+                "articulo_codigo_corto": articulo_codigo_corto,
+                "articulo_descripcion": articulo_descripcion,
+                "articulo_label": articulo_label,
+                "envase": float(envase or 0.0),
+                "unidades": float(unidades or 0.0),
+                "kg": float(kg or 0.0),
+                "precio_kg": float(precio_kg or 0.0),
+                "euros": float(euros or 0.0),
+                "status": status,
+                "issue_text": issue_text,
+                "can_import": can_import,
+            }
+            preview_rows.append(row)
+            if can_import:
+                import_rows.append(row)
+            return row
+
+        with Session(engine) as session:
+            indirect_clients = {
+                str(row.cliente_id or "").strip(): row
+                for row in session.exec(select(Cliente)).all()
+                if self._is_indirect_client(row)
+            }
+            product_refs = self._build_clientes_product_reference_lookup(session)
+            product_ids = sorted({product_id for product_id in product_refs.values() if product_id})
+            products = {}
+            if product_ids:
+                products = {
+                    str(row.articulo_id or "").strip(): row
+                    for row in session.exec(select(IngredienteIreks).where(col(IngredienteIreks.articulo_id).in_(product_ids))).all()
+                    if str(row.articulo_id or "").strip()
+                }
+
+            existing_signatures = self._load_clientes_import_signatures(session)
+            seen_signatures = set(existing_signatures)
+
+            for item in parsed_rows:
+                cliente = indirect_clients.get(item.cliente_id)
+                cliente_nombre = str(item.cliente_nombre or "").strip()
+                if not cliente_nombre and cliente is not None:
+                    cliente_nombre = str(
+                        getattr(cliente, "cliente_nombre_comercial", "") or getattr(cliente, "cliente_nombre_fiscal", "") or ""
+                    ).strip()
+                if not cliente_nombre:
+                    cliente_nombre = item.cliente_id
+                cliente_codigo = str(item.cliente_codigo or "").strip()
+
+                if cliente is None:
+                    message = f"Cliente no valido o no indirecto ({item.cliente_id})."
+                    issues.append(f"Fila {item.source_row} - {cliente_nombre} - {item.cliente_id}: {message}")
+                    append_row(
+                        item=item,
+                        cliente_nombre=cliente_nombre,
+                        cliente_codigo=cliente_codigo,
+                        articulo_codigo=item.articulo_id,
+                        articulo_id="",
+                        articulo_codigo_corto="",
+                        articulo_descripcion=item.articulo_descripcion,
+                        articulo_label=item.articulo_descripcion or item.articulo_id,
+                        envase=0.0,
+                        unidades=item.unidades,
+                        kg=0.0,
+                        precio_kg=0.0,
+                        euros=0.0,
+                        status="error",
+                        issue_text=message,
+                        can_import=False,
+                    )
+                    invalid_rows += 1
+                    continue
+
+                product_id = self._resolve_clientes_product_id(item.articulo_id, product_refs)
+                if not product_id:
+                    message = f"Articulo sin referencia IREKS para codigo distribuidor {item.articulo_id}."
+                    issues.append(f"Fila {item.source_row} - {cliente_nombre} - {item.articulo_id}: {message}")
+                    append_row(
+                        item=item,
+                        cliente_nombre=cliente_nombre,
+                        cliente_codigo=cliente_codigo,
+                        articulo_codigo=item.articulo_id,
+                        articulo_id="",
+                        articulo_codigo_corto="",
+                        articulo_descripcion=item.articulo_descripcion,
+                        articulo_label=item.articulo_descripcion or item.articulo_id,
+                        envase=0.0,
+                        unidades=item.unidades,
+                        kg=0.0,
+                        precio_kg=0.0,
+                        euros=0.0,
+                        status="error",
+                        issue_text=message,
+                        can_import=False,
+                    )
+                    invalid_rows += 1
+                    continue
+
+                product = products.get(product_id)
+                short_code, product_name, product_label = self._clientes_product_label(product, item.articulo_descripcion)
+                product_weight = float(getattr(product, "articulo_envase_peso", 0.0) or 0.0)
+                if product_weight <= 0:
+                    message = f"Producto sin peso de envase en la ficha IREKS {product_label or product_id}."
+                    issues.append(f"Fila {item.source_row} - {cliente_nombre} - {short_code or product_id}: {message}")
+                    append_row(
+                        item=item,
+                        cliente_nombre=cliente_nombre,
+                        cliente_codigo=cliente_codigo,
+                        articulo_codigo=item.articulo_id,
+                        articulo_id=product_id,
+                        articulo_codigo_corto=short_code,
+                        articulo_descripcion=product_name,
+                        articulo_label=product_label or product_id,
+                        envase=0.0,
+                        unidades=item.unidades,
+                        kg=0.0,
+                        precio_kg=0.0,
+                        euros=0.0,
+                        status="error",
+                        issue_text=message,
+                        can_import=False,
+                    )
+                    invalid_rows += 1
+                    continue
+
+                row_year = int(item.anio or year or 0)
+                precio_kg = self._resolve_tarifa_precio_kg(session, product_id, row_year)
+                kg_calc = self._to_float(item.unidades) * product_weight
+                if kg_calc <= 0:
+                    message = "sin cantidad valida en unidades; no se pudo calcular kg con el peso del envase."
+                    issues.append(f"Fila {item.source_row} - {cliente_nombre} - {short_code or product_id}: {message}")
+                    append_row(
+                        item=item,
+                        cliente_nombre=cliente_nombre,
+                        cliente_codigo=cliente_codigo,
+                        articulo_codigo=item.articulo_id,
+                        articulo_id=product_id,
+                        articulo_codigo_corto=short_code,
+                        articulo_descripcion=product_name,
+                        articulo_label=product_label or product_id,
+                        envase=product_weight,
+                        unidades=item.unidades,
+                        kg=0.0,
+                        precio_kg=precio_kg,
+                        euros=0.0,
+                        status="error",
+                        issue_text=message,
+                        can_import=False,
+                    )
+                    invalid_rows += 1
+                    continue
+
+                euros = kg_calc * precio_kg if precio_kg > 0 else 0.0
+                status = "warning" if precio_kg <= 0 else "ok"
+                issue_text = ""
+                if status == "warning":
+                    issue_text = (
+                        f"sin tarifa valida para el ano {row_year} del producto IREKS {product_label or product_id}; "
+                        "se importara con precio 0."
+                    )
+
+                signature = self._clientes_row_signature(
+                    item.cliente_id,
+                    row_year,
+                    product_id,
+                    item.unidades,
+                    product_weight,
+                    precio_kg,
+                    euros,
+                )
+                if signature in seen_signatures:
+                    duplicate_rows += 1
+                    issues.append(
+                        f"Fila {item.source_row} - {cliente_nombre} - {short_code or item.articulo_id}: "
+                        "fila duplicada exacta respecto a una importacion existente; omitida."
+                    )
+                    continue
+                seen_signatures.add(signature)
+
+                append_row(
+                    item=item,
+                    cliente_nombre=cliente_nombre,
+                    cliente_codigo=cliente_codigo,
+                    articulo_codigo=item.articulo_id,
+                    articulo_id=product_id,
+                    articulo_codigo_corto=short_code,
+                    articulo_descripcion=product_name,
+                    articulo_label=product_label or product_id,
+                    envase=product_weight,
+                    unidades=item.unidades,
+                    kg=kg_calc,
+                    precio_kg=precio_kg,
+                    euros=euros,
+                    status=status,
+                    issue_text=issue_text,
+                    can_import=True,
+                )
+                valid_rows += 1
+                if issue_text:
+                    issues.append(
+                        f"Fila {item.source_row} - {cliente_nombre} - {short_code or product_id}: {issue_text}"
+                    )
+
+        return ClientesImportPreview(
+            total_rows=len(parsed_rows),
+            valid_rows=valid_rows,
+            invalid_rows=invalid_rows,
+            preview_rows=preview_rows,
+            issues=issues,
+            anio=year,
+            duplicate_rows=duplicate_rows,
+            import_rows=import_rows,
+        )
+
+    def _import_clientes_from_preview(
+        self,
+        file_path: Path,
+        preview: ClientesImportPreview,
+        *,
+        replace_existing: bool = False,
+    ) -> SalesOpResult:
+        file_hash = self._file_hash(file_path)
+        preview_rows = [
+            dict(row)
+            for row in list(getattr(preview, "import_rows", []) or [])
+            if str(row.get("status") or "").strip().lower() in {"ok", "warning"} or bool(row.get("can_import"))
+        ]
+        issue_lines = [str(item).strip() for item in list(getattr(preview, "issues", []) or []) if str(item).strip()]
+        if not preview_rows:
+            return SalesOpResult(
+                False,
+                "No se pudo importar ninguna fila valida.",
+                imported=0,
+                incidencias=int(getattr(preview, "invalid_rows", 0) or 0) + int(getattr(preview, "duplicate_rows", 0) or 0),
+                warnings=issue_lines,
+            )
+
+        lote_year = int(getattr(preview, "anio", 0) or 0)
+        if lote_year <= 0:
+            lote_year = next((int(item.get("anio") or 0) for item in preview_rows if int(item.get("anio") or 0) > 0), 0)
+        warning_rows = sum(1 for row in preview_rows if str(row.get("status") or "").strip().lower() == "warning")
+        omitted = int(getattr(preview, "invalid_rows", 0) or 0) + int(getattr(preview, "duplicate_rows", 0) or 0)
+
+        with Session(engine) as session:
+            if not replace_existing:
+                existing = session.exec(
+                    select(VentaClientesImportLote).where(
+                        VentaClientesImportLote.fuente == "clientes",
+                        VentaClientesImportLote.archivo_hash == file_hash,
+                    )
+                ).first()
+                if existing is not None:
+                    return SalesOpResult(True, "El archivo ya estaba importado.", imported=0, incidencias=0)
+
+            replacement_keys: set[tuple[str, int, str]] = set()
+            if replace_existing:
+                for item in preview_rows:
+                    cliente_id = str(item.get("cliente_id") or "").strip()
+                    articulo_id = str(item.get("articulo_id") or "").strip()
+                    anio = int(item.get("anio") or lote_year or 0)
+                    if not cliente_id or not articulo_id or anio <= 0:
+                        continue
+                    replacement_keys.add((cliente_id, anio, articulo_id))
+                for cliente_id, anio, articulo_id in replacement_keys:
+                    for raw_row in session.exec(
+                        select(VentaClientesRaw).where(
+                            VentaClientesRaw.anio == anio,
+                            VentaClientesRaw.cliente_id == cliente_id,
+                            VentaClientesRaw.articulo_id == articulo_id,
+                        )
+                    ).all():
+                        session.delete(raw_row)
+
+            lote = VentaClientesImportLote(
+                lote_id=str(uuid4()),
+                fuente="clientes",
+                anio=lote_year,
+                archivo_nombre=file_path.name,
+                archivo_hash=file_hash,
+                estado="procesado",
+            )
+            session.add(lote)
+            session.flush()
+
+            rows: list[VentaClientesRaw] = []
+            for item in preview_rows:
+                status = str(item.get("status") or "").strip().lower()
+                if status not in {"ok", "warning"}:
+                    continue
+                row_year = int(item.get("anio") or lote_year or 0)
+                row = VentaClientesRaw(
+                    raw_id=str(uuid4()),
+                    lote_id=lote.lote_id,
+                    cliente_id=str(item.get("cliente_id") or "").strip(),
+                    anio=row_year,
+                    articulo_codigo_origen=str(item.get("articulo_codigo") or "").strip(),
+                    articulo_id=str(item.get("articulo_id") or "").strip(),
+                    articulo_descripcion_origen=str(item.get("articulo_descripcion") or "").strip(),
+                    envase=float(item.get("envase") or 0.0),
+                    unidades=float(item.get("unidades") or 0.0),
+                    kg=float(item.get("kg") or 0.0),
+                    precio_kg=float(item.get("precio_kg") or 0.0),
+                    euros=float(item.get("euros") or 0.0),
+                    payload_json=json.dumps(
+                        {
+                            "source_row": item.get("source_row"),
+                            "cliente_id": str(item.get("cliente_id") or "").strip(),
+                            "cliente_codigo": str(item.get("cliente_codigo") or "").strip(),
+                            "cliente_nombre": str(item.get("cliente_nombre") or "").strip(),
+                            "articulo_id": str(item.get("articulo_codigo") or "").strip(),
+                            "articulo_id_interno": str(item.get("articulo_id") or "").strip(),
+                            "articulo_codigo_corto": str(item.get("articulo_codigo_corto") or "").strip(),
+                            "articulo_descripcion": str(item.get("articulo_descripcion") or "").strip(),
+                            "anio": row_year,
+                            "articulo_envase_peso": float(item.get("envase") or 0.0),
+                            "unidades": float(item.get("unidades") or 0.0),
+                            "precio_kg": float(item.get("precio_kg") or 0.0),
+                            "euros": float(item.get("euros") or 0.0),
+                        },
+                        ensure_ascii=False,
+                    ),
+                )
+                rows.append(row)
+                session.add(row)
+
+            if not rows:
+                session.rollback()
+                return SalesOpResult(
+                    False,
+                    "No se pudo importar ninguna fila valida.",
+                    imported=0,
+                    incidencias=int(getattr(preview, "invalid_rows", 0) or 0) + int(getattr(preview, "duplicate_rows", 0) or 0),
+                    warnings=issue_lines,
+                )
+
+            session.commit()
+
+        message = "Importacion de ventas de clientes completada."
+        if replace_existing:
+            message = f"{message} Modo correccion aplicado."
+        if warning_rows:
+            message = f"{message} Con {warning_rows} advertencias de tarifa."
+        if omitted:
+            message = f"{message} Se omitieron {omitted} filas no importables."
+        return SalesOpResult(True, message, imported=len(rows), incidencias=len(issue_lines), warnings=issue_lines)
+
+    def _clientes_row_signature(
+        self,
+        cliente_id: object,
+        anio: object,
+        articulo_id: object,
+        unidades: object,
+        envase: object,
+        precio_kg: object,
+        euros: object,
+    ) -> tuple[str, int, str, float, float, float, float]:
+        return (
+            str(cliente_id or "").strip(),
+            self._to_int(anio),
+            str(articulo_id or "").strip(),
+            round(self._to_float(unidades), 6),
+            round(self._to_float(envase), 6),
+            round(self._to_float(precio_kg), 6),
+            round(self._to_float(euros), 6),
+        )
+
+    def _load_clientes_import_signatures(self, session: Session) -> set[tuple[str, int, str, float, float, float, float]]:
+        signatures: set[tuple[str, int, str, float, float, float, float]] = set()
+        rows = list(session.exec(select(VentaClientesRaw)).all())
+        for row in rows:
+            payload = self._safe_json_dict(str(getattr(row, "payload_json", "") or ""))
+            cliente_id = str(payload.get("cliente_id") or getattr(row, "cliente_id", "") or "").strip()
+            anio = self._to_int(payload.get("anio") or getattr(row, "anio", 0))
+            articulo_id = str(payload.get("articulo_id_interno") or getattr(row, "articulo_id", "") or "").strip()
+            unidades = payload.get("unidades", getattr(row, "unidades", 0.0))
+            envase = payload.get("articulo_envase_peso", getattr(row, "envase", 0.0))
+            precio_kg = payload.get("precio_kg", getattr(row, "precio_kg", 0.0))
+            euros = payload.get("euros", getattr(row, "euros", 0.0))
+            signatures.add(self._clientes_row_signature(cliente_id, anio, articulo_id, unidades, envase, precio_kg, euros))
+        return signatures
+
+    def _clientes_product_label(
+        self,
+        product: IngredienteIreks | None,
+        fallback_descripcion: object = "",
+    ) -> tuple[str, str, str]:
+        short_code = ""
+        product_name = ""
+        if product is not None:
+            short_code = str(
+                getattr(product, "articulo_referencia_corta", "") or getattr(product, "articulo_referencia", "") or ""
+            ).strip()
+            product_name = str(getattr(product, "articulo_descripcion", "") or "").strip()
+        if not product_name:
+            product_name = str(fallback_descripcion or "").strip()
+        if not product_name:
+            product_name = short_code
+        product_label = f"{short_code} - {product_name}" if short_code else product_name
+        return short_code, product_name, product_label
 
     def get_clientes_import_warning_details(self, archivo_nombre: str) -> list[str]:
         clean_name = str(archivo_nombre or "").strip()
