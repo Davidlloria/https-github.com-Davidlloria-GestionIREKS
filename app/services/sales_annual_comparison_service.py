@@ -1123,9 +1123,12 @@ class SalesAnnualComparisonService:
         clean_cliente_text = self._normalize_search_text(cliente_texto)
         if current_year <= 0 or (not clean_articulo_id and not clean_articulo_codigo):
             return []
+        years = {current_year}
+        if current_year > 1:
+            years.add(current_year - 1)
 
         with Session(self._engine) as session:
-            stmt = select(VentaClientesRaw).where(col(VentaClientesRaw.anio) == current_year)
+            stmt = select(VentaClientesRaw).where(col(VentaClientesRaw.anio).in_(years))
             raw_rows = list(session.exec(stmt))
             clients = list(session.exec(select(Cliente)))
             products = list(session.exec(select(IngredienteIreks)))

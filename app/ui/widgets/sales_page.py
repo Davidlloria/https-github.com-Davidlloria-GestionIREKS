@@ -5409,8 +5409,9 @@ class SalesPage(QWidget):
         title.setStyleSheet("font-size: 20px; font-weight: 700; color: #14213D;")
         layout.addWidget(title)
 
+        year_text = f"Años {year - 1} y {year}" if year > 1 else f"Año {year}"
         subtitle = QLabel(
-            f"Año {year} | {articulo_codigo or articulo_id}"
+            f"{year_text} | {articulo_codigo or articulo_id}"
             f"{' - ' + articulo_nombre if articulo_nombre else ''}"
         )
         subtitle.setWordWrap(True)
