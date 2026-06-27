@@ -1793,7 +1793,6 @@ class SalesToolsDialog(QDialog):
         dialog = QDialog(self)
         dialog.setWindowTitle(f"Previsualización - {source.name}")
         dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
-        dialog.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         dialog.resize(1220, 760)
         root = QVBoxLayout(dialog)
         root.setContentsMargins(14, 14, 14, 14)
@@ -1922,31 +1921,30 @@ class SalesToolsDialog(QDialog):
             table.setItem(row_idx, 12, leve_item)
         root.addWidget(table, 1)
 
+        def queue_import(*, replace_existing: bool = False) -> None:
+            force_rows = self._collect_clientes_leve_rows(table)
+            dialog.accept()
+            QTimer.singleShot(
+                0,
+                lambda: self._execute_clientes_sales_import(
+                    source,
+                    replace_existing=replace_existing,
+                    force_leve_rows=force_rows,
+                ),
+            )
+
         actions = QHBoxLayout()
         actions.addStretch(1)
         import_btn = QPushButton("Importar")
         import_btn.setProperty("btnRole", "success")
         import_btn.setEnabled(bool(getattr(preview, "valid_rows", 0) or forceable_rows_count))
-        import_btn.clicked.connect(
-            lambda: self._execute_clientes_sales_import(
-                source,
-                force_leve_rows=self._collect_clientes_leve_rows(table),
-                close_dialog=dialog,
-            )
-        )
+        import_btn.clicked.connect(lambda: queue_import())
         actions.addWidget(import_btn)
 
         correction_btn = QPushButton("Importar corrección")
         correction_btn.setProperty("btnRole", "warning")
         correction_btn.setEnabled(bool(getattr(preview, "valid_rows", 0) or forceable_rows_count))
-        correction_btn.clicked.connect(
-            lambda: self._execute_clientes_sales_import(
-                source,
-                replace_existing=True,
-                force_leve_rows=self._collect_clientes_leve_rows(table),
-                close_dialog=dialog,
-            )
-        )
+        correction_btn.clicked.connect(lambda: queue_import(replace_existing=True))
         actions.addWidget(correction_btn)
         close_btn = QPushButton("Cerrar")
         close_btn.setProperty("btnRole", "secondary")
