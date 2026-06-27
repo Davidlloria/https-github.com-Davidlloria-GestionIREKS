@@ -512,6 +512,7 @@ class SalesReconciliationService:
                 if not product_id:
                     skipped += 1
                     continue
+                product = session.get(IngredienteIreks, product_id)
 
                 precio_kg = self._resolve_tarifa_precio_kg(session, product_id, year)
                 if precio_kg <= 0:
@@ -549,6 +550,9 @@ class SalesReconciliationService:
                             "cliente_nombre": item.cliente_nombre,
                             "articulo_id": item.articulo_id,
                             "articulo_id_interno": product_id,
+                            "articulo_codigo_corto": str(
+                                getattr(product, "articulo_referencia_corta", "") or getattr(product, "articulo_referencia", "") or ""
+                            ).strip(),
                             "articulo_descripcion": item.articulo_descripcion,
                             "envase": item.envase,
                             "unidades": item.unidades,
@@ -758,8 +762,11 @@ class SalesReconciliationService:
                 for row in rows
                 if str(self._safe_json_dict(row.payload_json).get("articulo_id_interno", "") or row.articulo_id).strip()
             }
-            product_names = {
-                str(product.articulo_id): str(getattr(product, "articulo_descripcion", "") or "").strip()
+            product_labels = {
+                str(product.articulo_id): (
+                    str(getattr(product, "articulo_referencia_corta", "") or getattr(product, "articulo_referencia", "") or "").strip(),
+                    str(getattr(product, "articulo_descripcion", "") or "").strip(),
+                )
                 for product in session.exec(select(IngredienteIreks).where(IngredienteIreks.articulo_id.in_(list(product_ids)))).all()
             }
 
@@ -772,18 +779,20 @@ class SalesReconciliationService:
                 envase = self._to_float(row.envase)
                 unidades = self._to_float(row.unidades)
                 kg_calc = envase * unidades
-                product_name = product_names.get(str(payload.get("articulo_id_interno", "") or row.articulo_id).strip(), "") or str(
-                    payload.get("articulo_descripcion", "") or ""
-                ).strip() or row.articulo_id
+                product_id = str(payload.get("articulo_id_interno", "") or row.articulo_id).strip()
+                product_code, product_name = product_labels.get(product_id, ("", ""))
+                product_code = str(payload.get("articulo_codigo_corto", "") or product_code or "").strip()
+                product_name = product_name or str(payload.get("articulo_descripcion", "") or "").strip() or product_id
+                product_label = f"{product_code} - {product_name}" if product_code else product_name
                 if row.precio_kg <= 0:
                     prefix = f"Fila {source_row}" if source_row else "Fila desconocida"
                     warnings.append(
-                        f"{prefix} - {cliente_nombre}: sin tarifa valida para el producto IREKS {product_name}."
+                        f"{prefix} - {cliente_nombre} - {product_code}: sin tarifa valida para el producto IREKS {product_label}."
                     )
                 if original_kg > 0 and abs(kg_calc - original_kg) > 0.01:
                     prefix = f"Fila {source_row}" if source_row else "Fila desconocida"
                     warnings.append(
-                        f"{prefix} - {cliente_nombre}: kg calculado ({kg_calc:.3f}) difiere del archivo ({original_kg:.3f}); se usara el valor del archivo."
+                        f"{prefix} - {cliente_nombre} - {product_code}: kg calculado ({kg_calc:.3f}) difiere del archivo ({original_kg:.3f}); se usara el valor del archivo."
                     )
             return warnings
 

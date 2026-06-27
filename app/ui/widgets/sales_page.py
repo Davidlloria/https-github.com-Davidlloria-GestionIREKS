@@ -1526,8 +1526,8 @@ class SalesToolsDialog(QDialog):
         meta.setStyleSheet("color: #5E708A;")
         layout.addWidget(meta)
 
-        table = QTableWidget(0, 3)
-        table.setHorizontalHeaderLabels(["Fila", "Cliente", "Mensaje"])
+        table = QTableWidget(0, 4)
+        table.setHorizontalHeaderLabels(["Fila", "Cliente", "Código", "Mensaje"])
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.verticalHeader().setVisible(False)
@@ -1538,16 +1538,18 @@ class SalesToolsDialog(QDialog):
         header.setStretchLastSection(True)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         table.setColumnWidth(0, 100)
         table.setColumnWidth(1, 240)
+        table.setColumnWidth(2, 120)
         table.verticalHeader().setDefaultSectionSize(34)
 
         for warning in warnings:
-            parsed_row, parsed_client, parsed_message = self._parse_history_warning_line(warning)
+            parsed_row, parsed_client, parsed_code, parsed_message = self._parse_history_warning_line(warning)
             row_idx = table.rowCount()
             table.insertRow(row_idx)
-            values = [parsed_row, parsed_client, parsed_message]
+            values = [parsed_row, parsed_client, parsed_code, parsed_message]
             for col_idx, value in enumerate(values):
                 item = QTableWidgetItem(value)
                 item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
@@ -1570,17 +1572,18 @@ class SalesToolsDialog(QDialog):
 
         dialog.exec()
 
-    def _parse_history_warning_line(self, warning: str) -> tuple[str, str, str]:
+    def _parse_history_warning_line(self, warning: str) -> tuple[str, str, str, str]:
         text = str(warning or "").strip()
         if not text:
-            return "", "", ""
+            return "", "", "", ""
         if text.startswith("Fila ") and " - " in text and ": " in text:
             prefix, message = text.split(": ", 1)
-            row_part, client_part = prefix.split(" - ", 1)
-            row_value = row_part.replace("Fila ", "", 1).strip()
-            client_value = client_part.strip()
-            return row_value, client_value, message.strip()
-        return "", "", text
+            parts = prefix.split(" - ")
+            row_value = parts[0].replace("Fila ", "", 1).strip() if parts else ""
+            client_value = parts[1].strip() if len(parts) > 1 else ""
+            code_value = parts[2].strip() if len(parts) > 2 else ""
+            return row_value, client_value, code_value, message.strip()
+        return "", "", "", text
 
     def _copy_history_warning_table_to_clipboard(self, table: QTableWidget) -> None:
         lines: list[str] = []
