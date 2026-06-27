@@ -441,7 +441,7 @@ class SalesReconciliationService:
             sync_warehouse_callback=self._sync_igsa_sales_to_warehouse,
         )
 
-    def import_clientes_excel(self, file_path: Path) -> SalesOpResult:
+    def import_clientes_excel(self, file_path: Path, *, replace_existing: bool = False) -> SalesOpResult:
         try:
             parsed_rows, year = self._parse_clientes_workbook(file_path)
         except ValueError as exc:
@@ -451,14 +451,15 @@ class SalesReconciliationService:
 
         file_hash = self._file_hash(file_path)
         with Session(engine) as session:
-            existing = session.exec(
-                select(VentaClientesImportLote).where(
-                    VentaClientesImportLote.fuente == "clientes",
-                    VentaClientesImportLote.archivo_hash == file_hash,
-                )
-            ).first()
-            if existing is not None:
-                return SalesOpResult(True, "El archivo ya estaba importado.", imported=0, incidencias=0)
+            if not replace_existing:
+                existing = session.exec(
+                    select(VentaClientesImportLote).where(
+                        VentaClientesImportLote.fuente == "clientes",
+                        VentaClientesImportLote.archivo_hash == file_hash,
+                    )
+                ).first()
+                if existing is not None:
+                    return SalesOpResult(True, "El archivo ya estaba importado.", imported=0, incidencias=0)
 
             indirect_clients = {
                 str(row.cliente_id or "").strip(): row
@@ -466,6 +467,25 @@ class SalesReconciliationService:
                 if self._is_indirect_client(row)
             }
             product_refs = self._build_clientes_product_reference_lookup(session)
+            replacement_keys: set[tuple[str, int, str]] = set()
+            if replace_existing:
+                for item in parsed_rows:
+                    cliente = indirect_clients.get(item.cliente_id)
+                    if cliente is None:
+                        continue
+                    product_id = self._resolve_clientes_product_id(item.articulo_id, product_refs)
+                    if not product_id:
+                        continue
+                    replacement_keys.add((item.cliente_id, year, product_id))
+                for cliente_id, anio, articulo_id in replacement_keys:
+                    for raw_row in session.exec(
+                        select(VentaClientesRaw).where(
+                            VentaClientesRaw.anio == anio,
+                            VentaClientesRaw.cliente_id == cliente_id,
+                            VentaClientesRaw.articulo_id == articulo_id,
+                        )
+                    ).all():
+                        session.delete(raw_row)
 
             lote = VentaClientesImportLote(
                 lote_id=str(uuid4()),
@@ -548,6 +568,8 @@ class SalesReconciliationService:
             session.commit()
 
         message = "Importacion de ventas de clientes completada."
+        if replace_existing:
+            message = f"{message} Modo correccion aplicado."
         if warnings_count:
             message = f"{message} Con {warnings_count} advertencias de precio o conversion."
         return SalesOpResult(

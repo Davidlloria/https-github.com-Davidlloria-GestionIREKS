@@ -1643,9 +1643,18 @@ class SalesToolsDialog(QDialog):
             return
         self._show_clientes_sales_preview_dialog(source, preview)
 
-    def _execute_clientes_sales_import(self, source: Path, *, close_dialog: QDialog | None = None) -> None:
+    def _execute_clientes_sales_import(
+        self,
+        source: Path,
+        *,
+        replace_existing: bool = False,
+        close_dialog: QDialog | None = None,
+    ) -> None:
         try:
-            result = self._sales_reconciliation_service.import_clientes_excel(source)
+            result = self._sales_reconciliation_service.import_clientes_excel(
+                source,
+                replace_existing=replace_existing,
+            )
         except Exception as exc:  # noqa: BLE001
             self._record_history(
                 action="import",
@@ -1662,7 +1671,7 @@ class SalesToolsDialog(QDialog):
             status = "warning" if status == "ok" else status
         self._record_history(
             action="import",
-            detail=f"{source.name} | Excel clientes",
+            detail=f"{source.name} | Excel clientes{' | Corrección' if replace_existing else ''}",
             status=status,
             message=str(getattr(result, "message", "") or "").replace("\n", " | "),
             warnings=list(getattr(result, "warnings", []) or []),
@@ -1700,6 +1709,11 @@ class SalesToolsDialog(QDialog):
         summary.setWordWrap(True)
         summary.setStyleSheet("color: #4B5F7A;")
         root.addWidget(summary)
+
+        correction_note = QLabel("La corrección reemplaza filas existentes con la misma combinación de cliente, año y artículo.")
+        correction_note.setWordWrap(True)
+        correction_note.setStyleSheet("color: #8A5A00; font-size: 12px;")
+        root.addWidget(correction_note)
 
         if getattr(preview, "issues", None):
             issues = QPlainTextEdit()
@@ -1790,6 +1804,14 @@ class SalesToolsDialog(QDialog):
         import_btn.setEnabled(bool(getattr(preview, "valid_rows", 0) or 0))
         import_btn.clicked.connect(lambda: self._execute_clientes_sales_import(source, close_dialog=dialog))
         actions.addWidget(import_btn)
+
+        correction_btn = QPushButton("Importar corrección")
+        correction_btn.setProperty("btnRole", "warning")
+        correction_btn.setEnabled(bool(getattr(preview, "valid_rows", 0) or 0))
+        correction_btn.clicked.connect(
+            lambda: self._execute_clientes_sales_import(source, replace_existing=True, close_dialog=dialog)
+        )
+        actions.addWidget(correction_btn)
         close_btn = QPushButton("Cerrar")
         close_btn.setProperty("btnRole", "secondary")
         close_btn.clicked.connect(dialog.reject)
