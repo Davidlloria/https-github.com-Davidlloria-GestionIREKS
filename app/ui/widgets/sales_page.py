@@ -1629,6 +1629,10 @@ class SalesToolsDialog(QDialog):
         number = float(value or 0.0)
         return f"{number:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
+    def _fmt_num(self, value) -> str:
+        number = float(value or 0.0)
+        return f"{number:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
     def _export_ireks_sales(self) -> None:
         default_name = f"ventas_ireks_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         default_path = DATA_DIR / "exports" / "sales" / default_name
