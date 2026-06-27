@@ -1539,7 +1539,7 @@ class SalesToolsDialog(QDialog):
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        table.setColumnWidth(0, 90)
+        table.setColumnWidth(0, 100)
         table.verticalHeader().setDefaultSectionSize(34)
 
         for warning in warnings:
@@ -1557,6 +1557,10 @@ class SalesToolsDialog(QDialog):
 
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
+        copy_btn = QPushButton("Copiar")
+        copy_btn.setMinimumWidth(120)
+        copy_btn.clicked.connect(lambda: self._copy_history_warning_table_to_clipboard(table))
+        btn_row.addWidget(copy_btn)
         close_btn = QPushButton("Cerrar")
         close_btn.setMinimumWidth(120)
         close_btn.clicked.connect(dialog.accept)
@@ -1576,6 +1580,17 @@ class SalesToolsDialog(QDialog):
             client_value = client_part.strip()
             return row_value, client_value, message.strip()
         return "", "", text
+
+    def _copy_history_warning_table_to_clipboard(self, table: QTableWidget) -> None:
+        lines: list[str] = []
+        for row_idx in range(table.rowCount()):
+            values = []
+            for col_idx in range(table.columnCount()):
+                item = table.item(row_idx, col_idx)
+                values.append(str(item.text() if item is not None else "").strip())
+            if any(values):
+                lines.append("\t".join(values))
+        QApplication.clipboard().setText("\n".join(lines))
 
     def _export_ireks_sales(self) -> None:
         default_name = f"ventas_ireks_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"

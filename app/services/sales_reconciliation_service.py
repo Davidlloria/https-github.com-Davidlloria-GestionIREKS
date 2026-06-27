@@ -753,19 +753,32 @@ class SalesReconciliationService:
             if not rows:
                 return []
 
+            product_ids = {
+                str(self._safe_json_dict(row.payload_json).get("articulo_id_interno", "") or row.articulo_id).strip()
+                for row in rows
+                if str(self._safe_json_dict(row.payload_json).get("articulo_id_interno", "") or row.articulo_id).strip()
+            }
+            product_names = {
+                str(product.articulo_id): str(getattr(product, "articulo_descripcion", "") or "").strip()
+                for product in session.exec(select(IngredienteIreks).where(IngredienteIreks.articulo_id.in_(list(product_ids)))).all()
+            }
+
             warnings: list[str] = []
-            for row in rows:
+            for fallback_row_number, row in enumerate(rows, start=1):
                 payload = self._safe_json_dict(row.payload_json)
-                source_row = int(self._to_float(payload.get("source_row", 0)) or 0) or None
+                source_row = int(self._to_float(payload.get("source_row", 0)) or 0) or fallback_row_number
                 cliente_nombre = str(payload.get("cliente_nombre", "") or "").strip() or row.cliente_id
                 original_kg = self._to_float(payload.get("kg", row.kg))
                 envase = self._to_float(row.envase)
                 unidades = self._to_float(row.unidades)
                 kg_calc = envase * unidades
+                product_name = product_names.get(str(payload.get("articulo_id_interno", "") or row.articulo_id).strip(), "") or str(
+                    payload.get("articulo_descripcion", "") or ""
+                ).strip() or row.articulo_id
                 if row.precio_kg <= 0:
                     prefix = f"Fila {source_row}" if source_row else "Fila desconocida"
                     warnings.append(
-                        f"{prefix} - {cliente_nombre}: sin tarifa valida para el producto IREKS {row.articulo_id}."
+                        f"{prefix} - {cliente_nombre}: sin tarifa valida para el producto IREKS {product_name}."
                     )
                 if original_kg > 0 and abs(kg_calc - original_kg) > 0.01:
                     prefix = f"Fila {source_row}" if source_row else "Fila desconocida"
