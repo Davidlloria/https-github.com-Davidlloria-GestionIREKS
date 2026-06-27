@@ -1779,11 +1779,6 @@ class SalesToolsDialog(QDialog):
 
         if bool(getattr(result, "ok", False)) and close_dialog is not None:
             close_dialog.accept()
-            message = str(getattr(result, "message", "") or "")
-            if status == "ok":
-                QTimer.singleShot(0, lambda text=message: QMessageBox.information(self, "Importación clientes", text))
-            else:
-                QTimer.singleShot(0, lambda text=message: QMessageBox.warning(self, "Importación clientes", text))
             return
 
         if bool(getattr(result, "ok", False)) and status == "ok":
