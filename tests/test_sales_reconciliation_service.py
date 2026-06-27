@@ -249,3 +249,23 @@ def test_import_clientes_from_preview_uses_only_importable_rows(tmp_path, monkey
     assert inserted_rows[0].articulo_id == "prod-1"
     assert inserted_rows[0].precio_kg == 0.0
     assert any("Cliente no valido" in line for line in result.warnings)
+
+
+def test_resolve_tarifa_precio_kg_converts_envase_price_to_kg_price(monkeypatch) -> None:
+    class _Tarifa:
+        precio_distribuidor = 41.95
+        precio_fabricante = 0.0
+
+    class _ExecResult:
+        def first(self):
+            return _Tarifa()
+
+    class _Session:
+        def exec(self, _stmt):
+            return _ExecResult()
+
+    service = SalesReconciliationService()
+
+    precio_kg = service._resolve_tarifa_precio_kg(_Session(), "product-1", 2025, envase_peso=12.5)
+
+    assert round(precio_kg, 2) == 3.36

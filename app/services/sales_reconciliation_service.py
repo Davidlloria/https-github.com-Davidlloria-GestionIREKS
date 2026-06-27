@@ -553,7 +553,7 @@ class SalesReconciliationService:
                     continue
 
                 row_year = int(item.anio or lote_year or 0)
-                precio_kg = self._resolve_tarifa_precio_kg(session, product_id, row_year)
+                precio_kg = self._resolve_tarifa_precio_kg(session, product_id, row_year, envase_peso=product_weight)
                 if precio_kg <= 0:
                     warnings_count += 1
                     warning_messages.append(
@@ -733,7 +733,7 @@ class SalesReconciliationService:
                     continue
 
                 row_year = int(item.anio or year or 0)
-                precio_kg = self._resolve_tarifa_precio_kg(session, product_id, row_year)
+                precio_kg = self._resolve_tarifa_precio_kg(session, product_id, row_year, envase_peso=product_weight)
                 kg_calc = self._to_float(item.unidades) * product_weight
                 issue_bits: list[str] = []
                 if precio_kg <= 0:
@@ -966,7 +966,7 @@ class SalesReconciliationService:
                     continue
 
                 row_year = int(item.anio or year or 0)
-                precio_kg = self._resolve_tarifa_precio_kg(session, product_id, row_year)
+                precio_kg = self._resolve_tarifa_precio_kg(session, product_id, row_year, envase_peso=product_weight)
                 kg_calc = self._to_float(item.unidades) * product_weight
                 if kg_calc <= 0:
                     message = "sin cantidad valida en unidades; no se pudo calcular kg con el peso del envase."
@@ -1583,7 +1583,14 @@ class SalesReconciliationService:
             )
         return parsed_rows, parsed_rows[0].anio if parsed_rows else year
 
-    def _resolve_tarifa_precio_kg(self, session: Session, articulo_id: str, year: int) -> float:
+    def _resolve_tarifa_precio_kg(
+        self,
+        session: Session,
+        articulo_id: str,
+        year: int,
+        *,
+        envase_peso: float = 0.0,
+    ) -> float:
         clean_articulo_id = str(articulo_id or "").strip()
         if not clean_articulo_id or year <= 0:
             return 0.0
@@ -1606,10 +1613,15 @@ class SalesReconciliationService:
             ).first()
         if tarifa is None:
             return 0.0
-        precio = float(getattr(tarifa, "precio_distribuidor", 0.0) or 0.0)
-        if precio <= 0:
-            precio = float(getattr(tarifa, "precio_fabricante", 0.0) or 0.0)
-        return precio
+        precio_envase = float(getattr(tarifa, "precio_distribuidor", 0.0) or 0.0)
+        if precio_envase <= 0:
+            precio_envase = float(getattr(tarifa, "precio_fabricante", 0.0) or 0.0)
+        peso = float(envase_peso or 0.0)
+        if precio_envase <= 0:
+            return 0.0
+        if peso <= 0:
+            return precio_envase
+        return precio_envase / peso
 
     def _build_clientes_product_reference_lookup(self, session: Session) -> dict[str, str]:
         lookup: dict[str, str] = {}
