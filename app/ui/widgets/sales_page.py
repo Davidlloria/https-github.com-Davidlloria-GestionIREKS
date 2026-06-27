@@ -1537,9 +1537,10 @@ class SalesToolsDialog(QDialog):
         header = table.horizontalHeader()
         header.setStretchLastSection(True)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         table.setColumnWidth(0, 100)
+        table.setColumnWidth(1, 240)
         table.verticalHeader().setDefaultSectionSize(34)
 
         for warning in warnings:
