@@ -1512,7 +1512,7 @@ class SalesToolsDialog(QDialog):
         dialog = QDialog(self)
         dialog.setWindowTitle("Advertencias de importación")
         dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
-        dialog.resize(780, 520)
+        dialog.resize(920, 560)
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
@@ -1526,10 +1526,34 @@ class SalesToolsDialog(QDialog):
         meta.setStyleSheet("color: #5E708A;")
         layout.addWidget(meta)
 
-        text = QPlainTextEdit()
-        text.setReadOnly(True)
-        text.setPlainText("\n".join(f"- {item}" for item in warnings))
-        layout.addWidget(text, 1)
+        table = QTableWidget(0, 3)
+        table.setHorizontalHeaderLabels(["Fila", "Cliente", "Mensaje"])
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.setAlternatingRowColors(True)
+        table.setShowGrid(False)
+        table.setWordWrap(True)
+        header = table.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        table.setColumnWidth(0, 90)
+        table.verticalHeader().setDefaultSectionSize(34)
+
+        for warning in warnings:
+            parsed_row, parsed_client, parsed_message = self._parse_history_warning_line(warning)
+            row_idx = table.rowCount()
+            table.insertRow(row_idx)
+            values = [parsed_row, parsed_client, parsed_message]
+            for col_idx, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                item.setForeground(QBrush(QColor("#14213D")))
+                table.setItem(row_idx, col_idx, item)
+
+        layout.addWidget(table, 1)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
@@ -1540,6 +1564,18 @@ class SalesToolsDialog(QDialog):
         layout.addLayout(btn_row)
 
         dialog.exec()
+
+    def _parse_history_warning_line(self, warning: str) -> tuple[str, str, str]:
+        text = str(warning or "").strip()
+        if not text:
+            return "", "", ""
+        if text.startswith("Fila ") and " - " in text and ": " in text:
+            prefix, message = text.split(": ", 1)
+            row_part, client_part = prefix.split(" - ", 1)
+            row_value = row_part.replace("Fila ", "", 1).strip()
+            client_value = client_part.strip()
+            return row_value, client_value, message.strip()
+        return "", "", text
 
     def _export_ireks_sales(self) -> None:
         default_name = f"ventas_ireks_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
