@@ -308,7 +308,7 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
                 cliente_id=cliente_id,
                 anio=2026,
                 articulo_codigo_origen="D123",
-                articulo_id="art-1",
+                articulo_id="",
                 articulo_descripcion_origen="Producto IREKS",
                 envase=1.0,
                 unidades=4.0,
@@ -324,7 +324,7 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
                 cliente_id=cliente_id,
                 anio=2026,
                 articulo_codigo_origen="D123",
-                articulo_id="art-1",
+                articulo_id="",
                 articulo_descripcion_origen="Producto IREKS",
                 envase=1.0,
                 unidades=1.0,
@@ -340,7 +340,7 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
                 cliente_id="cli-2",
                 anio=2026,
                 articulo_codigo_origen="D123",
-                articulo_id="art-1",
+                articulo_id="",
                 articulo_descripcion_origen="Producto IREKS",
                 envase=1.0,
                 unidades=2.0,
@@ -352,7 +352,7 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
         session.commit()
 
     service = SalesAnnualComparisonService()
-    rows = service.listar_clientes_consumidores_producto(2026, "art-1")
+    rows = service.listar_clientes_consumidores_producto(2026, "art-1", "D123")
 
     assert len(rows) == 2
     assert rows[0].cliente_codigo == "1"

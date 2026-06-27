@@ -1114,21 +1114,21 @@ class SalesAnnualComparisonService:
         self,
         year: int,
         articulo_id: str,
+        articulo_codigo: str = "",
         cliente_texto: str = "",
     ) -> list[SalesClientProductConsumerRow]:
         current_year = int(year or 0)
         clean_articulo_id = str(articulo_id or "").strip()
+        clean_articulo_codigo = self._normalize_code(articulo_codigo)
         clean_cliente_text = self._normalize_search_text(cliente_texto)
-        if current_year <= 0 or not clean_articulo_id:
+        if current_year <= 0 or (not clean_articulo_id and not clean_articulo_codigo):
             return []
 
         with Session(self._engine) as session:
-            stmt = select(VentaClientesRaw).where(
-                col(VentaClientesRaw.anio) == current_year,
-                col(VentaClientesRaw.articulo_id) == clean_articulo_id,
-            )
+            stmt = select(VentaClientesRaw).where(col(VentaClientesRaw.anio) == current_year)
             raw_rows = list(session.exec(stmt))
             clients = list(session.exec(select(Cliente)))
+            products = list(session.exec(select(IngredienteIreks)))
 
         client_by_id: dict[str, tuple[str, str, str]] = {}
         client_search_by_id: dict[str, str] = {}
@@ -1151,6 +1151,33 @@ class SalesAnnualComparisonService:
             client_by_id[cid] = (codigo, nombre, search_text)
             client_search_by_id[cid] = search_text
 
+        product_by_id: dict[str, tuple[str, str, str, str, str, str, str]] = {}
+        product_by_code: dict[str, tuple[str, str, str, str, str, str, str]] = {}
+        for product in products:
+            aid = str(product.articulo_id or "").strip()
+            short_ref = str(product.articulo_referencia_corta or "").strip()
+            full_ref = str(product.articulo_referencia or "").strip()
+            display_code = short_ref or full_ref
+            display_name = str(product.articulo_descripcion or "").strip()
+            fabricante = str(product.fabricante_id or "").strip()
+            familia = str(product.articulo_familia_id or "").strip()
+            subfamilia = str(product.articulo_subfamilia_id or "").strip()
+            searchable = self._normalize_search_text(" ".join([display_code, display_name, short_ref, full_ref]))
+            if aid:
+                product_by_id[aid] = (aid, display_code, display_name, fabricante, familia, subfamilia, searchable)
+            for candidate in (short_ref, full_ref):
+                norm = self._normalize_code(candidate)
+                if norm:
+                    product_by_code[norm] = (
+                        aid,
+                        display_code or str(candidate or "").strip(),
+                        display_name,
+                        fabricante,
+                        familia,
+                        subfamilia,
+                        searchable,
+                    )
+
         totals: dict[str, dict[str, float | str]] = defaultdict(
             lambda: {
                 "cliente_id": "",
@@ -1163,6 +1190,20 @@ class SalesAnnualComparisonService:
         for row in raw_rows:
             cliente_id_raw = str(getattr(row, "cliente_id", "") or "").strip()
             client_info = client_by_id.get(cliente_id_raw)
+            row_code = self._normalize_code(getattr(row, "articulo_codigo_origen", ""))
+            row_product = product_by_id.get(str(getattr(row, "articulo_id", "") or "").strip())
+            if row_product is None and row_code:
+                row_product = product_by_code.get(row_code)
+            row_product_id = str(row_product[0] if row_product else str(getattr(row, "articulo_id", "") or "").strip()).strip()
+            row_product_code = str(row_product[1] if row_product else row_code).strip()
+
+            if clean_articulo_id:
+                if row_product_id != clean_articulo_id:
+                    continue
+            elif clean_articulo_codigo:
+                if self._normalize_code(row_product_code) != clean_articulo_codigo and row_code != clean_articulo_codigo:
+                    continue
+
             if clean_cliente_text:
                 searchable = client_search_by_id.get(cliente_id_raw, "")
                 if clean_cliente_text not in searchable:

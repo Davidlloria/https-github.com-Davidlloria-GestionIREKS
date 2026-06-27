@@ -5383,7 +5383,7 @@ class SalesPage(QWidget):
         product_id = str(product_id_item.data(Qt.ItemDataRole.UserRole) or "").strip()
         product_code = str(product_id_item.text() or "").strip()
         product_name = str(product_name_item.text() if product_name_item is not None else "").strip()
-        if not product_id:
+        if not product_id and not product_code:
             return
 
         menu = QMenu(self)
@@ -5395,7 +5395,7 @@ class SalesPage(QWidget):
 
     def _show_clientes_product_consumers_dialog(self, articulo_id: str, articulo_codigo: str, articulo_nombre: str) -> None:
         year = self._current_year_clientes()
-        rows = self.sales_summary_service.listar_clientes_consumidores_producto(year, articulo_id)
+        rows = self.sales_summary_service.listar_clientes_consumidores_producto(year, articulo_id, articulo_codigo)
         dialog = QDialog(self)
         dialog.setWindowTitle("Clientes que consumen el producto")
         dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
