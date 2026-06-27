@@ -6,7 +6,16 @@ import pytest
 from sqlmodel import SQLModel, Session, create_engine
 
 import app.services.sales_annual_comparison_service as sales_annual_service_module
-from app.models import Cliente, Fabricante, Familia, IngredienteIreks, Subfamilia, VentaClientesRaw, VentaMensualRaw
+from app.models import (
+    Cliente,
+    Fabricante,
+    Familia,
+    IngredienteIreks,
+    ReferenciaDistribuidor,
+    Subfamilia,
+    VentaClientesRaw,
+    VentaMensualRaw,
+)
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
 
 
@@ -302,12 +311,20 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
             )
         )
         session.add(
+            ReferenciaDistribuidor(
+                articulo_id="art-1",
+                distribuidor_id="dist-1",
+                articulo_referencia_distribuidor="DX-001",
+                articulo_descripcion_distribuidor="Producto IREKS",
+            )
+        )
+        session.add(
             VentaClientesRaw(
                 raw_id="raw-10",
                 lote_id="lote-10",
                 cliente_id=cliente_id,
                 anio=2026,
-                articulo_codigo_origen="D123",
+                articulo_codigo_origen="DX-001",
                 articulo_id="",
                 articulo_descripcion_origen="Producto IREKS",
                 envase=1.0,
@@ -323,7 +340,7 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
                 lote_id="lote-11",
                 cliente_id=cliente_id,
                 anio=2026,
-                articulo_codigo_origen="D123",
+                articulo_codigo_origen="DX-001",
                 articulo_id="",
                 articulo_descripcion_origen="Producto IREKS",
                 envase=1.0,
@@ -339,7 +356,7 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
                 lote_id="lote-12",
                 cliente_id="cli-2",
                 anio=2026,
-                articulo_codigo_origen="D123",
+                articulo_codigo_origen="DX-001",
                 articulo_id="",
                 articulo_descripcion_origen="Producto IREKS",
                 envase=1.0,
@@ -352,8 +369,8 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
         session.commit()
 
     service = SalesAnnualComparisonService()
-    rows = service.listar_clientes_consumidores_producto(2026, "art-1", "D123")
-    rows_by_code_only = service.listar_clientes_consumidores_producto(2026, "wrong-id", "D123")
+    rows = service.listar_clientes_consumidores_producto(2026, "art-1", "DX-001")
+    rows_by_code_only = service.listar_clientes_consumidores_producto(2026, "wrong-id", "DX-001")
     rows_by_name_only = service.listar_clientes_consumidores_producto(2026, "wrong-id", "wrong-code", "Producto IREKS")
 
     assert len(rows) == 2

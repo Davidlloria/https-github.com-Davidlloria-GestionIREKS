@@ -14,6 +14,7 @@ from app.models import (
     Fabricante,
     Familia,
     IngredienteIreks,
+    ReferenciaDistribuidor,
     Subfamilia,
     VentaClientesRaw,
     VentaMensualRaw,
@@ -1134,6 +1135,7 @@ class SalesAnnualComparisonService:
             raw_rows = list(session.exec(stmt))
             clients = list(session.exec(select(Cliente)))
             products = list(session.exec(select(IngredienteIreks)))
+            product_reference_lookup = self._build_clientes_product_reference_lookup(session)
 
         client_by_id: dict[str, tuple[str, str, str]] = {}
         client_search_by_id: dict[str, str] = {}
@@ -1183,6 +1185,28 @@ class SalesAnnualComparisonService:
                         searchable,
                     )
 
+        def resolve_product(row_articulo_id: str, row_code: str, row_name: str):
+            product = product_by_id.get(row_articulo_id) if row_articulo_id else None
+            if product is None and row_code:
+                product = product_by_code.get(row_code)
+            if product is None and row_code:
+                resolved_id = product_reference_lookup.get(row_code, "")
+                if resolved_id:
+                    product = product_by_id.get(resolved_id)
+            if product is None and row_name:
+                searchable_name = self._normalize_search_text(row_name)
+                if searchable_name:
+                    for candidate in product_by_id.values():
+                        if searchable_name in candidate[6]:
+                            product = candidate
+                            break
+                    if product is None:
+                        for candidate in product_by_code.values():
+                            if searchable_name in candidate[6]:
+                                product = candidate
+                                break
+            return product
+
         totals: dict[str, dict[str, float | str]] = defaultdict(
             lambda: {
                 "cliente_id": "",
@@ -1196,13 +1220,12 @@ class SalesAnnualComparisonService:
             cliente_id_raw = str(getattr(row, "cliente_id", "") or "").strip()
             client_info = client_by_id.get(cliente_id_raw)
             row_code = self._normalize_code(getattr(row, "articulo_codigo_origen", ""))
-            row_product = product_by_id.get(str(getattr(row, "articulo_id", "") or "").strip())
-            if row_product is None and row_code:
-                row_product = product_by_code.get(row_code)
+            row_name = str(getattr(row, "articulo_descripcion_origen", "") or "").strip()
+            row_product = resolve_product(str(getattr(row, "articulo_id", "") or "").strip(), row_code, row_name)
             row_product_id = str(row_product[0] if row_product else str(getattr(row, "articulo_id", "") or "").strip()).strip()
             row_product_code = str(row_product[1] if row_product else row_code).strip()
             row_product_code_norm = self._normalize_code(row_product_code)
-            row_product_name = str(row_product[2] if row_product else getattr(row, "articulo_descripcion_origen", "") or "").strip()
+            row_product_name = str(row_product[2] if row_product else row_name).strip()
             row_searchable = self._normalize_search_text(" ".join([row_product_code, row_product_name, row_code]))
 
             if clean_articulo_id or clean_articulo_codigo or clean_articulo_nombre:
@@ -1243,6 +1266,18 @@ class SalesAnnualComparisonService:
         ]
         result.sort(key=lambda row: (-row.euros, -row.kilos, row.cliente_nombre.lower(), row.cliente_codigo.lower()))
         return result
+
+    def _build_clientes_product_reference_lookup(self, session: Session) -> dict[str, str]:
+        lookup: dict[str, str] = {}
+        rows = list(session.exec(select(ReferenciaDistribuidor)))
+        for row in rows:
+            articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+            reference = str(getattr(row, "articulo_referencia_distribuidor", "") or "").strip()
+            if not articulo_id or not reference:
+                continue
+            for candidate in self._code_candidates(reference):
+                lookup[candidate] = articulo_id
+        return lookup
 
     def _build_client_rows(self, totals: dict[str, dict[str, float | str]]) -> list[SalesClientsComparisonRow]:
         result: list[SalesClientsComparisonRow] = []
