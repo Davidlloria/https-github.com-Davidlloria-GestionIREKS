@@ -4884,26 +4884,24 @@ class SalesPage(QWidget):
         total_curr_sales = 0.0
 
         for idx, row in enumerate(rows):
-            total_prev_kg += row.kilos_prev
-            total_prev_sc += row.sc_prev
-            total_curr_kg += row.kilos_curr
-            total_curr_sc += row.sc_curr
-            total_prev_sales += row.ventas_prev
-            total_curr_sales += row.ventas_curr
+            total_prev_kg += row.kg_prev
+            total_curr_kg += row.kg_curr
+            total_prev_sales += row.euros_prev
+            total_curr_sales += row.euros_curr
 
             values = [
                 row.codigo,
                 row.nombre,
-                (self._fmt_num(row.kilos_prev), row.kilos_prev),
-                (self._fmt_num(row.sc_prev), row.sc_prev),
-                (self._fmt_money(row.ventas_prev), row.ventas_prev),
-                (self._fmt_num(row.kilos_curr), row.kilos_curr),
-                (self._fmt_num(row.sc_curr), row.sc_curr),
-                (self._fmt_money(row.ventas_curr), row.ventas_curr),
+                (self._fmt_num(row.kg_prev), row.kg_prev),
+                "",
+                (self._fmt_money(row.euros_prev), row.euros_prev),
+                (self._fmt_num(row.kg_curr), row.kg_curr),
+                "",
+                (self._fmt_money(row.euros_curr), row.euros_curr),
                 (self._fmt_num(row.delta_kg), row.delta_kg),
                 (self._fmt_pct(row.delta_kg_pct), row.delta_kg_pct),
-                (self._fmt_money(row.delta_ventas), row.delta_ventas),
-                (self._fmt_pct(row.delta_ventas_pct), row.delta_ventas_pct),
+                (self._fmt_money(row.delta_euros), row.delta_euros),
+                (self._fmt_pct(row.delta_euros_pct), row.delta_euros_pct),
             ]
             for col, value in enumerate(values):
                 if isinstance(value, tuple):
@@ -4950,10 +4948,10 @@ class SalesPage(QWidget):
         self.totals_table_clientes.setSpan(0, 0, 1, 2)
         values = {
             2: (self._fmt_num(prev_kg), float(prev_kg or 0.0)),
-            3: (self._fmt_num(prev_sc), float(prev_sc or 0.0)),
+            3: ("", 0.0),
             4: (self._fmt_money(prev_sales), float(prev_sales or 0.0)),
             5: (self._fmt_num(curr_kg), float(curr_kg or 0.0)),
-            6: (self._fmt_num(curr_sc), float(curr_sc or 0.0)),
+            6: ("", 0.0),
             7: (self._fmt_money(curr_sales), float(curr_sales or 0.0)),
             8: (self._fmt_num(delta_kg), float(delta_kg or 0.0)),
             9: (self._fmt_pct(delta_kg_pct), float(delta_kg_pct or 0.0)),
