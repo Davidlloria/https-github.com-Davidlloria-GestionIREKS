@@ -282,6 +282,151 @@ class AddTarifaIreksDialog(QDialog):
         )
 
 
+class IngredientIreksCreateDialog(QDialog):
+    CONTENT_UNITS = ["", "BOLSA", "BOTELLA", "SACO", "LATA", "CUBO", "UNIDAD"]
+    ENVASE_UNITS = ["", "kg", "g", "L", "Unidades"]
+    CATEGORIES = ["", "harina", "liquido"]
+
+    def __init__(self, catalogs, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Nuevo producto IREKS")
+        self._catalogs = catalogs
+
+        self.reference_input = QLineEdit()
+        self.short_reference_input = QLineEdit()
+        self.description_input = QLineEdit()
+        self.distributor_combo = QComboBox()
+        self.fabricante_combo = QComboBox()
+        self.familia_combo = QComboBox()
+        self.subfamilia_combo = QComboBox()
+        self.envase_combo = QComboBox()
+        self.content_unit_combo = QComboBox()
+        self.quantity_input = QLineEdit()
+        self.weight_input = QLineEdit()
+        self.envase_unit_combo = QComboBox()
+        self.category_combo = QComboBox()
+        self.active_check = QCheckBox("Activo")
+        self.in_list_check = QCheckBox("En lista")
+
+        self._build_ui()
+        self._load_catalogs()
+        self.description_input.setFocus()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self.reference_input.setPlaceholderText("Opcional")
+        self.short_reference_input.setPlaceholderText("Opcional")
+        self.description_input.setPlaceholderText("Nombre del producto")
+
+        self.distributor_combo.addItem("", "")
+        self.fabricante_combo.addItem("", "")
+        self.familia_combo.addItem("", "")
+        self.subfamilia_combo.addItem("", "")
+        self.envase_combo.addItem("", "")
+
+        self.content_unit_combo.setEditable(True)
+        self.content_unit_combo.addItems(self.CONTENT_UNITS)
+        self.content_unit_combo.setCurrentIndex(0)
+
+        self.quantity_input.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.weight_input.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.quantity_input.setPlaceholderText("0")
+        self.weight_input.setPlaceholderText("0")
+
+        self.envase_unit_combo.addItems(self.ENVASE_UNITS)
+        self.category_combo.addItems(self.CATEGORIES)
+        self.active_check.setChecked(True)
+        self.in_list_check.setChecked(False)
+
+        form.addRow("Ref.", self.reference_input)
+        form.addRow("Ref. corta", self.short_reference_input)
+        form.addRow("Descripcion", self.description_input)
+        form.addRow("Distribuidor", self.distributor_combo)
+        form.addRow("Fabricante", self.fabricante_combo)
+        form.addRow("Familia", self.familia_combo)
+        form.addRow("Subfamilia", self.subfamilia_combo)
+        form.addRow("Envase", self.envase_combo)
+        form.addRow("Unidad contenido", self.content_unit_combo)
+        form.addRow("Cantidad envase", self.quantity_input)
+        form.addRow("Peso envase", self.weight_input)
+        form.addRow("Unidad envase", self.envase_unit_combo)
+        form.addRow("Categoria", self.category_combo)
+
+        status_row = QWidget()
+        status_layout = QHBoxLayout(status_row)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        status_layout.addWidget(self.active_check)
+        status_layout.addWidget(self.in_list_check)
+        status_layout.addStretch(1)
+        form.addRow("Estado", status_row)
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self._accept_if_valid)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _load_catalogs(self) -> None:
+        self._populate_combo(self.distributor_combo, getattr(self._catalogs, "distribuidores", []), "distribuidor_id", "distribuidor_nombre_comercial", "distribuidor_razon_social")
+        self._populate_combo(self.fabricante_combo, getattr(self._catalogs, "fabricantes", []), "fabricante_id", "fabricante_nombre")
+        self._populate_combo(self.familia_combo, getattr(self._catalogs, "familias", []), "articulo_familia_id", "articulo_familia_nombre", "articulo_familia_codigo")
+        self._populate_combo(self.subfamilia_combo, getattr(self._catalogs, "subfamilias", []), "articulo_subfamilia_id", "articulo_subfamilia_nombre", "articulo_subfamilia_codigo")
+        self._populate_combo(self.envase_combo, getattr(self._catalogs, "envases", []), "envase_id", "envase_nombre", "envase_codigo")
+
+    def _populate_combo(self, combo: QComboBox, rows: list[Any], value_attr: str, *label_attrs: str) -> None:
+        for row in rows:
+            value = str(getattr(row, value_attr, "") or "").strip()
+            if not value:
+                continue
+            label = ""
+            for attr in label_attrs:
+                label = str(getattr(row, attr, "") or "").strip()
+                if label:
+                    break
+            combo.addItem(label or value, value)
+
+    @staticmethod
+    def _to_float(value: str) -> float:
+        text_value = str(value or "").strip()
+        if not text_value:
+            return 0.0
+        if "," in text_value:
+            text_value = text_value.replace(".", "").replace(",", ".")
+        try:
+            return float(text_value)
+        except Exception:
+            return 0.0
+
+    def _accept_if_valid(self) -> None:
+        if not self.description_input.text().strip():
+            QMessageBox.warning(self, "Productos IREKS", "La descripcion es obligatoria.")
+            return
+        self.accept()
+
+    def get_payload(self) -> dict[str, Any]:
+        return {
+            "articulo_referencia": self.reference_input.text().strip(),
+            "articulo_referencia_corta": self.short_reference_input.text().strip(),
+            "articulo_descripcion": self.description_input.text().strip(),
+            "distribuidor_id": str(self.distributor_combo.currentData() or "").strip(),
+            "fabricante_id": str(self.fabricante_combo.currentData() or "").strip(),
+            "articulo_familia_id": str(self.familia_combo.currentData() or "").strip(),
+            "articulo_subfamilia_id": str(self.subfamilia_combo.currentData() or "").strip(),
+            "articulo_envase_id": str(self.envase_combo.currentData() or "").strip(),
+            "articulo_contenido_unidad": self.content_unit_combo.currentText().strip(),
+            "articulo_envase_cantidad": self._to_float(self.quantity_input.text()),
+            "articulo_envase_peso": self._to_float(self.weight_input.text()),
+            "articulo_envase_unidad_medida": self.envase_unit_combo.currentText().strip(),
+            "categoria": self.category_combo.currentText().strip(),
+            "articulo_status_activo": bool(self.active_check.isChecked()),
+            "articulo_status_en_lista": bool(self.in_list_check.isChecked()),
+        }
+
+
 def ingredient_schema(include_referencia: bool) -> list[dict[str, Any]]:
     if include_referencia:
         return [
@@ -3029,9 +3174,14 @@ class IngredientsIreksPage(QWidget):
 
     def _new_product(self) -> None:
         try:
-            row_id = self.ireks_service.create_product()
+            catalogs = self.ireks_service.catalogs()
+            dialog = IngredientIreksCreateDialog(catalogs, self)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+            created = self.ireks_service.create_from_payload(dialog.get_payload())
             self.reload()
-            self._select_by_id(row_id)
+            if created.id is not None:
+                self._select_by_id(created.id)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Productos IREKS", f"No se pudo crear.\n{exc}")
 
