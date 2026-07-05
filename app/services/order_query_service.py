@@ -8,7 +8,19 @@ from sqlmodel import Session, select
 
 from app.core.database import engine
 from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
-from app.models import Albaran, AlbaranItem, Cliente, Fabricante, Familia, IngredienteIreks, Pedido, PedidoItem, PedidoPendiente, Subfamilia
+from app.models import (
+    Albaran,
+    AlbaranItem,
+    Cliente,
+    Distribuidor,
+    Fabricante,
+    Familia,
+    IngredienteIreks,
+    Pedido,
+    PedidoItem,
+    PedidoPendiente,
+    Subfamilia,
+)
 from app.schemas.orders import (
     OrderItemListResponse,
     OrderItemRead,
@@ -42,6 +54,8 @@ class WarehouseFilterOption:
 
 
 class OrderQueryService:
+    _DIRECT_CLIENT_TYPES = {"directo", "cliente directo", "cliente_directo"}
+
     def list_active_ingredients(self) -> list[IngredienteIreks]:
         with Session(engine) as session:
             return list(
@@ -134,16 +148,26 @@ class OrderQueryService:
             direct = session.get(Cliente, candidate)
             if direct is not None:
                 return str(direct.cliente_id or "").strip()
+            distributor = session.get(Distribuidor, candidate)
+            if distributor is not None:
+                return str(distributor.distribuidor_id or "").strip()
 
-            rows = list(session.exec(select(Cliente)))
+            client_rows = list(session.exec(select(Cliente)))
+            distributor_rows = list(session.exec(select(Distribuidor)))
         normalized = candidate.strip().lower()
-        for row in rows:
+        for row in client_rows:
+            tipo = str(getattr(row, "cliente_tipo", "") or "").strip().lower()
+            if tipo not in self._DIRECT_CLIENT_TYPES:
+                continue
             nombre_comercial = str(getattr(row, "cliente_nombre_comercial", "") or "").strip()
             nombre_fiscal = str(getattr(row, "cliente_nombre_fiscal", "") or "").strip()
             if normalized in {nombre_comercial.lower(), nombre_fiscal.lower()}:
-                tipo = str(getattr(row, "cliente_tipo", "") or "").strip().lower()
-                if tipo in {"distribuidor", "directo", "cliente directo", "cliente_directo"}:
-                    return str(getattr(row, "cliente_id", "") or "").strip()
+                return str(getattr(row, "cliente_id", "") or "").strip()
+        for row in distributor_rows:
+            nombre_comercial = str(getattr(row, "distribuidor_nombre_comercial", "") or "").strip()
+            razon_social = str(getattr(row, "distribuidor_razon_social", "") or "").strip()
+            if normalized in {nombre_comercial.lower(), razon_social.lower()}:
+                return str(getattr(row, "distribuidor_id", "") or "").strip()
         return candidate
 
     def get_order_edit_payload(self, pedido_id: str) -> tuple[Pedido, dict[str, float]]:
@@ -296,19 +320,46 @@ class OrderQueryService:
 
     def warehouse_filter_options(self) -> list[WarehouseFilterOption]:
         with Session(engine) as session:
-            rows = list(session.exec(select(Cliente).order_by(Cliente.cliente_nombre_comercial)))
+            distributors = list(
+                session.exec(
+                    select(Distribuidor).order_by(
+                        Distribuidor.distribuidor_nombre_comercial,
+                        Distribuidor.distribuidor_razon_social,
+                    )
+                )
+            )
+            clients = list(
+                session.exec(
+                    select(Cliente).order_by(Cliente.cliente_nombre_comercial, Cliente.cliente_nombre_fiscal)
+                )
+            )
         options = [WarehouseFilterOption("Todos", "")]
-        for row in rows:
+        for row in distributors:
+            distribuidor_id = str(getattr(row, "distribuidor_id", "") or "").strip()
+            if not distribuidor_id:
+                continue
+            label = self._warehouse_option_label(
+                str(getattr(row, "distribuidor_nombre_comercial", "") or "").strip(),
+                str(getattr(row, "distribuidor_razon_social", "") or "").strip(),
+                "Distribuidor",
+                distribuidor_id,
+            )
+            options.append(WarehouseFilterOption(label, distribuidor_id))
+        for row in clients:
             tipo = str(getattr(row, "cliente_tipo", "") or "").strip().lower()
-            if tipo not in {"distribuidor", "directo", "cliente directo", "cliente_directo"}:
+            if tipo not in self._DIRECT_CLIENT_TYPES:
                 continue
             cliente_id = str(getattr(row, "cliente_id", "") or "").strip()
             if not cliente_id:
                 continue
-            label = str(getattr(row, "cliente_nombre_comercial", "") or "").strip() or str(
-                getattr(row, "cliente_nombre_fiscal", "") or ""
-            ).strip()
-            options.append(WarehouseFilterOption(label or cliente_id, cliente_id))
+            label = self._warehouse_option_label(
+                str(getattr(row, "cliente_nombre_comercial", "") or "").strip(),
+                str(getattr(row, "cliente_nombre_fiscal", "") or "").strip(),
+                "Cliente directo",
+                cliente_id,
+            )
+            options.append(WarehouseFilterOption(label, cliente_id))
+        options[1:] = sorted(options[1:], key=lambda option: option.label.casefold())
         return options
 
     def list_raw_orders(self) -> list[Pedido]:
@@ -327,13 +378,9 @@ class OrderQueryService:
     ) -> list[OrderListRow]:
         pedidos = self.list_raw_orders()
         with Session(engine) as session:
-            clientes = list(session.exec(select(Cliente)))
-        cliente_name_by_id = {
-            str(row.cliente_id or ""): (
-                str(row.cliente_nombre_comercial or "").strip() or str(row.cliente_nombre_fiscal or "").strip()
-            )
-            for row in clientes
-        }
+            clients = list(session.exec(select(Cliente)))
+            distributors = list(session.exec(select(Distribuidor)))
+        warehouse_name_by_id = self._build_warehouse_name_map(clients, distributors)
 
         filtered = self._filter_orders(
             pedidos,
@@ -354,7 +401,7 @@ class OrderQueryService:
                 OrderListRow(
                     pedido_id=pedido_id,
                     almacen_id=almacen_id,
-                    almacen_nombre=cliente_name_by_id.get(almacen_id, almacen_id),
+                    almacen_nombre=warehouse_name_by_id.get(almacen_id, almacen_id),
                     pedido_fecha=p_date,
                     pedido_numero=str(row.pedido_numero or ""),
                     pedido_albaran_numero=str(row.pedido_albaran_numero or ""),
@@ -424,6 +471,40 @@ class OrderQueryService:
                 continue
             filtered.append(row)
         return filtered
+
+    @staticmethod
+    def _warehouse_display_name(primary: str, secondary: str, fallback: str) -> str:
+        label = str(primary or "").strip() or str(secondary or "").strip()
+        return label or fallback
+
+    @classmethod
+    def _warehouse_option_label(cls, primary: str, secondary: str, kind: str, fallback: str) -> str:
+        return f"{cls._warehouse_display_name(primary, secondary, fallback)} ({kind})"
+
+    def _build_warehouse_name_map(self, clients: list[Cliente], distributors: list[Distribuidor]) -> dict[str, str]:
+        name_by_id: dict[str, str] = {}
+        for row in distributors:
+            distribuidor_id = str(getattr(row, "distribuidor_id", "") or "").strip()
+            if not distribuidor_id:
+                continue
+            name_by_id[distribuidor_id] = self._warehouse_display_name(
+                str(getattr(row, "distribuidor_nombre_comercial", "") or "").strip(),
+                str(getattr(row, "distribuidor_razon_social", "") or "").strip(),
+                distribuidor_id,
+            )
+        for row in clients:
+            tipo = str(getattr(row, "cliente_tipo", "") or "").strip().lower()
+            if tipo not in self._DIRECT_CLIENT_TYPES:
+                continue
+            cliente_id = str(getattr(row, "cliente_id", "") or "").strip()
+            if not cliente_id:
+                continue
+            name_by_id[cliente_id] = self._warehouse_display_name(
+                str(getattr(row, "cliente_nombre_comercial", "") or "").strip(),
+                str(getattr(row, "cliente_nombre_fiscal", "") or "").strip(),
+                cliente_id,
+            )
+        return name_by_id
 
     def pedido_totals_kg(self, pedido_ids: list[str]) -> dict[str, float]:
         if not pedido_ids:
