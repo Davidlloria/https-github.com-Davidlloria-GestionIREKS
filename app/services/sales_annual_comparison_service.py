@@ -422,28 +422,16 @@ class SalesAnnualComparisonService:
                 col(VentaMensualRaw.periodo).in_(periods),
             )
             if clean_cliente_id:
-                stmt = stmt.where(col(VentaMensualRaw.cliente_id) == clean_cliente_id)
+                resolved_cliente_ids = self._resolve_sales_party_ids(session, clean_cliente_id)
+                stmt = stmt.where(col(VentaMensualRaw.cliente_id).in_(sorted(resolved_cliente_ids)))
+            else:
+                resolved_cliente_ids = set()
             raw_rows = list(session.exec(stmt))
             products = list(session.exec(select(IngredienteIreks)))
+            clients = list(session.exec(select(Cliente)))
+            distributors = list(session.exec(select(Distribuidor)))
 
-        client_search_by_id: dict[str, str] = {}
-        if clean_cliente_text:
-            with Session(self._engine) as session:
-                clients = list(session.exec(select(Cliente)))
-            for client in clients:
-                cid = str(client.cliente_id or "").strip()
-                if not cid:
-                    continue
-                client_search_by_id[cid] = self._normalize_search_text(
-                    " ".join(
-                        [
-                            str(getattr(client, "cliente_codigo", "") or ""),
-                            str(client.cliente_nombre_comercial or ""),
-                            str(client.cliente_nombre_fiscal or ""),
-                            str(client.cliente_abreviatura or ""),
-                        ]
-                    )
-                )
+        client_by_id, client_search_by_id = self._build_sales_party_lookup(clients, distributors)
 
         product_by_id: dict[str, tuple[str, str, str, str, str, str]] = {}
         product_by_code: dict[str, tuple[str, str, str, str, str, str]] = {}
@@ -563,9 +551,16 @@ class SalesAnnualComparisonService:
         with Session(self._engine) as session:
             stmt = select(VentaClientesRaw).where(col(VentaClientesRaw.anio).in_([previous_year, current_year]))
             if clean_cliente_id:
-                stmt = stmt.where(col(VentaClientesRaw.cliente_id) == clean_cliente_id)
+                resolved_cliente_ids = self._resolve_sales_party_ids(session, clean_cliente_id)
+                stmt = stmt.where(col(VentaClientesRaw.cliente_id).in_(sorted(resolved_cliente_ids)))
+            else:
+                resolved_cliente_ids = set()
             raw_rows = list(session.exec(stmt))
             products = list(session.exec(select(IngredienteIreks)))
+            clients = list(session.exec(select(Cliente)))
+            distributors = list(session.exec(select(Distribuidor)))
+
+        client_by_id, client_search_by_id = self._build_sales_party_lookup(clients, distributors)
 
         product_by_id: dict[str, tuple[str, str, str, str, str, str, str]] = {}
         product_by_code: dict[str, tuple[str, str, str, str, str, str, str]] = {}
@@ -787,46 +782,14 @@ class SalesAnnualComparisonService:
                 col(VentaMensualRaw.periodo).in_(periods),
             )
             if clean_cliente_id:
-                stmt = stmt.where(col(VentaMensualRaw.cliente_id) == clean_cliente_id)
+                resolved_cliente_ids = self._resolve_sales_party_ids(session, clean_cliente_id)
+                stmt = stmt.where(col(VentaMensualRaw.cliente_id).in_(sorted(resolved_cliente_ids)))
             raw_rows = list(session.exec(stmt))
             products = list(session.exec(select(IngredienteIreks)))
-            clients = list(session.exec(select(Cliente))) if clean_cliente_text else []
+            clients = list(session.exec(select(Cliente)))
+            distributors = list(session.exec(select(Distribuidor)))
 
-        client_search_by_id: dict[str, str] = {}
-        if clean_cliente_text:
-            for client in clients:
-                cid = str(client.cliente_id or "").strip()
-                if not cid:
-                    continue
-                client_search_by_id[cid] = self._normalize_search_text(
-                    " ".join(
-                        [
-                            str(getattr(client, "cliente_codigo", "") or ""),
-                            str(client.cliente_nombre_comercial or ""),
-                            str(client.cliente_nombre_fiscal or ""),
-                            str(client.cliente_abreviatura or ""),
-                        ]
-                    )
-                )
-
-        client_by_id: dict[str, tuple[str, str]] = {}
-        client_search: list[tuple[str, str, str]] = []
-        for client in clients:
-            cid = str(client.cliente_id or "").strip()
-            label = str(client.cliente_nombre_comercial or client.cliente_nombre_fiscal or cid).strip()
-            searchable = self._normalize_search_text(
-                " ".join(
-                    [
-                        str(getattr(client, "cliente_codigo", "") or ""),
-                        str(client.cliente_nombre_comercial or ""),
-                        str(client.cliente_nombre_fiscal or ""),
-                        str(client.cliente_abreviatura or ""),
-                    ]
-                )
-            )
-            if cid:
-                client_by_id[cid] = (cid, label or cid)
-                client_search.append((cid, label or cid, searchable))
+        client_by_id, client_search_by_id = self._build_sales_party_lookup(clients, distributors)
 
         product_by_id: dict[str, tuple[str, str, str, str, str, str, str]] = {}
         product_by_code: dict[str, tuple[str, str, str, str, str, str, str]] = {}
@@ -890,7 +853,7 @@ class SalesAnnualComparisonService:
 
             client = client_by_id.get(row_cliente_id)
             client_name = str(client[1] if client else row_cliente_id).strip()
-            client_searchable = next((search for cid, _label, search in client_search if cid == row_cliente_id), "")
+            client_searchable = client_search_by_id.get(row_cliente_id, "")
 
             if clean_cliente_id and row_cliente_id != clean_cliente_id:
                 continue
@@ -961,7 +924,8 @@ class SalesAnnualComparisonService:
                 col(VentaMensualRaw.periodo).like(f"{current_year:04d}-%"),
             )
             if clean_cliente_id:
-                stmt = stmt.where(col(VentaMensualRaw.cliente_id) == clean_cliente_id)
+                resolved_cliente_ids = self._resolve_sales_party_ids(session, clean_cliente_id)
+                stmt = stmt.where(col(VentaMensualRaw.cliente_id).in_(sorted(resolved_cliente_ids)))
             rows = list(session.exec(stmt))
 
         totals_by_month = {month: 0.0 for month in range(1, 13)}
@@ -997,7 +961,8 @@ class SalesAnnualComparisonService:
                 col(VentaMensualRaw.periodo).like(f"{previous_year:04d}-%"),
             )
             if clean_cliente_id:
-                stmt = stmt.where(col(VentaMensualRaw.cliente_id) == clean_cliente_id)
+                resolved_cliente_ids = self._resolve_sales_party_ids(session, clean_cliente_id)
+                stmt = stmt.where(col(VentaMensualRaw.cliente_id).in_(sorted(resolved_cliente_ids)))
             prev_rows = list(session.exec(stmt))
 
             stmt = select(VentaMensualRaw).where(
@@ -1006,7 +971,8 @@ class SalesAnnualComparisonService:
                 col(VentaMensualRaw.periodo).like(f"{current_year:04d}-%"),
             )
             if clean_cliente_id:
-                stmt = stmt.where(col(VentaMensualRaw.cliente_id) == clean_cliente_id)
+                resolved_cliente_ids = self._resolve_sales_party_ids(session, clean_cliente_id)
+                stmt = stmt.where(col(VentaMensualRaw.cliente_id).in_(sorted(resolved_cliente_ids)))
             curr_rows = list(session.exec(stmt))
 
         prev_totals = {month: 0.0 for month in range(1, 13)}
@@ -1045,7 +1011,8 @@ class SalesAnnualComparisonService:
                 col(VentaMensualRaw.periodo).like(f"{previous_year:04d}-%"),
             )
             if clean_cliente_id:
-                prev_stmt = prev_stmt.where(col(VentaMensualRaw.cliente_id) == clean_cliente_id)
+                resolved_cliente_ids = self._resolve_sales_party_ids(session, clean_cliente_id)
+                prev_stmt = prev_stmt.where(col(VentaMensualRaw.cliente_id).in_(sorted(resolved_cliente_ids)))
             prev_rows = list(session.exec(prev_stmt))
 
             curr_stmt = select(VentaMensualRaw).where(
@@ -1053,7 +1020,8 @@ class SalesAnnualComparisonService:
                 col(VentaMensualRaw.periodo).like(f"{current_year:04d}-%"),
             )
             if clean_cliente_id:
-                curr_stmt = curr_stmt.where(col(VentaMensualRaw.cliente_id) == clean_cliente_id)
+                resolved_cliente_ids = self._resolve_sales_party_ids(session, clean_cliente_id)
+                curr_stmt = curr_stmt.where(col(VentaMensualRaw.cliente_id).in_(sorted(resolved_cliente_ids)))
             curr_rows = list(session.exec(curr_stmt))
 
         prev_totals = {month: 0.0 for month in range(1, 13)}
@@ -1338,6 +1306,120 @@ class SalesAnnualComparisonService:
             for candidate in self._code_candidates(reference):
                 lookup[candidate] = articulo_id
         return lookup
+
+    def _build_sales_party_lookup(
+        self,
+        clients: list[Cliente],
+        distributors: list[Distribuidor],
+    ) -> tuple[dict[str, tuple[str, str]], dict[str, str]]:
+        party_by_id: dict[str, tuple[str, str]] = {}
+        party_search_by_id: dict[str, str] = {}
+        for client in clients:
+            cid = str(client.cliente_id or "").strip()
+            if not cid:
+                continue
+            codigo = str(getattr(client, "cliente_codigo", "") or "").strip()
+            nombre = str(client.cliente_nombre_comercial or client.cliente_nombre_fiscal or cid).strip()
+            searchable = self._normalize_search_text(
+                " ".join(
+                    [
+                        codigo,
+                        str(client.cliente_nombre_comercial or ""),
+                        str(client.cliente_nombre_fiscal or ""),
+                        str(client.cliente_abreviatura or ""),
+                    ]
+                )
+            )
+            party_by_id[cid] = (codigo, nombre or cid)
+            party_search_by_id[cid] = searchable
+        for distributor in distributors:
+            did = str(getattr(distributor, "distribuidor_id", "") or "").strip()
+            if not did or did in party_by_id:
+                continue
+            codigo = str(getattr(distributor, "distribuidor_codigo", "") or "").strip()
+            nombre = str(
+                getattr(distributor, "distribuidor_nombre_comercial", "") or getattr(distributor, "distribuidor_razon_social", "") or did
+            ).strip()
+            searchable = self._normalize_search_text(
+                " ".join(
+                    [
+                        codigo,
+                        str(getattr(distributor, "distribuidor_nombre_comercial", "") or ""),
+                        str(getattr(distributor, "distribuidor_razon_social", "") or ""),
+                    ]
+                )
+            )
+            party_by_id[did] = (codigo, nombre or did)
+            party_search_by_id[did] = searchable
+        return party_by_id, party_search_by_id
+
+    def _resolve_sales_party_ids(self, session: Session, party_id: str) -> set[str]:
+        clean_party_id = str(party_id or "").strip()
+        if not clean_party_id:
+            return set()
+        ids: set[str] = {clean_party_id}
+        client = session.get(Cliente, clean_party_id)
+        distributor = session.get(Distribuidor, clean_party_id)
+        search_terms: set[str] = set()
+        if client is not None:
+            linked_distributor_id = str(getattr(client, "distribuidor_id", "") or "").strip()
+            if linked_distributor_id:
+                ids.add(linked_distributor_id)
+                distributor = distributor or session.get(Distribuidor, linked_distributor_id)
+            search_terms.update(
+                {
+                    self._normalize_search_text(getattr(client, "cliente_nombre_comercial", "")),
+                    self._normalize_search_text(getattr(client, "cliente_nombre_fiscal", "")),
+                    self._normalize_search_text(getattr(client, "cliente_abreviatura", "")),
+                }
+            )
+        if distributor is not None:
+            search_terms.update(
+                {
+                    self._normalize_search_text(getattr(distributor, "distribuidor_nombre_comercial", "")),
+                    self._normalize_search_text(getattr(distributor, "distribuidor_razon_social", "")),
+                }
+            )
+
+        search_terms = {term for term in search_terms if term}
+        if not search_terms:
+            return ids
+
+        for row in session.exec(select(Cliente)):
+            row_id = str(getattr(row, "cliente_id", "") or "").strip()
+            if not row_id:
+                continue
+            searchable = self._normalize_search_text(
+                " ".join(
+                    [
+                        str(getattr(row, "cliente_codigo", "") or ""),
+                        str(getattr(row, "cliente_nombre_comercial", "") or ""),
+                        str(getattr(row, "cliente_nombre_fiscal", "") or ""),
+                        str(getattr(row, "cliente_abreviatura", "") or ""),
+                    ]
+                )
+            )
+            if any(term in searchable or searchable in term for term in search_terms):
+                ids.add(row_id)
+                linked_distributor_id = str(getattr(row, "distribuidor_id", "") or "").strip()
+                if linked_distributor_id:
+                    ids.add(linked_distributor_id)
+        for row in session.exec(select(Distribuidor)):
+            row_id = str(getattr(row, "distribuidor_id", "") or "").strip()
+            if not row_id:
+                continue
+            searchable = self._normalize_search_text(
+                " ".join(
+                    [
+                        str(getattr(row, "distribuidor_codigo", "") or ""),
+                        str(getattr(row, "distribuidor_nombre_comercial", "") or ""),
+                        str(getattr(row, "distribuidor_razon_social", "") or ""),
+                    ]
+                )
+            )
+            if any(term in searchable or searchable in term for term in search_terms):
+                ids.add(row_id)
+        return ids
 
     def _build_client_rows(self, totals: dict[str, dict[str, float | str]]) -> list[SalesClientsComparisonRow]:
         result: list[SalesClientsComparisonRow] = []

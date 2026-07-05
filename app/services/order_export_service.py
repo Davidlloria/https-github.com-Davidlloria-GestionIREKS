@@ -15,7 +15,7 @@ from sqlmodel import Session, select
 
 from app.core.config import BASE_DIR, PEDIDOS_EMAIL_DESTINO, PEDIDOS_HISTORICO_DIR
 from app.core.database import engine
-from app.models import Cliente, IngredienteIreks, Pedido, PedidoItem
+from app.models import Cliente, Distribuidor, IngredienteIreks, Pedido, PedidoItem
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
 
 @dataclass(frozen=True)
@@ -52,7 +52,11 @@ class OrderExportService:
             pedido = session.get(Pedido, pedido_id)
             if pedido is None:
                 raise ValueError("Pedido no encontrado.")
-            cliente = session.get(Cliente, str(getattr(pedido, "almacen_id", "") or "").strip())
+            almacen_id = str(getattr(pedido, "almacen_id", "") or "").strip()
+            cliente = session.get(Cliente, almacen_id) if almacen_id else None
+            if cliente is None and almacen_id:
+                distribuidor = session.get(Distribuidor, almacen_id)
+                cliente = distribuidor
             rows = list(
                 session.exec(
                     select(PedidoItem, IngredienteIreks)
@@ -66,9 +70,11 @@ class OrderExportService:
         cliente_nombre = (
             str(getattr(cliente, "cliente_nombre_comercial", "") or "").strip()
             or str(getattr(cliente, "cliente_nombre_fiscal", "") or "").strip()
+            or str(getattr(cliente, "distribuidor_nombre_comercial", "") or "").strip()
+            or str(getattr(cliente, "distribuidor_razon_social", "") or "").strip()
             or str(getattr(pedido, "almacen_id", "") or "").strip()
         )
-        base_name = self.build_export_base_name(pedido_fecha, cliente)
+        base_name = self.build_export_base_name(pedido_fecha, cliente_nombre)
 
         wb = Workbook()
         ws = wb.active
@@ -190,28 +196,18 @@ class OrderExportService:
         ws.row_dimensions[9].height = 14.65
         return wb, base_name
 
-    def build_export_base_name(self, pedido_fecha: date, cliente: Cliente | None) -> str:
+    def build_export_base_name(self, pedido_fecha: date, warehouse_name: str) -> str:
         week = int(pedido_fecha.isocalendar().week)
-        cliente_comercial = str(getattr(cliente, "cliente_nombre_comercial", "") or "").strip().lower()
-        cliente_fiscal = str(getattr(cliente, "cliente_nombre_fiscal", "") or "").strip().lower()
-        is_igsa = "igsa" in cliente_comercial or "igsa" in cliente_fiscal
-        prefix = "LPA" if is_igsa else self.cliente_export_code(cliente)
+        warehouse_name = str(warehouse_name or "").strip()
+        is_igsa = "igsa" in warehouse_name.lower()
+        prefix = "LPA" if is_igsa else self._export_prefix_from_name(warehouse_name)
         return f"{prefix} - Pedido SEMANA {week} - {pedido_fecha.strftime('%d.%m.%Y')}"
 
     @staticmethod
-    def cliente_export_code(cliente: Cliente | None) -> str:
-        if cliente is None:
+    def _export_prefix_from_name(name: str) -> str:
+        name = str(name or "").strip()
+        if not name:
             return "PED"
-        abreviatura = str(getattr(cliente, "cliente_abreviatura", "") or "").strip().upper()
-        if abreviatura:
-            return abreviatura
-        interno = str(getattr(cliente, "cliente_nombre_interno", "") or "").strip().upper()
-        if interno:
-            return interno
-        name = (
-            str(getattr(cliente, "cliente_nombre_comercial", "") or "").strip()
-            or str(getattr(cliente, "cliente_nombre_fiscal", "") or "").strip()
-        )
         words = [w for w in re.split(r"[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9]+", name) if w]
         if not words:
             return "PED"
