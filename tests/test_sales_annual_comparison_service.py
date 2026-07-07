@@ -323,6 +323,22 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
                 raw_id="raw-10",
                 lote_id="lote-10",
                 cliente_id=cliente_id,
+                anio=2025,
+                articulo_codigo_origen="DX-001",
+                articulo_id="",
+                articulo_descripcion_origen="Producto IREKS",
+                envase=1.0,
+                unidades=2.0,
+                kg=4.0,
+                precio_kg=2.5,
+                euros=10.0,
+            )
+        )
+        session.add(
+            VentaClientesRaw(
+                raw_id="raw-11",
+                lote_id="lote-11",
+                cliente_id=cliente_id,
                 anio=2026,
                 articulo_codigo_origen="DX-001",
                 articulo_id="",
@@ -336,8 +352,8 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
         )
         session.add(
             VentaClientesRaw(
-                raw_id="raw-11",
-                lote_id="lote-11",
+                raw_id="raw-12",
+                lote_id="lote-12",
                 cliente_id=cliente_id,
                 anio=2026,
                 articulo_codigo_origen="DX-001",
@@ -352,8 +368,24 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
         )
         session.add(
             VentaClientesRaw(
-                raw_id="raw-12",
-                lote_id="lote-12",
+                raw_id="raw-13",
+                lote_id="lote-13",
+                cliente_id="cli-2",
+                anio=2025,
+                articulo_codigo_origen="DX-001",
+                articulo_id="",
+                articulo_descripcion_origen="Producto IREKS",
+                envase=1.0,
+                unidades=1.0,
+                kg=1.0,
+                precio_kg=3.0,
+                euros=3.0,
+            )
+        )
+        session.add(
+            VentaClientesRaw(
+                raw_id="raw-14",
+                lote_id="lote-14",
                 cliente_id="cli-2",
                 anio=2026,
                 articulo_codigo_origen="DX-001",
@@ -376,11 +408,19 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
     assert len(rows) == 2
     assert rows[0].cliente_codigo == "1"
     assert rows[0].cliente_nombre == "Cliente"
-    assert rows[0].kilos == pytest.approx(12.5)
-    assert rows[0].euros == pytest.approx(42.0)
+    assert rows[0].kg_prev == pytest.approx(4.0)
+    assert rows[0].euros_prev == pytest.approx(10.0)
+    assert rows[0].kg_curr == pytest.approx(12.5)
+    assert rows[0].euros_curr == pytest.approx(42.0)
+    assert rows[0].delta_kg == pytest.approx(8.5)
+    assert rows[0].delta_euros == pytest.approx(32.0)
     assert rows[1].cliente_codigo == "2"
     assert rows[1].cliente_nombre == "Cliente Dos"
-    assert rows[1].kilos == pytest.approx(5.0)
-    assert rows[1].euros == pytest.approx(16.8)
+    assert rows[1].kg_prev == pytest.approx(1.0)
+    assert rows[1].euros_prev == pytest.approx(3.0)
+    assert rows[1].kg_curr == pytest.approx(5.0)
+    assert rows[1].euros_curr == pytest.approx(16.8)
+    assert rows[1].delta_kg == pytest.approx(4.0)
+    assert rows[1].delta_euros == pytest.approx(13.8)
     assert len(rows_by_code_only) == 2
     assert len(rows_by_name_only) == 2

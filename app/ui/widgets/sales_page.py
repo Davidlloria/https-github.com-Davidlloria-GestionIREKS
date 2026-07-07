@@ -5603,8 +5603,20 @@ class SalesPage(QWidget):
             empty.setStyleSheet("color: #6B7280; font-style: italic; padding: 8px 2px;")
             layout.addWidget(empty)
         else:
-            table = QTableWidget(0, 4)
-            table.setHorizontalHeaderLabels(["Código", "Cliente", "Kilos", "Ventas"])
+            table = QTableWidget(0, 8)
+            table.setRowCount(len(rows))
+            table.setHorizontalHeaderLabels(
+                [
+                    "Código",
+                    "Cliente",
+                    f"Kilos {year - 1}",
+                    f"€ {year - 1}",
+                    f"Kilos {year}",
+                    f"€ {year}",
+                    "Δ Kilos",
+                    "Δ €",
+                ]
+            )
             table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
             table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
             table.verticalHeader().setVisible(False)
@@ -5615,41 +5627,97 @@ class SalesPage(QWidget):
             header.setStretchLastSection(False)
             header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
             header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-            header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+            for col in range(2, 8):
+                header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
             table.setColumnWidth(0, 110)
             table.setColumnWidth(2, 120)
-            table.setColumnWidth(3, 140)
+            table.setColumnWidth(3, 130)
+            table.setColumnWidth(4, 120)
+            table.setColumnWidth(5, 130)
+            table.setColumnWidth(6, 110)
+            table.setColumnWidth(7, 130)
             table.verticalHeader().setDefaultSectionSize(34)
 
-            total_kilos = 0.0
-            total_sales = 0.0
+            total_prev_kg = 0.0
+            total_prev_sales = 0.0
+            total_curr_kg = 0.0
+            total_curr_sales = 0.0
             for row_idx, row in enumerate(rows):
-                total_kilos += float(getattr(row, "kilos", 0.0) or 0.0)
-                total_sales += float(getattr(row, "euros", 0.0) or 0.0)
+                prev_kg = float(getattr(row, "kg_prev", 0.0) or 0.0)
+                prev_sales = float(getattr(row, "euros_prev", 0.0) or 0.0)
+                curr_kg = float(getattr(row, "kg_curr", 0.0) or 0.0)
+                curr_sales = float(getattr(row, "euros_curr", 0.0) or 0.0)
+                delta_kg = float(getattr(row, "delta_kg", curr_kg - prev_kg) or 0.0)
+                delta_sales = float(getattr(row, "delta_euros", curr_sales - prev_sales) or 0.0)
+                total_prev_kg += prev_kg
+                total_prev_sales += prev_sales
+                total_curr_kg += curr_kg
+                total_curr_sales += curr_sales
                 codigo_item = QTableWidgetItem(str(getattr(row, "cliente_codigo", "") or ""))
                 cliente_item = QTableWidgetItem(str(getattr(row, "cliente_nombre", "") or ""))
-                kilos_item = NumericTableWidgetItem(self._fmt_num(getattr(row, "kilos", 0.0)), float(getattr(row, "kilos", 0.0) or 0.0))
-                euros_item = NumericTableWidgetItem(self._fmt_money(getattr(row, "euros", 0.0)), float(getattr(row, "euros", 0.0) or 0.0))
+                prev_kg_item = NumericTableWidgetItem(self._fmt_num(prev_kg), prev_kg)
+                prev_sales_item = NumericTableWidgetItem(self._fmt_money(prev_sales), prev_sales)
+                curr_kg_item = NumericTableWidgetItem(self._fmt_num(curr_kg), curr_kg)
+                curr_sales_item = NumericTableWidgetItem(self._fmt_money(curr_sales), curr_sales)
+                delta_kg_item = NumericTableWidgetItem(self._fmt_signed_num(delta_kg), delta_kg)
+                delta_sales_item = NumericTableWidgetItem(self._fmt_signed_money(delta_sales), delta_sales)
                 codigo_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
                 cliente_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-                kilos_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-                euros_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-                for item_widget in (codigo_item, cliente_item, kilos_item, euros_item):
+                prev_kg_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                prev_sales_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                curr_kg_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                curr_sales_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                delta_kg_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                delta_sales_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                for item_widget in (
+                    codigo_item,
+                    cliente_item,
+                    prev_kg_item,
+                    prev_sales_item,
+                    curr_kg_item,
+                    curr_sales_item,
+                    delta_kg_item,
+                    delta_sales_item,
+                ):
                     item_widget.setForeground(QColor("#14213D"))
                     item_widget.setToolTip(item_widget.text())
-                kilos_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                euros_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                for item_widget in (prev_kg_item, prev_sales_item, curr_kg_item, curr_sales_item, delta_kg_item, delta_sales_item):
+                    item_widget.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                for item_widget, value in (
+                    (delta_kg_item, delta_kg),
+                    (delta_sales_item, delta_sales),
+                ):
+                    if value > 0:
+                        item_widget.setForeground(QColor("#067647"))
+                    elif value < 0:
+                        item_widget.setForeground(QColor("#B42318"))
                 table.setItem(row_idx, 0, codigo_item)
                 table.setItem(row_idx, 1, cliente_item)
-                table.setItem(row_idx, 2, kilos_item)
-                table.setItem(row_idx, 3, euros_item)
+                table.setItem(row_idx, 2, prev_kg_item)
+                table.setItem(row_idx, 3, prev_sales_item)
+                table.setItem(row_idx, 4, curr_kg_item)
+                table.setItem(row_idx, 5, curr_sales_item)
+                table.setItem(row_idx, 6, delta_kg_item)
+                table.setItem(row_idx, 7, delta_sales_item)
 
             layout.addWidget(table, 1)
 
             footer = QHBoxLayout()
             footer.addStretch(1)
-            total_label = QLabel(f"Total kilos: {self._fmt_num(total_kilos)} | Total ventas: {self._fmt_money(total_sales)}")
+            delta_kg_total = total_curr_kg - total_prev_kg
+            delta_sales_total = total_curr_sales - total_prev_sales
+            total_label = QLabel(
+                " | ".join(
+                    [
+                        f"Total {year - 1} kilos: {self._fmt_num(total_prev_kg)}",
+                        f"Total {year - 1} ventas: {self._fmt_money(total_prev_sales)}",
+                        f"Total {year} kilos: {self._fmt_num(total_curr_kg)}",
+                        f"Total {year} ventas: {self._fmt_money(total_curr_sales)}",
+                        f"Δ kilos: {self._fmt_signed_num(delta_kg_total)}",
+                        f"Δ ventas: {self._fmt_signed_money(delta_sales_total)}",
+                    ]
+                )
+            )
             total_label.setStyleSheet("color: #14213D; font-weight: 600;")
             footer.addWidget(total_label)
             layout.addLayout(footer)
@@ -6033,4 +6101,12 @@ class SalesPage(QWidget):
 
     def _fmt_pct(self, value) -> str:
         return f"{self._fmt_num(value)} %"
+
+    def _fmt_signed_num(self, value) -> str:
+        number = float(value or 0.0)
+        sign = "+" if number > 0 else ""
+        return f"{sign}{self._fmt_num(number)}"
+
+    def _fmt_signed_money(self, value) -> str:
+        return f"{self._fmt_signed_num(value)} €"
 

@@ -101,8 +101,12 @@ class SalesClientProductConsumerRow:
     cliente_id: str
     cliente_codigo: str
     cliente_nombre: str
-    kilos: float
-    euros: float
+    kg_prev: float
+    euros_prev: float
+    kg_curr: float
+    euros_curr: float
+    delta_kg: float
+    delta_euros: float
 
 
 class SalesAnnualComparisonService:
@@ -1098,93 +1102,15 @@ class SalesAnnualComparisonService:
         if current_year > 1:
             years.add(current_year - 1)
 
-        selected_product_text = " ".join(
-            part
-            for part in [
-                str(articulo_codigo or "").strip(),
-                str(articulo_nombre or "").strip(),
-                str(articulo_id or "").strip(),
-            ]
-            if part
-        ).strip()
-
-        summary_rows = self.listar_resumen_anual_clientes(
-            current_year,
-            producto_texto=selected_product_text,
-        )
-        if summary_rows:
-            totals_summary: dict[str, dict[str, float | str]] = defaultdict(
-                lambda: {
-                    "cliente_id": "",
-                    "cliente_codigo": "",
-                    "cliente_nombre": "",
-                    "kilos": 0.0,
-                    "euros": 0.0,
-                }
-            )
-            for row in summary_rows:
-                row_articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
-                row_code = self._normalize_code(getattr(row, "codigo", "") or "")
-                row_name = str(getattr(row, "nombre", "") or "").strip()
-                row_searchable = self._normalize_search_text(" ".join([row_code, row_name, row_articulo_id]))
-                if clean_articulo_id or clean_articulo_codigo or clean_articulo_nombre:
-                    matches_id = bool(clean_articulo_id and row_articulo_id == clean_articulo_id)
-                    matches_code = bool(clean_articulo_codigo and row_code == clean_articulo_codigo)
-                    matches_name = bool(clean_articulo_nombre and clean_articulo_nombre in row_searchable)
-                    if not matches_id and not matches_code and not matches_name:
-                        continue
-                cliente_id_value = str(getattr(row, "cliente_id", "") or "").strip()
-                bucket = totals_summary[cliente_id_value or str(getattr(row, "cliente_nombre", "") or "").strip()]
-                bucket["cliente_id"] = cliente_id_value
-                if not str(bucket["cliente_codigo"]):
-                    bucket["cliente_codigo"] = str(getattr(row, "cliente_codigo", "") or "").strip()
-                if not str(bucket["cliente_nombre"]):
-                    bucket["cliente_nombre"] = str(getattr(row, "cliente_nombre", "") or "").strip()
-                bucket["kilos"] = float(bucket["kilos"] or 0.0) + float(getattr(row, "kg_prev", 0.0) or 0.0) + float(getattr(row, "kg_curr", 0.0) or 0.0)
-                bucket["euros"] = float(bucket["euros"] or 0.0) + float(getattr(row, "euros_prev", 0.0) or 0.0) + float(getattr(row, "euros_curr", 0.0) or 0.0)
-
-            summary_result = [
-                SalesClientProductConsumerRow(
-                    cliente_id=str(values["cliente_id"] or ""),
-                    cliente_codigo=str(values["cliente_codigo"] or ""),
-                    cliente_nombre=str(values["cliente_nombre"] or ""),
-                    kilos=float(values["kilos"] or 0.0),
-                    euros=float(values["euros"] or 0.0),
-                )
-                for values in totals_summary.values()
-                if float(values["kilos"] or 0.0) > 0 or float(values["euros"] or 0.0) > 0
-            ]
-            summary_result.sort(key=lambda row: (-row.euros, -row.kilos, row.cliente_nombre.lower(), row.cliente_codigo.lower()))
-            if summary_result:
-                return summary_result
-
         with Session(self._engine) as session:
             stmt = select(VentaClientesRaw).where(col(VentaClientesRaw.anio).in_(years))
             raw_rows = list(session.exec(stmt))
             clients = list(session.exec(select(Cliente)))
+            distributors = list(session.exec(select(Distribuidor)))
             products = list(session.exec(select(IngredienteIreks)))
             product_reference_lookup = self._build_clientes_product_reference_lookup(session)
 
-        client_by_id: dict[str, tuple[str, str, str]] = {}
-        client_search_by_id: dict[str, str] = {}
-        for client in clients:
-            cid = str(client.cliente_id or "").strip()
-            if not cid:
-                continue
-            codigo = str(getattr(client, "cliente_codigo", "") or "").strip()
-            nombre = str(client.cliente_nombre_comercial or client.cliente_nombre_fiscal or cid).strip()
-            search_text = self._normalize_search_text(
-                " ".join(
-                    [
-                        codigo,
-                        str(client.cliente_nombre_comercial or ""),
-                        str(client.cliente_nombre_fiscal or ""),
-                        str(client.cliente_abreviatura or ""),
-                    ]
-                )
-            )
-            client_by_id[cid] = (codigo, nombre, search_text)
-            client_search_by_id[cid] = search_text
+        client_by_id, client_search_by_id = self._build_sales_party_lookup(clients, distributors)
 
         product_by_id: dict[str, tuple[str, str, str, str, str, str, str]] = {}
         product_by_code: dict[str, tuple[str, str, str, str, str, str, str]] = {}
@@ -1240,11 +1166,16 @@ class SalesAnnualComparisonService:
                 "cliente_id": "",
                 "cliente_codigo": "",
                 "cliente_nombre": "",
-                "kilos": 0.0,
-                "euros": 0.0,
+                "kg_prev": 0.0,
+                "euros_prev": 0.0,
+                "kg_curr": 0.0,
+                "euros_curr": 0.0,
             }
         )
         for row in raw_rows:
+            row_year = int(getattr(row, "anio", 0) or 0)
+            if row_year not in years:
+                continue
             cliente_id_raw = str(getattr(row, "cliente_id", "") or "").strip()
             client_info = client_by_id.get(cliente_id_raw)
             row_code = self._normalize_code(getattr(row, "articulo_codigo_origen", ""))
@@ -1278,21 +1209,41 @@ class SalesAnnualComparisonService:
                 bucket["cliente_codigo"] = cliente_codigo
             if not str(bucket["cliente_nombre"]):
                 bucket["cliente_nombre"] = cliente_nombre
-            bucket["kilos"] = float(bucket["kilos"] or 0.0) + float(getattr(row, "kg", 0.0) or 0.0)
-            bucket["euros"] = float(bucket["euros"] or 0.0) + float(getattr(row, "euros", 0.0) or 0.0)
+            if row_year == current_year - 1:
+                bucket["kg_prev"] = float(bucket["kg_prev"] or 0.0) + float(getattr(row, "kg", 0.0) or 0.0)
+                bucket["euros_prev"] = float(bucket["euros_prev"] or 0.0) + float(getattr(row, "euros", 0.0) or 0.0)
+            elif row_year == current_year:
+                bucket["kg_curr"] = float(bucket["kg_curr"] or 0.0) + float(getattr(row, "kg", 0.0) or 0.0)
+                bucket["euros_curr"] = float(bucket["euros_curr"] or 0.0) + float(getattr(row, "euros", 0.0) or 0.0)
 
         result = [
             SalesClientProductConsumerRow(
                 cliente_id=str(values["cliente_id"] or ""),
                 cliente_codigo=str(values["cliente_codigo"] or ""),
                 cliente_nombre=str(values["cliente_nombre"] or ""),
-                kilos=float(values["kilos"] or 0.0),
-                euros=float(values["euros"] or 0.0),
+                kg_prev=float(values["kg_prev"] or 0.0),
+                euros_prev=float(values["euros_prev"] or 0.0),
+                kg_curr=float(values["kg_curr"] or 0.0),
+                euros_curr=float(values["euros_curr"] or 0.0),
+                delta_kg=float(values["kg_curr"] or 0.0) - float(values["kg_prev"] or 0.0),
+                delta_euros=float(values["euros_curr"] or 0.0) - float(values["euros_prev"] or 0.0),
             )
             for values in totals.values()
-            if float(values["kilos"] or 0.0) > 0 or float(values["euros"] or 0.0) > 0
+            if float(values["kg_prev"] or 0.0) > 0
+            or float(values["euros_prev"] or 0.0) > 0
+            or float(values["kg_curr"] or 0.0) > 0
+            or float(values["euros_curr"] or 0.0) > 0
         ]
-        result.sort(key=lambda row: (-row.euros, -row.kilos, row.cliente_nombre.lower(), row.cliente_codigo.lower()))
+        result.sort(
+            key=lambda row: (
+                -row.euros_curr,
+                -row.kg_curr,
+                -row.euros_prev,
+                -row.kg_prev,
+                row.cliente_nombre.lower(),
+                row.cliente_codigo.lower(),
+            )
+        )
         return result
 
     def _build_clientes_product_reference_lookup(self, session: Session) -> dict[str, str]:
