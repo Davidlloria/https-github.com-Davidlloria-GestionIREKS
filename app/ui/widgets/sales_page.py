@@ -5579,7 +5579,7 @@ class SalesPage(QWidget):
         dialog = QDialog(self)
         dialog.setWindowTitle("Clientes que consumen el producto")
         dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
-        dialog.setFixedSize(1360, 780)
+        dialog.setFixedSize(1240, 740)
 
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(14, 14, 14, 14)
@@ -5605,15 +5605,16 @@ class SalesPage(QWidget):
             layout.addWidget(empty)
         else:
             column_widths = {
-                0: 72,
-                1: 610,
-                2: 92,
-                3: 108,
-                4: 92,
-                5: 108,
-                6: 104,
-                7: 120,
+                0: 64,
+                1: 558,
+                2: 84,
+                3: 98,
+                4: 84,
+                5: 98,
+                6: 92,
+                7: 104,
             }
+            content_width = sum(column_widths.values()) + 2
 
             band_widget = QWidget()
             band_layout = QGridLayout(band_widget)
@@ -5622,6 +5623,7 @@ class SalesPage(QWidget):
             band_layout.setVerticalSpacing(0)
             for col, width in column_widths.items():
                 band_layout.setColumnMinimumWidth(col, width)
+            band_widget.setFixedWidth(content_width)
 
             def make_pill(text: str, color: str) -> QWidget:
                 label = QLabel(text)
@@ -5632,7 +5634,7 @@ class SalesPage(QWidget):
                 )
                 wrapper = QWidget()
                 wrapper_layout = QHBoxLayout(wrapper)
-                wrapper_layout.setContentsMargins(8, 0, 8, 0)
+                wrapper_layout.setContentsMargins(0, 0, 0, 0)
                 wrapper_layout.addWidget(label)
                 return wrapper
 
@@ -5640,6 +5642,7 @@ class SalesPage(QWidget):
                 blank = QWidget()
                 blank.setStyleSheet("background: transparent; border: none;")
                 band_layout.addWidget(blank, 0, col)
+            band_layout.setRowMinimumHeight(0, 32)
             band_layout.addWidget(make_pill(str(year - 1), "#3E5064"), 0, 2, 1, 2)
             band_layout.addWidget(make_pill(str(year), "#0F766E"), 0, 4, 1, 2)
             band_layout.addWidget(make_pill("Diferencias", "#111827"), 0, 6, 1, 2)
@@ -5660,6 +5663,7 @@ class SalesPage(QWidget):
             for col in range(8):
                 header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
                 table.setColumnWidth(col, column_widths[col])
+            table.setFixedWidth(content_width)
             table.verticalHeader().setDefaultSectionSize(34)
 
             total_prev_kg = 0.0
