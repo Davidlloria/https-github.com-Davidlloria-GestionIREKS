@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QFormLayout,
     QDialogButtonBox,
+    QGridLayout,
     QLabel,
     QMessageBox,
     QLineEdit,
@@ -5578,7 +5579,7 @@ class SalesPage(QWidget):
         dialog = QDialog(self)
         dialog.setWindowTitle("Clientes que consumen el producto")
         dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
-        dialog.resize(900, 560)
+        dialog.setFixedSize(1360, 780)
 
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(14, 14, 14, 14)
@@ -5603,39 +5604,62 @@ class SalesPage(QWidget):
             empty.setStyleSheet("color: #6B7280; font-style: italic; padding: 8px 2px;")
             layout.addWidget(empty)
         else:
+            column_widths = {
+                0: 72,
+                1: 610,
+                2: 92,
+                3: 108,
+                4: 92,
+                5: 108,
+                6: 104,
+                7: 120,
+            }
+
+            band_widget = QWidget()
+            band_layout = QGridLayout(band_widget)
+            band_layout.setContentsMargins(0, 0, 0, 0)
+            band_layout.setHorizontalSpacing(0)
+            band_layout.setVerticalSpacing(0)
+            for col, width in column_widths.items():
+                band_layout.setColumnMinimumWidth(col, width)
+
+            def make_pill(text: str, color: str) -> QWidget:
+                label = QLabel(text)
+                label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                label.setFixedHeight(28)
+                label.setStyleSheet(
+                    f"background-color: {color}; color: #FFFFFF; border-radius: 14px; padding: 0 12px; font-weight: 700;"
+                )
+                wrapper = QWidget()
+                wrapper_layout = QHBoxLayout(wrapper)
+                wrapper_layout.setContentsMargins(8, 0, 8, 0)
+                wrapper_layout.addWidget(label)
+                return wrapper
+
+            for col in (0, 1):
+                blank = QWidget()
+                blank.setStyleSheet("background: transparent; border: none;")
+                band_layout.addWidget(blank, 0, col)
+            band_layout.addWidget(make_pill(str(year - 1), "#3E5064"), 0, 2, 1, 2)
+            band_layout.addWidget(make_pill(str(year), "#0F766E"), 0, 4, 1, 2)
+            band_layout.addWidget(make_pill("Diferencias", "#111827"), 0, 6, 1, 2)
+            layout.addWidget(band_widget)
+
             table = QTableWidget(0, 8)
             table.setRowCount(len(rows))
-            table.setHorizontalHeaderLabels(
-                [
-                    "Código",
-                    "Cliente",
-                    f"Kilos {year - 1}",
-                    f"€ {year - 1}",
-                    f"Kilos {year}",
-                    f"€ {year}",
-                    "Δ Kilos",
-                    "Δ €",
-                ]
-            )
+            table.setHorizontalHeaderLabels(["Código", "Cliente", "Kilos", "€", "Kilos", "€", "Kilos", "€"])
             table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
             table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
             table.verticalHeader().setVisible(False)
             table.setAlternatingRowColors(True)
             table.setShowGrid(False)
             table.setWordWrap(False)
+            table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             header = table.horizontalHeader()
             header.setStretchLastSection(False)
-            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-            header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-            for col in range(2, 8):
+            for col in range(8):
                 header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
-            table.setColumnWidth(0, 110)
-            table.setColumnWidth(2, 120)
-            table.setColumnWidth(3, 130)
-            table.setColumnWidth(4, 120)
-            table.setColumnWidth(5, 130)
-            table.setColumnWidth(6, 110)
-            table.setColumnWidth(7, 130)
+                table.setColumnWidth(col, column_widths[col])
             table.verticalHeader().setDefaultSectionSize(34)
 
             total_prev_kg = 0.0
