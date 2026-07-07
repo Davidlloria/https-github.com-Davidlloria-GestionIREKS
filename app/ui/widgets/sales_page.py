@@ -2276,6 +2276,157 @@ class SalesPage(QWidget):
         igsa_filters_bottom.addWidget(self.product_filter_igsa, 1)
         igsa_layout.addLayout(igsa_filters_bottom)
 
+        igsa_action_button_width = 110
+        igsa_action_button_height = 36
+
+        def make_igsa_action_button(
+            *,
+            text: str,
+            tooltip: str,
+            icon_path: Path,
+            background: str,
+            border: str,
+            hover_background: str,
+            pressed_background: str,
+            foreground: str = "#1F2937",
+        ) -> QToolButton:
+            button = QToolButton()
+            button.setToolTip(tooltip)
+            button.setIcon(QIcon(str(icon_path)))
+            button.setIconSize(QSize(16, 16))
+            button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setFixedSize(igsa_action_button_width, igsa_action_button_height)
+            button.setText(text)
+            button.setStyleSheet(
+                f"""
+                QToolButton {{
+                    background-color: {background};
+                    border: 1px solid {border};
+                    border-radius: 8px;
+                    color: {foreground};
+                    padding: 0 8px;
+                    font-size: 12px;
+                    font-weight: 600;
+                }}
+                QToolButton:hover {{
+                    background-color: {hover_background};
+                }}
+                QToolButton:pressed {{
+                    background-color: {pressed_background};
+                }}
+                QToolButton:disabled {{
+                    background-color: {background};
+                    border-color: {border};
+                    color: #6B7280;
+                }}
+                """
+            )
+            return button
+
+        self.sales_chart_btn_igsa = make_igsa_action_button(
+            text="Producto",
+            tooltip="Ver gráfico del producto",
+            icon_path=CHART_LINE_ICON_PATH,
+            background="#9CC9F5",
+            border="#7AAEE3",
+            hover_background="#B0D4F8",
+            pressed_background="#8AB8E6",
+        )
+        self.sales_chart_btn_igsa.clicked.connect(lambda: self._show_igsa_placeholder_action("Producto"))
+
+        self.sales_total_chart_btn_igsa = make_igsa_action_button(
+            text="Total",
+            tooltip="Ver gráfico total",
+            icon_path=CHART_LINE_ICON_PATH,
+            background="#A7E3D1",
+            border="#83CBB5",
+            hover_background="#B8E8DA",
+            pressed_background="#91D2BE",
+        )
+        self.sales_total_chart_btn_igsa.clicked.connect(lambda: self._show_igsa_placeholder_action("Total"))
+
+        self.sales_analysis_btn_igsa = make_igsa_action_button(
+            text="Análisis",
+            tooltip="Análisis",
+            icon_path=BASE_DIR / "assets" / "icons" / "brain.svg",
+            background="#F6E3A1",
+            border="#E3C56D",
+            hover_background="#F8E8B6",
+            pressed_background="#EED88B",
+        )
+        self.sales_analysis_btn_igsa.clicked.connect(lambda: self._show_igsa_placeholder_action("Análisis"))
+
+        self.sales_print_btn_igsa = make_igsa_action_button(
+            text="Imprimir",
+            tooltip="Imprimir",
+            icon_path=PRINTER_ICON_PATH,
+            background="#D6D0C8",
+            border="#B8B1A8",
+            hover_background="#E2DDD6",
+            pressed_background="#C8C1B7",
+        )
+        self.sales_print_btn_igsa.clicked.connect(lambda: self._show_igsa_placeholder_action("Imprimir"))
+
+        self.sales_pdf_btn_igsa = make_igsa_action_button(
+            text="PDF",
+            tooltip="Exportar a PDF",
+            icon_path=FILE_TEXT_ICON_PATH,
+            background="#F4B2A8",
+            border="#D98E83",
+            hover_background="#F7C0B8",
+            pressed_background="#E89A8F",
+        )
+        self.sales_pdf_btn_igsa.clicked.connect(lambda: self._show_igsa_placeholder_action("PDF"))
+
+        self.sales_excel_btn_igsa = make_igsa_action_button(
+            text="Excel",
+            tooltip="Exportar a Excel",
+            icon_path=SHEET_ICON_PATH,
+            background="#CBEA8B",
+            border="#AFD268",
+            hover_background="#D7F09D",
+            pressed_background="#B9DE72",
+        )
+        self.sales_excel_btn_igsa.clicked.connect(self._export_sales_excel)
+
+        self.sales_tools_btn_igsa = make_igsa_action_button(
+            text="Tools",
+            tooltip="Herramientas",
+            icon_path=TOOLBOX_ICON_PATH,
+            background="#D9C3F3",
+            border="#BA9EE7",
+            hover_background="#E3D2F7",
+            pressed_background="#CBB2ED",
+        )
+        self.sales_tools_btn_igsa.clicked.connect(lambda: self._show_igsa_placeholder_action("Tools"))
+
+        igsa_chart_actions_widget = QWidget()
+        igsa_chart_band = QHBoxLayout(igsa_chart_actions_widget)
+        igsa_chart_band.setContentsMargins(0, 0, 0, 0)
+        igsa_chart_band.setSpacing(4)
+        igsa_chart_band.addWidget(self.sales_chart_btn_igsa)
+        igsa_chart_band.addWidget(self.sales_total_chart_btn_igsa)
+        igsa_chart_band.addWidget(self.sales_analysis_btn_igsa)
+        igsa_chart_band.addWidget(self.sales_print_btn_igsa)
+        igsa_chart_band.addWidget(self.sales_pdf_btn_igsa)
+        igsa_chart_band.addWidget(self.sales_excel_btn_igsa)
+        igsa_chart_band.addWidget(self.sales_tools_btn_igsa)
+
+        igsa_actions_band = QHBoxLayout()
+        igsa_actions_band.setContentsMargins(0, 0, 0, 0)
+        igsa_actions_band.setSpacing(8)
+        igsa_actions_band.addWidget(igsa_chart_actions_widget)
+        igsa_actions_band.addStretch(1)
+        igsa_layout.addLayout(igsa_actions_band)
+
+        igsa_separator_line = QFrame()
+        igsa_separator_line.setFrameShape(QFrame.Shape.HLine)
+        igsa_separator_line.setFrameShadow(QFrame.Shadow.Plain)
+        igsa_separator_line.setStyleSheet("color: #D8E0EC; background: #D8E0EC;")
+        igsa_separator_line.setFixedHeight(1)
+        igsa_layout.addWidget(igsa_separator_line)
+
         group_header_style = """
             QTableWidget#salesGroupHeader {
                 border: none;
@@ -2286,6 +2437,22 @@ class SalesPage(QWidget):
             QTableWidget#salesGroupHeader::item:hover,
             QTableWidget#salesGroupHeader::item:selected,
             QTableWidget#salesGroupHeader::item:focus {
+                border: none;
+                background: transparent;
+                outline: none;
+            }
+            """
+
+        igsa_group_header_style = """
+            QTableWidget#salesGroupHeaderIgsa {
+                border: none;
+                background: transparent;
+                selection-background-color: transparent;
+            }
+            QTableWidget#salesGroupHeaderIgsa::item,
+            QTableWidget#salesGroupHeaderIgsa::item:hover,
+            QTableWidget#salesGroupHeaderIgsa::item:selected,
+            QTableWidget#salesGroupHeaderIgsa::item:focus {
                 border: none;
                 background: transparent;
                 outline: none;
@@ -2333,7 +2500,7 @@ class SalesPage(QWidget):
         self.group_header_igsa.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.group_header_igsa.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.group_header_igsa.viewport().setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.group_header_igsa.setStyleSheet(group_header_style)
+        self.group_header_igsa.setStyleSheet(igsa_group_header_style)
         igsa_layout.addWidget(self.group_header_igsa)
 
         self.sales_table_igsa = QTableWidget(0, 12)
@@ -3382,6 +3549,13 @@ class SalesPage(QWidget):
     def _open_clientes_sales_tools_dialog(self) -> None:
         dialog = SalesToolsDialog(mode="clientes", on_import_completed=self.reload_clientes, parent=self)
         dialog.exec()
+
+    def _show_igsa_placeholder_action(self, action_name: str) -> None:
+        QMessageBox.information(
+            self,
+            "Ventas IGSA",
+            f"La acción '{action_name}' todavía no está disponible en la pestaña Ventas IGSA.",
+        )
 
     def _sales_export_state(self) -> dict[str, object] | None:
         if not hasattr(self, "sales_tabs"):
@@ -4855,7 +5029,7 @@ class SalesPage(QWidget):
             if col in {0, 1}:
                 label.setStyleSheet("background-color: transparent; border: none; padding: 0;")
             else:
-                label.setStyleSheet("background-color: #F3F6FA; border: 1px solid #000000; border-radius: 0; padding: 0;")
+                label.setStyleSheet("background-color: transparent; border: none; padding: 0;")
             self.group_header_igsa.setCellWidget(0, col, label)
         self._set_group_item_igsa(2, str(year - 1), "#3E5064", 3)
         self._set_group_item_igsa(5, str(year), "#0F766E", 3)
