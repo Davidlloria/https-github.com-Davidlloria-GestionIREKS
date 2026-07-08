@@ -3,7 +3,7 @@ from datetime import date, datetime
 import unicodedata
 
 from PySide6.QtCore import QSize, QTimer, Qt
-from PySide6.QtGui import QColor, QTextDocument
+from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
@@ -44,6 +44,8 @@ from app.services.customer_service import CustomerService
 from app.services.customer_report_service import CustomerReportIntentService, CustomerReportResult, CustomerReportService
 from app.services.report_export_service import ReportExportService
 from app.ui.widgets.entity_dialog import EntityDialog
+
+BASE_DIR = Path(__file__).resolve().parents[3]
 
 
 class CustomersPage(QWidget):
@@ -99,6 +101,11 @@ class CustomersPage(QWidget):
         self._related_context_menu_open = False
         self._loading_related_contacts = False
         self._loading_agenda = False
+        self._agenda_filter_type: QComboBox | None = None
+        self._agenda_filter_state: QComboBox | None = None
+        self._agenda_filter_from: QDateEdit | None = None
+        self._agenda_filter_to: QDateEdit | None = None
+        self._agenda_filter_refresh_btn: QPushButton | None = None
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
         self._search_timer.timeout.connect(self.reload)
@@ -452,7 +459,61 @@ class CustomersPage(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(8)
 
-        self.agenda_table = QTableWidget(0, 5)
+        title = QLabel("Historial de actividades")
+        title.setObjectName("customerAgendaTitle")
+        layout.addWidget(title)
+
+        filter_bar = QHBoxLayout()
+        filter_bar.setContentsMargins(0, 0, 0, 0)
+        filter_bar.setSpacing(10)
+
+        self._agenda_filter_type = QComboBox()
+        self._agenda_filter_type.setObjectName("customerAgendaFilter")
+        self._agenda_filter_type.setFixedWidth(190)
+        self._agenda_filter_type.addItem("Todos los tipos", "")
+        for key, label in self._agenda_type_options():
+            self._agenda_filter_type.addItem(label, key)
+
+        self._agenda_filter_state = QComboBox()
+        self._agenda_filter_state.setObjectName("customerAgendaFilter")
+        self._agenda_filter_state.setFixedWidth(190)
+        self._agenda_filter_state.addItem("Todos los estados", "")
+        for key, label in self._agenda_state_options():
+            self._agenda_filter_state.addItem(label, key)
+
+        current_year = date.today().year
+        self._agenda_filter_from = QDateEdit()
+        self._agenda_filter_from.setObjectName("customerAgendaFilterDate")
+        self._agenda_filter_from.setCalendarPopup(True)
+        self._agenda_filter_from.setDisplayFormat("dd/MM/yyyy")
+        self._agenda_filter_from.setFixedWidth(170)
+        self._agenda_filter_from.setDate(self._agenda_qdate(date(current_year, 1, 1), fallback_today=False))
+
+        self._agenda_filter_to = QDateEdit()
+        self._agenda_filter_to.setObjectName("customerAgendaFilterDate")
+        self._agenda_filter_to.setCalendarPopup(True)
+        self._agenda_filter_to.setDisplayFormat("dd/MM/yyyy")
+        self._agenda_filter_to.setFixedWidth(170)
+        self._agenda_filter_to.setDate(self._agenda_qdate(date(current_year, 12, 31), fallback_today=False))
+
+        range_sep = QLabel(" - ")
+        range_sep.setObjectName("customerAgendaRangeSep")
+
+        self._agenda_filter_refresh_btn = QPushButton("Actualizar")
+        self._agenda_filter_refresh_btn.setProperty("btnRole", "secondary")
+        self._agenda_filter_refresh_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        self._agenda_filter_refresh_btn.setFixedWidth(130)
+
+        filter_bar.addWidget(self._agenda_filter_type)
+        filter_bar.addWidget(self._agenda_filter_state)
+        filter_bar.addWidget(self._agenda_filter_from)
+        filter_bar.addWidget(range_sep)
+        filter_bar.addWidget(self._agenda_filter_to)
+        filter_bar.addWidget(self._agenda_filter_refresh_btn)
+        filter_bar.addStretch(1)
+        layout.addLayout(filter_bar)
+
+        self.agenda_table = QTableWidget(0, 6)
         self.agenda_table.setObjectName("customerAgendaTable")
         self.agenda_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.agenda_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -462,19 +523,21 @@ class CustomersPage(QWidget):
         self.agenda_table.setAlternatingRowColors(True)
         self.agenda_table.setShowGrid(False)
         self.agenda_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.agenda_table.setHorizontalHeaderLabels(["Fecha", "Tipo", "Estado", "Resumen", "Seguimiento"])
+        self.agenda_table.setHorizontalHeaderLabels(["", "Fecha", "Tipo", "Estado", "Resumen", "Seguimiento"])
         header = self.agenda_table.horizontalHeader()
         header.setSectionsClickable(False)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        self.agenda_table.setColumnWidth(0, 96)
-        self.agenda_table.setColumnWidth(1, 150)
-        self.agenda_table.setColumnWidth(2, 104)
-        self.agenda_table.setColumnWidth(4, 108)
-        self.agenda_table.verticalHeader().setDefaultSectionSize(36)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        self.agenda_table.setColumnWidth(0, 58)
+        self.agenda_table.setColumnWidth(1, 98)
+        self.agenda_table.setColumnWidth(2, 146)
+        self.agenda_table.setColumnWidth(3, 122)
+        self.agenda_table.setColumnWidth(5, 110)
+        self.agenda_table.verticalHeader().setDefaultSectionSize(46)
         self.agenda_table.cellDoubleClicked.connect(self._open_agenda_activity_from_row)
         self.agenda_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.agenda_table.customContextMenuRequested.connect(self._show_agenda_context_menu)
@@ -486,17 +549,29 @@ class CustomersPage(QWidget):
         self.agenda_empty.setWordWrap(True)
         self.agenda_empty.setVisible(False)
         layout.addWidget(self.agenda_empty)
+
+        if self._agenda_filter_type is not None:
+            self._agenda_filter_type.currentIndexChanged.connect(self._refresh_agenda_view)
+        if self._agenda_filter_state is not None:
+            self._agenda_filter_state.currentIndexChanged.connect(self._refresh_agenda_view)
+        if self._agenda_filter_from is not None:
+            self._agenda_filter_from.dateChanged.connect(self._refresh_agenda_view)
+        if self._agenda_filter_to is not None:
+            self._agenda_filter_to.dateChanged.connect(self._refresh_agenda_view)
+        if self._agenda_filter_refresh_btn is not None:
+            self._agenda_filter_refresh_btn.clicked.connect(self._refresh_agenda_view)
         return panel
 
     def _render_customer_agenda(self, cliente_id: str) -> None:
         if not hasattr(self, "agenda_table"):
             return
         entries = self.customer_service.related_agenda(cliente_id)
+        filtered_entries = [item for item in entries if self._agenda_matches_filters(item)]
         self._loading_agenda = True
         self.agenda_table.blockSignals(True)
         try:
-            self.agenda_table.setRowCount(len(entries))
-            for row_idx, item in enumerate(entries):
+            self.agenda_table.setRowCount(len(filtered_entries))
+            for row_idx, item in enumerate(filtered_entries):
                 agenda_id = str(getattr(item, "agenda_id", "") or "")
                 fecha = self._format_agenda_date(getattr(item, "fecha_actividad", None))
                 tipo = self._agenda_type_label(str(getattr(item, "tipo", "") or ""))
@@ -504,35 +579,173 @@ class CustomersPage(QWidget):
                 resumen = str(getattr(item, "resumen", "") or "").strip()
                 seguimiento = self._format_agenda_date(getattr(item, "fecha_seguimiento", None), allow_blank=True)
 
+                icon_cell = self._make_agenda_icon_widget(str(getattr(item, "tipo", "") or ""))
                 fecha_item = QTableWidgetItem(fecha)
                 tipo_item = QTableWidgetItem(tipo)
-                estado_item = QTableWidgetItem(estado)
                 resumen_item = QTableWidgetItem(resumen)
                 seguimiento_item = QTableWidgetItem(seguimiento)
+                state_cell = self._make_agenda_state_pill_widget(str(getattr(item, "estado", "") or ""))
                 fecha_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
                 tipo_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
-                estado_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
                 resumen_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
                 seguimiento_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
-                for item_widget in (fecha_item, tipo_item, estado_item, resumen_item, seguimiento_item):
+                for item_widget in (fecha_item, tipo_item, resumen_item, seguimiento_item):
                     item_widget.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
                     item_widget.setToolTip(item_widget.text())
                     item_widget.setForeground(QColor("#14213D"))
                 fecha_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 tipo_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                estado_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 seguimiento_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self._agenda_style_state_item(estado_item, str(getattr(item, "estado", "") or ""))
-                self.agenda_table.setItem(row_idx, 0, fecha_item)
-                self.agenda_table.setItem(row_idx, 1, tipo_item)
-                self.agenda_table.setItem(row_idx, 2, estado_item)
-                self.agenda_table.setItem(row_idx, 3, resumen_item)
-                self.agenda_table.setItem(row_idx, 4, seguimiento_item)
+                self.agenda_table.setCellWidget(row_idx, 0, icon_cell)
+                self.agenda_table.setItem(row_idx, 1, fecha_item)
+                self.agenda_table.setItem(row_idx, 2, tipo_item)
+                self.agenda_table.setCellWidget(row_idx, 3, state_cell)
+                self.agenda_table.setItem(row_idx, 4, resumen_item)
+                self.agenda_table.setItem(row_idx, 5, seguimiento_item)
         finally:
             self.agenda_table.blockSignals(False)
             self._loading_agenda = False
         if hasattr(self, "agenda_empty"):
-            self.agenda_empty.setVisible(len(entries) == 0)
+            self.agenda_empty.setVisible(len(filtered_entries) == 0)
+        if self.agenda_table.rowCount() > 0:
+            self.agenda_table.resizeRowsToContents()
+
+    def _refresh_agenda_view(self, *_args) -> None:
+        selected = self._selected_row()
+        if selected is None:
+            if hasattr(self, "agenda_table"):
+                self.agenda_table.setRowCount(0)
+            if hasattr(self, "agenda_empty"):
+                self.agenda_empty.setVisible(True)
+            return
+        self._render_customer_agenda(str(getattr(selected, "cliente_id", "") or ""))
+
+    def _agenda_matches_filters(self, item) -> bool:
+        tipo_filter = ""
+        estado_filter = ""
+        date_from = None
+        date_to = None
+        if self._agenda_filter_type is not None:
+            tipo_filter = str(self._agenda_filter_type.currentData() or "").strip().lower()
+        if self._agenda_filter_state is not None:
+            estado_filter = str(self._agenda_filter_state.currentData() or "").strip().lower()
+        if self._agenda_filter_from is not None:
+            date_from = self._agenda_filter_from.date().toPython()
+        if self._agenda_filter_to is not None:
+            date_to = self._agenda_filter_to.date().toPython()
+
+        tipo = str(getattr(item, "tipo", "") or "").strip().lower()
+        estado = str(getattr(item, "estado", "") or "").strip().lower()
+        actividad_fecha = self._agenda_entry_date(getattr(item, "fecha_actividad", None))
+
+        if tipo_filter and tipo != tipo_filter:
+            return False
+        if estado_filter and estado != estado_filter:
+            return False
+        if actividad_fecha is None:
+            return True
+        if date_from is not None and actividad_fecha < date_from:
+            return False
+        if date_to is not None and actividad_fecha > date_to:
+            return False
+        return True
+
+    @staticmethod
+    def _agenda_entry_date(value: object) -> date | None:
+        if isinstance(value, date) and not isinstance(value, datetime):
+            return value
+        text = str(value or "").strip()
+        if not text:
+            return None
+        try:
+            return date.fromisoformat(text)
+        except ValueError:
+            try:
+                return datetime.fromisoformat(text).date()
+            except ValueError:
+                return None
+
+    def _agenda_type_icon_path(self, value: str) -> Path:
+        normalized = str(value or "").strip().lower()
+        icon_map = {
+            "visita_realizada": "icon_usuario.png",
+            "visita_prevista": "icon_calendario.png",
+            "llamada": "icon_reloj.png",
+            "seguimiento": "history.svg",
+            "desarrollo_futuro": "icon_hoja.png",
+            "incidencia": "alert.svg",
+            "nota": "pencil_white.svg",
+        }
+        icon_name = icon_map.get(normalized, "history.svg")
+        return BASE_DIR / "assets" / "icons" / icon_name
+
+    def _agenda_type_color(self, value: str) -> str:
+        normalized = str(value or "").strip().lower()
+        palette = {
+            "visita_realizada": "#2563EB",
+            "visita_prevista": "#7C3AED",
+            "llamada": "#059669",
+            "seguimiento": "#0F766E",
+            "desarrollo_futuro": "#D97706",
+            "incidencia": "#DC2626",
+            "nota": "#6B7280",
+        }
+        return palette.get(normalized, "#6B7280")
+
+    def _agenda_state_palette(self, value: str) -> tuple[str, str]:
+        normalized = str(value or "").strip().lower()
+        palette = {
+            "pendiente": ("#B54708", "#FEF3C7"),
+            "hecho": ("#067647", "#E9F8EF"),
+            "aplazado": ("#175CD3", "#EAF2FF"),
+            "cancelado": ("#B42318", "#FDEDEC"),
+        }
+        return palette.get(normalized, ("#475467", "#EEF2F6"))
+
+    def _recolor_pixmap_white(self, pixmap: QPixmap) -> QPixmap:
+        if pixmap.isNull():
+            return pixmap
+        out = QPixmap(pixmap.size())
+        out.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(out)
+        painter.drawPixmap(0, 0, pixmap)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+        painter.fillRect(out.rect(), QColor("#FFFFFF"))
+        painter.end()
+        return out
+
+    def _make_agenda_icon_widget(self, activity_type: str) -> QWidget:
+        container = QWidget()
+        container.setFixedSize(40, 40)
+        container.setStyleSheet(
+            f"background: {self._agenda_type_color(activity_type)}; border-radius: 20px;"
+        )
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label = QLabel()
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pixmap = QIcon(str(self._agenda_type_icon_path(activity_type))).pixmap(18, 18)
+        icon_label.setPixmap(self._recolor_pixmap_white(pixmap))
+        layout.addWidget(icon_label)
+        return container
+
+    def _make_agenda_state_pill_widget(self, state: str) -> QWidget:
+        fg_color, bg_color = self._agenda_state_palette(state)
+        label = QLabel(self._agenda_state_label(state))
+        label.setObjectName("customerAgendaStatePill")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setFixedHeight(26)
+        label.setStyleSheet(
+            f"background: {bg_color}; color: {fg_color}; border-radius: 13px; padding: 0 12px; "
+            "font-size: 12px; font-weight: 700;"
+        )
+        wrapper = QWidget()
+        wrapper_layout = QHBoxLayout(wrapper)
+        wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        wrapper_layout.addWidget(label)
+        return wrapper
 
     def _show_agenda_context_menu(self, pos) -> None:
         customer = self._selected_row()
@@ -717,7 +930,7 @@ class CustomersPage(QWidget):
             if not selected:
                 return ""
             row_idx = selected[0].row()
-        id_item = self.agenda_table.item(row_idx, 0)
+        id_item = self.agenda_table.item(row_idx, 1)
         if id_item is None:
             return ""
         return str(id_item.data(Qt.ItemDataRole.UserRole) or "").strip()
@@ -759,7 +972,7 @@ class CustomersPage(QWidget):
     def _agenda_state_options(self) -> list[tuple[str, str]]:
         return [
             ("pendiente", "Pendiente"),
-            ("hecho", "Hecho"),
+            ("hecho", "Completada"),
             ("aplazado", "Aplazado"),
             ("cancelado", "Cancelado"),
         ]
@@ -1931,6 +2144,33 @@ class CustomersPage(QWidget):
                 padding: 6px 8px;
                 min-height: 30px;
                 font-weight: 600;
+            }
+            QLabel#customerAgendaTitle {
+                color: #14213D;
+                font-size: 20px;
+                font-weight: 800;
+                padding: 2px 2px 0 2px;
+            }
+            QComboBox#customerAgendaFilter, QDateEdit#customerAgendaFilterDate {
+                min-height: 34px;
+                padding: 4px 12px;
+                border: 1px solid #C9D5E6;
+                border-radius: 8px;
+                background: #FFFFFF;
+                color: #334155;
+                font-weight: 600;
+            }
+            QComboBox#customerAgendaFilter::drop-down, QDateEdit#customerAgendaFilterDate::drop-down {
+                border: none;
+                width: 24px;
+            }
+            QLabel#customerAgendaRangeSep {
+                color: #64748B;
+                font-weight: 700;
+                padding: 0 2px;
+            }
+            QLabel#customerAgendaStatePill {
+                min-width: 92px;
             }
             QLabel#customerAgendaEmpty {
                 color: #6E7E96;
