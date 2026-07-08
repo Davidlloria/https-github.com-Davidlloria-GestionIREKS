@@ -202,14 +202,14 @@ class CustomersPage(QWidget):
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Buscar cliente...")
-        self.search_input.setFixedWidth(220)
+        self.search_input.setFixedWidth(390)
         self.search_input.setFixedHeight(30)
         self.search_input.textChanged.connect(self._schedule_reload)
         self.search_input.textChanged.connect(self._update_search_clear_button)
         self.clear_search_btn = QPushButton()
         self.clear_search_btn.setObjectName("customerSearchClearButton")
         self.clear_search_btn.setFixedSize(30, 30)
-        self.clear_search_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCloseButton))
+        self.clear_search_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "close-white.svg")))
         self.clear_search_btn.setIconSize(QSize(14, 14))
         self.clear_search_btn.setToolTip("Vaciar filtro")
         self.clear_search_btn.setEnabled(False)
@@ -2101,18 +2101,18 @@ class CustomersPage(QWidget):
                 padding: 0;
                 margin: 0;
                 border-radius: 8px;
-                background: #FEE2E2;
-                color: #991B1B;
-                border: 1px solid #FCA5A5;
+                background: #EF4444;
+                color: #FFFFFF;
+                border: 1px solid #DC2626;
                 icon-size: 14px;
             }
             QPushButton#customerSearchClearButton:hover {
-                background: #FECACA;
-                border: 1px solid #F87171;
+                background: #DC2626;
+                border: 1px solid #B91C1C;
             }
             QPushButton#customerSearchClearButton:pressed {
-                background: #FCA5A5;
-                border: 1px solid #EF4444;
+                background: #B91C1C;
+                border: 1px solid #991B1B;
             }
             QPushButton#customerSearchClearButton:disabled {
                 background: #F8FAFC;
