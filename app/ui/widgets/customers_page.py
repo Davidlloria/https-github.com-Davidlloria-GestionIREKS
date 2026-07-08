@@ -423,12 +423,18 @@ class CustomersPage(QWidget):
         right_card = getattr(self, "right_card", None)
         if panel is None or left_card is None or right_card is None:
             return
+        parent = panel.parentWidget()
+        panel_width = panel.width()
+        if parent is not None:
+            panel_width = max(panel_width, parent.width())
+        if panel_width > 0 and panel.width() != panel_width:
+            panel.setFixedWidth(panel_width)
         # Coordenadas fijas dentro del detail_panel.
         right_width = 290
         left_x = 5
         top_y = 25
         gap = 5
-        right_x = max(left_x + 1, panel.width() - right_width - gap)
+        right_x = max(left_x + 1, panel_width - right_width - gap)
         left_width = max(1, right_x - left_x - gap)
         left_card.setGeometry(left_x, top_y, left_width, 270)
         right_card.setGeometry(right_x, top_y, right_width, 270)
