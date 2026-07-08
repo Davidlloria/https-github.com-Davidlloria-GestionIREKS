@@ -305,6 +305,7 @@ class CustomersPage(QWidget):
         splitter.addWidget(left_panel)
 
         right_panel = QWidget()
+        right_panel.setObjectName("customersRightPanel")
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
@@ -2021,6 +2022,10 @@ class CustomersPage(QWidget):
             QWidget#detailSubPanel {
                 background: transparent;
                 border: 0;
+            }
+            QWidget#customersRightPanel {
+                background: transparent;
+                border: none;
             }
             QFrame#detailLeftCard {
                 background: #FFFFFF;
