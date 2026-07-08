@@ -2024,6 +2024,10 @@ class CustomersPage(QWidget):
                 background: transparent;
                 border: 0;
             }
+            QWidget#detailTopArea {
+                background: transparent;
+                border: none;
+            }
             QWidget#customersRightPanel {
                 background: transparent;
                 border: none;
