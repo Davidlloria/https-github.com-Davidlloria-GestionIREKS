@@ -470,14 +470,16 @@ class CustomersPage(QWidget):
 
         self._agenda_filter_type = QComboBox()
         self._agenda_filter_type.setObjectName("customerAgendaFilter")
-        self._agenda_filter_type.setFixedWidth(158)
+        self._agenda_filter_type.setFixedWidth(170)
+        self._agenda_filter_type.setFixedHeight(32)
         self._agenda_filter_type.addItem("Todos los tipos", "")
         for key, label in self._agenda_type_options():
             self._agenda_filter_type.addItem(label, key)
 
         self._agenda_filter_state = QComboBox()
         self._agenda_filter_state.setObjectName("customerAgendaFilter")
-        self._agenda_filter_state.setFixedWidth(158)
+        self._agenda_filter_state.setFixedWidth(170)
+        self._agenda_filter_state.setFixedHeight(32)
         self._agenda_filter_state.addItem("Todos los estados", "")
         for key, label in self._agenda_state_options():
             self._agenda_filter_state.addItem(label, key)
@@ -487,16 +489,16 @@ class CustomersPage(QWidget):
         self._agenda_filter_from.setObjectName("customerAgendaFilterDate")
         self._agenda_filter_from.setCalendarPopup(True)
         self._agenda_filter_from.setDisplayFormat("dd/MM/yyyy")
-        self._agenda_filter_from.setFixedWidth(132)
-        self._agenda_filter_from.setFixedHeight(30)
+        self._agenda_filter_from.setFixedWidth(126)
+        self._agenda_filter_from.setFixedHeight(32)
         self._agenda_filter_from.setDate(self._agenda_qdate(date(current_year, 1, 1), fallback_today=False))
 
         self._agenda_filter_to = QDateEdit()
         self._agenda_filter_to.setObjectName("customerAgendaFilterDate")
         self._agenda_filter_to.setCalendarPopup(True)
         self._agenda_filter_to.setDisplayFormat("dd/MM/yyyy")
-        self._agenda_filter_to.setFixedWidth(132)
-        self._agenda_filter_to.setFixedHeight(30)
+        self._agenda_filter_to.setFixedWidth(126)
+        self._agenda_filter_to.setFixedHeight(32)
         self._agenda_filter_to.setDate(self._agenda_qdate(date(current_year, 12, 31), fallback_today=False))
 
         range_sep = QLabel(" - ")
@@ -536,12 +538,12 @@ class CustomersPage(QWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-        self.agenda_table.setColumnWidth(0, 52)
+        self.agenda_table.setColumnWidth(0, 46)
         self.agenda_table.setColumnWidth(1, 92)
         self.agenda_table.setColumnWidth(2, 132)
-        self.agenda_table.setColumnWidth(3, 104)
+        self.agenda_table.setColumnWidth(3, 108)
         self.agenda_table.setColumnWidth(5, 106)
-        self.agenda_table.verticalHeader().setDefaultSectionSize(42)
+        self.agenda_table.verticalHeader().setDefaultSectionSize(40)
         self.agenda_table.cellDoubleClicked.connect(self._open_agenda_activity_from_row)
         self.agenda_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.agenda_table.customContextMenuRequested.connect(self._show_agenda_context_menu)
@@ -719,45 +721,45 @@ class CustomersPage(QWidget):
         return out
 
     def _make_agenda_icon_widget(self, activity_type: str) -> QWidget:
-        container = QWidget()
-        container.setFixedSize(32, 32)
+        container = QFrame()
+        container.setFixedSize(30, 30)
+        container.setObjectName("customerAgendaIconBubble")
         container.setAutoFillBackground(False)
-        container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         container.setStyleSheet(
-            f"background: {self._agenda_type_color(activity_type)}; border-radius: 16px; border: none;"
+            f"QFrame#customerAgendaIconBubble {{ background: {self._agenda_type_color(activity_type)}; "
+            "border-radius: 15px; border: none; }}"
         )
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label = QLabel()
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pixmap = QIcon(str(self._agenda_type_icon_path(activity_type))).pixmap(14, 14)
+        pixmap = QIcon(str(self._agenda_type_icon_path(activity_type))).pixmap(15, 15)
         icon_label.setPixmap(self._recolor_pixmap_white(pixmap))
         layout.addWidget(icon_label)
         return container
 
     def _make_agenda_state_pill_widget(self, state: str) -> QWidget:
         fg_color, bg_color = self._agenda_state_palette(state)
-        label = QLabel(self._agenda_state_label(state))
-        label.setObjectName("customerAgendaStatePill")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setFixedHeight(24)
-        label.setFixedWidth(96)
-        label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        label.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        label.setStyleSheet(
-            f"background: {bg_color}; color: {fg_color}; border-radius: 12px; padding: 0 10px; "
-            "font-size: 11px; font-weight: 700; border: 1px solid rgba(0,0,0,0.04);"
-        )
-        wrapper = QWidget()
+        wrapper = QFrame()
+        wrapper.setObjectName("customerAgendaStatePill")
         wrapper.setAutoFillBackground(False)
-        wrapper.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        wrapper.setStyleSheet("background: transparent; border: none;")
         wrapper.setFixedSize(96, 24)
         wrapper.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        wrapper.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        wrapper.setStyleSheet(
+            f"QFrame#customerAgendaStatePill {{ background: {bg_color}; border: 1px solid rgba(0,0,0,0.04); "
+            "border-radius: 12px; }}"
+        )
         wrapper_layout = QHBoxLayout(wrapper)
         wrapper_layout.setContentsMargins(0, 0, 0, 0)
         wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label = QLabel(self._agenda_state_label(state))
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setStyleSheet(
+            f"background: transparent; color: {fg_color}; font-size: 11px; font-weight: 700;"
+        )
         wrapper_layout.addWidget(label)
         return wrapper
 
@@ -1909,8 +1911,8 @@ class CustomersPage(QWidget):
             contacts_page._select_row_by_id(contacto_id)
 
     def _apply_modern_styles(self) -> None:
-        self.setStyleSheet(
-            """
+        agenda_arrow_icon = (BASE_DIR / "assets" / "icons" / "arrow-down.svg").as_posix()
+        style = """
             QWidget {
                 font-family: 'Segoe UI', 'Inter';
             }
@@ -2176,20 +2178,24 @@ class CustomersPage(QWidget):
             }
             QComboBox#customerAgendaFilter::drop-down, QDateEdit#customerAgendaFilterDate::drop-down {
                 border: none;
-                width: 18px;
+                width: 22px;
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
             }
-            QComboBox#customerAgendaFilter::down-arrow {
+            QComboBox#customerAgendaFilter::down-arrow, QDateEdit#customerAgendaFilterDate::down-arrow {
                 width: 10px;
                 height: 10px;
+                image: url("__AGENDA_ARROW_ICON__");
+            }
+            QComboBox#customerAgendaFilter, QDateEdit#customerAgendaFilterDate {
+                padding-right: 26px;
             }
             QLabel#customerAgendaRangeSep {
                 color: #64748B;
                 font-weight: 700;
                 padding: 0 2px;
             }
-            QLabel#customerAgendaStatePill {
+            QWidget#customerAgendaStatePill {
                 min-width: 96px;
             }
             QLabel#customerAgendaEmpty {
@@ -2302,7 +2308,7 @@ class CustomersPage(QWidget):
                 color: #991B1B;
             }
             """
-        )
+        self.setStyleSheet(style.replace("__AGENDA_ARROW_ICON__", agenda_arrow_icon))
 
     def _show_related_contacts_context_menu(self, pos) -> None:
         source = self.sender()
