@@ -424,7 +424,9 @@ class CustomersPage(QWidget):
             return
         # Coordenadas fijas dentro del detail_panel.
         left_card.setGeometry(5, 25, 540, 270)
-        right_card.setGeometry(550, 25, 290, 270)
+        right_width = 290
+        right_x = max(5, panel.width() - right_width - 5)
+        right_card.setGeometry(right_x, 25, right_width, 270)
 
     def _build_tab_placeholder(self, text: str) -> QWidget:
         panel = QWidget()
