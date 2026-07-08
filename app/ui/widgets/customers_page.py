@@ -317,7 +317,7 @@ class CustomersPage(QWidget):
 
         detail_panel = QWidget()
         detail_panel.setObjectName("detailTopArea")
-        detail_panel.setFixedSize(845, 300)
+        detail_panel.setFixedHeight(300)
         detail_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         detail_layout = QVBoxLayout(detail_panel)
         detail_layout.setContentsMargins(0, 0, 0, 0)
@@ -424,12 +424,14 @@ class CustomersPage(QWidget):
         if panel is None or left_card is None or right_card is None:
             return
         # Coordenadas fijas dentro del detail_panel.
-        left_card.setGeometry(5, 25, 540, 270)
         right_width = 290
-        right_x = panel.width() - right_width - 5
-        if right_x < 5:
-            right_x = 5
-        right_card.setGeometry(right_x, 25, right_width, 270)
+        left_x = 5
+        top_y = 25
+        gap = 5
+        right_x = max(left_x + 1, panel.width() - right_width - gap)
+        left_width = max(1, right_x - left_x - gap)
+        left_card.setGeometry(left_x, top_y, left_width, 270)
+        right_card.setGeometry(right_x, top_y, right_width, 270)
 
     def _build_tab_placeholder(self, text: str) -> QWidget:
         panel = QWidget()
