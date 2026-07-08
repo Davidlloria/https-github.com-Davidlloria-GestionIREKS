@@ -668,13 +668,13 @@ class CustomersPage(QWidget):
     def _agenda_type_icon_path(self, value: str) -> Path:
         normalized = str(value or "").strip().lower()
         icon_map = {
-            "visita_realizada": "icon_usuario.png",
-            "visita_prevista": "icon_calendario.png",
-            "llamada": "icon_reloj.png",
+            "visita_realizada": "user-check.svg",
+            "visita_prevista": "calendar-check.svg",
+            "llamada": "phone-call.svg",
             "seguimiento": "history.svg",
-            "desarrollo_futuro": "icon_hoja.png",
-            "incidencia": "alert.svg",
-            "nota": "pencil_white.svg",
+            "desarrollo_futuro": "lightbulb.svg",
+            "incidencia": "triangle-alert.svg",
+            "nota": "file-pen.svg",
         }
         icon_name = icon_map.get(normalized, "history.svg")
         return BASE_DIR / "assets" / "icons" / icon_name
