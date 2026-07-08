@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFrame,
-    QGridLayout,
     QFormLayout,
     QHeaderView,
     QHBoxLayout,
@@ -754,29 +753,23 @@ class CustomersPage(QWidget):
         wrapper.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         wrapper.setFixedSize(50, 32)
         wrapper.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        wrapper_layout = QGridLayout(wrapper)
+        wrapper_layout = QHBoxLayout(wrapper)
         wrapper_layout.setContentsMargins(0, 0, 0, 0)
         wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        container = QFrame()
-        container.setFixedSize(24, 24)
-        container.setObjectName("customerAgendaIconBubble")
-        container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        container.setStyleSheet(
-            f"QFrame#customerAgendaIconBubble {{ background: {self._agenda_type_color(activity_type)}; "
+        bubble = QLabel()
+        bubble.setObjectName("customerAgendaIconBubble")
+        bubble.setFixedSize(24, 24)
+        bubble.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        bubble.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        bubble.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        bubble.setStyleSheet(
+            f"QLabel#customerAgendaIconBubble {{ background: {self._agenda_type_color(activity_type)}; "
             "border-radius: 12px; border: none; }}"
         )
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label = QLabel()
-        icon_label.setFixedSize(14, 14)
-        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         pixmap = QIcon(str(self._agenda_type_icon_path(activity_type))).pixmap(14, 14)
-        icon_label.setPixmap(self._recolor_pixmap_white(pixmap, QColor(self._agenda_type_accent_color(activity_type))))
-        layout.addWidget(icon_label)
-        wrapper_layout.addWidget(container, 0, 0, Qt.AlignmentFlag.AlignCenter)
+        bubble.setPixmap(self._recolor_pixmap_white(pixmap, QColor(self._agenda_type_accent_color(activity_type))))
+        wrapper_layout.addWidget(bubble, 0, Qt.AlignmentFlag.AlignCenter)
         return wrapper
 
     def _make_agenda_state_pill_widget(self, state: str) -> QWidget:
