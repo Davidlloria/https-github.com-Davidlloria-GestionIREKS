@@ -318,6 +318,7 @@ class CustomersPage(QWidget):
         detail_panel = QWidget()
         detail_panel.setObjectName("detailTopArea")
         detail_panel.setFixedHeight(300)
+        detail_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         detail_layout = QVBoxLayout(detail_panel)
         detail_layout.setContentsMargins(0, 0, 0, 0)
         detail_layout.setSpacing(10)
