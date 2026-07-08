@@ -2009,12 +2009,12 @@ class CustomersPage(QWidget):
                 font-family: 'Segoe UI', 'Inter';
             }
             QWidget#CustomersPageRoot {
-                background: #F5F7FA;
+                background: transparent;
             }
             QFrame#crmCard, QWidget#crmCard {
-                background: #FFFFFF;
-                border: 1px solid #E2E8F0;
-                border-radius: 8px;
+                background: transparent;
+                border: none;
+                border-radius: 0;
             }
             QWidget#detailSubPanel {
                 background: transparent;
