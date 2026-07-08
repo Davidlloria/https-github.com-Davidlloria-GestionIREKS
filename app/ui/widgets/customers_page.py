@@ -586,7 +586,7 @@ class CustomersPage(QWidget):
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
         self.agenda_table.setColumnWidth(0, 50)
-        self.agenda_table.setColumnWidth(1, 92)
+        self.agenda_table.setColumnWidth(1, 112)
         self.agenda_table.setColumnWidth(2, 132)
         self.agenda_table.setColumnWidth(3, 104)
         self.agenda_table.setColumnWidth(5, 106)
