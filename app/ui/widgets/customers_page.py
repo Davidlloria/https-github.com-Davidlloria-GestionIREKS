@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QComboBox,
+    QCalendarWidget,
     QDateEdit,
     QDialog,
     QDialogButtonBox,
@@ -470,16 +471,18 @@ class CustomersPage(QWidget):
 
         self._agenda_filter_type = QComboBox()
         self._agenda_filter_type.setObjectName("customerAgendaFilter")
-        self._agenda_filter_type.setFixedWidth(170)
-        self._agenda_filter_type.setFixedHeight(32)
+        self._agenda_filter_type.setFixedWidth(156)
+        self._agenda_filter_type.setFixedHeight(28)
+        self._agenda_filter_type.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._agenda_filter_type.addItem("Todos los tipos", "")
         for key, label in self._agenda_type_options():
             self._agenda_filter_type.addItem(label, key)
 
         self._agenda_filter_state = QComboBox()
         self._agenda_filter_state.setObjectName("customerAgendaFilter")
-        self._agenda_filter_state.setFixedWidth(170)
-        self._agenda_filter_state.setFixedHeight(32)
+        self._agenda_filter_state.setFixedWidth(156)
+        self._agenda_filter_state.setFixedHeight(28)
+        self._agenda_filter_state.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._agenda_filter_state.addItem("Todos los estados", "")
         for key, label in self._agenda_state_options():
             self._agenda_filter_state.addItem(label, key)
@@ -489,27 +492,35 @@ class CustomersPage(QWidget):
         self._agenda_filter_from.setObjectName("customerAgendaFilterDate")
         self._agenda_filter_from.setCalendarPopup(True)
         self._agenda_filter_from.setDisplayFormat("dd/MM/yyyy")
-        self._agenda_filter_from.setFixedWidth(126)
-        self._agenda_filter_from.setFixedHeight(32)
+        self._agenda_filter_from.setFixedWidth(136)
+        self._agenda_filter_from.setFixedHeight(28)
+        self._agenda_filter_from.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._agenda_filter_from.setDate(self._agenda_qdate(date(current_year, 1, 1), fallback_today=False))
 
         self._agenda_filter_to = QDateEdit()
         self._agenda_filter_to.setObjectName("customerAgendaFilterDate")
         self._agenda_filter_to.setCalendarPopup(True)
         self._agenda_filter_to.setDisplayFormat("dd/MM/yyyy")
-        self._agenda_filter_to.setFixedWidth(126)
-        self._agenda_filter_to.setFixedHeight(32)
+        self._agenda_filter_to.setFixedWidth(136)
+        self._agenda_filter_to.setFixedHeight(28)
+        self._agenda_filter_to.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._agenda_filter_to.setDate(self._agenda_qdate(date(current_year, 12, 31), fallback_today=False))
+        for calendar_edit in (self._agenda_filter_from, self._agenda_filter_to):
+            calendar_widget = calendar_edit.calendarWidget()
+            if calendar_widget is not None:
+                calendar_widget.setGridVisible(False)
+                calendar_widget.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
 
         range_sep = QLabel(" - ")
         range_sep.setObjectName("customerAgendaRangeSep")
 
         self._agenda_filter_refresh_btn = QPushButton("Actualizar")
         self._agenda_filter_refresh_btn.setObjectName("customerAgendaRefreshButton")
-        self._agenda_filter_refresh_btn.setProperty("btnRole", "secondary")
         self._agenda_filter_refresh_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
         self._agenda_filter_refresh_btn.setFixedWidth(118)
-        self._agenda_filter_refresh_btn.setFixedHeight(30)
+        self._agenda_filter_refresh_btn.setFixedHeight(28)
+        self._agenda_filter_refresh_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self._agenda_filter_refresh_btn.setIconSize(QSize(14, 14))
 
         filter_bar.addWidget(self._agenda_filter_type)
         filter_bar.addWidget(self._agenda_filter_state)
@@ -542,9 +553,9 @@ class CustomersPage(QWidget):
         self.agenda_table.setColumnWidth(0, 50)
         self.agenda_table.setColumnWidth(1, 92)
         self.agenda_table.setColumnWidth(2, 132)
-        self.agenda_table.setColumnWidth(3, 112)
+        self.agenda_table.setColumnWidth(3, 104)
         self.agenda_table.setColumnWidth(5, 106)
-        self.agenda_table.verticalHeader().setDefaultSectionSize(38)
+        self.agenda_table.verticalHeader().setDefaultSectionSize(36)
         self.agenda_table.cellDoubleClicked.connect(self._open_agenda_activity_from_row)
         self.agenda_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.agenda_table.customContextMenuRequested.connect(self._show_agenda_context_menu)
@@ -738,25 +749,26 @@ class CustomersPage(QWidget):
         wrapper = QWidget()
         wrapper.setAutoFillBackground(False)
         wrapper.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        wrapper.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        wrapper.setFixedSize(50, 36)
+        wrapper.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         wrapper_layout = QHBoxLayout(wrapper)
         wrapper_layout.setContentsMargins(0, 0, 0, 0)
         wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         container = QFrame()
-        container.setFixedSize(34, 34)
+        container.setFixedSize(30, 30)
         container.setObjectName("customerAgendaIconBubble")
         container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         container.setStyleSheet(
             f"QFrame#customerAgendaIconBubble {{ background: {self._agenda_type_color(activity_type)}; "
-            "border-radius: 17px; border: none; }}"
+            "border-radius: 15px; border: none; }}"
         )
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label = QLabel()
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pixmap = QIcon(str(self._agenda_type_icon_path(activity_type))).pixmap(16, 16)
+        pixmap = QIcon(str(self._agenda_type_icon_path(activity_type))).pixmap(18, 18)
         icon_label.setPixmap(self._recolor_pixmap_white(pixmap, QColor(self._agenda_type_accent_color(activity_type))))
         layout.addWidget(icon_label)
         wrapper_layout.addWidget(container)
@@ -767,32 +779,23 @@ class CustomersPage(QWidget):
         wrapper = QFrame()
         wrapper.setObjectName("customerAgendaStatePill")
         wrapper.setAutoFillBackground(False)
-        wrapper.setMinimumHeight(36)
-        wrapper.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        wrapper.setFixedSize(96, 24)
+        wrapper.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         wrapper.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         wrapper.setStyleSheet(
             f"QFrame#customerAgendaStatePill {{ background: transparent; border: none; }}"
         )
-        inner = QFrame(wrapper)
-        inner.setFixedSize(96, 24)
-        inner.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        inner.setStyleSheet(
-            f"QFrame {{ background: {bg_color}; border: 1px solid rgba(0,0,0,0.04); "
-            "border-radius: 12px; }}"
-        )
         wrapper_layout = QHBoxLayout(wrapper)
         wrapper_layout.setContentsMargins(0, 0, 0, 0)
         wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        inner_layout = QHBoxLayout(inner)
-        inner_layout.setContentsMargins(0, 0, 0, 0)
-        inner_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label = QLabel(self._agenda_state_label(state))
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setFixedSize(96, 24)
         label.setStyleSheet(
-            f"background: transparent; color: {fg_color}; font-size: 11px; font-weight: 700;"
+            f"background: {bg_color}; color: {fg_color}; border: 1px solid rgba(0,0,0,0.04); "
+            "border-radius: 12px; font-size: 11px; font-weight: 700; padding: 0 10px;"
         )
-        inner_layout.addWidget(label)
-        wrapper_layout.addWidget(inner)
+        wrapper_layout.addWidget(label)
         return wrapper
 
     def _show_agenda_context_menu(self, pos) -> None:
@@ -2189,8 +2192,8 @@ class CustomersPage(QWidget):
                 border: 0;
                 border-right: 1px solid #E7ECF3;
                 border-bottom: 1px solid #DEE6F1;
-                padding: 2px 8px;
-                min-height: 20px;
+                padding: 1px 8px;
+                min-height: 18px;
                 font-weight: 600;
             }
             QLabel#customerAgendaTitle {
@@ -2200,28 +2203,29 @@ class CustomersPage(QWidget):
                 padding: 0 2px 0 2px;
             }
             QComboBox#customerAgendaFilter, QDateEdit#customerAgendaFilterDate {
-                min-height: 28px;
-                max-height: 28px;
-                padding: 1px 8px;
+                min-height: 26px;
+                max-height: 26px;
+                padding: 0px 8px;
                 border: 1px solid #C9D5E6;
                 border-radius: 8px;
                 background: #FFFFFF;
                 color: #334155;
                 font-weight: 600;
+                font-size: 11px;
             }
-            QComboBox#customerAgendaFilter::drop-down, QDateEdit#customerAgendaFilterDate::drop-down {
+            QComboBox#customerAgendaFilter::drop-down, QAbstractSpinBox#customerAgendaFilterDate::down-button {
                 border: none;
-                width: 20px;
+                width: 16px;
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
             }
-            QComboBox#customerAgendaFilter::down-arrow, QDateEdit#customerAgendaFilterDate::down-arrow {
-                width: 10px;
-                height: 10px;
+            QComboBox#customerAgendaFilter::down-arrow, QAbstractSpinBox#customerAgendaFilterDate::down-arrow {
+                width: 8px;
+                height: 8px;
                 image: url("__AGENDA_ARROW_ICON__");
             }
             QComboBox#customerAgendaFilter, QDateEdit#customerAgendaFilterDate {
-                padding-right: 24px;
+                padding-right: 18px;
             }
             QLabel#customerAgendaRangeSep {
                 color: #64748B;
@@ -2234,14 +2238,14 @@ class CustomersPage(QWidget):
             QPushButton#customerAgendaRefreshButton {
                 min-width: 118px;
                 max-width: 118px;
-                min-height: 28px;
-                max-height: 28px;
-                padding: 0 12px;
+                min-height: 26px;
+                max-height: 26px;
+                padding: 0 10px;
                 border-radius: 8px;
                 background: #FFFFFF;
                 color: #334155;
                 border: 1px solid #CBD5E1;
-                font-size: 12px;
+                font-size: 11px;
                 font-weight: 600;
             }
             QPushButton#customerAgendaRefreshButton:hover {
@@ -2263,44 +2267,47 @@ class CustomersPage(QWidget):
                 background: #FFFFFF;
                 color: #0F172A;
             }
-            QCalendarWidget QWidget {
-                alternate-background-color: #FFFFFF;
-            }
             QCalendarWidget QToolButton {
-                min-width: 20px;
-                max-width: 20px;
-                min-height: 20px;
-                max-height: 20px;
+                min-width: 16px;
+                max-width: 16px;
+                min-height: 16px;
+                max-height: 16px;
                 padding: 0;
                 margin: 0;
                 border: none;
                 background: transparent;
+                icon-size: 12px;
             }
             QCalendarWidget QToolButton::menu-indicator {
                 image: none;
             }
             QCalendarWidget QComboBox {
-                min-height: 20px;
-                max-height: 20px;
-                padding: 0 4px;
+                min-height: 18px;
+                max-height: 18px;
+                min-width: 54px;
+                max-width: 54px;
+                padding: 0 2px;
                 margin: 0;
                 border: 1px solid #CBD5E1;
                 border-radius: 6px;
                 background: #FFFFFF;
                 color: #334155;
+                font-size: 10px;
             }
             QCalendarWidget QComboBox::drop-down {
                 border: none;
-                width: 16px;
+                width: 12px;
             }
             QCalendarWidget QComboBox::down-arrow {
-                width: 8px;
-                height: 8px;
+                width: 7px;
+                height: 7px;
                 image: url("__AGENDA_ARROW_ICON__");
             }
             QCalendarWidget QAbstractItemView {
                 selection-background-color: #3A78CF;
                 selection-color: #FFFFFF;
+                min-width: 24px;
+                min-height: 24px;
             }
             QLabel#customerAgendaEmpty {
                 color: #6E7E96;
