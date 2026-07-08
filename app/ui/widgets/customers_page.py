@@ -505,10 +505,11 @@ class CustomersPage(QWidget):
         range_sep.setObjectName("customerAgendaRangeSep")
 
         self._agenda_filter_refresh_btn = QPushButton("Actualizar")
+        self._agenda_filter_refresh_btn.setObjectName("customerAgendaRefreshButton")
         self._agenda_filter_refresh_btn.setProperty("btnRole", "secondary")
         self._agenda_filter_refresh_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
-        self._agenda_filter_refresh_btn.setFixedWidth(120)
-        self._agenda_filter_refresh_btn.setFixedHeight(32)
+        self._agenda_filter_refresh_btn.setFixedWidth(118)
+        self._agenda_filter_refresh_btn.setFixedHeight(30)
 
         filter_bar.addWidget(self._agenda_filter_type)
         filter_bar.addWidget(self._agenda_filter_state)
@@ -538,12 +539,12 @@ class CustomersPage(QWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-        self.agenda_table.setColumnWidth(0, 46)
+        self.agenda_table.setColumnWidth(0, 50)
         self.agenda_table.setColumnWidth(1, 92)
         self.agenda_table.setColumnWidth(2, 132)
-        self.agenda_table.setColumnWidth(3, 108)
+        self.agenda_table.setColumnWidth(3, 112)
         self.agenda_table.setColumnWidth(5, 106)
-        self.agenda_table.verticalHeader().setDefaultSectionSize(40)
+        self.agenda_table.verticalHeader().setDefaultSectionSize(38)
         self.agenda_table.cellDoubleClicked.connect(self._open_agenda_activity_from_row)
         self.agenda_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.agenda_table.customContextMenuRequested.connect(self._show_agenda_context_menu)
@@ -688,15 +689,28 @@ class CustomersPage(QWidget):
     def _agenda_type_color(self, value: str) -> str:
         normalized = str(value or "").strip().lower()
         palette = {
+            "visita_realizada": "#DCEBFF",
+            "visita_prevista": "#EDE3FF",
+            "llamada": "#DCF7EA",
+            "seguimiento": "#DDF6F1",
+            "desarrollo_futuro": "#FEF1D8",
+            "incidencia": "#FDE3E2",
+            "nota": "#EEF2F7",
+        }
+        return palette.get(normalized, "#EEF2F7")
+
+    def _agenda_type_accent_color(self, value: str) -> str:
+        normalized = str(value or "").strip().lower()
+        palette = {
             "visita_realizada": "#2563EB",
             "visita_prevista": "#7C3AED",
             "llamada": "#059669",
             "seguimiento": "#0F766E",
             "desarrollo_futuro": "#D97706",
             "incidencia": "#DC2626",
-            "nota": "#6B7280",
+            "nota": "#475467",
         }
-        return palette.get(normalized, "#6B7280")
+        return palette.get(normalized, "#475467")
 
     def _agenda_state_palette(self, value: str) -> tuple[str, str]:
         normalized = str(value or "").strip().lower()
@@ -708,7 +722,7 @@ class CustomersPage(QWidget):
         }
         return palette.get(normalized, ("#475467", "#EEF2F6"))
 
-    def _recolor_pixmap_white(self, pixmap: QPixmap) -> QPixmap:
+    def _recolor_pixmap_white(self, pixmap: QPixmap, color: QColor | str = "#FFFFFF") -> QPixmap:
         if pixmap.isNull():
             return pixmap
         out = QPixmap(pixmap.size())
@@ -716,51 +730,69 @@ class CustomersPage(QWidget):
         painter = QPainter(out)
         painter.drawPixmap(0, 0, pixmap)
         painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
-        painter.fillRect(out.rect(), QColor("#FFFFFF"))
+        painter.fillRect(out.rect(), QColor(color))
         painter.end()
         return out
 
     def _make_agenda_icon_widget(self, activity_type: str) -> QWidget:
+        wrapper = QWidget()
+        wrapper.setAutoFillBackground(False)
+        wrapper.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        wrapper.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        wrapper_layout = QHBoxLayout(wrapper)
+        wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         container = QFrame()
-        container.setFixedSize(30, 30)
+        container.setFixedSize(34, 34)
         container.setObjectName("customerAgendaIconBubble")
-        container.setAutoFillBackground(False)
         container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         container.setStyleSheet(
             f"QFrame#customerAgendaIconBubble {{ background: {self._agenda_type_color(activity_type)}; "
-            "border-radius: 15px; border: none; }}"
+            "border-radius: 17px; border: none; }}"
         )
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label = QLabel()
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pixmap = QIcon(str(self._agenda_type_icon_path(activity_type))).pixmap(15, 15)
-        icon_label.setPixmap(self._recolor_pixmap_white(pixmap))
+        pixmap = QIcon(str(self._agenda_type_icon_path(activity_type))).pixmap(16, 16)
+        icon_label.setPixmap(self._recolor_pixmap_white(pixmap, QColor(self._agenda_type_accent_color(activity_type))))
         layout.addWidget(icon_label)
-        return container
+        wrapper_layout.addWidget(container)
+        return wrapper
 
     def _make_agenda_state_pill_widget(self, state: str) -> QWidget:
         fg_color, bg_color = self._agenda_state_palette(state)
         wrapper = QFrame()
         wrapper.setObjectName("customerAgendaStatePill")
         wrapper.setAutoFillBackground(False)
-        wrapper.setFixedSize(96, 24)
-        wrapper.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        wrapper.setMinimumHeight(36)
+        wrapper.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         wrapper.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         wrapper.setStyleSheet(
-            f"QFrame#customerAgendaStatePill {{ background: {bg_color}; border: 1px solid rgba(0,0,0,0.04); "
+            f"QFrame#customerAgendaStatePill {{ background: transparent; border: none; }}"
+        )
+        inner = QFrame(wrapper)
+        inner.setFixedSize(96, 24)
+        inner.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        inner.setStyleSheet(
+            f"QFrame {{ background: {bg_color}; border: 1px solid rgba(0,0,0,0.04); "
             "border-radius: 12px; }}"
         )
         wrapper_layout = QHBoxLayout(wrapper)
         wrapper_layout.setContentsMargins(0, 0, 0, 0)
         wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        inner_layout = QHBoxLayout(inner)
+        inner_layout.setContentsMargins(0, 0, 0, 0)
+        inner_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label = QLabel(self._agenda_state_label(state))
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label.setStyleSheet(
             f"background: transparent; color: {fg_color}; font-size: 11px; font-weight: 700;"
         )
-        wrapper_layout.addWidget(label)
+        inner_layout.addWidget(label)
+        wrapper_layout.addWidget(inner)
         return wrapper
 
     def _show_agenda_context_menu(self, pos) -> None:
@@ -2157,19 +2189,20 @@ class CustomersPage(QWidget):
                 border: 0;
                 border-right: 1px solid #E7ECF3;
                 border-bottom: 1px solid #DEE6F1;
-                padding: 6px 8px;
-                min-height: 30px;
+                padding: 2px 8px;
+                min-height: 20px;
                 font-weight: 600;
             }
             QLabel#customerAgendaTitle {
                 color: #14213D;
-                font-size: 18px;
+                font-size: 17px;
                 font-weight: 800;
-                padding: 2px 2px 0 2px;
+                padding: 0 2px 0 2px;
             }
             QComboBox#customerAgendaFilter, QDateEdit#customerAgendaFilterDate {
                 min-height: 28px;
-                padding: 2px 10px;
+                max-height: 28px;
+                padding: 1px 8px;
                 border: 1px solid #C9D5E6;
                 border-radius: 8px;
                 background: #FFFFFF;
@@ -2178,7 +2211,7 @@ class CustomersPage(QWidget):
             }
             QComboBox#customerAgendaFilter::drop-down, QDateEdit#customerAgendaFilterDate::drop-down {
                 border: none;
-                width: 22px;
+                width: 20px;
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
             }
@@ -2188,7 +2221,7 @@ class CustomersPage(QWidget):
                 image: url("__AGENDA_ARROW_ICON__");
             }
             QComboBox#customerAgendaFilter, QDateEdit#customerAgendaFilterDate {
-                padding-right: 26px;
+                padding-right: 24px;
             }
             QLabel#customerAgendaRangeSep {
                 color: #64748B;
@@ -2196,7 +2229,78 @@ class CustomersPage(QWidget):
                 padding: 0 2px;
             }
             QWidget#customerAgendaStatePill {
-                min-width: 96px;
+                background: transparent;
+            }
+            QPushButton#customerAgendaRefreshButton {
+                min-width: 118px;
+                max-width: 118px;
+                min-height: 28px;
+                max-height: 28px;
+                padding: 0 12px;
+                border-radius: 8px;
+                background: #FFFFFF;
+                color: #334155;
+                border: 1px solid #CBD5E1;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            QPushButton#customerAgendaRefreshButton:hover {
+                background: #F8FAFC;
+                border: 1px solid #94A3B8;
+            }
+            QPushButton#customerAgendaRefreshButton:pressed {
+                background: #E2E8F0;
+                border: 1px solid #94A3B8;
+            }
+            QPushButton#customerAgendaRefreshButton::menu-indicator {
+                image: none;
+            }
+            QPushButton#customerAgendaRefreshButton::icon {
+                width: 14px;
+                height: 14px;
+            }
+            QCalendarWidget {
+                background: #FFFFFF;
+                color: #0F172A;
+            }
+            QCalendarWidget QWidget {
+                alternate-background-color: #FFFFFF;
+            }
+            QCalendarWidget QToolButton {
+                min-width: 20px;
+                max-width: 20px;
+                min-height: 20px;
+                max-height: 20px;
+                padding: 0;
+                margin: 0;
+                border: none;
+                background: transparent;
+            }
+            QCalendarWidget QToolButton::menu-indicator {
+                image: none;
+            }
+            QCalendarWidget QComboBox {
+                min-height: 20px;
+                max-height: 20px;
+                padding: 0 4px;
+                margin: 0;
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                background: #FFFFFF;
+                color: #334155;
+            }
+            QCalendarWidget QComboBox::drop-down {
+                border: none;
+                width: 16px;
+            }
+            QCalendarWidget QComboBox::down-arrow {
+                width: 8px;
+                height: 8px;
+                image: url("__AGENDA_ARROW_ICON__");
+            }
+            QCalendarWidget QAbstractItemView {
+                selection-background-color: #3A78CF;
+                selection-color: #FFFFFF;
             }
             QLabel#customerAgendaEmpty {
                 color: #6E7E96;
