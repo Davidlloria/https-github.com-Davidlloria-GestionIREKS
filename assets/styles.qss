@@ -497,17 +497,80 @@ QFrame#topRibbon[pageType="contacts"] {
     border-radius: 8px;
 }
 
-QFrame#topRibbon[pageType="contacts"] QPushButton[btnRole="success"] {
-    background-color: #3E78D8;
-    border: 1px solid #2F6BD1;
-    color: #FFFFFF;
-    padding: 7px 16px;
-    min-height: 32px;
+QFrame#topRibbon QPushButton[btnRole] {
+    min-height: 26px;
+    max-height: 26px;
+    padding: 2px 10px;
+    margin: 0;
+    border-radius: 7px;
+    font-weight: 600;
+    border: 1px solid transparent;
 }
 
-QFrame#topRibbon[pageType="contacts"] QPushButton[btnRole="success"]:hover {
-    background-color: #336CCB;
-    border-color: #2A5FBE;
+QFrame#topRibbon QPushButton[btnRole="success"] {
+    background-color: #DCFCE7;
+    color: #166534;
+    border-color: #86EFAC;
+}
+
+QFrame#topRibbon QPushButton[btnRole="success"]:hover {
+    background-color: #BBF7D0;
+    border-color: #4ADE80;
+}
+
+QFrame#topRibbon QPushButton[btnRole="warning"] {
+    background-color: #FEF3C7;
+    color: #92400E;
+    border-color: #FCD34D;
+}
+
+QFrame#topRibbon QPushButton[btnRole="warning"]:hover {
+    background-color: #FDE68A;
+    border-color: #FBBF24;
+}
+
+QFrame#topRibbon QPushButton[btnRole="danger"] {
+    background-color: #FEE2E2;
+    color: #B91C1C;
+    border-color: #FCA5A5;
+}
+
+QFrame#topRibbon QPushButton[btnRole="danger"]:hover {
+    background-color: #FECACA;
+    border-color: #F87171;
+}
+
+QFrame#topRibbon QPushButton[btnRole="secondary"] {
+    background-color: #E2E8F0;
+    color: #334155;
+    border-color: #CBD5E1;
+}
+
+QFrame#topRibbon QPushButton[btnRole="secondary"]:hover {
+    background-color: #CBD5E1;
+    border-color: #94A3B8;
+}
+
+QFrame#topRibbon QPushButton[btnRole="primary"] {
+    background-color: #DBEAFE;
+    color: #1D4ED8;
+    border-color: #93C5FD;
+}
+
+QFrame#topRibbon QPushButton[btnRole="primary"]:hover {
+    background-color: #BFDBFE;
+    border-color: #60A5FA;
+}
+
+QFrame#topRibbon QPushButton[btnRole="info"] {
+    background-color: #F3E8FF;
+    color: #6B21A8;
+    border-color: #D8B4FE;
+}
+
+QFrame#topRibbon QPushButton[btnRole="info"]:hover {
+    background-color: #E9D5FF;
+    border-color: #C084FC;
 }
 
 #sidePanel {

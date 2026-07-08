@@ -176,32 +176,32 @@ class CustomersPage(QWidget):
         ribbon_layout.setSpacing(6)
 
         self.new_btn = QPushButton("Nuevo")
-        self.new_btn.setObjectName("customerRibbonNewBtn")
+        self.new_btn.setProperty("btnRole", "success")
         self.new_btn.setFixedHeight(26)
         self.new_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-text.svg")))
         self.new_btn.setIconSize(QSize(14, 14))
         self.edit_btn = QPushButton("Editar")
-        self.edit_btn.setObjectName("customerRibbonEditBtn")
+        self.edit_btn.setProperty("btnRole", "warning")
         self.edit_btn.setFixedHeight(26)
         self.edit_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-pen.svg")))
         self.edit_btn.setIconSize(QSize(14, 14))
         self.del_btn = QPushButton("Eliminar")
-        self.del_btn.setObjectName("customerRibbonDeleteBtn")
+        self.del_btn.setProperty("btnRole", "danger")
         self.del_btn.setFixedHeight(26)
         self.del_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
         self.del_btn.setIconSize(QSize(14, 14))
         self.print_btn = QPushButton("Imprimir")
-        self.print_btn.setObjectName("customerRibbonPrintBtn")
+        self.print_btn.setProperty("btnRole", "secondary")
         self.print_btn.setFixedHeight(26)
         self.print_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "printer.svg")))
         self.print_btn.setIconSize(QSize(14, 14))
         self.export_btn = QPushButton("Exportar")
-        self.export_btn.setObjectName("customerRibbonExportBtn")
+        self.export_btn.setProperty("btnRole", "primary")
         self.export_btn.setFixedHeight(26)
         self.export_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "export.svg")))
         self.export_btn.setIconSize(QSize(14, 14))
         self.refresh_btn = QPushButton("Actualizar")
-        self.refresh_btn.setObjectName("customerRibbonRefreshBtn")
+        self.refresh_btn.setProperty("btnRole", "info")
         self.refresh_btn.setFixedHeight(26)
         self.refresh_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
         self.refresh_btn.setIconSize(QSize(14, 14))
@@ -222,7 +222,7 @@ class CustomersPage(QWidget):
         self.clear_search_btn.setEnabled(False)
         self.clear_search_btn.clicked.connect(self._clear_search_filter)
         self.help_btn = QPushButton("Ayuda")
-        self.help_btn.setObjectName("customerRibbonHelpBtn")
+        self.help_btn.setProperty("btnRole", "secondary")
         self.help_btn.setFixedHeight(26)
         self.help_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion))
         self.help_btn.setIconSize(QSize(14, 14))
@@ -2100,84 +2100,6 @@ class CustomersPage(QWidget):
                 color: #FFFFFF;
                 border: 1px solid #2563EB;
                 font-weight: 600;
-            }
-            QPushButton#customerRibbonNewBtn,
-            QPushButton#customerRibbonEditBtn,
-            QPushButton#customerRibbonDeleteBtn,
-            QPushButton#customerRibbonPrintBtn,
-            QPushButton#customerRibbonExportBtn,
-            QPushButton#customerRibbonRefreshBtn,
-            QPushButton#customerRibbonHelpBtn {
-                min-height: 26px;
-                max-height: 26px;
-                padding: 2px 10px;
-                margin: 0;
-                border-radius: 7px;
-                font-weight: 600;
-                border: 1px solid transparent;
-            }
-            QPushButton#customerRibbonNewBtn {
-                background: #DCFCE7;
-                color: #166534;
-                border-color: #86EFAC;
-            }
-            QPushButton#customerRibbonNewBtn:hover {
-                background: #BBF7D0;
-                border-color: #4ADE80;
-            }
-            QPushButton#customerRibbonEditBtn {
-                background: #DBEAFE;
-                color: #1D4ED8;
-                border-color: #93C5FD;
-            }
-            QPushButton#customerRibbonEditBtn:hover {
-                background: #BFDBFE;
-                border-color: #60A5FA;
-            }
-            QPushButton#customerRibbonDeleteBtn {
-                background: #FEE2E2;
-                color: #B91C1C;
-                border-color: #FCA5A5;
-            }
-            QPushButton#customerRibbonDeleteBtn:hover {
-                background: #FECACA;
-                border-color: #F87171;
-            }
-            QPushButton#customerRibbonPrintBtn {
-                background: #E2E8F0;
-                color: #334155;
-                border-color: #CBD5E1;
-            }
-            QPushButton#customerRibbonPrintBtn:hover {
-                background: #CBD5E1;
-                border-color: #94A3B8;
-            }
-            QPushButton#customerRibbonExportBtn {
-                background: #FEF3C7;
-                color: #92400E;
-                border-color: #FCD34D;
-            }
-            QPushButton#customerRibbonExportBtn:hover {
-                background: #FDE68A;
-                border-color: #FBBF24;
-            }
-            QPushButton#customerRibbonRefreshBtn {
-                background: #DBEAFE;
-                color: #1E40AF;
-                border-color: #93C5FD;
-            }
-            QPushButton#customerRibbonRefreshBtn:hover {
-                background: #BFDBFE;
-                border-color: #60A5FA;
-            }
-            QPushButton#customerRibbonHelpBtn {
-                background: #F3E8FF;
-                color: #6B21A8;
-                border-color: #D8B4FE;
-            }
-            QPushButton#customerRibbonHelpBtn:hover {
-                background: #E9D5FF;
-                border-color: #C084FC;
             }
             QPushButton#customerSearchClearButton {
                 min-width: 30px;
