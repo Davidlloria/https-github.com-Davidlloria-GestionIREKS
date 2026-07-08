@@ -2066,41 +2066,6 @@ class CustomersPage(QWidget):
             QLineEdit:focus, QComboBox:focus {
                 border: 1px solid #3B82F6;
             }
-            QPushButton {
-                min-height: 30px;
-                border-radius: 8px;
-                padding: 5px 12px;
-            }
-            QPushButton[btnRole="success"] {
-                background: #22C55E;
-                color: white;
-                border: 1px solid #16A34A;
-                font-weight: 600;
-            }
-            QPushButton[btnRole="warning"] {
-                background: #F59E0B;
-                color: #111827;
-                border: 1px solid #D97706;
-                font-weight: 600;
-            }
-            QPushButton[btnRole="danger"] {
-                background: #EF4444;
-                color: white;
-                border: 1px solid #DC2626;
-                font-weight: 600;
-            }
-            QPushButton[btnRole="secondary"] {
-                background: #FFFFFF;
-                color: #334155;
-                border: 1px solid #CBD5E1;
-                font-weight: 500;
-            }
-            QPushButton[btnRole="primary"] {
-                background: #3B82F6;
-                color: #FFFFFF;
-                border: 1px solid #2563EB;
-                font-weight: 600;
-            }
             QPushButton#customerSearchClearButton {
                 min-width: 30px;
                 max-width: 30px;
