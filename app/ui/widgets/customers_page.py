@@ -751,9 +751,9 @@ class CustomersPage(QWidget):
         wrapper = QWidget()
         wrapper.setAutoFillBackground(False)
         wrapper.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        wrapper.setFixedSize(46, 36)
+        wrapper.setFixedSize(36, 36)
         wrapper.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        wrapper_layout = QHBoxLayout(wrapper)
+        wrapper_layout = QGridLayout(wrapper)
         wrapper_layout.setContentsMargins(0, 0, 0, 0)
         wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -769,11 +769,13 @@ class CustomersPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label = QLabel()
+        icon_label.setFixedSize(16, 16)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         pixmap = QIcon(str(self._agenda_type_icon_path(activity_type))).pixmap(16, 16)
         icon_label.setPixmap(self._recolor_pixmap_white(pixmap, QColor(self._agenda_type_accent_color(activity_type))))
         layout.addWidget(icon_label)
-        wrapper_layout.addWidget(container)
+        wrapper_layout.addWidget(container, 0, 0, Qt.AlignmentFlag.AlignCenter)
         return wrapper
 
     def _make_agenda_state_pill_widget(self, state: str) -> QWidget:
