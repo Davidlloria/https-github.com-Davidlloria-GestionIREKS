@@ -209,6 +209,7 @@ class CustomersPage(QWidget):
         self.clear_search_btn = QPushButton()
         self.clear_search_btn.setObjectName("customerSearchClearButton")
         self.clear_search_btn.setFixedSize(30, 30)
+        self.clear_search_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.clear_search_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "close-white.svg")))
         self.clear_search_btn.setIconSize(QSize(14, 14))
         self.clear_search_btn.setToolTip("Vaciar filtro")
@@ -2094,13 +2095,13 @@ class CustomersPage(QWidget):
                 font-weight: 600;
             }
             QPushButton#customerSearchClearButton {
-                min-width: 34px;
-                max-width: 34px;
-                min-height: 34px;
-                max-height: 34px;
+                min-width: 30px;
+                max-width: 30px;
+                min-height: 30px;
+                max-height: 30px;
                 padding: 0;
                 margin: 0;
-                border-radius: 8px;
+                border-radius: 6px;
                 background: #EF4444;
                 color: #FFFFFF;
                 border: 1px solid #DC2626;
