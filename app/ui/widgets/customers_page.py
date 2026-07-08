@@ -312,7 +312,8 @@ class CustomersPage(QWidget):
         right_splitter = QSplitter(Qt.Orientation.Vertical)
         right_splitter.setObjectName("customersDetailSplitter")
         self._detail_splitter = right_splitter
-        right_layout.addWidget(right_splitter, 1)
+        right_layout.addWidget(right_splitter)
+        right_layout.addStretch(1)
 
         detail_panel = QWidget()
         detail_panel.setObjectName("detailTopArea")
