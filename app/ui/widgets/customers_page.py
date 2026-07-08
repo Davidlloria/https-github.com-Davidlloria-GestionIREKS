@@ -242,8 +242,6 @@ class CustomersPage(QWidget):
         ribbon_layout.addWidget(self.export_btn)
         ribbon_layout.addWidget(self.refresh_btn)
         ribbon_layout.addStretch(1)
-        ribbon_layout.addWidget(self.search_input)
-        ribbon_layout.addWidget(self.clear_search_btn)
         ribbon_layout.addWidget(self.help_btn)
         layout.addWidget(ribbon)
 
@@ -261,6 +259,13 @@ class CustomersPage(QWidget):
         self.island_filter.setFixedWidth(390)
         self.island_filter.currentIndexChanged.connect(self.reload)
         left_layout.addWidget(self.island_filter)
+
+        search_row = QHBoxLayout()
+        search_row.setContentsMargins(0, 0, 0, 0)
+        search_row.setSpacing(8)
+        search_row.addWidget(self.search_input)
+        search_row.addWidget(self.clear_search_btn)
+        left_layout.addLayout(search_row)
 
         self.table = QTableWidget(0, 3)
         self.table.setObjectName("customersListTable")
