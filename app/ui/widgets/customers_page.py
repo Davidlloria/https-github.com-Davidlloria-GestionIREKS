@@ -342,7 +342,7 @@ class CustomersPage(QWidget):
         left_card_layout.addWidget(left_detail_panel, 1)
 
         right_card = QFrame(detail_panel)
-        right_card.setObjectName("crmCard")
+        right_card.setObjectName("detailRightCard")
         self.right_card = right_card
         right_card_layout = QVBoxLayout(right_card)
         right_card_layout.setContentsMargins(2, 2, 2, 2)
@@ -2033,6 +2033,11 @@ class CustomersPage(QWidget):
                 border: none;
             }
             QFrame#detailLeftCard {
+                background: #FFFFFF;
+                border: 1px solid #D7DEE8;
+                border-radius: 8px;
+            }
+            QFrame#detailRightCard {
                 background: #FFFFFF;
                 border: 1px solid #D7DEE8;
                 border-radius: 8px;
