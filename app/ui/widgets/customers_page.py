@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSplitter,
     QStyle,
+    QStyledItemDelegate,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -47,6 +48,38 @@ from app.services.report_export_service import ReportExportService
 from app.ui.widgets.entity_dialog import EntityDialog
 
 BASE_DIR = Path(__file__).resolve().parents[3]
+
+
+class AgendaIconDelegate(QStyledItemDelegate):
+    def __init__(self, page: "CustomersPage", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._page = page
+
+    def paint(self, painter: QPainter, option, index) -> None:
+        activity_type = str(index.data(Qt.ItemDataRole.UserRole + 1) or "")
+        rect = option.rect
+        bubble_size = 24
+        icon_size = 14
+        bubble_x = rect.x() + (rect.width() - bubble_size) // 2
+        bubble_y = rect.y() + (rect.height() - bubble_size) // 2
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(self._page._agenda_type_color(activity_type)))
+        painter.drawEllipse(bubble_x, bubble_y, bubble_size, bubble_size)
+
+        pixmap = QIcon(str(self._page._agenda_type_icon_path(activity_type))).pixmap(icon_size, icon_size)
+        tinted = self._page._recolor_pixmap_white(
+            pixmap, QColor(self._page._agenda_type_accent_color(activity_type))
+        )
+        icon_x = rect.x() + (rect.width() - icon_size) // 2
+        icon_y = rect.y() + (rect.height() - icon_size) // 2
+        painter.drawPixmap(icon_x, icon_y, tinted)
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        return QSize(50, 32)
 
 
 class CustomersPage(QWidget):
@@ -558,6 +591,7 @@ class CustomersPage(QWidget):
         self.agenda_table.setColumnWidth(3, 104)
         self.agenda_table.setColumnWidth(5, 106)
         self.agenda_table.verticalHeader().setDefaultSectionSize(32)
+        self.agenda_table.setItemDelegateForColumn(0, AgendaIconDelegate(self, self.agenda_table))
         self.agenda_table.cellDoubleClicked.connect(self._open_agenda_activity_from_row)
         self.agenda_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.agenda_table.customContextMenuRequested.connect(self._show_agenda_context_menu)
@@ -599,25 +633,28 @@ class CustomersPage(QWidget):
                 resumen = str(getattr(item, "resumen", "") or "").strip()
                 seguimiento = self._format_agenda_date(getattr(item, "fecha_seguimiento", None), allow_blank=True)
 
-                icon_cell = self._make_agenda_icon_widget(str(getattr(item, "tipo", "") or ""))
+                icon_item = QTableWidgetItem("")
                 fecha_item = QTableWidgetItem(fecha)
                 tipo_item = QTableWidgetItem(tipo)
                 resumen_item = QTableWidgetItem(resumen)
                 seguimiento_item = QTableWidgetItem(seguimiento)
                 state_cell = self._make_agenda_state_pill_widget(str(getattr(item, "estado", "") or ""))
+                icon_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
+                icon_item.setData(Qt.ItemDataRole.UserRole + 1, str(getattr(item, "tipo", "") or ""))
                 fecha_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
                 tipo_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
                 resumen_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
                 seguimiento_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
-                for item_widget in (fecha_item, tipo_item, resumen_item, seguimiento_item):
+                for item_widget in (icon_item, fecha_item, tipo_item, resumen_item, seguimiento_item):
                     item_widget.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
                     item_widget.setToolTip(item_widget.text())
                     item_widget.setForeground(QColor("#14213D"))
+                icon_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 fecha_item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignCenter)
                 tipo_item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignCenter)
                 resumen_item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
                 seguimiento_item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignCenter)
-                self.agenda_table.setCellWidget(row_idx, 0, icon_cell)
+                self.agenda_table.setItem(row_idx, 0, icon_item)
                 self.agenda_table.setItem(row_idx, 1, fecha_item)
                 self.agenda_table.setItem(row_idx, 2, tipo_item)
                 self.agenda_table.setCellWidget(row_idx, 3, state_cell)
