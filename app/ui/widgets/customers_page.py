@@ -254,6 +254,7 @@ class CustomersPage(QWidget):
         layout.addWidget(ribbon)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setObjectName("customersMainSplitter")
         self._main_splitter = splitter
         layout.addWidget(splitter, 1)
 
@@ -308,6 +309,7 @@ class CustomersPage(QWidget):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
         right_splitter = QSplitter(Qt.Orientation.Vertical)
+        right_splitter.setObjectName("customersDetailSplitter")
         self._detail_splitter = right_splitter
         right_layout.addWidget(right_splitter, 1)
 
@@ -2019,6 +2021,16 @@ class CustomersPage(QWidget):
             QWidget#detailSubPanel {
                 background: transparent;
                 border: 0;
+            }
+            QSplitter#customersMainSplitter,
+            QSplitter#customersDetailSplitter {
+                background: transparent;
+                border: none;
+            }
+            QSplitter#customersMainSplitter::handle,
+            QSplitter#customersDetailSplitter::handle {
+                background: transparent;
+                border: none;
             }
             QSplitter#detailInnerSplitter {
                 background: transparent;
