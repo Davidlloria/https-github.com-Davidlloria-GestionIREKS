@@ -340,6 +340,21 @@ class Contacto(TimeStampedModel, table=True):
     email: str = Field(default="", max_length=255)
 
 
+class ClienteAgenda(TimeStampedModel, table=True):
+    __tablename__: ClassVar[str] = "clientes_agenda"
+
+    agenda_id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True, max_length=36)
+    cliente_id: str = Field(index=True, foreign_key="clientes.cliente_id", nullable=False, max_length=36)
+    fecha_actividad: date = Field(default_factory=date.today, nullable=False, index=True)
+    tipo: str = Field(default="nota", nullable=False, max_length=50, index=True)
+    estado: str = Field(default="pendiente", nullable=False, max_length=30, index=True)
+    resumen: str = Field(default="", max_length=255)
+    detalle: str = Field(default="")
+    fecha_seguimiento: Optional[date] = Field(default=None, nullable=True, index=True)
+    prioridad: str = Field(default="normal", nullable=False, max_length=20, index=True)
+    responsable: str = Field(default="", max_length=255)
+
+
 class Tecnico(TimeStampedModel, table=True):
     __tablename__: ClassVar[str] = "tecnicos"
 

@@ -1,8 +1,9 @@
 from pathlib import Path
+from datetime import date, datetime
 import unicodedata
 
 from PySide6.QtCore import QSize, QTimer, Qt
-from PySide6.QtGui import QTextDocument
+from PySide6.QtGui import QColor, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
@@ -10,10 +11,13 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QComboBox,
+    QDateEdit,
     QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QFrame,
     QGridLayout,
+    QFormLayout,
     QHeaderView,
     QHBoxLayout,
     QLineEdit,
@@ -94,6 +98,7 @@ class CustomersPage(QWidget):
         self._is_loading_details = False
         self._related_context_menu_open = False
         self._loading_related_contacts = False
+        self._loading_agenda = False
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
         self._search_timer.timeout.connect(self.reload)
@@ -290,7 +295,7 @@ class CustomersPage(QWidget):
         self.customer_tabs.addTab(self._build_contacts_tab(), "Contactos")
         self.customer_tabs.addTab(self._build_tab_placeholder("Historial y resumen de ventas."), "Ventas")
         self.customer_tabs.addTab(self._build_recipes_tab(), "Recetas")
-        self.customer_tabs.addTab(self._build_tab_placeholder("Agenda y proxima actividad."), "Agenda")
+        self.customer_tabs.addTab(self._build_agenda_tab(), "Agenda")
         self.customer_tabs.setTabIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView))
         self.customer_tabs.setTabIcon(1, self.style().standardIcon(QStyle.StandardPixmap.SP_DriveHDIcon))
         self.customer_tabs.setTabIcon(2, self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
@@ -439,6 +444,344 @@ class CustomersPage(QWidget):
         self.related_recipes_empty.setVisible(False)
         layout.addWidget(self.related_recipes_empty)
         return panel
+
+    def _build_agenda_tab(self) -> QWidget:
+        panel = QWidget()
+        panel.setObjectName("customerAgendaPanel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(8)
+
+        self.agenda_table = QTableWidget(0, 5)
+        self.agenda_table.setObjectName("customerAgendaTable")
+        self.agenda_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.agenda_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.agenda_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.agenda_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.agenda_table.verticalHeader().setVisible(False)
+        self.agenda_table.setAlternatingRowColors(True)
+        self.agenda_table.setShowGrid(False)
+        self.agenda_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.agenda_table.setHorizontalHeaderLabels(["Fecha", "Tipo", "Estado", "Resumen", "Seguimiento"])
+        header = self.agenda_table.horizontalHeader()
+        header.setSectionsClickable(False)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self.agenda_table.setColumnWidth(0, 96)
+        self.agenda_table.setColumnWidth(1, 150)
+        self.agenda_table.setColumnWidth(2, 104)
+        self.agenda_table.setColumnWidth(4, 108)
+        self.agenda_table.verticalHeader().setDefaultSectionSize(36)
+        self.agenda_table.cellDoubleClicked.connect(self._open_agenda_activity_from_row)
+        self.agenda_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.agenda_table.customContextMenuRequested.connect(self._show_agenda_context_menu)
+        layout.addWidget(self.agenda_table, 1)
+
+        self.agenda_empty = QLabel("No hay actividades registradas para este cliente.")
+        self.agenda_empty.setObjectName("customerAgendaEmpty")
+        self.agenda_empty.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+        self.agenda_empty.setWordWrap(True)
+        self.agenda_empty.setVisible(False)
+        layout.addWidget(self.agenda_empty)
+        return panel
+
+    def _render_customer_agenda(self, cliente_id: str) -> None:
+        if not hasattr(self, "agenda_table"):
+            return
+        entries = self.customer_service.related_agenda(cliente_id)
+        self._loading_agenda = True
+        self.agenda_table.blockSignals(True)
+        try:
+            self.agenda_table.setRowCount(len(entries))
+            for row_idx, item in enumerate(entries):
+                agenda_id = str(getattr(item, "agenda_id", "") or "")
+                fecha = self._format_agenda_date(getattr(item, "fecha_actividad", None))
+                tipo = self._agenda_type_label(str(getattr(item, "tipo", "") or ""))
+                estado = self._agenda_state_label(str(getattr(item, "estado", "") or ""))
+                resumen = str(getattr(item, "resumen", "") or "").strip()
+                seguimiento = self._format_agenda_date(getattr(item, "fecha_seguimiento", None), allow_blank=True)
+
+                fecha_item = QTableWidgetItem(fecha)
+                tipo_item = QTableWidgetItem(tipo)
+                estado_item = QTableWidgetItem(estado)
+                resumen_item = QTableWidgetItem(resumen)
+                seguimiento_item = QTableWidgetItem(seguimiento)
+                fecha_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
+                tipo_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
+                estado_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
+                resumen_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
+                seguimiento_item.setData(Qt.ItemDataRole.UserRole, agenda_id)
+                for item_widget in (fecha_item, tipo_item, estado_item, resumen_item, seguimiento_item):
+                    item_widget.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                    item_widget.setToolTip(item_widget.text())
+                    item_widget.setForeground(QColor("#14213D"))
+                fecha_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                tipo_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                estado_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                seguimiento_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self._agenda_style_state_item(estado_item, str(getattr(item, "estado", "") or ""))
+                self.agenda_table.setItem(row_idx, 0, fecha_item)
+                self.agenda_table.setItem(row_idx, 1, tipo_item)
+                self.agenda_table.setItem(row_idx, 2, estado_item)
+                self.agenda_table.setItem(row_idx, 3, resumen_item)
+                self.agenda_table.setItem(row_idx, 4, seguimiento_item)
+        finally:
+            self.agenda_table.blockSignals(False)
+            self._loading_agenda = False
+        if hasattr(self, "agenda_empty"):
+            self.agenda_empty.setVisible(len(entries) == 0)
+
+    def _show_agenda_context_menu(self, pos) -> None:
+        customer = self._selected_row()
+        if customer is None:
+            return
+        index = self.agenda_table.indexAt(pos)
+        agenda_id = ""
+        row_idx = index.row() if index.isValid() else None
+        global_pos = self.agenda_table.viewport().mapToGlobal(pos)
+        if row_idx is not None:
+            self.agenda_table.selectRow(row_idx)
+            agenda_id = self._get_agenda_activity_id(row_idx)
+
+        menu = QMenu(self)
+        action_new = menu.addAction("Nueva actividad")
+        action_edit = menu.addAction("Editar")
+        action_delete = menu.addAction("Eliminar")
+        if not agenda_id:
+            action_edit.setEnabled(False)
+            action_delete.setEnabled(False)
+        chosen = menu.exec(global_pos)
+        if chosen == action_new:
+            self._open_agenda_activity_dialog()
+            return
+        if chosen == action_edit:
+            self._open_agenda_activity_dialog(agenda_id)
+            return
+        if chosen == action_delete:
+            self._delete_agenda_activity(agenda_id)
+
+    def _open_agenda_activity_from_row(self, row_idx: int, _column: int) -> None:
+        agenda_id = self._get_agenda_activity_id(row_idx)
+        if not agenda_id:
+            return
+        self._open_agenda_activity_dialog(agenda_id)
+
+    def _open_agenda_activity_dialog(self, agenda_id: str = "") -> None:
+        selected_customer = self._selected_row()
+        if selected_customer is None:
+            QMessageBox.warning(self, "Agenda", "Selecciona un cliente.")
+            return
+        customer_id = str(getattr(selected_customer, "cliente_id", "") or "").strip()
+        activity = self.customer_service.get_agenda_activity(agenda_id) if agenda_id else None
+        if activity is not None and str(getattr(activity, "cliente_id", "") or "").strip() != customer_id:
+            activity = None
+        editing = activity is not None
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Editar actividad" if editing else "Nueva actividad")
+        dialog.setModal(True)
+        dialog.setFixedSize(620, 520)
+
+        form_layout = QVBoxLayout(dialog)
+        form_layout.setContentsMargins(16, 16, 16, 16)
+        form_layout.setSpacing(10)
+
+        title = QLabel("Editar actividad" if editing else "Nueva actividad")
+        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #14213D;")
+        form_layout.addWidget(title)
+
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form.setFormAlignment(Qt.AlignmentFlag.AlignTop)
+        form.setVerticalSpacing(10)
+        form.setHorizontalSpacing(12)
+
+        tipo_combo = QComboBox()
+        for key, label in self._agenda_type_options():
+            tipo_combo.addItem(label, key)
+
+        estado_combo = QComboBox()
+        for key, label in self._agenda_state_options():
+            estado_combo.addItem(label, key)
+
+        fecha_edit = QDateEdit()
+        fecha_edit.setCalendarPopup(True)
+        fecha_edit.setDisplayFormat("dd/MM/yyyy")
+        fecha_edit.setDate(self._agenda_qdate(getattr(activity, "fecha_actividad", None)))
+
+        resumen_edit = QLineEdit()
+        resumen_edit.setPlaceholderText("Resumen de la actividad")
+
+        detalle_edit = QPlainTextEdit()
+        detalle_edit.setPlaceholderText("Detalle, acuerdos, próximos pasos...")
+        detalle_edit.setFixedHeight(110)
+
+        seguimiento_check = QCheckBox("Tiene seguimiento")
+        seguimiento_edit = QDateEdit()
+        seguimiento_edit.setCalendarPopup(True)
+        seguimiento_edit.setDisplayFormat("dd/MM/yyyy")
+        seguimiento_edit.setDate(self._agenda_qdate(getattr(activity, "fecha_seguimiento", None), fallback_today=True))
+        seguimiento_edit.setEnabled(False)
+        seguimiento_check.toggled.connect(seguimiento_edit.setEnabled)
+
+        if activity is not None:
+            tipo_combo.setCurrentIndex(max(0, tipo_combo.findData(str(getattr(activity, "tipo", "") or "nota"))))
+            estado_combo.setCurrentIndex(max(0, estado_combo.findData(str(getattr(activity, "estado", "") or "pendiente"))))
+            resumen_edit.setText(str(getattr(activity, "resumen", "") or ""))
+            detalle_edit.setPlainText(str(getattr(activity, "detalle", "") or ""))
+            if getattr(activity, "fecha_seguimiento", None):
+                seguimiento_check.setChecked(True)
+                seguimiento_edit.setEnabled(True)
+                seguimiento_edit.setDate(self._agenda_qdate(getattr(activity, "fecha_seguimiento", None)))
+        else:
+            tipo_combo.setCurrentIndex(max(0, tipo_combo.findData("nota")))
+            estado_combo.setCurrentIndex(max(0, estado_combo.findData("pendiente")))
+            seguimiento_check.setChecked(False)
+
+        form.addRow("Tipo", tipo_combo)
+        form.addRow("Fecha", fecha_edit)
+        form.addRow("Estado", estado_combo)
+        form.addRow("Resumen", resumen_edit)
+        form.addRow("Detalle", detalle_edit)
+        form.addRow("Seguimiento", seguimiento_check)
+        form.addRow("Fecha seguimiento", seguimiento_edit)
+        form_layout.addLayout(form)
+
+        buttons = QDialogButtonBox()
+        save_btn = buttons.addButton("Guardar", QDialogButtonBox.ButtonRole.AcceptRole)
+        cancel_btn = buttons.addButton("Cancelar", QDialogButtonBox.ButtonRole.RejectRole)
+        delete_btn = None
+        delete_requested = {"value": False}
+        if editing:
+            delete_btn = buttons.addButton("Eliminar", QDialogButtonBox.ButtonRole.DestructiveRole)
+        save_btn.clicked.connect(dialog.accept)
+        cancel_btn.clicked.connect(dialog.reject)
+        if delete_btn is not None:
+            delete_btn.clicked.connect(lambda: delete_requested.__setitem__("value", True))
+            delete_btn.clicked.connect(dialog.reject)
+        form_layout.addWidget(buttons)
+
+        result = dialog.exec()
+        if result != QDialog.DialogCode.Accepted:
+            if delete_requested["value"] and delete_btn is not None:
+                self._delete_agenda_activity(str(getattr(activity, "agenda_id", "") or ""))
+            return
+
+        payload = {
+            "cliente_id": customer_id,
+            "fecha_actividad": fecha_edit.date().toString("yyyy-MM-dd"),
+            "tipo": str(tipo_combo.currentData() or "nota"),
+            "estado": str(estado_combo.currentData() or "pendiente"),
+            "resumen": resumen_edit.text().strip(),
+            "detalle": detalle_edit.toPlainText().strip(),
+            "fecha_seguimiento": seguimiento_edit.date().toString("yyyy-MM-dd") if seguimiento_check.isChecked() else "",
+            "prioridad": "normal",
+            "responsable": "",
+        }
+        if not payload["resumen"] and not payload["detalle"]:
+            QMessageBox.warning(self, "Agenda", "El resumen o el detalle no pueden quedar vacíos.")
+            return
+        try:
+            self.customer_service.upsert_agenda_activity(str(getattr(activity, "agenda_id", "") or ""), payload)
+        except Exception as exc:
+            QMessageBox.warning(self, "Agenda", f"No se pudo guardar la actividad: {exc}")
+            return
+        self._render_customer_agenda(customer_id)
+
+    def _delete_agenda_activity(self, agenda_id: str) -> None:
+        clean_id = str(agenda_id or "").strip()
+        if not clean_id:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Confirmar eliminación",
+            "La actividad se eliminará de la agenda.\n\n¿Continuar?",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            deleted = self.customer_service.delete_agenda_activity(clean_id)
+        except Exception as exc:
+            QMessageBox.warning(self, "Agenda", f"No se pudo eliminar la actividad: {exc}")
+            return
+        if deleted:
+            selected = self._selected_row()
+            self._render_customer_agenda(str(getattr(selected, "cliente_id", "") or "") if selected else "")
+
+    def _get_agenda_activity_id(self, row_idx: int | None = None) -> str:
+        if row_idx is None:
+            selected = self.agenda_table.selectionModel().selectedRows()
+            if not selected:
+                return ""
+            row_idx = selected[0].row()
+        id_item = self.agenda_table.item(row_idx, 0)
+        if id_item is None:
+            return ""
+        return str(id_item.data(Qt.ItemDataRole.UserRole) or "").strip()
+
+    def _agenda_qdate(self, value: object, *, fallback_today: bool = True):
+        from PySide6.QtCore import QDate
+
+        if hasattr(value, "year") and hasattr(value, "month") and hasattr(value, "day"):
+            return QDate(int(value.year), int(value.month), int(value.day))
+        if fallback_today:
+            return QDate.currentDate()
+        return QDate()
+
+    def _format_agenda_date(self, value: object, *, allow_blank: bool = False) -> str:
+        text = str(value or "").strip()
+        if not text:
+            return "" if allow_blank else "-"
+        try:
+            parsed = datetime.fromisoformat(text)
+            return parsed.strftime("%d/%m/%Y")
+        except ValueError:
+            try:
+                parsed_date = date.fromisoformat(text)
+                return parsed_date.strftime("%d/%m/%Y")
+            except ValueError:
+                return text
+
+    def _agenda_type_options(self) -> list[tuple[str, str]]:
+        return [
+            ("visita_realizada", "Visita realizada"),
+            ("visita_prevista", "Visita prevista"),
+            ("llamada", "Llamada"),
+            ("seguimiento", "Seguimiento"),
+            ("desarrollo_futuro", "Desarrollo futuro"),
+            ("incidencia", "Incidencia"),
+            ("nota", "Nota"),
+        ]
+
+    def _agenda_state_options(self) -> list[tuple[str, str]]:
+        return [
+            ("pendiente", "Pendiente"),
+            ("hecho", "Hecho"),
+            ("aplazado", "Aplazado"),
+            ("cancelado", "Cancelado"),
+        ]
+
+    def _agenda_type_label(self, value: str) -> str:
+        options = dict(self._agenda_type_options())
+        return options.get(str(value or "").strip(), str(value or "").replace("_", " ").title())
+
+    def _agenda_state_label(self, value: str) -> str:
+        options = dict(self._agenda_state_options())
+        return options.get(str(value or "").strip(), str(value or "").replace("_", " ").title())
+
+    def _agenda_style_state_item(self, item: QTableWidgetItem, state: str) -> None:
+        normalized = str(state or "").strip().lower()
+        if normalized == "hecho":
+            item.setForeground(QColor("#067647"))
+        elif normalized == "aplazado":
+            item.setForeground(QColor("#B54708"))
+        elif normalized == "cancelado":
+            item.setForeground(QColor("#B42318"))
+        else:
+            item.setForeground(QColor("#475467"))
 
     def _build_reports_panel(self) -> QWidget:
         panel = QWidget()
@@ -1002,6 +1345,7 @@ class CustomersPage(QWidget):
             self.detail_prospeccion_no.setChecked(True)
             self._render_related_contacts("")
             self._render_related_recipes("")
+            self._render_customer_agenda("")
             self._is_loading_details = False
             return
         self._last_selected_customer_id = str(getattr(row, "cliente_id", "") or "").strip()
@@ -1042,6 +1386,7 @@ class CustomersPage(QWidget):
             self.detail_prospeccion_no.setChecked(True)
         self._render_related_contacts(str(getattr(row, "cliente_id", "") or ""))
         self._render_related_recipes(str(getattr(row, "cliente_id", "") or ""))
+        self._render_customer_agenda(str(getattr(row, "cliente_id", "") or ""))
         self._is_loading_details = False
 
     def _restore_customer_selection(self, customer_id: str) -> bool:
@@ -1560,6 +1905,38 @@ class CustomersPage(QWidget):
                 font-size: 14px;
                 font-weight: 500;
                 padding: 24px 16px;
+                background: #F8FAFD;
+                border: 1px dashed #D6E0EE;
+                border-radius: 10px;
+            }
+            QTableWidget#customerAgendaTable {
+                border: 1px solid #DCE4EF;
+                border-radius: 10px;
+                background: #FFFFFF;
+                gridline-color: #E8EDF5;
+            }
+            QTableWidget#customerAgendaTable::item {
+                padding: 8px 10px;
+            }
+            QTableWidget#customerAgendaTable::item:selected {
+                background: #3A78CF;
+                color: #FFFFFF;
+            }
+            QTableWidget#customerAgendaTable QHeaderView::section {
+                background: #F7F9FC;
+                color: #2F3E55;
+                border: 0;
+                border-right: 1px solid #E7ECF3;
+                border-bottom: 1px solid #DEE6F1;
+                padding: 6px 8px;
+                min-height: 30px;
+                font-weight: 600;
+            }
+            QLabel#customerAgendaEmpty {
+                color: #6E7E96;
+                font-size: 14px;
+                font-weight: 500;
+                padding: 18px 16px;
                 background: #F8FAFD;
                 border: 1px dashed #D6E0EE;
                 border-radius: 10px;
