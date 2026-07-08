@@ -202,7 +202,7 @@ class CustomersPage(QWidget):
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Buscar cliente...")
-        self.search_input.setFixedWidth(390)
+        self.search_input.setFixedWidth(352)
         self.search_input.setFixedHeight(30)
         self.search_input.textChanged.connect(self._schedule_reload)
         self.search_input.textChanged.connect(self._update_search_clear_button)
