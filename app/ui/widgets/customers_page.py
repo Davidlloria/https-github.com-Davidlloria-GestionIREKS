@@ -508,6 +508,7 @@ class CustomersPage(QWidget):
         for calendar_edit in (self._agenda_filter_from, self._agenda_filter_to):
             calendar_widget = calendar_edit.calendarWidget()
             if calendar_widget is not None:
+                calendar_widget.setMinimumSize(320, 250)
                 calendar_widget.setGridVisible(False)
                 calendar_widget.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
                 calendar_widget.setObjectName("customerAgendaPopupCalendar")
@@ -2269,9 +2270,10 @@ class CustomersPage(QWidget):
                 color: #0F172A;
             }
             QCalendarWidget#customerAgendaPopupCalendar QWidget#qt_calendar_navigationbar {
-                min-height: 20px;
-                max-height: 20px;
+                min-height: 24px;
+                max-height: 24px;
                 background: #FFFFFF;
+                padding: 0 4px;
             }
             QCalendarWidget QToolButton {
                 min-width: 18px;
@@ -2291,9 +2293,9 @@ class CustomersPage(QWidget):
             QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_nextmonth,
             QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_monthbutton,
             QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_yearbutton {
-                min-height: 18px;
-                max-height: 18px;
-                padding: 0 4px;
+                min-height: 20px;
+                max-height: 20px;
+                padding: 0 6px;
                 margin: 0 2px;
                 border: none;
                 background: transparent;
@@ -2326,12 +2328,20 @@ class CustomersPage(QWidget):
                 selection-color: #FFFFFF;
             }
             QCalendarWidget#customerAgendaPopupCalendar QComboBox {
-                min-height: 18px;
-                max-height: 18px;
-                min-width: 68px;
-                max-width: 68px;
+                min-height: 20px;
+                max-height: 20px;
+                min-width: 78px;
+                max-width: 78px;
                 padding: 0 4px;
                 font-size: 10px;
+            }
+            QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_monthbutton {
+                min-width: 84px;
+                max-width: 84px;
+            }
+            QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_yearbutton {
+                min-width: 54px;
+                max-width: 54px;
             }
             QLabel#customerAgendaEmpty {
                 color: #6E7E96;
