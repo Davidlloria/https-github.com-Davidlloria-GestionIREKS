@@ -557,7 +557,7 @@ class CustomersPage(QWidget):
         self.agenda_table.setColumnWidth(2, 132)
         self.agenda_table.setColumnWidth(3, 104)
         self.agenda_table.setColumnWidth(5, 106)
-        self.agenda_table.verticalHeader().setDefaultSectionSize(36)
+        self.agenda_table.verticalHeader().setDefaultSectionSize(32)
         self.agenda_table.cellDoubleClicked.connect(self._open_agenda_activity_from_row)
         self.agenda_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.agenda_table.customContextMenuRequested.connect(self._show_agenda_context_menu)
@@ -613,9 +613,10 @@ class CustomersPage(QWidget):
                     item_widget.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
                     item_widget.setToolTip(item_widget.text())
                     item_widget.setForeground(QColor("#14213D"))
-                fecha_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                tipo_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                seguimiento_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                fecha_item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignCenter)
+                tipo_item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignCenter)
+                resumen_item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+                seguimiento_item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignCenter)
                 self.agenda_table.setCellWidget(row_idx, 0, icon_cell)
                 self.agenda_table.setItem(row_idx, 1, fecha_item)
                 self.agenda_table.setItem(row_idx, 2, tipo_item)
@@ -728,10 +729,10 @@ class CustomersPage(QWidget):
     def _agenda_state_palette(self, value: str) -> tuple[str, str]:
         normalized = str(value or "").strip().lower()
         palette = {
-            "pendiente": ("#B54708", "#FEF3C7"),
-            "hecho": ("#067647", "#E9F8EF"),
-            "aplazado": ("#175CD3", "#EAF2FF"),
-            "cancelado": ("#B42318", "#FDEDEC"),
+            "pendiente": ("#A15C00", "#FFF0C2"),
+            "hecho": ("#0B7A4D", "#ECF9F0"),
+            "aplazado": ("#1D63C9", "#ECF3FF"),
+            "cancelado": ("#A63A2A", "#FEF0EE"),
         }
         return palette.get(normalized, ("#475467", "#EEF2F6"))
 
@@ -751,28 +752,28 @@ class CustomersPage(QWidget):
         wrapper = QWidget()
         wrapper.setAutoFillBackground(False)
         wrapper.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        wrapper.setFixedSize(36, 36)
+        wrapper.setFixedSize(50, 32)
         wrapper.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         wrapper_layout = QGridLayout(wrapper)
         wrapper_layout.setContentsMargins(0, 0, 0, 0)
         wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         container = QFrame()
-        container.setFixedSize(28, 28)
+        container.setFixedSize(24, 24)
         container.setObjectName("customerAgendaIconBubble")
         container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         container.setStyleSheet(
             f"QFrame#customerAgendaIconBubble {{ background: {self._agenda_type_color(activity_type)}; "
-            "border-radius: 14px; border: none; }}"
+            "border-radius: 12px; border: none; }}"
         )
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label = QLabel()
-        icon_label.setFixedSize(16, 16)
+        icon_label.setFixedSize(14, 14)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        pixmap = QIcon(str(self._agenda_type_icon_path(activity_type))).pixmap(16, 16)
+        pixmap = QIcon(str(self._agenda_type_icon_path(activity_type))).pixmap(14, 14)
         icon_label.setPixmap(self._recolor_pixmap_white(pixmap, QColor(self._agenda_type_accent_color(activity_type))))
         layout.addWidget(icon_label)
         wrapper_layout.addWidget(container, 0, 0, Qt.AlignmentFlag.AlignCenter)
@@ -783,7 +784,7 @@ class CustomersPage(QWidget):
         wrapper = QFrame()
         wrapper.setObjectName("customerAgendaStatePill")
         wrapper.setAutoFillBackground(False)
-        wrapper.setFixedSize(92, 22)
+        wrapper.setFixedSize(104, 32)
         wrapper.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         wrapper.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         wrapper.setStyleSheet(
@@ -794,10 +795,10 @@ class CustomersPage(QWidget):
         wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label = QLabel(self._agenda_state_label(state))
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setFixedSize(92, 22)
+        label.setFixedSize(82, 18)
         label.setStyleSheet(
-            f"background: {bg_color}; color: {fg_color}; border: 1px solid rgba(0,0,0,0.04); "
-            "border-radius: 11px; font-size: 10px; font-weight: 700; padding: 0 8px;"
+            f"background: {bg_color}; color: {fg_color}; border: 1px solid rgba(0,0,0,0.03); "
+            "border-radius: 9px; font-size: 9px; font-weight: 700; padding: 0 6px;"
         )
         wrapper_layout.addWidget(label)
         return wrapper
@@ -2184,7 +2185,7 @@ class CustomersPage(QWidget):
                 gridline-color: #E8EDF5;
             }
             QTableWidget#customerAgendaTable::item {
-                padding: 8px 10px;
+                padding: 4px 10px;
             }
             QTableWidget#customerAgendaTable::item:selected {
                 background: #3A78CF;
