@@ -539,6 +539,7 @@ class CustomersPage(QWidget):
         self.agenda_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.agenda_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.agenda_table.verticalHeader().setVisible(False)
+        self.agenda_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         self.agenda_table.setAlternatingRowColors(True)
         self.agenda_table.setShowGrid(False)
         self.agenda_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -622,13 +623,12 @@ class CustomersPage(QWidget):
                 self.agenda_table.setCellWidget(row_idx, 3, state_cell)
                 self.agenda_table.setItem(row_idx, 4, resumen_item)
                 self.agenda_table.setItem(row_idx, 5, seguimiento_item)
+                self.agenda_table.setRowHeight(row_idx, self.agenda_table.verticalHeader().defaultSectionSize())
         finally:
             self.agenda_table.blockSignals(False)
             self._loading_agenda = False
         if hasattr(self, "agenda_empty"):
             self.agenda_empty.setVisible(len(filtered_entries) == 0)
-        if self.agenda_table.rowCount() > 0:
-            self.agenda_table.resizeRowsToContents()
 
     def _refresh_agenda_view(self, *_args) -> None:
         selected = self._selected_row()
