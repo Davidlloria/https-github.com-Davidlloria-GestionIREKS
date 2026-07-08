@@ -813,8 +813,7 @@ class CustomersPage(QWidget):
         wrapper = QFrame()
         wrapper.setObjectName("customerAgendaStatePill")
         wrapper.setAutoFillBackground(False)
-        wrapper.setFixedSize(104, 32)
-        wrapper.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        wrapper.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         wrapper.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         wrapper.setStyleSheet(
             f"QFrame#customerAgendaStatePill {{ background: transparent; border: none; }}"
