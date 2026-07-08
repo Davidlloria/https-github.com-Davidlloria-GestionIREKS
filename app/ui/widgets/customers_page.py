@@ -331,7 +331,7 @@ class CustomersPage(QWidget):
         self.detail_panel = detail_panel
 
         left_card = QFrame(detail_panel)
-        left_card.setObjectName("crmCard")
+        left_card.setObjectName("detailLeftCard")
         self.left_card = left_card
         left_card_layout = QVBoxLayout(left_card)
         left_card_layout.setContentsMargins(2, 2, 2, 2)
@@ -2021,6 +2021,11 @@ class CustomersPage(QWidget):
             QWidget#detailSubPanel {
                 background: transparent;
                 border: 0;
+            }
+            QFrame#detailLeftCard {
+                background: #FFFFFF;
+                border: 1px solid #D7DEE8;
+                border-radius: 8px;
             }
             QSplitter#customersMainSplitter,
             QSplitter#customersDetailSplitter {
