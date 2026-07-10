@@ -36,13 +36,13 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Gestion IREKS")
-        self.setMinimumSize(1180, 720)
-        self.resize(1360, 840)
+        self.setFixedSize(1380, 840)
         self._build_ui()
 
     def _build_ui(self) -> None:
         root = QWidget()
         root.setObjectName("mainRoot")
+        root.setStyleSheet("QWidget#mainRoot { background: #FFF4CC; border: none; }")
         layout = QVBoxLayout(root)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -51,6 +51,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.ribbon)
 
         self.pages = QStackedWidget()
+        self.pages.setObjectName("mainPages")
+        self.pages.setStyleSheet("QStackedWidget#mainPages { background: #ECEFF3; border: none; }")
         layout.addWidget(self.pages, 1)
         self.setCentralWidget(root)
 

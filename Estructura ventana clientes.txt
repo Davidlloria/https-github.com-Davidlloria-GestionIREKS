@@ -1,0 +1,82 @@
+CustomersPage
+└── QVBoxLayout
+    ├── topRibbon
+    │   ├── Nuevo
+    │   ├── Editar
+    │   ├── Eliminar
+    │   ├── Imprimir
+    │   ├── Exportar
+    │   ├── Actualizar
+    │   └── Ayuda
+    └── QSplitter (horizontal)
+        ├── left_panel
+        │   ├── filtro isla
+        │   ├── buscador de cliente
+        │   └── tabla de clientes
+        └── right_panel
+            └── QSplitter (vertical)
+                ├── detail_panel
+                │   ├── tarjeta detalle izquierda
+                │   └── tarjeta detalle derecha
+                └── tabs_panel
+                    └── QTabWidget
+                        ├── Contactos
+                        ├── Ventas
+                        ├── Recetas
+                        └── Agenda
+                            ├── filtros
+                            └── tabla de actividades
+
+-------------------------------------------
+MainWindow (QMainWindow)
+└─ root (QWidget, objectName: mainRoot, fondo gris claro)
+   └─ layout principal (QVBoxLayout) (amarillo)
+      ├─ topRibbon (QFrame, objectName: topRibbon)
+      │  ├─ ribbon buttons: Nuevo / Editar / Eliminar / Imprimir / Exportar / Actualizar
+      │  ├─ separator(s)
+      │  └─ Ayuda
+      └─ pages (QStackedWidget) (gris)
+         ├─ CustomersPage (QWidget, objectName: CustomersPageRoot)
+         │  └─ layout principal (QVBoxLayout)
+         │     ├─ topRibbon (QFrame)
+         │     │  ├─ botones de acción
+         │     │  └─ campo búsqueda + botón limpiar
+         │     └─ customersMainSplitter (QSplitter horizontal, objectName: customersMainSplitter)
+         │        ├─ left_panel (QWidget, objectName: crmCard)
+         │        │  ├─ filtro isla
+         │        │  └─ customersListTable (QTableWidget)
+         │        └─ right_panel (QWidget, objectName: customersRightPanel)
+         │           ├─ right_panel_stretch (QWidget)(rojo)
+         │           └─ right_splitter (QSplitter vertical, objectName: customersDetailSplitter)(verde)
+         │              ├─ detail_panel (QWidget, objectName: detailTopArea, height fija 300)(azul)
+         │              │  ├─ detail_title (QLabel: "Detalle de cliente")
+         │              │  ├─ detail_tipo_header (QLabel: "Clasificación del cliente")
+         │              │  ├─ left_card (QFrame, objectName: detailLeftCard)
+         │              │  │  └─ left_detail_panel (QWidget, objectName: detailSubPanel)
+         │              │  │     ├─ labels y campos de la ficha cliente
+         │              │  │     └─ layout absoluto con geometrías fijas
+         │              │  └─ right_card (QFrame, objectName: detailRightCard)
+         │              │     └─ right_detail_panel (QWidget, objectName: detailSubPanel)
+         │              │        ├─ sector chips
+         │              │        ├─ combo "Tipo"
+         │              │        ├─ campo "Abrev. pedido"
+         │              │        ├─ estado ACTIVO / INACTIVO
+         │              │        └─ prospección Sí / No
+         │              └─ tabs_panel (QWidget, objectName: crmCard)
+         │                 └─ customer_tabs (QTabWidget)
+         │                    ├─ Contactos
+         │                    ├─ Ventas
+         │                    ├─ Recetas
+         │                    └─ Agenda
+         ├─ ContactsPage
+         ├─ TechniciansPage
+         ├─ DistributorsPage
+         ├─ PlaceholderPage("Colaboradores")
+         ├─ CoursesPage
+         ├─ RecipesPage
+         ├─ WarehousePage
+         ├─ IngredientsIreksPage
+         ├─ IngredientsStdPage
+         ├─ OrdersPage
+         ├─ SalesPage
+         └─ SettingsPage

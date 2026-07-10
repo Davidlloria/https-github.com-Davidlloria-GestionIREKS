@@ -313,12 +313,20 @@ class CustomersPage(QWidget):
         right_splitter.setObjectName("customersDetailSplitter")
         self._detail_splitter = right_splitter
         right_layout.addWidget(right_splitter)
-        right_layout.addStretch(1)
+        right_panel_stretch = QWidget()
+        right_panel_stretch.setObjectName("customersRightPanelStretch")
+        right_panel_stretch.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Expanding,
+        )
+        self.right_panel_stretch = right_panel_stretch
+        right_layout.addWidget(right_panel_stretch, 1)
 
         detail_panel = QWidget()
         detail_panel.setObjectName("detailTopArea")
         detail_panel.setFixedHeight(300)
-        detail_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        detail_panel.setFixedWidth(932)
+        detail_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         detail_layout = QVBoxLayout(detail_panel)
         detail_layout.setContentsMargins(0, 0, 0, 0)
         detail_layout.setSpacing(10)
@@ -329,7 +337,7 @@ class CustomersPage(QWidget):
         self.detail_title.setGeometry(5, 0, 300, 24)
         self.detail_tipo_header = QLabel("Clasificación del cliente", detail_panel)
         self.detail_tipo_header.setProperty("role", "sectionTitle")
-        self.detail_tipo_header.setGeometry(550, 0, 300, 24)
+        self.detail_tipo_header.setGeometry(0, 0, 300, 24)
 
         self.detail_panel = detail_panel
 
@@ -423,21 +431,18 @@ class CustomersPage(QWidget):
         right_card = getattr(self, "right_card", None)
         if panel is None or left_card is None or right_card is None:
             return
-        parent = panel.parentWidget()
-        panel_width = panel.width()
-        if parent is not None:
-            panel_width = max(panel_width, parent.width())
-        if panel_width > 0 and panel.width() != panel_width:
-            panel.setFixedWidth(panel_width)
+        panel.setFixedWidth(932)
         # Coordenadas fijas dentro del detail_panel.
-        right_width = 290
         left_x = 5
         top_y = 25
+        left_width = 620
         gap = 5
-        right_x = max(left_x + 1, panel_width - right_width - gap)
-        left_width = max(1, right_x - left_x - gap)
+        right_width = 290
+        right_x = left_x + left_width + gap
         left_card.setGeometry(left_x, top_y, left_width, 270)
         right_card.setGeometry(right_x, top_y, right_width, 270)
+        if hasattr(self, "detail_tipo_header"):
+            self.detail_tipo_header.setGeometry(right_x, 0, right_width, 24)
 
     def _build_tab_placeholder(self, text: str) -> QWidget:
         panel = QWidget()
@@ -2027,6 +2032,7 @@ class CustomersPage(QWidget):
             }
             QWidget#CustomersPageRoot {
                 background: transparent;
+                border: none;
             }
             QFrame#crmCard, QWidget#crmCard {
                 background: transparent;
@@ -2045,6 +2051,10 @@ class CustomersPage(QWidget):
                 background: transparent;
                 border: none;
             }
+            QWidget#customersRightPanelStretch {
+                background: #FDECEC;
+                border: none;
+            }
             QFrame#detailLeftCard {
                 background: #FFFFFF;
                 border: 1px solid #D7DEE8;
@@ -2059,6 +2069,9 @@ class CustomersPage(QWidget):
             QSplitter#customersDetailSplitter {
                 background: transparent;
                 border: none;
+            }
+            QSplitter#customersDetailSplitter {
+                background: #EAF8EA;
             }
             QSplitter#customersMainSplitter::handle,
             QSplitter#customersDetailSplitter::handle {
