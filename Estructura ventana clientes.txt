@@ -42,7 +42,7 @@ MainWindow (QMainWindow)
          │     │  ├─ botones de acción
          │     │  └─ campo búsqueda + botón limpiar
          │     └─ customersMainSplitter (QSplitter horizontal, objectName: customersMainSplitter)
-         │        ├─ left_panel (QWidget, objectName: crmCard)
+         │        ├─ left_panel (QWidget, objectName: customersLeftPanel, fondo blanco, borde gris)
          │        │  ├─ filtro isla
          │        │  └─ customersListTable (QTableWidget)
          │        └─ right_panel (QWidget, objectName: customersRightPanel)

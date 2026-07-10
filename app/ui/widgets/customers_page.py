@@ -259,7 +259,7 @@ class CustomersPage(QWidget):
         layout.addWidget(splitter, 1)
 
         left_panel = QWidget()
-        left_panel.setObjectName("crmCard")
+        left_panel.setObjectName("customersLeftPanel")
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(14, 14, 14, 14)
         left_layout.setSpacing(10)
@@ -2037,6 +2037,11 @@ class CustomersPage(QWidget):
             QFrame#crmCard, QWidget#crmCard {
                 background: transparent;
                 border: none;
+                border-radius: 0;
+            }
+            QWidget#customersLeftPanel {
+                background: #FFFFFF;
+                border: 1px solid #D7DEE8;
                 border-radius: 0;
             }
             QWidget#detailSubPanel {
