@@ -2049,7 +2049,7 @@ class CustomersPage(QWidget):
                 border: 0;
             }
             QWidget#detailTopArea {
-                background: #EAF3FF;
+                background: transparent;
                 border: none;
             }
             QWidget#customersRightPanel {
