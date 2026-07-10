@@ -2042,7 +2042,7 @@ class CustomersPage(QWidget):
             QWidget#customersLeftPanel {
                 background: #FFFFFF;
                 border: 1px solid #D7DEE8;
-                border-radius: 0;
+                border-radius: 8px;
             }
             QWidget#detailSubPanel {
                 background: transparent;
