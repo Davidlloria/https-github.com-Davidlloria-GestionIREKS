@@ -3,10 +3,10 @@ setlocal
 
 cd /d "%~dp0"
 
-if exist ".venv\Scripts\python.exe" (
-    ".venv\Scripts\python.exe" run.py
+if exist ".venv\Scripts\pythonw.exe" (
+    ".venv\Scripts\pythonw.exe" run.py
 ) else (
-    python run.py
+    pythonw run.py
 )
 
 endlocal
