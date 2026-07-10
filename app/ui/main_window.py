@@ -42,7 +42,6 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         root = QWidget()
         root.setObjectName("mainRoot")
-        root.setStyleSheet("QWidget#mainRoot { background: #FFF4CC; border: none; }")
         layout = QVBoxLayout(root)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)

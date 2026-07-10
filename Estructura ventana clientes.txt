@@ -30,7 +30,7 @@ CustomersPage
 -------------------------------------------
 MainWindow (QMainWindow)
 └─ root (QWidget, objectName: mainRoot, fondo gris claro)
-   └─ layout principal (QVBoxLayout) (amarillo)
+   └─ layout principal (QVBoxLayout)
       ├─ topRibbon (QFrame, objectName: topRibbon)
       │  ├─ ribbon buttons: Nuevo / Editar / Eliminar / Imprimir / Exportar / Actualizar
       │  ├─ separator(s)
