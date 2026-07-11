@@ -1907,13 +1907,37 @@ class CustomersPage(QWidget):
     def _open_related_sales_comparison(self) -> None:
         selected = self._selected_row()
         cliente_id = str(getattr(selected, "cliente_id", "") or "").strip() if selected is not None else ""
+        cliente_name = (
+            str(getattr(selected, "cliente_nombre_comercial", "") or "").strip()
+            or str(getattr(selected, "cliente_nombre_fiscal", "") or "").strip()
+            or cliente_id
+        )
         year = int(self.related_sales_year_filter.currentData() or 0)
         if not cliente_id or year <= 0:
             QMessageBox.information(self, "Comparativa de ventas", "Selecciona un cliente y un año.")
             return
-        self._build_related_sales_comparison_dialog(cliente_id, year).exec()
+        self._build_related_sales_comparison_dialog(cliente_id, year, cliente_name).exec()
 
-    def _build_related_sales_comparison_dialog(self, cliente_id: str, year: int) -> QDialog:
+    @staticmethod
+    def _sales_comparison_pill(text: str, background: str, color: str = "#FFFFFF") -> QWidget:
+        wrapper = QWidget()
+        wrapper_layout = QHBoxLayout(wrapper)
+        wrapper_layout.setContentsMargins(8, 3, 8, 3)
+        label = QLabel(text)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setStyleSheet(
+            f"background: {background}; color: {color}; border: none; border-radius: 10px; "
+            "font-size: 11px; font-weight: 700; padding: 2px 12px;"
+        )
+        wrapper_layout.addWidget(label)
+        return wrapper
+
+    def _build_related_sales_comparison_dialog(
+        self,
+        cliente_id: str,
+        year: int,
+        cliente_name: str = "",
+    ) -> QDialog:
         rows = self.customer_service.related_sales(cliente_id, year)
         dialog = QDialog(self)
         dialog.setWindowTitle("Comparativa de ventas")
@@ -1923,9 +1947,29 @@ class CustomersPage(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
-        title = QLabel(f"Comparativa {year - 1} / {year}")
+        display_name = str(cliente_name or "").strip() or str(cliente_id or "").strip()
+        title = QLabel(f"Comparativa de ventas · {display_name}")
         title.setProperty("role", "sectionTitle")
         layout.addWidget(title)
+
+        group_header = QTableWidget(1, 11)
+        group_header.setObjectName("customerSalesComparisonGroups")
+        group_header.setFixedHeight(38)
+        group_header.horizontalHeader().setVisible(False)
+        group_header.verticalHeader().setVisible(False)
+        group_header.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        group_header.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        group_header.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        group_header.setShowGrid(False)
+        group_header.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        group_header.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        group_header.setSpan(0, 2, 1, 3)
+        group_header.setSpan(0, 5, 1, 3)
+        group_header.setSpan(0, 8, 1, 3)
+        group_header.setCellWidget(0, 2, self._sales_comparison_pill(str(year - 1), "#475467"))
+        group_header.setCellWidget(0, 5, self._sales_comparison_pill(str(year), "#0F766E"))
+        group_header.setCellWidget(0, 8, self._sales_comparison_pill("Diferencia", "#E8EEF7", "#24324A"))
+        layout.addWidget(group_header)
 
         table = QTableWidget(0, 11)
         table.setObjectName("customerSalesComparisonTable")
@@ -1940,15 +1984,15 @@ class CustomersPage(QWidget):
             [
                 "Referencia",
                 "Descripción",
-                f"Unid. {year - 1}",
-                f"Unid. {year}",
-                "Dif. unid.",
-                f"Kg {year - 1}",
-                f"Kg {year}",
-                "Dif. kg",
-                f"€ {year - 1}",
-                f"€ {year}",
-                "Dif. €",
+                "Unid.",
+                "Kg",
+                "€",
+                "Unid.",
+                "Kg",
+                "€",
+                "Δ Unid.",
+                "Δ Kg",
+                "Δ €",
             ]
         )
         header = table.horizontalHeader()
@@ -1960,6 +2004,10 @@ class CustomersPage(QWidget):
         for column in range(2, 11):
             header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
             table.setColumnWidth(column, 92)
+        for column in range(11):
+            group_header.setColumnWidth(column, table.columnWidth(column))
+        header.sectionResized.connect(lambda column, _old, width: group_header.setColumnWidth(column, width))
+        table.horizontalScrollBar().valueChanged.connect(group_header.horizontalScrollBar().setValue)
 
         table.setRowCount(len(rows))
         for row_idx, item in enumerate(rows):
@@ -1967,18 +2015,26 @@ class CustomersPage(QWidget):
             table.setItem(row_idx, 1, QTableWidgetItem(str(item.nombre or "").strip()))
             numeric_values = [
                 item.unidades_prev,
-                item.unidades_curr,
-                item.delta_unidades,
                 item.kg_prev,
-                item.kg_curr,
-                item.delta_kg,
                 item.euros_prev,
+                item.unidades_curr,
+                item.kg_curr,
                 item.euros_curr,
+                item.delta_unidades,
+                item.delta_kg,
                 item.delta_euros,
             ]
             for column, value in enumerate(numeric_values, start=2):
                 cell = NumericTableWidgetItem(self._format_sales_number(value), float(value or 0.0))
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if column >= 8:
+                    font = cell.font()
+                    font.setBold(True)
+                    cell.setFont(font)
+                    if float(value or 0.0) > 0:
+                        cell.setForeground(QColor("#067647"))
+                    elif float(value or 0.0) < 0:
+                        cell.setForeground(QColor("#B42318"))
                 table.setItem(row_idx, column, cell)
         table.setSortingEnabled(True)
         table.sortByColumn(0, Qt.SortOrder.AscendingOrder)
@@ -2503,6 +2559,10 @@ class CustomersPage(QWidget):
                 background: #FFFFFF;
                 alternate-background-color: #FAFBFF;
                 gridline-color: #E8EDF5;
+            }
+            QTableWidget#customerSalesComparisonGroups {
+                background: transparent;
+                border: none;
             }
             QTableWidget#customerSalesTable QHeaderView::section,
             QTableWidget#customerSalesComparisonTable QHeaderView::section {

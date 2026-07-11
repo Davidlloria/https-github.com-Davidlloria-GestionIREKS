@@ -88,7 +88,11 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
                 │           │   │   └── € del año seleccionado
                 │           │   ├── totales del año seleccionado
                 │           │   ├── modal comparativa con el año anterior
-                │           │   │   └── tabla ordenable: referencia, descripción, unidades, kg, €, y diferencias
+                │           │   │   ├── nombre del cliente en la cabecera
+                │           │   │   ├── pastillas agrupadas: año anterior / año filtrado / Diferencia
+                │           │   │   ├── tabla ordenable: referencia y descripción
+                │           │   │   ├── bloques Unid. / Kg / € para cada periodo
+                │           │   │   └── columnas Δ con positivos verdes y negativos rojos
                 │           │   └── estado vacío si no hay ventas
                 │           ├── Recetas
                 │           │   ├── relatedRecipesTable (blanco #FFFFFF, borde gris suave)
