@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QPointF
 from PySide6.QtWidgets import QApplication, QLabel
 
 from app.ui.widgets import customers_page
@@ -68,5 +69,26 @@ def test_customer_sales_chart_exposes_product_name_for_each_reference() -> None:
         x_min, x_max = dialog._plot.viewRange()[0]
         assert x_min <= -0.7
         assert x_max >= 14.7
+
+    dialog.close()
+
+
+def test_customer_sales_chart_shows_tooltips_for_bar_and_reference(monkeypatch) -> None:
+    app = _app()
+    rows = [_row(code="ART-1", name="Producto completo", prev=3.0, curr=4.0)]
+    dialog = CustomerSalesComparisonChartDialog(rows=rows, year=2026, customer_name="Cliente")
+    dialog.show()
+    app.processEvents()
+
+    if customers_page.pg is not None:
+        shown_texts = []
+        monkeypatch.setattr(customers_page.QToolTip, "showText", lambda _pos, text, _widget: shown_texts.append(text))
+        view_box = dialog._plot.getPlotItem().vb
+
+        dialog._show_tooltip(view_box.mapViewToScene(QPointF(-0.2, 1.0)))
+        dialog._show_tooltip(view_box.mapViewToScene(QPointF(0.0, -1.0)))
+
+        assert shown_texts[0] == "Producto completo\n2025: 3,00 kg\n2026: 4,00 kg"
+        assert shown_texts[1] == "Producto completo"
 
     dialog.close()

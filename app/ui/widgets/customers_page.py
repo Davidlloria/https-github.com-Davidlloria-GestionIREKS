@@ -210,17 +210,21 @@ class CustomerSalesComparisonChartDialog(QDialog):
                 prev_text = CustomersPage._format_sales_number(row.kg_prev)
                 curr_text = CustomersPage._format_sales_number(row.kg_curr)
                 text = f"{name}\n{self._year - 1}: {prev_text} kg\n{self._year}: {curr_text} kg"
-                local_pos = self._plot.mapFromScene(scene_pos)
-                QToolTip.showText(self._plot.mapToGlobal(local_pos.toPoint()), text, self._plot)
+                QToolTip.showText(self._tooltip_global_pos(scene_pos), text, self._plot)
                 return
         product_index = self._product_index_at_x(x_value)
         if product_index is not None:
             row = self._rows[product_index]
             name = str(row.nombre or row.codigo or "Producto").strip()
-            local_pos = self._plot.mapFromScene(scene_pos)
-            QToolTip.showText(self._plot.mapToGlobal(local_pos.toPoint()), name, self._plot)
+            QToolTip.showText(self._tooltip_global_pos(scene_pos), name, self._plot)
             return
         QToolTip.hideText()
+
+    def _tooltip_global_pos(self, scene_pos):
+        local_pos = self._plot.mapFromScene(scene_pos)
+        if hasattr(local_pos, "toPoint"):
+            local_pos = local_pos.toPoint()
+        return self._plot.mapToGlobal(local_pos)
 
     def _product_index_at_x(self, x_value: float) -> int | None:
         index = int(round(float(x_value)))
