@@ -1924,10 +1924,10 @@ class CustomersPage(QWidget):
         wrapper_layout = QHBoxLayout(wrapper)
         wrapper_layout.setContentsMargins(8, 5, 8, 5)
         label = QLabel(text)
-        label.setFixedHeight(30)
+        label.setFixedHeight(22)
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label.setStyleSheet(
-            f"background: {background}; color: {color}; border: none; border-radius: 15px; "
+            f"background: {background}; color: {color}; border: none; border-radius: 6px; "
             "font-size: 12px; font-weight: 700; padding: 0 14px;"
         )
         wrapper_layout.addWidget(label)
@@ -1946,7 +1946,7 @@ class CustomersPage(QWidget):
         dialog.resize(1260, 650)
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(10)
+        layout.setSpacing(4)
 
         display_name = str(cliente_name or "").strip() or str(cliente_id or "").strip()
         title = QLabel(f"Comparativa de ventas · {display_name}")
@@ -1955,7 +1955,7 @@ class CustomersPage(QWidget):
 
         group_header = QTableWidget(1, 11)
         group_header.setObjectName("customerSalesComparisonGroups")
-        group_header.setFixedHeight(58)
+        group_header.setFixedHeight(48)
         group_header.horizontalHeader().setVisible(False)
         group_header.verticalHeader().setVisible(False)
         group_header.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -1964,7 +1964,7 @@ class CustomersPage(QWidget):
         group_header.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         group_header.viewport().setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         group_header.setShowGrid(False)
-        group_header.setRowHeight(0, 54)
+        group_header.setRowHeight(0, 46)
         group_header.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         group_header.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         group_header.setSpan(0, 2, 1, 3)
