@@ -2120,6 +2120,7 @@ class CustomersPage(QWidget):
 
         buttons = QDialogButtonBox()
         close_btn = buttons.addButton("Cerrar", QDialogButtonBox.ButtonRole.RejectRole)
+        close_btn.setObjectName("customerSalesComparisonCloseButton")
         close_btn.setProperty("btnRole", "secondary")
         close_btn.clicked.connect(dialog.reject)
 
@@ -2674,14 +2675,29 @@ class CustomersPage(QWidget):
             QPushButton#customerSalesComparisonChartButton {
                 border-radius: 7px;
                 font-weight: 600;
-                background-color: #DBEAFE;
-                color: #1D4ED8;
-                border: 1px solid #93C5FD;
+                background-color: #EDE9FE;
+                color: #6D28D9;
+                border: 1px solid #C4B5FD;
             }
             QPushButton#customerSalesComparisonChartButton:disabled {
-                background-color: #F8FAFC;
-                color: #94A3B8;
-                border-color: #CBD5E1;
+                background-color: #F3E8FF;
+                color: #7E22CE;
+                border-color: #D8B4FE;
+            }
+            QPushButton#customerSalesComparisonCloseButton {
+                background-color: #FEE2E2;
+                color: #B91C1C;
+                border: 1px solid #FCA5A5;
+                border-radius: 7px;
+                font-weight: 600;
+            }
+            QPushButton#customerSalesComparisonCloseButton:hover {
+                background-color: #FECACA;
+                border-color: #F87171;
+            }
+            QPushButton#customerSalesComparisonCloseButton:pressed {
+                background-color: #FCA5A5;
+                border-color: #EF4444;
             }
             QTableWidget#customerSalesTable QHeaderView::section,
             QTableWidget#customerSalesComparisonTable QHeaderView::section {
