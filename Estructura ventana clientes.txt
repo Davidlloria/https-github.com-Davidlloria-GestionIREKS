@@ -64,7 +64,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
                 │   │           ├── abreviatura de pedido
                 │   │           ├── estado Activo / Inactivo
                 │   │           └── prospección Sí / No
-                │   └── crmCard (QWidget, fondo transparente, alto 300 px)
+                │   └── crmCard (QWidget, fondo transparente, alto mínimo 300 px, expansión vertical)
                 │       └── customerTabs (QTabWidget, panel transparente; pestañas blanco #FFFFFF / gris #F8FAFC; activa azul #3B82F6)
                 │           ├── Contactos
                 │           │   ├── relatedContactsTable (blanco #FFFFFF, borde #DCE4EF, selección #3A78CF, 5 columnas)
@@ -103,8 +103,6 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
                 │               ├── doble clic: abre la actividad
                 │               ├── menú contextual: Nueva / Editar / Eliminar
                 │               └── estado vacío si no hay actividades
-                └── customersRightPanelStretch (rojo claro #FDECEC)
-                    └── relleno vertical inferior del panel derecho
 
 GEOMETRÍA ACTUAL DEL DETALLE
 ----------------------------
@@ -115,7 +113,7 @@ GEOMETRÍA ACTUAL DEL DETALLE
   - detailLeftCard: x=5, y=25, ancho=620, alto=270.
   - separación entre tarjetas: 5 px.
   - detailRightCard: x=630, y=25, ancho=290, alto=270.
-- El bloque inferior de pestañas tiene 300 px de alto.
+- El bloque inferior de pestañas tiene un mínimo de 300 px y ocupa todo el alto restante.
 - Los tiradores de ambos splitters están ocultos y deshabilitados.
 - resizeEvent vuelve a aplicar proporciones y geometrías para conservar el diseño.
 
@@ -166,5 +164,5 @@ RELACIÓN CON BACKEND / DATOS
 - Tarjeta derecha anclada junto a la izquierda con separación de 5 px.
 - Panel izquierdo del listado enmarcado y redondeado.
 - Eliminados los fondos de depuración del layout principal y del detalle.
-- Se mantienen colores temporales en zonas auxiliares del splitter:
-  customersDetailSplitter verde claro y customersRightPanelStretch rojo claro.
+- El crmCard absorbe el espacio vertical antes ocupado por customersRightPanelStretch.
+- Se mantiene temporalmente el fondo verde claro de customersDetailSplitter.

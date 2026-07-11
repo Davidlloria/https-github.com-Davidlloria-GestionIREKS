@@ -312,15 +312,7 @@ class CustomersPage(QWidget):
         right_splitter = QSplitter(Qt.Orientation.Vertical)
         right_splitter.setObjectName("customersDetailSplitter")
         self._detail_splitter = right_splitter
-        right_layout.addWidget(right_splitter)
-        right_panel_stretch = QWidget()
-        right_panel_stretch.setObjectName("customersRightPanelStretch")
-        right_panel_stretch.setSizePolicy(
-            QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Expanding,
-        )
-        self.right_panel_stretch = right_panel_stretch
-        right_layout.addWidget(right_panel_stretch, 1)
+        right_layout.addWidget(right_splitter, 1)
 
         detail_panel = QWidget()
         detail_panel.setObjectName("detailTopArea")
@@ -363,7 +355,8 @@ class CustomersPage(QWidget):
 
         tabs_panel = QWidget()
         tabs_panel.setObjectName("crmCard")
-        tabs_panel.setFixedHeight(300)
+        tabs_panel.setMinimumHeight(300)
+        tabs_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         tabs_layout = QVBoxLayout(tabs_panel)
         tabs_layout.setContentsMargins(12, 12, 12, 12)
         tabs_layout.setSpacing(8)
@@ -380,8 +373,8 @@ class CustomersPage(QWidget):
         self.customer_tabs.setTabIcon(3, self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
         tabs_layout.addWidget(self.customer_tabs)
         right_splitter.addWidget(tabs_panel)
-        right_splitter.setStretchFactor(0, 1)
-        right_splitter.setStretchFactor(1, 9)
+        right_splitter.setStretchFactor(0, 0)
+        right_splitter.setStretchFactor(1, 1)
         right_splitter.setChildrenCollapsible(False)
         right_splitter.setHandleWidth(0)
         right_splitter.handle(1).setEnabled(False)
@@ -419,10 +412,9 @@ class CustomersPage(QWidget):
         splitter = self._detail_splitter
         if splitter is None:
             return
-        # Coordenadas fijas efectivas en el splitter vertical:
-        # panel superior y=0,h=300 / panel inferior y=300,h=300
+        # El detalle superior permanece fijo y crmCard ocupa el alto restante.
         top_px = 300
-        bottom_px = 300
+        bottom_px = max(300, splitter.height() - top_px)
         splitter.setSizes([top_px, bottom_px])
 
     def _layout_detail_cards_abs(self) -> None:
@@ -2054,10 +2046,6 @@ class CustomersPage(QWidget):
             }
             QWidget#customersRightPanel {
                 background: transparent;
-                border: none;
-            }
-            QWidget#customersRightPanelStretch {
-                background: #FDECEC;
                 border: none;
             }
             QFrame#detailLeftCard {
