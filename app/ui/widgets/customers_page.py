@@ -518,6 +518,16 @@ class CustomersPage(QWidget):
         self.related_sales_year_filter.setFixedWidth(96)
         self.related_sales_year_filter.currentIndexChanged.connect(self._refresh_related_sales)
         toolbar.addWidget(self.related_sales_year_filter)
+        self.related_sales_compare_btn = QPushButton("Comp.")
+        self.related_sales_compare_btn.setObjectName("customerSalesCompareButton")
+        self.related_sales_compare_btn.setProperty("btnRole", "primary")
+        self.related_sales_compare_btn.setFixedHeight(26)
+        self.related_sales_compare_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "scale.svg")))
+        self.related_sales_compare_btn.setIconSize(QSize(14, 14))
+        self.related_sales_compare_btn.setToolTip("Comparar con el año anterior")
+        self.related_sales_compare_btn.setEnabled(False)
+        self.related_sales_compare_btn.clicked.connect(self._open_related_sales_comparison)
+        toolbar.addWidget(self.related_sales_compare_btn)
         toolbar.addStretch(1)
         layout.addLayout(toolbar)
 
@@ -1893,6 +1903,99 @@ class CustomersPage(QWidget):
         cliente_id = str(getattr(selected, "cliente_id", "") or "") if selected is not None else ""
         self._render_related_sales(cliente_id, reload_years=False)
 
+    def _open_related_sales_comparison(self) -> None:
+        selected = self._selected_row()
+        cliente_id = str(getattr(selected, "cliente_id", "") or "").strip() if selected is not None else ""
+        year = int(self.related_sales_year_filter.currentData() or 0)
+        if not cliente_id or year <= 0:
+            QMessageBox.information(self, "Comparativa de ventas", "Selecciona un cliente y un año.")
+            return
+        self._build_related_sales_comparison_dialog(cliente_id, year).exec()
+
+    def _build_related_sales_comparison_dialog(self, cliente_id: str, year: int) -> QDialog:
+        rows = self.customer_service.related_sales(cliente_id, year)
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Comparativa de ventas")
+        dialog.setModal(True)
+        dialog.resize(1260, 650)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        title = QLabel(f"Comparativa {year - 1} / {year}")
+        title.setProperty("role", "sectionTitle")
+        layout.addWidget(title)
+
+        table = QTableWidget(0, 11)
+        table.setObjectName("customerSalesComparisonTable")
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        table.setAlternatingRowColors(True)
+        table.verticalHeader().setVisible(False)
+        table.verticalHeader().setDefaultSectionSize(34)
+        table.setHorizontalHeaderLabels(
+            [
+                "Referencia",
+                "Descripción",
+                f"Unid. {year - 1}",
+                f"Unid. {year}",
+                "Dif. unid.",
+                f"Kg {year - 1}",
+                f"Kg {year}",
+                "Dif. kg",
+                f"€ {year - 1}",
+                f"€ {year}",
+                "Dif. €",
+            ]
+        )
+        header = table.horizontalHeader()
+        header.setSectionsClickable(True)
+        header.setSortIndicatorShown(True)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        table.setColumnWidth(0, 110)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        for column in range(2, 11):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+            table.setColumnWidth(column, 92)
+
+        table.setRowCount(len(rows))
+        for row_idx, item in enumerate(rows):
+            table.setItem(row_idx, 0, QTableWidgetItem(str(item.codigo or "").strip()))
+            table.setItem(row_idx, 1, QTableWidgetItem(str(item.nombre or "").strip()))
+            numeric_values = [
+                item.unidades_prev,
+                item.unidades_curr,
+                item.delta_unidades,
+                item.kg_prev,
+                item.kg_curr,
+                item.delta_kg,
+                item.euros_prev,
+                item.euros_curr,
+                item.delta_euros,
+            ]
+            for column, value in enumerate(numeric_values, start=2):
+                cell = NumericTableWidgetItem(self._format_sales_number(value), float(value or 0.0))
+                cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                table.setItem(row_idx, column, cell)
+        table.setSortingEnabled(True)
+        table.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+        layout.addWidget(table, 1)
+
+        if not rows:
+            empty = QLabel("No hay ventas para comparar en los años seleccionados.")
+            empty.setObjectName("customerSalesEmpty")
+            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(empty)
+
+        buttons = QDialogButtonBox()
+        close_btn = buttons.addButton("Cerrar", QDialogButtonBox.ButtonRole.RejectRole)
+        close_btn.setProperty("btnRole", "secondary")
+        close_btn.clicked.connect(dialog.reject)
+        layout.addWidget(buttons)
+        return dialog
+
     @staticmethod
     def _format_sales_number(value: float) -> str:
         return f"{float(value or 0.0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -1936,6 +2039,7 @@ class CustomersPage(QWidget):
         self.related_sales_table.setVisible(has_sales)
         self.related_sales_empty.setVisible(not has_sales)
         self.related_sales_totals.setVisible(has_sales)
+        self.related_sales_compare_btn.setEnabled(bool(str(cliente_id or "").strip()) and year > 0)
         if has_sales:
             self.related_sales_totals.setText(
                 f"Total {year}: {self._format_sales_number(totals['unidades_curr'])} unidades"
@@ -2392,7 +2496,15 @@ class CustomersPage(QWidget):
                 alternate-background-color: #FAFBFF;
                 gridline-color: #E8EDF5;
             }
-            QTableWidget#customerSalesTable QHeaderView::section {
+            QTableWidget#customerSalesComparisonTable {
+                border: 1px solid #DCE4EF;
+                border-radius: 10px;
+                background: #FFFFFF;
+                alternate-background-color: #FAFBFF;
+                gridline-color: #E8EDF5;
+            }
+            QTableWidget#customerSalesTable QHeaderView::section,
+            QTableWidget#customerSalesComparisonTable QHeaderView::section {
                 background: #F7F9FC;
                 color: #2F3E55;
                 border: 0;
@@ -2400,6 +2512,22 @@ class CustomersPage(QWidget):
                 border-bottom: 1px solid #DEE6F1;
                 padding: 6px;
                 font-weight: 600;
+            }
+            QPushButton#customerSalesCompareButton {
+                border-radius: 7px;
+                font-weight: 600;
+                background-color: #DBEAFE;
+                color: #1D4ED8;
+                border: 1px solid #93C5FD;
+            }
+            QPushButton#customerSalesCompareButton:hover {
+                background-color: #BFDBFE;
+                border-color: #60A5FA;
+            }
+            QPushButton#customerSalesCompareButton:disabled {
+                background-color: #F8FAFC;
+                color: #94A3B8;
+                border-color: #CBD5E1;
             }
             QLabel#customerSalesEmpty {
                 color: #6E7E96;

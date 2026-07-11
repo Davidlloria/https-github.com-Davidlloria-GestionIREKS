@@ -77,7 +77,9 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
                 │           │   ├── menú contextual: alta/edición relacionada
                 │           │   └── estado vacío si no hay contactos
                 │           ├── Ventas
-                │           │   ├── selector de año alineado a la izquierda
+                │           │   ├── fila de acciones alineada a la izquierda
+                │           │   │   ├── selector de año
+                │           │   │   └── Comp. (botón azul claro #DBEAFE, icono scale.svg)
                 │           │   ├── customerSalesTable (blanco #FFFFFF, borde #DCE4EF, 5 columnas ordenables)
                 │           │   │   ├── Referencia
                 │           │   │   ├── Descripción
@@ -85,6 +87,8 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
                 │           │   │   ├── Kg del año seleccionado
                 │           │   │   └── € del año seleccionado
                 │           │   ├── totales del año seleccionado
+                │           │   ├── modal comparativa con el año anterior
+                │           │   │   └── tabla ordenable: referencia, descripción, unidades, kg, €, y diferencias
                 │           │   └── estado vacío si no hay ventas
                 │           ├── Recetas
                 │           │   ├── relatedRecipesTable (blanco #FFFFFF, borde gris suave)
