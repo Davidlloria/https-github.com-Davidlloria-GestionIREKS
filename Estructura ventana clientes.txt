@@ -93,7 +93,10 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
                 │           │   │   ├── tabla ordenable: referencia y descripción
                 │           │   │   ├── bloques Unid. / Kg / € para cada periodo
                 │           │   │   ├── columnas Δ con positivos verdes y negativos rojos
-                │           │   │   └── fila TOTALES fija, sincronizada y fuera del scroll vertical
+                │           │   │   ├── fila TOTALES fija, sincronizada y fuera del scroll vertical
+                │           │   │   └── pie en una línea
+                │           │   │       ├── ribbon izquierdo: Graf. (deshabilitado, icono chart-no-axes-combined.svg)
+                │           │   │       └── Cerrar alineado a la derecha
                 │           │   └── estado vacío si no hay ventas
                 │           ├── Recetas
                 │           │   ├── relatedRecipesTable (blanco #FFFFFF, borde gris suave)

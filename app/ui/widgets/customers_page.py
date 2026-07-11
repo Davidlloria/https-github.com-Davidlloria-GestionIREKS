@@ -2122,7 +2122,28 @@ class CustomersPage(QWidget):
         close_btn = buttons.addButton("Cerrar", QDialogButtonBox.ButtonRole.RejectRole)
         close_btn.setProperty("btnRole", "secondary")
         close_btn.clicked.connect(dialog.reject)
-        layout.addWidget(buttons)
+
+        footer = QHBoxLayout()
+        footer.setContentsMargins(0, 0, 0, 0)
+        footer.setSpacing(10)
+        actions_ribbon = QFrame()
+        actions_ribbon.setObjectName("customerSalesComparisonRibbon")
+        actions_layout = QHBoxLayout(actions_ribbon)
+        actions_layout.setContentsMargins(6, 4, 6, 4)
+        actions_layout.setSpacing(6)
+        chart_btn = QPushButton("Graf.")
+        chart_btn.setObjectName("customerSalesComparisonChartButton")
+        chart_btn.setProperty("btnRole", "primary")
+        chart_btn.setFixedHeight(26)
+        chart_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "chart-no-axes-combined.svg")))
+        chart_btn.setIconSize(QSize(14, 14))
+        chart_btn.setToolTip("Gráfico comparativo (próximamente)")
+        chart_btn.setEnabled(False)
+        actions_layout.addWidget(chart_btn)
+        footer.addWidget(actions_ribbon)
+        footer.addStretch(1)
+        footer.addWidget(buttons)
+        layout.addLayout(footer)
         return dialog
 
     @staticmethod
@@ -2655,6 +2676,23 @@ class CustomersPage(QWidget):
                 border: none;
                 padding: 6px 10px;
                 font-weight: 700;
+            }
+            QFrame#customerSalesComparisonRibbon {
+                background: #FFFFFF;
+                border: 1px solid #E2E8F1;
+                border-radius: 8px;
+            }
+            QPushButton#customerSalesComparisonChartButton {
+                border-radius: 7px;
+                font-weight: 600;
+                background-color: #DBEAFE;
+                color: #1D4ED8;
+                border: 1px solid #93C5FD;
+            }
+            QPushButton#customerSalesComparisonChartButton:disabled {
+                background-color: #F8FAFC;
+                color: #94A3B8;
+                border-color: #CBD5E1;
             }
             QTableWidget#customerSalesTable QHeaderView::section,
             QTableWidget#customerSalesComparisonTable QHeaderView::section {
