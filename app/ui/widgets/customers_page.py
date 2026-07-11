@@ -2126,11 +2126,6 @@ class CustomersPage(QWidget):
         footer = QHBoxLayout()
         footer.setContentsMargins(0, 0, 0, 0)
         footer.setSpacing(10)
-        actions_ribbon = QFrame()
-        actions_ribbon.setObjectName("customerSalesComparisonRibbon")
-        actions_layout = QHBoxLayout(actions_ribbon)
-        actions_layout.setContentsMargins(6, 4, 6, 4)
-        actions_layout.setSpacing(6)
         chart_btn = QPushButton("Graf.")
         chart_btn.setObjectName("customerSalesComparisonChartButton")
         chart_btn.setProperty("btnRole", "primary")
@@ -2139,10 +2134,9 @@ class CustomersPage(QWidget):
         chart_btn.setIconSize(QSize(14, 14))
         chart_btn.setToolTip("Gráfico comparativo (próximamente)")
         chart_btn.setEnabled(False)
-        actions_layout.addWidget(chart_btn)
-        footer.addWidget(actions_ribbon)
+        footer.addWidget(chart_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         footer.addStretch(1)
-        footer.addWidget(buttons)
+        footer.addWidget(buttons, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addLayout(footer)
         return dialog
 
@@ -2676,11 +2670,6 @@ class CustomersPage(QWidget):
                 border: none;
                 padding: 6px 10px;
                 font-weight: 700;
-            }
-            QFrame#customerSalesComparisonRibbon {
-                background: #FFFFFF;
-                border: 1px solid #E2E8F1;
-                border-radius: 8px;
             }
             QPushButton#customerSalesComparisonChartButton {
                 border-radius: 7px;

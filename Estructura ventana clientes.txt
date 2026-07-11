@@ -95,7 +95,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
                 │           │   │   ├── columnas Δ con positivos verdes y negativos rojos
                 │           │   │   ├── fila TOTALES fija, sincronizada y fuera del scroll vertical
                 │           │   │   └── pie en una línea
-                │           │   │       ├── ribbon izquierdo: Graf. (deshabilitado, icono chart-no-axes-combined.svg)
+                │           │   │       ├── ribbon izquierdo sin caja: Graf. (deshabilitado, icono chart-no-axes-combined.svg)
                 │           │   │       └── Cerrar alineado a la derecha
                 │           │   └── estado vacío si no hay ventas
                 │           ├── Recetas
