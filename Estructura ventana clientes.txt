@@ -89,7 +89,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
                 │           │   ├── totales del año seleccionado
                 │           │   ├── modal comparativa con el año anterior
                 │           │   │   ├── nombre del cliente en la cabecera
-                │           │   │   ├── pastillas altas agrupadas: año anterior / año filtrado / Diferencia
+                │           │   │   ├── pastillas agrupadas sin recorte ni interacción hover: año anterior / año filtrado / Diferencia
                 │           │   │   ├── tabla ordenable: referencia y descripción
                 │           │   │   ├── bloques Unid. / Kg / € para cada periodo
                 │           │   │   └── columnas Δ con positivos verdes y negativos rojos

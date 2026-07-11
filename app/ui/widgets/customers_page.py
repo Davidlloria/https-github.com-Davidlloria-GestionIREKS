@@ -1922,7 +1922,7 @@ class CustomersPage(QWidget):
     def _sales_comparison_pill(text: str, background: str, color: str = "#FFFFFF") -> QWidget:
         wrapper = QWidget()
         wrapper_layout = QHBoxLayout(wrapper)
-        wrapper_layout.setContentsMargins(8, 7, 8, 7)
+        wrapper_layout.setContentsMargins(8, 5, 8, 5)
         label = QLabel(text)
         label.setFixedHeight(30)
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1955,14 +1955,16 @@ class CustomersPage(QWidget):
 
         group_header = QTableWidget(1, 11)
         group_header.setObjectName("customerSalesComparisonGroups")
-        group_header.setFixedHeight(48)
+        group_header.setFixedHeight(58)
         group_header.horizontalHeader().setVisible(False)
         group_header.verticalHeader().setVisible(False)
         group_header.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         group_header.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         group_header.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        group_header.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        group_header.viewport().setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         group_header.setShowGrid(False)
-        group_header.setRowHeight(0, 46)
+        group_header.setRowHeight(0, 54)
         group_header.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         group_header.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         group_header.setSpan(0, 2, 1, 3)
@@ -2565,6 +2567,13 @@ class CustomersPage(QWidget):
             QTableWidget#customerSalesComparisonGroups {
                 background: transparent;
                 border: none;
+            }
+            QTableWidget#customerSalesComparisonGroups::item,
+            QTableWidget#customerSalesComparisonGroups::item:hover,
+            QTableWidget#customerSalesComparisonGroups::item:selected {
+                background: transparent;
+                border: none;
+                outline: none;
             }
             QTableWidget#customerSalesTable QHeaderView::section,
             QTableWidget#customerSalesComparisonTable QHeaderView::section {
