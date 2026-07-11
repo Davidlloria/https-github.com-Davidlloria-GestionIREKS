@@ -6,29 +6,29 @@ Implementación principal:
 - Servicio: app/services/customer_service.py
 - Modelos: app/models.py
 
-CustomersPage (QWidget, objectName: CustomersPageRoot)
+CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
 └── layout principal (QVBoxLayout, márgenes 14 px, separación 10 px)
     ├── título de página "Clientes" (QLabel, actualmente oculto)
-    ├── topRibbon (QFrame)
-    │   ├── Nuevo
-    │   ├── Editar
-    │   ├── Eliminar
-    │   ├── Imprimir
-    │   ├── Exportar (QMenu)
+    ├── topRibbon (QFrame, fondo blanco #FFFFFF, borde #E2E8F1)
+    │   ├── Nuevo (verde claro #DCFCE7, texto #166534)
+    │   ├── Editar (amarillo claro #FEF3C7, texto #92400E)
+    │   ├── Eliminar (rojo claro #FEE2E2, texto #B91C1C)
+    │   ├── Imprimir (gris azulado #E2E8F0, texto #334155)
+    │   ├── Exportar (QMenu, azul claro #DBEAFE, texto #1D4ED8)
     │   │   ├── Listados
     │   │   ├── Importar Excel/CSV
     │   │   └── ID
-    │   ├── Actualizar
+    │   ├── Actualizar (violeta claro #F3E8FF, texto #6B21A8)
     │   ├── espacio flexible
-    │   └── Ayuda
-    └── customersMainSplitter (QSplitter horizontal, tirador oculto)
-        ├── customersLeftPanel (QWidget)
+    │   └── Ayuda (gris azulado #E2E8F0, texto #334155)
+    └── customersMainSplitter (QSplitter horizontal, transparente, tirador oculto)
+        ├── customersLeftPanel (QWidget, blanco #FFFFFF, borde #D7DEE8)
         │   └── QVBoxLayout (márgenes 14 px, separación 10 px)
-        │       ├── filtro de isla (QComboBox, ancho 390 px)
+        │       ├── filtro de isla (QComboBox, blanco #FFFFFF, borde #D1D5DB, ancho 390 px)
         │       ├── fila de búsqueda
-        │       │   ├── buscador "Buscar cliente..." (QLineEdit, ancho 352 px)
-        │       │   └── limpiar filtro (QPushButton rojo, 30 × 30 px)
-        │       └── customersListTable (QTableWidget, ancho 390 px)
+        │       │   ├── buscador "Buscar cliente..." (QLineEdit, blanco #FFFFFF, borde #D1D5DB, ancho 352 px)
+        │       │   └── limpiar filtro (QPushButton rojo #EF4444, texto blanco, 30 × 30 px)
+        │       └── customersListTable (QTableWidget, blanco #FFFFFF, alterno #FAFBFF, selección #3A78CF, ancho 390 px)
         │           ├── Cod. (60 px)
         │           ├── Nombre (268 px)
         │           └── Isla (48 px)
@@ -44,11 +44,11 @@ CustomersPage (QWidget, objectName: CustomersPageRoot)
         │
         └── customersRightPanel (QWidget, fondo transparente)
             └── QVBoxLayout sin márgenes
-                ├── customersDetailSplitter (QSplitter vertical)
-                │   ├── detailTopArea (QWidget, 932 × 300 px)
+                ├── customersDetailSplitter (QSplitter vertical, verde claro #EAF8EA)
+                │   ├── detailTopArea (QWidget, fondo transparente, 932 × 300 px)
                 │   │   ├── título "Detalle de cliente"
                 │   │   ├── título "Clasificación del cliente"
-                │   │   ├── detailLeftCard (QFrame)
+                │   │   ├── detailLeftCard (QFrame, blanco #FFFFFF, borde #D7DEE8)
                 │   │   │   └── ficha principal del cliente
                 │   │   │       ├── código
                 │   │   │       ├── nombre comercial
@@ -57,17 +57,17 @@ CustomersPage (QWidget, objectName: CustomersPageRoot)
                 │   │   │       ├── teléfono y email
                 │   │   │       ├── dirección y código postal
                 │   │   │       └── localidad / municipio / provincia / isla
-                │   │   └── detailRightCard (QFrame)
+                │   │   └── detailRightCard (QFrame, blanco #FFFFFF, borde #D7DEE8)
                 │   │       └── clasificación del cliente
                 │   │           ├── actividades/sectores seleccionables
                 │   │           ├── tipo de cliente
                 │   │           ├── abreviatura de pedido
                 │   │           ├── estado Activo / Inactivo
                 │   │           └── prospección Sí / No
-                │   └── crmCard (QWidget, alto 300 px)
-                │       └── customerTabs (QTabWidget)
+                │   └── crmCard (QWidget, fondo transparente, alto 300 px)
+                │       └── customerTabs (QTabWidget, panel transparente; pestañas blanco #FFFFFF / gris #F8FAFC; activa azul #3B82F6)
                 │           ├── Contactos
-                │           │   ├── relatedContactsTable (5 columnas)
+                │           │   ├── relatedContactsTable (blanco #FFFFFF, borde #DCE4EF, selección #3A78CF, 5 columnas)
                 │           │   │   ├── Avatar
                 │           │   │   ├── Nombre
                 │           │   │   ├── Cargo
@@ -79,7 +79,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot)
                 │           ├── Ventas
                 │           │   └── placeholder "Historial y resumen de ventas."
                 │           ├── Recetas
-                │           │   ├── relatedRecipesTable
+                │           │   ├── relatedRecipesTable (blanco #FFFFFF, borde gris suave)
                 │           │   │   ├── Nº
                 │           │   │   ├── Receta
                 │           │   │   └── Versión
@@ -93,7 +93,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot)
                 │               │   ├── fecha desde
                 │               │   ├── fecha hasta
                 │               │   └── Actualizar
-                │               ├── customerAgendaTable (6 columnas)
+                │               ├── customerAgendaTable (blanco #FFFFFF, borde #DCE4EF, selección #3A78CF, 6 columnas)
                 │               │   ├── icono de tipo
                 │               │   ├── Fecha
                 │               │   ├── Tipo
@@ -103,7 +103,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot)
                 │               ├── doble clic: abre la actividad
                 │               ├── menú contextual: Nueva / Editar / Eliminar
                 │               └── estado vacío si no hay actividades
-                └── customersRightPanelStretch
+                └── customersRightPanelStretch (rojo claro #FDECEC)
                     └── relleno vertical inferior del panel derecho
 
 GEOMETRÍA ACTUAL DEL DETALLE
