@@ -48,3 +48,25 @@ def test_customer_sales_chart_keeps_one_pair_of_bars_per_product() -> None:
         assert {region["index"] for region in dialog._hover_regions} == {0}
 
     dialog.close()
+
+
+def test_customer_sales_chart_exposes_product_name_for_each_reference() -> None:
+    _app()
+    rows = [
+        _row(code=f"ART-{index}", name=f"Producto {index}", prev=float(index), curr=float(index + 1))
+        for index in range(15)
+    ]
+
+    dialog = CustomerSalesComparisonChartDialog(rows=rows, year=2026, customer_name="Cliente")
+
+    assert dialog._product_index_at_x(0.0) == 0
+    assert dialog._product_index_at_x(12.2) == 12
+    assert dialog._product_index_at_x(14.0) == 14
+    assert dialog._product_index_at_x(14.8) is None
+
+    if customers_page.pg is not None:
+        x_min, x_max = dialog._plot.viewRange()[0]
+        assert x_min <= -0.7
+        assert x_max >= 14.7
+
+    dialog.close()

@@ -135,7 +135,7 @@ class CustomerSalesComparisonChartDialog(QDialog):
     def _configure_plot(self) -> None:
         self._plot.setBackground("#FFFFFF")
         self._plot.setMenuEnabled(False)
-        self._plot.setMouseEnabled(x=True, y=False)
+        self._plot.setMouseEnabled(x=False, y=False)
         self._plot.setAntialiasing(True)
         self._plot.hideButtons()
         self._plot.showGrid(x=False, y=True, alpha=0.18)
@@ -181,8 +181,8 @@ class CustomerSalesComparisonChartDialog(QDialog):
 
         self._plot.getAxis("bottom").setTicks([ticks])
         self._plot.getAxis("bottom").setStyle(tickTextOffset=8)
-        visible_products = min(max(len(self._rows), 1), 12)
-        self._plot.setXRange(-0.7, visible_products - 0.3, padding=0)
+        product_count = max(len(self._rows), 1)
+        self._plot.setXRange(-0.7, product_count - 0.3, padding=0)
         self._plot.setLimits(xMin=-0.8, xMax=max(len(self._rows) - 0.2, 0.8), yMin=0)
 
         legend = pg.LegendItem(offset=(16, 16))
@@ -195,7 +195,8 @@ class CustomerSalesComparisonChartDialog(QDialog):
 
     def _show_tooltip(self, scene_pos) -> None:
         view_box = self._plot.getPlotItem().vb
-        if not view_box.sceneBoundingRect().contains(scene_pos):
+        view_rect = view_box.sceneBoundingRect()
+        if not view_rect.left() <= scene_pos.x() <= view_rect.right():
             QToolTip.hideText()
             return
         point = view_box.mapSceneToView(scene_pos)
@@ -212,7 +213,20 @@ class CustomerSalesComparisonChartDialog(QDialog):
                 local_pos = self._plot.mapFromScene(scene_pos)
                 QToolTip.showText(self._plot.mapToGlobal(local_pos.toPoint()), text, self._plot)
                 return
+        product_index = self._product_index_at_x(x_value)
+        if product_index is not None:
+            row = self._rows[product_index]
+            name = str(row.nombre or row.codigo or "Producto").strip()
+            local_pos = self._plot.mapFromScene(scene_pos)
+            QToolTip.showText(self._plot.mapToGlobal(local_pos.toPoint()), name, self._plot)
+            return
         QToolTip.hideText()
+
+    def _product_index_at_x(self, x_value: float) -> int | None:
+        index = int(round(float(x_value)))
+        if 0 <= index < len(self._rows) and abs(float(x_value) - index) <= 0.45:
+            return index
+        return None
 
 
 class CustomersPage(QWidget):
