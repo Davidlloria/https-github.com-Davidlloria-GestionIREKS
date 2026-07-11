@@ -77,14 +77,14 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
                 │           │   ├── menú contextual: alta/edición relacionada
                 │           │   └── estado vacío si no hay contactos
                 │           ├── Ventas
-                │           │   ├── título "Ventas por producto"
-                │           │   ├── selector de año
-                │           │   ├── customerSalesTable (blanco #FFFFFF, borde #DCE4EF, 8 columnas)
-                │           │   │   ├── Producto
-                │           │   │   ├── Unidades / Kg / € del año anterior
-                │           │   │   ├── Unidades / Kg / € del año seleccionado
-                │           │   │   └── Variación €
-                │           │   ├── totales comparativos por año
+                │           │   ├── selector de año alineado a la izquierda
+                │           │   ├── customerSalesTable (blanco #FFFFFF, borde #DCE4EF, 5 columnas ordenables)
+                │           │   │   ├── Referencia
+                │           │   │   ├── Descripción
+                │           │   │   ├── Unidades del año seleccionado
+                │           │   │   ├── Kg del año seleccionado
+                │           │   │   └── € del año seleccionado
+                │           │   ├── totales del año seleccionado
                 │           │   └── estado vacío si no hay ventas
                 │           ├── Recetas
                 │           │   ├── relatedRecipesTable (blanco #FFFFFF, borde gris suave)

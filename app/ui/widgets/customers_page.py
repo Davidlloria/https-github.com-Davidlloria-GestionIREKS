@@ -82,6 +82,17 @@ class AgendaIconDelegate(QStyledItemDelegate):
         return QSize(50, 32)
 
 
+class NumericTableWidgetItem(QTableWidgetItem):
+    def __init__(self, text: str, value: float) -> None:
+        super().__init__(text)
+        self.setData(Qt.ItemDataRole.UserRole, float(value or 0.0))
+
+    def __lt__(self, other: QTableWidgetItem) -> bool:
+        left = float(self.data(Qt.ItemDataRole.UserRole) or 0.0)
+        right = float(other.data(Qt.ItemDataRole.UserRole) or 0.0)
+        return left < right
+
+
 class CustomersPage(QWidget):
     UNLINKED_CLIENT_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -501,19 +512,16 @@ class CustomersPage(QWidget):
         toolbar = QHBoxLayout()
         toolbar.setContentsMargins(0, 0, 0, 0)
         toolbar.setSpacing(8)
-        title = QLabel("Ventas por producto")
-        title.setObjectName("customerSalesTitle")
-        toolbar.addWidget(title)
-        toolbar.addStretch(1)
         toolbar.addWidget(QLabel("Año"))
         self.related_sales_year_filter = QComboBox()
         self.related_sales_year_filter.setObjectName("customerSalesYearFilter")
         self.related_sales_year_filter.setFixedWidth(96)
         self.related_sales_year_filter.currentIndexChanged.connect(self._refresh_related_sales)
         toolbar.addWidget(self.related_sales_year_filter)
+        toolbar.addStretch(1)
         layout.addLayout(toolbar)
 
-        self.related_sales_table = QTableWidget(0, 8)
+        self.related_sales_table = QTableWidget(0, 5)
         self.related_sales_table.setObjectName("customerSalesTable")
         self.related_sales_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.related_sales_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -522,15 +530,18 @@ class CustomersPage(QWidget):
         self.related_sales_table.setAlternatingRowColors(True)
         self.related_sales_table.verticalHeader().setVisible(False)
         self.related_sales_table.verticalHeader().setDefaultSectionSize(34)
-        self.related_sales_table.setHorizontalHeaderLabels(
-            ["Producto", "Unid. ant.", "Kg ant.", "€ ant.", "Unid. act.", "Kg act.", "€ act.", "Variación €"]
-        )
+        self.related_sales_table.setHorizontalHeaderLabels(["Referencia", "Descripción", "Unidades", "Kg", "€"])
         header = self.related_sales_table.horizontalHeader()
-        header.setSectionsClickable(False)
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for column in range(1, 8):
+        header.setSectionsClickable(True)
+        header.setSortIndicatorShown(True)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self.related_sales_table.setColumnWidth(0, 120)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        for column in range(2, 5):
             header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
-            self.related_sales_table.setColumnWidth(column, 92)
+            self.related_sales_table.setColumnWidth(column, 110)
+        self.related_sales_table.setSortingEnabled(True)
+        self.related_sales_table.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         layout.addWidget(self.related_sales_table, 1)
 
         self.related_sales_empty = QLabel("No hay ventas registradas para este cliente en el periodo seleccionado.")
@@ -1891,34 +1902,35 @@ class CustomersPage(QWidget):
             return
         year = self._reload_related_sales_years() if reload_years else int(self.related_sales_year_filter.currentData() or 0)
         rows = self.customer_service.related_sales(cliente_id, year)
+        header = self.related_sales_table.horizontalHeader()
+        sort_column = header.sortIndicatorSection()
+        sort_order = header.sortIndicatorOrder()
+        self.related_sales_table.setSortingEnabled(False)
         self.related_sales_table.setRowCount(len(rows))
         totals = {
-            "kg_prev": 0.0,
-            "euros_prev": 0.0,
+            "unidades_curr": 0.0,
             "kg_curr": 0.0,
             "euros_curr": 0.0,
         }
         for row_idx, item in enumerate(rows):
-            product_text = " · ".join(part for part in (str(item.codigo or "").strip(), str(item.nombre or "").strip()) if part)
-            values = [
-                product_text,
-                self._format_sales_number(item.unidades_prev),
-                self._format_sales_number(item.kg_prev),
-                self._format_sales_number(item.euros_prev),
-                self._format_sales_number(item.unidades_curr),
-                self._format_sales_number(item.kg_curr),
-                self._format_sales_number(item.euros_curr),
-                self._format_sales_number(item.delta_euros),
+            text_values = [
+                str(item.codigo or "").strip(),
+                str(item.nombre or "").strip(),
             ]
-            for column, value in enumerate(values):
+            for column, value in enumerate(text_values):
                 cell = QTableWidgetItem(value)
-                if column > 0:
-                    cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.related_sales_table.setItem(row_idx, column, cell)
-            totals["kg_prev"] += float(item.kg_prev or 0.0)
-            totals["euros_prev"] += float(item.euros_prev or 0.0)
+            numeric_values = [item.unidades_curr, item.kg_curr, item.euros_curr]
+            for column, value in enumerate(numeric_values, start=2):
+                cell = NumericTableWidgetItem(self._format_sales_number(value), float(value or 0.0))
+                cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                self.related_sales_table.setItem(row_idx, column, cell)
+            totals["unidades_curr"] += float(item.unidades_curr or 0.0)
             totals["kg_curr"] += float(item.kg_curr or 0.0)
             totals["euros_curr"] += float(item.euros_curr or 0.0)
+
+        self.related_sales_table.setSortingEnabled(True)
+        self.related_sales_table.sortByColumn(sort_column if sort_column >= 0 else 0, sort_order)
 
         has_sales = bool(rows)
         self.related_sales_table.setVisible(has_sales)
@@ -1926,8 +1938,9 @@ class CustomersPage(QWidget):
         self.related_sales_totals.setVisible(has_sales)
         if has_sales:
             self.related_sales_totals.setText(
-                f"Total {year - 1}: {self._format_sales_number(totals['kg_prev'])} kg / {self._format_sales_number(totals['euros_prev'])} €"
-                f"    ·    Total {year}: {self._format_sales_number(totals['kg_curr'])} kg / {self._format_sales_number(totals['euros_curr'])} €"
+                f"Total {year}: {self._format_sales_number(totals['unidades_curr'])} unidades"
+                f"    ·    {self._format_sales_number(totals['kg_curr'])} kg"
+                f"    ·    {self._format_sales_number(totals['euros_curr'])} €"
             )
         else:
             self.related_sales_totals.clear()
@@ -2371,11 +2384,6 @@ class CustomersPage(QWidget):
                 background: #F8FAFD;
                 border: 1px dashed #D6E0EE;
                 border-radius: 10px;
-            }
-            QLabel#customerSalesTitle {
-                color: #14213D;
-                font-size: 14px;
-                font-weight: 700;
             }
             QTableWidget#customerSalesTable {
                 border: 1px solid #DCE4EF;
