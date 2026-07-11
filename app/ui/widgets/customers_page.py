@@ -2063,9 +2063,6 @@ class CustomersPage(QWidget):
                 background: transparent;
                 border: none;
             }
-            QSplitter#customersDetailSplitter {
-                background: #EAF8EA;
-            }
             QSplitter#customersMainSplitter::handle,
             QSplitter#customersDetailSplitter::handle {
                 background: transparent;

@@ -44,7 +44,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
         │
         └── customersRightPanel (QWidget, fondo transparente)
             └── QVBoxLayout sin márgenes
-                ├── customersDetailSplitter (QSplitter vertical, verde claro #EAF8EA)
+                ├── customersDetailSplitter (QSplitter vertical, fondo transparente, sin borde)
                 │   ├── detailTopArea (QWidget, fondo transparente, 932 × 300 px)
                 │   │   ├── título "Detalle de cliente"
                 │   │   ├── título "Clasificación del cliente"
@@ -165,4 +165,4 @@ RELACIÓN CON BACKEND / DATOS
 - Panel izquierdo del listado enmarcado y redondeado.
 - Eliminados los fondos de depuración del layout principal y del detalle.
 - El crmCard absorbe el espacio vertical antes ocupado por customersRightPanelStretch.
-- Se mantiene temporalmente el fondo verde claro de customersDetailSplitter.
+- Eliminado el fondo verde temporal de customersDetailSplitter; queda transparente y sin borde.
