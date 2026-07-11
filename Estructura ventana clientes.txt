@@ -92,7 +92,8 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
                 │           │   │   ├── pastillas agrupadas sin recorte ni interacción hover: año anterior / año filtrado / Diferencia
                 │           │   │   ├── tabla ordenable: referencia y descripción
                 │           │   │   ├── bloques Unid. / Kg / € para cada periodo
-                │           │   │   └── columnas Δ con positivos verdes y negativos rojos
+                │           │   │   ├── columnas Δ con positivos verdes y negativos rojos
+                │           │   │   └── fila TOTALES fija, sincronizada y fuera del scroll vertical
                 │           │   └── estado vacío si no hay ventas
                 │           ├── Recetas
                 │           │   ├── relatedRecipesTable (blanco #FFFFFF, borde gris suave)

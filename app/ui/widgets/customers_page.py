@@ -2008,12 +2008,43 @@ class CustomersPage(QWidget):
         for column in range(2, 11):
             header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
             table.setColumnWidth(column, 92)
+
+        totals_table = QTableWidget(1, 11)
+        totals_table.setObjectName("customerSalesComparisonTotals")
+        totals_table.setFixedHeight(44)
+        totals_table.horizontalHeader().setVisible(False)
+        totals_table.verticalHeader().setVisible(False)
+        totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        totals_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        totals_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        totals_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        totals_table.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        totals_table.viewport().setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        totals_table.setRowHeight(0, 42)
+        totals_table.setSpan(0, 0, 1, 2)
+
         for column in range(11):
             group_header.setColumnWidth(column, table.columnWidth(column))
-        header.sectionResized.connect(lambda column, _old, width: group_header.setColumnWidth(column, width))
+            totals_table.setColumnWidth(column, table.columnWidth(column))
+
+        def sync_comparison_column_width(column: int, _old: int, width: int) -> None:
+            group_header.setColumnWidth(column, width)
+            totals_table.setColumnWidth(column, width)
+
+        header.sectionResized.connect(sync_comparison_column_width)
         table.horizontalScrollBar().valueChanged.connect(group_header.horizontalScrollBar().setValue)
+        table.horizontalScrollBar().valueChanged.connect(totals_table.horizontalScrollBar().setValue)
 
         table.setRowCount(len(rows))
+        totals = {
+            "unidades_prev": 0.0,
+            "kg_prev": 0.0,
+            "euros_prev": 0.0,
+            "unidades_curr": 0.0,
+            "kg_curr": 0.0,
+            "euros_curr": 0.0,
+        }
         for row_idx, item in enumerate(rows):
             table.setItem(row_idx, 0, QTableWidgetItem(str(item.codigo or "").strip()))
             table.setItem(row_idx, 1, QTableWidgetItem(str(item.nombre or "").strip()))
@@ -2040,9 +2071,46 @@ class CustomersPage(QWidget):
                     elif float(value or 0.0) < 0:
                         cell.setForeground(QColor("#B42318"))
                 table.setItem(row_idx, column, cell)
+            totals["unidades_prev"] += float(item.unidades_prev or 0.0)
+            totals["kg_prev"] += float(item.kg_prev or 0.0)
+            totals["euros_prev"] += float(item.euros_prev or 0.0)
+            totals["unidades_curr"] += float(item.unidades_curr or 0.0)
+            totals["kg_curr"] += float(item.kg_curr or 0.0)
+            totals["euros_curr"] += float(item.euros_curr or 0.0)
         table.setSortingEnabled(True)
         table.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         layout.addWidget(table, 1)
+
+        total_label = QTableWidgetItem("TOTALES")
+        total_label.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        total_label_font = total_label.font()
+        total_label_font.setBold(True)
+        total_label.setFont(total_label_font)
+        totals_table.setItem(0, 0, total_label)
+        total_values = [
+            totals["unidades_prev"],
+            totals["kg_prev"],
+            totals["euros_prev"],
+            totals["unidades_curr"],
+            totals["kg_curr"],
+            totals["euros_curr"],
+            totals["unidades_curr"] - totals["unidades_prev"],
+            totals["kg_curr"] - totals["kg_prev"],
+            totals["euros_curr"] - totals["euros_prev"],
+        ]
+        for column, value in enumerate(total_values, start=2):
+            cell = NumericTableWidgetItem(self._format_sales_number(value), value)
+            cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            font = cell.font()
+            font.setBold(True)
+            cell.setFont(font)
+            if column >= 8:
+                if value > 0:
+                    cell.setForeground(QColor("#067647"))
+                elif value < 0:
+                    cell.setForeground(QColor("#B42318"))
+            totals_table.setItem(0, column, cell)
+        layout.addWidget(totals_table)
 
         if not rows:
             empty = QLabel("No hay ventas para comparar en los años seleccionados.")
@@ -2574,6 +2642,19 @@ class CustomersPage(QWidget):
                 background: transparent;
                 border: none;
                 outline: none;
+            }
+            QTableWidget#customerSalesComparisonTotals {
+                background: #E8EEF7;
+                color: #24324A;
+                border: 1px solid #CBD5E1;
+                border-radius: 8px;
+                gridline-color: #D5DEEA;
+            }
+            QTableWidget#customerSalesComparisonTotals::item {
+                background: #E8EEF7;
+                border: none;
+                padding: 6px 10px;
+                font-weight: 700;
             }
             QTableWidget#customerSalesTable QHeaderView::section,
             QTableWidget#customerSalesComparisonTable QHeaderView::section {
