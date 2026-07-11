@@ -1,0 +1,50 @@
+import os
+from types import SimpleNamespace
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from PySide6.QtWidgets import QApplication, QLabel
+
+from app.ui.widgets import customers_page
+from app.ui.widgets.customers_page import CustomerSalesComparisonChartDialog
+
+
+def _app() -> QApplication:
+    return QApplication.instance() or QApplication([])
+
+
+def _row(*, code: str, name: str, prev: float, curr: float) -> SimpleNamespace:
+    return SimpleNamespace(codigo=code, nombre=name, kg_prev=prev, kg_curr=curr)
+
+
+def test_customer_sales_chart_uses_kg_series_and_year_labels() -> None:
+    app = _app()
+    rows = [
+        _row(code="ART-1", name="Producto uno", prev=12.5, curr=18.0),
+        _row(code="ART-2", name="Producto dos", prev=7.0, curr=5.5),
+    ]
+
+    dialog = CustomerSalesComparisonChartDialog(rows=rows, year=2026, customer_name="Cliente Uno")
+    app.processEvents()
+
+    labels = [label.text() for label in dialog.findChildren(QLabel)]
+    assert "Comparativa de ventas en kg · Cliente Uno" in labels
+    assert "Productos · 2025 vs 2026" in labels
+    if customers_page.pg is not None:
+        assert dialog._plot.getAxis("left").labelText == "Kg"
+        assert [region["value"] for region in dialog._hover_regions] == [12.5, 18.0, 7.0, 5.5]
+
+    dialog.close()
+
+
+def test_customer_sales_chart_keeps_one_pair_of_bars_per_product() -> None:
+    _app()
+    rows = [_row(code="ART-1", name="Producto uno", prev=3.0, curr=4.0)]
+
+    dialog = CustomerSalesComparisonChartDialog(rows=rows, year=2025, customer_name="Cliente")
+
+    if customers_page.pg is not None:
+        assert len(dialog._hover_regions) == 2
+        assert {region["index"] for region in dialog._hover_regions} == {0}
+
+    dialog.close()

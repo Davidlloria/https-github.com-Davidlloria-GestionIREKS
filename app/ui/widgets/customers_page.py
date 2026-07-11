@@ -34,10 +34,16 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
 from sqlalchemy.exc import IntegrityError
+
+try:
+    import pyqtgraph as pg
+except ModuleNotFoundError:  # pragma: no cover - dependency guard
+    pg = None
 
 from app.models import CodigoPostal, Cliente, Contacto, Isla, Localidad, Municipio, Provincia, Receta
 from app.services.customer_report_document_helper import build_customer_report_html
@@ -91,6 +97,122 @@ class NumericTableWidgetItem(QTableWidgetItem):
         left = float(self.data(Qt.ItemDataRole.UserRole) or 0.0)
         right = float(other.data(Qt.ItemDataRole.UserRole) or 0.0)
         return left < right
+
+
+class CustomerSalesComparisonChartDialog(QDialog):
+    def __init__(self, *, rows: list, year: int, customer_name: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._rows = list(rows or [])
+        self._year = int(year)
+        self._hover_regions: list[dict[str, float | int]] = []
+        self.setWindowTitle("Gráfico comparativo de ventas")
+        self.resize(980, 560)
+        self.setMinimumSize(720, 420)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+        title = QLabel(f"Comparativa de ventas en kg · {customer_name}")
+        title.setProperty("role", "sectionTitle")
+        layout.addWidget(title)
+        subtitle = QLabel(f"Productos · {self._year - 1} vs {self._year}")
+        subtitle.setStyleSheet("color: #667085;")
+        layout.addWidget(subtitle)
+
+        if pg is None:
+            unavailable = QLabel("No se puede mostrar el gráfico porque pyqtgraph no está instalado.")
+            unavailable.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(unavailable, 1)
+        else:
+            self._plot = pg.PlotWidget(parent=self)
+            self._configure_plot()
+            layout.addWidget(self._plot, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _configure_plot(self) -> None:
+        self._plot.setBackground("#FFFFFF")
+        self._plot.setMenuEnabled(False)
+        self._plot.setMouseEnabled(x=True, y=False)
+        self._plot.setAntialiasing(True)
+        self._plot.hideButtons()
+        self._plot.showGrid(x=False, y=True, alpha=0.18)
+        plot_item = self._plot.getPlotItem()
+        plot_item.setLabel("left", "Kg")
+        plot_item.setLabel("bottom", "Producto")
+        plot_item.hideAxis("top")
+        plot_item.hideAxis("right")
+
+        positions = list(range(len(self._rows)))
+        prev_values = [float(row.kg_prev or 0.0) for row in self._rows]
+        curr_values = [float(row.kg_curr or 0.0) for row in self._rows]
+        width = 0.34
+        self._plot.addItem(
+            pg.BarGraphItem(
+                x=[position - 0.2 for position in positions],
+                height=prev_values,
+                width=width,
+                brush=QColor("#98A2B3"),
+                pen=QColor("#667085"),
+            )
+        )
+        self._plot.addItem(
+            pg.BarGraphItem(
+                x=[position + 0.2 for position in positions],
+                height=curr_values,
+                width=width,
+                brush=QColor("#0F766E"),
+                pen=QColor("#0B5F59"),
+            )
+        )
+
+        ticks = []
+        for position, row, prev_value, curr_value in zip(positions, self._rows, prev_values, curr_values):
+            label = str(row.codigo or row.nombre or position + 1).strip()
+            ticks.append((position, label[:16]))
+            self._hover_regions.extend(
+                [
+                    {"index": position, "x1": position - 0.2 - width / 2, "x2": position - 0.2 + width / 2, "value": prev_value},
+                    {"index": position, "x1": position + 0.2 - width / 2, "x2": position + 0.2 + width / 2, "value": curr_value},
+                ]
+            )
+
+        self._plot.getAxis("bottom").setTicks([ticks])
+        self._plot.getAxis("bottom").setStyle(tickTextOffset=8)
+        visible_products = min(max(len(self._rows), 1), 12)
+        self._plot.setXRange(-0.7, visible_products - 0.3, padding=0)
+        self._plot.setLimits(xMin=-0.8, xMax=max(len(self._rows) - 0.2, 0.8), yMin=0)
+
+        legend = pg.LegendItem(offset=(16, 16))
+        legend.setParentItem(plot_item.vb)
+        legend.setBrush(QColor(255, 255, 255, 225))
+        legend.setPen(QColor("#D0D5DD"))
+        legend.addItem(pg.BarGraphItem(x=[0], height=[1], width=1, brush=QColor("#98A2B3")), str(self._year - 1))
+        legend.addItem(pg.BarGraphItem(x=[0], height=[1], width=1, brush=QColor("#0F766E")), str(self._year))
+        self._plot.scene().sigMouseMoved.connect(self._show_tooltip)
+
+    def _show_tooltip(self, scene_pos) -> None:
+        view_box = self._plot.getPlotItem().vb
+        if not view_box.sceneBoundingRect().contains(scene_pos):
+            QToolTip.hideText()
+            return
+        point = view_box.mapSceneToView(scene_pos)
+        x_value = float(point.x())
+        y_value = float(point.y())
+        for region in self._hover_regions:
+            height = float(region["value"])
+            if float(region["x1"]) <= x_value <= float(region["x2"]) and 0 <= y_value <= height:
+                row = self._rows[int(region["index"])]
+                name = str(row.nombre or row.codigo or "Producto").strip()
+                prev_text = CustomersPage._format_sales_number(row.kg_prev)
+                curr_text = CustomersPage._format_sales_number(row.kg_curr)
+                text = f"{name}\n{self._year - 1}: {prev_text} kg\n{self._year}: {curr_text} kg"
+                local_pos = self._plot.mapFromScene(scene_pos)
+                QToolTip.showText(self._plot.mapToGlobal(local_pos.toPoint()), text, self._plot)
+                return
+        QToolTip.hideText()
 
 
 class CustomersPage(QWidget):
@@ -2133,8 +2255,16 @@ class CustomersPage(QWidget):
         chart_btn.setFixedHeight(26)
         chart_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "chart-no-axes-combined.svg")))
         chart_btn.setIconSize(QSize(14, 14))
-        chart_btn.setToolTip("Gráfico comparativo (próximamente)")
-        chart_btn.setEnabled(False)
+        chart_btn.setToolTip("Ver gráfico comparativo en kg")
+        chart_btn.setEnabled(bool(rows))
+        chart_btn.clicked.connect(
+            lambda: CustomerSalesComparisonChartDialog(
+                rows=rows,
+                year=year,
+                customer_name=display_name,
+                parent=dialog,
+            ).exec()
+        )
         footer.addWidget(chart_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         footer.addStretch(1)
         footer.addWidget(buttons, 0, Qt.AlignmentFlag.AlignVCenter)
