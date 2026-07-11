@@ -79,7 +79,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
                 │           ├── Ventas
                 │           │   ├── fila de acciones alineada a la izquierda
                 │           │   │   ├── selector de año
-                │           │   │   └── Comp. (botón azul claro #DBEAFE, icono scale.svg)
+                │           │   │   └── Comp. (botón azul claro #DBEAFE, misma altura que el filtro, icono scale.svg)
                 │           │   ├── customerSalesTable (blanco #FFFFFF, borde #DCE4EF, 5 columnas ordenables)
                 │           │   │   ├── Referencia
                 │           │   │   ├── Descripción
