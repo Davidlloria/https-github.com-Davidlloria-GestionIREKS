@@ -1,82 +1,115 @@
-CustomersPage
-└── QVBoxLayout
-    ├── topRibbon
-    │   ├── Nuevo
-    │   ├── Editar
-    │   ├── Eliminar
-    │   ├── Imprimir
-    │   ├── Exportar
-    │   ├── Actualizar
-    │   └── Ayuda
-    └── QSplitter (horizontal)
-        ├── left_panel
-        │   ├── filtro isla
-        │   ├── buscador de cliente
-        │   └── tabla de clientes
-        └── right_panel
-            └── QSplitter (vertical)
-                ├── detail_panel
-                │   ├── tarjeta detalle izquierda
-                │   └── tarjeta detalle derecha
-                └── tabs_panel
-                    └── QTabWidget
-                        ├── Contactos
-                        ├── Ventas
-                        ├── Recetas
-                        └── Agenda
-                            ├── filtros
-                            └── tabla de actividades
+VENTANA CLIENTES — ESTRUCTURA Y ASPECTO ACTUAL
+------------------------------------------------
 
--------------------------------------------
-MainWindow (QMainWindow)
-└─ root (QWidget, objectName: mainRoot, fondo gris claro)
-   └─ layout principal (QVBoxLayout)
-      ├─ topRibbon (QFrame, objectName: topRibbon)
-      │  ├─ ribbon buttons: Nuevo / Editar / Eliminar / Imprimir / Exportar / Actualizar
-      │  ├─ separator(s)
-      │  └─ Ayuda
-      └─ pages (QStackedWidget) (gris)
-         ├─ CustomersPage (QWidget, objectName: CustomersPageRoot)
-         │  └─ layout principal (QVBoxLayout)
-         │     ├─ topRibbon (QFrame)
-         │     │  ├─ botones de acción
-         │     │  └─ campo búsqueda + botón limpiar
-         │     └─ customersMainSplitter (QSplitter horizontal, objectName: customersMainSplitter)
-         │        ├─ left_panel (QWidget, objectName: customersLeftPanel, fondo blanco, borde gris, esquinas 8 px)
-         │        │  ├─ filtro isla
-         │        │  └─ customersListTable (QTableWidget)
-         │        └─ right_panel (QWidget, objectName: customersRightPanel)
-         │           ├─ right_panel_stretch (QWidget)(rojo)
-         │           └─ right_splitter (QSplitter vertical, objectName: customersDetailSplitter)(verde)
-         │              ├─ detail_panel (QWidget, objectName: detailTopArea, height fija 300)
-         │              │  ├─ detail_title (QLabel: "Detalle de cliente")
-         │              │  ├─ detail_tipo_header (QLabel: "Clasificación del cliente")
-         │              │  ├─ left_card (QFrame, objectName: detailLeftCard)
-         │              │  │  └─ left_detail_panel (QWidget, objectName: detailSubPanel)
-         │              │  │     ├─ labels y campos de la ficha cliente
-         │              │  │     └─ layout absoluto con geometrías fijas
-         │              │  └─ right_card (QFrame, objectName: detailRightCard)
-         │              │     └─ right_detail_panel (QWidget, objectName: detailSubPanel)
-         │              │        ├─ sector chips
-         │              │        ├─ combo "Tipo"
-         │              │        ├─ campo "Abrev. pedido"
-         │              │        ├─ estado ACTIVO / INACTIVO
-         │              │        └─ prospección Sí / No
-         │              └─ tabs_panel (QWidget, objectName: crmCard)
-         │                 └─ customer_tabs (QTabWidget)
-         │                    ├─ Contactos
-         │                    ├─ Ventas
-         │                    ├─ Recetas
-         │                    └─ Agenda
-         ├─ ContactsPage
-         ├─ TechniciansPage
-         ├─ DistributorsPage
-         ├─ PlaceholderPage("Colaboradores")
-         ├─ CoursesPage
-         ├─ RecipesPage
-         ├─ WarehousePage
-         ├─ IngredientsIreksPage
-         ├─ IngredientsStdPage
-         ├─ OrdersPage
-         ├─ SalesPage
-         └─ SettingsPage
+Implementación actual: React (`frontend/src/pages/CustomersPage.tsx`)
+Estilos principales: `frontend/src/index.css`
+
+CustomersPage
+└── customers-saas-page
+    └── customers-saas-workspace (distribución principal en dos columnas)
+        ├── Panel izquierdo: listado de clientes (AppCard)
+        │   ├── Cabecera
+        │   │   ├── Título "Clientes"
+        │   │   └── Contador de clientes visibles (AppChip)
+        │   ├── Acciones
+        │   │   ├── Nuevo (acción primaria, icono +)
+        │   │   ├── Eliminar (acción de peligro, icono papelera)
+        │   │   └── Listados (acción secundaria, icono listado)
+        │   ├── Filtros
+        │   │   ├── Selector de isla
+        │   │   ├── Buscador "Buscar cliente..."
+        │   │   └── Botón para limpiar filtros/listado aplicado
+        │   └── Listado con scroll interno
+        │       ├── Estado de carga animado
+        │       ├── Estados de error o lista vacía
+        │       ├── Cabecera ordenable: COD. / NOMBRE / ISLA
+        │       └── Filas seleccionables
+        │           ├── Código
+        │           ├── Icono de actividad + nombre comercial/fiscal
+        │           └── Abreviatura de isla
+        └── Panel derecho: detalle del cliente
+            ├── Bloque superior en dos tarjetas
+            │   ├── Tarjeta "Detalle de cliente"
+            │   │   ├── Chip de estado Activo/Inactivo
+            │   │   ├── Código
+            │   │   ├── Nombre comercial
+            │   │   ├── C.I.F.
+            │   │   ├── Teléfono
+            │   │   ├── Nombre fiscal
+            │   │   ├── Provincia / Isla / Municipio
+            │   │   ├── Localidad / Código postal
+            │   │   ├── Calle
+            │   │   └── Acciones de edición: Guardar / Cancelar
+            │   └── Tarjeta "Clasificación del cliente"
+            │       ├── Actividades en botones tipo píldora, con color e icono
+            │       │   ├── Panadería
+            │       │   ├── Pastelería
+            │       │   ├── Heladería
+            │       │   ├── Cafetería
+            │       │   ├── Restaurante
+            │       │   └── Hotel
+            │       ├── Tipo: Directo / Indirecto
+            │       ├── Estado: Activo / Inactivo
+            │       └── Prospección: Sí / No
+            └── Tarjeta inferior de pestañas
+                ├── Contactos
+                │   ├── Contador de contactos
+                │   └── Tabla: Nombre / Empresa / Cargo / Email / Teléfono
+                ├── Ventas (estado vacío si no hay datos)
+                ├── Recetas (estado vacío si no hay datos)
+                └── Agenda (estado vacío si no hay datos)
+
+MODALES
+-------
+
+1. Nuevo cliente
+   - Se abre sobre la ventana mediante un overlay.
+   - Reutiliza la distribución de Detalle + Clasificación.
+   - El código se muestra como "Auto" hasta guardar.
+   - Incluye Guardar y Cancelar.
+
+2. Eliminar cliente
+   - Diálogo compacto de confirmación.
+   - Muestra nombre y código del registro seleccionado.
+   - Incluye Eliminar y Cancelar.
+
+3. Listados asistidos
+   - Cabecera "Listados asistidos", chip ChatGPT y botón de cierre.
+   - Campo para describir el listado solicitado.
+   - Cinta de exportación: Imprimir / PDF / Excel / CSV.
+   - Nota sobre datos disponibles: clientes, contactos, ventas y recetas.
+   - Tarjeta de vista previa con estado Pendiente/Listo.
+   - La vista previa muestra hasta cinco filas; la exportación usa el resultado completo.
+   - Acciones: Generar listado / Pasar al listado / Cancelar.
+
+ASPECTO VISUAL
+--------------
+
+- Diseño tipo SaaS, sobre fondo gris claro y con tarjetas blancas.
+- Tarjetas con borde suave, esquinas redondeadas y sombra ligera.
+- Jerarquía visual basada en títulos, chips de estado y separadores.
+- Botones consistentes mediante AppButton: primario, secundario, peligro y ghost.
+- Iconografía Lucide en acciones y pictogramas por actividad de cliente.
+- El cliente seleccionado queda resaltado en el listado.
+- Los encabezados COD., NOMBRE e ISLA permiten orden ascendente/descendente.
+- El scroll se mantiene dentro del listado y del contenido de pestañas para evitar
+  scroll horizontal global.
+- En anchos reducidos, las dos columnas y las rejillas internas pasan a una sola
+  columna; los botones y campos se reorganizan para conservar la legibilidad.
+
+COMPONENTES VISUALES COMPARTIDOS
+--------------------------------
+
+- AppCard: contenedores principales y tarjetas.
+- AppSectionHeader: títulos y cabeceras de sección.
+- AppChip: contadores y estados.
+- AppButton: acciones con variantes visuales coherentes.
+- AppDataTable: tablas de contactos y vista previa de listados.
+- AppStateBox / QueryState: carga, error y estados vacíos.
+
+NOTA SOBRE LA ESTRUCTURA ANTERIOR
+--------------------------------
+
+La descripción basada en PySide6 (`QMainWindow`, `QVBoxLayout`, `QSplitter`,
+`QTableWidget` y `QTabWidget`) era una referencia de la ventana legacy. La ventana
+actual descrita en este documento corresponde a la migración React.
