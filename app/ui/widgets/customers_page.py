@@ -1922,12 +1922,13 @@ class CustomersPage(QWidget):
     def _sales_comparison_pill(text: str, background: str, color: str = "#FFFFFF") -> QWidget:
         wrapper = QWidget()
         wrapper_layout = QHBoxLayout(wrapper)
-        wrapper_layout.setContentsMargins(8, 3, 8, 3)
+        wrapper_layout.setContentsMargins(8, 7, 8, 7)
         label = QLabel(text)
+        label.setFixedHeight(30)
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label.setStyleSheet(
-            f"background: {background}; color: {color}; border: none; border-radius: 10px; "
-            "font-size: 11px; font-weight: 700; padding: 2px 12px;"
+            f"background: {background}; color: {color}; border: none; border-radius: 15px; "
+            "font-size: 12px; font-weight: 700; padding: 0 14px;"
         )
         wrapper_layout.addWidget(label)
         return wrapper
@@ -1954,13 +1955,14 @@ class CustomersPage(QWidget):
 
         group_header = QTableWidget(1, 11)
         group_header.setObjectName("customerSalesComparisonGroups")
-        group_header.setFixedHeight(38)
+        group_header.setFixedHeight(48)
         group_header.horizontalHeader().setVisible(False)
         group_header.verticalHeader().setVisible(False)
         group_header.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         group_header.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         group_header.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         group_header.setShowGrid(False)
+        group_header.setRowHeight(0, 46)
         group_header.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         group_header.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         group_header.setSpan(0, 2, 1, 3)
@@ -2575,6 +2577,10 @@ class CustomersPage(QWidget):
                 font-weight: 600;
             }
             QPushButton#customerSalesCompareButton {
+                min-height: 26px;
+                max-height: 26px;
+                padding: 2px 10px;
+                margin: 0;
                 border-radius: 7px;
                 font-weight: 600;
                 background-color: #DBEAFE;
