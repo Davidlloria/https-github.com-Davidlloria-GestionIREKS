@@ -2315,10 +2315,45 @@ class CustomersPage(QWidget):
             ).exec()
         )
         footer.addWidget(chart_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        pdf_btn = QPushButton("Pdf")
+        pdf_btn.setObjectName("customerSalesComparisonPdfButton")
+        pdf_btn.setProperty("btnRole", "primary")
+        pdf_btn.setFixedHeight(26)
+        pdf_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-text.svg")))
+        pdf_btn.setIconSize(QSize(14, 14))
+        pdf_btn.setToolTip("Exportar comparativa a PDF")
+        pdf_btn.setEnabled(bool(rows))
+        pdf_btn.clicked.connect(lambda: self._export_related_sales_comparison_pdf(rows, year, display_name, dialog))
+        footer.addWidget(pdf_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         footer.addStretch(1)
         footer.addWidget(buttons, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addLayout(footer)
         return dialog
+
+    def _export_related_sales_comparison_pdf(self, rows: list, year: int, customer_name: str, parent: QWidget) -> None:
+        filename = self._sales_comparison_pdf_filename(year, customer_name)
+        exports_dir = self.report_export_service.default_path("Comparativa", "pdf").parent
+        path, _ = QFileDialog.getSaveFileName(parent, "Exportar comparativa a PDF", str(exports_dir / filename), "PDF (*.pdf)")
+        if not path:
+            return
+        try:
+            out = self.report_export_service.export_customer_sales_comparison_pdf(
+                path,
+                customer_name=customer_name,
+                year=year,
+                rows=rows,
+            )
+        except Exception as exc:
+            QMessageBox.critical(parent, "Comparativa de ventas", f"No se pudo exportar el PDF:\n{exc}")
+            return
+        QMessageBox.information(parent, "Comparativa de ventas", f"PDF exportado:\n{out}")
+
+    @staticmethod
+    def _sales_comparison_pdf_filename(year: int, customer_name: str) -> str:
+        safe_customer = "".join(
+            "_" if character in '<>:"/\\|?*' else character for character in str(customer_name or "Cliente").strip()
+        ).rstrip(". ")
+        return f"Comparativa - {int(year) - 1} vs {int(year)} - {safe_customer or 'Cliente'}.pdf"
 
     @staticmethod
     def _format_sales_number(value: float) -> str:
