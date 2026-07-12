@@ -105,6 +105,11 @@ class CustomerSalesComparisonChartDialog(QDialog):
         self._rows = list(rows or [])
         self._year = int(year)
         self._hover_regions: list[dict[str, float | int]] = []
+        self._tooltip_text = ""
+        self._tooltip_global_position = None
+        self._tooltip_refresh_timer = QTimer(self)
+        self._tooltip_refresh_timer.setInterval(250)
+        self._tooltip_refresh_timer.timeout.connect(self._refresh_tooltip)
         self.setWindowTitle("Gráfico comparativo de ventas")
         self.resize(980, 560)
         self.setMinimumSize(720, 420)
@@ -197,7 +202,7 @@ class CustomerSalesComparisonChartDialog(QDialog):
         view_box = self._plot.getPlotItem().vb
         view_rect = view_box.sceneBoundingRect()
         if not view_rect.left() <= scene_pos.x() <= view_rect.right():
-            QToolTip.hideText()
+            self._clear_tooltip()
             return
         point = view_box.mapSceneToView(scene_pos)
         x_value = float(point.x())
@@ -210,14 +215,31 @@ class CustomerSalesComparisonChartDialog(QDialog):
                 prev_text = CustomersPage._format_sales_number(row.kg_prev)
                 curr_text = CustomersPage._format_sales_number(row.kg_curr)
                 text = f"{name}\n{self._year - 1}: {prev_text} kg\n{self._year}: {curr_text} kg"
-                QToolTip.showText(self._tooltip_global_pos(scene_pos), text, self._plot)
+                self._display_tooltip(scene_pos, text)
                 return
         product_index = self._product_index_at_x(x_value)
         if product_index is not None:
             row = self._rows[product_index]
             name = str(row.nombre or row.codigo or "Producto").strip()
-            QToolTip.showText(self._tooltip_global_pos(scene_pos), name, self._plot)
+            self._display_tooltip(scene_pos, name)
             return
+        self._clear_tooltip()
+
+    def _display_tooltip(self, scene_pos, text: str) -> None:
+        self._tooltip_text = str(text or "")
+        self._tooltip_global_position = self._tooltip_global_pos(scene_pos)
+        QToolTip.showText(self._tooltip_global_position, self._tooltip_text, self._plot)
+        self._tooltip_refresh_timer.start()
+
+    def _refresh_tooltip(self) -> None:
+        if not self._tooltip_text or self._tooltip_global_position is None:
+            return
+        QToolTip.showText(self._tooltip_global_position, self._tooltip_text, self._plot)
+
+    def _clear_tooltip(self) -> None:
+        self._tooltip_refresh_timer.stop()
+        self._tooltip_text = ""
+        self._tooltip_global_position = None
         QToolTip.hideText()
 
     def _tooltip_global_pos(self, scene_pos):
@@ -231,6 +253,10 @@ class CustomerSalesComparisonChartDialog(QDialog):
         if 0 <= index < len(self._rows) and abs(float(x_value) - index) <= 0.45:
             return index
         return None
+
+    def leaveEvent(self, event) -> None:
+        self._clear_tooltip()
+        super().leaveEvent(event)
 
 
 class CustomersPage(QWidget):

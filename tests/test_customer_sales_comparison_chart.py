@@ -90,5 +90,13 @@ def test_customer_sales_chart_shows_tooltips_for_bar_and_reference(monkeypatch) 
 
         assert shown_texts[0] == "Producto completo\n2025: 3,00 kg\n2026: 4,00 kg"
         assert shown_texts[1] == "Producto completo"
+        assert dialog._tooltip_refresh_timer.isActive()
+
+        dialog._refresh_tooltip()
+        assert shown_texts[2] == "Producto completo"
+
+        dialog._clear_tooltip()
+        assert not dialog._tooltip_refresh_timer.isActive()
+        assert dialog._tooltip_text == ""
 
     dialog.close()
