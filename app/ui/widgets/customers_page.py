@@ -2217,7 +2217,9 @@ class CustomersPage(QWidget):
             "euros_curr": 0.0,
         }
         for row_idx, item in enumerate(rows):
-            table.setItem(row_idx, 0, QTableWidgetItem(str(item.codigo or "").strip()))
+            reference_cell = QTableWidgetItem(str(item.codigo or "").strip())
+            reference_cell.setData(Qt.ItemDataRole.UserRole, row_idx)
+            table.setItem(row_idx, 0, reference_cell)
             table.setItem(row_idx, 1, QTableWidgetItem(str(item.nombre or "").strip()))
             numeric_values = [
                 item.unidades_prev,
@@ -2323,7 +2325,14 @@ class CustomersPage(QWidget):
         pdf_btn.setIconSize(QSize(14, 14))
         pdf_btn.setToolTip("Exportar comparativa a PDF")
         pdf_btn.setEnabled(bool(rows))
-        pdf_btn.clicked.connect(lambda: self._export_related_sales_comparison_pdf(rows, year, display_name, dialog))
+        pdf_btn.clicked.connect(
+            lambda: self._export_related_sales_comparison_pdf(
+                self._sales_comparison_rows_in_table_order(table, rows),
+                year,
+                display_name,
+                dialog,
+            )
+        )
         footer.addWidget(pdf_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         footer.addStretch(1)
         footer.addWidget(buttons, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -2347,6 +2356,16 @@ class CustomersPage(QWidget):
             QMessageBox.critical(parent, "Comparativa de ventas", f"No se pudo exportar el PDF:\n{exc}")
             return
         QMessageBox.information(parent, "Comparativa de ventas", f"PDF exportado:\n{out}")
+
+    @staticmethod
+    def _sales_comparison_rows_in_table_order(table: QTableWidget, rows: list) -> list:
+        ordered_rows = []
+        for table_row in range(table.rowCount()):
+            reference_cell = table.item(table_row, 0)
+            source_index = reference_cell.data(Qt.ItemDataRole.UserRole) if reference_cell is not None else None
+            if isinstance(source_index, int) and 0 <= source_index < len(rows):
+                ordered_rows.append(rows[source_index])
+        return ordered_rows
 
     @staticmethod
     def _sales_comparison_pdf_filename(year: int, customer_name: str) -> str:

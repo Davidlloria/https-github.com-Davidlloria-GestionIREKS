@@ -29,6 +29,16 @@ def test_customer_sales_comparison_pdf_filename_uses_years_and_customer() -> Non
     )
 
 
+def test_customer_sales_comparison_pdf_uses_current_table_order() -> None:
+    rows = [_row("ART-1", "Producto uno", 10), _row("ART-2", "Producto dos", 20)]
+    table_items = [SimpleNamespace(data=lambda _role: 1), SimpleNamespace(data=lambda _role: 0)]
+    table = SimpleNamespace(rowCount=lambda: 2, item=lambda row, _column: table_items[row])
+
+    ordered = CustomersPage._sales_comparison_rows_in_table_order(table, rows)
+
+    assert [row.codigo for row in ordered] == ["ART-2", "ART-1"]
+
+
 def test_export_customer_sales_comparison_pdf_contains_all_rows_and_totals(tmp_path) -> None:
     output = tmp_path / "Comparativa - 2025 vs 2026 - Cliente Uno.pdf"
     rows = [_row("ART-1", "Producto uno", 10), _row("ART-2", "Producto dos", 20)]
