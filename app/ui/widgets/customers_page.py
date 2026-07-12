@@ -2173,7 +2173,7 @@ class CustomersPage(QWidget):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         for column in range(2, 11):
             header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
-            table.setColumnWidth(column, 92)
+            table.setColumnWidth(column, 116 if column in {4, 7, 10} else 92)
 
         totals_table = QTableWidget(1, 11)
         totals_table.setObjectName("customerSalesComparisonTotals")
@@ -2190,9 +2190,14 @@ class CustomersPage(QWidget):
         totals_table.setRowHeight(0, 42)
         totals_table.setSpan(0, 0, 1, 2)
 
-        for column in range(11):
-            group_header.setColumnWidth(column, table.columnWidth(column))
-            totals_table.setColumnWidth(column, table.columnWidth(column))
+        def sync_comparison_column_widths() -> None:
+            for column in range(11):
+                width = table.columnWidth(column)
+                group_header.setColumnWidth(column, width)
+                totals_table.setColumnWidth(column, width)
+
+        sync_comparison_column_widths()
+        QTimer.singleShot(0, sync_comparison_column_widths)
 
         def sync_comparison_column_width(column: int, _old: int, width: int) -> None:
             group_header.setColumnWidth(column, width)
