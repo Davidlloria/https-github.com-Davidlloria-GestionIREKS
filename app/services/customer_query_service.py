@@ -15,6 +15,7 @@ class CustomerQueryIntent:
     query_type: str = "customer_filter"
     year: int = 0
     limit: int = 500
+    customer_type: str = ''
     direction: str = "asc"
     metric: str = "kg"
 
@@ -63,6 +64,8 @@ class CustomerQueryService:
             return CustomerQueryResult(status="empty", message="Escribe una consulta sobre los clientes.")
 
         intent = self.interpret(text)
+        if intent.query_type == 'sales_customer_list':
+            return self._run_sales_customer_list(intent)
         if intent.query_type in {"sales_drop_ranking", "sales_growth_ranking"}:
             return self._run_sales_ranking(intent)
         return self._run_customer_filter(text, intent)
@@ -81,6 +84,23 @@ class CustomerQueryService:
         wants_drop = any(term in normalized for term in drop_terms)
         wants_growth = any(term in normalized for term in growth_terms)
         wants_ranking = any(term in normalized for term in ranking_terms) or limit != 500
+        customer_type = ''
+        if 'indirect' in normalized:
+            customer_type = 'indirecto'
+        elif 'distribuidor' in normalized:
+            customer_type = 'distribuidor'
+        elif 'direct' in normalized:
+            customer_type = 'directo'
+
+        if is_sales and not (wants_ranking and (wants_drop or wants_growth)):
+            return CustomerQueryIntent(
+                query_type='sales_customer_list',
+                year=year,
+                limit=limit,
+                direction='asc',
+                metric='kg',
+                customer_type=customer_type,
+            )
 
         if is_sales and wants_ranking and (wants_drop or wants_growth):
             query_type = "sales_drop_ranking" if wants_drop else "sales_growth_ranking"
@@ -114,6 +134,29 @@ class CustomerQueryService:
             message=flow_result.message,
             source=flow_result.source,
             interpretation=f"Listado de clientes · {filters}",
+            intent=intent,
+        )
+
+    def _run_sales_customer_list(self, intent: CustomerQueryIntent) -> CustomerQueryResult:
+        rows = self.sales_service.listar_ventas_anuales_clientes(
+            year=intent.year,
+            cliente_tipo=intent.customer_type,
+        )
+        safe_limit = min(max(int(intent.limit or 500), 1), 5000)
+        rows = rows[:safe_limit]
+        data = [[row.isla, row.cliente_codigo, row.cliente_nombre, row.kg] for row in rows]
+        customer_type = f' de clientes {intent.customer_type}s' if intent.customer_type else ''
+        return CustomerQueryResult(
+            status='ready' if data else 'empty',
+            title=f'Listado de ventas {intent.year}{customer_type}',
+            headers=['Isla', 'Cod.', 'Nombre comercial', 'Kg'],
+            rows=data,
+            message='' if data else 'No se encontraron ventas para los filtros indicados.',
+            source='cálculo local',
+            interpretation=(
+                f'Ventas {intent.year}{customer_type} · métrica Kg · '
+                'orden: isla y kg de menor a mayor'
+            ),
             intent=intent,
         )
 

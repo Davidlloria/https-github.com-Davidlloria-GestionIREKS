@@ -204,6 +204,13 @@ class CustomerQueriesDialog(QDialog):
         self.results_table.setSortingEnabled(True)
 
     def _table_item(self, header: str, value: Any) -> QTableWidgetItem:
+        normalized_header = str(header or '').strip().lower()
+        if normalized_header in {'cod.', 'cod', 'codigo', 'código'}:
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                number = float(value)
+                text = str(int(number)) if number.is_integer() else str(value)
+                return QTableWidgetItem(text)
+            return QTableWidgetItem(str(value or ''))
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             text = self._format_number(float(value), percent="%" in header)
             item = CustomerQueryNumericItem(text, float(value))

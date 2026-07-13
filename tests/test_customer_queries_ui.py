@@ -25,6 +25,14 @@ def test_customer_queries_dialog_exposes_named_controls() -> None:
     assert dialog.close_button.objectName() == "customerQueriesCloseButton"
 
 
+def test_customer_code_is_not_formatted_as_decimal() -> None:
+    _application()
+    dialog = CustomerQueriesDialog()
+
+    assert dialog._table_item('Cod.', 35).text() == '35'
+    assert dialog._table_item('Kg', 35).text() == '35,00'
+
+
 def test_customers_top_ribbon_contains_queries_button(monkeypatch) -> None:
     _application()
     monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
