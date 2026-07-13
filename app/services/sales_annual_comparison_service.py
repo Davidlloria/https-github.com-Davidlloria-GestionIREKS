@@ -109,6 +109,17 @@ class SalesClientProductConsumerRow:
     delta_euros: float
 
 
+@dataclass
+class SalesCustomerAnnualComparisonRow:
+    cliente_id: str
+    cliente_codigo: str
+    cliente_nombre: str
+    kg_prev: float
+    kg_curr: float
+    delta_kg: float
+    delta_kg_pct: float
+
+
 class SalesAnnualComparisonService:
     def __init__(self, db_engine=None) -> None:
         self._engine = db_engine if db_engine is not None else engine
@@ -668,6 +679,61 @@ class SalesAnnualComparisonService:
             bucket[f"euros_{suffix}"] = float(bucket[f"euros_{suffix}"] or 0.0) + float(getattr(row, "euros", 0.0) or 0.0)
 
         return self._build_client_rows(totals)
+
+    def listar_ranking_anual_clientes(self, year: int, limit: int = 10, direction: str = 'asc'):
+        current_year = int(year or 0)
+        if current_year <= 0:
+            return []
+        previous_year = current_year - 1
+        safe_limit = min(max(int(limit or 10), 1), 500)
+        with Session(self._engine) as session:
+            raw_rows = list(
+                session.exec(
+                    select(VentaClientesRaw).where(
+                        col(VentaClientesRaw.anio).in_([previous_year, current_year])
+                    )
+                )
+            )
+            clients = list(session.exec(select(Cliente)))
+            distributors = list(session.exec(select(Distribuidor)))
+        party_by_id, _search_by_id = self._build_sales_party_lookup(clients, distributors)
+        return self._build_annual_customer_ranking(
+            raw_rows, party_by_id, current_year, safe_limit, direction
+        )
+
+    def _build_annual_customer_ranking(
+        self, raw_rows, party_by_id, current_year: int, safe_limit: int, direction: str
+    ):
+        totals = defaultdict(lambda: {'kg_prev': 0.0, 'kg_curr': 0.0})
+        for raw_row in raw_rows:
+            cliente_id = str(getattr(raw_row, 'cliente_id', '') or '').strip()
+            if not cliente_id:
+                continue
+            key = 'kg_curr' if int(getattr(raw_row, 'anio', 0) or 0) == current_year else 'kg_prev'
+            totals[cliente_id][key] += float(getattr(raw_row, 'kg', 0.0) or 0.0)
+        result = []
+        for cliente_id, values in totals.items():
+            code, name = party_by_id.get(cliente_id, ('', cliente_id))
+            kg_prev = float(values['kg_prev'] or 0.0)
+            kg_curr = float(values['kg_curr'] or 0.0)
+            delta_kg = kg_curr - kg_prev
+            result.append(
+                SalesCustomerAnnualComparisonRow(
+                    cliente_id=cliente_id,
+                    cliente_codigo=str(code or ''),
+                    cliente_nombre=str(name or cliente_id),
+                    kg_prev=kg_prev,
+                    kg_curr=kg_curr,
+                    delta_kg=delta_kg,
+                    delta_kg_pct=self._pct(delta_kg, kg_prev),
+                )
+            )
+        reverse = str(direction or 'asc').strip().lower() == 'desc'
+        result.sort(
+            key=lambda row: (row.delta_kg, row.cliente_nombre.lower(), row.cliente_codigo.lower()),
+            reverse=reverse,
+        )
+        return result[:safe_limit]
 
     def listar_ranking_anual(
         self,

@@ -48,10 +48,12 @@ except ModuleNotFoundError:  # pragma: no cover - dependency guard
 from app.models import CodigoPostal, Cliente, Contacto, Isla, Localidad, Municipio, Provincia, Receta
 from app.services.customer_report_document_helper import build_customer_report_html
 from app.services.customer_report_flow_service import CustomerReportFlowResult, CustomerReportFlowService
+from app.services.customer_query_service import CustomerQueryService
 from app.services.customer_service import CustomerService
 from app.services.customer_report_service import CustomerReportIntentService, CustomerReportResult, CustomerReportService
 from app.services.report_export_service import ReportExportService
 from app.ui.widgets.entity_dialog import EntityDialog
+from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 
@@ -271,6 +273,9 @@ class CustomersPage(QWidget):
             intent_service=self.report_intent_service,
             report_service=self.customer_report_service,
         )
+        self.customer_query_service = CustomerQueryService(
+            report_flow_service=self.customer_report_flow_service
+        )
         self.report_export_service = ReportExportService()
         self.schema = [
             {"name": "cliente_nombre_comercial", "label": "Nombre comercial"},
@@ -383,6 +388,14 @@ class CustomersPage(QWidget):
         self.refresh_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
         self.refresh_btn.setIconSize(QSize(14, 14))
 
+        self.queries_btn = QPushButton('Consultas')
+        self.queries_btn.setObjectName('customerQueriesButton')
+        self.queries_btn.setProperty('btnRole', 'primary')
+        self.queries_btn.setFixedHeight(26)
+        self.queries_btn.setIcon(QIcon(str(BASE_DIR / 'assets' / 'icons' / 'brain.svg')))
+        self.queries_btn.setIconSize(QSize(14, 14))
+        self.queries_btn.setToolTip('Abrir consultas de clientes')
+
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Buscar cliente...")
         self.search_input.setFixedWidth(352)
@@ -419,6 +432,7 @@ class CustomersPage(QWidget):
         self.del_btn.clicked.connect(self._delete_entity)
         self.print_btn.clicked.connect(self._print_customer_report)
         self.refresh_btn.clicked.connect(self.reload)
+        self.queries_btn.clicked.connect(self._open_customer_queries_dialog)
 
         ribbon_layout.addWidget(self.new_btn)
         ribbon_layout.addWidget(self.edit_btn)
@@ -426,6 +440,7 @@ class CustomersPage(QWidget):
         ribbon_layout.addWidget(self.print_btn)
         ribbon_layout.addWidget(self.export_btn)
         ribbon_layout.addWidget(self.refresh_btn)
+        ribbon_layout.addWidget(self.queries_btn)
         ribbon_layout.addStretch(1)
         ribbon_layout.addWidget(self.help_btn)
         layout.addWidget(ribbon)
@@ -1360,6 +1375,11 @@ class CustomersPage(QWidget):
             item.setForeground(QColor("#B42318"))
         else:
             item.setForeground(QColor("#475467"))
+
+    def _open_customer_queries_dialog(self) -> None:
+        dialog = CustomerQueriesDialog(service=self.customer_query_service, parent=self)
+        self._customer_queries_dialog = dialog
+        dialog.exec()
 
     def _build_reports_panel(self) -> QWidget:
         panel = QWidget()

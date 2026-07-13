@@ -19,6 +19,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
     │   │   ├── Importar Excel/CSV
     │   │   └── ID
     │   ├── Actualizar (violeta claro #F3E8FF, texto #6B21A8)
+    │   ├── customerQueriesButton (QPushButton, Consultas, icono brain.svg)
     │   ├── espacio flexible
     │   └── Ayuda (gris azulado #E2E8F0, texto #334155)
     └── customersMainSplitter (QSplitter horizontal, transparente, tirador oculto)
@@ -163,6 +164,16 @@ DIÁLOGOS Y FLUJOS RELACIONADOS
 - Nuevo/Editar cliente: EntityDialog con el esquema de Cliente.
 - Eliminar cliente: confirmación antes de borrar.
 - Listados: diálogo asistido mediante CustomerReportFlowService.
+- customerQueriesDialog (QDialog modal): consultas read-only sobre clientes.
+  - customerQueryPrompt (QPlainTextEdit): consulta en lenguaje natural.
+  - customerQueryExampleButton (QPushButton): ejemplos de consulta.
+  - customerQueryRunButton (QPushButton): interpreta y ejecuta la consulta.
+  - customerQueryInterpretationPanel (QFrame): interpretación aplicada.
+  - customerQueryInterpretation (QLabel): filtros, años, métrica y límite.
+  - customerQueryResultsTable (QTableWidget): resultados ordenables.
+  - customerQueryStatusLabel (QLabel): estado, filas y origen.
+  - customerQueriesCloseButton (QPushButton): cierra el modal.
+  - Los rankings comparan siempre kg del año filtrado con el anterior.
 - Imprimir: genera HTML del informe y usa QPrinter/QPrintDialog.
 - Exportar: Listados, importación Excel/CSV y consulta del ID técnico.
 - Contactos: alta y edición desde la pestaña relacionada.
