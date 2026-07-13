@@ -692,7 +692,12 @@ class SalesAnnualComparisonService:
         return self._build_client_rows(totals)
 
     def listar_ventas_anuales_clientes(
-        self, year: int, cliente_tipo: str = '', isla: str = '', direction: str = 'asc'
+        self,
+        year: int,
+        cliente_tipo: str = '',
+        isla: str = '',
+        direction: str = 'asc',
+        zero_consumption: bool = False,
     ):
         current_year = int(year or 0)
         if current_year <= 0:
@@ -706,7 +711,7 @@ class SalesAnnualComparisonService:
             clients = list(session.exec(select(Cliente)))
             islands = list(session.exec(select(Isla)))
         return self._build_annual_customer_sales(
-            raw_rows, clients, islands, cliente_tipo, isla, direction
+            raw_rows, clients, islands, cliente_tipo, isla, direction, zero_consumption
         )
 
     def listar_ranking_anual_clientes(self, year: int, limit: int = 10, direction: str = 'asc'):
@@ -731,18 +736,21 @@ class SalesAnnualComparisonService:
         )
 
     def _build_annual_customer_sales(
-        self, raw_rows, clients, islands, cliente_tipo: str, isla: str, direction: str
+        self,
+        raw_rows,
+        clients,
+        islands,
+        cliente_tipo: str,
+        isla: str,
+        direction: str,
+        zero_consumption: bool = False,
     ):
         client_by_id = {str(row.cliente_id or '').strip(): row for row in clients}
         island_by_id = {str(row.isla_id or '').strip(): str(row.isla_nombre or '') for row in islands}
         clean_type = str(cliente_tipo or '').strip().lower()
         clean_island = self._normalize_search_text(isla)
-        totals = defaultdict(float)
-        for raw_row in raw_rows:
-            cliente_id = str(getattr(raw_row, 'cliente_id', '') or '').strip()
-            client = client_by_id.get(cliente_id)
-            if client is None:
-                continue
+        eligible_clients = {}
+        for cliente_id, client in client_by_id.items():
             row_type = str(getattr(client, 'cliente_tipo', '') or '').strip()
             if clean_type and row_type.lower() != clean_type:
                 continue
@@ -750,11 +758,24 @@ class SalesAnnualComparisonService:
             island_name = island_by_id.get(island_id, '')
             if clean_island and self._normalize_search_text(island_name) != clean_island:
                 continue
+            eligible_clients[cliente_id] = client
+
+        totals = defaultdict(float)
+        for raw_row in raw_rows:
+            cliente_id = str(getattr(raw_row, 'cliente_id', '') or '').strip()
+            if cliente_id not in eligible_clients:
+                continue
             totals[cliente_id] += float(getattr(raw_row, 'kg', 0.0) or 0.0)
 
         result = []
-        for cliente_id, kg in totals.items():
-            client = client_by_id[cliente_id]
+        candidates = eligible_clients.items() if zero_consumption else (
+            (cliente_id, eligible_clients[cliente_id])
+            for cliente_id in totals
+        )
+        for cliente_id, client in candidates:
+            kg = float(totals.get(cliente_id, 0.0) or 0.0)
+            if zero_consumption and abs(kg) > 1e-9:
+                continue
             island_id = str(getattr(client, 'cliente_direccion_isla_id', '') or '').strip()
             result.append(
                 SalesCustomerAnnualSalesRow(

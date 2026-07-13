@@ -108,6 +108,19 @@ def test_sales_customer_list_query_filters_gran_canaria_and_orders_descending() 
     assert intent.direction == 'desc'
 
 
+def test_zero_consumption_is_not_interpreted_as_a_one_row_limit() -> None:
+    intent = CustomerQueryService().interpret(
+        'dame el listado de los clientes de gran canaria con consumo 0 en el 2025, '
+        'campos, isla, cod, nombre, kg'
+    )
+
+    assert intent.query_type == 'sales_customer_list'
+    assert intent.year == 2025
+    assert intent.island == 'Gran Canaria'
+    assert intent.limit == 500
+    assert intent.zero_consumption is True
+
+
 def test_sales_customer_list_returns_codes_as_text_and_orders_by_island_and_kg(tmp_path) -> None:
     db_engine = _sales_engine(tmp_path)
     with Session(db_engine) as session:
@@ -163,6 +176,35 @@ def test_sales_customer_list_applies_island_filter_and_descending_kg(tmp_path) -
     assert [row[0] for row in result.rows] == ['Gran Canaria', 'Gran Canaria']
     assert [row[1] for row in result.rows] == ['102', '101']
     assert [row[3] for row in result.rows] == [20.0, 5.0]
+
+
+def test_zero_consumption_includes_customers_without_sales_and_excludes_positive_sales(tmp_path) -> None:
+    db_engine = _sales_engine(tmp_path)
+    with Session(db_engine) as session:
+        session.add_all([
+            Isla(isla_id='gc', provincia_id='p1', isla_nombre='Gran Canaria', isla_codigo='GC0'),
+            Isla(isla_id='fue', provincia_id='p1', isla_nombre='Fuerteventura', isla_codigo='FUE0'),
+            Cliente(cliente_id='no-sales', cliente_codigo=201, cliente_nombre_comercial='Sin movimientos', cliente_direccion_isla_id='gc'),
+            Cliente(cliente_id='zero-sum', cliente_codigo=202, cliente_nombre_comercial='Suma cero', cliente_direccion_isla_id='gc'),
+            Cliente(cliente_id='positive', cliente_codigo=203, cliente_nombre_comercial='Medio kilo', cliente_direccion_isla_id='gc'),
+            Cliente(cliente_id='other-island', cliente_codigo=204, cliente_nombre_comercial='Otra isla', cliente_direccion_isla_id='fue'),
+        ])
+        _add_sale(session, 'z1', 'zero-sum', 2025, 2.0)
+        _add_sale(session, 'z2', 'zero-sum', 2025, -2.0)
+        _add_sale(session, 'p1', 'positive', 2025, 0.5)
+        session.commit()
+
+    result = CustomerQueryService(
+        sales_service=SalesAnnualComparisonService(db_engine=db_engine)
+    ).run(
+        'dame el listado de los clientes de gran canaria con consumo 0 en el 2025, '
+        'campos, isla, cod, nombre, kg'
+    )
+
+    assert result.status == 'ready'
+    assert [row[1] for row in result.rows] == ['201', '202']
+    assert all(row[0] == 'Gran Canaria' for row in result.rows)
+    assert all(row[3] == pytest.approx(0.0) for row in result.rows)
 
 
 def test_customer_report_ai_format_is_strict_and_allowlisted() -> None:

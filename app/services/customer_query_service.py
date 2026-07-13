@@ -19,6 +19,7 @@ class CustomerQueryIntent:
     island: str = ''
     direction: str = "asc"
     metric: str = "kg"
+    zero_consumption: bool = False
 
 
 @dataclass
@@ -112,6 +113,13 @@ class CustomerQueryService:
             for term in ('mayor a menor', 'descendente', 'decreciente')
         )
         list_direction = 'desc' if descending else 'asc'
+        zero_consumption = bool(
+            re.search(r'\bconsumo\s*(?:=|igual\s+a)?\s*0(?:[,.]0+)?\b', normalized)
+            or any(
+                term in normalized
+                for term in ('sin consumo', 'no han consumido', 'no ha consumido')
+            )
+        )
 
         if is_sales and not (wants_ranking and (wants_drop or wants_growth)):
             return CustomerQueryIntent(
@@ -122,6 +130,7 @@ class CustomerQueryService:
                 metric='kg',
                 customer_type=customer_type,
                 island=island,
+                zero_consumption=zero_consumption,
             )
 
         if is_sales and wants_ranking and (wants_drop or wants_growth):
@@ -165,22 +174,24 @@ class CustomerQueryService:
             cliente_tipo=intent.customer_type,
             isla=intent.island,
             direction=intent.direction,
+            zero_consumption=intent.zero_consumption,
         )
         safe_limit = min(max(int(intent.limit or 500), 1), 5000)
         rows = rows[:safe_limit]
         data = [[row.isla, row.cliente_codigo, row.cliente_nombre, row.kg] for row in rows]
         customer_type = f' de clientes {intent.customer_type}s' if intent.customer_type else ''
         location = f' de {intent.island}' if intent.island else ''
+        consumption = ' con consumo 0 kg' if intent.zero_consumption else ''
         order_label = 'mayor a menor' if intent.direction == 'desc' else 'menor a mayor'
         return CustomerQueryResult(
             status='ready' if data else 'empty',
-            title=f'Listado de ventas {intent.year}{customer_type}{location}',
+            title=f'Listado de ventas {intent.year}{customer_type}{location}{consumption}',
             headers=['Isla', 'Cod.', 'Nombre comercial', 'Kg'],
             rows=data,
-            message='' if data else 'No se encontraron ventas para los filtros indicados.',
+            message='' if data else 'No se encontraron clientes para los filtros indicados.',
             source='cálculo local',
             interpretation=(
-                f'Ventas {intent.year}{customer_type}{location} · métrica Kg · '
+                f'Ventas {intent.year}{customer_type}{location}{consumption} · métrica Kg · '
                 f'orden: kg de {order_label}'
             ),
             intent=intent,
@@ -224,7 +235,7 @@ class CustomerQueryService:
         digit_match = re.search(r"\b(?:top\s*)?(\d{1,3})\b", normalized)
         if digit_match:
             value = int(digit_match.group(1))
-            if value < 1900:
+            if 1 <= value < 1900:
                 return min(max(value, 1), 500)
         for word, value in self._NUMBER_WORDS.items():
             if word in ('un', 'uno'):
