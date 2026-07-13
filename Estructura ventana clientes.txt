@@ -76,28 +76,33 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
                 │           │   ├── doble clic: abre el contacto
                 │           │   ├── menú contextual: alta/edición relacionada
                 │           │   └── estado vacío si no hay contactos
-                │           ├── Ventas
-                │           │   ├── fila de acciones alineada a la izquierda
-                │           │   │   ├── selector de año
-                │           │   │   └── Comp. (botón azul claro #DBEAFE, misma altura que el filtro, icono scale.svg)
+                │           ├── customerSalesPanel (QWidget, pestaña Ventas)
+                │           │   ├── fila de acciones alineada a la izquierda (QHBoxLayout, sin objectName)
+                │           │   │   ├── customerSalesYearFilter (QComboBox, selector de año)
+                │           │   │   └── customerSalesCompareButton (QPushButton "Comp.", azul claro #DBEAFE, icono scale.svg)
                 │           │   ├── customerSalesTable (blanco #FFFFFF, borde #DCE4EF, 5 columnas ordenables)
                 │           │   │   ├── Referencia
                 │           │   │   ├── Descripción
                 │           │   │   ├── Unidades del año seleccionado
                 │           │   │   ├── Kg del año seleccionado
                 │           │   │   └── € del año seleccionado
-                │           │   ├── totales del año seleccionado
-                │           │   ├── modal comparativa con el año anterior
-                │           │   │   ├── nombre del cliente en la cabecera
-                │           │   │   ├── pastillas compactas, radio 6 px, sin recorte ni hover: año anterior / año filtrado / Diferencia
-                │           │   │   ├── tabla ordenable: referencia y descripción
-                │           │   │   ├── bloques Unid. / Kg / € para cada periodo
-                │           │   │   ├── columnas Δ con positivos verdes y negativos rojos
-                │           │   │   ├── fila TOTALES fija, sincronizada y fuera del scroll vertical
-                │           │   │   └── pie en una línea
-                │           │   │       ├── ribbon izquierdo sin caja: Graf. (violeta pastel #F3E8FF, deshabilitado, icono chart-no-axes-combined.svg)
-                │           │   │       └── Cerrar alineado a la derecha (rojo pastel #FEE2E2)
-                │           │   └── estado vacío si no hay ventas
+                │           │   ├── customerSalesTotals (QTableWidget, totales del año seleccionado)
+                │           │   ├── QDialog comparativa con el año anterior (sin objectName)
+                │           │   │   ├── QLabel con nombre del cliente en la cabecera (sin objectName)
+                │           │   │   ├── customerSalesComparisonGroups (QTableWidget, grupos año anterior / año filtrado / Diferencia)
+                │           │   │   ├── customerSalesComparisonTable (QTableWidget ordenable, 11 columnas)
+                │           │   │   │   ├── Referencia y Descripción
+                │           │   │   │   ├── bloques Unid. / Kg / € para cada periodo
+                │           │   │   │   └── columnas Δ con positivos verdes y negativos rojos
+                │           │   │   ├── customerSalesComparisonTotals (QTableWidget, fila TOTALES fija y sincronizada)
+                │           │   │   ├── customerSalesEmpty (QLabel, visible si la comparativa no tiene filas)
+                │           │   │   └── pie en una línea (QHBoxLayout, sin objectName)
+                │           │   │       ├── customerSalesComparisonChartButton (QPushButton "Graf.", violeta pastel, icono chart-no-axes-combined.svg)
+                │           │   │       │   └── abre CustomerSalesComparisonChartDialog (QDialog, barras comparativas en kg)
+                │           │   │       ├── customerSalesComparisonPdfButton (QPushButton "Pdf", azul pastel, icono file-text.svg)
+                │           │   │       │   └── exporta todas las filas en el orden visual a PDF mediante ReportExportService
+                │           │   │       └── customerSalesComparisonCloseButton (QPushButton "Cerrar", rojo pastel #FEE2E2)
+                │           │   └── customerSalesEmpty (QLabel, estado vacío si no hay ventas)
                 │           ├── Recetas
                 │           │   ├── relatedRecipesTable (blanco #FFFFFF, borde gris suave)
                 │           │   │   ├── Nº
