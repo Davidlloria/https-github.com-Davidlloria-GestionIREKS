@@ -97,6 +97,17 @@ def test_sales_customer_list_query_uses_year_type_and_kg() -> None:
     assert intent.direction == 'asc'
 
 
+def test_sales_customer_list_query_filters_gran_canaria_and_orders_descending() -> None:
+    intent = CustomerQueryService().interpret(
+        'dame el listado de las ventas del 2025 de los clientes indirectos de gran canaria, '
+        'solo los campos isla, cod. nombre, kg, y ordenar por kg de mayor a menor'
+    )
+
+    assert intent.query_type == 'sales_customer_list'
+    assert intent.island == 'Gran Canaria'
+    assert intent.direction == 'desc'
+
+
 def test_sales_customer_list_returns_codes_as_text_and_orders_by_island_and_kg(tmp_path) -> None:
     db_engine = _sales_engine(tmp_path)
     with Session(db_engine) as session:
@@ -126,6 +137,32 @@ def test_sales_customer_list_returns_codes_as_text_and_orders_by_island_and_kg(t
     assert [row[1] for row in result.rows] == ['36', '35', '50']
     assert [row[3] for row in result.rows] == [5.0, 10.0, 2.0]
     assert all(isinstance(row[1], str) for row in result.rows)
+
+
+def test_sales_customer_list_applies_island_filter_and_descending_kg(tmp_path) -> None:
+    db_engine = _sales_engine(tmp_path)
+    with Session(db_engine) as session:
+        session.add_all([
+            Isla(isla_id='gc', provincia_id='p1', isla_nombre='Gran Canaria', isla_codigo='GC'),
+            Isla(isla_id='fue', provincia_id='p1', isla_nombre='Fuerteventura', isla_codigo='FUE2'),
+            Cliente(cliente_id='gc1', cliente_codigo=101, cliente_nombre_comercial='GC Menor', cliente_tipo='indirecto', cliente_direccion_isla_id='gc'),
+            Cliente(cliente_id='gc2', cliente_codigo=102, cliente_nombre_comercial='GC Mayor', cliente_tipo='indirecto', cliente_direccion_isla_id='gc'),
+            Cliente(cliente_id='f1', cliente_codigo=103, cliente_nombre_comercial='Fuera', cliente_tipo='indirecto', cliente_direccion_isla_id='fue'),
+        ])
+        _add_sale(session, 'g1', 'gc1', 2025, 5.0)
+        _add_sale(session, 'g2', 'gc2', 2025, 20.0)
+        _add_sale(session, 'f1-sale', 'f1', 2025, 100.0)
+        session.commit()
+
+    result = CustomerQueryService(
+        sales_service=SalesAnnualComparisonService(db_engine=db_engine)
+    ).run(
+        'ventas 2025 de clientes indirectos de Gran Canaria, kg de mayor a menor'
+    )
+
+    assert [row[0] for row in result.rows] == ['Gran Canaria', 'Gran Canaria']
+    assert [row[1] for row in result.rows] == ['102', '101']
+    assert [row[3] for row in result.rows] == [20.0, 5.0]
 
 
 def test_customer_report_ai_format_is_strict_and_allowlisted() -> None:

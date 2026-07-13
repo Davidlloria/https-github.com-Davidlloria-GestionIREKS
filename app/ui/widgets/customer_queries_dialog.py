@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QThread, Qt, Signal
-from PySide6.QtGui import QColor, QIcon
+from PySide6.QtGui import QColor, QIcon, QPainter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -21,6 +21,15 @@ from PySide6.QtWidgets import (
 from app.services.customer_query_service import CustomerQueryResult, CustomerQueryService
 
 BASE_DIR = Path(__file__).resolve().parents[3]
+
+
+def _tinted_icon(path: Path, color: QColor, size: int = 16) -> QIcon:
+    pixmap = QIcon(str(path)).pixmap(size, size)
+    painter = QPainter(pixmap)
+    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    painter.fillRect(pixmap.rect(), color)
+    painter.end()
+    return QIcon(pixmap)
 
 
 class CustomerQueryNumericItem(QTableWidgetItem):
@@ -92,29 +101,27 @@ class CustomerQueriesDialog(QDialog):
         )
         layout.addWidget(self.prompt)
 
-        examples = QHBoxLayout()
-        examples.setSpacing(6)
-        for text in (
-            "Cinco clientes con mayores bajadas en compras este año",
-            "Clientes de Tenerife",
-            "Panaderías de Lanzarote",
-        ):
-            button = QPushButton(text)
-            button.setObjectName("customerQueryExampleButton")
-            button.setProperty("btnRole", "secondary")
-            button.clicked.connect(lambda _checked=False, value=text: self.prompt.setPlainText(value))
-            examples.addWidget(button)
-        examples.addStretch(1)
-        layout.addLayout(examples)
-
         action_row = QHBoxLayout()
         self.run_button = QPushButton("Consultar")
         self.run_button.setObjectName("customerQueryRunButton")
         self.run_button.setProperty("btnRole", "primary")
-        self.run_button.setIcon(QIcon("assets/icons/brain.svg"))
         self.run_button.clicked.connect(self._run_query)
-        self.run_button.setIcon(QIcon(str(BASE_DIR / 'assets' / 'icons' / 'brain.svg')))
+        self.run_button.setIcon(
+            _tinted_icon(BASE_DIR / 'assets' / 'icons' / 'brain.svg', QColor('#FFFFFF'), 16)
+        )
+        self.run_button.setStyleSheet(
+            'QPushButton#customerQueryRunButton {'
+            'background: #60A5FA; color: #FFFFFF; border: 1px solid #3B82F6; '
+            'border-radius: 6px; padding: 5px 12px; font-weight: 600; }'
+            'QPushButton#customerQueryRunButton:hover { background: #3B82F6; }'
+            'QPushButton#customerQueryRunButton:disabled { background: #BFDBFE; }'
+        )
         action_row.addWidget(self.run_button)
+        self.clear_button = QPushButton('Limpiar')
+        self.clear_button.setObjectName('customerQueryClearButton')
+        self.clear_button.setProperty('btnRole', 'secondary')
+        self.clear_button.clicked.connect(self._clear_query)
+        action_row.addWidget(self.clear_button)
         action_row.addStretch(1)
         layout.addLayout(action_row)
 
@@ -154,6 +161,15 @@ class CustomerQueriesDialog(QDialog):
         self.close_button.clicked.connect(self.reject)
         footer.addWidget(self.close_button)
         layout.addLayout(footer)
+
+    def _clear_query(self) -> None:
+        self.prompt.clear()
+        self.results_table.clear()
+        self.results_table.setRowCount(0)
+        self.results_table.setColumnCount(0)
+        self.interpretation_label.setText('La interpretación de la consulta aparecerá aquí.')
+        self.status_label.setText('Sin consulta ejecutada.')
+        self.prompt.setFocus()
 
     def _run_query(self) -> None:
         prompt = self.prompt.toPlainText().strip()
@@ -231,6 +247,7 @@ class CustomerQueriesDialog(QDialog):
 
     def _set_busy(self, busy: bool) -> None:
         self.run_button.setEnabled(not busy)
+        self.clear_button.setEnabled(not busy)
         self.close_button.setEnabled(not busy)
         self.prompt.setReadOnly(busy)
 

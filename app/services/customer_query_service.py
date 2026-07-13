@@ -16,6 +16,7 @@ class CustomerQueryIntent:
     year: int = 0
     limit: int = 500
     customer_type: str = ''
+    island: str = ''
     direction: str = "asc"
     metric: str = "kg"
 
@@ -92,14 +93,35 @@ class CustomerQueryService:
         elif 'direct' in normalized:
             customer_type = 'directo'
 
+        island = ''
+        island_names = {
+            'gran canaria': 'Gran Canaria',
+            'tenerife': 'Tenerife',
+            'lanzarote': 'Lanzarote',
+            'fuerteventura': 'Fuerteventura',
+            'la palma': 'La Palma',
+            'la gomera': 'La Gomera',
+            'el hierro': 'El Hierro',
+        }
+        for island_term, island_name in island_names.items():
+            if island_term in normalized:
+                island = island_name
+                break
+        descending = any(
+            term in normalized
+            for term in ('mayor a menor', 'descendente', 'decreciente')
+        )
+        list_direction = 'desc' if descending else 'asc'
+
         if is_sales and not (wants_ranking and (wants_drop or wants_growth)):
             return CustomerQueryIntent(
                 query_type='sales_customer_list',
                 year=year,
                 limit=limit,
-                direction='asc',
+                direction=list_direction,
                 metric='kg',
                 customer_type=customer_type,
+                island=island,
             )
 
         if is_sales and wants_ranking and (wants_drop or wants_growth):
@@ -141,21 +163,25 @@ class CustomerQueryService:
         rows = self.sales_service.listar_ventas_anuales_clientes(
             year=intent.year,
             cliente_tipo=intent.customer_type,
+            isla=intent.island,
+            direction=intent.direction,
         )
         safe_limit = min(max(int(intent.limit or 500), 1), 5000)
         rows = rows[:safe_limit]
         data = [[row.isla, row.cliente_codigo, row.cliente_nombre, row.kg] for row in rows]
         customer_type = f' de clientes {intent.customer_type}s' if intent.customer_type else ''
+        location = f' de {intent.island}' if intent.island else ''
+        order_label = 'mayor a menor' if intent.direction == 'desc' else 'menor a mayor'
         return CustomerQueryResult(
             status='ready' if data else 'empty',
-            title=f'Listado de ventas {intent.year}{customer_type}',
+            title=f'Listado de ventas {intent.year}{customer_type}{location}',
             headers=['Isla', 'Cod.', 'Nombre comercial', 'Kg'],
             rows=data,
             message='' if data else 'No se encontraron ventas para los filtros indicados.',
             source='cálculo local',
             interpretation=(
-                f'Ventas {intent.year}{customer_type} · métrica Kg · '
-                'orden: isla y kg de menor a mayor'
+                f'Ventas {intent.year}{customer_type}{location} · métrica Kg · '
+                f'orden: kg de {order_label}'
             ),
             intent=intent,
         )

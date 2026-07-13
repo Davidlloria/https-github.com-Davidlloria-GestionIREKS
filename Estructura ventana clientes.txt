@@ -166,8 +166,8 @@ DIÁLOGOS Y FLUJOS RELACIONADOS
 - Listados: diálogo asistido mediante CustomerReportFlowService.
 - customerQueriesDialog (QDialog modal): consultas read-only sobre clientes.
   - customerQueryPrompt (QPlainTextEdit): consulta en lenguaje natural.
-  - customerQueryExampleButton (QPushButton): ejemplos de consulta.
-  - customerQueryRunButton (QPushButton): interpreta y ejecuta la consulta.
+  - customerQueryRunButton (QPushButton, azul pastel, icono brain.svg blanco): interpreta y ejecuta la consulta.
+  - customerQueryClearButton (QPushButton): limpia consulta, interpretación y resultados.
   - customerQueryInterpretationPanel (QFrame): interpretación aplicada.
   - customerQueryInterpretation (QLabel): filtros, años, métrica y límite.
   - customerQueryResultsTable (QTableWidget): resultados ordenables.
