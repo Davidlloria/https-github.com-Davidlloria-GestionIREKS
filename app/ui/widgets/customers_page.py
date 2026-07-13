@@ -2917,6 +2917,22 @@ class CustomersPage(QWidget):
                 color: #7E22CE;
                 border-color: #D8B4FE;
             }
+            QPushButton#customerSalesComparisonPdfButton {
+                border-radius: 7px;
+                font-weight: 600;
+                background-color: #DBEAFE;
+                color: #1D4ED8;
+                border: 1px solid #93C5FD;
+            }
+            QPushButton#customerSalesComparisonPdfButton:hover {
+                background-color: #BFDBFE;
+                border-color: #60A5FA;
+            }
+            QPushButton#customerSalesComparisonPdfButton:disabled {
+                background-color: #F8FAFC;
+                color: #94A3B8;
+                border-color: #CBD5E1;
+            }
             QPushButton#customerSalesComparisonCloseButton {
                 background-color: #FEE2E2;
                 color: #B91C1C;
