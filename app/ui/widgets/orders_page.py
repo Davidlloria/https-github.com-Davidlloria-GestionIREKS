@@ -1163,10 +1163,6 @@ class OrdersPage(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        header = QLabel("Pedidos")
-        header.setProperty("role", "pageTitle")
-        layout.addWidget(header)
-
         splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(splitter, 1)
 

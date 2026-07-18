@@ -21,7 +21,6 @@ Implementación principal:
 
 OrdersPage (QWidget, sin objectName)
 └── layout principal (QVBoxLayout, márgenes y separación heredados)
-    ├── header (QLabel "Pedidos", role=pageTitle, sin objectName)
     └── splitter principal (QSplitter horizontal, sin objectName, tirador oculto)
         ├── sidePanel (QWidget, blanco #FFFFFF, borde #D7DEE8, radio 8 px, ancho 560–620 px)
         │   └── left_layout (QVBoxLayout, sin objectName)
