@@ -67,7 +67,7 @@ OrdersPage (QWidget, sin objectName)
         └── right_panel (QWidget, sin objectName, fondo azul #0000FF, sin borde)
             └── right_layout (QVBoxLayout, sin márgenes, separación 6 px)
                 └── right_splitter (QSplitter vertical, sin objectName, fondo verde #008000, sin borde)
-                    ├── detailPanel (QWidget, fondo #FCFDFF, borde #E2E8F1, radio 8 px, alto máximo 170 px)
+                    ├── detailPanel (QWidget, fondo rojo #FF0000, borde #E2E8F1, radio 8 px, alto máximo 170 px)
                     │   └── detail_layout (QVBoxLayout, márgenes 14 px, separación 8 px)
                     │       ├── detail_title (QLabel "Detalle del pedido", role=sectionTitle, sin objectName)
                     │       └── row_1 (QHBoxLayout, sin objectName)
@@ -168,7 +168,7 @@ ASPECTO VISUAL ACTUAL
 
 - La ventana usa los estilos globales de assets/styles.qss.
 - sidePanel es blanco #FFFFFF, con borde gris azulado #D7DEE8 y radio de 8 px.
-- detailPanel usa fondo casi blanco #FCFDFF y borde #E2E8F1.
+- detailPanel usa fondo rojo #FF0000, borde #E2E8F1 y radio 8 px.
 - El topRibbon principal usa pageType=contacts: fondo #FFFFFF, borde completo
   #E2E8F1, radio 8 px y botones compactos de 26 px, igual que Clientes.
 - Los topRibbon interiores son blancos #FFFFFF y tienen borde inferior #D7DEE8.

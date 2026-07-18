@@ -1365,6 +1365,10 @@ class OrdersPage(QWidget):
 
         detail_panel = QWidget()
         detail_panel.setObjectName("detailPanel")
+        detail_panel.setStyleSheet(
+            "#detailPanel { background-color: #FF0000; "
+            "border: 1px solid #E2E8F1; border-radius: 8px; }"
+        )
         detail_panel.setMaximumHeight(170)
         detail_layout = QVBoxLayout(detail_panel)
         detail_layout.setContentsMargins(14, 14, 14, 14)
