@@ -834,12 +834,7 @@ class CustomersPage(QWidget):
         self._agenda_filter_to.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._agenda_filter_to.setDate(self._agenda_qdate(date(current_year, 12, 31), fallback_today=False))
         for calendar_edit in (self._agenda_filter_from, self._agenda_filter_to):
-            calendar_widget = calendar_edit.calendarWidget()
-            if calendar_widget is not None:
-                calendar_widget.setMinimumSize(340, 272)
-                calendar_widget.setGridVisible(False)
-                calendar_widget.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
-                calendar_widget.setObjectName("customerAgendaPopupCalendar")
+            self._configure_agenda_calendar(calendar_edit)
 
         range_sep = QLabel(" - ")
         range_sep.setObjectName("customerAgendaRangeSep")
@@ -1219,6 +1214,8 @@ class CustomersPage(QWidget):
         seguimiento_edit.setDate(self._agenda_qdate(getattr(activity, "fecha_seguimiento", None), fallback_today=True))
         seguimiento_edit.setEnabled(False)
         seguimiento_check.toggled.connect(seguimiento_edit.setEnabled)
+        for calendar_edit in (fecha_edit, seguimiento_edit):
+            self._configure_agenda_calendar(calendar_edit)
 
         if activity is not None:
             tipo_combo.setCurrentIndex(max(0, tipo_combo.findData(str(getattr(activity, "tipo", "") or "nota"))))
@@ -1323,6 +1320,16 @@ class CustomersPage(QWidget):
         if fallback_today:
             return QDate.currentDate()
         return QDate()
+
+    @staticmethod
+    def _configure_agenda_calendar(date_edit: QDateEdit) -> None:
+        calendar_widget = date_edit.calendarWidget()
+        if calendar_widget is None:
+            return
+        calendar_widget.setMinimumSize(340, 272)
+        calendar_widget.setGridVisible(False)
+        calendar_widget.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+        calendar_widget.setObjectName("customerAgendaPopupCalendar")
 
     def _format_agenda_date(self, value: object, *, allow_blank: bool = False) -> str:
         text = str(value or "").strip()
@@ -3191,6 +3198,10 @@ class CustomersPage(QWidget):
             QCalendarWidget QAbstractItemView {
                 selection-background-color: #3A78CF;
                 selection-color: #FFFFFF;
+            }
+            QCalendarWidget#customerAgendaPopupCalendar QAbstractItemView::item {
+                padding: 0;
+                border: none;
             }
             QCalendarWidget#customerAgendaPopupCalendar QComboBox {
                 min-height: 22px;
