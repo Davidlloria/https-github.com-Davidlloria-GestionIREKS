@@ -21,13 +21,13 @@ Implementación principal:
 
 OrdersPage (QWidget, sin objectName)
 └── layout principal (QVBoxLayout, márgenes y separación heredados)
-    ├── topRibbon (QFrame, pageType=contacts, estándar visual de Clientes)
-    │   ├── new_btn (QPushButton "Nuevo", btnRole=success, icono file-text.svg, verde pastel)
-    │   ├── edit_btn (QPushButton "Editar", btnRole=warning, icono file-pen.svg, amarillo pastel)
-    │   ├── del_btn (QPushButton "Eliminar", btnRole=danger, icono estándar de papelera, rojo pastel)
-    │   ├── export_btn (QPushButton "Exportar", btnRole=secondary, icono export.svg, gris azulado)
-    │   ├── send_mail_btn (QPushButton "Enviar Outlook", btnRole=secondary, icono mail.svg)
-    │   ├── print_btn (QPushButton "Imprimir", btnRole=secondary, icono printer.svg)
+    ├── topRibbon (QFrame, pageType=contacts, fondo #FFFFFF, borde #E2E8F1)
+    │   ├── new_btn (QPushButton "Nuevo", btnRole=success, icono file-text.svg, fondo #DCFCE7, texto #166534, borde #86EFAC)
+    │   ├── edit_btn (QPushButton "Editar", btnRole=warning, icono file-pen.svg, fondo #FEF3C7, texto #92400E, borde #FCD34D)
+    │   ├── del_btn (QPushButton "Eliminar", btnRole=danger, icono trash.svg, fondo #FEE2E2, texto #B91C1C, borde #FCA5A5)
+    │   ├── export_btn (QPushButton "Exportar", btnRole=secondary, icono export.svg, fondo #E2E8F0, texto #334155, borde #CBD5E1)
+    │   ├── send_mail_btn (QPushButton "Enviar Outlook", btnRole=secondary, icono mail.svg, fondo #E2E8F0, texto #334155, borde #CBD5E1)
+    │   ├── print_btn (QPushButton "Imprimir", btnRole=secondary, icono printer.svg, fondo #E2E8F0, texto #334155, borde #CBD5E1)
     │   └── espacio flexible
     └── splitter principal (QSplitter horizontal, sin objectName, tirador oculto)
         ├── sidePanel (QWidget, blanco #FFFFFF, borde #D7DEE8, radio 8 px, ancho 560–620 px)
@@ -55,7 +55,7 @@ OrdersPage (QWidget, sin objectName)
         │       │   - edición directa deshabilitada;
         │       │   - orden inicial por Semana descendente;
         │       │   - sin scroll horizontal;
-        │       │   - estado E azul, P naranja y M rojo;
+        │       │   - estado E azul #1565C0, P naranja #EF6C00 y M rojo #C62828;
         │       │   - al seleccionar una fila carga detalle, pedido, albaranes,
         │       │     facturas y pendientes.
         │       └── table_totals (QTableWidget, 1 fila, sin objectName)
@@ -87,7 +87,7 @@ OrdersPage (QWidget, sin objectName)
                             │   ├── topRibbon (QFrame; comparte objectName con las demás cintas)
                             │   │   ├── add_line_btn (QPushButton "Añadir", btnRole=success)
                             │   │   ├── edit_line_btn (QPushButton "Editar", btnRole=warning)
-                            │   │   ├── del_line_btn (QPushButton "Eliminar", btnRole=danger)
+                            │   │   ├── del_line_btn (QPushButton "Eliminar", btnRole=danger, icono trash.svg)
                             │   │   ├── edit_order_btn (QPushButton "Editar pedido", btnRole=warning)
                             │   │   └── espacio flexible
                             │   ├── pedido_items_table (QTableWidget, sin objectName, ordenable)
@@ -122,7 +122,7 @@ OrdersPage (QWidget, sin objectName)
                             │   ├── topRibbon (QFrame)
                             │   │   ├── import_factura_btn (QPushButton "Imp. Factura", btnRole=warning)
                             │   │   ├── edit_factura_line_btn (QPushButton "Editar línea", btnRole=primary)
-                            │   │   ├── delete_factura_btn (QPushButton "Eliminar Factura", btnRole=danger)
+                            │   │   ├── delete_factura_btn (QPushButton "Eliminar Factura", btnRole=danger, icono trash.svg)
                             │   │   └── espacio flexible
                             │   └── factura_content (QSplitter horizontal, sin objectName, tirador oculto)
                             │       ├── facturas_table (QTableWidget, sin objectName, ancho fijo 120 px)
@@ -145,7 +145,7 @@ OrdersPage (QWidget, sin objectName)
                                     ├── Nombre (ancho flexible)
                                     ├── Pedida (90 px)
                                     ├── Recibida (90 px)
-                                    ├── Pendiente (100 px; positivo verde y negativo rojo)
+                                    ├── Pendiente (100 px; positivo verde #2E7D32 y negativo rojo #C62828)
                                     └── Estado (90 px)
 
 GEOMETRÍA ACTUAL
@@ -165,11 +165,11 @@ ASPECTO VISUAL ACTUAL
 ---------------------
 
 - La ventana usa los estilos globales de assets/styles.qss.
-- sidePanel es blanco, con borde gris azulado y radio de 8 px.
+- sidePanel es blanco #FFFFFF, con borde gris azulado #D7DEE8 y radio de 8 px.
 - detailPanel usa fondo casi blanco #FCFDFF y borde #E2E8F1.
 - El topRibbon principal usa pageType=contacts: fondo #FFFFFF, borde completo
   #E2E8F1, radio 8 px y botones compactos de 26 px, igual que Clientes.
-- Los topRibbon interiores son blancos y tienen borde inferior #D7DEE8.
+- Los topRibbon interiores son blancos #FFFFFF y tienen borde inferior #D7DEE8.
 - Botones por función:
   - success: verde pastel #DCFCE7, texto #166534;
   - warning: amarillo pastel #FEF3C7, texto #92400E;
@@ -191,7 +191,7 @@ AlbaranPreviewDialog (QDialog, sin objectName, 980 × 620 px)
 
 FacturaPreviewDialog (QDialog, sin objectName, 1120 × 680 px)
 - Previsualiza cabecera y once columnas de la factura extraída.
-- Precio con discrepancia en rojo.
+- Precio con discrepancia en rojo #C62828.
 - Acciones: Importar / Cancelar.
 
 FacturaItemEditDialog (QDialog, sin objectName, 940 × 280 px)

@@ -50,6 +50,10 @@ def test_main_orders_ribbon_is_above_splitter_and_uses_customer_standard(monkeyp
     ]
     assert all(not button.icon().isNull() for button in ribbon.findChildren(QPushButton))
     assert all(button.iconSize() == QSize(14, 14) for button in ribbon.findChildren(QPushButton))
+    assert not page.del_line_btn.icon().isNull()
+    assert page.del_line_btn.iconSize() == QSize(14, 14)
+    assert not page.delete_factura_btn.icon().isNull()
+    assert page.delete_factura_btn.iconSize() == QSize(14, 14)
     page.close()
     page.deleteLater()
     QApplication.processEvents()

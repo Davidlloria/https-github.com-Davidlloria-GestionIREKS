@@ -31,7 +31,6 @@ from PySide6.QtWidgets import (
     QProgressDialog,
     QPushButton,
     QSplitter,
-    QStyle,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -1211,7 +1210,7 @@ class OrdersPage(QWidget):
         self.edit_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-pen.svg")))
         self.del_btn = QPushButton("Eliminar")
         self.del_btn.setProperty("btnRole", "danger")
-        self.del_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
+        self.del_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
         self.export_btn = QPushButton("Exportar")
         self.export_btn.setProperty("btnRole", "secondary")
         self.export_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "export.svg")))
@@ -1314,6 +1313,8 @@ class OrdersPage(QWidget):
         self.import_factura_btn.clicked.connect(self._import_factura_for_selected_order)
         self.delete_factura_btn = QPushButton("Eliminar Factura")
         self.delete_factura_btn.setProperty("btnRole", "danger")
+        self.delete_factura_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
+        self.delete_factura_btn.setIconSize(QSize(14, 14))
         self.delete_factura_btn.setFixedHeight(24)
         self.delete_factura_btn.setEnabled(False)
         self.delete_factura_btn.clicked.connect(self._delete_selected_factura)
@@ -1332,6 +1333,8 @@ class OrdersPage(QWidget):
         self.edit_line_btn.clicked.connect(self._edit_order_line)
         self.del_line_btn = QPushButton("Eliminar")
         self.del_line_btn.setProperty("btnRole", "danger")
+        self.del_line_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
+        self.del_line_btn.setIconSize(QSize(14, 14))
         self.del_line_btn.setFixedHeight(24)
         self.del_line_btn.clicked.connect(self._delete_order_line)
         self.edit_order_btn = QPushButton("Editar pedido")
