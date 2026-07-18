@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.core.database import engine
 from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
@@ -183,7 +183,10 @@ class CustomerService:
             return list(
                 session.exec(
                     select(Receta)
-                    .where(Receta.cliente_id == clean_id)
+                    .where(
+                        Receta.cliente_id == clean_id,
+                        col(Receta.es_base).is_(False),
+                    )
                     .order_by(Receta.nombre, Receta.version)
                 )
             )
