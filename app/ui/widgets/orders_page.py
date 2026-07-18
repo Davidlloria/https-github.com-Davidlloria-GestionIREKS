@@ -8,8 +8,8 @@ import re
 import tempfile
 from typing import Any, Callable, cast
 
-from PySide6.QtCore import QDate, QTimer, Qt
-from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtCore import QDate, QSize, QTimer, Qt
+from PySide6.QtGui import QBrush, QColor, QFont, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QProgressDialog,
     QPushButton,
     QSplitter,
+    QStyle,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -64,6 +65,8 @@ from app.services.orders_documents_import_ui_service import (
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderLineInput, OrderService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
+
+BASE_DIR = Path(__file__).resolve().parents[3]
 
 MONTHS = [
     (1, "Enero"),
@@ -1200,18 +1203,33 @@ class OrdersPage(QWidget):
         almacen_row.addWidget(self.almacen_filter, 1)
         left_layout.addLayout(almacen_row)
 
-        self.new_btn = QPushButton("Nuevo pedido")
+        self.new_btn = QPushButton("Nuevo")
         self.new_btn.setProperty("btnRole", "success")
+        self.new_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-text.svg")))
         self.edit_btn = QPushButton("Editar")
         self.edit_btn.setProperty("btnRole", "warning")
+        self.edit_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-pen.svg")))
         self.del_btn = QPushButton("Eliminar")
         self.del_btn.setProperty("btnRole", "danger")
+        self.del_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
         self.export_btn = QPushButton("Exportar")
         self.export_btn.setProperty("btnRole", "secondary")
+        self.export_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "export.svg")))
         self.send_mail_btn = QPushButton("Enviar Outlook")
         self.send_mail_btn.setProperty("btnRole", "secondary")
+        self.send_mail_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "mail.svg")))
         self.print_btn = QPushButton("Imprimir")
         self.print_btn.setProperty("btnRole", "secondary")
+        self.print_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "printer.svg")))
+        for button in (
+            self.new_btn,
+            self.edit_btn,
+            self.del_btn,
+            self.export_btn,
+            self.send_mail_btn,
+            self.print_btn,
+        ):
+            button.setIconSize(QSize(14, 14))
 
         self.new_btn.clicked.connect(self._new_order)
         self.edit_btn.clicked.connect(self._edit_order)

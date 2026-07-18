@@ -4,6 +4,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QSize
 from PySide6.QtWidgets import QApplication, QFrame, QPushButton, QSplitter
 
 from app.ui.widgets.orders_page import OrdersPage
@@ -32,7 +33,7 @@ def test_main_orders_ribbon_is_above_splitter_and_uses_customer_standard(monkeyp
     assert ribbon.property("pageType") == "contacts"
     assert isinstance(splitter, QSplitter)
     assert [button.text() for button in ribbon.findChildren(QPushButton)] == [
-        "Nuevo pedido",
+        "Nuevo",
         "Editar",
         "Eliminar",
         "Exportar",
@@ -47,6 +48,8 @@ def test_main_orders_ribbon_is_above_splitter_and_uses_customer_standard(monkeyp
         "secondary",
         "secondary",
     ]
+    assert all(not button.icon().isNull() for button in ribbon.findChildren(QPushButton))
+    assert all(button.iconSize() == QSize(14, 14) for button in ribbon.findChildren(QPushButton))
     page.close()
     page.deleteLater()
     QApplication.processEvents()
