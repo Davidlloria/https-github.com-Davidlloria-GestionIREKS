@@ -30,7 +30,7 @@ OrdersPage (QWidget, sin objectName)
     │   ├── print_btn (QPushButton "Imprimir", btnRole=secondary, icono printer.svg, fondo #E2E8F0, texto #334155, borde #CBD5E1)
     │   ├── espacio flexible
     │   └── help_btn (QPushButton "Ayuda", btnRole=secondary, icono circle-question-mark.svg, fondo #E2E8F0, texto #334155, borde #CBD5E1)
-    └── splitter principal (QSplitter horizontal, sin objectName, tirador oculto)
+    └── splitter principal (QSplitter horizontal, sin objectName, fondo transparente, sin borde, tirador oculto)
         ├── sidePanel (QWidget, blanco #FFFFFF, borde #D7DEE8, radio 8 px, ancho 560–620 px)
         │   └── left_layout (QVBoxLayout, sin objectName)
         │       ├── filters_row (QHBoxLayout, sin objectName)
@@ -152,7 +152,8 @@ OrdersPage (QWidget, sin objectName)
 GEOMETRÍA ACTUAL
 ----------------
 
-- El splitter principal es horizontal y arranca aproximadamente en 580 / 660 px.
+- El splitter principal es horizontal, tiene fondo transparente, no tiene borde
+  y arranca aproximadamente en 580 / 660 px.
 - sidePanel tiene ancho mínimo de 560 px y máximo de 620 px.
 - El tirador del splitter principal está oculto y deshabilitado.
 - right_splitter es vertical:

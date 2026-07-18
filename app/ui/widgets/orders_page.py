@@ -1166,6 +1166,9 @@ class OrdersPage(QWidget):
         layout = QVBoxLayout(self)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setFrameShape(QFrame.Shape.NoFrame)
+        splitter.setAutoFillBackground(False)
+        splitter.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         layout.addWidget(splitter, 1)
 
         left_panel = QWidget()
