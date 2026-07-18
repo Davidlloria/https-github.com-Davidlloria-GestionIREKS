@@ -4,7 +4,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtWidgets import QApplication, QCalendarWidget, QDateEdit, QPushButton
 
 from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
 from app.ui.widgets.customers_page import CustomersPage
@@ -83,6 +83,26 @@ def test_customers_top_ribbon_contains_queries_button(monkeypatch) -> None:
     assert button is not None
     assert button.text() == "Consultas"
     assert not button.icon().isNull()
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_agenda_calendar_uses_unclipped_popup_configuration(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+    date_edit = QDateEdit(page)
+    date_edit.setCalendarPopup(True)
+
+    page._configure_agenda_calendar(date_edit)
+
+    calendar = date_edit.calendarWidget()
+    assert calendar.objectName() == "customerAgendaPopupCalendar"
+    assert calendar.minimumWidth() == 340
+    assert calendar.minimumHeight() == 272
+    assert calendar.verticalHeaderFormat() == QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader
+    assert "QCalendarWidget#customerAgendaPopupCalendar QAbstractItemView::item" in page.styleSheet()
     page.close()
     page.deleteLater()
     QApplication.processEvents()
