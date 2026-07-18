@@ -64,9 +64,9 @@ OrdersPage (QWidget, sin objectName)
         │           ├── Total Kg en la quinta columna
         │           └── anchos sincronizados con table
         │
-        └── right_panel (QWidget, sin objectName)
+        └── right_panel (QWidget, sin objectName, fondo azul #0000FF, sin borde)
             └── right_layout (QVBoxLayout, sin márgenes, separación 6 px)
-                └── right_splitter (QSplitter vertical, sin objectName)
+                └── right_splitter (QSplitter vertical, sin objectName, fondo verde #008000, sin borde)
                     ├── detailPanel (QWidget, fondo #FCFDFF, borde #E2E8F1, radio 8 px, alto máximo 170 px)
                     │   └── detail_layout (QVBoxLayout, márgenes 14 px, separación 8 px)
                     │       ├── detail_title (QLabel "Detalle del pedido", role=sectionTitle, sin objectName)

@@ -1306,6 +1306,10 @@ class OrdersPage(QWidget):
         splitter.addWidget(left_panel)
 
         right_panel = QWidget()
+        right_panel.setProperty("ordersRegion", "rightPanel")
+        right_panel.setStyleSheet(
+            'QWidget[ordersRegion="rightPanel"] { background-color: #0000FF; border: none; }'
+        )
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(6)
@@ -1352,6 +1356,11 @@ class OrdersPage(QWidget):
         self.edit_order_btn.clicked.connect(self._edit_order)
 
         right_splitter = QSplitter(Qt.Orientation.Vertical)
+        right_splitter.setProperty("ordersRegion", "rightSplitter")
+        right_splitter.setFrameShape(QFrame.Shape.NoFrame)
+        right_splitter.setStyleSheet(
+            'QSplitter[ordersRegion="rightSplitter"] { background-color: #008000; border: none; }'
+        )
         right_layout.addWidget(right_splitter, 1)
 
         detail_panel = QWidget()

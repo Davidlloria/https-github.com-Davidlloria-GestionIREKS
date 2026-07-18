@@ -36,6 +36,21 @@ def test_main_orders_ribbon_is_above_splitter_and_uses_customer_standard(monkeyp
     assert splitter.frameShape() == QFrame.Shape.NoFrame
     assert not splitter.autoFillBackground()
     assert splitter.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+    right_panel = splitter.widget(1)
+    right_layout = right_panel.layout()
+    right_splitter = right_layout.itemAt(0).widget()
+    assert right_panel.objectName() == ""
+    assert right_panel.property("ordersRegion") == "rightPanel"
+    assert "#0000FF" in right_panel.styleSheet()
+    assert "border: none" in right_panel.styleSheet()
+    assert right_layout.contentsMargins().isNull()
+    assert right_layout.spacing() == 6
+    assert isinstance(right_splitter, QSplitter)
+    assert right_splitter.objectName() == ""
+    assert right_splitter.property("ordersRegion") == "rightSplitter"
+    assert right_splitter.frameShape() == QFrame.Shape.NoFrame
+    assert "#008000" in right_splitter.styleSheet()
+    assert "border: none" in right_splitter.styleSheet()
     assert [button.text() for button in ribbon.findChildren(QPushButton)] == [
         "Nuevo",
         "Editar",
