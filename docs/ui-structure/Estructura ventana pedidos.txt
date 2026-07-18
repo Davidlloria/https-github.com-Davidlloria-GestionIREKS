@@ -21,6 +21,14 @@ Implementación principal:
 
 OrdersPage (QWidget, sin objectName)
 └── layout principal (QVBoxLayout, márgenes y separación heredados)
+    ├── topRibbon (QFrame, pageType=contacts, estándar visual de Clientes)
+    │   ├── new_btn (QPushButton "Nuevo pedido", btnRole=success, verde pastel)
+    │   ├── edit_btn (QPushButton "Editar", btnRole=warning, amarillo pastel)
+    │   ├── del_btn (QPushButton "Eliminar", btnRole=danger, rojo pastel)
+    │   ├── export_btn (QPushButton "Exportar", btnRole=secondary, gris azulado)
+    │   ├── send_mail_btn (QPushButton "Enviar Outlook", btnRole=secondary)
+    │   ├── print_btn (QPushButton "Imprimir", btnRole=secondary)
+    │   └── espacio flexible
     └── splitter principal (QSplitter horizontal, sin objectName, tirador oculto)
         ├── sidePanel (QWidget, blanco #FFFFFF, borde #D7DEE8, radio 8 px, ancho 560–620 px)
         │   └── left_layout (QVBoxLayout, sin objectName)
@@ -34,14 +42,6 @@ OrdersPage (QWidget, sin objectName)
         │       ├── almacen_row (QHBoxLayout, sin objectName)
         │       │   ├── QLabel "Cliente/Distribuidor" (sin objectName)
         │       │   └── almacen_filter (QComboBox, sin objectName, ancho mínimo 210 px)
-        │       ├── topRibbon (QFrame, blanco #FFFFFF, borde inferior #D7DEE8)
-        │       │   ├── new_btn (QPushButton "Nuevo pedido", btnRole=success, verde pastel)
-        │       │   ├── edit_btn (QPushButton "Editar", btnRole=warning, amarillo pastel)
-        │       │   ├── del_btn (QPushButton "Eliminar", btnRole=danger, rojo pastel)
-        │       │   ├── export_btn (QPushButton "Exportar", btnRole=secondary, gris azulado)
-        │       │   ├── send_mail_btn (QPushButton "Enviar Outlook", btnRole=secondary)
-        │       │   ├── print_btn (QPushButton "Imprimir", btnRole=secondary)
-        │       │   └── espacio flexible
         │       ├── table (QTableWidget, sin objectName, 6 columnas ordenables)
         │       │   ├── Almacen (180 px)
         │       │   ├── Nº (60 px)
@@ -167,7 +167,9 @@ ASPECTO VISUAL ACTUAL
 - La ventana usa los estilos globales de assets/styles.qss.
 - sidePanel es blanco, con borde gris azulado y radio de 8 px.
 - detailPanel usa fondo casi blanco #FCFDFF y borde #E2E8F1.
-- Los QFrame con objectName topRibbon son blancos y tienen borde inferior #D7DEE8.
+- El topRibbon principal usa pageType=contacts: fondo #FFFFFF, borde completo
+  #E2E8F1, radio 8 px y botones compactos de 26 px, igual que Clientes.
+- Los topRibbon interiores son blancos y tienen borde inferior #D7DEE8.
 - Botones por función:
   - success: verde pastel #DCFCE7, texto #166534;
   - warning: amarillo pastel #FEF3C7, texto #92400E;
@@ -259,6 +261,8 @@ OBSERVACIONES DE ESTRUCTURA
 - OrdersPage, los splitters, tabs y la mayoría de controles no tienen objectName.
 - topRibbon se reutiliza como objectName en cuatro QFrame diferentes:
   cinta principal, Pedido, Albarán y Factura.
+- Solo la cinta principal usa pageType=contacts y está situada encima del
+  splitter principal; las otras tres permanecen dentro de sus pestañas.
 - Los nombres usados en este documento son los atributos Python reales cuando
   existen; los elementos locales se identifican por su variable y se marcan
   expresamente como "sin objectName".

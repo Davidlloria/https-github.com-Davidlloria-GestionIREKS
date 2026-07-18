@@ -1222,6 +1222,7 @@ class OrdersPage(QWidget):
 
         left_ribbon = QFrame()
         left_ribbon.setObjectName("topRibbon")
+        left_ribbon.setProperty("pageType", "contacts")
         left_ribbon.setFrameShape(QFrame.Shape.StyledPanel)
         left_ribbon_layout = QHBoxLayout(left_ribbon)
         left_ribbon_layout.setContentsMargins(8, 6, 8, 6)
@@ -1233,7 +1234,7 @@ class OrdersPage(QWidget):
         left_ribbon_layout.addWidget(self.send_mail_btn)
         left_ribbon_layout.addWidget(self.print_btn)
         left_ribbon_layout.addStretch(1)
-        left_layout.addWidget(left_ribbon)
+        layout.insertWidget(0, left_ribbon)
 
         self.table = QTableWidget(0, 6)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
