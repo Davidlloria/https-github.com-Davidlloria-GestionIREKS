@@ -28,7 +28,8 @@ OrdersPage (QWidget, sin objectName)
     │   ├── export_btn (QPushButton "Exportar", btnRole=secondary, icono export.svg, fondo #E2E8F0, texto #334155, borde #CBD5E1)
     │   ├── send_mail_btn (QPushButton "Enviar Outlook", btnRole=secondary, icono mail.svg, fondo #E2E8F0, texto #334155, borde #CBD5E1)
     │   ├── print_btn (QPushButton "Imprimir", btnRole=secondary, icono printer.svg, fondo #E2E8F0, texto #334155, borde #CBD5E1)
-    │   └── espacio flexible
+    │   ├── espacio flexible
+    │   └── help_btn (QPushButton "Ayuda", btnRole=secondary, icono circle-question-mark.svg, fondo #E2E8F0, texto #334155, borde #CBD5E1)
     └── splitter principal (QSplitter horizontal, sin objectName, tirador oculto)
         ├── sidePanel (QWidget, blanco #FFFFFF, borde #D7DEE8, radio 8 px, ancho 560–620 px)
         │   └── left_layout (QVBoxLayout, sin objectName)
@@ -183,6 +184,9 @@ ASPECTO VISUAL ACTUAL
 
 DIÁLOGOS Y FLUJOS RELACIONADOS
 ------------------------------
+
+Ayuda de pedidos (QMessageBox informativo)
+- Explica las acciones de la cinta superior, los filtros y las pestañas de detalle.
 
 AlbaranPreviewDialog (QDialog, sin objectName, 980 × 620 px)
 - Previsualiza cabecera y seis columnas del albarán extraído.

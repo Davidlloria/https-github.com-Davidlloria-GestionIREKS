@@ -1220,6 +1220,9 @@ class OrdersPage(QWidget):
         self.print_btn = QPushButton("Imprimir")
         self.print_btn.setProperty("btnRole", "secondary")
         self.print_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "printer.svg")))
+        self.help_btn = QPushButton("Ayuda")
+        self.help_btn.setProperty("btnRole", "secondary")
+        self.help_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "circle-question-mark.svg")))
         for button in (
             self.new_btn,
             self.edit_btn,
@@ -1227,6 +1230,7 @@ class OrdersPage(QWidget):
             self.export_btn,
             self.send_mail_btn,
             self.print_btn,
+            self.help_btn,
         ):
             button.setIconSize(QSize(14, 14))
 
@@ -1236,6 +1240,7 @@ class OrdersPage(QWidget):
         self.export_btn.clicked.connect(self._export_selected_order_to_excel)
         self.send_mail_btn.clicked.connect(self._send_selected_order_by_outlook)
         self.print_btn.clicked.connect(self._print_selected_order)
+        self.help_btn.clicked.connect(self._show_orders_help)
 
         left_ribbon = QFrame()
         left_ribbon.setObjectName("topRibbon")
@@ -1251,6 +1256,7 @@ class OrdersPage(QWidget):
         left_ribbon_layout.addWidget(self.send_mail_btn)
         left_ribbon_layout.addWidget(self.print_btn)
         left_ribbon_layout.addStretch(1)
+        left_ribbon_layout.addWidget(self.help_btn)
         layout.insertWidget(0, left_ribbon)
 
         self.table = QTableWidget(0, 6)
@@ -2773,6 +2779,15 @@ class OrdersPage(QWidget):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Pedidos", f"No se pudo eliminar.\n{exc}")
         self.reload()
+
+    def _show_orders_help(self) -> None:
+        QMessageBox.information(
+            self,
+            "Ayuda de pedidos",
+            "Usa la barra superior para crear, editar, eliminar, exportar, enviar o imprimir pedidos. "
+            "Los filtros acotan el listado y las pestañas muestran el pedido, sus albaranes, "
+            "facturas y artículos pendientes.",
+        )
 
     def _confirm_albaran_preview(self, header: dict[str, str], rows: list[dict[str, Any]]) -> bool:
         dialog = AlbaranPreviewDialog(header=header, items=rows, parent=self)

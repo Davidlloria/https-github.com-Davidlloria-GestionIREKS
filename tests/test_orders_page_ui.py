@@ -39,6 +39,7 @@ def test_main_orders_ribbon_is_above_splitter_and_uses_customer_standard(monkeyp
         "Exportar",
         "Enviar Outlook",
         "Imprimir",
+        "Ayuda",
     ]
     assert [button.property("btnRole") for button in ribbon.findChildren(QPushButton)] == [
         "success",
@@ -47,9 +48,13 @@ def test_main_orders_ribbon_is_above_splitter_and_uses_customer_standard(monkeyp
         "secondary",
         "secondary",
         "secondary",
+        "secondary",
     ]
     assert all(not button.icon().isNull() for button in ribbon.findChildren(QPushButton))
     assert all(button.iconSize() == QSize(14, 14) for button in ribbon.findChildren(QPushButton))
+    ribbon_layout = ribbon.layout()
+    assert ribbon_layout.itemAt(ribbon_layout.count() - 2).spacerItem() is not None
+    assert ribbon_layout.itemAt(ribbon_layout.count() - 1).widget() is page.help_btn
     assert not page.del_line_btn.icon().isNull()
     assert page.del_line_btn.iconSize() == QSize(14, 14)
     assert not page.delete_factura_btn.icon().isNull()
