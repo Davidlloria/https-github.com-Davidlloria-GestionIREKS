@@ -30,7 +30,7 @@ def test_entries_filters_columns_date_sort_and_fixed_totals(monkeypatch) -> None
             id=1,
             almacen_id="warehouse",
             articulo_id="product",
-            cantidad=3,
+            cantidad=3000,
             fecha_pedido=date(current_year, 1, 20),
             articulo_lote="L-1",
             articulo_caducidad=date(current_year + 1, 1, 31),
@@ -94,6 +94,11 @@ def test_entries_filters_columns_date_sort_and_fixed_totals(monkeypatch) -> None
     }
     assert {tab.table.item(row, 7).text() for row in range(2)} == {"ALB-1", "ALB-2"}
     assert isinstance(tab.table.item(0, 0), SortableTableWidgetItem)
+    assert {tab.table.item(row, 3).text() for row in range(2)} == {"3.000,00", "2,00"}
+    assert {tab.table.item(row, 4).text() for row in range(2)} == {
+        "75.000,00 kg",
+        "50,00 kg",
+    }
 
     tab.table.sortItems(0, Qt.SortOrder.AscendingOrder)
     assert [tab.table.item(row, 0).text() for row in range(2)] == [
@@ -101,8 +106,8 @@ def test_entries_filters_columns_date_sort_and_fixed_totals(monkeypatch) -> None
         f"05/03/{current_year}",
     ]
     assert tab.totals_table.item(0, 0).text() == "TOTALES"
-    assert tab.totals_table.item(0, 3).text() == "5.00"
-    assert tab.totals_table.item(0, 4).text() == "125.00 kg"
+    assert tab.totals_table.item(0, 3).text() == "3.002,00"
+    assert tab.totals_table.item(0, 4).text() == "75.050,00 kg"
     assert tab.layout().itemAt(tab.layout().count() - 1).widget() is tab.totals_table
 
     tab.table.setColumnWidth(1, 123)
@@ -113,7 +118,7 @@ def test_entries_filters_columns_date_sort_and_fixed_totals(monkeypatch) -> None
     app.processEvents()
     assert tab.table.rowCount() == 1
     assert tab.table.item(0, 7).text() == "ALB-2"
-    assert tab.totals_table.item(0, 3).text() == "2.00"
-    assert tab.totals_table.item(0, 4).text() == "50.00 kg"
+    assert tab.totals_table.item(0, 3).text() == "2,00"
+    assert tab.totals_table.item(0, 4).text() == "50,00 kg"
 
     tab.deleteLater()

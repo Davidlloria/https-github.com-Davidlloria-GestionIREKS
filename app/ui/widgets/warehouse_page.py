@@ -687,6 +687,11 @@ class MovimientosTab(QWidget):
     def _current_filter_data(self, combo: QComboBox, default: str = "") -> str:
         return str(combo.currentData() or default).strip()
 
+    @staticmethod
+    def _format_entry_number(value: float, suffix: str = "") -> str:
+        formatted = f"{float(value or 0.0):,.2f}"
+        return formatted.replace(",", "_").replace(".", ",").replace("_", ".") + suffix
+
     def _concept_from_albaran(self, value: str) -> str:
         text = str(value or "").strip()
         if text.upper().startswith("IGSA"):
@@ -891,8 +896,8 @@ class MovimientosTab(QWidget):
                     fecha,
                     ref,
                     nombre,
-                    f"{abs_cantidad:.2f}",
-                    f"{kg:.2f} kg",
+                    self._format_entry_number(abs_cantidad),
+                    self._format_entry_number(kg, " kg"),
                     str(getattr(mov, "articulo_lote", "") or "").strip(),
                     caduca,
                     str(getattr(mov, "pedido_albaran_numero", "") or "").strip(),
@@ -1031,7 +1036,16 @@ class MovimientosTab(QWidget):
         self.table.setSortingEnabled(True)
 
     def _set_entry_totals(self, total_units: float, total_kg: float) -> None:
-        values = ["TOTALES", "", "", f"{total_units:.2f}", f"{total_kg:.2f} kg", "", "", ""]
+        values = [
+            "TOTALES",
+            "",
+            "",
+            self._format_entry_number(total_units),
+            self._format_entry_number(total_kg, " kg"),
+            "",
+            "",
+            "",
+        ]
         for column, value in enumerate(values):
             item = QTableWidgetItem(value)
             font = item.font()
