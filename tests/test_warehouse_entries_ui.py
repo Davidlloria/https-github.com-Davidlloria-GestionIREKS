@@ -85,7 +85,7 @@ def test_entries_filters_columns_date_sort_and_fixed_totals(monkeypatch) -> None
     header = tab.table.horizontalHeader()
     assert header.sectionResizeMode(2) == QHeaderView.ResizeMode.Stretch
     assert header.sectionResizeMode(4) == QHeaderView.ResizeMode.Fixed
-    assert tab.table.columnWidth(4) == 76
+    assert tab.table.columnWidth(4) == 120
     assert tab.table.rowCount() == 2
     assert {tab.table.item(row, 6).text() for row in range(2)} == {
         f"31/01/{current_year + 1}",
