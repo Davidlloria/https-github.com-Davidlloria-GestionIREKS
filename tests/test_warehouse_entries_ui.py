@@ -57,7 +57,7 @@ def test_entries_filters_columns_date_sort_and_fixed_totals(monkeypatch) -> None
     product = IngredienteIreks(
         articulo_id="product",
         articulo_referencia_corta="REF",
-        articulo_descripcion="Producto",
+        articulo_descripcion="Producto Especial",
         articulo_envase_peso_total=25,
     )
     monkeypatch.setattr(
@@ -109,6 +109,16 @@ def test_entries_filters_columns_date_sort_and_fixed_totals(monkeypatch) -> None
     assert tab.totals_table.item(0, 3).text() == "3.002,00"
     assert tab.totals_table.item(0, 4).text() == "75.050,00 kg"
     assert tab.layout().itemAt(tab.layout().count() - 1).widget() is tab.totals_table
+
+    tab.occurrence_filter.setText("Producto ")
+    app.processEvents()
+    assert tab.occurrence_filter.text() == "Producto "
+    tab.occurrence_filter.insert("Especial")
+    app.processEvents()
+    assert tab.occurrence_filter.text() == "Producto Especial"
+    assert tab.table.rowCount() == 2
+    tab.occurrence_filter.clear()
+    app.processEvents()
 
     tab.table.setColumnWidth(1, 123)
     app.processEvents()

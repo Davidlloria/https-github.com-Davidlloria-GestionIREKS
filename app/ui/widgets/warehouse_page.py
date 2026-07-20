@@ -718,7 +718,7 @@ class MovimientosTab(QWidget):
             current_mfg = self._current_filter_data(self.manufacturer_filter)
             current_fam = self._current_filter_data(self.family_filter)
             current_sub = self._current_filter_data(self.subfamily_filter)
-            current_occ = str(self.occurrence_filter.text() or "").strip()
+            current_occ = str(self.occurrence_filter.text() or "")
 
             self.year_filter.blockSignals(True)
             self.year_filter.clear()
