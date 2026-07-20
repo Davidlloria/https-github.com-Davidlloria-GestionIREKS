@@ -517,7 +517,7 @@ class MovimientosTab(QWidget):
             self.year_filter.currentIndexChanged.connect(self.reload)
             filters.addWidget(self.year_filter)
 
-            if self._mode == "in":
+            if self._mode in {"in", "out"}:
                 filters.addWidget(QLabel("Mes inicial"))
                 self.month_from_filter = QComboBox()
                 self.month_from_filter.currentIndexChanged.connect(self.reload)
@@ -710,9 +710,9 @@ class MovimientosTab(QWidget):
         self._building_filters = True
         try:
             current_year = self._current_filter_data(self.year_filter)
-            if self._mode == "in" and not current_year:
+            if self._mode in {"in", "out"} and not current_year:
                 current_year = str(date.today().year)
-            if self._mode == "in":
+            if self._mode in {"in", "out"}:
                 current_month_from = self._current_filter_data(self.month_from_filter, "1")
                 current_month_to = self._current_filter_data(self.month_to_filter, "12")
             else:
@@ -726,7 +726,7 @@ class MovimientosTab(QWidget):
             self.year_filter.clear()
             self.year_filter.addItem("Todos", "0")
             available_years = list(years)
-            if self._mode == "in" and date.today().year not in available_years:
+            if self._mode in {"in", "out"} and date.today().year not in available_years:
                 available_years.insert(0, date.today().year)
             for year in available_years:
                 self.year_filter.addItem(str(year), str(year))
@@ -735,7 +735,7 @@ class MovimientosTab(QWidget):
             self.year_filter.blockSignals(False)
 
             months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-            if self._mode == "in":
+            if self._mode in {"in", "out"}:
                 for combo, selected in (
                     (self.month_from_filter, current_month_from),
                     (self.month_to_filter, current_month_to),
@@ -828,7 +828,7 @@ class MovimientosTab(QWidget):
             )
 
             year_filter = int(self._current_filter_data(self.year_filter, "0") or "0")
-            if self._mode == "in":
+            if self._mode in {"in", "out"}:
                 month_from = int(self._current_filter_data(self.month_from_filter, "1") or "1")
                 month_to = int(self._current_filter_data(self.month_to_filter, "12") or "12")
                 month_from, month_to = min(month_from, month_to), max(month_from, month_to)
@@ -846,7 +846,7 @@ class MovimientosTab(QWidget):
                     continue
                 if year_filter > 0 and mov.fecha_pedido.year != year_filter:
                     continue
-                if self._mode == "in":
+                if self._mode in {"in", "out"}:
                     if not month_from <= mov.fecha_pedido.month <= month_to:
                         continue
                 elif month_filter > 0 and mov.fecha_pedido.month != month_filter:

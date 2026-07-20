@@ -139,3 +139,57 @@ def test_entries_filters_columns_date_sort_and_fixed_totals(monkeypatch) -> None
     assert tab.totals_table.item(0, 4).text() == "50,00 kg"
 
     tab.deleteLater()
+
+
+def test_outputs_default_to_current_year_and_use_month_range(monkeypatch) -> None:
+    app = _application()
+    current_year = date.today().year
+    movements = [
+        AlmacenMovimiento(
+            id=10,
+            almacen_id="warehouse",
+            articulo_id="product",
+            cantidad=-3,
+            fecha_pedido=date(current_year, 1, 20),
+        ),
+        AlmacenMovimiento(
+            id=11,
+            almacen_id="warehouse",
+            articulo_id="product",
+            cantidad=-2,
+            fecha_pedido=date(current_year, 3, 5),
+        ),
+        AlmacenMovimiento(
+            id=12,
+            almacen_id="warehouse",
+            articulo_id="product",
+            cantidad=-7,
+            fecha_pedido=date(current_year - 1, 2, 1),
+        ),
+    ]
+    product = IngredienteIreks(
+        articulo_id="product",
+        articulo_referencia_corta="REF",
+        articulo_descripcion="Producto",
+        articulo_envase_peso_total=25,
+    )
+    monkeypatch.setattr(
+        WarehouseMovementService,
+        "movement_payload",
+        lambda self, **kwargs: (movements, [product], [], [], []),
+    )
+
+    tab = MovimientosTab("out")
+    app.processEvents()
+
+    assert tab.year_filter.currentData() == str(current_year)
+    assert tab.month_from_filter.currentData() == "1"
+    assert tab.month_to_filter.currentData() == "12"
+    assert tab.table.rowCount() == 2
+
+    tab.month_from_filter.setCurrentIndex(tab.month_from_filter.findData("2"))
+    app.processEvents()
+    assert tab.table.rowCount() == 1
+    assert tab.table.item(0, 0).text() == f"05/03/{current_year}"
+
+    tab.deleteLater()
