@@ -620,7 +620,7 @@ class MovimientosTab(QWidget):
             self.table.setColumnWidth(0, 110)
             self.table.setColumnWidth(1, 110)
             self.table.setColumnWidth(2, 520)
-            self.table.setColumnWidth(3, 70)
+            self.table.setColumnWidth(3, 120)
             self.table.setColumnWidth(4, 120)
             self.table.setColumnWidth(5, 105)
             self.table.setColumnWidth(6, 105)
