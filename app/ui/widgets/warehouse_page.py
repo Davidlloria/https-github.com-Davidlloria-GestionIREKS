@@ -517,10 +517,21 @@ class MovimientosTab(QWidget):
             self.year_filter.currentIndexChanged.connect(self.reload)
             filters.addWidget(self.year_filter)
 
-            filters.addWidget(QLabel("Mes"))
-            self.month_filter = QComboBox()
-            self.month_filter.currentIndexChanged.connect(self.reload)
-            filters.addWidget(self.month_filter)
+            if self._mode == "in":
+                filters.addWidget(QLabel("Mes inicial"))
+                self.month_from_filter = QComboBox()
+                self.month_from_filter.currentIndexChanged.connect(self.reload)
+                filters.addWidget(self.month_from_filter)
+
+                filters.addWidget(QLabel("Mes final"))
+                self.month_to_filter = QComboBox()
+                self.month_to_filter.currentIndexChanged.connect(self.reload)
+                filters.addWidget(self.month_to_filter)
+            else:
+                filters.addWidget(QLabel("Mes"))
+                self.month_filter = QComboBox()
+                self.month_filter.currentIndexChanged.connect(self.reload)
+                filters.addWidget(self.month_filter)
 
             filters.addWidget(QLabel("Fabricante"))
             self.manufacturer_filter = QComboBox()
@@ -581,7 +592,7 @@ class MovimientosTab(QWidget):
             actions.addStretch(1)
             layout.addLayout(actions)
 
-        col_count = 7 if self._mode in {"in", "out"} else 8
+        col_count = 8 if self._mode in {"in", "all"} else 7
         self.table = QTableWidget(0, col_count)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -599,7 +610,22 @@ class MovimientosTab(QWidget):
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
 
-        if self._mode in {"in", "out"}:
+        if self._mode == "in":
+            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(7, QHeaderView.ResizeMode.Fixed)
+            self.table.setHorizontalHeaderLabels(
+                ["Fecha", "Ref.", "Nombre", "Uds", "Kg", "Lote", "Caduca", "Albarán"]
+            )
+            self.table.setColumnWidth(0, 110)
+            self.table.setColumnWidth(1, 110)
+            self.table.setColumnWidth(2, 520)
+            self.table.setColumnWidth(3, 70)
+            self.table.setColumnWidth(4, 76)
+            self.table.setColumnWidth(5, 105)
+            self.table.setColumnWidth(6, 105)
+            self.table.setColumnWidth(7, 145)
+        elif self._mode == "out":
             self.table.setHorizontalHeaderLabels(["Fecha", "Ref.", "Nombre", "Uds", "Kg", "Lote", "Concepto"])
             self.table.setColumnWidth(0, 110)
             self.table.setColumnWidth(1, 110)
@@ -631,6 +657,28 @@ class MovimientosTab(QWidget):
             self.table.setColumnWidth(7, 100)
 
         layout.addWidget(self.table, 1)
+        if self._mode == "in":
+            self.totals_table = QTableWidget(1, 8)
+            self.totals_table.setObjectName("entriesTotalsTable")
+            self.totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+            self.totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+            self.totals_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            self.totals_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.totals_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.totals_table.verticalHeader().setVisible(False)
+            self.totals_table.horizontalHeader().setVisible(False)
+            totals_header = self.totals_table.horizontalHeader()
+            for column in range(8):
+                totals_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+                self.totals_table.setColumnWidth(column, self.table.columnWidth(column))
+            self.totals_table.setFixedHeight(32)
+            header.sectionResized.connect(
+                lambda column, _old, new: self.totals_table.setColumnWidth(column, new)
+            )
+            self.table.horizontalScrollBar().valueChanged.connect(
+                self.totals_table.horizontalScrollBar().setValue
+            )
+            layout.addWidget(self.totals_table)
 
     def set_almacen_filter(self, almacen_id: str) -> None:
         self._almacen_id = str(almacen_id or "").strip()
@@ -655,7 +703,13 @@ class MovimientosTab(QWidget):
         self._building_filters = True
         try:
             current_year = self._current_filter_data(self.year_filter)
-            current_month = self._current_filter_data(self.month_filter, "0")
+            if self._mode == "in" and not current_year:
+                current_year = str(date.today().year)
+            if self._mode == "in":
+                current_month_from = self._current_filter_data(self.month_from_filter, "1")
+                current_month_to = self._current_filter_data(self.month_to_filter, "12")
+            else:
+                current_month = self._current_filter_data(self.month_filter, "0")
             current_mfg = self._current_filter_data(self.manufacturer_filter)
             current_fam = self._current_filter_data(self.family_filter)
             current_sub = self._current_filter_data(self.subfamily_filter)
@@ -664,21 +718,37 @@ class MovimientosTab(QWidget):
             self.year_filter.blockSignals(True)
             self.year_filter.clear()
             self.year_filter.addItem("Todos", "0")
-            for year in years:
+            available_years = list(years)
+            if self._mode == "in" and date.today().year not in available_years:
+                available_years.insert(0, date.today().year)
+            for year in available_years:
                 self.year_filter.addItem(str(year), str(year))
             idx = self.year_filter.findData(current_year)
             self.year_filter.setCurrentIndex(idx if idx >= 0 else 0)
             self.year_filter.blockSignals(False)
 
-            self.month_filter.blockSignals(True)
-            self.month_filter.clear()
-            self.month_filter.addItem("Todos", "0")
             months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-            for i, label in enumerate(months, start=1):
-                self.month_filter.addItem(label, str(i))
-            idx = self.month_filter.findData(current_month)
-            self.month_filter.setCurrentIndex(idx if idx >= 0 else 0)
-            self.month_filter.blockSignals(False)
+            if self._mode == "in":
+                for combo, selected in (
+                    (self.month_from_filter, current_month_from),
+                    (self.month_to_filter, current_month_to),
+                ):
+                    combo.blockSignals(True)
+                    combo.clear()
+                    for i, label in enumerate(months, start=1):
+                        combo.addItem(label, str(i))
+                    idx = combo.findData(selected)
+                    combo.setCurrentIndex(idx if idx >= 0 else 0)
+                    combo.blockSignals(False)
+            else:
+                self.month_filter.blockSignals(True)
+                self.month_filter.clear()
+                self.month_filter.addItem("Todos", "0")
+                for i, label in enumerate(months, start=1):
+                    self.month_filter.addItem(label, str(i))
+                idx = self.month_filter.findData(current_month)
+                self.month_filter.setCurrentIndex(idx if idx >= 0 else 0)
+                self.month_filter.blockSignals(False)
 
             self.manufacturer_filter.blockSignals(True)
             self.manufacturer_filter.clear()
@@ -751,7 +821,12 @@ class MovimientosTab(QWidget):
             )
 
             year_filter = int(self._current_filter_data(self.year_filter, "0") or "0")
-            month_filter = int(self._current_filter_data(self.month_filter, "0") or "0")
+            if self._mode == "in":
+                month_from = int(self._current_filter_data(self.month_from_filter, "1") or "1")
+                month_to = int(self._current_filter_data(self.month_to_filter, "12") or "12")
+                month_from, month_to = min(month_from, month_to), max(month_from, month_to)
+            else:
+                month_filter = int(self._current_filter_data(self.month_filter, "0") or "0")
             mfg_filter = self._current_filter_data(self.manufacturer_filter)
             fam_filter = self._current_filter_data(self.family_filter)
             sub_filter = self._current_filter_data(self.subfamily_filter)
@@ -764,7 +839,10 @@ class MovimientosTab(QWidget):
                     continue
                 if year_filter > 0 and mov.fecha_pedido.year != year_filter:
                     continue
-                if month_filter > 0 and mov.fecha_pedido.month != month_filter:
+                if self._mode == "in":
+                    if not month_from <= mov.fecha_pedido.month <= month_to:
+                        continue
+                elif month_filter > 0 and mov.fecha_pedido.month != month_filter:
                     continue
                 art_id = str(getattr(mov, "articulo_id", "") or "").strip()
                 meta = meta_by_articulo.get(art_id, {})
@@ -803,7 +881,23 @@ class MovimientosTab(QWidget):
             kg = abs_cantidad * float(peso_by_articulo.get(articulo_id, 0.0) or 0.0)
             tipo = "Salida" if cantidad < 0 else "Entrada"
 
-            if self._mode in {"in", "out", "all"}:
+            if self._mode == "in":
+                caduca = (
+                    mov.articulo_caducidad.strftime("%d/%m/%Y")
+                    if mov.articulo_caducidad
+                    else ""
+                )
+                values = [
+                    fecha,
+                    ref,
+                    nombre,
+                    f"{abs_cantidad:.2f}",
+                    f"{kg:.2f} kg",
+                    str(getattr(mov, "articulo_lote", "") or "").strip(),
+                    caduca,
+                    str(getattr(mov, "pedido_albaran_numero", "") or "").strip(),
+                ]
+            elif self._mode in {"out", "all"}:
                 concepto = "entrada" if cantidad > 0 else self._concept_from_albaran(str(getattr(mov, "pedido_albaran_numero", "") or "").strip())
                 values = [
                     fecha,
@@ -827,7 +921,11 @@ class MovimientosTab(QWidget):
                 ]
 
             for col_idx, value in enumerate(values):
-                item = QTableWidgetItem(value)
+                if col_idx == 0 and self._mode == "in":
+                    sort_value = mov.fecha_pedido.toordinal() if mov.fecha_pedido else 0
+                    item = SortableTableWidgetItem(value, sort_value)
+                else:
+                    item = QTableWidgetItem(value)
                 if col_idx == 0:
                     if self._mode in {"in", "out"}:
                         mov_id = int(getattr(mov, "id", 0) or 0)
@@ -854,6 +952,14 @@ class MovimientosTab(QWidget):
                     else:
                         item.setForeground(QBrush(QColor("#067647")))
                 self.table.setItem(row_idx, col_idx, item)
+        if self._mode == "in":
+            total_units = sum(abs(float(getattr(mov, "cantidad", 0.0) or 0.0)) for mov in moves)
+            total_kg = sum(
+                abs(float(getattr(mov, "cantidad", 0.0) or 0.0))
+                * float(peso_by_articulo.get(str(getattr(mov, "articulo_id", "") or "").strip(), 0.0) or 0.0)
+                for mov in moves
+            )
+            self._set_entry_totals(total_units, total_kg)
         if self._mode == "all":
             # Regroup by month + article + lot so entradas/salidas share line.
             grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
@@ -923,6 +1029,18 @@ class MovimientosTab(QWidget):
                         it.setForeground(QBrush(QColor("#000000")))
                     self.table.setItem(row_idx, col_idx, it)
         self.table.setSortingEnabled(True)
+
+    def _set_entry_totals(self, total_units: float, total_kg: float) -> None:
+        values = ["TOTALES", "", "", f"{total_units:.2f}", f"{total_kg:.2f} kg", "", "", ""]
+        for column, value in enumerate(values):
+            item = QTableWidgetItem(value)
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            if column in (3, 4):
+                item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                item.setForeground(QBrush(QColor("#067647")))
+            self.totals_table.setItem(0, column, item)
 
     def selected_articulo_id_from_row(self, row: int) -> str:
         item = self.table.item(row, 0)
