@@ -549,7 +549,9 @@ class MovimientosTab(QWidget):
             filters.addWidget(self.subfamily_filter)
 
             self.occurrence_filter = QLineEdit()
-            self.occurrence_filter.setPlaceholderText("Nombre o ref...")
+            self.occurrence_filter.setPlaceholderText(
+                "Nombre, referencia o lote..." if self._mode == "in" else "Nombre o ref..."
+            )
             self.occurrence_filter.textChanged.connect(self.reload)
             if self._mode == "all":
                 filters.addWidget(QLabel("Producto"))
@@ -559,7 +561,7 @@ class MovimientosTab(QWidget):
         if self._mode in {"in", "out"}:
             actions = QHBoxLayout()
             field_height = self.occurrence_filter.sizeHint().height()
-            actions.addWidget(QLabel("Producto"))
+            actions.addWidget(QLabel("Producto o lote" if self._mode == "in" else "Producto"))
             self.occurrence_filter.setMinimumWidth(420)
             actions.addWidget(self.occurrence_filter)
             add_btn = QPushButton("Nueva manual")
@@ -861,7 +863,12 @@ class MovimientosTab(QWidget):
                 nombre = (nombre_by_articulo.get(art_id, "") or "").lower()
                 art_id_lower = art_id.lower()
                 if product_terms:
-                    searchable = " ".join([ref, nombre, art_id_lower])
+                    searchable_fields = [ref, nombre, art_id_lower]
+                    if self._mode == "in":
+                        searchable_fields.append(
+                            str(getattr(mov, "articulo_lote", "") or "").strip().lower()
+                        )
+                    searchable = " ".join(searchable_fields)
                     if not all(term in searchable for term in product_terms):
                         continue
                 filtered.append(mov)

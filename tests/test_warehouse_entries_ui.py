@@ -72,6 +72,7 @@ def test_entries_filters_columns_date_sort_and_fixed_totals(monkeypatch) -> None
     assert tab.year_filter.currentData() == str(current_year)
     assert tab.month_from_filter.currentData() == "1"
     assert tab.month_to_filter.currentData() == "12"
+    assert tab.occurrence_filter.placeholderText() == "Nombre, referencia o lote..."
     assert [tab.table.horizontalHeaderItem(i).text() for i in range(8)] == [
         "Fecha",
         "Ref.",
@@ -117,6 +118,12 @@ def test_entries_filters_columns_date_sort_and_fixed_totals(monkeypatch) -> None
     app.processEvents()
     assert tab.occurrence_filter.text() == "Producto Especial"
     assert tab.table.rowCount() == 2
+    tab.occurrence_filter.clear()
+    app.processEvents()
+    tab.occurrence_filter.setText("L-2")
+    app.processEvents()
+    assert tab.table.rowCount() == 1
+    assert tab.table.item(0, 5).text() == "L-2"
     tab.occurrence_filter.clear()
     app.processEvents()
 
