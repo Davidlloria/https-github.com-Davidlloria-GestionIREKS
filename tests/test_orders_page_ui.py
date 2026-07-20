@@ -53,7 +53,7 @@ def test_main_orders_ribbon_is_above_splitter_and_uses_customer_standard(monkeyp
     assert "border: none" in right_splitter.styleSheet()
     detail_panel = right_splitter.widget(0)
     assert detail_panel.objectName() == "detailPanel"
-    assert "#FF0000" in detail_panel.styleSheet()
+    assert "#FCFDFF" in detail_panel.styleSheet()
     assert "1px solid #E2E8F1" in detail_panel.styleSheet()
     assert "border-radius: 8px" in detail_panel.styleSheet()
     assert detail_panel.maximumHeight() == 170
