@@ -801,3 +801,256 @@ class DashboardPage(QWidget):
         date_label.setObjectName("dashboardUpcomingDate")
         layout.addWidget(date_label)
         text = QLabel(f"{self.customer_label(row.cliente_codigo, row.cliente_nombre)} · {self.agenda_type_label(row.tipo)}")
+        text.setObjectName("dashboardUpcomingText")
+        text.setWordWrap(True)
+        layout.addWidget(text, 1)
+        state = QLabel(self.agenda_state_label(row.estado))
+        state.setObjectName("dashboardUpcomingState")
+        fg_color, bg_color = self._state_palette(row.estado)
+        state.setStyleSheet(
+            "QLabel#dashboardUpcomingState {"
+            f"background: {bg_color}; color: {fg_color}; padding: 2px 8px; border-radius: 999px;"
+            "font-weight: 600;"
+            "}"
+        )
+        layout.addWidget(state)
+        return frame
+
+    def _populate_reactivation_table(self, rows: list[DashboardReactivationRow]) -> None:
+        self.reactivation_table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            values = [
+                self.customer_label(row.cliente_codigo, row.cliente_nombre),
+                row.isla_nombre or "Sin isla",
+                self.format_date(row.last_contact, allow_blank=True) or "Sin registro",
+                "-" if row.days_without_follow_up is None else str(row.days_without_follow_up),
+                row.priority,
+            ]
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                if column in {3, 4}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.reactivation_table.setItem(row_index, column, item)
+
+    def _populate_island_table(self, snapshot: DashboardSnapshot) -> None:
+        rows = snapshot.island_rows
+        self.island_table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            values = [
+                row.isla_nombre,
+                str(row.pending),
+                str(row.postponed),
+                str(row.completed),
+                str(row.total),
+            ]
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                if column > 0:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.island_table.setItem(row_index, column, item)
+
+    def _configure_table(self, table: QTableWidget) -> None:
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setAlternatingRowColors(True)
+        table.setShowGrid(False)
+        table.verticalHeader().setVisible(False)
+        table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+    def _clear_layout(self, layout: QVBoxLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            child_layout = item.layout()
+            if widget is not None:
+                widget.deleteLater()
+            elif child_layout is not None:
+                self._clear_layout(child_layout)  # type: ignore[arg-type]
+
+    def _open_new_activity(self) -> None:
+        if not self.customer_choices():
+            QMessageBox.warning(self, "Agenda", "No hay clientes disponibles para registrar actividades.")
+            return
+        dialog = DashboardAgendaDialog(self, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.reload()
+
+    def _open_full_agenda(self) -> None:
+        dialog = DashboardAgendaOverviewDialog(self, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.changed:
+            self.reload()
+        elif dialog.changed:
+            self.reload()
+
+    def _open_activity_dialog(self, *, agenda_id: str = "", default_customer_id: str = "") -> None:
+        dialog = DashboardAgendaDialog(self, agenda_id=agenda_id, default_customer_id=default_customer_id, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.reload()
+
+    @staticmethod
+    def _type_palette(activity_type: str) -> tuple[str, str]:
+        normalized = str(activity_type or "").strip().lower()
+        palettes = {
+            "visita_realizada": ("#2563EB", "#DBEAFE"),
+            "visita_prevista": ("#1D4ED8", "#DBEAFE"),
+            "llamada": ("#7C3AED", "#EDE9FE"),
+            "seguimiento": ("#0F766E", "#DDF6F1"),
+            "desarrollo_futuro": ("#B45309", "#FEF3C7"),
+            "incidencia": ("#DC2626", "#FEE2E2"),
+            "nota": ("#475569", "#E2E8F0"),
+        }
+        return palettes.get(normalized, ("#475569", "#E2E8F0"))
+
+    @staticmethod
+    def _state_palette(state: str) -> tuple[str, str]:
+        normalized = str(state or "").strip().lower()
+        if normalized == "hecho":
+            return "#067647", "#ECFDF3"
+        if normalized == "aplazado":
+            return "#B54708", "#FFF7ED"
+        if normalized == "cancelado":
+            return "#6B7280", "#F1F5F9"
+        return "#1D4ED8", "#EFF6FF"
+
+    def _apply_styles(self) -> None:
+        self.setStyleSheet(
+            """
+            QWidget#dashboardPageRoot {
+                background: #EEF3F8;
+            }
+            QWidget#dashboardContent {
+                background: transparent;
+            }
+            QLabel#dashboardTitle {
+                color: #0F172A;
+                font-size: 30px;
+                font-weight: 700;
+            }
+            QLabel#dashboardDateLabel {
+                color: #475569;
+                font-size: 14px;
+            }
+            QFrame#dashboardKpiCard {
+                background: #FFFFFF;
+                border: 1px solid #E2E8F1;
+                border-radius: 14px;
+            }
+            QFrame#dashboardKpiCard[tone="blue"] {
+                border-bottom: 3px solid #2563EB;
+            }
+            QFrame#dashboardKpiCard[tone="red"] {
+                border-bottom: 3px solid #DC2626;
+            }
+            QFrame#dashboardKpiCard[tone="green"] {
+                border-bottom: 3px solid #16A34A;
+            }
+            QFrame#dashboardKpiCard[tone="orange"] {
+                border-bottom: 3px solid #EA580C;
+            }
+            QLabel#dashboardKpiTitle {
+                color: #334155;
+                font-size: 14px;
+                font-weight: 600;
+            }
+            QLabel#dashboardKpiValue {
+                color: #0F172A;
+                font-size: 34px;
+                font-weight: 700;
+            }
+            QLabel#dashboardKpiNote {
+                color: #64748B;
+                font-size: 13px;
+            }
+            QFrame[dashboardPanel="true"] {
+                background: #FFFFFF;
+                border: 1px solid #DCE4EF;
+                border-radius: 14px;
+            }
+            QLabel#dashboardPanelTitle {
+                color: #0F172A;
+                font-size: 22px;
+                font-weight: 700;
+            }
+            QLabel#dashboardEmptyLabel {
+                color: #64748B;
+                background: #F8FAFC;
+                border: 1px dashed #CBD5E1;
+                border-radius: 10px;
+                padding: 14px;
+                font-size: 13px;
+            }
+            QLabel#dashboardActivityCustomer {
+                color: #0F172A;
+                font-size: 15px;
+                font-weight: 700;
+            }
+            QLabel#dashboardActivitySummary {
+                color: #1E293B;
+                font-size: 14px;
+                font-weight: 600;
+            }
+            QLabel#dashboardActivityDetail {
+                color: #475569;
+                font-size: 13px;
+            }
+            QFrame#dashboardUpcomingRow {
+                background: #FFFFFF;
+                border: 1px solid #E2E8F1;
+                border-radius: 10px;
+            }
+            QLabel#dashboardUpcomingDate {
+                color: #1D4ED8;
+                font-weight: 700;
+                min-width: 86px;
+            }
+            QLabel#dashboardUpcomingText {
+                color: #1E293B;
+                font-size: 13px;
+            }
+            QLabel#dashboardUpcomingSectionTitle {
+                color: #334155;
+                font-size: 14px;
+                font-weight: 700;
+            }
+            QPushButton#dashboardPanelLinkButton {
+                text-align: center;
+            }
+            QLabel#dashboardFooterLabel,
+            QLabel#dashboardDialogSummary {
+                color: #64748B;
+                font-size: 12px;
+            }
+            QLabel#dashboardDialogTitle {
+                color: #0F172A;
+                font-size: 20px;
+                font-weight: 700;
+            }
+            QTableWidget#dashboardReactivationTable,
+            QTableWidget#dashboardIslandTable,
+            QTableWidget#dashboardAgendaOverviewTable {
+                background: #FFFFFF;
+                border: 1px solid #E2E8F1;
+                border-radius: 10px;
+                alternate-background-color: #F8FBFF;
+                selection-background-color: #DBEAFE;
+                selection-color: #0F172A;
+            }
+            QHeaderView::section {
+                background: #F8FAFC;
+                color: #334155;
+                border: none;
+                border-bottom: 1px solid #E2E8F1;
+                padding: 8px 10px;
+                font-weight: 700;
+            }
+            QCalendarWidget#dashboardPopupCalendar QWidget#qt_calendar_navigationbar {
+                background: #FFFFFF;
+                border-bottom: 1px solid #D7DEE8;
+            }
+            QCalendarWidget#dashboardPopupCalendar QAbstractItemView::item {
+                min-width: 30px;
+                min-height: 26px;
+            }
+            """
+        )
