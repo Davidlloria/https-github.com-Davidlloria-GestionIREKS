@@ -16,6 +16,7 @@ from app.core.config import USE_QML_CUSTOMERS
 from app.core.feature_flags import use_qml_customers_enabled
 from app.ui.widgets.contacts_page import ContactsPage
 from app.ui.widgets.courses_page import CoursesPage
+from app.ui.widgets.dashboard_page import DashboardPage
 from app.ui.widgets.customers_page import CustomersPage
 from app.ui.widgets.distributors_page import DistributorsPage
 from app.ui.widgets.ingredients_page import IngredientsIreksPage, IngredientsStdPage
@@ -73,6 +74,7 @@ class MainWindow(QMainWindow):
 
     def _build_pages(self) -> None:
         self.page_names: list[str] = []
+        self._add_page("Inicio", DashboardPage())
         self._add_page("Clientes", self._build_customers_page())
         self._add_page("Contactos", ContactsPage())
         self._add_page("Tecnicos", TechniciansPage())
@@ -104,6 +106,7 @@ class MainWindow(QMainWindow):
 
     def _build_ribbon_groups(self) -> None:
         groups = [
+            ["Inicio"],
             ["Clientes", "Contactos", "Tecnicos", "Distribuidores", "Colaboradores"],
             ["Cursos", "Formulas"],
             ["Almacen", "Productos IREKS", "Materias primas"],
