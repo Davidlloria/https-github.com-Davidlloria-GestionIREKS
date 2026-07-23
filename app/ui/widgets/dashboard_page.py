@@ -392,14 +392,14 @@ class DashboardPage(QWidget):
         self.new_activity_btn = QPushButton("Nueva actividad")
         self.new_activity_btn.setObjectName("dashboardNewActivityButton")
         self.new_activity_btn.setProperty("btnRole", "primary")
-        self._set_button_icon(self.new_activity_btn, "plus.svg", color="#FFFFFF", size=20)
+        self._set_button_icon(self.new_activity_btn, "plus.svg", color="#FFFFFF", size=24)
         self.new_activity_btn.clicked.connect(self._open_new_activity)
         header_layout.addWidget(self.new_activity_btn)
 
         self.full_agenda_btn = QPushButton("Ver agenda completa")
         self.full_agenda_btn.setObjectName("dashboardFullAgendaButton")
         self.full_agenda_btn.setProperty("btnRole", "secondary")
-        self._set_button_icon(self.full_agenda_btn, "calendar.svg", color="#1D4ED8", size=20)
+        self._set_button_icon(self.full_agenda_btn, "calendar.svg", color="#1D4ED8", size=24)
         self.full_agenda_btn.clicked.connect(self._open_full_agenda)
         header_layout.addWidget(self.full_agenda_btn)
 
@@ -632,13 +632,22 @@ class DashboardPage(QWidget):
         layout.setContentsMargins(14, 12, 14, 12)
         layout.setSpacing(14)
 
+        icon_wrap = QFrame()
+        icon_wrap.setObjectName("dashboardKpiIcon")
+        icon_wrap.setProperty("tone", tone)
+        icon_wrap.setFixedSize(72, 72)
+        icon_wrap_layout = QVBoxLayout(icon_wrap)
+        icon_wrap_layout.setContentsMargins(0, 0, 0, 0)
+        icon_wrap_layout.setSpacing(0)
+
         icon_label = QLabel()
-        icon_label.setObjectName("dashboardKpiIcon")
-        icon_label.setProperty("tone", tone)
-        icon_label.setFixedSize(58, 58)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setPixmap(self._icon_pixmap(icon_name, 30, color=self._kpi_tone_color(tone)))
-        layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
+        icon_label.setFixedSize(40, 40)
+        icon_label.setPixmap(self._icon_pixmap(icon_name, 36, color=self._kpi_tone_color(tone)))
+        icon_wrap_layout.addStretch(1)
+        icon_wrap_layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignCenter)
+        icon_wrap_layout.addStretch(1)
+        layout.addWidget(icon_wrap, 0, Qt.AlignmentFlag.AlignVCenter)
 
         copy_layout = QVBoxLayout()
         copy_layout.setContentsMargins(0, 0, 0, 0)
@@ -913,13 +922,13 @@ class DashboardPage(QWidget):
         home_btn = QPushButton("Dashboard")
         home_btn.setObjectName("dashboardSidebarButton")
         home_btn.setProperty("active", True)
-        self._set_button_icon(home_btn, "layout-dashboard.svg", color="#FFFFFF", size=22)
+        self._set_button_icon(home_btn, "layout-dashboard.svg", color="#FFFFFF", size=28)
         layout.addWidget(home_btn)
 
         for label, icon_name in [("Agenda", "calendar-days.svg"), ("Almacen", "box.svg"), ("Pedidos", "shopping-cart.svg"), ("Ventas", "bar-chart-3.svg")]:
             button = QPushButton(label)
             button.setObjectName("dashboardSidebarButton")
-            self._set_button_icon(button, icon_name, color="#475569", size=22)
+            self._set_button_icon(button, icon_name, color="#475569", size=28)
             button.clicked.connect(lambda _checked=False, name=label: self._show_placeholder_dashboard(name))
             layout.addWidget(button)
 
@@ -941,7 +950,7 @@ class DashboardPage(QWidget):
 
     def _set_button_icon(self, button: QPushButton, icon_name: str, *, color: str, size: int = 18) -> None:
         button.setIcon(QIcon(self._icon_pixmap(icon_name, size, color=color)))
-        button.setIconSize(QSize(max(size, 22), max(size, 22)))
+        button.setIconSize(QSize(size, size))
 
     @staticmethod
     def _recolor_pixmap(pixmap: QPixmap, color: QColor) -> QPixmap:
@@ -1064,7 +1073,7 @@ class DashboardPage(QWidget):
             }
             QLabel#dashboardKpiIcon {
                 background: #EFF6FF;
-                border-radius: 29px;
+                border-radius: 36px;
                 border: none;
             }
             QLabel#dashboardKpiIcon[tone="red"] {
