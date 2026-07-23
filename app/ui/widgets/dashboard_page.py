@@ -642,8 +642,8 @@ class DashboardPage(QWidget):
 
         icon_label = QLabel()
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setFixedSize(40, 40)
-        icon_label.setPixmap(self._icon_pixmap(icon_name, 36, color=self._kpi_tone_color(tone)))
+        icon_label.setFixedSize(44, 44)
+        icon_label.setPixmap(self._icon_pixmap(icon_name, 40, color=self._kpi_tone_color(tone)))
         icon_wrap_layout.addStretch(1)
         icon_wrap_layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignCenter)
         icon_wrap_layout.addStretch(1)
@@ -944,6 +944,7 @@ class DashboardPage(QWidget):
     def _icon_pixmap(self, icon_name: str, size: int, *, color: str | None = None) -> QPixmap:
         path = self._icon_path(icon_name)
         pixmap = QIcon(str(path)).pixmap(size, size) if path.exists() else QPixmap(size, size)
+        pixmap = self._trim_transparent_margins(pixmap, size)
         if color is None:
             return pixmap
         return self._recolor_pixmap(pixmap, QColor(color))
@@ -964,6 +965,30 @@ class DashboardPage(QWidget):
         painter.fillRect(tinted.rect(), color)
         painter.end()
         return tinted
+
+    @staticmethod
+    def _trim_transparent_margins(pixmap: QPixmap, target_size: int) -> QPixmap:
+        if pixmap.isNull():
+            return pixmap
+        image = pixmap.toImage()
+        rect = image.rect()
+        left = rect.right()
+        top = rect.bottom()
+        right = rect.left()
+        bottom = rect.top()
+        found = False
+        for y in range(image.height()):
+            for x in range(image.width()):
+                if QColor(image.pixelColor(x, y)).alpha() > 0:
+                    left = min(left, x)
+                    top = min(top, y)
+                    right = max(right, x)
+                    bottom = max(bottom, y)
+                    found = True
+        if not found:
+            return pixmap
+        cropped = pixmap.copy(left, top, right - left + 1, bottom - top + 1)
+        return cropped.scaled(target_size, target_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
 
     @staticmethod
     def _kpi_tone_color(tone: str) -> str:
@@ -1071,18 +1096,18 @@ class DashboardPage(QWidget):
                 border: 1px solid #E2E8F1;
                 border-radius: 14px;
             }
-            QLabel#dashboardKpiIcon {
+            QFrame#dashboardKpiIcon {
                 background: #EFF6FF;
                 border-radius: 36px;
                 border: none;
             }
-            QLabel#dashboardKpiIcon[tone="red"] {
+            QFrame#dashboardKpiIcon[tone="red"] {
                 background: #FEF2F2;
             }
-            QLabel#dashboardKpiIcon[tone="green"] {
+            QFrame#dashboardKpiIcon[tone="green"] {
                 background: #F0FDF4;
             }
-            QLabel#dashboardKpiIcon[tone="orange"] {
+            QFrame#dashboardKpiIcon[tone="orange"] {
                 background: #FFF7ED;
             }
             QFrame#dashboardKpiCard[tone="blue"] {
