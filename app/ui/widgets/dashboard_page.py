@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QSize, Qt
+from PySide6.QtCore import QDate, QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCalendarWidget,
@@ -943,11 +944,14 @@ class DashboardPage(QWidget):
 
     def _icon_pixmap(self, icon_name: str, size: int, *, color: str | None = None) -> QPixmap:
         path = self._icon_path(icon_name)
-        pixmap = QIcon(str(path)).pixmap(size, size) if path.exists() else QPixmap(size, size)
+        if not path.exists():
+            return QPixmap(size, size)
+
+        pixmap = self._render_icon_source(path, size)
         pixmap = self._trim_transparent_margins(pixmap, size)
-        if color is None:
-            return pixmap
-        return self._recolor_pixmap(pixmap, QColor(color))
+        if color is not None:
+            pixmap = self._recolor_pixmap(pixmap, QColor(color))
+        return self._compose_centered_pixmap(pixmap, size)
 
     def _set_button_icon(self, button: QPushButton, icon_name: str, *, color: str, size: int = 18) -> None:
         button.setIcon(QIcon(self._icon_pixmap(icon_name, size, color=color)))
@@ -965,6 +969,33 @@ class DashboardPage(QWidget):
         painter.fillRect(tinted.rect(), color)
         painter.end()
         return tinted
+
+    @staticmethod
+    def _render_icon_source(path: Path, target_size: int) -> QPixmap:
+        render_size = max(target_size * 4, 64)
+        if path.suffix.lower() == ".svg":
+            renderer = QSvgRenderer(str(path))
+            pixmap = QPixmap(render_size, render_size)
+            pixmap.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pixmap)
+            renderer.render(painter, QRectF(0, 0, render_size, render_size))
+            painter.end()
+            return pixmap
+        source = QPixmap(str(path))
+        return source.scaled(render_size, render_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+
+    @staticmethod
+    def _compose_centered_pixmap(pixmap: QPixmap, target_size: int) -> QPixmap:
+        if pixmap.isNull():
+            return pixmap
+        canvas = QPixmap(target_size, target_size)
+        canvas.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(canvas)
+        x = (target_size - pixmap.width()) / 2
+        y = (target_size - pixmap.height()) / 2
+        painter.drawPixmap(int(round(x)), int(round(y)), pixmap)
+        painter.end()
+        return canvas
 
     @staticmethod
     def _trim_transparent_margins(pixmap: QPixmap, target_size: int) -> QPixmap:
