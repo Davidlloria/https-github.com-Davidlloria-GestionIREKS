@@ -636,15 +636,15 @@ class DashboardPage(QWidget):
         icon_wrap = QFrame()
         icon_wrap.setObjectName("dashboardKpiIcon")
         icon_wrap.setProperty("tone", tone)
-        icon_wrap.setFixedSize(72, 72)
+        icon_wrap.setFixedSize(64, 64)
         icon_wrap_layout = QVBoxLayout(icon_wrap)
         icon_wrap_layout.setContentsMargins(0, 0, 0, 0)
         icon_wrap_layout.setSpacing(0)
 
         icon_label = QLabel()
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setFixedSize(54, 54)
-        icon_label.setPixmap(self._icon_pixmap(icon_name, 50, color=self._kpi_tone_color(tone)))
+        icon_label.setFixedSize(46, 46)
+        icon_label.setPixmap(self._icon_pixmap(icon_name, 42, color=self._kpi_tone_color(tone)))
         icon_wrap_layout.addStretch(1)
         icon_wrap_layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignCenter)
         icon_wrap_layout.addStretch(1)
@@ -1129,7 +1129,7 @@ class DashboardPage(QWidget):
             }
             QFrame#dashboardKpiIcon {
                 background: #EFF6FF;
-                border-radius: 36px;
+                border-radius: 32px;
                 border: none;
             }
             QFrame#dashboardKpiIcon[tone="red"] {
