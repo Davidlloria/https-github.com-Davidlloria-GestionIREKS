@@ -392,14 +392,14 @@ class DashboardPage(QWidget):
         self.new_activity_btn = QPushButton("Nueva actividad")
         self.new_activity_btn.setObjectName("dashboardNewActivityButton")
         self.new_activity_btn.setProperty("btnRole", "primary")
-        self._set_button_icon(self.new_activity_btn, "plus.svg", color="#FFFFFF")
+        self._set_button_icon(self.new_activity_btn, "plus.svg", color="#FFFFFF", size=20)
         self.new_activity_btn.clicked.connect(self._open_new_activity)
         header_layout.addWidget(self.new_activity_btn)
 
         self.full_agenda_btn = QPushButton("Ver agenda completa")
         self.full_agenda_btn.setObjectName("dashboardFullAgendaButton")
         self.full_agenda_btn.setProperty("btnRole", "secondary")
-        self._set_button_icon(self.full_agenda_btn, "calendar.svg", color="#1D4ED8")
+        self._set_button_icon(self.full_agenda_btn, "calendar.svg", color="#1D4ED8", size=20)
         self.full_agenda_btn.clicked.connect(self._open_full_agenda)
         header_layout.addWidget(self.full_agenda_btn)
 
@@ -410,15 +410,15 @@ class DashboardPage(QWidget):
         kpi_row.setVerticalSpacing(12)
         self.kpi_labels: dict[str, QLabel] = {}
         self.kpi_notes: dict[str, QLabel] = {}
-        for column, (key, title, tone) in enumerate(
+        for column, (key, title, tone, icon_name) in enumerate(
             [
-                ("pending_today", "Pendientes hoy", "blue"),
-                ("overdue", "Vencidas", "red"),
-                ("completed_today", "Completadas hoy", "green"),
-                ("customers_without_follow_up", "Clientes sin seguimiento", "orange"),
+                ("pending_today", "Pendientes hoy", "blue", "clipboard-list.svg"),
+                ("overdue", "Vencidas", "red", "clock-3.svg"),
+                ("completed_today", "Completadas hoy", "green", "circle-check.svg"),
+                ("customers_without_follow_up", "Clientes sin seguimiento", "orange", "users.svg"),
             ]
         ):
-            card, value_label, note_label = self._build_kpi_card(title, tone=tone)
+            card, value_label, note_label = self._build_kpi_card(title, tone=tone, icon_name=icon_name)
             self.kpi_labels[key] = value_label
             self.kpi_notes[key] = note_label
             kpi_row.addWidget(card, 0, column)
@@ -624,22 +624,36 @@ class DashboardPage(QWidget):
             layout.addWidget(self._build_activity_card(row))
         layout.addStretch(1)
 
-    def _build_kpi_card(self, title: str, *, tone: str) -> tuple[QFrame, QLabel, QLabel]:
+    def _build_kpi_card(self, title: str, *, tone: str, icon_name: str) -> tuple[QFrame, QLabel, QLabel]:
         card = QFrame()
         card.setObjectName("dashboardKpiCard")
         card.setProperty("tone", tone)
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(2)
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(14)
+
+        icon_label = QLabel()
+        icon_label.setObjectName("dashboardKpiIcon")
+        icon_label.setProperty("tone", tone)
+        icon_label.setFixedSize(58, 58)
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setPixmap(self._icon_pixmap(icon_name, 30, color=self._kpi_tone_color(tone)))
+        layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
+
+        copy_layout = QVBoxLayout()
+        copy_layout.setContentsMargins(0, 0, 0, 0)
+        copy_layout.setSpacing(2)
         title_label = QLabel(title)
         title_label.setObjectName("dashboardKpiTitle")
-        layout.addWidget(title_label)
+        copy_layout.addWidget(title_label)
         value_label = QLabel("0")
         value_label.setObjectName("dashboardKpiValue")
-        layout.addWidget(value_label)
+        copy_layout.addWidget(value_label)
         note_label = QLabel("actividad(es)")
         note_label.setObjectName("dashboardKpiNote")
-        layout.addWidget(note_label)
+        copy_layout.addWidget(note_label)
+        copy_layout.addStretch(1)
+        layout.addLayout(copy_layout, 1)
         return card, value_label, note_label
 
     def _build_list_panel(self, title: str, object_name: str, *, empty_text: str) -> tuple[QFrame, QVBoxLayout]:
@@ -899,13 +913,13 @@ class DashboardPage(QWidget):
         home_btn = QPushButton("Dashboard")
         home_btn.setObjectName("dashboardSidebarButton")
         home_btn.setProperty("active", True)
-        self._set_button_icon(home_btn, "layout-dashboard.svg", color="#1D4ED8")
+        self._set_button_icon(home_btn, "layout-dashboard.svg", color="#FFFFFF", size=22)
         layout.addWidget(home_btn)
 
         for label, icon_name in [("Agenda", "calendar-days.svg"), ("Almacen", "box.svg"), ("Pedidos", "shopping-cart.svg"), ("Ventas", "bar-chart-3.svg")]:
             button = QPushButton(label)
             button.setObjectName("dashboardSidebarButton")
-            self._set_button_icon(button, icon_name, color="#DCE9FF")
+            self._set_button_icon(button, icon_name, color="#475569", size=22)
             button.clicked.connect(lambda _checked=False, name=label: self._show_placeholder_dashboard(name))
             layout.addWidget(button)
 
@@ -927,7 +941,7 @@ class DashboardPage(QWidget):
 
     def _set_button_icon(self, button: QPushButton, icon_name: str, *, color: str, size: int = 18) -> None:
         button.setIcon(QIcon(self._icon_pixmap(icon_name, size, color=color)))
-        button.setIconSize(QSize(size, size))
+        button.setIconSize(QSize(max(size, 22), max(size, 22)))
 
     @staticmethod
     def _recolor_pixmap(pixmap: QPixmap, color: QColor) -> QPixmap:
@@ -941,6 +955,15 @@ class DashboardPage(QWidget):
         painter.fillRect(tinted.rect(), color)
         painter.end()
         return tinted
+
+    @staticmethod
+    def _kpi_tone_color(tone: str) -> str:
+        return {
+            "blue": "#2563EB",
+            "red": "#EF4444",
+            "green": "#16A34A",
+            "orange": "#F97316",
+        }.get(tone, "#2563EB")
 
     def _open_new_activity(self) -> None:
         if not self.customer_choices():
@@ -994,31 +1017,32 @@ class DashboardPage(QWidget):
                 background: #EEF3F8;
             }
             QFrame#dashboardSidebar {
-                background: #0F4FA8;
+                background: #F8FAFC;
                 border: none;
+                border-right: 1px solid #E2E8F0;
             }
             QLabel#dashboardSidebarBrand {
-                color: #FFFFFF;
-                background: rgba(255, 255, 255, 0.10);
-                border: 1px solid rgba(255, 255, 255, 0.18);
-                border-radius: 14px;
-                padding: 12px;
+                color: #0F172A;
+                background: #FFFFFF;
+                border: 1px solid #E2E8F0;
+                border-radius: 16px;
+                padding: 14px;
                 font-size: 18px;
                 font-weight: 700;
             }
             QPushButton#dashboardSidebarButton {
                 background: transparent;
-                color: #DCE9FF;
+                color: #334155;
                 border: none;
-                border-radius: 10px;
-                padding: 10px 12px;
+                border-radius: 16px;
+                padding: 14px 16px;
                 text-align: left;
-                font-size: 14px;
+                font-size: 15px;
                 font-weight: 600;
             }
             QPushButton#dashboardSidebarButton[active="true"] {
-                background: #FFFFFF;
-                color: #1D4ED8;
+                background: #2563EB;
+                color: #FFFFFF;
             }
             QWidget#dashboardContentHost,
             QWidget#dashboardContent {
@@ -1037,6 +1061,20 @@ class DashboardPage(QWidget):
                 background: #FFFFFF;
                 border: 1px solid #E2E8F1;
                 border-radius: 14px;
+            }
+            QLabel#dashboardKpiIcon {
+                background: #EFF6FF;
+                border-radius: 29px;
+                border: none;
+            }
+            QLabel#dashboardKpiIcon[tone="red"] {
+                background: #FEF2F2;
+            }
+            QLabel#dashboardKpiIcon[tone="green"] {
+                background: #F0FDF4;
+            }
+            QLabel#dashboardKpiIcon[tone="orange"] {
+                background: #FFF7ED;
             }
             QFrame#dashboardKpiCard[tone="blue"] {
                 border-bottom: 3px solid #2563EB;
