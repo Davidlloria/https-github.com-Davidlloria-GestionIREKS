@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 from sqlmodel import Session, select
 
 from app.core.database import engine as default_engine
-from app.models import Cliente, ClienteAgenda, Isla
+from app.models import Cliente, ClienteAgenda, Isla, VentaMensualRaw
 
 
 @dataclass(slots=True)
@@ -39,7 +39,9 @@ class DashboardReactivationRow:
     cliente_nombre: str
     isla_nombre: str
     last_contact: date | None
-    days_without_follow_up: int | None
+    current_kg: float
+    previous_kg: float
+    delta_kg: float
     priority: str
 
 
@@ -64,6 +66,7 @@ class DashboardSnapshot:
     upcoming_week: list[DashboardActivityRow] = field(default_factory=list)
     reactivation_rows: list[DashboardReactivationRow] = field(default_factory=list)
     island_rows: list[DashboardIslandRow] = field(default_factory=list)
+    reactivation_metric_label: str = ""
     generated_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -73,10 +76,7 @@ class CustomerDashboardService:
 
     def list_all_activities(self) -> list[DashboardActivityRow]:
         with Session(self.engine) as session:
-            customers = {
-                row.cliente_id: row
-                for row in session.exec(select(Cliente))
-            }
+            customers = {row.cliente_id: row for row in session.exec(select(Cliente))}
             islands = {
                 row.isla_id: str(row.isla_nombre or "").strip()
                 for row in session.exec(select(Isla))
@@ -129,20 +129,19 @@ class CustomerDashboardService:
         today_value = today or date.today()
         horizon_end = today_value + timedelta(days=max(1, int(horizon_days or 7)))
         reactivation_cutoff = today_value - timedelta(days=max(1, int(reactivation_days or 30)))
+        current_period, previous_period = self._monthly_periods(today_value)
 
         rows = self.list_all_activities()
         active_customers = self._active_customers()
         last_contact_by_customer: dict[str, date] = {}
+        sales_by_customer = self._sales_delta_by_customer(current_period=current_period, previous_period=previous_period)
 
         for row in rows:
             previous = last_contact_by_customer.get(row.cliente_id)
             if previous is None or row.due_date > previous:
                 last_contact_by_customer[row.cliente_id] = row.due_date
 
-        today_items = sorted(
-            [row for row in rows if row.fecha_actividad == today_value],
-            key=self._today_sort_key,
-        )
+        today_items = sorted([row for row in rows if row.fecha_actividad == today_value], key=self._today_sort_key)
         overdue = [
             row
             for row in rows
@@ -178,7 +177,7 @@ class CustomerDashboardService:
             last_contact = last_contact_by_customer.get(customer["cliente_id"])
             if last_contact is not None and last_contact >= reactivation_cutoff:
                 continue
-            days_without_follow_up = (today_value - last_contact).days if last_contact is not None else None
+            sales_data = sales_by_customer.get(customer["cliente_id"], {"current_kg": 0.0, "previous_kg": 0.0, "delta_kg": 0.0})
             reactivation_rows.append(
                 DashboardReactivationRow(
                     cliente_id=customer["cliente_id"],
@@ -186,12 +185,15 @@ class CustomerDashboardService:
                     cliente_nombre=customer["cliente_nombre"],
                     isla_nombre=customer["isla_nombre"],
                     last_contact=last_contact,
-                    days_without_follow_up=days_without_follow_up,
-                    priority=self._reactivation_priority(days_without_follow_up),
+                    current_kg=float(sales_data["current_kg"]),
+                    previous_kg=float(sales_data["previous_kg"]),
+                    delta_kg=float(sales_data["delta_kg"]),
+                    priority=self._reactivation_priority(last_contact, float(sales_data["delta_kg"])),
                 )
             )
         reactivation_rows.sort(
             key=lambda row: (
+                row.delta_kg,
                 row.last_contact is not None,
                 row.last_contact or date.min,
                 row.cliente_nombre.lower(),
@@ -211,6 +213,7 @@ class CustomerDashboardService:
             upcoming_week=upcoming_week,
             reactivation_rows=reactivation_rows[: max(1, int(reactivation_limit or 8))],
             island_rows=island_rows,
+            reactivation_metric_label=f"Variación kg · {previous_period} vs {current_period}",
             generated_at=datetime.utcnow(),
         )
 
@@ -231,13 +234,34 @@ class CustomerDashboardService:
                     "cliente_id": str(getattr(customer, "cliente_id", "") or "").strip(),
                     "cliente_codigo": int(getattr(customer, "cliente_codigo", 0) or 0),
                     "cliente_nombre": str(getattr(customer, "cliente_nombre_comercial", "") or "").strip(),
-                    "isla_nombre": islands.get(
-                        str(getattr(customer, "cliente_direccion_isla_id", "") or "").strip(),
-                        "",
-                    ),
+                    "isla_nombre": islands.get(str(getattr(customer, "cliente_direccion_isla_id", "") or "").strip(), ""),
                 }
             )
         return active_rows
+
+    def _sales_delta_by_customer(self, *, current_period: str, previous_period: str) -> dict[str, dict[str, float]]:
+        with Session(self.engine) as session:
+            monthly_rows = list(
+                session.exec(
+                    select(VentaMensualRaw).where(VentaMensualRaw.periodo.in_([current_period, previous_period]))
+                )
+            )
+
+        grouped: dict[str, dict[str, float]] = {}
+        for row in monthly_rows:
+            cliente_id = str(getattr(row, "cliente_id", "") or "").strip()
+            if not cliente_id:
+                continue
+            bucket = grouped.setdefault(cliente_id, {"current_kg": 0.0, "previous_kg": 0.0, "delta_kg": 0.0})
+            kilos = float(getattr(row, "venta_kilos", 0.0) or 0.0)
+            if str(getattr(row, "periodo", "") or "").strip() == current_period:
+                bucket["current_kg"] += kilos
+            elif str(getattr(row, "periodo", "") or "").strip() == previous_period:
+                bucket["previous_kg"] += kilos
+
+        for bucket in grouped.values():
+            bucket["delta_kg"] = bucket["current_kg"] - bucket["previous_kg"]
+        return grouped
 
     def _build_island_rows(
         self,
@@ -263,18 +287,24 @@ class CustomerDashboardService:
                 island_row.pending += 1
             island_row.total += 1
 
-        return sorted(
-            grouped.values(),
-            key=lambda row: (-row.total, row.isla_nombre.lower()),
-        )
+        return sorted(grouped.values(), key=lambda row: (-row.total, row.isla_nombre.lower()))
 
     @staticmethod
-    def _reactivation_priority(days_without_follow_up: int | None) -> str:
-        if days_without_follow_up is None or days_without_follow_up >= 90:
+    def _reactivation_priority(last_contact: date | None, delta_kg: float) -> str:
+        if last_contact is None and delta_kg <= 0:
             return "Alta"
-        if days_without_follow_up >= 60:
+        if delta_kg <= -100.0:
+            return "Alta"
+        if delta_kg < 0:
             return "Media"
         return "Baja"
+
+    @staticmethod
+    def _monthly_periods(today_value: date) -> tuple[str, str]:
+        current_month = date(today_value.year, today_value.month, 1)
+        previous_month_end = current_month - timedelta(days=1)
+        previous_month = date(previous_month_end.year, previous_month_end.month, 1)
+        return current_month.strftime("%Y-%m"), previous_month.strftime("%Y-%m")
 
     @staticmethod
     def _state_group(state: str) -> str:
@@ -314,7 +344,6 @@ class CustomerDashboardService:
         if group == "completed":
             return 2
         return 3
-
 
     @staticmethod
     def _priority_sort_rank(priority: str) -> int:

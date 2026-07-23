@@ -60,13 +60,16 @@ class _StubDashboardService:
                     cliente_nombre="Cliente frio",
                     isla_nombre="Tenerife",
                     last_contact=None,
-                    days_without_follow_up=None,
+                    current_kg=15.0,
+                    previous_kg=40.0,
+                    delta_kg=-25.0,
                     priority="Alta",
                 )
             ],
             island_rows=[
                 DashboardIslandRow(isla_nombre="Gran Canaria", pending=2, postponed=1, completed=0, total=3)
             ],
+            reactivation_metric_label="Variación kg · 2026-06 vs 2026-07",
             generated_at=datetime(2026, 7, 21, 9, 30, 0),
         )
 
@@ -93,6 +96,7 @@ def test_dashboard_page_renders_named_controls_and_snapshot() -> None:
     page = DashboardPage(customer_service=_StubCustomerService(), dashboard_service=_StubDashboardService())
 
     assert page.objectName() == "dashboardPageRoot"
+    assert page.sidebar.objectName() == "dashboardSidebar"
     assert page.new_activity_btn.objectName() == "dashboardNewActivityButton"
     assert page.full_agenda_btn.objectName() == "dashboardFullAgendaButton"
     assert page.kpi_labels["pending_today"].text() == "2"
@@ -100,7 +104,9 @@ def test_dashboard_page_renders_named_controls_and_snapshot() -> None:
     assert page.kpi_labels["completed_today"].text() == "3"
     assert page.kpi_labels["customers_without_follow_up"].text() == "4"
     assert page.reactivation_table.rowCount() == 1
+    assert page.reactivation_table.item(0, 3).text() == "-25,00 kg"
     assert page.island_table.rowCount() == 1
+    assert "Variación kg" in page.footer_label.text()
 
 
 def test_dashboard_page_uses_static_layout_without_scrollbar() -> None:

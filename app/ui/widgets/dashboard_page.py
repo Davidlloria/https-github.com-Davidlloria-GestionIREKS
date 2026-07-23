@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
-from PySide6.QtCore import QDate, Qt
+from PySide6.QtCore import QDate, QSize, Qt
+from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCalendarWidget,
@@ -36,6 +38,8 @@ from app.services.customer_dashboard_service import (
     DashboardSnapshot,
 )
 from app.services.customer_service import CustomerService
+
+BASE_DIR = Path(__file__).resolve().parents[3]
 
 
 class DashboardAgendaDialog(QDialog):
@@ -347,15 +351,26 @@ class DashboardPage(QWidget):
         self.reload()
 
     def _build_ui(self) -> None:
-        root_layout = QVBoxLayout(self)
+        root_layout = QHBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
+
+        self.sidebar = self._build_sidebar()
+        root_layout.addWidget(self.sidebar)
+
+        content_host = QWidget()
+        content_host.setObjectName("dashboardContentHost")
+        content_host_layout = QVBoxLayout(content_host)
+        content_host_layout.setContentsMargins(0, 0, 0, 0)
+        content_host_layout.setSpacing(0)
+
         content = QWidget()
         content.setObjectName("dashboardContent")
         self.content_layout = QVBoxLayout(content)
         self.content_layout.setContentsMargins(16, 14, 16, 14)
         self.content_layout.setSpacing(14)
-        root_layout.addWidget(content)
+        content_host_layout.addWidget(content)
+        root_layout.addWidget(content_host, 1)
 
         header = QFrame()
         header.setObjectName("dashboardHeader")
@@ -377,12 +392,14 @@ class DashboardPage(QWidget):
         self.new_activity_btn = QPushButton("Nueva actividad")
         self.new_activity_btn.setObjectName("dashboardNewActivityButton")
         self.new_activity_btn.setProperty("btnRole", "primary")
+        self._set_button_icon(self.new_activity_btn, "plus.svg", color="#FFFFFF")
         self.new_activity_btn.clicked.connect(self._open_new_activity)
         header_layout.addWidget(self.new_activity_btn)
 
         self.full_agenda_btn = QPushButton("Ver agenda completa")
         self.full_agenda_btn.setObjectName("dashboardFullAgendaButton")
         self.full_agenda_btn.setProperty("btnRole", "secondary")
+        self._set_button_icon(self.full_agenda_btn, "calendar.svg", color="#1D4ED8")
         self.full_agenda_btn.clicked.connect(self._open_full_agenda)
         header_layout.addWidget(self.full_agenda_btn)
 
@@ -433,9 +450,7 @@ class DashboardPage(QWidget):
         reactivation_panel = self._build_table_panel("Clientes a reactivar", "dashboardReactivationPanel")
         self.reactivation_table = QTableWidget(0, 5)
         self.reactivation_table.setObjectName("dashboardReactivationTable")
-        self.reactivation_table.setHorizontalHeaderLabels(
-            ["Cliente", "Isla", "Último contacto", "Días sin seguimiento", "Prioridad"]
-        )
+        self.reactivation_table.setHorizontalHeaderLabels(["Cliente", "Isla", "Último contacto", "Variación kg", "Prioridad"])
         self._configure_table(self.reactivation_table)
         reactivation_header = self.reactivation_table.horizontalHeader()
         reactivation_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -499,7 +514,7 @@ class DashboardPage(QWidget):
         )
         self._populate_reactivation_table(snapshot.reactivation_rows)
         self._populate_island_table(snapshot)
-        self.footer_label.setText(f"Última actualización: {snapshot.generated_at.strftime('%d/%m/%Y %H:%M')}")
+        self.footer_label.setText(f"Última actualización: {snapshot.generated_at.strftime('%d/%m/%Y %H:%M')} · {snapshot.reactivation_metric_label}")
 
     def customer_choices(self, *, include_inactive: bool = False) -> list[tuple[str, str]]:
         rows = []
@@ -812,16 +827,18 @@ class DashboardPage(QWidget):
         self.reactivation_table.setRowCount(len(rows))
         for row_index, row in enumerate(rows):
             values = [
-                self.customer_label(row.cliente_codigo, row.cliente_nombre),
-                row.isla_nombre or "Sin isla",
-                self.format_date(row.last_contact, allow_blank=True) or "Sin registro",
-                "-" if row.days_without_follow_up is None else str(row.days_without_follow_up),
-                row.priority,
+                QTableWidgetItem(self.customer_label(row.cliente_codigo, row.cliente_nombre)),
+                QTableWidgetItem(row.isla_nombre or "Sin isla"),
+                QTableWidgetItem(self.format_date(row.last_contact, allow_blank=True) or "Sin registro"),
+                QTableWidgetItem(self.format_kg(row.delta_kg, signed=True, suffix=" kg")),
+                QTableWidgetItem(row.priority),
             ]
-            for column, value in enumerate(values):
-                item = QTableWidgetItem(value)
+            for column, item in enumerate(values):
                 if column in {3, 4}:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if column == 3:
+                    item.setForeground(QColor("#DC2626") if row.delta_kg < 0 else QColor("#067647") if row.delta_kg > 0 else QColor("#475569"))
+                    item.setData(Qt.ItemDataRole.UserRole, float(row.delta_kg or 0.0))
                 self.reactivation_table.setItem(row_index, column, item)
 
     def _populate_island_table(self, snapshot: DashboardSnapshot) -> None:
@@ -859,6 +876,71 @@ class DashboardPage(QWidget):
                 widget.deleteLater()
             elif child_layout is not None:
                 self._clear_layout(child_layout)  # type: ignore[arg-type]
+
+    @staticmethod
+    def format_kg(value: float, *, signed: bool = False, suffix: str = "") -> str:
+        number = float(value or 0.0)
+        text = f"{number:+,.2f}" if signed else f"{number:,.2f}"
+        text = text.replace(",", "_").replace(".", ",").replace("_", ".")
+        return f"{text}{suffix}"
+
+    def _build_sidebar(self) -> QFrame:
+        sidebar = QFrame()
+        sidebar.setObjectName("dashboardSidebar")
+        sidebar.setFixedWidth(188)
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(12, 16, 12, 16)
+        layout.setSpacing(12)
+
+        brand = QLabel("GestionIREKS\nDashboards")
+        brand.setObjectName("dashboardSidebarBrand")
+        layout.addWidget(brand)
+
+        home_btn = QPushButton("Dashboard")
+        home_btn.setObjectName("dashboardSidebarButton")
+        home_btn.setProperty("active", True)
+        self._set_button_icon(home_btn, "layout-dashboard.svg", color="#1D4ED8")
+        layout.addWidget(home_btn)
+
+        for label, icon_name in [("Agenda", "calendar-days.svg"), ("Almacen", "box.svg"), ("Pedidos", "shopping-cart.svg"), ("Ventas", "bar-chart-3.svg")]:
+            button = QPushButton(label)
+            button.setObjectName("dashboardSidebarButton")
+            self._set_button_icon(button, icon_name, color="#DCE9FF")
+            button.clicked.connect(lambda _checked=False, name=label: self._show_placeholder_dashboard(name))
+            layout.addWidget(button)
+
+        layout.addStretch(1)
+        return sidebar
+
+    def _show_placeholder_dashboard(self, name: str) -> None:
+        QMessageBox.information(self, "Dashboard", f"El dashboard de {name} se implementará en una siguiente fase.")
+
+    def _icon_path(self, icon_name: str) -> Path:
+        return BASE_DIR / "assets" / "icons" / icon_name
+
+    def _icon_pixmap(self, icon_name: str, size: int, *, color: str | None = None) -> QPixmap:
+        path = self._icon_path(icon_name)
+        pixmap = QIcon(str(path)).pixmap(size, size) if path.exists() else QPixmap(size, size)
+        if color is None:
+            return pixmap
+        return self._recolor_pixmap(pixmap, QColor(color))
+
+    def _set_button_icon(self, button: QPushButton, icon_name: str, *, color: str, size: int = 18) -> None:
+        button.setIcon(QIcon(self._icon_pixmap(icon_name, size, color=color)))
+        button.setIconSize(QSize(size, size))
+
+    @staticmethod
+    def _recolor_pixmap(pixmap: QPixmap, color: QColor) -> QPixmap:
+        if pixmap.isNull():
+            return pixmap
+        tinted = QPixmap(pixmap.size())
+        tinted.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(tinted)
+        painter.drawPixmap(0, 0, pixmap)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+        painter.fillRect(tinted.rect(), color)
+        painter.end()
+        return tinted
 
     def _open_new_activity(self) -> None:
         if not self.customer_choices():
@@ -911,6 +993,34 @@ class DashboardPage(QWidget):
             QWidget#dashboardPageRoot {
                 background: #EEF3F8;
             }
+            QFrame#dashboardSidebar {
+                background: #0F4FA8;
+                border: none;
+            }
+            QLabel#dashboardSidebarBrand {
+                color: #FFFFFF;
+                background: rgba(255, 255, 255, 0.10);
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                border-radius: 14px;
+                padding: 12px;
+                font-size: 18px;
+                font-weight: 700;
+            }
+            QPushButton#dashboardSidebarButton {
+                background: transparent;
+                color: #DCE9FF;
+                border: none;
+                border-radius: 10px;
+                padding: 10px 12px;
+                text-align: left;
+                font-size: 14px;
+                font-weight: 600;
+            }
+            QPushButton#dashboardSidebarButton[active="true"] {
+                background: #FFFFFF;
+                color: #1D4ED8;
+            }
+            QWidget#dashboardContentHost,
             QWidget#dashboardContent {
                 background: transparent;
             }
