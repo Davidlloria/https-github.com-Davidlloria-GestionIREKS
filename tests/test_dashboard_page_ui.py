@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QScrollArea, QWidget
 
 from app.services.customer_dashboard_service import (
     DashboardActivityRow,
@@ -36,13 +36,13 @@ class _StubDashboardService:
                     agenda_id="ag-1",
                     cliente_id="cli-1",
                     cliente_codigo=101,
-                    cliente_nombre="Panadería Norte",
+                    cliente_nombre="Panaderia Norte",
                     isla_nombre="Gran Canaria",
                     fecha_actividad=date(2026, 7, 21),
                     fecha_seguimiento=None,
                     tipo="seguimiento",
                     estado="pendiente",
-                    resumen="Revisión comercial",
+                    resumen="Revision comercial",
                     detalle="Revisar consumo semanal",
                     prioridad="alta",
                     responsable="Juan",
@@ -57,7 +57,7 @@ class _StubDashboardService:
                 DashboardReactivationRow(
                     cliente_id="cli-9",
                     cliente_codigo=909,
-                    cliente_nombre="Cliente frío",
+                    cliente_nombre="Cliente frio",
                     isla_nombre="Tenerife",
                     last_contact=None,
                     days_without_follow_up=None,
@@ -90,3 +90,29 @@ class _StubCustomerService:
 
 def test_dashboard_page_renders_named_controls_and_snapshot() -> None:
     _application()
+    page = DashboardPage(customer_service=_StubCustomerService(), dashboard_service=_StubDashboardService())
+
+    assert page.objectName() == "dashboardPageRoot"
+    assert page.new_activity_btn.objectName() == "dashboardNewActivityButton"
+    assert page.full_agenda_btn.objectName() == "dashboardFullAgendaButton"
+    assert page.kpi_labels["pending_today"].text() == "2"
+    assert page.kpi_labels["overdue"].text() == "1"
+    assert page.kpi_labels["completed_today"].text() == "3"
+    assert page.kpi_labels["customers_without_follow_up"].text() == "4"
+    assert page.reactivation_table.rowCount() == 1
+    assert page.island_table.rowCount() == 1
+
+
+def test_dashboard_page_uses_static_layout_without_scrollbar() -> None:
+    _application()
+    page = DashboardPage(customer_service=_StubCustomerService(), dashboard_service=_StubDashboardService())
+    page.resize(1380, 760)
+    page.show()
+    QApplication.processEvents()
+
+    content = page.findChild(QWidget, "dashboardContent")
+
+    assert content is not None
+    assert page.findChildren(QScrollArea) == []
+    assert page.sizeHint().height() <= page.height()
+    assert content.sizeHint().height() <= page.height()

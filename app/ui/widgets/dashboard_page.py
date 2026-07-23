@@ -20,7 +20,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QScrollArea,
     QSizePolicy,
     QSpacerItem,
     QTableWidget,
@@ -351,29 +350,22 @@ class DashboardPage(QWidget):
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        root_layout.addWidget(scroll)
-
         content = QWidget()
         content.setObjectName("dashboardContent")
         self.content_layout = QVBoxLayout(content)
-        self.content_layout.setContentsMargins(20, 18, 20, 18)
-        self.content_layout.setSpacing(18)
-        scroll.setWidget(content)
+        self.content_layout.setContentsMargins(16, 14, 16, 14)
+        self.content_layout.setSpacing(14)
+        root_layout.addWidget(content)
 
         header = QFrame()
         header.setObjectName("dashboardHeader")
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.setSpacing(12)
+        header_layout.setSpacing(10)
 
         header_copy = QVBoxLayout()
         header_copy.setContentsMargins(0, 0, 0, 0)
-        header_copy.setSpacing(6)
+        header_copy.setSpacing(4)
         self.title_label = QLabel("Dashboard")
         self.title_label.setObjectName("dashboardTitle")
         header_copy.addWidget(self.title_label)
@@ -397,8 +389,8 @@ class DashboardPage(QWidget):
         self.content_layout.addWidget(header)
 
         kpi_row = QGridLayout()
-        kpi_row.setHorizontalSpacing(14)
-        kpi_row.setVerticalSpacing(14)
+        kpi_row.setHorizontalSpacing(12)
+        kpi_row.setVerticalSpacing(12)
         self.kpi_labels: dict[str, QLabel] = {}
         self.kpi_notes: dict[str, QLabel] = {}
         for column, (key, title, tone) in enumerate(
@@ -417,7 +409,7 @@ class DashboardPage(QWidget):
 
         middle_row = QHBoxLayout()
         middle_row.setContentsMargins(0, 0, 0, 0)
-        middle_row.setSpacing(16)
+        middle_row.setSpacing(14)
         today_panel, self.today_items_layout = self._build_list_panel(
             "Agenda de hoy",
             "dashboardTodayPanel",
@@ -436,7 +428,7 @@ class DashboardPage(QWidget):
 
         lower_row = QHBoxLayout()
         lower_row.setContentsMargins(0, 0, 0, 0)
-        lower_row.setSpacing(16)
+        lower_row.setSpacing(14)
 
         reactivation_panel = self._build_table_panel("Clientes a reactivar", "dashboardReactivationPanel")
         self.reactivation_table = QTableWidget(0, 5)
@@ -622,8 +614,8 @@ class DashboardPage(QWidget):
         card.setObjectName("dashboardKpiCard")
         card.setProperty("tone", tone)
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(4)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(2)
         title_label = QLabel(title)
         title_label.setObjectName("dashboardKpiTitle")
         layout.addWidget(title_label)
@@ -640,15 +632,15 @@ class DashboardPage(QWidget):
         panel.setObjectName(object_name)
         panel.setProperty("dashboardPanel", True)
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(8)
         heading = QLabel(title)
         heading.setObjectName("dashboardPanelTitle")
         layout.addWidget(heading)
         container = QWidget()
         container_layout = QVBoxLayout(container)
         container_layout.setContentsMargins(0, 0, 0, 0)
-        container_layout.setSpacing(10)
+        container_layout.setSpacing(6)
         container_layout.addWidget(self._empty_label(empty_text))
         layout.addWidget(container, 1)
         return panel, container_layout
@@ -658,8 +650,8 @@ class DashboardPage(QWidget):
         panel.setObjectName(object_name)
         panel.setProperty("dashboardPanel", True)
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(8)
         heading = QLabel(title)
         heading.setObjectName("dashboardPanelTitle")
         layout.addWidget(heading)
@@ -670,8 +662,8 @@ class DashboardPage(QWidget):
         panel.setObjectName("dashboardUpcomingPanel")
         panel.setProperty("dashboardPanel", True)
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(14)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(8)
         heading = QLabel("Próximos vencimientos")
         heading.setObjectName("dashboardPanelTitle")
         layout.addWidget(heading)
@@ -690,14 +682,14 @@ class DashboardPage(QWidget):
         frame.setObjectName("dashboardUpcomingSection")
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        layout.setSpacing(6)
         heading = QLabel(title)
         heading.setObjectName("dashboardUpcomingSectionTitle")
         layout.addWidget(heading)
         container = QWidget()
         container_layout = QVBoxLayout(container)
         container_layout.setContentsMargins(0, 0, 0, 0)
-        container_layout.setSpacing(8)
+        container_layout.setSpacing(6)
         layout.addWidget(container)
         return frame, container_layout
 
@@ -713,12 +705,12 @@ class DashboardPage(QWidget):
             "}"
         )
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(14, 12, 14, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(6)
 
         top_row = QHBoxLayout()
         top_row.setContentsMargins(0, 0, 0, 0)
-        top_row.setSpacing(10)
+        top_row.setSpacing(8)
         customer_label = QLabel(self.customer_label(row.cliente_codigo, row.cliente_nombre))
         customer_label.setObjectName("dashboardActivityCustomer")
         top_row.addWidget(customer_label, 1)
@@ -739,7 +731,7 @@ class DashboardPage(QWidget):
 
         meta_row = QHBoxLayout()
         meta_row.setContentsMargins(0, 0, 0, 0)
-        meta_row.setSpacing(8)
+        meta_row.setSpacing(6)
         meta_row.addWidget(self._meta_badge(self.agenda_type_label(row.tipo), badge_bg, "#1F2937"))
         meta_row.addWidget(self._meta_badge(row.isla_nombre or "Sin isla", "#EEF2FF", "#3730A3"))
         follow_up_text = (
@@ -795,8 +787,8 @@ class DashboardPage(QWidget):
         frame = QFrame()
         frame.setObjectName("dashboardUpcomingRow")
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(10)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(8)
         date_label = QLabel(self.format_date(row.due_date))
         date_label.setObjectName("dashboardUpcomingDate")
         layout.addWidget(date_label)
@@ -924,12 +916,12 @@ class DashboardPage(QWidget):
             }
             QLabel#dashboardTitle {
                 color: #0F172A;
-                font-size: 30px;
+                font-size: 26px;
                 font-weight: 700;
             }
             QLabel#dashboardDateLabel {
                 color: #475569;
-                font-size: 14px;
+                font-size: 13px;
             }
             QFrame#dashboardKpiCard {
                 background: #FFFFFF;
@@ -950,17 +942,17 @@ class DashboardPage(QWidget):
             }
             QLabel#dashboardKpiTitle {
                 color: #334155;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 600;
             }
             QLabel#dashboardKpiValue {
                 color: #0F172A;
-                font-size: 34px;
+                font-size: 30px;
                 font-weight: 700;
             }
             QLabel#dashboardKpiNote {
                 color: #64748B;
-                font-size: 13px;
+                font-size: 12px;
             }
             QFrame[dashboardPanel="true"] {
                 background: #FFFFFF;
@@ -969,7 +961,7 @@ class DashboardPage(QWidget):
             }
             QLabel#dashboardPanelTitle {
                 color: #0F172A;
-                font-size: 22px;
+                font-size: 18px;
                 font-weight: 700;
             }
             QLabel#dashboardEmptyLabel {
@@ -978,21 +970,21 @@ class DashboardPage(QWidget):
                 border: 1px dashed #CBD5E1;
                 border-radius: 10px;
                 padding: 14px;
-                font-size: 13px;
+                font-size: 12px;
             }
             QLabel#dashboardActivityCustomer {
                 color: #0F172A;
-                font-size: 15px;
+                font-size: 14px;
                 font-weight: 700;
             }
             QLabel#dashboardActivitySummary {
                 color: #1E293B;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 600;
             }
             QLabel#dashboardActivityDetail {
                 color: #475569;
-                font-size: 13px;
+                font-size: 11px;
             }
             QFrame#dashboardUpcomingRow {
                 background: #FFFFFF;
@@ -1006,11 +998,11 @@ class DashboardPage(QWidget):
             }
             QLabel#dashboardUpcomingText {
                 color: #1E293B;
-                font-size: 13px;
+                font-size: 12px;
             }
             QLabel#dashboardUpcomingSectionTitle {
                 color: #334155;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 700;
             }
             QPushButton#dashboardPanelLinkButton {
@@ -1019,7 +1011,7 @@ class DashboardPage(QWidget):
             QLabel#dashboardFooterLabel,
             QLabel#dashboardDialogSummary {
                 color: #64748B;
-                font-size: 12px;
+                font-size: 11px;
             }
             QLabel#dashboardDialogTitle {
                 color: #0F172A;
@@ -1041,7 +1033,7 @@ class DashboardPage(QWidget):
                 color: #334155;
                 border: none;
                 border-bottom: 1px solid #E2E8F1;
-                padding: 8px 10px;
+                padding: 6px 8px;
                 font-weight: 700;
             }
             QCalendarWidget#dashboardPopupCalendar QWidget#qt_calendar_navigationbar {
@@ -1054,3 +1046,4 @@ class DashboardPage(QWidget):
             }
             """
         )
+
