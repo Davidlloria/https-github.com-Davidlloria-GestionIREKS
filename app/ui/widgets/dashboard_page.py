@@ -642,8 +642,8 @@ class DashboardPage(QWidget):
 
         icon_label = QLabel()
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setFixedSize(44, 44)
-        icon_label.setPixmap(self._icon_pixmap(icon_name, 40, color=self._kpi_tone_color(tone)))
+        icon_label.setFixedSize(54, 54)
+        icon_label.setPixmap(self._icon_pixmap(icon_name, 50, color=self._kpi_tone_color(tone)))
         icon_wrap_layout.addStretch(1)
         icon_wrap_layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignCenter)
         icon_wrap_layout.addStretch(1)
