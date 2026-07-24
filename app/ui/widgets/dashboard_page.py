@@ -1647,6 +1647,12 @@ class DashboardPage(QWidget):
         layout.addWidget(ventas_btn)
         self.dashboard_nav_buttons["ventas"] = ventas_btn
 
+        objetivos_btn = QPushButton("Objetivos")
+        objetivos_btn.setObjectName("dashboardSidebarButton")
+        self._set_button_icon(objetivos_btn, "goal.svg", color="#475569", size=28)
+        objetivos_btn.clicked.connect(lambda: self._show_placeholder_dashboard("Objetivos"))
+        layout.addWidget(objetivos_btn)
+
         layout.addStretch(1)
         return sidebar
 

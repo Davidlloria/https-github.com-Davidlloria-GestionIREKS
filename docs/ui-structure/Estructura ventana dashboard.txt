@@ -16,6 +16,7 @@ DashboardPage (QWidget, objectName: dashboardPageRoot, fondo #EEF3F8)
     │   └── QVBoxLayout (márgenes 12/16/12/16 px, separación 12 px)
     │       ├── dashboardSidebarBrand (QLabel HTML solo logo IREKS_Logo_transparente.png, centrado, fondo transparente, texto #0F172A, sin borde, radio 16 px)
     │       ├── dashboardSidebarButton activo (QPushButton del modo activo: Agenda / Almacen / Pedidos / Ventas, fondo #2563EB, texto #FFFFFF)
+    │       ├── dashboardSidebarButton (QPushButton “Objetivos”, icono goal.svg, fondo transparente, texto #334155, placeholder)
     │       ├── dashboardSidebarButton (QPushButton inactivo “Agenda”, icono calendar-days.svg, fondo transparente, texto #334155)
     │       ├── dashboardSidebarButton (QPushButton inactivo “Almacen”, icono box.svg, fondo transparente, texto #334155)
     │       ├── dashboardSidebarButton (QPushButton inactivo “Pedidos”, icono shopping-cart.svg, fondo transparente, texto #334155)
@@ -106,6 +107,8 @@ COMPORTAMIENTO FUNCIONAL ACTUAL
   - Almacen
   - Pedidos
   - Ventas
+- Botón lateral adicional actualmente en placeholder:
+  - Objetivos
 - En modo Agenda:
   - “Nueva actividad” abre DashboardAgendaDialog.
   - “Ver agenda completa” abre DashboardAgendaOverviewDialog.
@@ -118,6 +121,7 @@ COMPORTAMIENTO FUNCIONAL ACTUAL
 - En modo Ventas:
   - “Ver ventas” navega a la página principal “Ventas” si existe en MainWindow.
   - “Actualizar” recarga el snapshot del dashboard de ventas.
+- El botón lateral “Objetivos” muestra por ahora un QMessageBox informativo hasta que se implemente ese dashboard.
 - Las tablas del dashboard son de solo lectura, con selección por fila y sin edición directa.
 
 GEOMETRÍA ACTUAL
@@ -160,3 +164,4 @@ RELACIÓN CON BACKEND / DATOS
 - Incorporado el dashboard de Almacen con navegación lateral y métricas principales en kg.
 - Incorporado el dashboard de Pedidos con navegación lateral y métricas principales en kg.
 - Incorporado el dashboard de Ventas con navegación lateral y foco principal en kg vendidos, variación anual, clientes activos e islas activas.
+- Añadido el botón lateral Objetivos con icono goal.svg, pendiente de implementación funcional.
