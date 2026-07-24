@@ -1122,6 +1122,10 @@ class DashboardPage(QWidget):
             QWidget#dashboardContent {
                 background: transparent;
             }
+            QFrame#dashboardHeader {
+                background: transparent;
+                border: none;
+            }
             QLabel#dashboardTitle {
                 color: #0F172A;
                 font-size: 26px;
