@@ -916,19 +916,13 @@ class DashboardPage(QWidget):
         layout.setContentsMargins(12, 16, 12, 16)
         layout.setSpacing(12)
 
-        brand_logo = BASE_DIR / "assets" / "logos" / "corporativos" / "IREKS_Logo.svg"
-        brand_icon = self._path_data_uri(brand_logo, 32, color="#FFFFFF")
-        brand = QLabel(
-            (
-                "<table cellspacing='0' cellpadding='0'><tr>"
-                f"<td width='40'><img src='{brand_icon}' width='32' height='32'/></td>"
-                "<td><span>IREKS</span><br/><span>Dashboard</span></td>"
-                "</tr></table>"
-            )
-        )
+        brand_logo = BASE_DIR / "assets" / "logos" / "corporativos" / "IREKS_Logo_transparente.png"
+        brand_icon = self._path_data_uri(brand_logo, 84, color=None)
+        brand = QLabel(f"<div align='center'><img src='{brand_icon}' width='84' height='84'/></div>")
         brand.setObjectName("dashboardSidebarBrand")
         brand.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(brand)
+        brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(brand, 0, Qt.AlignmentFlag.AlignHCenter)
 
         agenda_btn = QPushButton("Agenda")
         agenda_btn.setObjectName("dashboardSidebarButton")
@@ -1116,13 +1110,11 @@ class DashboardPage(QWidget):
                 border-right: 1px solid #E2E8F0;
             }
             QLabel#dashboardSidebarBrand {
-                color: #FFFFFF;
-                background: #7F1D2D;
-                border: 1px solid #7F1D2D;
+                color: #0F172A;
+                background: transparent;
+                border: none;
                 border-radius: 16px;
-                padding: 14px 16px;
-                font-size: 18px;
-                font-weight: 700;
+                padding: 8px;
             }
             QPushButton#dashboardSidebarButton {
                 background: transparent;
