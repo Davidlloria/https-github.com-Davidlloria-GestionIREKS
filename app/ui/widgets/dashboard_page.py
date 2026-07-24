@@ -442,6 +442,7 @@ class DashboardPage(QWidget):
 
     def _build_agenda_dashboard(self) -> QWidget:
         widget = QWidget()
+        widget.setObjectName("dashboardAgendaView")
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(14)
@@ -518,6 +519,7 @@ class DashboardPage(QWidget):
 
     def _build_warehouse_dashboard(self) -> QWidget:
         widget = QWidget()
+        widget.setObjectName("dashboardWarehouseView")
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(14)
@@ -610,6 +612,7 @@ class DashboardPage(QWidget):
 
     def _build_orders_dashboard(self) -> QWidget:
         widget = QWidget()
+        widget.setObjectName("dashboardOrdersView")
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(14)
@@ -1621,7 +1624,10 @@ class DashboardPage(QWidget):
             }
             QWidget#dashboardContentHost,
             QWidget#dashboardContent,
-            QStackedWidget#dashboardContentStack {
+            QStackedWidget#dashboardContentStack,
+            QWidget#dashboardAgendaView,
+            QWidget#dashboardWarehouseView,
+            QWidget#dashboardOrdersView {
                 background: transparent;
             }
             QFrame#dashboardHeader {

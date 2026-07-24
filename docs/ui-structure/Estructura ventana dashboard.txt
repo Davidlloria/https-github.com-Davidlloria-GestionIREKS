@@ -6,114 +6,97 @@ Implementación principal:
 - Servicios:
   - app/services/customer_dashboard_service.py
   - app/services/customer_service.py
+  - app/services/order_dashboard_service.py
+  - app/services/warehouse_dashboard_service.py
 
 DashboardPage (QWidget, objectName: dashboardPageRoot, fondo #EEF3F8)
 └── layout principal (QHBoxLayout, márgenes 0 px, separación 0 px)
     ├── dashboardSidebar (QFrame, ancho fijo 188 px, fondo #F8FAFC, borde derecho #E2E8F0)
     │   └── QVBoxLayout (márgenes 12/16/12/16 px, separación 12 px)
-    │       ├── dashboardSidebarBrand (QLabel HTML solo logo IREKS_Logo_transparente.png, centrado, sin etiqueta, fondo transparente, sin borde, radio 16 px)
-    │       ├── dashboardSidebarButton activo (QPushButton "Agenda", icono calendar-days.svg blanco, fondo #2563EB, texto #FFFFFF)
-    │       ├── dashboardSidebarButton (QPushButton "Almacen", icono box.svg, fondo transparente, texto #334155)
-    │       ├── dashboardSidebarButton (QPushButton "Pedidos", icono shopping-cart.svg, fondo transparente, texto #334155)
-    │       ├── dashboardSidebarButton (QPushButton "Ventas", icono bar-chart-3.svg, fondo transparente, texto #334155)
+    │       ├── dashboardSidebarBrand (QLabel HTML solo logo IREKS_Logo_transparente.png, centrado, fondo transparente, texto #0F172A, sin borde, radio 16 px)
+    │       ├── dashboardSidebarButton activo (QPushButton del modo activo: Agenda / Almacen / Pedidos, fondo #2563EB, texto #FFFFFF)
+    │       ├── dashboardSidebarButton (QPushButton inactivo “Agenda”, icono calendar-days.svg, fondo transparente, texto #334155)
+    │       ├── dashboardSidebarButton (QPushButton inactivo “Almacen”, icono box.svg, fondo transparente, texto #334155)
+    │       ├── dashboardSidebarButton (QPushButton inactivo “Pedidos”, icono shopping-cart.svg, fondo transparente, texto #334155)
+    │       ├── dashboardSidebarButton (QPushButton “Ventas”, icono bar-chart-3.svg, fondo transparente, texto #334155)
     │       └── espacio flexible
     └── dashboardContentHost (QWidget, fondo transparente)
         └── dashboardContent (QWidget, fondo transparente)
-            └── content_layout (QVBoxLayout, márgenes 16/14/16/14 px, separación 14 px)
+            └── content_layout (QVBoxLayout, márgenes 16/14/16/14 px, separación 14 px, sin fondo propio)
                 ├── dashboardHeader (QFrame, fondo transparente)
-                │   └── QHBoxLayout (márgenes 0 px, separación 10 px, fondo transparente efectivo vía dashboardHeader)
+                │   └── QHBoxLayout (márgenes 0 px, separación 10 px)
                 │       ├── bloque de cabecera (QVBoxLayout, separación 4 px)
-                │       │   ├── dashboardTitle (QLabel "Agenda", texto #0F172A)
-                │       │   └── dashboardDateLabel (QLabel, fecha larga en español, texto #475569)
-                │       ├── dashboardNewActivityButton (QPushButton "Nueva actividad", btnRole=primary, icono plus.svg blanco)
-                │       └── dashboardFullAgendaButton (QPushButton "Ver agenda completa", btnRole=secondary, icono calendar.svg azul #1D4ED8)
-                ├── fila KPI (QGridLayout, separación horizontal 12 px, vertical 12 px)
-                │   ├── dashboardKpiCard tone=blue (QFrame, fondo #FFFFFF, borde #E2E8F1, borde inferior #2563EB, radio 14 px)
-                │   │   └── QHBoxLayout (márgenes 14/12/14/12 px, separación 14 px)
-                │   │       ├── dashboardKpiIcon tone=blue (QFrame 64 × 64 px, círculo #EFF6FF)
-                │   │       │   └── icono clipboard-list.svg coloreado en #2563EB
-                │   │       └── bloque de texto (QVBoxLayout)
-                │   │           ├── dashboardKpiTitle (QLabel "Pendientes hoy", texto #334155)
-                │   │           ├── dashboardKpiValue (QLabel, valor numérico, texto #0F172A)
-                │   │           └── dashboardKpiNote (QLabel "actividad(es)", texto #64748B)
-                │   ├── dashboardKpiCard tone=red (QFrame, fondo #FFFFFF, borde inferior #DC2626)
-                │   │   ├── dashboardKpiIcon tone=red (QFrame 64 × 64 px, círculo #FEF2F2)
-                │   │   │   └── icono clock-3.svg coloreado en #EF4444
-                │   │   └── textos: "Vencidas" / valor / "actividad(es)"
-                │   ├── dashboardKpiCard tone=green (QFrame, fondo #FFFFFF, borde inferior #16A34A)
-                │   │   ├── dashboardKpiIcon tone=green (QFrame 64 × 64 px, círculo #F0FDF4)
-                │   │   │   └── icono circle-check.svg coloreado en #16A34A
-                │   │   └── textos: "Completadas hoy" / valor / "actividad(es)"
-                │   └── dashboardKpiCard tone=orange (QFrame, fondo #FFFFFF, borde inferior #EA580C)
-                │       ├── dashboardKpiIcon tone=orange (QFrame 64 × 64 px, círculo #FFF7ED)
-                │       │   └── icono users.svg coloreado en #F97316
-                │       └── textos: "Clientes sin seguimiento" / valor / "cliente(s)"
-                ├── fila media (QHBoxLayout, separación 14 px)
-                │   ├── dashboardTodayPanel (QFrame, dashboardPanel=true, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                │   │   └── QVBoxLayout (márgenes 12/10/12/10 px, separación 8 px)
-                │   │       ├── dashboardPanelTitle (QLabel "Agenda de hoy", texto #0F172A)
-                │   │       ├── contenedor de tarjetas (QWidget)
-                │   │       │   └── QVBoxLayout (márgenes 0 px, separación 6 px)
-                │   │       │       ├── dashboardActivityCard (QFrame, fondo #FFFFFF, borde #E2E8F1, radio 10 px, borde izquierdo por tipo)
-                │   │       │       │   └── QVBoxLayout (márgenes 12/10/12/10 px, separación 6 px)
-                │   │       │       │       ├── fila superior (QHBoxLayout)
-                │   │       │       │       │   ├── dashboardActivityCustomer (QLabel, código · nombre, texto #0F172A)
-                │   │       │       │       │   ├── dashboardStatePill (QLabel, estado con píldora de color)
-                │   │       │       │       │   └── botón "Editar" (QPushButton, btnRole=secondary)
-                │   │       │       │       ├── fila de metadatos (QHBoxLayout)
-                │   │       │       │       │   ├── dashboardMetaBadge tipo (píldora con color por tipo)
-                │   │       │       │       │   ├── dashboardMetaBadge isla (fondo #EEF2FF, texto #3730A3)
-                │   │       │       │       │   ├── dashboardMetaBadge seguimiento o fecha actividad (fondo #F8FAFC, texto #475569)
-                │   │       │       │       │   └── dashboardMetaBadge responsable (si existe, fondo #ECFDF3, texto #067647)
-                │   │       │       │       ├── dashboardActivitySummary (QLabel, resumen principal, texto #1E293B)
-                │   │       │       │       └── dashboardActivityDetail (QLabel opcional, detalle ampliado, texto #475569)
-                │   │       │       └── dashboardEmptyLabel (QLabel, estado vacío, fondo #F8FAFC, borde discontinuo #CBD5E1)
-                │   │       └── dashboardPanelLinkButton (QPushButton "Ver toda la agenda", btnRole=secondary)
-                │   └── dashboardUpcomingPanel (QFrame, dashboardPanel=true, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                │       └── QVBoxLayout (márgenes 12/10/12/10 px, separación 8 px)
-                │           ├── dashboardPanelTitle (QLabel "Próximos vencimientos")
-                │           ├── dashboardUpcomingSection (QFrame, bloque "Mañana")
-                │           │   └── QVBoxLayout (márgenes 0 px, separación 6 px)
-                │           │       ├── dashboardUpcomingSectionTitle (QLabel "Mañana", texto #334155)
-                │           │       └── contenedor de filas
-                │           │           └── dashboardUpcomingRow (QFrame, fondo #FFFFFF, borde #E2E8F1, radio 10 px)
-                │           │               └── QHBoxLayout (márgenes 8/6/8/6 px, separación 8 px)
-                │           │                   ├── dashboardUpcomingDate (QLabel, texto azul #1D4ED8, ancho mínimo 86 px)
-                │           │                   ├── dashboardUpcomingText (QLabel, cliente + tipo)
-                │           │                   └── dashboardUpcomingState (QLabel, estado en píldora de color)
-                │           ├── dashboardUpcomingSection (QFrame, bloque "Próximos 3 días")
-                │           ├── dashboardUpcomingSection (QFrame, bloque "Semana")
-                │           └── dashboardEmptyLabel (QLabel, visible cuando un bloque no tiene filas)
-                ├── fila inferior (QHBoxLayout, separación 14 px)
-                │   ├── dashboardReactivationPanel (QFrame, dashboardPanel=true, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                │   │   └── QVBoxLayout (márgenes 12/10/12/10 px, separación 8 px)
-                │   │       ├── dashboardPanelTitle (QLabel "Clientes a reactivar")
-                │   │       └── dashboardReactivationTable (QTableWidget, fondo #FFFFFF, borde #E2E8F1, radio 10 px)
-                │   │           ├── columnas: Cliente / Isla / Último contacto / Variación kg / Prioridad
-                │   │           ├── cabecera #F8FAFC, texto #334155, borde inferior #E2E8F1
-                │   │           ├── filas alternas #F8FBFF
-                │   │           ├── selección #DBEAFE con texto #0F172A
-                │   │           └── variación kg coloreada: negativo #DC2626, positivo #067647, cero #475569
-                │   └── dashboardIslandPanel (QFrame, dashboardPanel=true, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                │       └── QVBoxLayout (márgenes 12/10/12/10 px, separación 8 px)
-                │           ├── dashboardPanelTitle (QLabel "Agenda por isla")
-                │           └── dashboardIslandTable (QTableWidget, fondo #FFFFFF, borde #E2E8F1, radio 10 px)
-                │               ├── columnas: Isla / Pend. / Aplaz. / Hechas / Total
-                │               ├── cabecera #F8FAFC, texto #334155, borde inferior #E2E8F1
-                │               ├── filas alternas #F8FBFF
-                │               └── selección #DBEAFE con texto #0F172A
+                │       │   ├── dashboardTitle (QLabel, texto #0F172A, 26 px, negrita 700)
+                │       │   └── dashboardDateLabel (QLabel, fecha larga en español, texto #475569, 13 px)
+                │       ├── dashboardNewActivityButton (QPushButton, btnRole=primary, icono variable por modo)
+                │       └── dashboardFullAgendaButton (QPushButton, btnRole=secondary, icono variable por modo)
+                ├── dashboardContentStack (QStackedWidget, fondo transparente)
+                │   ├── dashboardAgendaView (QWidget, fondo transparente; contenedor real de fila KPI + fila media + fila inferior de Agenda)
+                │   │   └── QVBoxLayout (márgenes 0 px, separación 14 px)
+                │   │       ├── fila KPI (QGridLayout, separación horizontal 12 px, vertical 12 px)
+                │   │       ├── fila media (QHBoxLayout, separación 14 px)
+                │   │       │   ├── dashboardTodayPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │   │       │   └── dashboardUpcomingPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │   │       └── fila inferior (QHBoxLayout, separación 14 px)
+                │   │           ├── dashboardReactivationPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │   │           │   └── dashboardReactivationTable (QTableWidget, fondo #FFFFFF, borde #E2E8F1, radio 10 px)
+                │   │           └── dashboardIslandPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │   │               └── dashboardIslandTable (QTableWidget, fondo #FFFFFF, borde #E2E8F1, radio 10 px)
+                │   ├── dashboardWarehouseView (QWidget, fondo transparente; contenedor real de fila KPI + fila media + fila inferior de Almacén)
+                │   │   └── QVBoxLayout (márgenes 0 px, separación 14 px)
+                │   │       ├── fila KPI (QGridLayout)
+                │   │       │   ├── KPI “Stock actual” (icono package-open.svg, tono blue)
+                │   │       │   ├── KPI “Riesgos activos” (icono triangle-alert.svg, tono red)
+                │   │       │   ├── KPI “Entradas del mes” (icono arrow-down-to-line.svg, tono green)
+                │   │       │   └── KPI “Salidas del mes” (icono arrow-down-from-line.svg, tono orange)
+                │   │       ├── fila media (QHBoxLayout, separación 14 px)
+                │   │       │   ├── dashboardWarehouseRiskPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │   │       │   │   └── dashboardWarehouseRiskTable (QTableWidget; columnas: Almacén / Ref / Producto / Lote / Caduca / Kg / Estado)
+                │   │       │   └── dashboardWarehouseStockPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │   │       │       └── dashboardWarehouseStockTable (QTableWidget; columnas: Almacén / Artículos / Stock kg)
+                │   │       └── fila inferior (QHBoxLayout, separación 14 px)
+                │   │           ├── dashboardWarehouseEntriesPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │   │           │   └── dashboardWarehouseEntriesTable (QTableWidget; columnas: Fecha / Almacén / Ref / Producto / Kg)
+                │   │           └── dashboardWarehouseOutputsPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │   │               └── dashboardWarehouseOutputsTable (QTableWidget; columnas: Fecha / Almacén / Ref / Producto / Kg)
+                │   └── dashboardOrdersView (QWidget, fondo transparente; contenedor real de fila KPI + fila media + fila inferior de Pedidos)
+                │       └── QVBoxLayout (márgenes 0 px, separación 14 px)
+                │           ├── fila KPI (QGridLayout)
+                │           │   ├── KPI “Pedidos del año” (icono shopping-cart.svg, tono blue)
+                │           │   ├── KPI “Kg recibidos” (icono package-check.svg, tono green)
+                │           │   ├── KPI “Kg pendientes” (icono scale.svg, tono orange)
+                │           │   └── KPI “Incidencias” (icono circle-alert.svg, tono red)
+                │           ├── fila media (QHBoxLayout, separación 14 px)
+                │           │   ├── dashboardOrdersRecentPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │           │   │   └── dashboardOrdersRecentTable (QTableWidget; columnas: Pedido / Almacén / Fecha / Kg pedido / Kg recibido / Kg pend. / Estado)
+                │           │   └── dashboardOrdersPendingPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │           │       └── dashboardOrdersPendingTable (QTableWidget; columnas: Fecha / Pedido / Almacén / Kg pend.)
+                │           └── fila inferior (QHBoxLayout, separación 14 px)
+                │               ├── dashboardOrdersWarehousePanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │               │   └── dashboardOrdersWarehouseTable (QTableWidget; columnas: Almacén / Abiertos / Kg pend. / Últ. recepción)
+                │               └── dashboardOrdersStatePanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │                   └── dashboardOrdersStateTable (QTableWidget; columnas: Estado / Pedidos / Kg)
                 └── dashboardFooterLabel (QLabel, texto #64748B)
 
 COMPORTAMIENTO FUNCIONAL ACTUAL
 -------------------------------
 
-- El dashboard carga datos agregados desde CustomerDashboardService.load_snapshot().
-- La fecha de cabecera usa el formato largo en español: "jueves, 23 de julio de 2026".
-- El botón "Nueva actividad" abre DashboardAgendaDialog en modo alta.
-- El botón "Ver agenda completa" abre DashboardAgendaOverviewDialog.
-- El botón "Editar" de cada tarjeta abre DashboardAgendaDialog sobre la actividad seleccionada.
-- Los botones laterales Agenda / Almacen / Pedidos / Ventas son placeholders y muestran un QMessageBox informativo.
-- La tabla de clientes a reactivar mide la variación principal en kg y colorea el signo.
+- El dashboard arranca por defecto en Agenda.
+- El botón lateral activo sincroniza el modo visible del dashboard dentro de dashboardContentStack.
+- Modos implementados actualmente:
+  - Agenda
+  - Almacen
+  - Pedidos
+- El botón lateral Ventas sigue siendo placeholder y muestra un QMessageBox informativo.
+- En modo Agenda:
+  - “Nueva actividad” abre DashboardAgendaDialog.
+  - “Ver agenda completa” abre DashboardAgendaOverviewDialog.
+- En modo Almacen:
+  - “Ver almacén” navega a la página principal “Almacen” si existe en MainWindow.
+  - “Actualizar” recarga el snapshot del dashboard de almacén.
+- En modo Pedidos:
+  - “Ver pedidos” navega a la página principal “Pedidos” si existe en MainWindow.
+  - “Actualizar” recarga el snapshot del dashboard de pedidos.
 - Las tablas del dashboard son de solo lectura, con selección por fila y sin edición directa.
 
 GEOMETRÍA ACTUAL
@@ -121,80 +104,36 @@ GEOMETRÍA ACTUAL
 
 - dashboardSidebar tiene ancho fijo de 188 px.
 - dashboardContent reparte el resto del ancho disponible sin splitter visible.
+- dashboardAgendaView, dashboardWarehouseView y dashboardOrdersView no tienen fondo propio; se apoyan visualmente sobre el fondo general #EEF3F8 a través de contenedores transparentes.
 - La fila KPI usa cuatro tarjetas en una rejilla de una sola fila.
 - Las filas media e inferior usan proporción 5:3 entre bloque izquierdo y derecho.
 - dashboardKpiIcon mide 64 × 64 px.
 - Los iconos KPI renderizados se centran dentro de un área interna de 46 × 46 px.
-- El calendario emergente configurado para las fechas del dashboard tiene tamaño mínimo 340 × 272 px.
 
 ASPECTO VISUAL ACTUAL
 ---------------------
 
 - Fondo general del dashboard: #EEF3F8.
-- Sidebar clara, no azul completa; solo el botón activo va en azul #2563EB.
+- dashboardContentHost, dashboardContent, dashboardContentStack, dashboardAgendaView, dashboardWarehouseView y dashboardOrdersView: fondo transparente.
+- Sidebar clara; solo el botón activo va en azul #2563EB.
 - Tarjetas KPI y paneles principales blancos con bordes suaves y radios amplios.
 - Empty states con fondo #F8FAFC y borde discontinuo #CBD5E1.
-- Tipos de actividad:
-  - visita_realizada: acento #2563EB, badge #DBEAFE.
-  - visita_prevista: acento #1D4ED8, badge #DBEAFE.
-  - llamada: acento #7C3AED, badge #EDE9FE.
-  - seguimiento: acento #0F766E, badge #DDF6F1.
-  - desarrollo_futuro: acento #B45309, badge #FEF3C7.
-  - incidencia: acento #DC2626, badge #FEE2E2.
-  - nota: acento #475569, badge #E2E8F0.
-- Estados de actividad:
-  - pendiente: texto #1D4ED8, fondo #EFF6FF.
-  - hecho: texto #067647, fondo #ECFDF3.
-  - aplazado: texto #B54708, fondo #FFF7ED.
-  - cancelado: texto #6B7280, fondo #F1F5F9.
-- Botones de cabecera usan el sistema estándar de botones compactos de la app.
-
-DIÁLOGOS Y FLUJOS RELACIONADOS
-------------------------------
-
-DashboardAgendaDialog (QDialog modal, 620 × 520 px)
-- dashboardDialogTitle (QLabel "Actividad de agenda")
-- QFormLayout con:
-  - customer_combo (QComboBox, mínimo 340 px)
-  - date_edit (QDateEdit, calendario desplegable, formato dd/MM/yyyy)
-  - type_combo (QComboBox)
-  - state_combo (QComboBox)
-  - priority_combo (QComboBox)
-  - responsible_edit (QLineEdit)
-  - summary_edit (QLineEdit)
-  - detail_edit (QTextEdit, mínimo 120 px)
-  - follow_up_check (QCheckBox "Tiene seguimiento")
-  - follow_up_date (QDateEdit, habilitado solo si hay seguimiento)
-- Botonera:
-  - Guardar (btnRole=success)
-  - Cancelar (btnRole=secondary)
-  - Eliminar (btnRole=danger, solo en edición)
-- Si se acepta, recarga el dashboard.
-
-DashboardAgendaOverviewDialog (QDialog, 1120 × 640 px)
-- dashboardDialogTitle (QLabel "Agenda completa")
-- dashboardDialogSummary (QLabel, resumen de actividades activas)
-- dashboardAgendaOverviewTable (QTableWidget, 8 columnas)
-  - Fecha / Seguimiento / Cliente / Isla / Tipo / Estado / Resumen / Responsable
-- Acciones inferiores:
-  - "Nueva actividad" (btnRole=primary)
-  - "Editar" (btnRole=warning)
-  - espacio flexible
-  - "Cerrar" (btnRole=secondary)
-- Doble clic en fila abre edición de la actividad.
 
 RELACIÓN CON BACKEND / DATOS
 ----------------------------
 
 - DashboardPage no depende del frontend React.
 - CustomerDashboardService aporta los KPIs, agenda de hoy, próximos vencimientos, clientes a reactivar y agenda por isla.
+- WarehouseDashboardService aporta KPIs y tablas agregadas de stock, riesgos, entradas y salidas de almacén en kg.
+- OrderDashboardService aporta KPIs y tablas agregadas del seguimiento de pedidos.
 - CustomerService se usa para cargar clientes y para alta, edición y borrado de actividades de agenda.
 - La agenda del dashboard trabaja directamente contra la base local desde PySide6/backend.
 
 ÚLTIMOS AJUSTES DE ESTRUCTURA Y ASPECTO
 ---------------------------------------
 
-- Incorporada sidebar vertical de dashboards con un único botón activo azul.
-- Sustituida la métrica de "días sin seguimiento" por "Variación kg" en la tabla de reactivación.
-- Ajustado el tamaño del círculo KPI y el render centrado de iconos SVG.
-- Eliminado el scroll vertical global de la página para que el contenido entre en la ventana de arranque.
+- Nombrados explícitamente los contenedores reales de vistas: dashboardAgendaView, dashboardWarehouseView y dashboardOrdersView.
+- Documentado que fila KPI, fila media y fila inferior cuelgan de esos widgets de vista, no de content_layout directamente.
+- Incorporado el dashboard de Almacen con navegación lateral y métricas principales en kg.
+- Incorporado el dashboard de Pedidos con navegación lateral y métricas principales en kg.
+- Manteniendo Ventas como siguiente fase.
