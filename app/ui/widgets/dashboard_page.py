@@ -916,7 +916,8 @@ class DashboardPage(QWidget):
         layout.setContentsMargins(12, 16, 12, 16)
         layout.setSpacing(12)
 
-        brand_icon = self._icon_data_uri("layout-dashboard.svg", 32, color="#FFFFFF")
+        brand_logo = BASE_DIR / "assets" / "logos" / "corporativos" / "IREKS_Logo.svg"
+        brand_icon = self._path_data_uri(brand_logo, 32, color="#FFFFFF")
         brand = QLabel(
             (
                 "<table cellspacing='0' cellpadding='0'><tr>"
@@ -967,7 +968,16 @@ class DashboardPage(QWidget):
         button.setIconSize(QSize(size, size))
 
     def _icon_data_uri(self, icon_name: str, size: int, *, color: str | None = None) -> str:
-        pixmap = self._icon_pixmap(icon_name, size, color=color)
+        return self._path_data_uri(self._icon_path(icon_name), size, color=color)
+
+    def _path_data_uri(self, asset_path: Path, size: int, *, color: str | None = None) -> str:
+        if not asset_path.exists():
+            return ""
+        pixmap = self._render_icon_source(asset_path, size)
+        pixmap = self._trim_transparent_margins(pixmap, size)
+        if color is not None:
+            pixmap = self._recolor_pixmap(pixmap, QColor(color))
+        pixmap = self._compose_centered_pixmap(pixmap, size)
         if pixmap.isNull():
             return ""
         buffer = QBuffer()
