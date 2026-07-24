@@ -382,7 +382,7 @@ class DashboardPage(QWidget):
         header_copy = QVBoxLayout()
         header_copy.setContentsMargins(0, 0, 0, 0)
         header_copy.setSpacing(4)
-        self.title_label = QLabel("Dashboard")
+        self.title_label = QLabel("Agenda")
         self.title_label.setObjectName("dashboardTitle")
         header_copy.addWidget(self.title_label)
         self.date_label = QLabel("")
