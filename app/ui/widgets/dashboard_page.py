@@ -929,13 +929,13 @@ class DashboardPage(QWidget):
         brand.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(brand)
 
-        home_btn = QPushButton("Dashboard")
-        home_btn.setObjectName("dashboardSidebarButton")
-        home_btn.setProperty("active", True)
-        self._set_button_icon(home_btn, "layout-dashboard.svg", color="#FFFFFF", size=28)
-        layout.addWidget(home_btn)
+        agenda_btn = QPushButton("Agenda")
+        agenda_btn.setObjectName("dashboardSidebarButton")
+        agenda_btn.setProperty("active", True)
+        self._set_button_icon(agenda_btn, "calendar-days.svg", color="#FFFFFF", size=28)
+        layout.addWidget(agenda_btn)
 
-        for label, icon_name in [("Agenda", "calendar-days.svg"), ("Almacen", "box.svg"), ("Pedidos", "shopping-cart.svg"), ("Ventas", "bar-chart-3.svg")]:
+        for label, icon_name in [("Almacen", "box.svg"), ("Pedidos", "shopping-cart.svg"), ("Ventas", "bar-chart-3.svg")]:
             button = QPushButton(label)
             button.setObjectName("dashboardSidebarButton")
             self._set_button_icon(button, icon_name, color="#475569", size=28)
@@ -1268,4 +1268,3 @@ class DashboardPage(QWidget):
             }
             """
         )
-
