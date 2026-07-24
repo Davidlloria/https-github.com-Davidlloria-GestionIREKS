@@ -19,6 +19,12 @@ from app.services.order_dashboard_service import (
     DashboardOrdersWarehouseRow,
     OrderDashboardSnapshot,
 )
+from app.services.warehouse_dashboard_service import (
+    DashboardWarehouseMovementRow,
+    DashboardWarehouseRiskRow,
+    DashboardWarehouseStockRow,
+    WarehouseDashboardSnapshot,
+)
 from app.ui.widgets.dashboard_page import DashboardPage
 
 _APP: QApplication | None = None
@@ -154,6 +160,68 @@ class _StubOrderDashboardService:
         )
 
 
+class _StubWarehouseDashboardService:
+    def load_snapshot(self) -> WarehouseDashboardSnapshot:
+        return WarehouseDashboardSnapshot(
+            year=2026,
+            month=7,
+            total_stock_kg=8425.0,
+            risk_items=3,
+            entries_month_kg=2150.0,
+            outputs_month_kg=1745.5,
+            risk_rows=[
+                DashboardWarehouseRiskRow(
+                    almacen_id="alm-1",
+                    almacen_nombre="Almacén Norte",
+                    articulo_id="art-1",
+                    referencia="5001",
+                    nombre="Mezcla Muffin",
+                    lote="L-100",
+                    caducidad=date(2026, 7, 28),
+                    stock_units=2.0,
+                    stock_kg=50.0,
+                    state="Caduca pronto",
+                )
+            ],
+            warehouse_rows=[
+                DashboardWarehouseStockRow(
+                    almacen_id="alm-1",
+                    almacen_nombre="Almacén Norte",
+                    article_count=18,
+                    stock_kg=4200.0,
+                )
+            ],
+            entry_rows=[
+                DashboardWarehouseMovementRow(
+                    almacen_id="alm-1",
+                    almacen_nombre="Almacén Norte",
+                    articulo_id="art-1",
+                    referencia="5001",
+                    nombre="Mezcla Muffin",
+                    fecha=date(2026, 7, 22),
+                    units=4.0,
+                    kg=100.0,
+                    document_number="ALB-1",
+                )
+            ],
+            output_rows=[
+                DashboardWarehouseMovementRow(
+                    almacen_id="alm-2",
+                    almacen_nombre="Almacén Sur",
+                    articulo_id="art-2",
+                    referencia="7002",
+                    nombre="Pan rallado",
+                    fecha=date(2026, 7, 23),
+                    units=3.0,
+                    kg=75.5,
+                    document_number="SAL-9",
+                )
+            ],
+            low_stock_threshold_units=1.0,
+            generated_at=datetime(2026, 7, 24, 11, 0, 0),
+        )
+
+
 def test_dashboard_page_renders_named_controls_and_snapshot() -> None:
     _application()
     page = DashboardPage(customer_service=_StubCustomerService(), dashboard_service=_StubDashboardService())
@@ -210,3 +278,29 @@ def test_dashboard_page_switches_to_orders_mode_and_renders_snapshot() -> None:
     assert page.orders_warehouse_table.rowCount() == 1
     assert page.orders_state_table.rowCount() == 2
     assert "Pedidos 2026" in page.footer_label.text()
+
+
+def test_dashboard_page_switches_to_warehouse_mode_and_renders_snapshot() -> None:
+    _application()
+    page = DashboardPage(
+        customer_service=_StubCustomerService(),
+        dashboard_service=_StubDashboardService(),
+        order_dashboard_service=_StubOrderDashboardService(),
+        warehouse_dashboard_service=_StubWarehouseDashboardService(),
+    )
+
+    page._set_dashboard_mode("almacen")
+
+    assert page.title_label.text() == "Almacén"
+    assert page.new_activity_btn.text() == "Ver almacén"
+    assert page.full_agenda_btn.text() == "Actualizar"
+    assert page.warehouse_kpi_labels["total_stock_kg"].text() == "8.425,00"
+    assert page.warehouse_kpi_labels["risk_items"].text() == "3"
+    assert page.warehouse_kpi_labels["entries_month_kg"].text() == "2.150,00"
+    assert page.warehouse_kpi_labels["outputs_month_kg"].text() == "1.745,50"
+    assert page.warehouse_risk_table.rowCount() == 1
+    assert page.warehouse_risk_table.item(0, 0).text() == "Almacén Norte"
+    assert page.warehouse_stock_table.rowCount() == 1
+    assert page.warehouse_entries_table.rowCount() == 1
+    assert page.warehouse_outputs_table.rowCount() == 1
+    assert "umbral bajo stock" in page.footer_label.text()

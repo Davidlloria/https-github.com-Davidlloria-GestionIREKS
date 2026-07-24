@@ -46,6 +46,12 @@ from app.services.order_dashboard_service import (
     DashboardOrdersWarehouseRow,
     OrderDashboardService,
 )
+from app.services.warehouse_dashboard_service import (
+    DashboardWarehouseMovementRow,
+    DashboardWarehouseRiskRow,
+    DashboardWarehouseStockRow,
+    WarehouseDashboardService,
+)
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 
@@ -350,12 +356,14 @@ class DashboardPage(QWidget):
         customer_service: CustomerService | None = None,
         dashboard_service: CustomerDashboardService | None = None,
         order_dashboard_service: OrderDashboardService | None = None,
+        warehouse_dashboard_service: WarehouseDashboardService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.customer_service = customer_service or CustomerService()
         self.dashboard_service = dashboard_service or CustomerDashboardService()
         self.order_dashboard_service = order_dashboard_service or OrderDashboardService()
+        self.warehouse_dashboard_service = warehouse_dashboard_service or WarehouseDashboardService()
         self.setObjectName("dashboardPageRoot")
         self.current_dashboard = "agenda"
         self.dashboard_nav_buttons: dict[str, QPushButton] = {}
@@ -418,8 +426,10 @@ class DashboardPage(QWidget):
         self.dashboard_stack = QStackedWidget()
         self.dashboard_stack.setObjectName("dashboardContentStack")
         self.agenda_dashboard = self._build_agenda_dashboard()
+        self.warehouse_dashboard = self._build_warehouse_dashboard()
         self.orders_dashboard = self._build_orders_dashboard()
         self.dashboard_stack.addWidget(self.agenda_dashboard)
+        self.dashboard_stack.addWidget(self.warehouse_dashboard)
         self.dashboard_stack.addWidget(self.orders_dashboard)
         self.content_layout.addWidget(self.dashboard_stack, 1)
 
@@ -503,6 +513,98 @@ class DashboardPage(QWidget):
             island_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         island_panel.layout().addWidget(self.island_table)
         lower_row.addWidget(island_panel, 3)
+        layout.addLayout(lower_row)
+        return widget
+
+    def _build_warehouse_dashboard(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(14)
+
+        kpi_row = QGridLayout()
+        kpi_row.setHorizontalSpacing(12)
+        kpi_row.setVerticalSpacing(12)
+        self.warehouse_kpi_labels: dict[str, QLabel] = {}
+        self.warehouse_kpi_notes: dict[str, QLabel] = {}
+        for column, (key, title, tone, icon_name) in enumerate(
+            [
+                ("total_stock_kg", "Stock actual", "blue", "package-open.svg"),
+                ("risk_items", "Riesgos activos", "red", "triangle-alert.svg"),
+                ("entries_month_kg", "Entradas del mes", "green", "arrow-down-to-line.svg"),
+                ("outputs_month_kg", "Salidas del mes", "orange", "arrow-down-from-line.svg"),
+            ]
+        ):
+            card, value_label, note_label = self._build_kpi_card(title, tone=tone, icon_name=icon_name)
+            self.warehouse_kpi_labels[key] = value_label
+            self.warehouse_kpi_notes[key] = note_label
+            kpi_row.addWidget(card, 0, column)
+        layout.addLayout(kpi_row)
+
+        middle_row = QHBoxLayout()
+        middle_row.setContentsMargins(0, 0, 0, 0)
+        middle_row.setSpacing(14)
+
+        risk_panel = self._build_table_panel("Riesgos de stock y caducidad", "dashboardWarehouseRiskPanel")
+        self.warehouse_risk_table = QTableWidget(0, 7)
+        self.warehouse_risk_table.setObjectName("dashboardWarehouseRiskTable")
+        self.warehouse_risk_table.setHorizontalHeaderLabels(["Almacén", "Ref", "Producto", "Lote", "Caduca", "Kg", "Estado"])
+        self._configure_table(self.warehouse_risk_table)
+        risk_header = self.warehouse_risk_table.horizontalHeader()
+        risk_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        risk_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        risk_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        risk_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        risk_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        risk_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        risk_header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+        risk_panel.layout().addWidget(self.warehouse_risk_table)
+        middle_row.addWidget(risk_panel, 5)
+
+        stock_panel = self._build_table_panel("Stock por almacén", "dashboardWarehouseStockPanel")
+        self.warehouse_stock_table = QTableWidget(0, 3)
+        self.warehouse_stock_table.setObjectName("dashboardWarehouseStockTable")
+        self.warehouse_stock_table.setHorizontalHeaderLabels(["Almacén", "Artículos", "Stock kg"])
+        self._configure_table(self.warehouse_stock_table)
+        stock_header = self.warehouse_stock_table.horizontalHeader()
+        stock_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        stock_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        stock_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        stock_panel.layout().addWidget(self.warehouse_stock_table)
+        middle_row.addWidget(stock_panel, 3)
+        layout.addLayout(middle_row)
+
+        lower_row = QHBoxLayout()
+        lower_row.setContentsMargins(0, 0, 0, 0)
+        lower_row.setSpacing(14)
+
+        entries_panel = self._build_table_panel("Entradas del mes", "dashboardWarehouseEntriesPanel")
+        self.warehouse_entries_table = QTableWidget(0, 5)
+        self.warehouse_entries_table.setObjectName("dashboardWarehouseEntriesTable")
+        self.warehouse_entries_table.setHorizontalHeaderLabels(["Fecha", "Almacén", "Ref", "Producto", "Kg"])
+        self._configure_table(self.warehouse_entries_table)
+        entries_header = self.warehouse_entries_table.horizontalHeader()
+        entries_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        entries_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        entries_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        entries_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        entries_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        entries_panel.layout().addWidget(self.warehouse_entries_table)
+        lower_row.addWidget(entries_panel, 5)
+
+        outputs_panel = self._build_table_panel("Salidas del mes", "dashboardWarehouseOutputsPanel")
+        self.warehouse_outputs_table = QTableWidget(0, 5)
+        self.warehouse_outputs_table.setObjectName("dashboardWarehouseOutputsTable")
+        self.warehouse_outputs_table.setHorizontalHeaderLabels(["Fecha", "Almacén", "Ref", "Producto", "Kg"])
+        self._configure_table(self.warehouse_outputs_table)
+        outputs_header = self.warehouse_outputs_table.horizontalHeader()
+        outputs_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        outputs_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        outputs_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        outputs_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        outputs_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        outputs_panel.layout().addWidget(self.warehouse_outputs_table)
+        lower_row.addWidget(outputs_panel, 3)
         layout.addLayout(lower_row)
         return widget
 
@@ -599,6 +701,9 @@ class DashboardPage(QWidget):
         if self.current_dashboard == "pedidos":
             self._reload_orders_dashboard()
             return
+        if self.current_dashboard == "almacen":
+            self._reload_warehouse_dashboard()
+            return
         self._reload_agenda_dashboard()
 
     def _reload_agenda_dashboard(self) -> None:
@@ -656,9 +761,28 @@ class DashboardPage(QWidget):
             f"Última actualización: {snapshot.generated_at.strftime('%d/%m/%Y %H:%M')} · Pedidos {snapshot.year} · métrica principal kg"
         )
 
+    def _reload_warehouse_dashboard(self) -> None:
+        snapshot = self.warehouse_dashboard_service.load_snapshot()
+        self.warehouse_kpi_labels["total_stock_kg"].setText(self.format_kg(snapshot.total_stock_kg))
+        self.warehouse_kpi_notes["total_stock_kg"].setText("kg netos")
+        self.warehouse_kpi_labels["risk_items"].setText(str(snapshot.risk_items))
+        self.warehouse_kpi_notes["risk_items"].setText("lote(s)")
+        self.warehouse_kpi_labels["entries_month_kg"].setText(self.format_kg(snapshot.entries_month_kg))
+        self.warehouse_kpi_notes["entries_month_kg"].setText("kg entrados")
+        self.warehouse_kpi_labels["outputs_month_kg"].setText(self.format_kg(snapshot.outputs_month_kg))
+        self.warehouse_kpi_notes["outputs_month_kg"].setText("kg salidos")
+        self._populate_warehouse_risk_table(snapshot.risk_rows)
+        self._populate_warehouse_stock_table(snapshot.warehouse_rows)
+        self._populate_warehouse_movement_table(self.warehouse_entries_table, snapshot.entry_rows, tone="#067647")
+        self._populate_warehouse_movement_table(self.warehouse_outputs_table, snapshot.output_rows, tone="#B42318")
+        threshold_text = self.format_kg(snapshot.low_stock_threshold_units)
+        self.footer_label.setText(
+            f"Última actualización: {snapshot.generated_at.strftime('%d/%m/%Y %H:%M')} · Almacén {snapshot.month:02d}/{snapshot.year} · umbral bajo stock {threshold_text} uds"
+        )
+
     def _set_dashboard_mode(self, mode: str, *, reload: bool = True) -> None:
         clean_mode = str(mode or "agenda").strip().lower()
-        if clean_mode not in {"agenda", "pedidos"}:
+        if clean_mode not in {"agenda", "almacen", "pedidos"}:
             return
         self.current_dashboard = clean_mode
         if clean_mode == "pedidos":
@@ -667,7 +791,14 @@ class DashboardPage(QWidget):
             self.new_activity_btn.setText("Ver pedidos")
             self.full_agenda_btn.setText("Actualizar")
             self._set_button_icon(self.new_activity_btn, "shopping-cart.svg", color="#FFFFFF", size=24)
-            self._set_button_icon(self.full_agenda_btn, "history.svg", color="#1D4ED8", size=24)
+            self._set_button_icon(self.full_agenda_btn, "refresh-cw.svg", color="#1D4ED8", size=24)
+        elif clean_mode == "almacen":
+            self.dashboard_stack.setCurrentWidget(self.warehouse_dashboard)
+            self.title_label.setText("Almacén")
+            self.new_activity_btn.setText("Ver almacén")
+            self.full_agenda_btn.setText("Actualizar")
+            self._set_button_icon(self.new_activity_btn, "warehouse.svg", color="#FFFFFF", size=24)
+            self._set_button_icon(self.full_agenda_btn, "refresh-cw.svg", color="#1D4ED8", size=24)
         else:
             self.dashboard_stack.setCurrentWidget(self.agenda_dashboard)
             self.title_label.setText("Agenda")
@@ -680,10 +811,15 @@ class DashboardPage(QWidget):
             self.reload()
 
     def _refresh_dashboard_nav_buttons(self) -> None:
+        icon_names = {
+            "agenda": "calendar-days.svg",
+            "almacen": "box.svg",
+            "pedidos": "shopping-cart.svg",
+        }
         for key, button in self.dashboard_nav_buttons.items():
             active = key == self.current_dashboard
             button.setProperty("active", active)
-            icon_name = "calendar-days.svg" if key == "agenda" else "shopping-cart.svg"
+            icon_name = icon_names.get(key, "calendar-days.svg")
             icon_color = "#FFFFFF" if active else "#475569"
             self._set_button_icon(button, icon_name, color=icon_color, size=28)
             button.style().unpolish(button)
@@ -694,10 +830,13 @@ class DashboardPage(QWidget):
         if self.current_dashboard == "pedidos":
             self._open_orders_page()
             return
+        if self.current_dashboard == "almacen":
+            self._open_warehouse_page()
+            return
         self._open_new_activity()
 
     def _handle_secondary_action(self) -> None:
-        if self.current_dashboard == "pedidos":
+        if self.current_dashboard in {"pedidos", "almacen"}:
             self.reload()
             return
         self._open_full_agenda()
@@ -712,6 +851,17 @@ class DashboardPage(QWidget):
                 return
             widget = widget.parentWidget()
         QMessageBox.information(self, "Pedidos", "La vista completa de pedidos no está disponible desde este contexto.")
+
+    def _open_warehouse_page(self) -> None:
+        widget: QWidget | None = self
+        while widget is not None:
+            page_names = getattr(widget, "page_names", None)
+            setter = getattr(widget, "_set_current_page", None)
+            if isinstance(page_names, list) and callable(setter) and "Almacen" in page_names:
+                setter(page_names.index("Almacen"))
+                return
+            widget = widget.parentWidget()
+        QMessageBox.information(self, "Almacén", "La vista completa de almacén no está disponible desde este contexto.")
 
     def _populate_order_recent_table(self, rows: list[DashboardOrderRow]) -> None:
         self.orders_recent_table.setRowCount(len(rows))
@@ -778,6 +928,61 @@ class DashboardPage(QWidget):
                 if column in {1, 2}:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.orders_state_table.setItem(row_index, column, item)
+
+    def _populate_warehouse_risk_table(self, rows: list[DashboardWarehouseRiskRow]) -> None:
+        self.warehouse_risk_table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            values = [
+                row.almacen_nombre,
+                row.referencia,
+                row.nombre,
+                row.lote,
+                self.format_date(row.caducidad, allow_blank=True) or "-",
+                self.format_kg(row.stock_kg),
+                row.state,
+            ]
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                if column == 5:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if column == 6:
+                    state_color = "#B42318" if row.state == "Caducado" else "#B54708" if row.state == "Caduca pronto" else "#1D4ED8"
+                    item.setForeground(QColor(state_color))
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.warehouse_risk_table.setItem(row_index, column, item)
+
+    def _populate_warehouse_stock_table(self, rows: list[DashboardWarehouseStockRow]) -> None:
+        self.warehouse_stock_table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            values = [row.almacen_nombre, str(row.article_count), self.format_kg(row.stock_kg)]
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                if column in {1, 2}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                self.warehouse_stock_table.setItem(row_index, column, item)
+
+    def _populate_warehouse_movement_table(
+        self,
+        table: QTableWidget,
+        rows: list[DashboardWarehouseMovementRow],
+        *,
+        tone: str,
+    ) -> None:
+        table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            values = [
+                self.format_date(row.fecha),
+                row.almacen_nombre,
+                row.referencia,
+                row.nombre,
+                self.format_kg(row.kg),
+            ]
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                if column == 4:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                    item.setForeground(QColor(tone))
+                table.setItem(row_index, column, item)
 
     @staticmethod
     def _order_status_meta(status: str) -> tuple[str, str]:
@@ -1205,9 +1410,9 @@ class DashboardPage(QWidget):
 
         almacen_btn = QPushButton("Almacen")
         almacen_btn.setObjectName("dashboardSidebarButton")
-        self._set_button_icon(almacen_btn, "box.svg", color="#475569", size=28)
-        almacen_btn.clicked.connect(lambda: self._show_placeholder_dashboard("Almacen"))
+        almacen_btn.clicked.connect(lambda: self._set_dashboard_mode("almacen"))
         layout.addWidget(almacen_btn)
+        self.dashboard_nav_buttons["almacen"] = almacen_btn
 
         pedidos_btn = QPushButton("Pedidos")
         pedidos_btn.setObjectName("dashboardSidebarButton")
