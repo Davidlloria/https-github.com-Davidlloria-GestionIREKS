@@ -916,8 +916,17 @@ class DashboardPage(QWidget):
         layout.setContentsMargins(12, 16, 12, 16)
         layout.setSpacing(12)
 
-        brand = QLabel("GestionIREKS\nDashboards")
+        brand_icon = self._icon_path("layout-dashboard.svg").as_posix()
+        brand = QLabel(
+            (
+                "<table cellspacing='0' cellpadding='0'><tr>"
+                f"<td width='30'><img src='{brand_icon}' width='22' height='22'/></td>"
+                "<td><span>IREKS</span><br/><span>Dashboard</span></td>"
+                "</tr></table>"
+            )
+        )
         brand.setObjectName("dashboardSidebarBrand")
+        brand.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(brand)
 
         home_btn = QPushButton("Dashboard")
