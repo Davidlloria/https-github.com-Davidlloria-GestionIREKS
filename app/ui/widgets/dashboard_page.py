@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSpacerItem,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -39,6 +40,12 @@ from app.services.customer_dashboard_service import (
     DashboardSnapshot,
 )
 from app.services.customer_service import CustomerService
+from app.services.order_dashboard_service import (
+    DashboardOrderRow,
+    DashboardOrdersStateRow,
+    DashboardOrdersWarehouseRow,
+    OrderDashboardService,
+)
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 
@@ -342,12 +349,16 @@ class DashboardPage(QWidget):
         *,
         customer_service: CustomerService | None = None,
         dashboard_service: CustomerDashboardService | None = None,
+        order_dashboard_service: OrderDashboardService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.customer_service = customer_service or CustomerService()
         self.dashboard_service = dashboard_service or CustomerDashboardService()
+        self.order_dashboard_service = order_dashboard_service or OrderDashboardService()
         self.setObjectName("dashboardPageRoot")
+        self.current_dashboard = "agenda"
+        self.dashboard_nav_buttons: dict[str, QPushButton] = {}
         self._build_ui()
         self.reload()
 
@@ -393,18 +404,37 @@ class DashboardPage(QWidget):
         self.new_activity_btn = QPushButton("Nueva actividad")
         self.new_activity_btn.setObjectName("dashboardNewActivityButton")
         self.new_activity_btn.setProperty("btnRole", "primary")
-        self._set_button_icon(self.new_activity_btn, "plus.svg", color="#FFFFFF", size=24)
-        self.new_activity_btn.clicked.connect(self._open_new_activity)
+        self.new_activity_btn.clicked.connect(self._handle_primary_action)
         header_layout.addWidget(self.new_activity_btn)
 
         self.full_agenda_btn = QPushButton("Ver agenda completa")
         self.full_agenda_btn.setObjectName("dashboardFullAgendaButton")
         self.full_agenda_btn.setProperty("btnRole", "secondary")
-        self._set_button_icon(self.full_agenda_btn, "calendar.svg", color="#1D4ED8", size=24)
-        self.full_agenda_btn.clicked.connect(self._open_full_agenda)
+        self.full_agenda_btn.clicked.connect(self._handle_secondary_action)
         header_layout.addWidget(self.full_agenda_btn)
 
         self.content_layout.addWidget(header)
+
+        self.dashboard_stack = QStackedWidget()
+        self.dashboard_stack.setObjectName("dashboardContentStack")
+        self.agenda_dashboard = self._build_agenda_dashboard()
+        self.orders_dashboard = self._build_orders_dashboard()
+        self.dashboard_stack.addWidget(self.agenda_dashboard)
+        self.dashboard_stack.addWidget(self.orders_dashboard)
+        self.content_layout.addWidget(self.dashboard_stack, 1)
+
+        self.footer_label = QLabel("")
+        self.footer_label.setObjectName("dashboardFooterLabel")
+        self.content_layout.addWidget(self.footer_label)
+
+        self._apply_styles()
+        self._set_dashboard_mode("agenda", reload=False)
+
+    def _build_agenda_dashboard(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(14)
 
         kpi_row = QGridLayout()
         kpi_row.setHorizontalSpacing(12)
@@ -423,7 +453,7 @@ class DashboardPage(QWidget):
             self.kpi_labels[key] = value_label
             self.kpi_notes[key] = note_label
             kpi_row.addWidget(card, 0, column)
-        self.content_layout.addLayout(kpi_row)
+        layout.addLayout(kpi_row)
 
         middle_row = QHBoxLayout()
         middle_row.setContentsMargins(0, 0, 0, 0)
@@ -442,7 +472,7 @@ class DashboardPage(QWidget):
 
         self.upcoming_panel = self._build_upcoming_panel()
         middle_row.addWidget(self.upcoming_panel, 3)
-        self.content_layout.addLayout(middle_row)
+        layout.addLayout(middle_row)
 
         lower_row = QHBoxLayout()
         lower_row.setContentsMargins(0, 0, 0, 0)
@@ -473,17 +503,106 @@ class DashboardPage(QWidget):
             island_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         island_panel.layout().addWidget(self.island_table)
         lower_row.addWidget(island_panel, 3)
-        self.content_layout.addLayout(lower_row)
+        layout.addLayout(lower_row)
+        return widget
 
-        self.footer_label = QLabel("")
-        self.footer_label.setObjectName("dashboardFooterLabel")
-        self.content_layout.addWidget(self.footer_label)
+    def _build_orders_dashboard(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(14)
 
-        self._apply_styles()
+        kpi_row = QGridLayout()
+        kpi_row.setHorizontalSpacing(12)
+        kpi_row.setVerticalSpacing(12)
+        self.order_kpi_labels: dict[str, QLabel] = {}
+        self.order_kpi_notes: dict[str, QLabel] = {}
+        for column, (key, title, tone, icon_name) in enumerate(
+            [
+                ("total_orders", "Pedidos del año", "blue", "shopping-cart.svg"),
+                ("received_kg", "Kg recibidos", "green", "package-check.svg"),
+                ("pending_kg", "Kg pendientes", "orange", "scale.svg"),
+                ("incident_orders", "Incidencias", "red", "circle-alert.svg"),
+            ]
+        ):
+            card, value_label, note_label = self._build_kpi_card(title, tone=tone, icon_name=icon_name)
+            self.order_kpi_labels[key] = value_label
+            self.order_kpi_notes[key] = note_label
+            kpi_row.addWidget(card, 0, column)
+        layout.addLayout(kpi_row)
+
+        middle_row = QHBoxLayout()
+        middle_row.setContentsMargins(0, 0, 0, 0)
+        middle_row.setSpacing(14)
+
+        recent_panel = self._build_table_panel("Pedidos recientes", "dashboardOrdersRecentPanel")
+        self.orders_recent_table = QTableWidget(0, 7)
+        self.orders_recent_table.setObjectName("dashboardOrdersRecentTable")
+        self.orders_recent_table.setHorizontalHeaderLabels(["Pedido", "Almacén", "Fecha", "Kg pedido", "Kg recibido", "Kg pend.", "Estado"])
+        self._configure_table(self.orders_recent_table)
+        recent_header = self.orders_recent_table.horizontalHeader()
+        recent_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        recent_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        recent_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        for column in range(3, 7):
+            recent_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+        recent_panel.layout().addWidget(self.orders_recent_table)
+        middle_row.addWidget(recent_panel, 5)
+
+        pending_panel = self._build_table_panel("Pendientes de recibir", "dashboardOrdersPendingPanel")
+        self.orders_pending_table = QTableWidget(0, 4)
+        self.orders_pending_table.setObjectName("dashboardOrdersPendingTable")
+        self.orders_pending_table.setHorizontalHeaderLabels(["Fecha", "Pedido", "Almacén", "Kg pend."])
+        self._configure_table(self.orders_pending_table)
+        pending_header = self.orders_pending_table.horizontalHeader()
+        pending_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        pending_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        pending_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        pending_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        pending_panel.layout().addWidget(self.orders_pending_table)
+        middle_row.addWidget(pending_panel, 3)
+        layout.addLayout(middle_row)
+
+        lower_row = QHBoxLayout()
+        lower_row.setContentsMargins(0, 0, 0, 0)
+        lower_row.setSpacing(14)
+
+        warehouse_panel = self._build_table_panel("Más pendiente por almacén", "dashboardOrdersWarehousePanel")
+        self.orders_warehouse_table = QTableWidget(0, 4)
+        self.orders_warehouse_table.setObjectName("dashboardOrdersWarehouseTable")
+        self.orders_warehouse_table.setHorizontalHeaderLabels(["Almacén", "Abiertos", "Kg pend.", "Últ. recepción"])
+        self._configure_table(self.orders_warehouse_table)
+        warehouse_header = self.orders_warehouse_table.horizontalHeader()
+        warehouse_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        warehouse_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        warehouse_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        warehouse_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        warehouse_panel.layout().addWidget(self.orders_warehouse_table)
+        lower_row.addWidget(warehouse_panel, 5)
+
+        state_panel = self._build_table_panel("Resumen por estado", "dashboardOrdersStatePanel")
+        self.orders_state_table = QTableWidget(0, 3)
+        self.orders_state_table.setObjectName("dashboardOrdersStateTable")
+        self.orders_state_table.setHorizontalHeaderLabels(["Estado", "Pedidos", "Kg"])
+        self._configure_table(self.orders_state_table)
+        state_header = self.orders_state_table.horizontalHeader()
+        state_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        state_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        state_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        state_panel.layout().addWidget(self.orders_state_table)
+        lower_row.addWidget(state_panel, 3)
+        layout.addLayout(lower_row)
+        return widget
 
     def reload(self) -> None:
-        snapshot = self.dashboard_service.load_snapshot()
         self.date_label.setText(self.format_header_date(date.today()))
+        if self.current_dashboard == "pedidos":
+            self._reload_orders_dashboard()
+            return
+        self._reload_agenda_dashboard()
+
+    def _reload_agenda_dashboard(self) -> None:
+        snapshot = self.dashboard_service.load_snapshot()
         self.kpi_labels["pending_today"].setText(str(snapshot.pending_today))
         self.kpi_notes["pending_today"].setText("actividad(es)")
         self.kpi_labels["overdue"].setText(str(snapshot.overdue))
@@ -515,7 +634,161 @@ class DashboardPage(QWidget):
         )
         self._populate_reactivation_table(snapshot.reactivation_rows)
         self._populate_island_table(snapshot)
-        self.footer_label.setText(f"Última actualización: {snapshot.generated_at.strftime('%d/%m/%Y %H:%M')} · {snapshot.reactivation_metric_label}")
+        self.footer_label.setText(
+            f"Última actualización: {snapshot.generated_at.strftime('%d/%m/%Y %H:%M')} · {snapshot.reactivation_metric_label}"
+        )
+
+    def _reload_orders_dashboard(self) -> None:
+        snapshot = self.order_dashboard_service.load_snapshot()
+        self.order_kpi_labels["total_orders"].setText(str(snapshot.total_orders))
+        self.order_kpi_notes["total_orders"].setText("pedido(s)")
+        self.order_kpi_labels["received_kg"].setText(self.format_kg(snapshot.received_kg))
+        self.order_kpi_notes["received_kg"].setText("kg recibidos")
+        self.order_kpi_labels["pending_kg"].setText(self.format_kg(snapshot.pending_kg))
+        self.order_kpi_notes["pending_kg"].setText("kg pendientes")
+        self.order_kpi_labels["incident_orders"].setText(str(snapshot.incident_orders))
+        self.order_kpi_notes["incident_orders"].setText("pedido(s)")
+        self._populate_order_recent_table(snapshot.recent_orders)
+        self._populate_order_pending_table(snapshot.pending_orders)
+        self._populate_order_warehouse_table(snapshot.warehouse_rows)
+        self._populate_order_state_table(snapshot.state_rows)
+        self.footer_label.setText(
+            f"Última actualización: {snapshot.generated_at.strftime('%d/%m/%Y %H:%M')} · Pedidos {snapshot.year} · métrica principal kg"
+        )
+
+    def _set_dashboard_mode(self, mode: str, *, reload: bool = True) -> None:
+        clean_mode = str(mode or "agenda").strip().lower()
+        if clean_mode not in {"agenda", "pedidos"}:
+            return
+        self.current_dashboard = clean_mode
+        if clean_mode == "pedidos":
+            self.dashboard_stack.setCurrentWidget(self.orders_dashboard)
+            self.title_label.setText("Pedidos")
+            self.new_activity_btn.setText("Ver pedidos")
+            self.full_agenda_btn.setText("Actualizar")
+            self._set_button_icon(self.new_activity_btn, "shopping-cart.svg", color="#FFFFFF", size=24)
+            self._set_button_icon(self.full_agenda_btn, "history.svg", color="#1D4ED8", size=24)
+        else:
+            self.dashboard_stack.setCurrentWidget(self.agenda_dashboard)
+            self.title_label.setText("Agenda")
+            self.new_activity_btn.setText("Nueva actividad")
+            self.full_agenda_btn.setText("Ver agenda completa")
+            self._set_button_icon(self.new_activity_btn, "plus.svg", color="#FFFFFF", size=24)
+            self._set_button_icon(self.full_agenda_btn, "calendar.svg", color="#1D4ED8", size=24)
+        self._refresh_dashboard_nav_buttons()
+        if reload:
+            self.reload()
+
+    def _refresh_dashboard_nav_buttons(self) -> None:
+        for key, button in self.dashboard_nav_buttons.items():
+            active = key == self.current_dashboard
+            button.setProperty("active", active)
+            icon_name = "calendar-days.svg" if key == "agenda" else "shopping-cart.svg"
+            icon_color = "#FFFFFF" if active else "#475569"
+            self._set_button_icon(button, icon_name, color=icon_color, size=28)
+            button.style().unpolish(button)
+            button.style().polish(button)
+            button.update()
+
+    def _handle_primary_action(self) -> None:
+        if self.current_dashboard == "pedidos":
+            self._open_orders_page()
+            return
+        self._open_new_activity()
+
+    def _handle_secondary_action(self) -> None:
+        if self.current_dashboard == "pedidos":
+            self.reload()
+            return
+        self._open_full_agenda()
+
+    def _open_orders_page(self) -> None:
+        widget: QWidget | None = self
+        while widget is not None:
+            page_names = getattr(widget, "page_names", None)
+            setter = getattr(widget, "_set_current_page", None)
+            if isinstance(page_names, list) and callable(setter) and "Pedidos" in page_names:
+                setter(page_names.index("Pedidos"))
+                return
+            widget = widget.parentWidget()
+        QMessageBox.information(self, "Pedidos", "La vista completa de pedidos no está disponible desde este contexto.")
+
+    def _populate_order_recent_table(self, rows: list[DashboardOrderRow]) -> None:
+        self.orders_recent_table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            status_label, status_color = self._order_status_meta(row.status)
+            values = [
+                row.pedido_numero,
+                row.almacen_nombre,
+                self.format_date(row.pedido_fecha),
+                self.format_kg(row.ordered_kg),
+                self.format_kg(row.received_kg),
+                self.format_kg(row.pending_kg),
+                status_label,
+            ]
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                if column in {3, 4, 5}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if column == 6:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    item.setForeground(QColor(status_color))
+                self.orders_recent_table.setItem(row_index, column, item)
+
+    def _populate_order_pending_table(self, rows: list[DashboardOrderRow]) -> None:
+        self.orders_pending_table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            values = [
+                self.format_date(row.pedido_fecha),
+                row.pedido_numero,
+                row.almacen_nombre,
+                self.format_kg(row.pending_kg),
+            ]
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                if column == 3:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                    item.setForeground(QColor("#C62828") if row.pending_kg > 1e-9 else QColor("#B54708"))
+                self.orders_pending_table.setItem(row_index, column, item)
+
+    def _populate_order_warehouse_table(self, rows: list[DashboardOrdersWarehouseRow]) -> None:
+        self.orders_warehouse_table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            values = [
+                row.almacen_nombre,
+                str(row.open_orders),
+                self.format_kg(row.pending_kg),
+                self.format_date(row.last_receipt, allow_blank=True) or "-",
+            ]
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                if column in {1, 2}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                self.orders_warehouse_table.setItem(row_index, column, item)
+
+    def _populate_order_state_table(self, rows: list[DashboardOrdersStateRow]) -> None:
+        self.orders_state_table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            _status_label, status_color = self._order_status_meta(row.status)
+            values = [row.status, str(row.count), self.format_kg(row.kg)]
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                if column == 0:
+                    item.setForeground(QColor(status_color))
+                if column in {1, 2}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                self.orders_state_table.setItem(row_index, column, item)
+
+    @staticmethod
+    def _order_status_meta(status: str) -> tuple[str, str]:
+        normalized = str(status or "").strip().lower()
+        if normalized == "incidencia":
+            return "Incidencia", "#C62828"
+        if normalized == "completado":
+            return "Completado", "#067647"
+        if normalized == "parcial":
+            return "Parcial", "#B54708"
+        return "Pendiente", "#1D4ED8"
 
     def customer_choices(self, *, include_inactive: bool = False) -> list[tuple[str, str]]:
         rows = []
@@ -917,8 +1190,8 @@ class DashboardPage(QWidget):
         layout.setSpacing(12)
 
         brand_logo = BASE_DIR / "assets" / "logos" / "corporativos" / "IREKS_Logo_transparente.png"
-        brand_icon = self._path_data_uri(brand_logo, 84, color=None)
-        brand = QLabel(f"<div align='center'><img src='{brand_icon}' width='84' height='84'/></div>")
+        brand_icon = self._path_data_uri(brand_logo, 92, color=None)
+        brand = QLabel(f"<div align='center'><img src='{brand_icon}' width='92' height='92'/></div>")
         brand.setObjectName("dashboardSidebarBrand")
         brand.setTextFormat(Qt.TextFormat.RichText)
         brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -926,16 +1199,27 @@ class DashboardPage(QWidget):
 
         agenda_btn = QPushButton("Agenda")
         agenda_btn.setObjectName("dashboardSidebarButton")
-        agenda_btn.setProperty("active", True)
-        self._set_button_icon(agenda_btn, "calendar-days.svg", color="#FFFFFF", size=28)
+        agenda_btn.clicked.connect(lambda: self._set_dashboard_mode("agenda"))
         layout.addWidget(agenda_btn)
+        self.dashboard_nav_buttons["agenda"] = agenda_btn
 
-        for label, icon_name in [("Almacen", "box.svg"), ("Pedidos", "shopping-cart.svg"), ("Ventas", "bar-chart-3.svg")]:
-            button = QPushButton(label)
-            button.setObjectName("dashboardSidebarButton")
-            self._set_button_icon(button, icon_name, color="#475569", size=28)
-            button.clicked.connect(lambda _checked=False, name=label: self._show_placeholder_dashboard(name))
-            layout.addWidget(button)
+        almacen_btn = QPushButton("Almacen")
+        almacen_btn.setObjectName("dashboardSidebarButton")
+        self._set_button_icon(almacen_btn, "box.svg", color="#475569", size=28)
+        almacen_btn.clicked.connect(lambda: self._show_placeholder_dashboard("Almacen"))
+        layout.addWidget(almacen_btn)
+
+        pedidos_btn = QPushButton("Pedidos")
+        pedidos_btn.setObjectName("dashboardSidebarButton")
+        pedidos_btn.clicked.connect(lambda: self._set_dashboard_mode("pedidos"))
+        layout.addWidget(pedidos_btn)
+        self.dashboard_nav_buttons["pedidos"] = pedidos_btn
+
+        ventas_btn = QPushButton("Ventas")
+        ventas_btn.setObjectName("dashboardSidebarButton")
+        self._set_button_icon(ventas_btn, "bar-chart-3.svg", color="#475569", size=28)
+        ventas_btn.clicked.connect(lambda: self._show_placeholder_dashboard("Ventas"))
+        layout.addWidget(ventas_btn)
 
         layout.addStretch(1)
         return sidebar
@@ -1131,7 +1415,8 @@ class DashboardPage(QWidget):
                 color: #FFFFFF;
             }
             QWidget#dashboardContentHost,
-            QWidget#dashboardContent {
+            QWidget#dashboardContent,
+            QStackedWidget#dashboardContentStack {
                 background: transparent;
             }
             QFrame#dashboardHeader {
@@ -1258,7 +1543,11 @@ class DashboardPage(QWidget):
             }
             QTableWidget#dashboardReactivationTable,
             QTableWidget#dashboardIslandTable,
-            QTableWidget#dashboardAgendaOverviewTable {
+            QTableWidget#dashboardAgendaOverviewTable,
+            QTableWidget#dashboardOrdersRecentTable,
+            QTableWidget#dashboardOrdersPendingTable,
+            QTableWidget#dashboardOrdersWarehouseTable,
+            QTableWidget#dashboardOrdersStateTable {
                 background: #FFFFFF;
                 border: 1px solid #E2E8F1;
                 border-radius: 10px;

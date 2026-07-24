@@ -13,6 +13,12 @@ from app.services.customer_dashboard_service import (
     DashboardReactivationRow,
     DashboardSnapshot,
 )
+from app.services.order_dashboard_service import (
+    DashboardOrderRow,
+    DashboardOrdersStateRow,
+    DashboardOrdersWarehouseRow,
+    OrderDashboardSnapshot,
+)
 from app.ui.widgets.dashboard_page import DashboardPage
 
 _APP: QApplication | None = None
@@ -91,6 +97,63 @@ class _StubCustomerService:
         return True
 
 
+class _StubOrderDashboardService:
+    def load_snapshot(self) -> OrderDashboardSnapshot:
+        return OrderDashboardSnapshot(
+            year=2026,
+            total_orders=12,
+            received_kg=15250.0,
+            pending_kg=1875.5,
+            incident_orders=2,
+            recent_orders=[
+                DashboardOrderRow(
+                    pedido_id="ped-1",
+                    almacen_id="alm-1",
+                    almacen_nombre="Distribuidor Norte",
+                    pedido_fecha=date(2026, 7, 20),
+                    pedido_numero="P-001",
+                    semana=30,
+                    ordered_kg=1000.0,
+                    received_kg=750.0,
+                    pending_kg=250.0,
+                    incident_kg=0.0,
+                    status="parcial",
+                    last_receipt=date(2026, 7, 22),
+                )
+            ],
+            pending_orders=[
+                DashboardOrderRow(
+                    pedido_id="ped-2",
+                    almacen_id="alm-2",
+                    almacen_nombre="Cliente Centro",
+                    pedido_fecha=date(2026, 7, 18),
+                    pedido_numero="P-002",
+                    semana=29,
+                    ordered_kg=850.0,
+                    received_kg=0.0,
+                    pending_kg=850.0,
+                    incident_kg=0.0,
+                    status="pendiente",
+                    last_receipt=None,
+                )
+            ],
+            warehouse_rows=[
+                DashboardOrdersWarehouseRow(
+                    almacen_id="alm-2",
+                    almacen_nombre="Cliente Centro",
+                    open_orders=3,
+                    pending_kg=1250.0,
+                    last_receipt=date(2026, 7, 21),
+                )
+            ],
+            state_rows=[
+                DashboardOrdersStateRow(status="Pendiente", count=4, kg=2100.0),
+                DashboardOrdersStateRow(status="Parcial", count=6, kg=9200.0),
+            ],
+            generated_at=datetime(2026, 7, 24, 10, 15, 0),
+        )
+
+
 def test_dashboard_page_renders_named_controls_and_snapshot() -> None:
     _application()
     page = DashboardPage(customer_service=_StubCustomerService(), dashboard_service=_StubDashboardService())
@@ -122,3 +185,28 @@ def test_dashboard_page_uses_static_layout_without_scrollbar() -> None:
     assert page.findChildren(QScrollArea) == []
     assert page.sizeHint().height() <= page.height()
     assert content.sizeHint().height() <= page.height()
+
+
+def test_dashboard_page_switches_to_orders_mode_and_renders_snapshot() -> None:
+    _application()
+    page = DashboardPage(
+        customer_service=_StubCustomerService(),
+        dashboard_service=_StubDashboardService(),
+        order_dashboard_service=_StubOrderDashboardService(),
+    )
+
+    page._set_dashboard_mode("pedidos")
+
+    assert page.title_label.text() == "Pedidos"
+    assert page.new_activity_btn.text() == "Ver pedidos"
+    assert page.full_agenda_btn.text() == "Actualizar"
+    assert page.order_kpi_labels["total_orders"].text() == "12"
+    assert page.order_kpi_labels["received_kg"].text() == "15.250,00"
+    assert page.order_kpi_labels["pending_kg"].text() == "1.875,50"
+    assert page.order_kpi_labels["incident_orders"].text() == "2"
+    assert page.orders_recent_table.rowCount() == 1
+    assert page.orders_recent_table.item(0, 1).text() == "Distribuidor Norte"
+    assert page.orders_pending_table.rowCount() == 1
+    assert page.orders_warehouse_table.rowCount() == 1
+    assert page.orders_state_table.rowCount() == 2
+    assert "Pedidos 2026" in page.footer_label.text()
