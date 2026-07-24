@@ -1110,6 +1110,7 @@ class DashboardPage(QWidget):
         card = QFrame()
         card.setObjectName("dashboardKpiCard")
         card.setProperty("tone", tone)
+        card.setFixedHeight(118)
         layout = QHBoxLayout(card)
         layout.setContentsMargins(14, 12, 14, 12)
         layout.setSpacing(14)
