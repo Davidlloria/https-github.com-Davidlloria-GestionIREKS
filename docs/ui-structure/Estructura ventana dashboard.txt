@@ -7,6 +7,7 @@ Implementación principal:
   - app/services/customer_dashboard_service.py
   - app/services/customer_service.py
   - app/services/order_dashboard_service.py
+  - app/services/sales_dashboard_service.py
   - app/services/warehouse_dashboard_service.py
 
 DashboardPage (QWidget, objectName: dashboardPageRoot, fondo #EEF3F8)
@@ -14,7 +15,7 @@ DashboardPage (QWidget, objectName: dashboardPageRoot, fondo #EEF3F8)
     ├── dashboardSidebar (QFrame, ancho fijo 188 px, fondo #F8FAFC, borde derecho #E2E8F0)
     │   └── QVBoxLayout (márgenes 12/16/12/16 px, separación 12 px)
     │       ├── dashboardSidebarBrand (QLabel HTML solo logo IREKS_Logo_transparente.png, centrado, fondo transparente, texto #0F172A, sin borde, radio 16 px)
-    │       ├── dashboardSidebarButton activo (QPushButton del modo activo: Agenda / Almacen / Pedidos, fondo #2563EB, texto #FFFFFF)
+    │       ├── dashboardSidebarButton activo (QPushButton del modo activo: Agenda / Almacen / Pedidos / Ventas, fondo #2563EB, texto #FFFFFF)
     │       ├── dashboardSidebarButton (QPushButton inactivo “Agenda”, icono calendar-days.svg, fondo transparente, texto #334155)
     │       ├── dashboardSidebarButton (QPushButton inactivo “Almacen”, icono box.svg, fondo transparente, texto #334155)
     │       ├── dashboardSidebarButton (QPushButton inactivo “Pedidos”, icono shopping-cart.svg, fondo transparente, texto #334155)
@@ -59,23 +60,40 @@ DashboardPage (QWidget, objectName: dashboardPageRoot, fondo #EEF3F8)
                 │   │           │   └── dashboardWarehouseEntriesTable (QTableWidget; columnas: Fecha / Almacén / Ref / Producto / Kg)
                 │   │           └── dashboardWarehouseOutputsPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
                 │   │               └── dashboardWarehouseOutputsTable (QTableWidget; columnas: Fecha / Almacén / Ref / Producto / Kg)
-                │   └── dashboardOrdersView (QWidget, fondo transparente; contenedor real de fila KPI + fila media + fila inferior de Pedidos)
+                │   ├── dashboardOrdersView (QWidget, fondo transparente; contenedor real de fila KPI + fila media + fila inferior de Pedidos)
+                │   │   └── QVBoxLayout (márgenes 0 px, separación 14 px)
+                │   │       ├── fila KPI (QGridLayout)
+                │   │       │   ├── KPI “Pedidos del año” (icono shopping-cart.svg, tono blue)
+                │   │       │   ├── KPI “Kg recibidos” (icono package-check.svg, tono green)
+                │   │       │   ├── KPI “Kg pendientes” (icono scale.svg, tono orange)
+                │   │       │   └── KPI “Incidencias” (icono circle-alert.svg, tono red)
+                │   │       ├── fila media (QHBoxLayout, separación 14 px)
+                │   │       │   ├── dashboardOrdersRecentPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │   │       │   │   └── dashboardOrdersRecentTable (QTableWidget; columnas: Pedido / Almacén / Fecha / Kg pedido / Kg recibido / Kg pend. / Estado)
+                │   │       │   └── dashboardOrdersPendingPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │   │       │       └── dashboardOrdersPendingTable (QTableWidget; columnas: Fecha / Pedido / Almacén / Kg pend.)
+                │   │       └── fila inferior (QHBoxLayout, separación 14 px)
+                │   │           ├── dashboardOrdersWarehousePanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │   │           │   └── dashboardOrdersWarehouseTable (QTableWidget; columnas: Almacén / Abiertos / Kg pend. / Últ. recepción)
+                │   │           └── dashboardOrdersStatePanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │   │               └── dashboardOrdersStateTable (QTableWidget; columnas: Estado / Pedidos / Kg)
+                │   └── dashboardSalesView (QWidget, fondo transparente; contenedor real de fila KPI + fila media + fila inferior de Ventas)
                 │       └── QVBoxLayout (márgenes 0 px, separación 14 px)
                 │           ├── fila KPI (QGridLayout)
-                │           │   ├── KPI “Pedidos del año” (icono shopping-cart.svg, tono blue)
-                │           │   ├── KPI “Kg recibidos” (icono package-check.svg, tono green)
-                │           │   ├── KPI “Kg pendientes” (icono scale.svg, tono orange)
-                │           │   └── KPI “Incidencias” (icono circle-alert.svg, tono red)
+                │           │   ├── KPI “Kg vendidos” (icono scale.svg, tono blue)
+                │           │   ├── KPI “Variación kg” (icono trending-down.svg, tono blue, valor en verde/rojo según signo)
+                │           │   ├── KPI “Clientes activos” (icono briefcase.svg, tono green)
+                │           │   └── KPI “Islas activas” (icono map.svg, tono orange)
                 │           ├── fila media (QHBoxLayout, separación 14 px)
-                │           │   ├── dashboardOrdersRecentPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                │           │   │   └── dashboardOrdersRecentTable (QTableWidget; columnas: Pedido / Almacén / Fecha / Kg pedido / Kg recibido / Kg pend. / Estado)
-                │           │   └── dashboardOrdersPendingPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                │           │       └── dashboardOrdersPendingTable (QTableWidget; columnas: Fecha / Pedido / Almacén / Kg pend.)
+                │           │   ├── dashboardSalesDropsPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │           │   │   └── dashboardSalesDropsTable (QTableWidget; columnas: Cliente / Isla / Kg ant. / Kg act. / Δ Kg)
+                │           │   └── dashboardSalesIslandsPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │           │       └── dashboardSalesIslandsTable (QTableWidget; columnas: Isla / Clientes / Kg act. / Δ Kg / %)
                 │           └── fila inferior (QHBoxLayout, separación 14 px)
-                │               ├── dashboardOrdersWarehousePanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                │               │   └── dashboardOrdersWarehouseTable (QTableWidget; columnas: Almacén / Abiertos / Kg pend. / Últ. recepción)
-                │               └── dashboardOrdersStatePanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                │                   └── dashboardOrdersStateTable (QTableWidget; columnas: Estado / Pedidos / Kg)
+                │               ├── dashboardSalesTypesPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │               │   └── dashboardSalesTypesTable (QTableWidget; columnas: Tipo / Clientes / Kg act. / Δ Kg / %)
+                │               └── dashboardSalesZeroPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │                   └── dashboardSalesZeroTable (QTableWidget; columnas: Cliente / Isla / Tipo / Kg ant.)
                 └── dashboardFooterLabel (QLabel, texto #64748B)
 
 COMPORTAMIENTO FUNCIONAL ACTUAL
@@ -87,7 +105,7 @@ COMPORTAMIENTO FUNCIONAL ACTUAL
   - Agenda
   - Almacen
   - Pedidos
-- El botón lateral Ventas sigue siendo placeholder y muestra un QMessageBox informativo.
+  - Ventas
 - En modo Agenda:
   - “Nueva actividad” abre DashboardAgendaDialog.
   - “Ver agenda completa” abre DashboardAgendaOverviewDialog.
@@ -97,6 +115,9 @@ COMPORTAMIENTO FUNCIONAL ACTUAL
 - En modo Pedidos:
   - “Ver pedidos” navega a la página principal “Pedidos” si existe en MainWindow.
   - “Actualizar” recarga el snapshot del dashboard de pedidos.
+- En modo Ventas:
+  - “Ver ventas” navega a la página principal “Ventas” si existe en MainWindow.
+  - “Actualizar” recarga el snapshot del dashboard de ventas.
 - Las tablas del dashboard son de solo lectura, con selección por fila y sin edición directa.
 
 GEOMETRÍA ACTUAL
@@ -104,7 +125,7 @@ GEOMETRÍA ACTUAL
 
 - dashboardSidebar tiene ancho fijo de 188 px.
 - dashboardContent reparte el resto del ancho disponible sin splitter visible.
-- dashboardAgendaView, dashboardWarehouseView y dashboardOrdersView no tienen fondo propio; se apoyan visualmente sobre el fondo general #EEF3F8 a través de contenedores transparentes.
+- dashboardAgendaView, dashboardWarehouseView, dashboardOrdersView y dashboardSalesView no tienen fondo propio; se apoyan visualmente sobre el fondo general #EEF3F8 a través de contenedores transparentes.
 - La fila KPI usa cuatro tarjetas en una rejilla de una sola fila.
 - Las filas media e inferior usan proporción 5:3 entre bloque izquierdo y derecho.
 - dashboardKpiIcon mide 64 × 64 px.
@@ -114,7 +135,7 @@ ASPECTO VISUAL ACTUAL
 ---------------------
 
 - Fondo general del dashboard: #EEF3F8.
-- dashboardContentHost, dashboardContent, dashboardAgendaView, dashboardWarehouseView y dashboardOrdersView: fondo transparente.
+- dashboardContentHost, dashboardContent, dashboardAgendaView, dashboardWarehouseView, dashboardOrdersView y dashboardSalesView: fondo transparente.
 - dashboardContentStack: fondo transparente, sin borde.
 - Sidebar clara; solo el botón activo va en azul #2563EB.
 - Tarjetas KPI y paneles principales blancos con bordes suaves y radios amplios.
@@ -127,6 +148,7 @@ RELACIÓN CON BACKEND / DATOS
 - CustomerDashboardService aporta los KPIs, agenda de hoy, próximos vencimientos, clientes a reactivar y agenda por isla.
 - WarehouseDashboardService aporta KPIs y tablas agregadas de stock, riesgos, entradas y salidas de almacén en kg.
 - OrderDashboardService aporta KPIs y tablas agregadas del seguimiento de pedidos.
+- SalesDashboardService aporta KPIs y tablas agregadas de ventas anuales por cliente, isla y tipo de cliente, siempre con kg como métrica principal.
 - CustomerService se usa para cargar clientes y para alta, edición y borrado de actividades de agenda.
 - La agenda del dashboard trabaja directamente contra la base local desde PySide6/backend.
 
@@ -137,4 +159,4 @@ RELACIÓN CON BACKEND / DATOS
 - Documentado que fila KPI, fila media y fila inferior cuelgan de esos widgets de vista, no de content_layout directamente.
 - Incorporado el dashboard de Almacen con navegación lateral y métricas principales en kg.
 - Incorporado el dashboard de Pedidos con navegación lateral y métricas principales en kg.
-- Manteniendo Ventas como siguiente fase.
+- Incorporado el dashboard de Ventas con navegación lateral y foco principal en kg vendidos, variación anual, clientes activos e islas activas.
