@@ -30,7 +30,7 @@ DashboardPage (QWidget, objectName: dashboardPageRoot, fondo #EEF3F8)
                 │       │   └── dashboardDateLabel (QLabel, fecha larga en español, texto #475569, 13 px)
                 │       ├── dashboardNewActivityButton (QPushButton, btnRole=primary, icono variable por modo)
                 │       └── dashboardFullAgendaButton (QPushButton, btnRole=secondary, icono variable por modo)
-                ├── dashboardContentStack (QStackedWidget, fondo transparente)
+                ├── dashboardContentStack (QStackedWidget, fondo transparente, sin borde)
                 │   ├── dashboardAgendaView (QWidget, fondo transparente; contenedor real de fila KPI + fila media + fila inferior de Agenda)
                 │   │   └── QVBoxLayout (márgenes 0 px, separación 14 px)
                 │   │       ├── fila KPI (QGridLayout, separación horizontal 12 px, vertical 12 px)
@@ -114,7 +114,8 @@ ASPECTO VISUAL ACTUAL
 ---------------------
 
 - Fondo general del dashboard: #EEF3F8.
-- dashboardContentHost, dashboardContent, dashboardContentStack, dashboardAgendaView, dashboardWarehouseView y dashboardOrdersView: fondo transparente.
+- dashboardContentHost, dashboardContent, dashboardAgendaView, dashboardWarehouseView y dashboardOrdersView: fondo transparente.
+- dashboardContentStack: fondo transparente, sin borde.
 - Sidebar clara; solo el botón activo va en azul #2563EB.
 - Tarjetas KPI y paneles principales blancos con bordes suaves y radios amplios.
 - Empty states con fondo #F8FAFC y borde discontinuo #CBD5E1.

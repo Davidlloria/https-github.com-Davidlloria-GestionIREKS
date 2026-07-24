@@ -1624,11 +1624,14 @@ class DashboardPage(QWidget):
             }
             QWidget#dashboardContentHost,
             QWidget#dashboardContent,
-            QStackedWidget#dashboardContentStack,
             QWidget#dashboardAgendaView,
             QWidget#dashboardWarehouseView,
             QWidget#dashboardOrdersView {
                 background: transparent;
+            }
+            QStackedWidget#dashboardContentStack {
+                background: transparent;
+                border: none;
             }
             QFrame#dashboardHeader {
                 background: transparent;
