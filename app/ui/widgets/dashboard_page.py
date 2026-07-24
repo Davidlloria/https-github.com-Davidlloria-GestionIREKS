@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QRectF, QSize, Qt
+from PySide6.QtCore import QBuffer, QDate, QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
@@ -916,11 +916,11 @@ class DashboardPage(QWidget):
         layout.setContentsMargins(12, 16, 12, 16)
         layout.setSpacing(12)
 
-        brand_icon = self._icon_path("layout-dashboard.svg").as_posix()
+        brand_icon = self._icon_data_uri("layout-dashboard.svg", 32, color="#FFFFFF")
         brand = QLabel(
             (
                 "<table cellspacing='0' cellpadding='0'><tr>"
-                f"<td width='30'><img src='{brand_icon}' width='22' height='22'/></td>"
+                f"<td width='40'><img src='{brand_icon}' width='32' height='32'/></td>"
                 "<td><span>IREKS</span><br/><span>Dashboard</span></td>"
                 "</tr></table>"
             )
@@ -965,6 +965,16 @@ class DashboardPage(QWidget):
     def _set_button_icon(self, button: QPushButton, icon_name: str, *, color: str, size: int = 18) -> None:
         button.setIcon(QIcon(self._icon_pixmap(icon_name, size, color=color)))
         button.setIconSize(QSize(size, size))
+
+    def _icon_data_uri(self, icon_name: str, size: int, *, color: str | None = None) -> str:
+        pixmap = self._icon_pixmap(icon_name, size, color=color)
+        if pixmap.isNull():
+            return ""
+        buffer = QBuffer()
+        buffer.open(QBuffer.OpenModeFlag.WriteOnly)
+        pixmap.save(buffer, "PNG")
+        payload = bytes(buffer.data().toBase64()).decode("ascii")
+        return f"data:image/png;base64,{payload}"
 
     @staticmethod
     def _recolor_pixmap(pixmap: QPixmap, color: QColor) -> QPixmap:
@@ -1096,11 +1106,11 @@ class DashboardPage(QWidget):
                 border-right: 1px solid #E2E8F0;
             }
             QLabel#dashboardSidebarBrand {
-                color: #0F172A;
-                background: #FFFFFF;
-                border: 1px solid #E2E8F0;
+                color: #FFFFFF;
+                background: #7F1D2D;
+                border: 1px solid #7F1D2D;
                 border-radius: 16px;
-                padding: 14px;
+                padding: 14px 16px;
                 font-size: 18px;
                 font-weight: 700;
             }
