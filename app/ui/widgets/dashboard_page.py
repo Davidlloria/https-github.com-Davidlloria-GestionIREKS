@@ -1390,7 +1390,7 @@ class DashboardPage(QWidget):
         panel = QFrame()
         panel.setObjectName("dashboardUpcomingPanel")
         panel.setProperty("dashboardPanel", True)
-        panel.setFixedHeight(280)
+        panel.setFixedHeight(292)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(4)
@@ -1481,7 +1481,7 @@ class DashboardPage(QWidget):
         self.agenda_month_detail_layout = QVBoxLayout(detail_container)
         self.agenda_month_detail_layout.setContentsMargins(0, 0, 0, 0)
         self.agenda_month_detail_layout.setSpacing(4)
-        detail_container.setMaximumHeight(50)
+        detail_container.setMaximumHeight(62)
         layout.addWidget(detail_container, 0)
         return panel
 
@@ -1612,10 +1612,10 @@ class DashboardPage(QWidget):
         if not selected_rows:
             self.agenda_month_detail_layout.addWidget(self._empty_label("No hay actividades para el día seleccionado."))
             return
-        for row in selected_rows[:1]:
+        for row in selected_rows[:2]:
             self.agenda_month_detail_layout.addWidget(self._build_calendar_detail_row(row, today_value=today_value))
-        if len(selected_rows) > 1:
-            self.agenda_month_detail_layout.addWidget(self._empty_label(f"+{len(selected_rows) - 1} actividad(es) más en este día."))
+        if len(selected_rows) > 2:
+            self.agenda_month_detail_layout.addWidget(self._empty_label(f"+{len(selected_rows) - 2} actividad(es) más en este día."))
 
     def _build_calendar_detail_row(self, row: DashboardActivityRow, *, today_value: date) -> QFrame:
         frame = QFrame()
