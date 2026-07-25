@@ -38,7 +38,15 @@ DashboardPage (QWidget, objectName: dashboardPageRoot, fondo #EEF3F8)
                 │   │       ├── fila KPI (QGridLayout, separación horizontal 12 px, vertical 12 px)
                 │   │       ├── fila media (QHBoxLayout, separación 14 px)
                 │   │       │   ├── dashboardTodayPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                │   │       │   └── dashboardUpcomingPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                │   │       │   └── dashboardUpcomingPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px, alto fijo 280 px)
+                │   │       │       ├── dashboardMonthTitle (QLabel, mes visible en español, centrado)
+                │   │       │       ├── dashboardCalendarNavButton (QPushButton “<” / “>”, navegación mensual)
+                │   │       │       ├── leyenda de estados (QLabel pills: Pendiente / Hecha / Vencida)
+                │   │       │       ├── dashboardMonthGrid (QFrame, rejilla 7×6 de días)
+                │   │       │       │   └── dashboardMonthDayButton (QPushButton por día, marca visual cuando hay agenda, selección y resaltado del día actual)
+                │   │       │       ├── dashboardCalendarSummaryChip (QFrame resumen: Pendientes / Hechas / Vencidas)
+                │   │       │       └── detalle del día seleccionado
+                │   │       │           └── dashboardUpcomingRow (QFrame, preview compacto de actividades del día)
                 │   │       └── fila inferior (QHBoxLayout, separación 14 px)
                 │   │           ├── dashboardReactivationPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
                 │   │           │   └── dashboardReactivationTable (QTableWidget, fondo #FFFFFF, borde #E2E8F1, radio 10 px)
@@ -112,6 +120,10 @@ COMPORTAMIENTO FUNCIONAL ACTUAL
 - En modo Agenda:
   - “Nueva actividad” abre DashboardAgendaDialog.
   - “Ver agenda completa” abre DashboardAgendaOverviewDialog.
+  - El panel derecho muestra un calendario mensual del mes visible.
+  - Los días con agenda quedan marcados visualmente según estado principal: pendiente, hecha o vencida.
+  - Al pulsar un día, el panel inferior del mismo widget muestra una preview compacta de sus actividades.
+  - La navegación “< / >” permite cambiar de mes sin salir del dashboard.
 - En modo Almacen:
   - “Ver almacén” navega a la página principal “Almacen” si existe en MainWindow.
   - “Actualizar” recarga el snapshot del dashboard de almacén.
@@ -130,6 +142,7 @@ GEOMETRÍA ACTUAL
 - dashboardSidebar tiene ancho fijo de 188 px.
 - dashboardContent reparte el resto del ancho disponible sin splitter visible.
 - dashboardAgendaView, dashboardWarehouseView, dashboardOrdersView y dashboardSalesView no tienen fondo propio; se apoyan visualmente sobre el fondo general #EEF3F8 a través de contenedores transparentes.
+- El dashboard de Agenda mantiene altura fija total sin scroll global; el calendario mensual del panel derecho está compactado para entrar en la ventana principal.
 - La fila KPI usa cuatro tarjetas en una rejilla de una sola fila.
 - Las filas media e inferior usan proporción 5:3 entre bloque izquierdo y derecho.
 - dashboardKpiIcon mide 64 × 64 px.
@@ -149,7 +162,7 @@ RELACIÓN CON BACKEND / DATOS
 ----------------------------
 
 - DashboardPage no depende del frontend React.
-- CustomerDashboardService aporta los KPIs, agenda de hoy, próximos vencimientos, clientes a reactivar y agenda por isla.
+- CustomerDashboardService aporta los KPIs, agenda de hoy, actividades base para el calendario mensual, clientes a reactivar y agenda por isla.
 - WarehouseDashboardService aporta KPIs y tablas agregadas de stock, riesgos, entradas y salidas de almacén en kg.
 - OrderDashboardService aporta KPIs y tablas agregadas del seguimiento de pedidos.
 - SalesDashboardService aporta KPIs y tablas agregadas de ventas anuales por cliente, isla y tipo de cliente, siempre con kg como métrica principal.
@@ -164,4 +177,5 @@ RELACIÓN CON BACKEND / DATOS
 - Incorporado el dashboard de Almacen con navegación lateral y métricas principales en kg.
 - Incorporado el dashboard de Pedidos con navegación lateral y métricas principales en kg.
 - Incorporado el dashboard de Ventas con navegación lateral y foco principal en kg vendidos, variación anual, clientes activos e islas activas.
+- Sustituido el antiguo bloque de próximos vencimientos de Agenda por un calendario mensual interactivo con marcas de estado y preview por día.
 - Añadido el botón lateral Objetivos con icono goal.svg, pendiente de implementación funcional.
