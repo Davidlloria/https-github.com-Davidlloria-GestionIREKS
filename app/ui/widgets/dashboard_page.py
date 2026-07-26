@@ -1393,7 +1393,7 @@ class DashboardPage(QWidget):
         panel.setFixedHeight(312)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(6)
+        layout.setSpacing(8)
 
         heading = QLabel("Agenda del mes")
         heading.setObjectName("dashboardPanelTitle")
@@ -1427,10 +1427,13 @@ class DashboardPage(QWidget):
 
         grid_host = QFrame()
         grid_host.setObjectName("dashboardMonthGrid")
+        grid_host.setFixedHeight(176)
         grid_layout = QGridLayout(grid_host)
         grid_layout.setContentsMargins(0, 0, 0, 0)
         grid_layout.setHorizontalSpacing(2)
         grid_layout.setVerticalSpacing(2)
+        for row_index in range(6):
+            grid_layout.setRowMinimumHeight(row_index, 27)
         self.agenda_day_buttons = []
         for row_index in range(6):
             for column_index in range(7):
@@ -1442,11 +1445,12 @@ class DashboardPage(QWidget):
                 button.setProperty("hasAgenda", False)
                 button.setProperty("outsideMonth", False)
                 button.setProperty("tone", "none")
-                button.setMinimumHeight(26)
+                button.setFixedHeight(27)
                 button.clicked.connect(lambda _checked=False, current_button=button: self._handle_agenda_calendar_button(current_button))
                 grid_layout.addWidget(button, row_index, column_index)
                 self.agenda_day_buttons.append(button)
         layout.addWidget(grid_host, 1)
+        layout.addSpacing(2)
 
         summary_row = QHBoxLayout()
         summary_row.setContentsMargins(0, 0, 0, 0)
