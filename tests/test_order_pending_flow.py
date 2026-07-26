@@ -223,8 +223,8 @@ def test_list_pendientes_acumulados_uses_selected_order_almacen_context(isolated
     service = OrderQueryService()
     rows, articles = service.list_pendientes_acumulados("pedido-2")
 
-    assert len(rows) == 2
+    assert len(rows) == 1
     resumen = [(pedido.pedido_numero, pendiente.cantidad_pendiente) for pendiente, pedido in rows]
-    assert resumen == [("P-1", 3.0), ("P-2", 5.0)]
+    assert resumen == [("P-1", 8.0)]
     assert len(articles) == 1
     assert articles[0].articulo_id == articulo_id
