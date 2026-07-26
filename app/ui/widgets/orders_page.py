@@ -2933,11 +2933,16 @@ class OrdersPage(QWidget):
             return default
 
     @staticmethod
-    def _format_number_es_static(value: float, decimals: int = 2, suffix: str = "") -> str:
-        return OrderDocumentParser.format_number_es(value, decimals, suffix)
+    def _format_number_es_static(value: float, decimals: int = 2, suffix: str = "", *, signed: bool = False) -> str:
+        number = float(value or 0.0)
+        if signed:
+            text = f"{number:+,.{decimals}f}"
+            text = text.replace(",", "_").replace(".", ",").replace("_", ".")
+            return f"{text}{suffix}"
+        return OrderDocumentParser.format_number_es(number, decimals, suffix)
 
-    def _format_number_es(self, value: float, decimals: int = 2, suffix: str = "") -> str:
-        return OrdersPage._format_number_es_static(value, decimals, suffix)
+    def _format_number_es(self, value: float, decimals: int = 2, suffix: str = "", *, signed: bool = False) -> str:
+        return OrdersPage._format_number_es_static(value, decimals, suffix, signed=signed)
 
     def _is_article_pending(self, article: IngredienteIreks | None) -> bool:
         if article is None:
