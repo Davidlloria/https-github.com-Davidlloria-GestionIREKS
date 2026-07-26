@@ -1603,7 +1603,7 @@ class OrdersPage(QWidget):
         pendientes_tab_layout = QVBoxLayout(pendientes_tab)
         pendientes_tab_layout.setContentsMargins(8, 8, 8, 8)
         pendientes_tab_layout.setSpacing(6)
-        self.pendientes_table = QTableWidget(0, 6)
+        self.pendientes_table = QTableWidget(0, 4)
         self.pendientes_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.pendientes_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.pendientes_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -1616,14 +1616,12 @@ class OrdersPage(QWidget):
         pendientes_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         pendientes_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         pendientes_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        pendientes_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        pendientes_header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-        self.pendientes_table.setHorizontalHeaderLabels(["Cod.", "Nombre", "Pedida", "Recibida", "Pendiente", "Estado"])
+        pendientes_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        pendientes_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self.pendientes_table.setHorizontalHeaderLabels(["Cod.", "Nombre", "Pendiente", "Pedido"])
         self.pendientes_table.setColumnWidth(0, 95)
-        self.pendientes_table.setColumnWidth(2, 90)
-        self.pendientes_table.setColumnWidth(3, 90)
-        self.pendientes_table.setColumnWidth(4, 100)
-        self.pendientes_table.setColumnWidth(5, 90)
+        self.pendientes_table.setColumnWidth(2, 100)
+        self.pendientes_table.setColumnWidth(3, 100)
         pendientes_tab_layout.addWidget(self.pendientes_table, 1)
         tabs.addTab(pendientes_tab, "Pendientes")
         tabs_layout.addWidget(tabs)
@@ -2215,37 +2213,30 @@ class OrdersPage(QWidget):
         self.pendientes_table.setRowCount(0)
         if not pedido_id:
             return
-        rows, articles = self.order_query_service.list_pendientes(pedido_id)
+        rows, articles = self.order_query_service.list_pendientes_acumulados(pedido_id)
         name_by_article = {str(a.articulo_id or ""): str(a.articulo_descripcion or "").strip() for a in articles}
         ref_by_article = {str(a.articulo_id or ""): str(a.articulo_referencia_corta or "").strip() for a in articles}
-        article_by_id = {str(a.articulo_id or ""): a for a in articles}
 
         self.pendientes_table.setRowCount(len(rows))
-        for row_idx, row in enumerate(rows):
+        for row_idx, (row, pedido) in enumerate(rows):
             articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
             cod = ref_by_article.get(articulo_id, "") or articulo_id
             nombre = name_by_article.get(articulo_id, "") or articulo_id
-            pendiente_raw = float(getattr(row, "cantidad_pendiente", 0.0) or 0.0)
-            pendiente_display = -pendiente_raw
+            pendiente = float(getattr(row, "cantidad_pendiente", 0.0) or 0.0)
+            pedido_numero = str(getattr(pedido, "pedido_numero", "") or "").strip()
             values = [
                 cod,
                 nombre,
-                self._format_number_es(float(getattr(row, "cantidad_pedida", 0.0) or 0.0), 2),
-                self._format_number_es(float(getattr(row, "cantidad_recibida", 0.0) or 0.0), 2),
-                self._format_number_es(pendiente_display, 2),
-                str(getattr(row, "estado", "") or "").strip(),
+                self._format_number_es(pendiente, 2),
+                pedido_numero,
             ]
             for col_idx, value in enumerate(values):
-                cell = QTableWidgetItem(value)
-                if col_idx == 0 and self._is_article_pending(article_by_id.get(articulo_id)):
-                    cell.setForeground(QBrush(QColor("#c62828")))
-                if col_idx == 4:
-                    if pendiente_display > 0:
-                        cell.setForeground(QBrush(QColor("#2e7d32")))
-                    elif pendiente_display < 0:
-                        cell.setForeground(QBrush(QColor("#c62828")))
-                if col_idx in (2, 3, 4):
+                if col_idx == 2:
+                    cell = NumericTableWidgetItem(value, pendiente)
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                    cell.setForeground(QBrush(QColor("#C62828")))
+                else:
+                    cell = QTableWidgetItem(value)
                 self.pendientes_table.setItem(row_idx, col_idx, cell)
 
     def reload(self) -> None:
