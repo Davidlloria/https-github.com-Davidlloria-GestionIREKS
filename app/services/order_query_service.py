@@ -36,7 +36,6 @@ class OrderListRow:
 
 
 @dataclass
-@dataclass
 class PendingAggregateRow:
     pedido_id: str
     articulo_id: str
@@ -46,6 +45,7 @@ class PendingAggregateRow:
     estado: str = "pendiente"
 
 
+@dataclass
 class WarehouseFilterOption:
     label: str
     value: str
