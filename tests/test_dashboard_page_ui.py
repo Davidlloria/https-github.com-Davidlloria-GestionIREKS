@@ -36,6 +36,29 @@ from app.ui.widgets.dashboard_page import DashboardPage
 _APP: QApplication | None = None
 
 
+def _layout_texts(layout) -> list[str]:
+    texts: list[str] = []
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        widget = item.widget()
+        child_layout = item.layout()
+        if widget is not None:
+            if hasattr(widget, "text") and callable(widget.text):
+                try:
+                    texts.append(widget.text())
+                except TypeError:
+                    pass
+            for child in widget.findChildren(QWidget):
+                if hasattr(child, "text") and callable(child.text):
+                    try:
+                        texts.append(child.text())
+                    except TypeError:
+                        pass
+        elif child_layout is not None:
+            texts.extend(_layout_texts(child_layout))
+    return texts
+
+
 def _application() -> QApplication:
     global _APP
     _APP = QApplication.instance() or QApplication([])
@@ -92,7 +115,42 @@ class _StubDashboardService:
         )
 
     def list_all_activities(self):
-        return self.load_snapshot().today_items
+        return [
+            DashboardActivityRow(
+                agenda_id="ag-1",
+                cliente_id="cli-1",
+                cliente_codigo=101,
+                cliente_nombre="Panaderia Norte",
+                isla_nombre="Gran Canaria",
+                fecha_actividad=date(2026, 7, 21),
+                fecha_seguimiento=None,
+                tipo="seguimiento",
+                estado="pendiente",
+                resumen="Revision comercial",
+                detalle="Revisar consumo semanal",
+                prioridad="alta",
+                responsable="Juan",
+                created_at=datetime(2026, 7, 21, 8, 0, 0),
+                updated_at=datetime(2026, 7, 21, 8, 0, 0),
+            ),
+            DashboardActivityRow(
+                agenda_id="ag-2",
+                cliente_id="cli-2",
+                cliente_codigo=202,
+                cliente_nombre="Panaderia Centro",
+                isla_nombre="Tenerife",
+                fecha_actividad=date.today(),
+                fecha_seguimiento=None,
+                tipo="visita_prevista",
+                estado="pendiente",
+                resumen="Visita del d?a",
+                detalle="Seguimiento del cliente",
+                prioridad="media",
+                responsable="Ana",
+                created_at=datetime(2026, 7, 26, 9, 0, 0),
+                updated_at=datetime(2026, 7, 26, 9, 0, 0),
+            ),
+        ]
 
 
 class _StubCustomerService:
@@ -304,6 +362,22 @@ def test_dashboard_page_renders_named_controls_and_snapshot() -> None:
     assert page.reactivation_table.item(0, 3).text() == "-25,00 kg"
     assert page.island_table.rowCount() == 1
     assert "Variación kg" in page.footer_label.text()
+
+
+
+def test_dashboard_page_updates_today_panel_from_selected_calendar_day() -> None:
+    _application()
+    page = DashboardPage(customer_service=_StubCustomerService(), dashboard_service=_StubDashboardService())
+
+    page.agenda_month_calendar.setSelectedDate(page.qdate_from_value(date(2026, 7, 21)))
+    QApplication.processEvents()
+
+    assert page.agenda_calendar_selected_date == date(2026, 7, 21)
+    assert page.today_panel_title.text() == "Agenda del 21/07/2026"
+    today_texts = _layout_texts(page.today_items_layout)
+    assert "Revision comercial" in today_texts
+    assert "Visita del d?a" not in today_texts
+
 
 
 def test_dashboard_page_uses_static_layout_without_scrollbar() -> None:

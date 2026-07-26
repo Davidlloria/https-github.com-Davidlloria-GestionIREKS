@@ -54,6 +54,8 @@
               - fila resumen (`QHBoxLayout`, separacion `6 px`)
                 - `dashboardCalendarSummaryChip` (`QFrame`, resumen `Pendientes / Hechas / Vencidas`)
             - `dashboardTodayPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`, alto fijo `312 px`)
+              - `dashboardPanelTitle` (`QLabel`, dinamico: `Agenda de hoy` o `Agenda del dd/mm/aaaa` segun fecha seleccionada)
+              - listado de actividades del dia seleccionado en `dashboardMonthCalendar`
           - fila inferior (`QHBoxLayout`, separacion `14 px`)
             - `dashboardReactivationPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
               - `dashboardReactivationTable` (`QTableWidget`, fondo `#FFFFFF`, borde `#E2E8F1`, radio `10 px`)
@@ -118,6 +120,9 @@
   - La fila media muestra primero `dashboardUpcomingPanel` y despues `dashboardTodayPanel`.
   - El panel mensual usa un `QCalendarWidget` personalizado.
   - El titulo y la fila de navegacion del calendario comparten el mismo ancho util que `dashboardMonthCalendar` para alinear su borde izquierdo con la rejilla.
+  - La fecha seleccionada por defecto en el calendario es el dia en curso.
+  - `dashboardTodayPanel` muestra siempre la agenda de la fecha seleccionada en el calendario.
+  - Su titulo cambia entre `Agenda de hoy` y `Agenda del dd/mm/aaaa` segun la fecha activa.
   - Los dias con agenda quedan marcados visualmente segun estado principal: pendiente, hecha o vencida.
   - La navegacion `< / >` permite cambiar de mes sin salir del dashboard.
   - La columna ISO de semanas se muestra de forma nativa en el calendario.

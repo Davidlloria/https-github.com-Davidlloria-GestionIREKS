@@ -560,7 +560,7 @@ class DashboardPage(QWidget):
         middle_row = QHBoxLayout()
         middle_row.setContentsMargins(0, 0, 0, 0)
         middle_row.setSpacing(14)
-        today_panel, self.today_items_layout = self._build_list_panel(
+        today_panel, self.today_items_layout, self.today_panel_title = self._build_list_panel(
             "Agenda de hoy",
             "dashboardTodayPanel",
             empty_text="Hoy no hay actividades registradas.",
@@ -903,11 +903,6 @@ class DashboardPage(QWidget):
         self.kpi_labels["customers_without_follow_up"].setText(str(snapshot.customers_without_follow_up))
         self.kpi_notes["customers_without_follow_up"].setText("cliente(s)")
 
-        self.populate_activity_list(
-            self.today_items_layout,
-            snapshot.today_items,
-            empty_text="Hoy no hay actividades registradas.",
-        )
         self._reload_agenda_calendar_panel(self.dashboard_service.list_all_activities(), today_value=date.today())
         self._populate_reactivation_table(snapshot.reactivation_rows)
         self._populate_island_table(snapshot)
@@ -1433,7 +1428,7 @@ class DashboardPage(QWidget):
         layout.addLayout(copy_layout, 1)
         return card, value_label, note_label
 
-    def _build_list_panel(self, title: str, object_name: str, *, empty_text: str) -> tuple[QFrame, QVBoxLayout]:
+    def _build_list_panel(self, title: str, object_name: str, *, empty_text: str) -> tuple[QFrame, QVBoxLayout, QLabel]:
         panel = QFrame()
         panel.setObjectName(object_name)
         panel.setProperty("dashboardPanel", True)
@@ -1450,7 +1445,7 @@ class DashboardPage(QWidget):
         container_layout.setSpacing(6)
         container_layout.addWidget(self._empty_label(empty_text))
         layout.addWidget(container, 1)
-        return panel, container_layout
+        return panel, container_layout, heading
 
     def _build_table_panel(self, title: str, object_name: str) -> QFrame:
         panel = QFrame()
@@ -1630,7 +1625,20 @@ class DashboardPage(QWidget):
         return "muted"
 
     def _refresh_agenda_day_detail(self, *, today_value: date) -> None:
-        return
+        selected_day = self.agenda_calendar_selected_date
+        rows = self._agenda_rows_for_date(selected_day)
+        is_today = selected_day == today_value
+        if is_today:
+            self.today_panel_title.setText("Agenda de hoy")
+            empty_text = "Hoy no hay actividades registradas."
+        else:
+            self.today_panel_title.setText(f"Agenda del {self.format_date(selected_day)}")
+            empty_text = "No hay actividades para el d?a seleccionado."
+        self.populate_activity_list(
+            self.today_items_layout,
+            rows,
+            empty_text=empty_text,
+        )
 
     def _build_calendar_detail_row(self, row: DashboardActivityRow, *, today_value: date) -> QFrame:
         frame = QFrame()
