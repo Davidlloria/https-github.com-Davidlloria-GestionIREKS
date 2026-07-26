@@ -40,11 +40,13 @@
           - fila KPI (`QGridLayout`, separacion horizontal `12 px`, vertical `12 px`)
           - fila media (`QHBoxLayout`, separacion `14 px`)
             - `dashboardUpcomingPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`, alto fijo `312 px`, ancho maximo `348 px`)
-              - `dashboardPanelTitle` (`QLabel`, texto `Agenda del mes`)
-              - fila navegacion (`QHBoxLayout`)
-                - `dashboardCalendarNavButton` (`QPushButton`, texto `<`)
-                - `dashboardMonthTitle` (`QLabel`, mes visible en espanol, centrado)
-                - `dashboardCalendarNavButton` (`QPushButton`, texto `>`)
+              - bloque cabecera calendario (ancho fijo `276 px`, centrado en panel)
+                - `dashboardPanelTitle` (`QLabel`, texto `Agenda del mes`, alineado a la izquierda del bloque y de la rejilla)
+              - bloque navegacion calendario (ancho fijo `276 px`, centrado en panel)
+                - fila navegacion (`QHBoxLayout`)
+                  - `dashboardCalendarNavButton` (`QPushButton`, texto `<`, alineado al borde izquierdo de la rejilla)
+                  - `dashboardMonthTitle` (`QLabel`, mes visible en espanol, centrado)
+                  - `dashboardCalendarNavButton` (`QPushButton`, texto `>`)
               - `dashboardMonthCalendar` (`QCalendarWidget` personalizado, tamano fijo `276 x 196`)
                 - cabecera semanal nativa (`L / M / X / J / V / S / D`)
                 - columna ISO de semanas nativa (`Sem`)
@@ -115,6 +117,7 @@
   - `Ver agenda completa` abre `DashboardAgendaOverviewDialog`.
   - La fila media muestra primero `dashboardUpcomingPanel` y despues `dashboardTodayPanel`.
   - El panel mensual usa un `QCalendarWidget` personalizado.
+  - El titulo y la fila de navegacion del calendario comparten el mismo ancho util que `dashboardMonthCalendar` para alinear su borde izquierdo con la rejilla.
   - Los dias con agenda quedan marcados visualmente segun estado principal: pendiente, hecha o vencida.
   - La navegacion `< / >` permite cambiar de mes sin salir del dashboard.
   - La columna ISO de semanas se muestra de forma nativa en el calendario.
