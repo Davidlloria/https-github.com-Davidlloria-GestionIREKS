@@ -1428,15 +1428,15 @@ class DashboardPage(QWidget):
 
         grid_host = QFrame()
         grid_host.setObjectName("dashboardMonthGrid")
-        grid_host.setFixedHeight(172)
+        grid_host.setFixedHeight(170)
         self.agenda_month_grid_host = grid_host
         grid_layout = QGridLayout(grid_host)
-        grid_layout.setContentsMargins(0, 0, 0, 0)
-        grid_layout.setHorizontalSpacing(2)
-        grid_layout.setVerticalSpacing(2)
-        grid_layout.setColumnMinimumWidth(0, 32)
+        grid_layout.setContentsMargins(0, 0, 2, 0)
+        grid_layout.setHorizontalSpacing(4)
+        grid_layout.setVerticalSpacing(4)
+        grid_layout.setColumnMinimumWidth(0, 26)
         for row_index in range(6):
-            grid_layout.setRowMinimumHeight(row_index, 27)
+            grid_layout.setRowMinimumHeight(row_index, 24)
 
         self.agenda_week_labels = []
         self.agenda_day_buttons = []
@@ -1454,7 +1454,7 @@ class DashboardPage(QWidget):
                 button.setProperty("hasAgenda", False)
                 button.setProperty("outsideMonth", False)
                 button.setProperty("tone", "none")
-                button.setFixedHeight(27)
+                button.setFixedHeight(24)
                 button.clicked.connect(lambda _checked=False, current_button=button: self._handle_agenda_calendar_button(current_button))
                 grid_layout.addWidget(button, row_index, column_index + 1)
                 self.agenda_day_buttons.append(button)
@@ -1486,8 +1486,8 @@ class DashboardPage(QWidget):
         label = QLabel(text_value)
         label.setObjectName("dashboardWeekNumberLabel")
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setMinimumWidth(32)
-        label.setMaximumWidth(32)
+        label.setMinimumWidth(26)
+        label.setMaximumWidth(26)
         return label
 
     def _build_calendar_summary_chip(self, title: str, *, tone: str) -> tuple[QFrame, QLabel]:
@@ -1538,7 +1538,10 @@ class DashboardPage(QWidget):
             self.agenda_calendar_selected_date = today_value if today_value.year == month_start.year and today_value.month == month_start.month else month_start
 
         visible_weeks = len(month_weeks)
-        self.agenda_month_grid_host.setFixedHeight((visible_weeks * 27) + (max(visible_weeks - 1, 0) * 2))
+        row_height = 24
+        row_spacing = 6 if visible_weeks <= 5 else 3
+        grid_height = (visible_weeks * row_height) + (max(visible_weeks - 1, 0) * row_spacing)
+        self.agenda_month_grid_host.setFixedHeight(grid_height)
 
         for row_index in range(6):
             week_visible = row_index < visible_weeks
