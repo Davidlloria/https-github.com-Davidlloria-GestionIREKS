@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import calendar
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from PySide6.QtCore import QBuffer, QDate, QRectF, QSize, Qt
@@ -1418,31 +1418,40 @@ class DashboardPage(QWidget):
         nav_row.addWidget(self.agenda_next_month_btn, 0)
         layout.addLayout(nav_row)
 
-        weekdays_row = QHBoxLayout()
+        calendar_cell_size = 22
+        calendar_week_width = 26
+        calendar_spacing = 4
+        calendar_grid_width = calendar_week_width + (7 * calendar_cell_size) + (7 * calendar_spacing)
+        calendar_grid_height = (6 * calendar_cell_size) + (5 * calendar_spacing)
+
+        weekdays_host = QWidget()
+        weekdays_host.setFixedWidth(calendar_grid_width)
+        weekdays_row = QHBoxLayout(weekdays_host)
         weekdays_row.setContentsMargins(0, 0, 0, 0)
-        weekdays_row.setSpacing(2)
+        weekdays_row.setSpacing(calendar_spacing)
         weekdays_row.addWidget(self._build_week_number_label("Sem"))
         for label_text in ("L", "M", "X", "J", "V", "S", "D"):
-            weekdays_row.addWidget(self._build_weekday_label(label_text))
-        layout.addLayout(weekdays_row)
+            weekdays_row.addWidget(self._build_weekday_label(label_text, width=calendar_cell_size))
+        layout.addWidget(weekdays_host, 0, Qt.AlignmentFlag.AlignHCenter)
 
         grid_host = QFrame()
         grid_host.setObjectName("dashboardMonthGrid")
-        grid_host.setFixedHeight(170)
+        grid_host.setFixedSize(calendar_grid_width, calendar_grid_height)
         self.agenda_month_grid_host = grid_host
         grid_layout = QGridLayout(grid_host)
-        grid_layout.setContentsMargins(0, 0, 2, 0)
-        grid_layout.setHorizontalSpacing(4)
-        grid_layout.setVerticalSpacing(4)
-        grid_layout.setColumnMinimumWidth(0, 26)
+        grid_layout.setContentsMargins(0, 0, 0, 0)
+        grid_layout.setHorizontalSpacing(calendar_spacing)
+        grid_layout.setVerticalSpacing(calendar_spacing)
+        grid_layout.setColumnMinimumWidth(0, calendar_week_width)
+        for column_index in range(1, 8):
+            grid_layout.setColumnMinimumWidth(column_index, calendar_cell_size)
         for row_index in range(6):
-            grid_layout.setRowMinimumHeight(row_index, 24)
+            grid_layout.setRowMinimumHeight(row_index, calendar_cell_size)
 
         self.agenda_week_labels = []
         self.agenda_day_buttons = []
         for row_index in range(6):
             week_label = self._build_week_number_label("")
-            week_label.setVisible(False)
             grid_layout.addWidget(week_label, row_index, 0)
             self.agenda_week_labels.append(week_label)
             for column_index in range(7):
@@ -1454,11 +1463,11 @@ class DashboardPage(QWidget):
                 button.setProperty("hasAgenda", False)
                 button.setProperty("outsideMonth", False)
                 button.setProperty("tone", "none")
-                button.setFixedHeight(24)
+                button.setFixedSize(calendar_cell_size, calendar_cell_size)
                 button.clicked.connect(lambda _checked=False, current_button=button: self._handle_agenda_calendar_button(current_button))
                 grid_layout.addWidget(button, row_index, column_index + 1)
                 self.agenda_day_buttons.append(button)
-        layout.addWidget(grid_host, 0)
+        layout.addWidget(grid_host, 0, Qt.AlignmentFlag.AlignHCenter)
         layout.addStretch(1)
 
         summary_row = QHBoxLayout()
@@ -1476,10 +1485,12 @@ class DashboardPage(QWidget):
         layout.addLayout(summary_row)
         return panel
 
-    def _build_weekday_label(self, text_value: str) -> QLabel:
+    def _build_weekday_label(self, text_value: str, *, width: int | None = None) -> QLabel:
         label = QLabel(text_value)
         label.setObjectName("dashboardWeekdayLabel")
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        if width is not None:
+            label.setFixedWidth(width)
         return label
 
     def _build_week_number_label(self, text_value: str) -> QLabel:
@@ -1515,7 +1526,9 @@ class DashboardPage(QWidget):
     def _refresh_agenda_calendar(self, *, today_value: date) -> None:
         month_start = self.agenda_calendar_month.replace(day=1)
         month_days = list(calendar.Calendar(firstweekday=0).itermonthdates(month_start.year, month_start.month))
-        month_weeks = [month_days[index:index + 7] for index in range(0, len(month_days), 7)]
+        while len(month_days) < 42:
+            month_days.append(month_days[-1] + timedelta(days=1))
+        month_weeks = [month_days[index:index + 7] for index in range(0, 42, 7)]
         month_rows = self._agenda_month_rows(month_start)
 
         pending_count = 0
@@ -1537,30 +1550,14 @@ class DashboardPage(QWidget):
         if self.agenda_calendar_selected_date.year != month_start.year or self.agenda_calendar_selected_date.month != month_start.month:
             self.agenda_calendar_selected_date = today_value if today_value.year == month_start.year and today_value.month == month_start.month else month_start
 
-        visible_weeks = len(month_weeks)
-        row_height = 24
-        row_spacing = 6 if visible_weeks <= 5 else 3
-        grid_height = (visible_weeks * row_height) + (max(visible_weeks - 1, 0) * row_spacing)
-        self.agenda_month_grid_host.setFixedHeight(grid_height)
-
         for row_index in range(6):
-            week_visible = row_index < visible_weeks
             week_label = self.agenda_week_labels[row_index]
-            week_label.setVisible(week_visible)
-            if week_visible:
-                week_label.setText(str(month_weeks[row_index][0].isocalendar().week))
-            else:
-                week_label.setText("")
+            week_label.setVisible(True)
+            week_label.setText(str(month_weeks[row_index][0].isocalendar().week))
 
             for column_index in range(7):
                 button = self.agenda_day_buttons[(row_index * 7) + column_index]
-                button.setVisible(week_visible)
-                if not week_visible:
-                    button.setText("")
-                    button.setToolTip("")
-                    button.setEnabled(False)
-                    continue
-
+                button.setVisible(True)
                 day_value = month_weeks[row_index][column_index]
                 rows_for_day = self._agenda_rows_for_date(day_value)
                 has_agenda = bool(rows_for_day)
@@ -2207,7 +2204,7 @@ class DashboardPage(QWidget):
             }
             QLabel#dashboardWeekNumberLabel {
                 color: #64748B;
-                font-size: 10px;
+                font-size: 9px;
                 font-weight: 700;
                 min-height: 14px;
             }
@@ -2218,9 +2215,9 @@ class DashboardPage(QWidget):
             QPushButton#dashboardMonthDayButton {
                 background: #FFFFFF;
                 border: 1px solid #E2E8F1;
-                border-radius: 10px;
+                border-radius: 8px;
                 color: #0F172A;
-                font-size: 11px;
+                font-size: 10px;
                 font-weight: 600;
                 padding: 0;
                 text-align: center;
