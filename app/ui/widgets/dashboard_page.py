@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from pathlib import Path
 
-from PySide6.QtCore import QDate, Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QDate, QSize, Qt
+from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCalendarWidget,
@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -71,9 +72,10 @@ class DashboardPage(QWidget):
 
         sidebar = QFrame()
         sidebar.setObjectName('dashboardSidebar')
+        sidebar.setFixedWidth(184)
         sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(18, 18, 18, 18)
-        sidebar_layout.setSpacing(16)
+        sidebar_layout.setContentsMargins(16, 22, 16, 18)
+        sidebar_layout.setSpacing(24)
 
         brand = QLabel()
         brand.setObjectName('dashboardSidebarBrand')
@@ -87,6 +89,9 @@ class DashboardPage(QWidget):
         agenda_btn.setObjectName('dashboardSidebarButton')
         agenda_btn.setProperty('active', True)
         agenda_btn.setEnabled(False)
+        agenda_btn.setIcon(self._icon('calendar-days.svg'))
+        agenda_btn.setIconSize(QSize(20, 20))
+        agenda_btn.setMinimumHeight(52)
         sidebar_layout.addWidget(agenda_btn)
         sidebar_layout.addStretch(1)
         root_layout.addWidget(sidebar)
@@ -100,8 +105,8 @@ class DashboardPage(QWidget):
         content = QWidget()
         content.setObjectName('dashboardContent')
         self.content_layout = QVBoxLayout(content)
-        self.content_layout.setContentsMargins(14, 6, 14, 6)
-        self.content_layout.setSpacing(8)
+        self.content_layout.setContentsMargins(22, 16, 22, 12)
+        self.content_layout.setSpacing(12)
         content_host_layout.addWidget(content)
         root_layout.addWidget(content_host, 1)
 
@@ -119,16 +124,21 @@ class DashboardPage(QWidget):
         header_copy.addWidget(self.title_label)
         self.date_label = QLabel('')
         self.date_label.setObjectName('dashboardDateLabel')
+        self.date_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         header_copy.addWidget(self.date_label)
         header_layout.addLayout(header_copy, 1)
 
         self.new_activity_btn = QPushButton('Nueva actividad')
         self.new_activity_btn.setObjectName('dashboardNewActivityButton')
+        self.new_activity_btn.setIcon(self._icon('plus.svg'))
+        self.new_activity_btn.setIconSize(QSize(18, 18))
         self.new_activity_btn.clicked.connect(self._handle_primary_action)
         header_layout.addWidget(self.new_activity_btn)
 
         self.full_agenda_btn = QPushButton('Ver agenda completa')
         self.full_agenda_btn.setObjectName('dashboardFullAgendaButton')
+        self.full_agenda_btn.setIcon(self._icon('calendar.svg'))
+        self.full_agenda_btn.setIconSize(QSize(18, 18))
         self.full_agenda_btn.clicked.connect(self._handle_secondary_action)
         header_layout.addWidget(self.full_agenda_btn)
 
@@ -138,6 +148,7 @@ class DashboardPage(QWidget):
 
         self.footer_label = QLabel('')
         self.footer_label.setObjectName('dashboardFooterLabel')
+        self.footer_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.content_layout.addWidget(self.footer_label)
         self._apply_styles()
 
@@ -146,28 +157,29 @@ class DashboardPage(QWidget):
         widget.setObjectName('dashboardAgendaView')
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(14)
+        layout.setSpacing(12)
 
         kpi_row = QGridLayout()
         kpi_row.setHorizontalSpacing(12)
         kpi_row.setVerticalSpacing(12)
         self.kpi_labels: dict[str, QLabel] = {}
         self.kpi_notes: dict[str, QLabel] = {}
-        for column, (key, title) in enumerate([
-            ('pending_today', 'Pendientes hoy'),
-            ('overdue', 'Vencidas'),
-            ('completed_today', 'Completadas hoy'),
-            ('customers_without_follow_up', 'Clientes sin seguimiento'),
+        for column, (key, title, icon_name) in enumerate([
+            ('pending_today', 'Pendientes hoy', 'calendar.svg'),
+            ('overdue', 'Vencidas', 'clock-3.svg'),
+            ('completed_today', 'Completadas hoy', 'circle-check.svg'),
+            ('customers_without_follow_up', 'Clientes sin seguimiento', 'users.svg'),
         ]):
-            card, value_label, note_label = self._build_kpi_card(title)
+            card, value_label, note_label = self._build_kpi_card(title, icon_name)
             self.kpi_labels[key] = value_label
             self.kpi_notes[key] = note_label
             kpi_row.addWidget(card, 0, column)
-        layout.addLayout(kpi_row)
+            kpi_row.setColumnStretch(column, 1)
+        layout.addLayout(kpi_row, 0)
 
         middle_row = QHBoxLayout()
         middle_row.setContentsMargins(0, 0, 0, 0)
-        middle_row.setSpacing(14)
+        middle_row.setSpacing(12)
         self.upcoming_panel = self._build_upcoming_panel()
         today_panel, self.today_items_layout, self.today_panel_title = self._build_list_panel(
             'Agenda de hoy',
@@ -178,18 +190,18 @@ class DashboardPage(QWidget):
         self.today_link_btn.setObjectName('dashboardPanelLinkButton')
         self.today_link_btn.clicked.connect(self._handle_secondary_action)
         today_panel.layout().addWidget(self.today_link_btn)
-        middle_row.addWidget(self.upcoming_panel, 2)
-        middle_row.addWidget(today_panel, 5)
-        layout.addLayout(middle_row)
+        middle_row.addWidget(self.upcoming_panel, 4)
+        middle_row.addWidget(today_panel, 6)
+        layout.addLayout(middle_row, 3)
 
         lower_row = QHBoxLayout()
         lower_row.setContentsMargins(0, 0, 0, 0)
-        lower_row.setSpacing(14)
+        lower_row.setSpacing(12)
 
         reactivation_panel = self._build_table_panel('Clientes a reactivar', 'dashboardReactivationPanel')
         self.reactivation_table = QTableWidget(0, 5)
         self.reactivation_table.setObjectName('dashboardReactivationTable')
-        self.reactivation_table.setHorizontalHeaderLabels(['Cliente', 'Isla', '?ltimo contacto', 'Variaci?n kg', 'Prioridad'])
+        self.reactivation_table.setHorizontalHeaderLabels(['Cliente', 'Isla', 'Último contacto', 'Variación kg', 'Prioridad'])
         self._configure_table(self.reactivation_table)
         header = self.reactivation_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -209,42 +221,58 @@ class DashboardPage(QWidget):
             island_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         island_panel.layout().addWidget(self.island_table)
         lower_row.addWidget(island_panel, 3)
-        layout.addLayout(lower_row)
+        layout.addLayout(lower_row, 2)
         return widget
 
-    def _build_kpi_card(self, title: str) -> tuple[QFrame, QLabel, QLabel]:
+    def _build_kpi_card(self, title: str, icon_name: str) -> tuple[QFrame, QLabel, QLabel]:
         card = QFrame()
         card.setObjectName('dashboardKpiCard')
-        layout = QVBoxLayout(card)
+        card.setMinimumHeight(104)
+        card.setMaximumHeight(118)
+        card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        layout = QGridLayout(card)
         layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(6)
+        layout.setHorizontalSpacing(12)
+        layout.setVerticalSpacing(3)
+        icon_label = QLabel()
+        icon_label.setObjectName('dashboardKpiIcon')
+        icon_label.setPixmap(self._icon(icon_name).pixmap(QSize(22, 22)))
+        icon_label.setFixedSize(38, 38)
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label = QLabel(title)
         title_label.setObjectName('dashboardKpiTitle')
+        title_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         value_label = QLabel('0')
         value_label.setObjectName('dashboardKpiValue')
         note_label = QLabel('')
         note_label.setObjectName('dashboardKpiNote')
-        layout.addWidget(title_label)
-        layout.addWidget(value_label)
-        layout.addWidget(note_label)
-        layout.addStretch(1)
+        note_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        layout.addWidget(icon_label, 0, 0, 2, 1)
+        layout.addWidget(title_label, 0, 1)
+        layout.addWidget(value_label, 1, 1)
+        layout.addWidget(note_label, 1, 2, Qt.AlignmentFlag.AlignBottom)
+        layout.setColumnStretch(1, 1)
         return card, value_label, note_label
 
     def _build_list_panel(self, title: str, object_name: str, *, empty_text: str) -> tuple[QFrame, QVBoxLayout, QLabel]:
         panel = QFrame()
         panel.setObjectName(object_name)
         panel.setProperty('dashboardPanel', True)
+        panel.setMinimumHeight(205)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
         heading = QLabel(title)
         heading.setObjectName('dashboardPanelTitle')
+        heading.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         layout.addWidget(heading)
         container = QVBoxLayout()
         container.setContentsMargins(0, 0, 0, 0)
         container.setSpacing(8)
         empty = QLabel(empty_text)
         empty.setObjectName('dashboardEmptyLabel')
+        empty.setWordWrap(True)
+        empty.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         container.addWidget(empty)
         layout.addLayout(container)
         return panel, container, heading
@@ -253,11 +281,13 @@ class DashboardPage(QWidget):
         panel = QFrame()
         panel.setObjectName(object_name)
         panel.setProperty('dashboardPanel', True)
+        panel.setMinimumHeight(170)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
         heading = QLabel(title)
         heading.setObjectName('dashboardPanelTitle')
+        heading.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         layout.addWidget(heading)
         return panel
 
@@ -265,15 +295,19 @@ class DashboardPage(QWidget):
         panel = QFrame()
         panel.setObjectName('dashboardUpcomingPanel')
         panel.setProperty('dashboardPanel', True)
+        panel.setMinimumWidth(390)
+        panel.setMinimumHeight(205)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
 
         heading = QLabel('Agenda del mes')
         heading.setObjectName('dashboardPanelTitle')
+        heading.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         layout.addWidget(heading)
 
         self.agenda_month_calendar = DashboardMonthCalendar(self, panel)
+        self.agenda_month_calendar.setMinimumHeight(190)
         layout.addWidget(self.agenda_month_calendar)
 
         summary_row = QHBoxLayout()
@@ -307,8 +341,12 @@ class DashboardPage(QWidget):
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         table.setAlternatingRowColors(True)
+        table.setShowGrid(False)
+        table.setWordWrap(False)
         table.verticalHeader().setVisible(False)
+        table.verticalHeader().setDefaultSectionSize(32)
         table.horizontalHeader().setStretchLastSection(False)
+        table.horizontalHeader().setMinimumHeight(34)
 
     def reload(self) -> None:
         self._reload_agenda_dashboard()
@@ -329,7 +367,7 @@ class DashboardPage(QWidget):
         self._reload_island_table(snapshot.island_rows)
         self._reload_agenda_calendar_panel(self.dashboard_service.list_all_activities(), today_value=date.today())
         self.footer_label.setText(
-            f'?ltima actualizaci?n: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} ? {snapshot.reactivation_metric_label}'
+            f'Última actualización: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} · {snapshot.reactivation_metric_label}'
         )
 
     def _reload_today_panel(self, rows: list[DashboardActivityRow], selected_day: date) -> None:
@@ -344,8 +382,10 @@ class DashboardPage(QWidget):
             self.today_panel_title.setText(f'Agenda del {self.format_date(selected_day)}')
         filtered = [row for row in rows if row.fecha_actividad == selected_day] if selected_day != date.today() else list(rows)
         if not filtered:
-            empty = QLabel('No hay actividades para el d?a seleccionado.')
+            empty = QLabel('No hay actividades para el día seleccionado.')
             empty.setObjectName('dashboardEmptyLabel')
+            empty.setWordWrap(True)
+            empty.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             self.today_items_layout.addWidget(empty)
             return
         for row in filtered:
@@ -354,11 +394,11 @@ class DashboardPage(QWidget):
             layout = QVBoxLayout(card)
             layout.setContentsMargins(10, 10, 10, 10)
             layout.setSpacing(4)
-            customer = QLabel(f'{row.cliente_codigo} ? {row.cliente_nombre}')
+            customer = QLabel(f'{row.cliente_codigo} · {row.cliente_nombre}')
             customer.setObjectName('dashboardActivityCustomer')
             summary = QLabel(row.resumen)
             summary.setObjectName('dashboardActivitySummary')
-            detail = QLabel(f'{row.isla_nombre} ? {row.estado}')
+            detail = QLabel(f'{row.isla_nombre} · {row.estado}')
             detail.setObjectName('dashboardActivityDetail')
             layout.addWidget(customer)
             layout.addWidget(summary)
@@ -369,7 +409,7 @@ class DashboardPage(QWidget):
         self.reactivation_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
-                f'{row.cliente_codigo} ? {row.cliente_nombre}',
+                f'{row.cliente_codigo} · {row.cliente_nombre}',
                 row.isla_nombre,
                 self.format_date(row.last_contact) if row.last_contact else 'Sin registro',
                 self._format_number_es(row.delta_kg, suffix=' kg', signed=True),
@@ -402,10 +442,10 @@ class DashboardPage(QWidget):
         self._reload_agenda_calendar_panel(self.dashboard_service.list_all_activities(), today_value=date.today())
 
     def _handle_primary_action(self) -> None:
-        QMessageBox.information(self, 'Agenda', 'La creaci?n de actividades se incorporar? en el siguiente corte limpio.')
+        QMessageBox.information(self, 'Agenda', 'La creación de actividades se incorporará en el siguiente corte limpio.')
 
     def _handle_secondary_action(self) -> None:
-        QMessageBox.information(self, 'Agenda', 'La vista completa de agenda se incorporar? en el siguiente corte limpio.')
+        QMessageBox.information(self, 'Agenda', 'La vista completa de agenda se incorporará en el siguiente corte limpio.')
 
     @staticmethod
     def _state_group(state: str) -> str:
@@ -422,7 +462,7 @@ class DashboardPage(QWidget):
             return ''
         if long:
             months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-            weekdays = ['lunes', 'martes', 'mi?rcoles', 'jueves', 'viernes', 's?bado', 'domingo']
+            weekdays = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
             return f"{weekdays[value.weekday()]}, {value.day:02d} de {months[value.month - 1]} de {value.year}"
         return value.strftime('%d/%m/%Y')
 
@@ -433,30 +473,41 @@ class DashboardPage(QWidget):
         fmt = fmt.replace(',', '_').replace('.', ',').replace('_', '.')
         return f'{fmt}{suffix}'
 
+    @staticmethod
+    def _icon(asset_name: str) -> QIcon:
+        return QIcon(str(BASE_DIR / 'assets' / 'icons' / asset_name))
+
     def _apply_styles(self) -> None:
         self.setStyleSheet(
             """
-            QWidget#dashboardPageRoot { background: #EEF3F8; }
+            QWidget#dashboardPageRoot { background: #F1F5F9; font-family: "Segoe UI"; }
             QFrame#dashboardSidebar { background: #FFFFFF; border-right: 1px solid #DCE4EF; }
-            QLabel#dashboardSidebarBrand { background: transparent; padding: 14px; border-radius: 18px; }
-            QPushButton#dashboardSidebarButton { background: #2563EB; color: #FFFFFF; border: none; border-radius: 18px; padding: 18px 22px; font-size: 18px; font-weight: 600; }
+            QLabel#dashboardSidebarBrand { background: transparent; padding: 10px; }
+            QPushButton#dashboardSidebarButton { background: #2563EB; color: #FFFFFF; border: none; border-radius: 14px; padding: 12px 18px; font-size: 16px; font-weight: 700; text-align: left; }
             QWidget#dashboardContentHost, QWidget#dashboardContent, QWidget#dashboardAgendaView { background: transparent; }
             QFrame#dashboardHeader { background: transparent; }
-            QLabel#dashboardTitle { font-size: 34px; font-weight: 700; color: #0F172A; }
-            QLabel#dashboardDateLabel { font-size: 16px; color: #334155; }
-            QPushButton#dashboardNewActivityButton { background: #2563EB; color: #FFFFFF; border: 1px solid #2563EB; border-radius: 14px; padding: 14px 18px; font-size: 16px; font-weight: 600; }
-            QPushButton#dashboardFullAgendaButton, QPushButton#dashboardPanelLinkButton { background: #FFFFFF; color: #1D4ED8; border: 1px solid #CBD5E1; border-radius: 14px; padding: 14px 18px; font-size: 16px; font-weight: 600; }
-            QFrame#dashboardKpiCard, QFrame[dashboardPanel='true'] { background: #FFFFFF; border: 1px solid #DCE4EF; border-radius: 18px; }
-            QLabel#dashboardKpiTitle, QLabel#dashboardPanelTitle { color: #1E293B; font-size: 16px; font-weight: 700; }
-            QLabel#dashboardKpiValue { color: #0F172A; font-size: 34px; font-weight: 800; }
-            QLabel#dashboardKpiNote, QLabel#dashboardFooterLabel, QLabel#dashboardEmptyLabel, QLabel#dashboardActivityDetail { color: #64748B; font-size: 14px; }
-            QLabel#dashboardActivityCustomer { color: #0F172A; font-size: 15px; font-weight: 700; }
-            QLabel#dashboardActivitySummary { color: #1E293B; font-size: 14px; }
-            QCalendarWidget#dashboardMonthCalendar { background: #FFFFFF; border: 1px solid #DCE4EF; border-radius: 16px; }
-            QFrame#dashboardCalendarSummaryChip { background: #FFFFFF; border: 1px solid #DCE4EF; border-radius: 12px; }
-            QLabel#dashboardCalendarSummaryTitle { color: #334155; font-size: 13px; font-weight: 600; }
-            QLabel#dashboardCalendarSummaryValue { color: #0F172A; font-size: 18px; font-weight: 800; }
-            QTableWidget#dashboardReactivationTable, QTableWidget#dashboardIslandTable { background: #FFFFFF; border: none; gridline-color: #E2E8F0; }
-            QHeaderView::section { background: #F8FAFC; color: #334155; padding: 8px; border: none; border-bottom: 1px solid #E2E8F0; font-weight: 700; }
+            QLabel#dashboardTitle { font-size: 30px; font-weight: 700; color: #0F172A; }
+            QLabel#dashboardDateLabel { font-size: 14px; color: #64748B; }
+            QPushButton#dashboardNewActivityButton { background: #2563EB; color: #FFFFFF; border: 1px solid #2563EB; border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700; }
+            QPushButton#dashboardFullAgendaButton, QPushButton#dashboardPanelLinkButton { background: #FFFFFF; color: #1D4ED8; border: 1px solid #CBD5E1; border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700; }
+            QPushButton#dashboardNewActivityButton:hover { background: #1D4ED8; }
+            QPushButton#dashboardFullAgendaButton:hover, QPushButton#dashboardPanelLinkButton:hover { background: #EFF6FF; border-color: #93C5FD; }
+            QFrame#dashboardKpiCard, QFrame[dashboardPanel='true'] { background: #FFFFFF; border: 1px solid #DCE4EF; border-radius: 16px; }
+            QLabel#dashboardKpiIcon { background: #EFF6FF; border-radius: 10px; }
+            QLabel#dashboardKpiTitle, QLabel#dashboardPanelTitle { color: #1E293B; font-size: 15px; font-weight: 700; }
+            QLabel#dashboardKpiValue { color: #0F172A; font-size: 28px; font-weight: 800; }
+            QLabel#dashboardKpiNote, QLabel#dashboardFooterLabel, QLabel#dashboardEmptyLabel, QLabel#dashboardActivityDetail { color: #64748B; font-size: 13px; }
+            QLabel#dashboardActivityCustomer { color: #0F172A; font-size: 14px; font-weight: 700; }
+            QLabel#dashboardActivitySummary { color: #1E293B; font-size: 13px; }
+            QFrame#dashboardActivityCard { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
+            QCalendarWidget#dashboardMonthCalendar { background: #FFFFFF; border: none; }
+            QCalendarWidget#dashboardMonthCalendar QWidget#qt_calendar_navigationbar { background: #2563EB; border-radius: 8px; }
+            QCalendarWidget#dashboardMonthCalendar QToolButton { color: #FFFFFF; background: transparent; border: none; font-weight: 700; padding: 5px; }
+            QCalendarWidget#dashboardMonthCalendar QAbstractItemView { background: #FFFFFF; color: #334155; selection-background-color: #2563EB; selection-color: #FFFFFF; outline: none; }
+            QFrame#dashboardCalendarSummaryChip { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
+            QLabel#dashboardCalendarSummaryTitle { color: #475569; font-size: 12px; font-weight: 600; }
+            QLabel#dashboardCalendarSummaryValue { color: #0F172A; font-size: 16px; font-weight: 800; }
+            QTableWidget#dashboardReactivationTable, QTableWidget#dashboardIslandTable { background: #FFFFFF; alternate-background-color: #F8FAFC; border: none; color: #334155; }
+            QHeaderView::section { background: #F8FAFC; color: #475569; padding: 7px; border: none; border-bottom: 1px solid #E2E8F0; font-weight: 700; }
             """
         )

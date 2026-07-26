@@ -47,7 +47,7 @@ class _StubDashboardService:
                 )
             ],
             island_rows=[DashboardIslandRow(isla_nombre='Gran Canaria', pending=2, postponed=1, completed=0, total=3)],
-            reactivation_metric_label='Variaci?n kg ? 2026-06 vs 2026-07',
+            reactivation_metric_label='Variación kg · 2026-06 vs 2026-07',
             generated_at=datetime(2026, 7, 21, 9, 30, 0),
         )
 
@@ -77,7 +77,11 @@ def test_dashboard_page_starts_in_agenda_mode() -> None:
     assert page.full_agenda_btn.objectName() == 'dashboardFullAgendaButton'
     assert page.reactivation_table.rowCount() == 1
     assert page.island_table.rowCount() == 1
-    assert 'Variaci?n kg' in page.footer_label.text()
+    assert 'Variación kg' in page.footer_label.text()
+    assert not page.new_activity_btn.icon().isNull()
+    assert not page.full_agenda_btn.icon().isNull()
+    assert page.findChild(QWidget, 'dashboardSidebar').width() == 184
+    assert page.minimumSizeHint().width() <= 1180
 
     page.close()
     page.deleteLater()
