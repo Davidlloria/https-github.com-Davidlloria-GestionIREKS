@@ -164,3 +164,66 @@ def test_order_dialog_catalogs_can_disable_history(isolated_engine) -> None:
     )
 
     assert prev_qty_by_articulo == {}
+
+
+def test_list_order_items_returns_received_quantity_by_article(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        articulo_id = _seed_catalog(session)
+        session.add(
+            Pedido(
+                pedido_id="pedido-1",
+                almacen_id="alm-1",
+                pedido_fecha=date(2026, 6, 10),
+                pedido_numero="A-001",
+            )
+        )
+        session.add(
+            PedidoItem(
+                pedido_id="pedido-1",
+                pedido_numero="A-001",
+                pedido_item_fecha=date(2026, 6, 10),
+                articulo_id=articulo_id,
+                articulo_cantidad=4.0,
+            )
+        )
+        session.add(
+            Albaran(
+                albaran_id="alb-1",
+                almacen_id="alm-1",
+                pedido_id="pedido-1",
+                albaran_numero="ALB-1",
+                albaran_fecha=date(2026, 6, 11),
+            )
+        )
+        session.add(
+            AlbaranItem(
+                item_id="alb-item-1",
+                pedido_id="pedido-1",
+                albaran_id="alb-1",
+                albaran_numero="ALB-1",
+                albaran_fecha=date(2026, 6, 11),
+                articulo_codigo="REF-1",
+                articulo_id=articulo_id,
+                articulo_cantidad=1.5,
+            )
+        )
+        session.add(
+            AlbaranItem(
+                item_id="alb-item-2",
+                pedido_id="pedido-1",
+                albaran_id="alb-1",
+                albaran_numero="ALB-1",
+                albaran_fecha=date(2026, 6, 11),
+                articulo_codigo="REF-1",
+                articulo_id=articulo_id,
+                articulo_cantidad=0.5,
+            )
+        )
+        session.commit()
+
+    service = OrderQueryService()
+    rows, pending_article_ids, received_by_article = service.list_order_items("pedido-1")
+
+    assert len(rows) == 1
+    assert pending_article_ids == set()
+    assert received_by_article == {articulo_id: 2.0}

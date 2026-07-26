@@ -197,10 +197,10 @@ class OrderQueryService:
     def list_order_items(
         self,
         pedido_id: str,
-    ) -> tuple[list[tuple[PedidoItem, IngredienteIreks | None]], set[str]]:
+    ) -> tuple[list[tuple[PedidoItem, IngredienteIreks | None]], set[str], dict[str, float]]:
         clean_pedido_id = str(pedido_id or "").strip()
         if not clean_pedido_id:
-            return [], set()
+            return [], set(), {}
         with Session(engine) as session:
             rows = list(
                 session.exec(
@@ -218,12 +218,23 @@ class OrderQueryService:
                     )
                 )
             )
+            albaran_rows = list(
+                session.exec(
+                    select(AlbaranItem).where(AlbaranItem.pedido_id == clean_pedido_id)
+                )
+            )
         pending_article_ids = {
             str(getattr(row, "articulo_id", "") or "").strip()
             for row in pending_rows
             if float(getattr(row, "cantidad_pendiente", 0.0) or 0.0) > 1e-9
         }
-        return rows, pending_article_ids
+        received_by_article: dict[str, float] = {}
+        for row in albaran_rows:
+            articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+            if not articulo_id:
+                continue
+            received_by_article[articulo_id] = received_by_article.get(articulo_id, 0.0) + float(getattr(row, "articulo_cantidad", 0.0) or 0.0)
+        return rows, pending_article_ids, received_by_article
 
     def list_order_items_payload(
         self,
@@ -232,7 +243,7 @@ class OrderQueryService:
         limit: int = DEFAULT_PAGE_LIMIT,
         offset: int = 0,
     ) -> OrderItemListResponse:
-        rows, _pending_article_ids = self.list_order_items(pedido_id)
+        rows, _pending_article_ids, _received_by_article = self.list_order_items(pedido_id)
         items = [item for item, _article in rows]
         return OrderItemListResponse(
             items=OrderItemRead.list_from_entities(page_items(items, limit=limit, offset=offset)),
