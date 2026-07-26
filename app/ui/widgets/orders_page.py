@@ -1388,7 +1388,7 @@ class OrdersPage(QWidget):
         pedido_actions_layout.addWidget(self.edit_order_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         pedido_actions_layout.addStretch(1)
         pedido_tab_layout.addWidget(pedido_actions_ribbon)
-        self.pedido_items_table = QTableWidget(0, 4)
+        self.pedido_items_table = QTableWidget(0, 5)
         self.pedido_items_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.pedido_items_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.pedido_items_table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked | QAbstractItemView.EditTrigger.EditKeyPressed | QAbstractItemView.EditTrigger.SelectedClicked)
@@ -1402,13 +1402,15 @@ class OrdersPage(QWidget):
         items_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         items_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         items_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        self.pedido_items_table.setHorizontalHeaderLabels(["Cod.", "Nombre", "Cantidad", "Kg"])
+        items_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self.pedido_items_table.setHorizontalHeaderLabels(["Cod.", "Nombre", "Pedido", "Recib.", "Kg"])
         self.pedido_items_table.setColumnWidth(0, 95)
         self.pedido_items_table.setColumnWidth(2, 90)
-        self.pedido_items_table.setColumnWidth(3, 100)
+        self.pedido_items_table.setColumnWidth(3, 90)
+        self.pedido_items_table.setColumnWidth(4, 100)
         self.pedido_items_table.setSortingEnabled(True)
         pedido_tab_layout.addWidget(self.pedido_items_table, 1)
-        self.pedido_items_totals_table = QTableWidget(1, 4)
+        self.pedido_items_totals_table = QTableWidget(1, 5)
         self.pedido_items_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.pedido_items_totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.pedido_items_totals_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -1421,10 +1423,12 @@ class OrdersPage(QWidget):
         pedido_totals_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         pedido_totals_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         pedido_totals_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        pedido_totals_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         self.pedido_items_totals_table.setFixedHeight(30)
         self.pedido_items_totals_table.setColumnWidth(0, 95)
         self.pedido_items_totals_table.setColumnWidth(2, 90)
-        self.pedido_items_totals_table.setColumnWidth(3, 100)
+        self.pedido_items_totals_table.setColumnWidth(3, 90)
+        self.pedido_items_totals_table.setColumnWidth(4, 100)
         pedido_tab_layout.addWidget(self.pedido_items_totals_table)
         tabs.addTab(pedido_tab, "Pedido")
 
@@ -1739,18 +1743,22 @@ class OrdersPage(QWidget):
         self.pedido_items_table.setRowCount(0)
         if not pedido_id:
             self.pedido_items_table.setSortingEnabled(was_sorting)
-            self._set_pedido_items_totals(0.0, 0.0)
+            self._set_pedido_items_totals(0.0, 0.0, 0.0)
             self._loading_pedido_items_table = False
             return
-        rows, pending_article_ids = self.order_query_service.list_order_items(pedido_id)
+        rows, pending_article_ids, received_by_article = self.order_query_service.list_order_items(pedido_id)
         self.pedido_items_table.setRowCount(len(rows))
         total_cantidad = 0.0
+        total_recibida = 0.0
         total_kg = 0.0
         for row_idx, (item, article) in enumerate(rows):
             cantidad = float(getattr(item, "articulo_cantidad", 0.0) or 0.0)
+            articulo_id = str(getattr(item, "articulo_id", "") or "").strip()
+            cantidad_recibida = float(received_by_article.get(articulo_id, 0.0) or 0.0)
             peso_total = float(getattr(article, "articulo_envase_peso_total", 0.0) or 0.0) if article else 0.0
             kg = cantidad * peso_total
             total_cantidad += cantidad
+            total_recibida += cantidad_recibida
             total_kg += kg
             cod = str(getattr(article, "articulo_referencia_corta", "") or "").strip() if article else ""
             nombre = str(getattr(article, "articulo_descripcion", "") or "").strip() if article else ""
@@ -1762,12 +1770,15 @@ class OrdersPage(QWidget):
                 cod,
                 nombre,
                 self._format_number_es(cantidad, 2),
+                self._format_number_es(cantidad_recibida, 2),
                 self._format_number_es(kg, 2, " kg"),
             ]
             for col_idx, value in enumerate(values):
                 if col_idx == 2:
                     cell = NumericTableWidgetItem(value, cantidad)
                 elif col_idx == 3:
+                    cell = NumericTableWidgetItem(value, cantidad_recibida)
+                elif col_idx == 4:
                     cell = NumericTableWidgetItem(value, kg)
                 else:
                     cell = QTableWidgetItem(value)
@@ -1777,7 +1788,7 @@ class OrdersPage(QWidget):
                     cell.setForeground(QBrush(QColor("#c62828")))
                 if str(getattr(item, "articulo_id", "") or "").strip() in pending_article_ids:
                     cell.setForeground(QBrush(QColor("#c62828")))
-                if col_idx in (2, 3):
+                if col_idx in (2, 3, 4):
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 if col_idx == 2:
                     cell.setFlags(cell.flags() | Qt.ItemFlag.ItemIsEditable)
@@ -1787,7 +1798,7 @@ class OrdersPage(QWidget):
         self.pedido_items_table.setSortingEnabled(was_sorting)
         if was_sorting:
             self.pedido_items_table.sortItems(sort_col if sort_col >= 0 else 0, sort_order if sort_col >= 0 else Qt.SortOrder.AscendingOrder)
-        self._set_pedido_items_totals(total_cantidad, total_kg)
+        self._set_pedido_items_totals(total_cantidad, total_recibida, total_kg)
         self._loading_pedido_items_table = False
 
     def _on_pedido_item_cell_changed(self, item: QTableWidgetItem) -> None:
@@ -2314,22 +2325,25 @@ class OrdersPage(QWidget):
             cell.setFont(font)
             self.table_totals.setItem(0, col_idx, cell)
 
-    def _set_pedido_items_totals(self, total_cantidad: float, total_kg: float) -> None:
+    def _set_pedido_items_totals(self, total_cantidad: float, total_recibida: float, total_kg: float) -> None:
         values = [
             "TOTAL",
             "",
             self._format_number_es(total_cantidad, 2),
+            self._format_number_es(total_recibida, 2),
             self._format_number_es(total_kg, 2, " kg"),
         ]
         for col_idx, value in enumerate(values):
             if col_idx == 2:
                 cell = NumericTableWidgetItem(value, total_cantidad)
             elif col_idx == 3:
+                cell = NumericTableWidgetItem(value, total_recibida)
+            elif col_idx == 4:
                 cell = NumericTableWidgetItem(value, total_kg)
             else:
                 cell = QTableWidgetItem(value)
             cell.setFlags(Qt.ItemFlag.ItemIsEnabled)
-            if col_idx in (2, 3):
+            if col_idx in (2, 3, 4):
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             font = cell.font()
             font.setBold(True)
