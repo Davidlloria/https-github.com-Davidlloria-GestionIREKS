@@ -1,10 +1,11 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 from PySide6.QtCore import QDate, QSize, Qt
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCalendarWidget,
@@ -47,6 +48,55 @@ class DashboardMonthCalendar(QCalendarWidget):
         selected = self.selectedDate()
         self._page.set_selected_date(date(selected.year(), selected.month(), selected.day()))
 
+    def paintCell(self, painter: QPainter, rect, calendar_date: QDate) -> None:  # type: ignore[override]
+        day_value = date(calendar_date.year(), calendar_date.month(), calendar_date.day())
+        rows_for_day = self._page._agenda_rows_for_date(day_value)
+        tone = self._page._agenda_day_tone(rows_for_day, today_value=date.today())
+        in_month = calendar_date.month() == self.monthShown() and calendar_date.year() == self.yearShown()
+        selected = calendar_date == self.selectedDate()
+
+        background = QColor('#FFFFFF')
+        border = QColor('#E2E8F0')
+        text_color = QColor('#0F172A')
+        if not in_month:
+            background = QColor('#F8FAFC')
+            border = QColor('#E2E8F0')
+            text_color = QColor('#94A3B8')
+        elif tone == 'blue':
+            background = QColor('#EFF6FF')
+            border = QColor('#BFDBFE')
+            text_color = QColor('#1D4ED8')
+        elif tone == 'green':
+            background = QColor('#F0FDF4')
+            border = QColor('#BBF7D0')
+            text_color = QColor('#15803D')
+        elif tone == 'red':
+            background = QColor('#FEF2F2')
+            border = QColor('#FECACA')
+            text_color = QColor('#DC2626')
+
+        if selected:
+            border = QColor('#2563EB')
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(Qt.GlobalColor.transparent)
+        painter.drawRect(rect)
+        painter.setBrush(background)
+        pen = painter.pen()
+        pen.setColor(border)
+        pen.setWidth(2 if selected else 1)
+        painter.setPen(pen)
+        cell_rect = rect.adjusted(2, 2, -2, -2)
+        painter.drawRoundedRect(cell_rect, 8, 8)
+        font = painter.font()
+        font.setPointSize(9)
+        painter.setFont(font)
+        painter.setPen(text_color)
+        painter.drawText(cell_rect, int(Qt.AlignmentFlag.AlignCenter), str(calendar_date.day()))
+        painter.restore()
+
 
 class DashboardPage(QWidget):
     def __init__(
@@ -84,16 +134,15 @@ class DashboardPage(QWidget):
         brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
         brand_path = BASE_DIR / 'assets' / 'logos' / 'corporativos' / 'IREKS_Logo_transparente.png'
         if brand_path.exists():
-            brand.setPixmap(QPixmap(str(brand_path)).scaledToWidth(140, Qt.TransformationMode.SmoothTransformation))
+            brand.setPixmap(QPixmap(str(brand_path)).scaledToWidth(144, Qt.TransformationMode.SmoothTransformation))
         sidebar_layout.addWidget(brand)
 
         agenda_btn = QPushButton('Agenda')
         agenda_btn.setObjectName('dashboardSidebarButton')
         agenda_btn.setProperty('active', True)
         agenda_btn.setEnabled(False)
-        agenda_btn.setIcon(self._icon('calendar-days.svg'))
-        agenda_btn.setIconSize(QSize(20, 20))
-        agenda_btn.setMinimumHeight(52)
+        agenda_btn.setMinimumHeight(58)
+        self._set_button_icon(agenda_btn, 'calendar-days.svg', '#FFFFFF', 20)
         sidebar_layout.addWidget(agenda_btn)
         sidebar_layout.addStretch(1)
         root_layout.addWidget(sidebar)
@@ -134,15 +183,13 @@ class DashboardPage(QWidget):
 
         self.new_activity_btn = QPushButton('Nueva actividad')
         self.new_activity_btn.setObjectName('dashboardNewActivityButton')
-        self.new_activity_btn.setIcon(self._icon('plus.svg'))
-        self.new_activity_btn.setIconSize(QSize(18, 18))
+        self._set_button_icon(self.new_activity_btn, 'plus.svg', '#FFFFFF', 18)
         self.new_activity_btn.clicked.connect(self._handle_primary_action)
         header_layout.addWidget(self.new_activity_btn)
 
         self.full_agenda_btn = QPushButton('Ver agenda completa')
         self.full_agenda_btn.setObjectName('dashboardFullAgendaButton')
-        self.full_agenda_btn.setIcon(self._icon('calendar.svg'))
-        self.full_agenda_btn.setIconSize(QSize(18, 18))
+        self._set_button_icon(self.full_agenda_btn, 'calendar.svg', '#2563EB', 18)
         self.full_agenda_btn.clicked.connect(self._handle_secondary_action)
         header_layout.addWidget(self.full_agenda_btn)
 
@@ -168,13 +215,13 @@ class DashboardPage(QWidget):
         kpi_row.setVerticalSpacing(12)
         self.kpi_labels: dict[str, QLabel] = {}
         self.kpi_notes: dict[str, QLabel] = {}
-        for column, (key, title, icon_name) in enumerate([
-            ('pending_today', 'Pendientes hoy', 'calendar.svg'),
-            ('overdue', 'Vencidas', 'clock-3.svg'),
-            ('completed_today', 'Completadas hoy', 'circle-check.svg'),
-            ('customers_without_follow_up', 'Clientes sin seguimiento', 'users.svg'),
+        for column, (key, title, tone, icon_name) in enumerate([
+            ('pending_today', 'Pendientes hoy', 'blue', 'clipboard-list.svg'),
+            ('overdue', 'Vencidas', 'red', 'clock-3.svg'),
+            ('completed_today', 'Completadas hoy', 'green', 'circle-check.svg'),
+            ('customers_without_follow_up', 'Clientes sin seguimiento', 'orange', 'users.svg'),
         ]):
-            card, value_label, note_label = self._build_kpi_card(title, icon_name)
+            card, value_label, note_label = self._build_kpi_card(title, tone, icon_name)
             self.kpi_labels[key] = value_label
             self.kpi_notes[key] = note_label
             kpi_row.addWidget(card, 0, column)
@@ -228,21 +275,33 @@ class DashboardPage(QWidget):
         layout.addLayout(lower_row, 2)
         return widget
 
-    def _build_kpi_card(self, title: str, icon_name: str) -> tuple[QFrame, QLabel, QLabel]:
+    def _build_kpi_card(self, title: str, tone: str, icon_name: str) -> tuple[QFrame, QLabel, QLabel]:
         card = QFrame()
         card.setObjectName('dashboardKpiCard')
-        card.setMinimumHeight(104)
+        card.setProperty('tone', tone)
+        card.setMinimumHeight(118)
         card.setMaximumHeight(118)
         card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        layout = QGridLayout(card)
+        layout = QHBoxLayout(card)
         layout.setContentsMargins(16, 14, 16, 14)
-        layout.setHorizontalSpacing(12)
-        layout.setVerticalSpacing(3)
+        layout.setSpacing(14)
+
+        icon_wrap = QFrame()
+        icon_wrap.setObjectName('dashboardKpiIconWrap')
+        icon_wrap.setProperty('tone', tone)
+        icon_wrap.setFixedSize(62, 62)
+        icon_layout = QVBoxLayout(icon_wrap)
+        icon_layout.setContentsMargins(0, 0, 0, 0)
+        icon_layout.setSpacing(0)
         icon_label = QLabel()
         icon_label.setObjectName('dashboardKpiIcon')
-        icon_label.setPixmap(self._icon(icon_name).pixmap(QSize(22, 22)))
-        icon_label.setFixedSize(38, 38)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setPixmap(self._icon_pixmap(icon_name, self._tone_color(tone), 28))
+        icon_layout.addWidget(icon_label)
+
+        text_layout = QVBoxLayout()
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(2)
         title_label = QLabel(title)
         title_label.setObjectName('dashboardKpiTitle')
         title_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
@@ -251,11 +310,14 @@ class DashboardPage(QWidget):
         note_label = QLabel('')
         note_label.setObjectName('dashboardKpiNote')
         note_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        layout.addWidget(icon_label, 0, 0, 2, 1)
-        layout.addWidget(title_label, 0, 1)
-        layout.addWidget(value_label, 1, 1)
-        layout.addWidget(note_label, 1, 2, Qt.AlignmentFlag.AlignBottom)
-        layout.setColumnStretch(1, 1)
+        text_layout.addWidget(title_label)
+        text_layout.addSpacing(2)
+        text_layout.addWidget(value_label)
+        text_layout.addWidget(note_label)
+        text_layout.addStretch(1)
+
+        layout.addWidget(icon_wrap, 0, Qt.AlignmentFlag.AlignTop)
+        layout.addLayout(text_layout, 1)
         return card, value_label, note_label
 
     def _build_list_panel(self, title: str, object_name: str, *, empty_text: str) -> tuple[QFrame, QVBoxLayout, QLabel]:
@@ -317,18 +379,19 @@ class DashboardPage(QWidget):
         summary_row = QHBoxLayout()
         summary_row.setContentsMargins(0, 0, 0, 0)
         summary_row.setSpacing(8)
-        self.pending_summary = self._build_summary_chip('Pendientes')
-        self.done_summary = self._build_summary_chip('Hechas')
-        self.overdue_summary = self._build_summary_chip('Vencidas')
+        self.pending_summary = self._build_summary_chip('Pendientes', 'blue')
+        self.done_summary = self._build_summary_chip('Hechas', 'green')
+        self.overdue_summary = self._build_summary_chip('Vencidas', 'red')
         summary_row.addWidget(self.pending_summary[0])
         summary_row.addWidget(self.done_summary[0])
         summary_row.addWidget(self.overdue_summary[0])
         layout.addLayout(summary_row)
         return panel
 
-    def _build_summary_chip(self, title: str) -> tuple[QFrame, QLabel]:
+    def _build_summary_chip(self, title: str, tone: str) -> tuple[QFrame, QLabel]:
         frame = QFrame()
         frame.setObjectName('dashboardCalendarSummaryChip')
+        frame.setProperty('tone', tone)
         inner = QHBoxLayout(frame)
         inner.setContentsMargins(10, 8, 10, 8)
         inner.setSpacing(8)
@@ -451,6 +514,19 @@ class DashboardPage(QWidget):
     def _handle_secondary_action(self) -> None:
         QMessageBox.information(self, 'Agenda', 'La vista completa de agenda se incorporará en el siguiente corte limpio.')
 
+
+    def _agenda_rows_for_date(self, day_value: date) -> list[DashboardActivityRow]:
+        return [row for row in self.agenda_calendar_rows if row.fecha_actividad == day_value]
+
+    def _agenda_day_tone(self, rows: list[DashboardActivityRow], *, today_value: date) -> str | None:
+        if not rows:
+            return None
+        if any(self._state_group(row.estado) == 'completed' for row in rows):
+            return 'green'
+        if any(row.due_date < today_value and self._state_group(row.estado) not in {'completed', 'cancelled'} for row in rows):
+            return 'red'
+        return 'blue'
+
     @staticmethod
     def _state_group(state: str) -> str:
         normalized = str(state or '').strip().lower()
@@ -478,40 +554,116 @@ class DashboardPage(QWidget):
         return f'{fmt}{suffix}'
 
     @staticmethod
-    def _icon(asset_name: str) -> QIcon:
-        return QIcon(str(BASE_DIR / 'assets' / 'icons' / asset_name))
+    def _tone_color(tone: str) -> str:
+        return {
+            'blue': '#2563EB',
+            'red': '#EF4444',
+            'green': '#16A34A',
+            'orange': '#F97316',
+        }.get(tone, '#2563EB')
+
+    @staticmethod
+    def _icon_path(asset_name: str) -> Path:
+        return BASE_DIR / 'assets' / 'icons' / asset_name
+
+    def _icon_pixmap(self, asset_name: str, color: str, size: int) -> QPixmap:
+        path = self._icon_path(asset_name)
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        if not path.exists():
+            return pixmap
+        renderer = QSvgRenderer(str(path))
+        painter = QPainter(pixmap)
+        renderer.render(painter)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+        painter.fillRect(pixmap.rect(), QColor(color))
+        painter.end()
+        return pixmap
+
+    def _set_button_icon(self, button: QPushButton, asset_name: str, color: str, size: int) -> None:
+        button.setIcon(QIcon(self._icon_pixmap(asset_name, color, size)))
+        button.setIconSize(QSize(size, size))
 
     def _apply_styles(self) -> None:
         self.setStyleSheet(
             """
-            QWidget#dashboardPageRoot { background-color: #F1F5F9; font-family: "Segoe UI"; }
-            QFrame#dashboardSidebar { background-color: #FFFFFF; border-right: 1px solid #DCE4EF; }
-            QLabel#dashboardSidebarBrand { background-color: transparent; padding: 10px; }
-            QPushButton#dashboardSidebarButton { background-color: #2563EB; color: #FFFFFF; border: none; border-radius: 14px; padding: 12px 18px; font-size: 16px; font-weight: 700; text-align: left; }
+            QWidget#dashboardPageRoot { background-color: #EEF3F8; font-family: "Segoe UI"; }
+            QFrame#dashboardSidebar { background-color: #F8FAFC; border-right: 1px solid #E2E8F0; }
+            QLabel#dashboardSidebarBrand { background-color: transparent; padding: 8px 0 6px 0; }
+            QPushButton#dashboardSidebarButton {
+                background-color: transparent;
+                color: #334155;
+                border: none;
+                border-radius: 16px;
+                padding: 14px 16px;
+                font-size: 15px;
+                font-weight: 600;
+                text-align: left;
+            }
+            QPushButton#dashboardSidebarButton[active="true"] {
+                background-color: #2563EB;
+                color: #FFFFFF;
+            }
             QWidget#dashboardContentHost, QWidget#dashboardContent, QWidget#dashboardAgendaView { background-color: transparent; }
             QFrame#dashboardHeader { background-color: transparent; }
             QLabel#dashboardTitle { font-size: 30px; font-weight: 700; color: #0F172A; }
             QLabel#dashboardDateLabel { font-size: 14px; color: #64748B; }
-            QPushButton#dashboardNewActivityButton { background-color: #2563EB; color: #FFFFFF; border: 1px solid #2563EB; border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700; }
-            QPushButton#dashboardFullAgendaButton, QPushButton#dashboardPanelLinkButton { background-color: #FFFFFF; color: #1D4ED8; border: 1px solid #CBD5E1; border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700; }
+            QPushButton#dashboardNewActivityButton {
+                background-color: #2563EB; color: #FFFFFF; border: 1px solid #2563EB;
+                border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700;
+            }
+            QPushButton#dashboardFullAgendaButton, QPushButton#dashboardPanelLinkButton {
+                background-color: #FFFFFF; color: #1D4ED8; border: 1px solid #CBD5E1;
+                border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700;
+            }
             QPushButton#dashboardNewActivityButton:hover { background-color: #1D4ED8; }
-            QPushButton#dashboardFullAgendaButton:hover, QPushButton#dashboardPanelLinkButton:hover { background-color: #EFF6FF; border-color: #93C5FD; }
-            QFrame#dashboardKpiCard, QFrame[dashboardPanel='true'] { background-color: #FFFFFF; border: 1px solid #DCE4EF; border-radius: 16px; }
-            QLabel#dashboardKpiIcon { background-color: #EFF6FF; border-radius: 10px; }
+            QPushButton#dashboardFullAgendaButton:hover, QPushButton#dashboardPanelLinkButton:hover {
+                background-color: #EFF6FF; border-color: #93C5FD;
+            }
+            QFrame#dashboardKpiCard, QFrame[dashboardPanel='true'] {
+                background-color: #FFFFFF; border: 1px solid #DCE4EF; border-radius: 16px;
+            }
+            QFrame#dashboardKpiCard[tone='blue'] { border-bottom: 4px solid #2563EB; }
+            QFrame#dashboardKpiCard[tone='red'] { border-bottom: 4px solid #EF4444; }
+            QFrame#dashboardKpiCard[tone='green'] { border-bottom: 4px solid #16A34A; }
+            QFrame#dashboardKpiCard[tone='orange'] { border-bottom: 4px solid #F97316; }
+            QFrame#dashboardKpiIconWrap {
+                background-color: #EFF6FF; border: none; border-radius: 31px;
+            }
+            QFrame#dashboardKpiIconWrap[tone='red'] { background-color: #FEF2F2; }
+            QFrame#dashboardKpiIconWrap[tone='green'] { background-color: #F0FDF4; }
+            QFrame#dashboardKpiIconWrap[tone='orange'] { background-color: #FFF7ED; }
             QLabel#dashboardKpiTitle, QLabel#dashboardPanelTitle { color: #1E293B; font-size: 15px; font-weight: 700; }
             QLabel#dashboardKpiValue { color: #0F172A; font-size: 28px; font-weight: 800; }
-            QLabel#dashboardKpiNote, QLabel#dashboardFooterLabel, QLabel#dashboardEmptyLabel, QLabel#dashboardActivityDetail { color: #64748B; font-size: 13px; }
+            QLabel#dashboardKpiNote, QLabel#dashboardFooterLabel, QLabel#dashboardEmptyLabel, QLabel#dashboardActivityDetail {
+                color: #64748B; font-size: 13px;
+            }
             QLabel#dashboardActivityCustomer { color: #0F172A; font-size: 14px; font-weight: 700; }
             QLabel#dashboardActivitySummary { color: #1E293B; font-size: 13px; }
             QFrame#dashboardActivityCard { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
             QCalendarWidget#dashboardMonthCalendar { background-color: #FFFFFF; border: none; }
             QCalendarWidget#dashboardMonthCalendar QWidget#qt_calendar_navigationbar { background-color: #2563EB; border-radius: 8px; }
-            QCalendarWidget#dashboardMonthCalendar QToolButton { color: #FFFFFF; background-color: transparent; border: none; font-weight: 700; padding: 5px; }
-            QCalendarWidget#dashboardMonthCalendar QAbstractItemView { background-color: #FFFFFF; color: #334155; selection-background-color: #2563EB; selection-color: #FFFFFF; outline: none; }
-            QFrame#dashboardCalendarSummaryChip { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
+            QCalendarWidget#dashboardMonthCalendar QToolButton {
+                color: #FFFFFF; background-color: transparent; border: none; font-weight: 700; padding: 5px;
+            }
+            QCalendarWidget#dashboardMonthCalendar QAbstractItemView {
+                background-color: #FFFFFF; color: #334155; selection-background-color: #2563EB;
+                selection-color: #FFFFFF; outline: none;
+            }
+            QFrame#dashboardCalendarSummaryChip {
+                background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px;
+            }
+            QFrame#dashboardCalendarSummaryChip[tone='blue'] { background-color: #EFF6FF; border-color: #BFDBFE; }
+            QFrame#dashboardCalendarSummaryChip[tone='green'] { background-color: #F0FDF4; border-color: #BBF7D0; }
+            QFrame#dashboardCalendarSummaryChip[tone='red'] { background-color: #FEF2F2; border-color: #FECACA; }
             QLabel#dashboardCalendarSummaryTitle { color: #475569; font-size: 12px; font-weight: 600; }
             QLabel#dashboardCalendarSummaryValue { color: #0F172A; font-size: 16px; font-weight: 800; }
-            QTableWidget#dashboardReactivationTable, QTableWidget#dashboardIslandTable { background-color: #FFFFFF; alternate-background-color: #F8FAFC; border: none; color: #334155; }
-            QHeaderView::section { background-color: #F8FAFC; color: #475569; padding: 7px; border: none; border-bottom: 1px solid #E2E8F0; font-weight: 700; }
+            QTableWidget#dashboardReactivationTable, QTableWidget#dashboardIslandTable {
+                background-color: #FFFFFF; alternate-background-color: #F8FAFC; border: none; color: #334155;
+            }
+            QHeaderView::section {
+                background-color: #F8FAFC; color: #475569; padding: 7px; border: none;
+                border-bottom: 1px solid #E2E8F0; font-weight: 700;
+            }
             """
         )

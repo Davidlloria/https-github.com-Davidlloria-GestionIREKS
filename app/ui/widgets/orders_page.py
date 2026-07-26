@@ -8,8 +8,8 @@ import re
 import tempfile
 from typing import Any, Callable, cast
 
-from PySide6.QtCore import QDate, QSize, QTimer, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QIcon
+from PySide6.QtCore import QDate, QTimer, Qt
+from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -64,8 +64,6 @@ from app.services.orders_documents_import_ui_service import (
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderLineInput, OrderService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
-
-BASE_DIR = Path(__file__).resolve().parents[3]
 
 MONTHS = [
     (1, "Enero"),
@@ -1165,10 +1163,11 @@ class OrdersPage(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
+        header = QLabel("Pedidos")
+        header.setProperty("role", "pageTitle")
+        layout.addWidget(header)
+
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setFrameShape(QFrame.Shape.NoFrame)
-        splitter.setAutoFillBackground(False)
-        splitter.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         layout.addWidget(splitter, 1)
 
         left_panel = QWidget()
@@ -1205,29 +1204,18 @@ class OrdersPage(QWidget):
         almacen_row.addWidget(self.almacen_filter, 1)
         left_layout.addLayout(almacen_row)
 
-        self.new_btn = QPushButton("Nuevo")
+        self.new_btn = QPushButton("Nuevo pedido")
         self.new_btn.setProperty("btnRole", "success")
-        self.new_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "plus.svg")))
         self.edit_btn = QPushButton("Editar")
         self.edit_btn.setProperty("btnRole", "warning")
-        self.edit_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "pencil_white.svg")))
         self.del_btn = QPushButton("Eliminar")
         self.del_btn.setProperty("btnRole", "danger")
-        self.del_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
         self.export_btn = QPushButton("Exportar")
         self.export_btn.setProperty("btnRole", "secondary")
-        self.export_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "clipboard-list.svg")))
         self.send_mail_btn = QPushButton("Enviar Outlook")
         self.send_mail_btn.setProperty("btnRole", "secondary")
-        self.send_mail_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "mail.svg")))
         self.print_btn = QPushButton("Imprimir")
         self.print_btn.setProperty("btnRole", "secondary")
-        self.print_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "printer.svg")))
-        self.help_btn = QPushButton("Ayuda")
-        self.help_btn.setProperty("btnRole", "secondary")
-        self.help_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "brain.svg")))
-        for button in (self.new_btn, self.edit_btn, self.del_btn, self.export_btn, self.send_mail_btn, self.print_btn, self.help_btn):
-            button.setIconSize(QSize(14, 14))
 
         self.new_btn.clicked.connect(self._new_order)
         self.edit_btn.clicked.connect(self._edit_order)
@@ -1235,11 +1223,9 @@ class OrdersPage(QWidget):
         self.export_btn.clicked.connect(self._export_selected_order_to_excel)
         self.send_mail_btn.clicked.connect(self._send_selected_order_by_outlook)
         self.print_btn.clicked.connect(self._print_selected_order)
-        self.help_btn.clicked.connect(self._show_orders_help)
 
         left_ribbon = QFrame()
         left_ribbon.setObjectName("topRibbon")
-        left_ribbon.setProperty("pageType", "contacts")
         left_ribbon.setFrameShape(QFrame.Shape.StyledPanel)
         left_ribbon_layout = QHBoxLayout(left_ribbon)
         left_ribbon_layout.setContentsMargins(8, 6, 8, 6)
@@ -1251,8 +1237,7 @@ class OrdersPage(QWidget):
         left_ribbon_layout.addWidget(self.send_mail_btn)
         left_ribbon_layout.addWidget(self.print_btn)
         left_ribbon_layout.addStretch(1)
-        left_ribbon_layout.addWidget(self.help_btn)
-        layout.insertWidget(0, left_ribbon)
+        left_layout.addWidget(left_ribbon)
 
         self.table = QTableWidget(0, 6)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -1298,8 +1283,6 @@ class OrdersPage(QWidget):
         splitter.addWidget(left_panel)
 
         right_panel = QWidget()
-        right_panel.setProperty("ordersRegion", "rightPanel")
-        right_panel.setStyleSheet('QWidget[ordersRegion="rightPanel"] { background-color: #0000FF; border: none; }')
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(6)
@@ -1316,8 +1299,6 @@ class OrdersPage(QWidget):
         self.import_factura_btn.clicked.connect(self._import_factura_for_selected_order)
         self.delete_factura_btn = QPushButton("Eliminar Factura")
         self.delete_factura_btn.setProperty("btnRole", "danger")
-        self.delete_factura_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
-        self.delete_factura_btn.setIconSize(QSize(14, 14))
         self.delete_factura_btn.setFixedHeight(24)
         self.delete_factura_btn.setEnabled(False)
         self.delete_factura_btn.clicked.connect(self._delete_selected_factura)
@@ -1336,8 +1317,6 @@ class OrdersPage(QWidget):
         self.edit_line_btn.clicked.connect(self._edit_order_line)
         self.del_line_btn = QPushButton("Eliminar")
         self.del_line_btn.setProperty("btnRole", "danger")
-        self.del_line_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
-        self.del_line_btn.setIconSize(QSize(14, 14))
         self.del_line_btn.setFixedHeight(24)
         self.del_line_btn.clicked.connect(self._delete_order_line)
         self.edit_order_btn = QPushButton("Editar pedido")
@@ -1346,14 +1325,10 @@ class OrdersPage(QWidget):
         self.edit_order_btn.clicked.connect(self._edit_order)
 
         right_splitter = QSplitter(Qt.Orientation.Vertical)
-        right_splitter.setProperty("ordersRegion", "rightSplitter")
-        right_splitter.setFrameShape(QFrame.Shape.NoFrame)
-        right_splitter.setStyleSheet('QSplitter[ordersRegion="rightSplitter"] { background-color: #008000; border: none; }')
         right_layout.addWidget(right_splitter, 1)
 
         detail_panel = QWidget()
         detail_panel.setObjectName("detailPanel")
-        detail_panel.setStyleSheet("#detailPanel { background-color: #FCFDFF; border: 1px solid #E2E8F1; border-radius: 8px; }")
         detail_panel.setMaximumHeight(170)
         detail_layout = QVBoxLayout(detail_panel)
         detail_layout.setContentsMargins(14, 14, 14, 14)
@@ -1413,7 +1388,7 @@ class OrdersPage(QWidget):
         pedido_actions_layout.addWidget(self.edit_order_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         pedido_actions_layout.addStretch(1)
         pedido_tab_layout.addWidget(pedido_actions_ribbon)
-        self.pedido_items_table = QTableWidget(0, 4)
+        self.pedido_items_table = QTableWidget(0, 7)
         self.pedido_items_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.pedido_items_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.pedido_items_table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked | QAbstractItemView.EditTrigger.EditKeyPressed | QAbstractItemView.EditTrigger.SelectedClicked)
@@ -1427,13 +1402,19 @@ class OrdersPage(QWidget):
         items_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         items_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         items_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        self.pedido_items_table.setHorizontalHeaderLabels(["Cod.", "Nombre", "Cantidad", "Kg"])
+        items_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        items_header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        items_header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
+        self.pedido_items_table.setHorizontalHeaderLabels(["Cod.", "Nombre", "Pedido", "Kg", "Recib.", "Kg", "Δ"])
         self.pedido_items_table.setColumnWidth(0, 95)
-        self.pedido_items_table.setColumnWidth(2, 90)
-        self.pedido_items_table.setColumnWidth(3, 100)
+        self.pedido_items_table.setColumnWidth(2, 82)
+        self.pedido_items_table.setColumnWidth(3, 96)
+        self.pedido_items_table.setColumnWidth(4, 82)
+        self.pedido_items_table.setColumnWidth(5, 96)
+        self.pedido_items_table.setColumnWidth(6, 72)
         self.pedido_items_table.setSortingEnabled(True)
         pedido_tab_layout.addWidget(self.pedido_items_table, 1)
-        self.pedido_items_totals_table = QTableWidget(1, 4)
+        self.pedido_items_totals_table = QTableWidget(1, 7)
         self.pedido_items_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.pedido_items_totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.pedido_items_totals_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -1446,10 +1427,16 @@ class OrdersPage(QWidget):
         pedido_totals_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         pedido_totals_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         pedido_totals_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        pedido_totals_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        pedido_totals_header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        pedido_totals_header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
         self.pedido_items_totals_table.setFixedHeight(30)
         self.pedido_items_totals_table.setColumnWidth(0, 95)
-        self.pedido_items_totals_table.setColumnWidth(2, 90)
-        self.pedido_items_totals_table.setColumnWidth(3, 100)
+        self.pedido_items_totals_table.setColumnWidth(2, 82)
+        self.pedido_items_totals_table.setColumnWidth(3, 96)
+        self.pedido_items_totals_table.setColumnWidth(4, 82)
+        self.pedido_items_totals_table.setColumnWidth(5, 96)
+        self.pedido_items_totals_table.setColumnWidth(6, 72)
         pedido_tab_layout.addWidget(self.pedido_items_totals_table)
         tabs.addTab(pedido_tab, "Pedido")
 
@@ -1616,7 +1603,7 @@ class OrdersPage(QWidget):
         pendientes_tab_layout = QVBoxLayout(pendientes_tab)
         pendientes_tab_layout.setContentsMargins(8, 8, 8, 8)
         pendientes_tab_layout.setSpacing(6)
-        self.pendientes_table = QTableWidget(0, 6)
+        self.pendientes_table = QTableWidget(0, 4)
         self.pendientes_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.pendientes_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.pendientes_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -1629,14 +1616,13 @@ class OrdersPage(QWidget):
         pendientes_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         pendientes_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         pendientes_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        pendientes_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        pendientes_header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-        self.pendientes_table.setHorizontalHeaderLabels(["Cod.", "Nombre", "Pedida", "Recibida", "Pendiente", "Estado"])
+        pendientes_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        pendientes_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self.pendientes_table.setHorizontalHeaderLabels(["Cod.", "Nombre", "Pendiente", "Pedido"])
         self.pendientes_table.setColumnWidth(0, 95)
-        self.pendientes_table.setColumnWidth(2, 90)
-        self.pendientes_table.setColumnWidth(3, 90)
-        self.pendientes_table.setColumnWidth(4, 100)
-        self.pendientes_table.setColumnWidth(5, 90)
+        self.pendientes_table.setColumnWidth(2, 100)
+        self.pendientes_table.setColumnWidth(3, 100)
+        self.pendientes_table.setSortingEnabled(True)
         pendientes_tab_layout.addWidget(self.pendientes_table, 1)
         tabs.addTab(pendientes_tab, "Pendientes")
         tabs_layout.addWidget(tabs)
@@ -1764,19 +1750,30 @@ class OrdersPage(QWidget):
         self.pedido_items_table.setRowCount(0)
         if not pedido_id:
             self.pedido_items_table.setSortingEnabled(was_sorting)
-            self._set_pedido_items_totals(0.0, 0.0)
+            self._set_pedido_items_totals(0.0, 0.0, 0.0, 0.0, 0.0)
             self._loading_pedido_items_table = False
             return
-        rows, pending_article_ids = self.order_query_service.list_order_items(pedido_id)
+        rows, pending_article_ids, received_by_article = self.order_query_service.list_order_items(pedido_id)
         self.pedido_items_table.setRowCount(len(rows))
         total_cantidad = 0.0
-        total_kg = 0.0
+        total_pedido_kg = 0.0
+        total_recibida = 0.0
+        total_recibida_kg = 0.0
+        total_delta = 0.0
         for row_idx, (item, article) in enumerate(rows):
             cantidad = float(getattr(item, "articulo_cantidad", 0.0) or 0.0)
+            articulo_id = str(getattr(item, "articulo_id", "") or "").strip()
+            cantidad_recibida = float(received_by_article.get(articulo_id, 0.0) or 0.0)
             peso_total = float(getattr(article, "articulo_envase_peso_total", 0.0) or 0.0) if article else 0.0
-            kg = cantidad * peso_total
+            pedido_kg = cantidad * peso_total
+            recibida_kg = cantidad_recibida * peso_total
+            delta = cantidad_recibida - cantidad
+            has_difference = abs(delta) > 1e-9
             total_cantidad += cantidad
-            total_kg += kg
+            total_pedido_kg += pedido_kg
+            total_recibida += cantidad_recibida
+            total_recibida_kg += recibida_kg
+            total_delta += delta
             cod = str(getattr(article, "articulo_referencia_corta", "") or "").strip() if article else ""
             nombre = str(getattr(article, "articulo_descripcion", "") or "").strip() if article else ""
             if not cod:
@@ -1787,23 +1784,32 @@ class OrdersPage(QWidget):
                 cod,
                 nombre,
                 self._format_number_es(cantidad, 2),
-                self._format_number_es(kg, 2, " kg"),
+                self._format_number_es(pedido_kg, 2, " kg"),
+                self._format_number_es(cantidad_recibida, 2),
+                self._format_number_es(recibida_kg, 2, " kg"),
+                self._format_number_es(delta, 2, signed=True) if has_difference else "",
             ]
             for col_idx, value in enumerate(values):
                 if col_idx == 2:
                     cell = NumericTableWidgetItem(value, cantidad)
                 elif col_idx == 3:
-                    cell = NumericTableWidgetItem(value, kg)
+                    cell = NumericTableWidgetItem(value, pedido_kg)
+                elif col_idx == 4:
+                    cell = NumericTableWidgetItem(value, cantidad_recibida)
+                elif col_idx == 5:
+                    cell = NumericTableWidgetItem(value, recibida_kg)
+                elif col_idx == 6:
+                    cell = NumericTableWidgetItem(value, delta)
                 else:
                     cell = QTableWidgetItem(value)
                 if col_idx == 0 and not isinstance(cell, NumericTableWidgetItem):
                     cell.setData(Qt.ItemDataRole.UserRole, str(getattr(item, "item_id", "") or "").strip())
-                if col_idx == 0 and self._is_article_pending(article):
-                    cell.setForeground(QBrush(QColor("#c62828")))
-                if str(getattr(item, "articulo_id", "") or "").strip() in pending_article_ids:
-                    cell.setForeground(QBrush(QColor("#c62828")))
-                if col_idx in (2, 3):
+                if col_idx in (2, 3, 4, 5, 6):
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if has_difference:
+                    cell.setBackground(QBrush(QColor("#FFF7ED")))
+                    if col_idx in (4, 5, 6):
+                        cell.setForeground(QBrush(QColor("#C2410C")))
                 if col_idx == 2:
                     cell.setFlags(cell.flags() | Qt.ItemFlag.ItemIsEditable)
                 else:
@@ -1812,7 +1818,7 @@ class OrdersPage(QWidget):
         self.pedido_items_table.setSortingEnabled(was_sorting)
         if was_sorting:
             self.pedido_items_table.sortItems(sort_col if sort_col >= 0 else 0, sort_order if sort_col >= 0 else Qt.SortOrder.AscendingOrder)
-        self._set_pedido_items_totals(total_cantidad, total_kg)
+        self._set_pedido_items_totals(total_cantidad, total_pedido_kg, total_recibida, total_recibida_kg, total_delta)
         self._loading_pedido_items_table = False
 
     def _on_pedido_item_cell_changed(self, item: QTableWidgetItem) -> None:
@@ -2110,8 +2116,12 @@ class OrdersPage(QWidget):
                     cell.setForeground(QBrush(QColor("#c62828")))
                 if col_idx == 4 and price_discrepancy_by_item.get(item_id, False):
                     cell.setForeground(QBrush(QColor("#c62828")))
-                if col_idx in (2, 3, 4):
+                if col_idx in (2, 3, 4, 5, 6):
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if has_difference:
+                    cell.setBackground(QBrush(QColor("#FFF7ED")))
+                    if col_idx in (4, 5, 6):
+                        cell.setForeground(QBrush(QColor("#C2410C")))
                 self.factura_items_table.setItem(row_idx, col_idx, cell)
         self.factura_items_table.setSortingEnabled(was_sorting)
         if was_sorting:
@@ -2201,41 +2211,45 @@ class OrdersPage(QWidget):
         self.reload()
 
     def _reload_pendientes_table(self, pedido_id: str | None) -> None:
+        header = self.pendientes_table.horizontalHeader()
+        sort_col = header.sortIndicatorSection()
+        sort_order = header.sortIndicatorOrder()
+        was_sorting = self.pendientes_table.isSortingEnabled()
+        self.pendientes_table.setSortingEnabled(False)
         self.pendientes_table.setRowCount(0)
         if not pedido_id:
+            self.pendientes_table.setSortingEnabled(was_sorting)
             return
-        rows, articles = self.order_query_service.list_pendientes(pedido_id)
+        rows, articles = self.order_query_service.list_pendientes_acumulados(pedido_id)
         name_by_article = {str(a.articulo_id or ""): str(a.articulo_descripcion or "").strip() for a in articles}
         ref_by_article = {str(a.articulo_id or ""): str(a.articulo_referencia_corta or "").strip() for a in articles}
-        article_by_id = {str(a.articulo_id or ""): a for a in articles}
 
         self.pendientes_table.setRowCount(len(rows))
-        for row_idx, row in enumerate(rows):
+        for row_idx, (row, pedido) in enumerate(rows):
             articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
             cod = ref_by_article.get(articulo_id, "") or articulo_id
             nombre = name_by_article.get(articulo_id, "") or articulo_id
-            pendiente_raw = float(getattr(row, "cantidad_pendiente", 0.0) or 0.0)
-            pendiente_display = -pendiente_raw
+            pendiente = float(getattr(row, "cantidad_pendiente", 0.0) or 0.0)
+            pedido_numero = str(getattr(pedido, "pedido_numero", "") or "").strip()
             values = [
                 cod,
                 nombre,
-                self._format_number_es(float(getattr(row, "cantidad_pedida", 0.0) or 0.0), 2),
-                self._format_number_es(float(getattr(row, "cantidad_recibida", 0.0) or 0.0), 2),
-                self._format_number_es(pendiente_display, 2),
-                str(getattr(row, "estado", "") or "").strip(),
+                self._format_number_es(pendiente, 2),
+                pedido_numero,
             ]
             for col_idx, value in enumerate(values):
-                cell = QTableWidgetItem(value)
-                if col_idx == 0 and self._is_article_pending(article_by_id.get(articulo_id)):
-                    cell.setForeground(QBrush(QColor("#c62828")))
-                if col_idx == 4:
-                    if pendiente_display > 0:
-                        cell.setForeground(QBrush(QColor("#2e7d32")))
-                    elif pendiente_display < 0:
-                        cell.setForeground(QBrush(QColor("#c62828")))
-                if col_idx in (2, 3, 4):
+                if col_idx == 2:
+                    cell = NumericTableWidgetItem(value, pendiente)
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                    cell.setForeground(QBrush(QColor("#C62828")))
+                elif col_idx == 3:
+                    cell = NumericTableWidgetItem(value, self._pedido_sort_value(pedido_numero))
+                else:
+                    cell = QTableWidgetItem(value)
                 self.pendientes_table.setItem(row_idx, col_idx, cell)
+        self.pendientes_table.setSortingEnabled(was_sorting)
+        if was_sorting:
+            self.pendientes_table.sortItems(sort_col if sort_col >= 0 else 3, sort_order if sort_col >= 0 else Qt.SortOrder.AscendingOrder)
 
     def reload(self) -> None:
         selected_id = self._selected_id()
@@ -2339,22 +2353,31 @@ class OrdersPage(QWidget):
             cell.setFont(font)
             self.table_totals.setItem(0, col_idx, cell)
 
-    def _set_pedido_items_totals(self, total_cantidad: float, total_kg: float) -> None:
+    def _set_pedido_items_totals(self, total_cantidad: float, total_pedido_kg: float, total_recibida: float, total_recibida_kg: float, total_delta: float) -> None:
         values = [
             "TOTAL",
             "",
             self._format_number_es(total_cantidad, 2),
-            self._format_number_es(total_kg, 2, " kg"),
+            self._format_number_es(total_pedido_kg, 2, " kg"),
+            self._format_number_es(total_recibida, 2),
+            self._format_number_es(total_recibida_kg, 2, " kg"),
+            self._format_number_es(total_delta, 2, signed=True),
         ]
         for col_idx, value in enumerate(values):
             if col_idx == 2:
                 cell = NumericTableWidgetItem(value, total_cantidad)
             elif col_idx == 3:
-                cell = NumericTableWidgetItem(value, total_kg)
+                cell = NumericTableWidgetItem(value, total_pedido_kg)
+            elif col_idx == 4:
+                cell = NumericTableWidgetItem(value, total_recibida)
+            elif col_idx == 5:
+                cell = NumericTableWidgetItem(value, total_recibida_kg)
+            elif col_idx == 6:
+                cell = NumericTableWidgetItem(value, total_delta)
             else:
                 cell = QTableWidgetItem(value)
             cell.setFlags(Qt.ItemFlag.ItemIsEnabled)
-            if col_idx in (2, 3):
+            if col_idx in (2, 3, 4, 5, 6):
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             font = cell.font()
             font.setBold(True)
@@ -2705,14 +2728,6 @@ class OrdersPage(QWidget):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Pedidos", f"No se pudo imprimir.\n{exc}")
 
-    def _show_orders_help(self) -> None:
-        QMessageBox.information(
-            self,
-            "Ayuda de pedidos",
-            "Usa la barra superior para crear, editar, eliminar, exportar, enviar o imprimir pedidos. "
-            "Los filtros acotan el listado y el panel derecho muestra el detalle del pedido seleccionado.",
-        )
-
     def _show_mail_preview_dialog(
         self,
         *,
@@ -2864,11 +2879,29 @@ class OrdersPage(QWidget):
             return default
 
     @staticmethod
-    def _format_number_es_static(value: float, decimals: int = 2, suffix: str = "") -> str:
-        return OrderDocumentParser.format_number_es(value, decimals, suffix)
+    def _pedido_sort_value(value: str) -> float:
+        text_value = str(value or "").strip()
+        if not text_value:
+            return -1.0
+        digits = re.sub(r"\D+", "", text_value)
+        if digits:
+            try:
+                return float(int(digits))
+            except Exception:
+                return float("inf")
+        return float("inf")
 
-    def _format_number_es(self, value: float, decimals: int = 2, suffix: str = "") -> str:
-        return OrdersPage._format_number_es_static(value, decimals, suffix)
+    @staticmethod
+    def _format_number_es_static(value: float, decimals: int = 2, suffix: str = "", *, signed: bool = False) -> str:
+        number = float(value or 0.0)
+        if signed:
+            text = f"{number:+,.{decimals}f}"
+            text = text.replace(",", "_").replace(".", ",").replace("_", ".")
+            return f"{text}{suffix}"
+        return OrderDocumentParser.format_number_es(number, decimals, suffix)
+
+    def _format_number_es(self, value: float, decimals: int = 2, suffix: str = "", *, signed: bool = False) -> str:
+        return OrdersPage._format_number_es_static(value, decimals, suffix, signed=signed)
 
     def _is_article_pending(self, article: IngredienteIreks | None) -> bool:
         if article is None:

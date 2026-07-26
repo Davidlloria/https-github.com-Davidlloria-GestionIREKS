@@ -95,6 +95,8 @@ def test_dashboard_page_selects_day_and_updates_title() -> None:
     page.set_selected_date(date(2026, 7, 21))
 
     assert page.today_panel_title.text() == 'Agenda del 21/07/2026'
+    assert len(page._agenda_rows_for_date(date(2026, 7, 21))) == 1
+    assert page._agenda_day_tone(page._agenda_rows_for_date(date(2026, 7, 21)), today_value=date(2026, 7, 20)) == 'blue'
 
     page.close()
     page.deleteLater()

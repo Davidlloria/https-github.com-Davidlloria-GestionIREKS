@@ -36,6 +36,16 @@ class OrderListRow:
 
 
 @dataclass
+class PendingAggregateRow:
+    pedido_id: str
+    articulo_id: str
+    cantidad_pedida: float
+    cantidad_recibida: float
+    cantidad_pendiente: float
+    estado: str = "pendiente"
+
+
+@dataclass
 class WarehouseFilterOption:
     label: str
     value: str
@@ -170,13 +180,118 @@ class OrderQueryService:
             row = session.get(Pedido, clean_pedido_id)
         return OrderRead.from_entity(row) if row is not None else None
 
+    def _build_operational_assignment(
+        self,
+        session: Session,
+        pedido_id: str,
+    ) -> tuple[Pedido | None, dict[tuple[str, str], dict[str, float]], dict[str, Pedido]]:
+        clean_pedido_id = str(pedido_id or "").strip()
+        if not clean_pedido_id:
+            return None, {}, {}
+        pedido = session.get(Pedido, clean_pedido_id)
+        if pedido is None:
+            return None, {}, {}
+        almacen_id = str(getattr(pedido, "almacen_id", "") or "").strip()
+        if not almacen_id:
+            return pedido, {}, {}
+
+        pedidos_almacen = list(
+            session.exec(
+                select(Pedido)
+                .where(Pedido.almacen_id == almacen_id)
+                .order_by(cast(Any, Pedido.pedido_fecha), Pedido.pedido_numero, Pedido.pedido_id)
+            )
+        )
+        pedido_by_id = {
+            str(getattr(row, "pedido_id", "") or "").strip(): row
+            for row in pedidos_almacen
+            if str(getattr(row, "pedido_id", "") or "").strip()
+        }
+        pedido_ids = list(pedido_by_id.keys())
+        if not pedido_ids:
+            return pedido, {}, pedido_by_id
+
+        ordered_rows = list(
+            session.exec(select(PedidoItem).where(cast(Any, PedidoItem.pedido_id).in_(pedido_ids)))
+        )
+        ordered_by_article_pedido: dict[str, dict[str, float]] = {}
+        for row in ordered_rows:
+            row_pedido_id = str(getattr(row, "pedido_id", "") or "").strip()
+            articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+            if not row_pedido_id or not articulo_id:
+                continue
+            by_pedido = ordered_by_article_pedido.setdefault(articulo_id, {})
+            by_pedido[row_pedido_id] = by_pedido.get(row_pedido_id, 0.0) + float(getattr(row, "articulo_cantidad", 0.0) or 0.0)
+
+        stats: dict[tuple[str, str], dict[str, float]] = {}
+        open_by_article: dict[str, list[dict[str, float | str]]] = {}
+        pedido_order = {pid: idx for idx, pid in enumerate(pedido_ids)}
+        for articulo_id, by_pedido in ordered_by_article_pedido.items():
+            for row_pedido_id in sorted(by_pedido.keys(), key=lambda pid: pedido_order.get(pid, 10**9)):
+                ordered_qty = float(by_pedido.get(row_pedido_id, 0.0) or 0.0)
+                if ordered_qty <= 1e-9:
+                    continue
+                stats[(row_pedido_id, articulo_id)] = {"ordered": ordered_qty, "received": 0.0}
+                open_by_article.setdefault(articulo_id, []).append({"pedido_id": row_pedido_id, "remaining": ordered_qty})
+
+        albaran_rows = list(
+            session.exec(
+                select(AlbaranItem, Albaran)
+                .outerjoin(Albaran, cast(Any, Albaran.albaran_id == AlbaranItem.albaran_id))
+                .where(cast(Any, AlbaranItem.pedido_id).in_(pedido_ids))
+                .order_by(cast(Any, Albaran.albaran_fecha), Albaran.albaran_numero, AlbaranItem.item_id)
+            )
+        )
+        for albaran_item, _albaran in albaran_rows:
+            articulo_id = str(getattr(albaran_item, "articulo_id", "") or "").strip()
+            source_pedido_id = str(getattr(albaran_item, "pedido_id", "") or "").strip()
+            cantidad = float(getattr(albaran_item, "articulo_cantidad", 0.0) or 0.0)
+            if not articulo_id or cantidad <= 1e-9:
+                continue
+            pending_queue = open_by_article.get(articulo_id, [])
+            remaining = cantidad
+            if source_pedido_id and pending_queue:
+                own_index = next(
+                    (
+                        idx
+                        for idx, candidate in enumerate(pending_queue)
+                        if str(candidate.get("pedido_id") or "").strip() == source_pedido_id
+                    ),
+                    -1,
+                )
+                if own_index >= 0:
+                    target = pending_queue[own_index]
+                    target_remaining = float(target.get("remaining", 0.0) or 0.0)
+                    if target_remaining > 1e-9:
+                        applied = min(target_remaining, remaining)
+                        stats[(source_pedido_id, articulo_id)]["received"] += applied
+                        target["remaining"] = target_remaining - applied
+                        remaining -= applied
+                    if float(target.get("remaining", 0.0) or 0.0) <= 1e-9:
+                        pending_queue.pop(own_index)
+            while remaining > 1e-9 and pending_queue:
+                target = pending_queue[0]
+                target_pedido_id = str(target.get("pedido_id") or "").strip()
+                target_remaining = float(target.get("remaining", 0.0) or 0.0)
+                if target_remaining <= 1e-9:
+                    pending_queue.pop(0)
+                    continue
+                applied = min(target_remaining, remaining)
+                stats[(target_pedido_id, articulo_id)]["received"] += applied
+                target["remaining"] = target_remaining - applied
+                remaining -= applied
+                if float(target["remaining"] or 0.0) <= 1e-9:
+                    pending_queue.pop(0)
+
+        return pedido, stats, pedido_by_id
+
     def list_order_items(
         self,
         pedido_id: str,
-    ) -> tuple[list[tuple[PedidoItem, IngredienteIreks | None]], set[str]]:
+    ) -> tuple[list[tuple[PedidoItem, IngredienteIreks | None]], set[str], dict[str, float]]:
         clean_pedido_id = str(pedido_id or "").strip()
         if not clean_pedido_id:
-            return [], set()
+            return [], set(), {}
         with Session(engine) as session:
             rows = list(
                 session.exec(
@@ -186,20 +301,26 @@ class OrderQueryService:
                     .order_by(PedidoItem.item_id)
                 )
             )
-            pending_rows = list(
+            albaran_rows = list(
                 session.exec(
-                    select(PedidoPendiente).where(
-                        PedidoPendiente.pedido_id == clean_pedido_id,
-                        PedidoPendiente.estado == "pendiente",
-                    )
+                    select(AlbaranItem)
+                    .where(AlbaranItem.pedido_id == clean_pedido_id)
+                    .order_by(AlbaranItem.item_id)
                 )
             )
+            _pedido, stats, _pedido_by_id = self._build_operational_assignment(session, clean_pedido_id)
         pending_article_ids = {
-            str(getattr(row, "articulo_id", "") or "").strip()
-            for row in pending_rows
-            if float(getattr(row, "cantidad_pendiente", 0.0) or 0.0) > 1e-9
+            articulo_id
+            for (row_pedido_id, articulo_id), values in stats.items()
+            if row_pedido_id == clean_pedido_id and float((values.get("ordered", 0.0) or 0.0) - (values.get("received", 0.0) or 0.0)) > 1e-9
         }
-        return rows, pending_article_ids
+        received_by_article: dict[str, float] = {}
+        for row in albaran_rows:
+            articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+            if not articulo_id:
+                continue
+            received_by_article[articulo_id] = received_by_article.get(articulo_id, 0.0) + float(getattr(row, "articulo_cantidad", 0.0) or 0.0)
+        return rows, pending_article_ids, received_by_article
 
     def list_order_items_payload(
         self,
@@ -208,7 +329,7 @@ class OrderQueryService:
         limit: int = DEFAULT_PAGE_LIMIT,
         offset: int = 0,
     ) -> OrderItemListResponse:
-        rows, _pending_article_ids = self.list_order_items(pedido_id)
+        rows, _pending_article_ids, _received_by_article = self.list_order_items(pedido_id)
         items = [item for item, _article in rows]
         return OrderItemListResponse(
             items=OrderItemRead.list_from_entities(page_items(items, limit=limit, offset=offset)),
@@ -277,6 +398,46 @@ class OrderQueryService:
                 if article_ids
                 else []
             )
+        return rows, articles
+
+
+    def list_pendientes_acumulados(self, pedido_id: str) -> tuple[list[tuple[PendingAggregateRow, Pedido]], list[IngredienteIreks]]:
+        clean_pedido_id = str(pedido_id or "").strip()
+        if not clean_pedido_id:
+            return [], []
+        with Session(engine) as session:
+            pedido, stats, pedido_by_id = self._build_operational_assignment(session, clean_pedido_id)
+            if pedido is None:
+                return [], []
+            rows: list[tuple[PendingAggregateRow, Pedido]] = []
+            article_ids: set[str] = set()
+            for (row_pedido_id, articulo_id), values in stats.items():
+                ordered = float(values.get("ordered", 0.0) or 0.0)
+                received = float(values.get("received", 0.0) or 0.0)
+                pending = ordered - received
+                if pending <= 1e-9:
+                    continue
+                pedido_row = pedido_by_id.get(row_pedido_id)
+                if pedido_row is None:
+                    continue
+                rows.append((
+                    PendingAggregateRow(
+                        pedido_id=row_pedido_id,
+                        articulo_id=articulo_id,
+                        cantidad_pedida=ordered,
+                        cantidad_recibida=received,
+                        cantidad_pendiente=pending,
+                        estado="pendiente",
+                    ),
+                    pedido_row,
+                ))
+                article_ids.add(articulo_id)
+            articles = (
+                list(session.exec(select(IngredienteIreks).where(cast(Any, IngredienteIreks.articulo_id).in_(sorted(article_ids)))))
+                if article_ids
+                else []
+            )
+        rows.sort(key=lambda pair: (pair[1].pedido_fecha, pair[1].pedido_numero, pair[1].pedido_id, pair[0].articulo_id))
         return rows, articles
 
     def list_pendientes_payload(
