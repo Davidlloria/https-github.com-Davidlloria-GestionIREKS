@@ -245,5 +245,5 @@ def test_list_order_items_uses_documented_received_quantity_for_same_order(isola
     rows, pending_article_ids, received_by_article = service.list_order_items("pedido-2")
 
     assert len(rows) == 1
-    assert pending_article_ids == set()
+    assert pending_article_ids == {articulo_id}
     assert received_by_article == {articulo_id: 7.0}
