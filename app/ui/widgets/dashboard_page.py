@@ -1390,7 +1390,7 @@ class DashboardPage(QWidget):
         panel = QFrame()
         panel.setObjectName("dashboardUpcomingPanel")
         panel.setProperty("dashboardPanel", True)
-        panel.setFixedHeight(304)
+        panel.setFixedHeight(312)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(6)
@@ -1398,11 +1398,6 @@ class DashboardPage(QWidget):
         heading = QLabel("Agenda del mes")
         heading.setObjectName("dashboardPanelTitle")
         layout.addWidget(heading)
-
-        top_section = QWidget()
-        top_layout = QVBoxLayout(top_section)
-        top_layout.setContentsMargins(0, 0, 0, 0)
-        top_layout.setSpacing(4)
 
         nav_row = QHBoxLayout()
         nav_row.setContentsMargins(0, 0, 0, 0)
@@ -1421,27 +1416,17 @@ class DashboardPage(QWidget):
         self.agenda_next_month_btn.setObjectName("dashboardCalendarNavButton")
         self.agenda_next_month_btn.clicked.connect(lambda: self._shift_agenda_calendar_month(1))
         nav_row.addWidget(self.agenda_next_month_btn, 0)
-        top_layout.addLayout(nav_row)
-
-        legend_row = QHBoxLayout()
-        legend_row.setContentsMargins(0, 0, 0, 0)
-        legend_row.setSpacing(6)
-        legend_row.addWidget(self._meta_badge("Pendiente", "#DBEAFE", "#1D4ED8"))
-        legend_row.addWidget(self._meta_badge("Hecha", "#DCFCE7", "#16A34A"))
-        legend_row.addWidget(self._meta_badge("Vencida", "#FEE2E2", "#DC2626"))
-        legend_row.addStretch(1)
-        top_layout.addLayout(legend_row)
+        layout.addLayout(nav_row)
 
         weekdays_row = QHBoxLayout()
         weekdays_row.setContentsMargins(0, 0, 0, 0)
         weekdays_row.setSpacing(2)
         for label_text in ("L", "M", "X", "J", "V", "S", "D"):
             weekdays_row.addWidget(self._build_weekday_label(label_text))
-        top_layout.addLayout(weekdays_row)
+        layout.addLayout(weekdays_row)
 
         grid_host = QFrame()
         grid_host.setObjectName("dashboardMonthGrid")
-        grid_host.setFixedHeight(154)
         grid_layout = QGridLayout(grid_host)
         grid_layout.setContentsMargins(0, 0, 0, 0)
         grid_layout.setHorizontalSpacing(2)
@@ -1457,18 +1442,11 @@ class DashboardPage(QWidget):
                 button.setProperty("hasAgenda", False)
                 button.setProperty("outsideMonth", False)
                 button.setProperty("tone", "none")
-                button.setMinimumHeight(24)
-                button.setMaximumHeight(24)
+                button.setMinimumHeight(26)
                 button.clicked.connect(lambda _checked=False, current_button=button: self._handle_agenda_calendar_button(current_button))
                 grid_layout.addWidget(button, row_index, column_index)
                 self.agenda_day_buttons.append(button)
-        top_layout.addWidget(grid_host)
-        layout.addWidget(top_section, 0)
-
-        bottom_section = QWidget()
-        bottom_layout = QVBoxLayout(bottom_section)
-        bottom_layout.setContentsMargins(0, 0, 0, 0)
-        bottom_layout.setSpacing(4)
+        layout.addWidget(grid_host, 1)
 
         summary_row = QHBoxLayout()
         summary_row.setContentsMargins(0, 0, 0, 0)
@@ -1482,22 +1460,7 @@ class DashboardPage(QWidget):
             chip, value_label = self._build_calendar_summary_chip(title, tone=tone)
             self.agenda_month_summary_labels[key] = value_label
             summary_row.addWidget(chip)
-        bottom_layout.addLayout(summary_row)
-
-        self.agenda_month_detail_title = QLabel("Agenda del día seleccionado")
-        self.agenda_month_detail_title.setObjectName("dashboardUpcomingSectionTitle")
-        bottom_layout.addWidget(self.agenda_month_detail_title)
-
-        detail_container = QWidget()
-        detail_container.setObjectName("dashboardCalendarDetailContainer")
-        detail_container.setFixedHeight(54)
-        self.agenda_month_detail_layout = QVBoxLayout(detail_container)
-        self.agenda_month_detail_layout.setContentsMargins(0, 0, 0, 0)
-        self.agenda_month_detail_layout.setSpacing(4)
-        bottom_layout.addWidget(detail_container)
-
-        layout.addWidget(bottom_section, 0)
-        layout.addStretch(1)
+        layout.addLayout(summary_row)
         return panel
 
     def _build_weekday_label(self, text_value: str) -> QLabel:
@@ -1619,16 +1582,7 @@ class DashboardPage(QWidget):
         return "muted"
 
     def _refresh_agenda_day_detail(self, *, today_value: date) -> None:
-        selected_rows = self._agenda_rows_for_date(self.agenda_calendar_selected_date)
-        self.agenda_month_detail_title.setText(f"Agenda del {self.format_date(self.agenda_calendar_selected_date)}")
-        self._clear_layout(self.agenda_month_detail_layout)
-        if not selected_rows:
-            self.agenda_month_detail_layout.addWidget(self._calendar_detail_empty_label("No hay actividades para el día seleccionado."))
-            return
-        for row in selected_rows[:2]:
-            self.agenda_month_detail_layout.addWidget(self._build_calendar_detail_row(row, today_value=today_value))
-        if len(selected_rows) > 2:
-            self.agenda_month_detail_layout.addWidget(self._calendar_detail_empty_label(f"+{len(selected_rows) - 2} actividad(es) más en este día."))
+        return
 
     def _build_calendar_detail_row(self, row: DashboardActivityRow, *, today_value: date) -> QFrame:
         frame = QFrame()
