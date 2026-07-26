@@ -269,3 +269,6 @@ Otros flujos:
 - expresamente como "sin objectName".
 - No existe una hoja QSS específica de OrdersPage: la apariencia depende de
 - assets/styles.qss y de algunos estilos locales en los diálogos y tablas.
+
+- La pesta?a `Pendientes` muestra el acumulado de art?culos pendientes del mismo almac?n del pedido seleccionado.
+- Si un albar?n de otro pedido recibe mercanc?a que cubre un pendiente anterior del mismo almac?n, la lista se actualiza en este acumulado y mantiene el n?mero de pedido origen.

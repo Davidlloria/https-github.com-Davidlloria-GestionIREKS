@@ -114,3 +114,17 @@ def test_pedido_delta_header_and_zero_value_behavior(monkeypatch) -> None:
     page.close()
     page.deleteLater()
     QApplication.processEvents()
+
+
+
+def test_pendientes_tab_uses_accumulated_pending_columns(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(OrdersPage, "reload", lambda self: None)
+    page = OrdersPage()
+
+    headers = [page.pendientes_table.horizontalHeaderItem(i).text() for i in range(page.pendientes_table.columnCount())]
+
+    assert headers == ["Cod.", "Nombre", "Pendiente", "Pedido"]
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()

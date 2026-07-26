@@ -314,6 +314,44 @@ class OrderQueryService:
             )
         return rows, articles
 
+
+    def list_pendientes_acumulados(self, pedido_id: str) -> tuple[list[tuple[PedidoPendiente, Pedido]], list[IngredienteIreks]]:
+        clean_pedido_id = str(pedido_id or "").strip()
+        if not clean_pedido_id:
+            return [], []
+        with Session(engine) as session:
+            pedido = session.get(Pedido, clean_pedido_id)
+            if pedido is None:
+                return [], []
+            almacen_id = str(getattr(pedido, "almacen_id", "") or "").strip()
+            if not almacen_id:
+                return [], []
+            rows = list(
+                session.exec(
+                    select(PedidoPendiente, Pedido)
+                    .join(Pedido, Pedido.pedido_id == PedidoPendiente.pedido_id)
+                    .where(
+                        Pedido.almacen_id == almacen_id,
+                        PedidoPendiente.estado == "pendiente",
+                        PedidoPendiente.cantidad_pendiente > 1e-9,
+                    )
+                    .order_by(Pedido.pedido_fecha, Pedido.pedido_numero, Pedido.pedido_id, PedidoPendiente.articulo_id)
+                )
+            )
+            article_ids = sorted(
+                {
+                    str(getattr(pendiente, "articulo_id", "") or "").strip()
+                    for pendiente, _pedido in rows
+                    if str(getattr(pendiente, "articulo_id", "") or "").strip()
+                }
+            )
+            articles = (
+                list(session.exec(select(IngredienteIreks).where(cast(Any, IngredienteIreks.articulo_id).in_(article_ids))))
+                if article_ids
+                else []
+            )
+        return rows, articles
+
     def list_pendientes_payload(
         self,
         pedido_id: str,
