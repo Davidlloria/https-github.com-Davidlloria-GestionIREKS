@@ -453,9 +453,9 @@ class DashboardPage(QWidget):
         self.orders_kpi_notes: dict[str, QLabel] = {}
         for column, (key, title, tone, icon_name) in enumerate([
             ('total_orders', 'Pedidos', 'blue', 'shopping-cart.svg'),
-            ('received_kg', 'Kg recibidos', 'green', 'package-check.svg'),
-            ('pending_kg', 'Kg pendientes', 'orange', 'package-open.svg'),
-            ('incident_orders', 'Incidencias', 'red', 'alert.svg'),
+            ('received_kg', 'Kg recibidos', 'green', 'circle-check.svg'),
+            ('pending_kg', 'Kg pendientes', 'orange', 'clipboard-list.svg'),
+            ('incident_orders', 'Incidencias', 'red', 'clock-3.svg'),
         ]):
             card, value_label, note_label = self._build_kpi_card(title, tone, icon_name)
             self.orders_kpi_labels[key] = value_label
@@ -653,7 +653,7 @@ class DashboardPage(QWidget):
             self.new_activity_btn.setText('Ver pedidos')
             self.full_agenda_btn.setText('Actualizar')
             self._set_button_icon(self.new_activity_btn, 'shopping-cart.svg', '#FFFFFF', 18)
-            self._set_button_icon(self.full_agenda_btn, 'package-open.svg', '#2563EB', 18)
+            self._set_button_icon(self.full_agenda_btn, 'clipboard-list.svg', '#2563EB', 18)
         else:
             self.title_label.setText('Agenda')
             self.date_label.setText(self.format_date(date.today(), long=True))
