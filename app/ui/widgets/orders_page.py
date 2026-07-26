@@ -1405,7 +1405,7 @@ class OrdersPage(QWidget):
         items_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         items_header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
         items_header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
-        self.pedido_items_table.setHorizontalHeaderLabels(["Cod.", "Nombre", "Pedido", "Kg", "Recib.", "Kg", "?"])
+        self.pedido_items_table.setHorizontalHeaderLabels(["Cod.", "Nombre", "Pedido", "Kg", "Recib.", "Kg", "Δ"])
         self.pedido_items_table.setColumnWidth(0, 95)
         self.pedido_items_table.setColumnWidth(2, 82)
         self.pedido_items_table.setColumnWidth(3, 96)
@@ -1788,7 +1788,7 @@ class OrdersPage(QWidget):
                 self._format_number_es(pedido_kg, 2, " kg"),
                 self._format_number_es(cantidad_recibida, 2),
                 self._format_number_es(recibida_kg, 2, " kg"),
-                self._format_number_es(delta, 2, signed=True),
+                self._format_number_es(delta, 2, signed=True) if has_difference else "",
             ]
             for col_idx, value in enumerate(values):
                 if col_idx == 2:
@@ -1805,10 +1805,6 @@ class OrdersPage(QWidget):
                     cell = QTableWidgetItem(value)
                 if col_idx == 0 and not isinstance(cell, NumericTableWidgetItem):
                     cell.setData(Qt.ItemDataRole.UserRole, str(getattr(item, "item_id", "") or "").strip())
-                if col_idx == 0 and self._is_article_pending(article):
-                    cell.setForeground(QBrush(QColor("#c62828")))
-                if str(getattr(item, "articulo_id", "") or "").strip() in pending_article_ids:
-                    cell.setForeground(QBrush(QColor("#c62828")))
                 if col_idx in (2, 3, 4, 5, 6):
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 if has_difference:
