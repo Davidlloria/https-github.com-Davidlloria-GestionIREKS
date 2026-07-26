@@ -125,6 +125,7 @@ def test_pendientes_tab_uses_accumulated_pending_columns(monkeypatch) -> None:
     headers = [page.pendientes_table.horizontalHeaderItem(i).text() for i in range(page.pendientes_table.columnCount())]
 
     assert headers == ["Cod.", "Nombre", "Pendiente", "Pedido"]
+    assert page.pendientes_table.isSortingEnabled()
     page.close()
     page.deleteLater()
     QApplication.processEvents()

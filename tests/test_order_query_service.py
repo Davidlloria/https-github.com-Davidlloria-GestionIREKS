@@ -225,5 +225,25 @@ def test_list_order_items_returns_received_quantity_by_article(isolated_engine) 
     rows, pending_article_ids, received_by_article = service.list_order_items("pedido-1")
 
     assert len(rows) == 1
-    assert pending_article_ids == set()
+    assert pending_article_ids == {articulo_id}
     assert received_by_article == {articulo_id: 2.0}
+
+
+
+def test_list_order_items_uses_operational_received_assignment(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        articulo_id = _seed_catalog(session)
+        session.add(Pedido(pedido_id="pedido-1", almacen_id="alm-1", pedido_fecha=date(2026, 6, 1), pedido_numero="P-1"))
+        session.add(PedidoItem(pedido_id="pedido-1", pedido_numero="P-1", pedido_item_fecha=date(2026, 6, 1), articulo_id=articulo_id, articulo_cantidad=10.0))
+        session.add(Pedido(pedido_id="pedido-2", almacen_id="alm-1", pedido_fecha=date(2026, 6, 2), pedido_numero="P-2"))
+        session.add(PedidoItem(pedido_id="pedido-2", pedido_numero="P-2", pedido_item_fecha=date(2026, 6, 2), articulo_id=articulo_id, articulo_cantidad=5.0))
+        session.add(Albaran(albaran_id="alb-2", almacen_id="alm-1", pedido_id="pedido-2", albaran_numero="ALB-2", albaran_fecha=date(2026, 6, 3)))
+        session.add(AlbaranItem(item_id="alb-item-2", pedido_id="pedido-2", albaran_id="alb-2", albaran_numero="ALB-2", albaran_fecha=date(2026, 6, 3), articulo_codigo="REF-1", articulo_id=articulo_id, articulo_cantidad=7.0))
+        session.commit()
+
+    service = OrderQueryService()
+    rows, pending_article_ids, received_by_article = service.list_order_items("pedido-2")
+
+    assert len(rows) == 1
+    assert pending_article_ids == {articulo_id}
+    assert received_by_article == {articulo_id: 0.0}
