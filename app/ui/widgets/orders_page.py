@@ -8,8 +8,8 @@ import re
 import tempfile
 from typing import Any, Callable, cast
 
-from PySide6.QtCore import QDate, QTimer, Qt
-from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtCore import QDate, QSize, QTimer, Qt
+from PySide6.QtGui import QBrush, QColor, QFont, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -64,6 +64,8 @@ from app.services.orders_documents_import_ui_service import (
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderLineInput, OrderService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
+
+BASE_DIR = Path(__file__).resolve().parents[3]
 
 MONTHS = [
     (1, "Enero"),
@@ -1163,11 +1165,10 @@ class OrdersPage(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        header = QLabel("Pedidos")
-        header.setProperty("role", "pageTitle")
-        layout.addWidget(header)
-
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setFrameShape(QFrame.Shape.NoFrame)
+        splitter.setAutoFillBackground(False)
+        splitter.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         layout.addWidget(splitter, 1)
 
         left_panel = QWidget()
@@ -1204,18 +1205,29 @@ class OrdersPage(QWidget):
         almacen_row.addWidget(self.almacen_filter, 1)
         left_layout.addLayout(almacen_row)
 
-        self.new_btn = QPushButton("Nuevo pedido")
+        self.new_btn = QPushButton("Nuevo")
         self.new_btn.setProperty("btnRole", "success")
+        self.new_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "plus.svg")))
         self.edit_btn = QPushButton("Editar")
         self.edit_btn.setProperty("btnRole", "warning")
+        self.edit_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "pencil_white.svg")))
         self.del_btn = QPushButton("Eliminar")
         self.del_btn.setProperty("btnRole", "danger")
+        self.del_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
         self.export_btn = QPushButton("Exportar")
         self.export_btn.setProperty("btnRole", "secondary")
+        self.export_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "clipboard-list.svg")))
         self.send_mail_btn = QPushButton("Enviar Outlook")
         self.send_mail_btn.setProperty("btnRole", "secondary")
+        self.send_mail_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "mail.svg")))
         self.print_btn = QPushButton("Imprimir")
         self.print_btn.setProperty("btnRole", "secondary")
+        self.print_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "printer.svg")))
+        self.help_btn = QPushButton("Ayuda")
+        self.help_btn.setProperty("btnRole", "secondary")
+        self.help_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "brain.svg")))
+        for button in (self.new_btn, self.edit_btn, self.del_btn, self.export_btn, self.send_mail_btn, self.print_btn, self.help_btn):
+            button.setIconSize(QSize(14, 14))
 
         self.new_btn.clicked.connect(self._new_order)
         self.edit_btn.clicked.connect(self._edit_order)
@@ -1223,9 +1235,11 @@ class OrdersPage(QWidget):
         self.export_btn.clicked.connect(self._export_selected_order_to_excel)
         self.send_mail_btn.clicked.connect(self._send_selected_order_by_outlook)
         self.print_btn.clicked.connect(self._print_selected_order)
+        self.help_btn.clicked.connect(self._show_orders_help)
 
         left_ribbon = QFrame()
         left_ribbon.setObjectName("topRibbon")
+        left_ribbon.setProperty("pageType", "contacts")
         left_ribbon.setFrameShape(QFrame.Shape.StyledPanel)
         left_ribbon_layout = QHBoxLayout(left_ribbon)
         left_ribbon_layout.setContentsMargins(8, 6, 8, 6)
@@ -1237,7 +1251,8 @@ class OrdersPage(QWidget):
         left_ribbon_layout.addWidget(self.send_mail_btn)
         left_ribbon_layout.addWidget(self.print_btn)
         left_ribbon_layout.addStretch(1)
-        left_layout.addWidget(left_ribbon)
+        left_ribbon_layout.addWidget(self.help_btn)
+        layout.insertWidget(0, left_ribbon)
 
         self.table = QTableWidget(0, 6)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -1283,6 +1298,8 @@ class OrdersPage(QWidget):
         splitter.addWidget(left_panel)
 
         right_panel = QWidget()
+        right_panel.setProperty("ordersRegion", "rightPanel")
+        right_panel.setStyleSheet('QWidget[ordersRegion="rightPanel"] { background-color: #0000FF; border: none; }')
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(6)
@@ -1299,6 +1316,8 @@ class OrdersPage(QWidget):
         self.import_factura_btn.clicked.connect(self._import_factura_for_selected_order)
         self.delete_factura_btn = QPushButton("Eliminar Factura")
         self.delete_factura_btn.setProperty("btnRole", "danger")
+        self.delete_factura_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
+        self.delete_factura_btn.setIconSize(QSize(14, 14))
         self.delete_factura_btn.setFixedHeight(24)
         self.delete_factura_btn.setEnabled(False)
         self.delete_factura_btn.clicked.connect(self._delete_selected_factura)
@@ -1317,6 +1336,8 @@ class OrdersPage(QWidget):
         self.edit_line_btn.clicked.connect(self._edit_order_line)
         self.del_line_btn = QPushButton("Eliminar")
         self.del_line_btn.setProperty("btnRole", "danger")
+        self.del_line_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
+        self.del_line_btn.setIconSize(QSize(14, 14))
         self.del_line_btn.setFixedHeight(24)
         self.del_line_btn.clicked.connect(self._delete_order_line)
         self.edit_order_btn = QPushButton("Editar pedido")
@@ -1325,10 +1346,14 @@ class OrdersPage(QWidget):
         self.edit_order_btn.clicked.connect(self._edit_order)
 
         right_splitter = QSplitter(Qt.Orientation.Vertical)
+        right_splitter.setProperty("ordersRegion", "rightSplitter")
+        right_splitter.setFrameShape(QFrame.Shape.NoFrame)
+        right_splitter.setStyleSheet('QSplitter[ordersRegion="rightSplitter"] { background-color: #008000; border: none; }')
         right_layout.addWidget(right_splitter, 1)
 
         detail_panel = QWidget()
         detail_panel.setObjectName("detailPanel")
+        detail_panel.setStyleSheet("#detailPanel { background-color: #FCFDFF; border: 1px solid #E2E8F1; border-radius: 8px; }")
         detail_panel.setMaximumHeight(170)
         detail_layout = QVBoxLayout(detail_panel)
         detail_layout.setContentsMargins(14, 14, 14, 14)
@@ -2679,6 +2704,14 @@ class OrdersPage(QWidget):
             QMessageBox.information(self, "Pedidos", f"Enviado a impresión.\n{tmp_path}")
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Pedidos", f"No se pudo imprimir.\n{exc}")
+
+    def _show_orders_help(self) -> None:
+        QMessageBox.information(
+            self,
+            "Ayuda de pedidos",
+            "Usa la barra superior para crear, editar, eliminar, exportar, enviar o imprimir pedidos. "
+            "Los filtros acotan el listado y el panel derecho muestra el detalle del pedido seleccionado.",
+        )
 
     def _show_mail_preview_dialog(
         self,

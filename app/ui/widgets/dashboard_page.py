@@ -60,6 +60,7 @@ class DashboardPage(QWidget):
         self.customer_service = customer_service or CustomerService()
         self.dashboard_service = dashboard_service or CustomerDashboardService()
         self.setObjectName('dashboardPageRoot')
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.agenda_calendar_selected_date = date.today()
         self.agenda_calendar_rows: list[DashboardActivityRow] = []
         self._build_ui()
@@ -72,6 +73,7 @@ class DashboardPage(QWidget):
 
         sidebar = QFrame()
         sidebar.setObjectName('dashboardSidebar')
+        sidebar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         sidebar.setFixedWidth(184)
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(16, 22, 16, 18)
@@ -98,12 +100,14 @@ class DashboardPage(QWidget):
 
         content_host = QWidget()
         content_host.setObjectName('dashboardContentHost')
+        content_host.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         content_host_layout = QVBoxLayout(content_host)
         content_host_layout.setContentsMargins(0, 0, 0, 0)
         content_host_layout.setSpacing(0)
 
         content = QWidget()
         content.setObjectName('dashboardContent')
+        content.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.content_layout = QVBoxLayout(content)
         self.content_layout.setContentsMargins(22, 16, 22, 12)
         self.content_layout.setSpacing(12)
@@ -480,34 +484,34 @@ class DashboardPage(QWidget):
     def _apply_styles(self) -> None:
         self.setStyleSheet(
             """
-            QWidget#dashboardPageRoot { background: #F1F5F9; font-family: "Segoe UI"; }
-            QFrame#dashboardSidebar { background: #FFFFFF; border-right: 1px solid #DCE4EF; }
-            QLabel#dashboardSidebarBrand { background: transparent; padding: 10px; }
-            QPushButton#dashboardSidebarButton { background: #2563EB; color: #FFFFFF; border: none; border-radius: 14px; padding: 12px 18px; font-size: 16px; font-weight: 700; text-align: left; }
-            QWidget#dashboardContentHost, QWidget#dashboardContent, QWidget#dashboardAgendaView { background: transparent; }
-            QFrame#dashboardHeader { background: transparent; }
+            QWidget#dashboardPageRoot { background-color: #F1F5F9; font-family: "Segoe UI"; }
+            QFrame#dashboardSidebar { background-color: #FFFFFF; border-right: 1px solid #DCE4EF; }
+            QLabel#dashboardSidebarBrand { background-color: transparent; padding: 10px; }
+            QPushButton#dashboardSidebarButton { background-color: #2563EB; color: #FFFFFF; border: none; border-radius: 14px; padding: 12px 18px; font-size: 16px; font-weight: 700; text-align: left; }
+            QWidget#dashboardContentHost, QWidget#dashboardContent, QWidget#dashboardAgendaView { background-color: transparent; }
+            QFrame#dashboardHeader { background-color: transparent; }
             QLabel#dashboardTitle { font-size: 30px; font-weight: 700; color: #0F172A; }
             QLabel#dashboardDateLabel { font-size: 14px; color: #64748B; }
-            QPushButton#dashboardNewActivityButton { background: #2563EB; color: #FFFFFF; border: 1px solid #2563EB; border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700; }
-            QPushButton#dashboardFullAgendaButton, QPushButton#dashboardPanelLinkButton { background: #FFFFFF; color: #1D4ED8; border: 1px solid #CBD5E1; border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700; }
-            QPushButton#dashboardNewActivityButton:hover { background: #1D4ED8; }
-            QPushButton#dashboardFullAgendaButton:hover, QPushButton#dashboardPanelLinkButton:hover { background: #EFF6FF; border-color: #93C5FD; }
-            QFrame#dashboardKpiCard, QFrame[dashboardPanel='true'] { background: #FFFFFF; border: 1px solid #DCE4EF; border-radius: 16px; }
-            QLabel#dashboardKpiIcon { background: #EFF6FF; border-radius: 10px; }
+            QPushButton#dashboardNewActivityButton { background-color: #2563EB; color: #FFFFFF; border: 1px solid #2563EB; border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700; }
+            QPushButton#dashboardFullAgendaButton, QPushButton#dashboardPanelLinkButton { background-color: #FFFFFF; color: #1D4ED8; border: 1px solid #CBD5E1; border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700; }
+            QPushButton#dashboardNewActivityButton:hover { background-color: #1D4ED8; }
+            QPushButton#dashboardFullAgendaButton:hover, QPushButton#dashboardPanelLinkButton:hover { background-color: #EFF6FF; border-color: #93C5FD; }
+            QFrame#dashboardKpiCard, QFrame[dashboardPanel='true'] { background-color: #FFFFFF; border: 1px solid #DCE4EF; border-radius: 16px; }
+            QLabel#dashboardKpiIcon { background-color: #EFF6FF; border-radius: 10px; }
             QLabel#dashboardKpiTitle, QLabel#dashboardPanelTitle { color: #1E293B; font-size: 15px; font-weight: 700; }
             QLabel#dashboardKpiValue { color: #0F172A; font-size: 28px; font-weight: 800; }
             QLabel#dashboardKpiNote, QLabel#dashboardFooterLabel, QLabel#dashboardEmptyLabel, QLabel#dashboardActivityDetail { color: #64748B; font-size: 13px; }
             QLabel#dashboardActivityCustomer { color: #0F172A; font-size: 14px; font-weight: 700; }
             QLabel#dashboardActivitySummary { color: #1E293B; font-size: 13px; }
-            QFrame#dashboardActivityCard { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
-            QCalendarWidget#dashboardMonthCalendar { background: #FFFFFF; border: none; }
-            QCalendarWidget#dashboardMonthCalendar QWidget#qt_calendar_navigationbar { background: #2563EB; border-radius: 8px; }
-            QCalendarWidget#dashboardMonthCalendar QToolButton { color: #FFFFFF; background: transparent; border: none; font-weight: 700; padding: 5px; }
-            QCalendarWidget#dashboardMonthCalendar QAbstractItemView { background: #FFFFFF; color: #334155; selection-background-color: #2563EB; selection-color: #FFFFFF; outline: none; }
-            QFrame#dashboardCalendarSummaryChip { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
+            QFrame#dashboardActivityCard { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
+            QCalendarWidget#dashboardMonthCalendar { background-color: #FFFFFF; border: none; }
+            QCalendarWidget#dashboardMonthCalendar QWidget#qt_calendar_navigationbar { background-color: #2563EB; border-radius: 8px; }
+            QCalendarWidget#dashboardMonthCalendar QToolButton { color: #FFFFFF; background-color: transparent; border: none; font-weight: 700; padding: 5px; }
+            QCalendarWidget#dashboardMonthCalendar QAbstractItemView { background-color: #FFFFFF; color: #334155; selection-background-color: #2563EB; selection-color: #FFFFFF; outline: none; }
+            QFrame#dashboardCalendarSummaryChip { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
             QLabel#dashboardCalendarSummaryTitle { color: #475569; font-size: 12px; font-weight: 600; }
             QLabel#dashboardCalendarSummaryValue { color: #0F172A; font-size: 16px; font-weight: 800; }
-            QTableWidget#dashboardReactivationTable, QTableWidget#dashboardIslandTable { background: #FFFFFF; alternate-background-color: #F8FAFC; border: none; color: #334155; }
-            QHeaderView::section { background: #F8FAFC; color: #475569; padding: 7px; border: none; border-bottom: 1px solid #E2E8F0; font-weight: 700; }
+            QTableWidget#dashboardReactivationTable, QTableWidget#dashboardIslandTable { background-color: #FFFFFF; alternate-background-color: #F8FAFC; border: none; color: #334155; }
+            QHeaderView::section { background-color: #F8FAFC; color: #475569; padding: 7px; border: none; border-bottom: 1px solid #E2E8F0; font-weight: 700; }
             """
         )
