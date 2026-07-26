@@ -1421,21 +1421,30 @@ class DashboardPage(QWidget):
         weekdays_row = QHBoxLayout()
         weekdays_row.setContentsMargins(0, 0, 0, 0)
         weekdays_row.setSpacing(2)
+        weekdays_row.addWidget(self._build_week_number_label("Sem"))
         for label_text in ("L", "M", "X", "J", "V", "S", "D"):
             weekdays_row.addWidget(self._build_weekday_label(label_text))
         layout.addLayout(weekdays_row)
 
         grid_host = QFrame()
         grid_host.setObjectName("dashboardMonthGrid")
-        grid_host.setFixedHeight(176)
+        grid_host.setFixedHeight(172)
+        self.agenda_month_grid_host = grid_host
         grid_layout = QGridLayout(grid_host)
         grid_layout.setContentsMargins(0, 0, 0, 0)
         grid_layout.setHorizontalSpacing(2)
         grid_layout.setVerticalSpacing(2)
+        grid_layout.setColumnMinimumWidth(0, 32)
         for row_index in range(6):
             grid_layout.setRowMinimumHeight(row_index, 27)
+
+        self.agenda_week_labels = []
         self.agenda_day_buttons = []
         for row_index in range(6):
+            week_label = self._build_week_number_label("")
+            week_label.setVisible(False)
+            grid_layout.addWidget(week_label, row_index, 0)
+            self.agenda_week_labels.append(week_label)
             for column_index in range(7):
                 button = QPushButton("")
                 button.setObjectName("dashboardMonthDayButton")
@@ -1447,10 +1456,10 @@ class DashboardPage(QWidget):
                 button.setProperty("tone", "none")
                 button.setFixedHeight(27)
                 button.clicked.connect(lambda _checked=False, current_button=button: self._handle_agenda_calendar_button(current_button))
-                grid_layout.addWidget(button, row_index, column_index)
+                grid_layout.addWidget(button, row_index, column_index + 1)
                 self.agenda_day_buttons.append(button)
-        layout.addWidget(grid_host, 1)
-        layout.addSpacing(2)
+        layout.addWidget(grid_host, 0)
+        layout.addStretch(1)
 
         summary_row = QHBoxLayout()
         summary_row.setContentsMargins(0, 0, 0, 0)
@@ -1471,6 +1480,14 @@ class DashboardPage(QWidget):
         label = QLabel(text_value)
         label.setObjectName("dashboardWeekdayLabel")
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        return label
+
+    def _build_week_number_label(self, text_value: str) -> QLabel:
+        label = QLabel(text_value)
+        label.setObjectName("dashboardWeekNumberLabel")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setMinimumWidth(32)
+        label.setMaximumWidth(32)
         return label
 
     def _build_calendar_summary_chip(self, title: str, *, tone: str) -> tuple[QFrame, QLabel]:
@@ -1498,6 +1515,7 @@ class DashboardPage(QWidget):
     def _refresh_agenda_calendar(self, *, today_value: date) -> None:
         month_start = self.agenda_calendar_month.replace(day=1)
         month_days = list(calendar.Calendar(firstweekday=0).itermonthdates(month_start.year, month_start.month))
+        month_weeks = [month_days[index:index + 7] for index in range(0, len(month_days), 7)]
         month_rows = self._agenda_month_rows(month_start)
 
         pending_count = 0
@@ -1519,28 +1537,49 @@ class DashboardPage(QWidget):
         if self.agenda_calendar_selected_date.year != month_start.year or self.agenda_calendar_selected_date.month != month_start.month:
             self.agenda_calendar_selected_date = today_value if today_value.year == month_start.year and today_value.month == month_start.month else month_start
 
-        for button, day_value in zip(self.agenda_day_buttons, month_days):
-            rows_for_day = self._agenda_rows_for_date(day_value)
-            has_agenda = bool(rows_for_day)
-            tone = self._agenda_day_tone(rows_for_day, today_value=today_value)
-            in_month = day_value.month == month_start.month
-            button.setText(str(day_value.day))
-            button.setEnabled(in_month)
-            button.setProperty("outsideMonth", not in_month)
-            button.setProperty("hasAgenda", has_agenda)
-            button.setProperty("tone", tone)
-            button.setProperty("selected", day_value == self.agenda_calendar_selected_date)
-            button.setProperty("today", day_value == today_value)
-            button.setProperty("agendaDate", day_value.isoformat())
-            if has_agenda:
-                tooltip_parts = [self.customer_label(row.cliente_codigo, row.cliente_nombre) for row in rows_for_day[:4]]
-                extra = "" if len(rows_for_day) <= 4 else f"\n+{len(rows_for_day) - 4} más"
-                button.setToolTip("\n".join(tooltip_parts) + extra)
+        visible_weeks = len(month_weeks)
+        self.agenda_month_grid_host.setFixedHeight((visible_weeks * 27) + (max(visible_weeks - 1, 0) * 2))
+
+        for row_index in range(6):
+            week_visible = row_index < visible_weeks
+            week_label = self.agenda_week_labels[row_index]
+            week_label.setVisible(week_visible)
+            if week_visible:
+                week_label.setText(str(month_weeks[row_index][0].isocalendar().week))
             else:
-                button.setToolTip("")
-            button.style().unpolish(button)
-            button.style().polish(button)
-            button.update()
+                week_label.setText("")
+
+            for column_index in range(7):
+                button = self.agenda_day_buttons[(row_index * 7) + column_index]
+                button.setVisible(week_visible)
+                if not week_visible:
+                    button.setText("")
+                    button.setToolTip("")
+                    button.setEnabled(False)
+                    continue
+
+                day_value = month_weeks[row_index][column_index]
+                rows_for_day = self._agenda_rows_for_date(day_value)
+                has_agenda = bool(rows_for_day)
+                tone = self._agenda_day_tone(rows_for_day, today_value=today_value)
+                in_month = day_value.month == month_start.month
+                button.setText(str(day_value.day))
+                button.setEnabled(in_month)
+                button.setProperty("outsideMonth", not in_month)
+                button.setProperty("hasAgenda", has_agenda)
+                button.setProperty("tone", tone)
+                button.setProperty("selected", day_value == self.agenda_calendar_selected_date)
+                button.setProperty("today", day_value == today_value)
+                button.setProperty("agendaDate", day_value.isoformat())
+                if has_agenda:
+                    tooltip_parts = [self.customer_label(row.cliente_codigo, row.cliente_nombre) for row in rows_for_day[:4]]
+                    extra = "" if len(rows_for_day) <= 4 else f"\n+{len(rows_for_day) - 4} m?s"
+                    button.setToolTip("\n".join(tooltip_parts) + extra)
+                else:
+                    button.setToolTip("")
+                button.style().unpolish(button)
+                button.style().polish(button)
+                button.update()
 
         self._refresh_agenda_day_detail(today_value=today_value)
 
@@ -2160,6 +2199,12 @@ class DashboardPage(QWidget):
             QLabel#dashboardWeekdayLabel {
                 color: #475569;
                 font-size: 11px;
+                font-weight: 700;
+                min-height: 14px;
+            }
+            QLabel#dashboardWeekNumberLabel {
+                color: #64748B;
+                font-size: 10px;
                 font-weight: 700;
                 min-height: 14px;
             }
