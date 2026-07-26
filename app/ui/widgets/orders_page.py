@@ -2248,12 +2248,8 @@ class OrdersPage(QWidget):
                         cell.setForeground(QBrush(QColor("#2e7d32")))
                     elif pendiente_display < 0:
                         cell.setForeground(QBrush(QColor("#c62828")))
-                if col_idx in (2, 3, 4, 5, 6):
+                if col_idx in (2, 3, 4):
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                if has_difference:
-                    cell.setBackground(QBrush(QColor("#FFF7ED")))
-                    if col_idx in (4, 5, 6):
-                        cell.setForeground(QBrush(QColor("#C2410C")))
                 self.pendientes_table.setItem(row_idx, col_idx, cell)
 
     def reload(self) -> None:
