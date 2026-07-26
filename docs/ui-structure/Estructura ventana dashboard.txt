@@ -1,7 +1,7 @@
-VENTANA DASHBOARD ? PYSIDE6 / BACKEND
+VENTANA DASHBOARD - PYSIDE6 / BACKEND
 -------------------------------------
 
-Implementaci?n principal:
+Implementacion principal:
 - UI: app/ui/widgets/dashboard_page.py
 - Servicios:
   - app/services/customer_dashboard_service.py
@@ -11,141 +11,141 @@ Implementaci?n principal:
   - app/services/warehouse_dashboard_service.py
 
 DashboardPage (QWidget, objectName: dashboardPageRoot, fondo #EEF3F8)
-??? layout principal (QHBoxLayout, m?rgenes 0 px, separaci?n 0 px)
-    ??? dashboardSidebar (QFrame, ancho fijo 188 px, fondo #F8FAFC, borde derecho #E2E8F0)
-    ?   ??? QVBoxLayout (m?rgenes 12/16/12/16 px, separaci?n 12 px)
-    ?       ??? dashboardSidebarBrand (QLabel solo logo IREKS, centrado, fondo transparente, sin borde)
-    ?       ??? dashboardSidebarButton activo (QPushButton del modo activo: Agenda / Almacen / Pedidos / Ventas / Objetivos, fondo #2563EB, texto #FFFFFF)
-    ?       ??? dashboardSidebarButton (QPushButton inactivo ?Agenda?, icono calendar-days.svg, fondo transparente, texto #334155)
-    ?       ??? dashboardSidebarButton (QPushButton inactivo ?Almacen?, icono box.svg, fondo transparente, texto #334155)
-    ?       ??? dashboardSidebarButton (QPushButton inactivo ?Pedidos?, icono shopping-cart.svg, fondo transparente, texto #334155)
-    ?       ??? dashboardSidebarButton (QPushButton inactivo ?Ventas?, icono bar-chart-3.svg, fondo transparente, texto #334155)
-    ?       ??? dashboardSidebarButton (QPushButton ?Objetivos?, icono goal.svg, fondo transparente, texto #334155, placeholder)
-    ?       ??? espacio flexible
-    ??? dashboardContentHost (QWidget, fondo transparente)
-        ??? dashboardContent (QWidget, fondo transparente)
-            ??? content_layout (QVBoxLayout, m?rgenes 16/14/16/14 px, separaci?n 14 px, sin fondo propio)
-                ??? dashboardHeader (QFrame, fondo transparente)
-                ?   ??? QHBoxLayout (m?rgenes 0 px, separaci?n 10 px, fondo transparente)
-                ?       ??? bloque de cabecera (QVBoxLayout, separaci?n 4 px)
-                ?       ?   ??? dashboardTitle (QLabel, texto #0F172A, 26 px, negrita 700)
-                ?       ?   ??? dashboardDateLabel (QLabel, fecha larga en espa?ol, texto #475569, 13 px)
-                ?       ??? dashboardNewActivityButton (QPushButton, btnRole=primary, icono variable por modo)
-                ?       ??? dashboardFullAgendaButton (QPushButton, btnRole=secondary, icono variable por modo)
-                ??? dashboardContentStack (QStackedWidget, fondo transparente, sin borde)
-                ?   ??? dashboardAgendaView (QWidget, fondo transparente)
-                ?   ?   ??? QVBoxLayout (m?rgenes 0 px, separaci?n 14 px)
-                ?   ?       ??? fila KPI (QGridLayout, separaci?n horizontal 12 px, vertical 12 px)
-                ?   ?       ??? fila media (QHBoxLayout, separaci?n 14 px)
-                ?   ?       ?   ??? dashboardTodayPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px, alto fijo 312 px)
-                ?   ?       ?   ??? dashboardUpcomingPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px, alto fijo 312 px)
-                ?   ?       ?       ??? dashboardPanelTitle (QLabel ?Agenda del mes?)
-                ?   ?       ?       ??? fila navegaci?n (QHBoxLayout)
-                ?   ?       ?       ?   ??? dashboardCalendarNavButton (QPushButton ?<?)
-                ?   ?       ?       ?   ??? dashboardMonthTitle (QLabel, mes visible en espa?ol, centrado)
-                ?   ?       ?       ?   ??? dashboardCalendarNavButton (QPushButton ?>?)
-                ?   ?       ?       ??? cabecera semanal (QHBoxLayout, separaci?n 2 px)
-                ?   ?       ?       ?   ??? dashboardWeekNumberLabel (QLabel ?Sem?, ancho fijo 26 px)
-                ?   ?       ?       ?   ??? dashboardWeekdayLabel (QLabel: L / M / X / J / V / S / D)
-                ?   ?       ?       ??? dashboardMonthGrid (QFrame, fondo transparente, altura din?mica)
-                ?   ?       ?       ?   ??? QGridLayout (8 columnas: Sem + 7 d?as, separaci?n horizontal 4 px, vertical 4 px)
-                ?   ?       ?       ?       ??? dashboardWeekNumberLabel (QLabel por fila, n?mero de semana ISO, ancho fijo 26 px)
-                ?   ?       ?       ?       ??? dashboardMonthDayButton (QPushButton por d?a, alto fijo 24 px, selecci?n, hoy, con/sin agenda, fuera de mes)
-                ?   ?       ?       ??? fila resumen (QHBoxLayout, separaci?n 6 px)
-                ?   ?       ?           ??? dashboardCalendarSummaryChip (QFrame resumen: Pendientes / Hechas / Vencidas)
-                ?   ?       ??? fila inferior (QHBoxLayout, separaci?n 14 px)
-                ?   ?           ??? dashboardReactivationPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?           ?   ??? dashboardReactivationTable (QTableWidget, fondo #FFFFFF, borde #E2E8F1, radio 10 px)
-                ?   ?           ??? dashboardIslandPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?               ??? dashboardIslandTable (QTableWidget, fondo #FFFFFF, borde #E2E8F1, radio 10 px)
-                ?   ??? dashboardWarehouseView (QWidget, fondo transparente)
-                ?   ?   ??? QVBoxLayout (m?rgenes 0 px, separaci?n 14 px)
-                ?   ?       ??? fila KPI (QGridLayout)
-                ?   ?       ??? fila media (QHBoxLayout, separaci?n 14 px)
-                ?   ?       ?   ??? dashboardWarehouseRiskPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?       ?   ?   ??? dashboardWarehouseRiskTable (QTableWidget; columnas: Almac?n / Ref / Producto / Lote / Caduca / Kg / Estado)
-                ?   ?       ?   ??? dashboardWarehouseStockPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?       ?       ??? dashboardWarehouseStockTable (QTableWidget; columnas: Almac?n / Art?culos / Stock kg)
-                ?   ?       ??? fila inferior (QHBoxLayout, separaci?n 14 px)
-                ?   ?           ??? dashboardWarehouseEntriesPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?           ?   ??? dashboardWarehouseEntriesTable (QTableWidget; columnas: Fecha / Almac?n / Ref / Producto / Kg)
-                ?   ?           ??? dashboardWarehouseOutputsPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?               ??? dashboardWarehouseOutputsTable (QTableWidget; columnas: Fecha / Almac?n / Ref / Producto / Kg)
-                ?   ??? dashboardOrdersView (QWidget, fondo transparente)
-                ?   ?   ??? QVBoxLayout (m?rgenes 0 px, separaci?n 14 px)
-                ?   ?       ??? fila KPI (QGridLayout)
-                ?   ?       ??? fila media (QHBoxLayout, separaci?n 14 px)
-                ?   ?       ?   ??? dashboardOrdersRecentPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?       ?   ?   ??? dashboardOrdersRecentTable (QTableWidget; columnas: Pedido / Almac?n / Fecha / Kg pedido / Kg recibido / Kg pend. / Estado)
-                ?   ?       ?   ??? dashboardOrdersPendingPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?       ?       ??? dashboardOrdersPendingTable (QTableWidget; columnas: Fecha / Pedido / Almac?n / Kg pend.)
-                ?   ?       ??? fila inferior (QHBoxLayout, separaci?n 14 px)
-                ?   ?           ??? dashboardOrdersWarehousePanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?           ?   ??? dashboardOrdersWarehouseTable (QTableWidget; columnas: Almac?n / Abiertos / Kg pend. / ?lt. recepci?n)
-                ?   ?           ??? dashboardOrdersStatePanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?               ??? dashboardOrdersStateTable (QTableWidget; columnas: Estado / Pedidos / Kg)
-                ?   ??? dashboardSalesView (QWidget, fondo transparente)
-                ?   ?   ??? QVBoxLayout (m?rgenes 0 px, separaci?n 14 px)
-                ?   ?       ??? fila KPI (QGridLayout)
-                ?   ?       ??? fila media (QHBoxLayout, separaci?n 14 px)
-                ?   ?       ?   ??? dashboardSalesDropsPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?       ?   ?   ??? dashboardSalesDropsTable (QTableWidget; columnas: Cliente / Isla / Kg ant. / Kg act. / ? Kg)
-                ?   ?       ?   ??? dashboardSalesIslandsPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?       ?       ??? dashboardSalesIslandsTable (QTableWidget; columnas: Isla / Clientes / Kg act. / ? Kg / %)
-                ?   ?       ??? fila inferior (QHBoxLayout, separaci?n 14 px)
-                ?   ?           ??? dashboardSalesTypesPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?           ?   ??? dashboardSalesTypesTable (QTableWidget; columnas: Tipo / Clientes / Kg act. / ? Kg / %)
-                ?   ?           ??? dashboardSalesZeroPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
-                ?   ?               ??? dashboardSalesZeroTable (QTableWidget; columnas: Cliente / Isla / Tipo / Kg ant.)
-                ?   ??? dashboardObjectivesView (placeholder actual si existe en stack / pendiente de implementaci?n funcional)
-                ??? dashboardFooterLabel (QLabel, texto #64748B)
+`-- layout principal (QHBoxLayout, margenes 0 px, separacion 0 px)
+    |-- dashboardSidebar (QFrame, ancho fijo 188 px, fondo #F8FAFC, borde derecho #E2E8F0)
+    |   `-- QVBoxLayout (margenes 12/16/12/16 px, separacion 12 px)
+    |       |-- dashboardSidebarBrand (QLabel solo logo IREKS, centrado, fondo transparente, sin borde)
+    |       |-- dashboardSidebarButton activo (QPushButton del modo activo: Agenda / Almacen / Pedidos / Ventas / Objetivos, fondo #2563EB, texto #FFFFFF)
+    |       |-- dashboardSidebarButton (QPushButton inactivo "Agenda", icono calendar-days.svg, fondo transparente, texto #334155)
+    |       |-- dashboardSidebarButton (QPushButton inactivo "Almacen", icono box.svg, fondo transparente, texto #334155)
+    |       |-- dashboardSidebarButton (QPushButton inactivo "Pedidos", icono shopping-cart.svg, fondo transparente, texto #334155)
+    |       |-- dashboardSidebarButton (QPushButton inactivo "Ventas", icono bar-chart-3.svg, fondo transparente, texto #334155)
+    |       |-- dashboardSidebarButton (QPushButton "Objetivos", icono goal.svg, fondo transparente, texto #334155, placeholder)
+    |       `-- espacio flexible
+    `-- dashboardContentHost (QWidget, fondo transparente)
+        `-- dashboardContent (QWidget, fondo transparente)
+            `-- content_layout (QVBoxLayout, margenes 16/14/16/14 px, separacion 14 px, sin fondo propio)
+                |-- dashboardHeader (QFrame, fondo transparente)
+                |   `-- QHBoxLayout (margenes 0 px, separacion 10 px, fondo transparente)
+                |       |-- bloque de cabecera (QVBoxLayout, separacion 4 px)
+                |       |   |-- dashboardTitle (QLabel, texto #0F172A, 26 px, negrita 700)
+                |       |   `-- dashboardDateLabel (QLabel, fecha larga en espanol, texto #475569, 13 px)
+                |       |-- dashboardNewActivityButton (QPushButton, btnRole=primary, icono variable por modo)
+                |       `-- dashboardFullAgendaButton (QPushButton, btnRole=secondary, icono variable por modo)
+                |-- dashboardContentStack (QStackedWidget, fondo transparente, sin borde)
+                |   |-- dashboardAgendaView (QWidget, fondo transparente)
+                |   |   `-- QVBoxLayout (margenes 0 px, separacion 14 px)
+                |   |       |-- fila KPI (QGridLayout, separacion horizontal 12 px, vertical 12 px)
+                |   |       |-- fila media (QHBoxLayout, separacion 14 px)
+                |   |       |   |-- dashboardTodayPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px, alto fijo 312 px)
+                |   |       |   `-- dashboardUpcomingPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px, alto fijo 312 px)
+                |   |       |       |-- dashboardPanelTitle (QLabel "Agenda del mes")
+                |   |       |       |-- fila navegacion (QHBoxLayout)
+                |   |       |       |   |-- dashboardCalendarNavButton (QPushButton "<")
+                |   |       |       |   |-- dashboardMonthTitle (QLabel, mes visible en espanol, centrado)
+                |   |       |       |   `-- dashboardCalendarNavButton (QPushButton ">")
+                |   |       |       |-- cabecera semanal (QHBoxLayout, separacion 2 px)
+                |   |       |       |   |-- dashboardWeekNumberLabel (QLabel "Sem", ancho fijo 26 px)
+                |   |       |       |   `-- dashboardWeekdayLabel (QLabel: L / M / X / J / V / S / D)
+                |   |       |       |-- dashboardMonthGrid (QFrame, fondo transparente, altura dinamica)
+                |   |       |       |   `-- QGridLayout (8 columnas: Sem + 7 dias, separacion horizontal 4 px, vertical 4 px)
+                |   |       |       |       |-- dashboardWeekNumberLabel (QLabel por fila, numero de semana ISO, ancho fijo 26 px)
+                |   |       |       |       `-- dashboardMonthDayButton (QPushButton por dia, alto fijo 24 px, seleccion, hoy, con/sin agenda, fuera de mes)
+                |   |       |       `-- fila resumen (QHBoxLayout, separacion 6 px)
+                |   |       |           `-- dashboardCalendarSummaryChip (QFrame resumen: Pendientes / Hechas / Vencidas)
+                |   |       `-- fila inferior (QHBoxLayout, separacion 14 px)
+                |   |           |-- dashboardReactivationPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |           |   `-- dashboardReactivationTable (QTableWidget, fondo #FFFFFF, borde #E2E8F1, radio 10 px)
+                |   |           `-- dashboardIslandPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |               `-- dashboardIslandTable (QTableWidget, fondo #FFFFFF, borde #E2E8F1, radio 10 px)
+                |   |-- dashboardWarehouseView (QWidget, fondo transparente)
+                |   |   `-- QVBoxLayout (margenes 0 px, separacion 14 px)
+                |   |       |-- fila KPI (QGridLayout)
+                |   |       |-- fila media (QHBoxLayout, separacion 14 px)
+                |   |       |   |-- dashboardWarehouseRiskPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |       |   |   `-- dashboardWarehouseRiskTable (QTableWidget; columnas: Almacen / Ref / Producto / Lote / Caduca / Kg / Estado)
+                |   |       |   `-- dashboardWarehouseStockPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |       |       `-- dashboardWarehouseStockTable (QTableWidget; columnas: Almacen / Articulos / Stock kg)
+                |   |       `-- fila inferior (QHBoxLayout, separacion 14 px)
+                |   |           |-- dashboardWarehouseEntriesPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |           |   `-- dashboardWarehouseEntriesTable (QTableWidget; columnas: Fecha / Almacen / Ref / Producto / Kg)
+                |   |           `-- dashboardWarehouseOutputsPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |               `-- dashboardWarehouseOutputsTable (QTableWidget; columnas: Fecha / Almacen / Ref / Producto / Kg)
+                |   |-- dashboardOrdersView (QWidget, fondo transparente)
+                |   |   `-- QVBoxLayout (margenes 0 px, separacion 14 px)
+                |   |       |-- fila KPI (QGridLayout)
+                |   |       |-- fila media (QHBoxLayout, separacion 14 px)
+                |   |       |   |-- dashboardOrdersRecentPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |       |   |   `-- dashboardOrdersRecentTable (QTableWidget; columnas: Pedido / Almacen / Fecha / Kg pedido / Kg recibido / Kg pend. / Estado)
+                |   |       |   `-- dashboardOrdersPendingPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |       |       `-- dashboardOrdersPendingTable (QTableWidget; columnas: Fecha / Pedido / Almacen / Kg pend.)
+                |   |       `-- fila inferior (QHBoxLayout, separacion 14 px)
+                |   |           |-- dashboardOrdersWarehousePanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |           |   `-- dashboardOrdersWarehouseTable (QTableWidget; columnas: Almacen / Abiertos / Kg pend. / Ult. recepcion)
+                |   |           `-- dashboardOrdersStatePanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |               `-- dashboardOrdersStateTable (QTableWidget; columnas: Estado / Pedidos / Kg)
+                |   |-- dashboardSalesView (QWidget, fondo transparente)
+                |   |   `-- QVBoxLayout (margenes 0 px, separacion 14 px)
+                |   |       |-- fila KPI (QGridLayout)
+                |   |       |-- fila media (QHBoxLayout, separacion 14 px)
+                |   |       |   |-- dashboardSalesDropsPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |       |   |   `-- dashboardSalesDropsTable (QTableWidget; columnas: Cliente / Isla / Kg ant. / Kg act. / Delta Kg)
+                |   |       |   `-- dashboardSalesIslandsPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |       |       `-- dashboardSalesIslandsTable (QTableWidget; columnas: Isla / Clientes / Kg act. / Delta Kg / %)
+                |   |       `-- fila inferior (QHBoxLayout, separacion 14 px)
+                |   |           |-- dashboardSalesTypesPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |           |   `-- dashboardSalesTypesTable (QTableWidget; columnas: Tipo / Clientes / Kg act. / Delta Kg / %)
+                |   |           `-- dashboardSalesZeroPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
+                |   |               `-- dashboardSalesZeroTable (QTableWidget; columnas: Cliente / Isla / Tipo / Kg ant.)
+                |   `-- dashboardObjectivesView (placeholder actual si existe en stack / pendiente de implementacion funcional)
+                `-- dashboardFooterLabel (QLabel, texto #64748B)
 
 COMPORTAMIENTO FUNCIONAL ACTUAL
 -------------------------------
 
 - El dashboard arranca por defecto en Agenda.
-- El bot?n lateral activo sincroniza el modo visible dentro de dashboardContentStack.
+- El boton lateral activo sincroniza el modo visible dentro de dashboardContentStack.
 - Modos implementados actualmente:
   - Agenda
   - Almacen
   - Pedidos
   - Ventas
-- Bot?n lateral adicional actualmente en placeholder:
+- Boton lateral adicional actualmente en placeholder:
   - Objetivos
 - En modo Agenda:
-  - ?Nueva actividad? abre DashboardAgendaDialog.
-  - ?Ver agenda completa? abre DashboardAgendaOverviewDialog.
+  - "Nueva actividad" abre DashboardAgendaDialog.
+  - "Ver agenda completa" abre DashboardAgendaOverviewDialog.
   - El panel derecho muestra un calendario mensual del mes visible.
-  - Los d?as con agenda quedan marcados visualmente seg?n estado principal: pendiente, hecha o vencida.
-  - La navegaci?n ?< / >? permite cambiar de mes sin salir del dashboard.
+  - Los dias con agenda quedan marcados visualmente segun estado principal: pendiente, hecha o vencida.
+  - La navegacion "< / >" permite cambiar de mes sin salir del dashboard.
   - La rejilla muestra 5 semanas cuando el mes cabe completo y 6 solo cuando es imprescindible.
-  - La primera columna muestra el n?mero de semana ISO (Sem).
-  - Ya no existe leyenda de estados ni preview inferior del d?a seleccionado dentro de ese panel.
+  - La primera columna muestra el numero de semana ISO (Sem).
+  - Ya no existe leyenda de estados ni preview inferior del dia seleccionado dentro de ese panel.
 - En modo Almacen:
-  - ?Ver almac?n? navega a la p?gina principal ?Almacen? si existe en MainWindow.
-  - ?Actualizar? recarga el snapshot del dashboard de almac?n.
+  - "Ver almacen" navega a la pagina principal "Almacen" si existe en MainWindow.
+  - "Actualizar" recarga el snapshot del dashboard de almacen.
 - En modo Pedidos:
-  - ?Ver pedidos? navega a la p?gina principal ?Pedidos? si existe en MainWindow.
-  - ?Actualizar? recarga el snapshot del dashboard de pedidos.
+  - "Ver pedidos" navega a la pagina principal "Pedidos" si existe en MainWindow.
+  - "Actualizar" recarga el snapshot del dashboard de pedidos.
 - En modo Ventas:
-  - ?Ver ventas? navega a la p?gina principal ?Ventas? si existe en MainWindow.
-  - ?Actualizar? recarga el snapshot del dashboard de ventas.
-- El bot?n lateral ?Objetivos? muestra por ahora un QMessageBox informativo hasta que se implemente ese dashboard.
-- Las tablas del dashboard son de solo lectura, con selecci?n por fila y sin edici?n directa.
+  - "Ver ventas" navega a la pagina principal "Ventas" si existe en MainWindow.
+  - "Actualizar" recarga el snapshot del dashboard de ventas.
+- El boton lateral "Objetivos" muestra por ahora un QMessageBox informativo hasta que se implemente ese dashboard.
+- Las tablas del dashboard son de solo lectura, con seleccion por fila y sin edicion directa.
 
-GEOMETR?A ACTUAL
+GEOMETRIA ACTUAL
 ----------------
 
 - dashboardSidebar tiene ancho fijo de 188 px.
 - dashboardContent reparte el resto del ancho disponible sin splitter visible.
-- dashboardAgendaView, dashboardWarehouseView, dashboardOrdersView y dashboardSalesView no tienen fondo propio; se apoyan visualmente sobre el fondo general #EEF3F8 a trav?s de contenedores transparentes.
+- dashboardAgendaView, dashboardWarehouseView, dashboardOrdersView y dashboardSalesView no tienen fondo propio; se apoyan visualmente sobre el fondo general #EEF3F8 a traves de contenedores transparentes.
 - El dashboard de Agenda mantiene altura fija total sin scroll global.
 - dashboardTodayPanel y dashboardUpcomingPanel tienen la misma altura fija: 312 px.
-- dashboardMonthGrid usa altura din?mica seg?n semanas visibles del mes.
+- dashboardMonthGrid usa altura dinamica segun semanas visibles del mes.
 - La fila KPI usa cuatro tarjetas en una rejilla de una sola fila.
-- Las filas media e inferior usan proporci?n 5:3 entre bloque izquierdo y derecho.
-- dashboardKpiIcon mide 64 ? 64 px.
-- Los iconos KPI renderizados se centran dentro de un ?rea interna de 46 ? 46 px.
+- Las filas media e inferior usan proporcion 5:3 entre bloque izquierdo y derecho.
+- dashboardKpiIcon mide 64 x 64 px.
+- Los iconos KPI renderizados se centran dentro de un area interna de 46 x 46 px.
 
 ASPECTO VISUAL ACTUAL
 ---------------------
@@ -153,31 +153,31 @@ ASPECTO VISUAL ACTUAL
 - Fondo general del dashboard: #EEF3F8.
 - dashboardContentHost, dashboardContent, dashboardAgendaView, dashboardWarehouseView, dashboardOrdersView y dashboardSalesView: fondo transparente.
 - dashboardContentStack: fondo transparente, sin borde.
-- Sidebar clara; solo el bot?n activo va en azul #2563EB.
+- Sidebar clara; solo el boton activo va en azul #2563EB.
 - Tarjetas KPI y paneles principales blancos con bordes suaves y radios amplios.
 - Empty states con fondo #F8FAFC y borde discontinuo #CBD5E1.
-- En la rejilla mensual de Agenda, la columna Sem es m?s compacta que las columnas de d?as y los botones de d?a tienen m?s aire horizontal y vertical.
+- En la rejilla mensual de Agenda, la columna Sem es mas compacta que las columnas de dias y los botones de dia tienen mas aire horizontal y vertical.
 
-RELACI?N CON BACKEND / DATOS
+RELACION CON BACKEND / DATOS
 ----------------------------
 
 - DashboardPage no depende del frontend React.
 - CustomerDashboardService aporta los KPIs, agenda de hoy, actividades base para el calendario mensual, clientes a reactivar y agenda por isla.
-- WarehouseDashboardService aporta KPIs y tablas agregadas de stock, riesgos, entradas y salidas de almac?n en kg.
+- WarehouseDashboardService aporta KPIs y tablas agregadas de stock, riesgos, entradas y salidas de almacen en kg.
 - OrderDashboardService aporta KPIs y tablas agregadas del seguimiento de pedidos.
-- SalesDashboardService aporta KPIs y tablas agregadas de ventas anuales por cliente, isla y tipo de cliente, siempre con kg como m?trica principal.
-- CustomerService se usa para cargar clientes y para alta, edici?n y borrado de actividades de agenda.
+- SalesDashboardService aporta KPIs y tablas agregadas de ventas anuales por cliente, isla y tipo de cliente, siempre con kg como metrica principal.
+- CustomerService se usa para cargar clientes y para alta, edicion y borrado de actividades de agenda.
 - La agenda del dashboard trabaja directamente contra la base local desde PySide6/backend.
 
-?LTIMOS AJUSTES DE ESTRUCTURA Y ASPECTO
+ULTIMOS AJUSTES DE ESTRUCTURA Y ASPECTO
 ---------------------------------------
 
-- Nombrados expl?citamente los contenedores reales de vistas: dashboardAgendaView, dashboardWarehouseView, dashboardOrdersView y dashboardSalesView.
+- Nombrados explicitamente los contenedores reales de vistas: dashboardAgendaView, dashboardWarehouseView, dashboardOrdersView y dashboardSalesView.
 - Documentado que fila KPI, fila media y fila inferior cuelgan de esos widgets de vista, no de content_layout directamente.
-- Incorporado el dashboard de Almacen con navegaci?n lateral y m?tricas principales en kg.
-- Incorporado el dashboard de Pedidos con navegaci?n lateral y m?tricas principales en kg.
-- Incorporado el dashboard de Ventas con navegaci?n lateral y foco principal en kg vendidos, variaci?n anual, clientes activos e islas activas.
-- Sustituido el antiguo bloque de pr?ximos vencimientos de Agenda por un calendario mensual interactivo con resumen inferior y columna de n?mero de semana ISO.
-- Eliminadas la leyenda de estados y la preview inferior del d?a seleccionado del panel mensual de Agenda.
+- Incorporado el dashboard de Almacen con navegacion lateral y metricas principales en kg.
+- Incorporado el dashboard de Pedidos con navegacion lateral y metricas principales en kg.
+- Incorporado el dashboard de Ventas con navegacion lateral y foco principal en kg vendidos, variacion anual, clientes activos e islas activas.
+- Sustituido el antiguo bloque de proximos vencimientos de Agenda por un calendario mensual interactivo con resumen inferior y columna de numero de semana ISO.
+- Eliminadas la leyenda de estados y la preview inferior del dia seleccionado del panel mensual de Agenda.
 - Ajustada la rejilla mensual para usar 5 semanas cuando el mes cabe completo y 6 solo cuando es necesario, con espaciado vertical y horizontal revisado.
-- A?adido el bot?n lateral Objetivos con icono goal.svg, pendiente de implementaci?n funcional.
+- Anadido el boton lateral Objetivos con icono goal.svg, pendiente de implementacion funcional.
