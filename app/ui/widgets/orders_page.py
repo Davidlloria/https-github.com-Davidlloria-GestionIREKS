@@ -1662,6 +1662,7 @@ class OrdersPage(QWidget):
         self.pendientes_table.setColumnWidth(0, 95)
         self.pendientes_table.setColumnWidth(2, 100)
         self.pendientes_table.setColumnWidth(3, 100)
+        self.pendientes_table.setSortingEnabled(True)
         pendientes_tab_layout.addWidget(self.pendientes_table, 1)
         tabs.addTab(pendientes_tab, "Pendientes")
         tabs_layout.addWidget(tabs)
@@ -2250,8 +2251,14 @@ class OrdersPage(QWidget):
         self.reload()
 
     def _reload_pendientes_table(self, pedido_id: str | None) -> None:
+        header = self.pendientes_table.horizontalHeader()
+        sort_col = header.sortIndicatorSection()
+        sort_order = header.sortIndicatorOrder()
+        was_sorting = self.pendientes_table.isSortingEnabled()
+        self.pendientes_table.setSortingEnabled(False)
         self.pendientes_table.setRowCount(0)
         if not pedido_id:
+            self.pendientes_table.setSortingEnabled(was_sorting)
             return
         rows, articles = self.order_query_service.list_pendientes_acumulados(pedido_id)
         name_by_article = {str(a.articulo_id or ""): str(a.articulo_descripcion or "").strip() for a in articles}
@@ -2278,6 +2285,9 @@ class OrdersPage(QWidget):
                 else:
                     cell = QTableWidgetItem(value)
                 self.pendientes_table.setItem(row_idx, col_idx, cell)
+        self.pendientes_table.setSortingEnabled(was_sorting)
+        if was_sorting:
+            self.pendientes_table.sortItems(sort_col if sort_col >= 0 else 3, sort_order if sort_col >= 0 else Qt.SortOrder.AscendingOrder)
 
     def reload(self) -> None:
         selected_id = self._selected_id()
