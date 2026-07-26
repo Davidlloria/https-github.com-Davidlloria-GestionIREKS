@@ -1473,11 +1473,22 @@ class DashboardPage(QWidget):
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(8)
 
+        calendar_block_width = 276
+
+        heading_row = QWidget()
+        heading_row.setFixedWidth(calendar_block_width)
+        heading_row_layout = QHBoxLayout(heading_row)
+        heading_row_layout.setContentsMargins(0, 0, 0, 0)
+        heading_row_layout.setSpacing(0)
         heading = QLabel("Agenda del mes")
         heading.setObjectName("dashboardPanelTitle")
-        layout.addWidget(heading)
+        heading_row_layout.addWidget(heading, 0, Qt.AlignmentFlag.AlignLeft)
+        heading_row_layout.addStretch(1)
+        layout.addWidget(heading_row, 0, Qt.AlignmentFlag.AlignHCenter)
 
-        nav_row = QHBoxLayout()
+        nav_row_host = QWidget()
+        nav_row_host.setFixedWidth(calendar_block_width)
+        nav_row = QHBoxLayout(nav_row_host)
         nav_row.setContentsMargins(0, 0, 0, 0)
         nav_row.setSpacing(8)
         self.agenda_prev_month_btn = QPushButton("<")
@@ -1494,7 +1505,7 @@ class DashboardPage(QWidget):
         self.agenda_next_month_btn.setObjectName("dashboardCalendarNavButton")
         self.agenda_next_month_btn.clicked.connect(lambda: self._shift_agenda_calendar_month(1))
         nav_row.addWidget(self.agenda_next_month_btn, 0)
-        layout.addLayout(nav_row)
+        layout.addWidget(nav_row_host, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self.agenda_month_calendar = DashboardMonthCalendar(self, panel)
         self.agenda_month_calendar.selectionChanged.connect(self._handle_agenda_calendar_selection_changed)
