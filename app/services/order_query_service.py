@@ -305,6 +305,13 @@ class OrderQueryService:
                     .order_by(PedidoItem.item_id)
                 )
             )
+            albaran_rows = list(
+                session.exec(
+                    select(AlbaranItem)
+                    .where(AlbaranItem.pedido_id == clean_pedido_id)
+                    .order_by(AlbaranItem.item_id)
+                )
+            )
             _pedido, stats, _pedido_by_id = self._build_operational_assignment(session, clean_pedido_id)
         pending_article_ids = {
             articulo_id
@@ -312,10 +319,11 @@ class OrderQueryService:
             if row_pedido_id == clean_pedido_id and float((values.get("ordered", 0.0) or 0.0) - (values.get("received", 0.0) or 0.0)) > 1e-9
         }
         received_by_article: dict[str, float] = {}
-        for (row_pedido_id, articulo_id), values in stats.items():
-            if row_pedido_id != clean_pedido_id:
+        for row in albaran_rows:
+            articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+            if not articulo_id:
                 continue
-            received_by_article[articulo_id] = received_by_article.get(articulo_id, 0.0) + float(values.get("received", 0.0) or 0.0)
+            received_by_article[articulo_id] = received_by_article.get(articulo_id, 0.0) + float(getattr(row, "articulo_cantidad", 0.0) or 0.0)
         return rows, pending_article_ids, received_by_article
 
     def list_order_items_payload(
