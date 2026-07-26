@@ -75,3 +75,18 @@ def test_new_order_uses_typed_almacen_filter_text(monkeypatch) -> None:
     page.close()
     page.deleteLater()
     QApplication.processEvents()
+
+
+
+def test_pedido_tab_uses_split_order_and_received_columns(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(OrdersPage, "reload", lambda self: None)
+    page = OrdersPage()
+
+    headers = [page.pedido_items_table.horizontalHeaderItem(i).text() for i in range(page.pedido_items_table.columnCount())]
+
+    assert headers == ["Cod.", "Nombre", "Pedido", "Kg", "Recib.", "Kg", "?"]
+    assert page.pedido_items_totals_table.columnCount() == 7
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
