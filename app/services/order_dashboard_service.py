@@ -259,9 +259,6 @@ class OrderDashboardService:
                 distribuidor_id,
             )
         for row in clients:
-            tipo = str(getattr(row, "cliente_tipo", "") or "").strip().lower()
-            if tipo not in OrderQueryService._DIRECT_CLIENT_TYPES:
-                continue
             cliente_id = str(getattr(row, "cliente_id", "") or "").strip()
             if not cliente_id:
                 continue
