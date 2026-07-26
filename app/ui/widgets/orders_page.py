@@ -2900,8 +2900,8 @@ class OrdersPage(QWidget):
             return f"{text}{suffix}"
         return OrderDocumentParser.format_number_es(number, decimals, suffix)
 
-    def _format_number_es(self, value: float, decimals: int = 2, suffix: str = "") -> str:
-        return OrdersPage._format_number_es_static(value, decimals, suffix)
+    def _format_number_es(self, value: float, decimals: int = 2, suffix: str = "", *, signed: bool = False) -> str:
+        return OrdersPage._format_number_es_static(value, decimals, suffix, signed=signed)
 
     def _is_article_pending(self, article: IngredienteIreks | None) -> bool:
         if article is None:
