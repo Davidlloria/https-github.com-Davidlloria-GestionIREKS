@@ -14,13 +14,13 @@ DashboardPage (QWidget, objectName: dashboardPageRoot, fondo #EEF3F8)
 └── layout principal (QHBoxLayout, margenes 0 px, separacion 0 px)
     ├── dashboardSidebar (QFrame, ancho fijo 188 px, fondo #F8FAFC, borde derecho #E2E8F0)
     │   └── QVBoxLayout (margenes 12/16/12/16 px, separacion 12 px)
-    ?       ├── dashboardSidebarBrand (QLabel solo logo IREKS, centrado, fondo transparente, sin borde)
-    ?       ├── dashboardSidebarButton activo (QPushButton del modo activo: Agenda / Almacen / Pedidos / Ventas / Objetivos, fondo #2563EB, texto #FFFFFF)
-    ?       ├── dashboardSidebarButton (QPushButton inactivo "Agenda", icono calendar-days.svg, fondo transparente, texto #334155)
-    ?       ├── dashboardSidebarButton (QPushButton inactivo "Almacen", icono box.svg, fondo transparente, texto #334155)
-    ?       ├── dashboardSidebarButton (QPushButton inactivo "Pedidos", icono shopping-cart.svg, fondo transparente, texto #334155)
-    ?       ├── dashboardSidebarButton (QPushButton inactivo "Ventas", icono bar-chart-3.svg, fondo transparente, texto #334155)
-    ?       ├── dashboardSidebarButton (QPushButton "Objetivos", icono goal.svg, fondo transparente, texto #334155, placeholder)
+    │       ├── dashboardSidebarBrand (QLabel solo logo IREKS, centrado, fondo transparente, sin borde)
+    │       ├── dashboardSidebarButton activo (QPushButton del modo activo: Agenda / Almacen / Pedidos / Ventas / Objetivos, fondo #2563EB, texto #FFFFFF)
+    │       ├── dashboardSidebarButton (QPushButton inactivo "Agenda", icono calendar-days.svg, fondo transparente, texto #334155)
+    │       ├── dashboardSidebarButton (QPushButton inactivo "Almacen", icono box.svg, fondo transparente, texto #334155)
+    │       ├── dashboardSidebarButton (QPushButton inactivo "Pedidos", icono shopping-cart.svg, fondo transparente, texto #334155)
+    │       ├── dashboardSidebarButton (QPushButton inactivo "Ventas", icono bar-chart-3.svg, fondo transparente, texto #334155)
+    │       ├── dashboardSidebarButton (QPushButton "Objetivos", icono goal.svg, fondo transparente, texto #334155, placeholder)
     │       └── espacio flexible
     └── dashboardContentHost (QWidget, fondo transparente)
         └── dashboardContent (QWidget, fondo transparente)
@@ -32,28 +32,24 @@ DashboardPage (QWidget, objectName: dashboardPageRoot, fondo #EEF3F8)
                 │       │   └── dashboardDateLabel (QLabel, fecha larga en espanol, texto #475569, 13 px)
                 │       ├── dashboardNewActivityButton (QPushButton, btnRole=primary, icono variable por modo)
                 │       └── dashboardFullAgendaButton (QPushButton, btnRole=secondary, icono variable por modo)
-                └── dashboardContentStack (QStackedWidget, fondo transparente, sin borde)
+                ├── dashboardContentStack (QStackedWidget, fondo transparente, sin borde)
                 │   ├── dashboardAgendaView (QWidget, fondo transparente)
                 │   │   └── QVBoxLayout (margenes 0 px, separacion 14 px)
                 │   │       ├── fila KPI (QGridLayout, separacion horizontal 12 px, vertical 12 px)
-                ?   ?       ??? fila media (QHBoxLayout, separacion 14 px)
-                ?   ?       ?   ??? dashboardUpcomingPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px, alto fijo 312 px)
-                ?   ?       ?   ?   ??? dashboardPanelTitle (QLabel "Agenda del mes")
-                ?   ?       ?   ?   ??? fila navegacion (QHBoxLayout)
-                ?   ?       ?   ?   ?   ??? dashboardCalendarNavButton (QPushButton "<")
-                ?   ?       ?   ?   ?   ??? dashboardMonthTitle (QLabel, mes visible en espanol, centrado)
-                ?   ?       ?   ?   ?   ??? dashboardCalendarNavButton (QPushButton ">")
-                ?   ?       ?   ?   ??? cabecera semanal (QHBoxLayout, separacion 2 px)
-                ?   ?       ?   ?   ?   ??? dashboardWeekNumberLabel (QLabel "Sem", ancho fijo 26 px)
-                ?   ?       ?   ?   ?   ??? dashboardWeekdayLabel (QLabel: L / M / X / J / V / S / D)
-                ?   ?       ?   ?   ??? dashboardMonthGrid (QFrame, fondo transparente, altura dinamica)
-                ?   ?       ?   ?   ?   ??? QGridLayout (8 columnas: Sem + 7 dias, separacion horizontal 4 px, vertical 4 px)
-                ?   ?       ?   ?   ?       ??? dashboardWeekNumberLabel (QLabel por fila, numero de semana ISO, ancho fijo 26 px)
-                ?   ?       ?   ?   ?       ??? dashboardMonthDayButton (QPushButton por dia, alto fijo 24 px, seleccion, hoy, con/sin agenda, fuera de mes)
-                ?   ?       ?   ?   ??? fila resumen (QHBoxLayout, separacion 6 px)
-                ?   ?       ?   ?       ??? dashboardCalendarSummaryChip (QFrame resumen: Pendientes / Hechas / Vencidas)
-                ?   ?       ?   ??? dashboardTodayPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px, alto fijo 312 px)
-                ?   ?       ??? fila inferior (QHBoxLayout, separacion 14 px)
+                │   │       ├── fila media (QHBoxLayout, separacion 14 px)
+                │   │       │   ├── dashboardUpcomingPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px, alto fijo 312 px)
+                │   │       │   │   ├── dashboardPanelTitle (QLabel "Agenda del mes")
+                │   │       │   │   ├── fila navegacion (QHBoxLayout)
+                │   │       │   │   │   ├── dashboardCalendarNavButton (QPushButton "<")
+                │   │       │   │   │   ├── dashboardMonthTitle (QLabel, mes visible en espanol, centrado)
+                │   │       │   │   │   └── dashboardCalendarNavButton (QPushButton ">")
+                │   │       │   │   ├── dashboardMonthCalendar (QCalendarWidget personalizado, tamano fijo 276 x 196)
+                │   │       │   │   │   ├── cabecera semanal nativa (L / M / X / J / V / S / D)
+                │   │       │   │   │   ├── columna ISO de semanas nativa (Sem)
+                │   │       │   │   │   └── celdas pintadas en paintCell() con estado, seleccion y dia actual
+                │   │       │   │   └── fila resumen (QHBoxLayout, separacion 6 px)
+                │   │       │   │       └── dashboardCalendarSummaryChip (QFrame resumen: Pendientes / Hechas / Vencidas)
+                │   │       │   └── dashboardTodayPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px, alto fijo 312 px)
                 │   │       └── fila inferior (QHBoxLayout, separacion 14 px)
                 │   │           ├── dashboardReactivationPanel (QFrame, fondo #FFFFFF, borde #DCE4EF, radio 14 px)
                 │   │           │   └── dashboardReactivationTable (QTableWidget, fondo #FFFFFF, borde #E2E8F1, radio 10 px)
@@ -116,11 +112,11 @@ COMPORTAMIENTO FUNCIONAL ACTUAL
 - En modo Agenda:
   - "Nueva actividad" abre DashboardAgendaDialog.
   - "Ver agenda completa" abre DashboardAgendaOverviewDialog.
-  - El panel derecho muestra un calendario mensual del mes visible.
+  - La fila media muestra primero dashboardUpcomingPanel y despues dashboardTodayPanel.
+  - El panel mensual usa un QCalendarWidget personalizado.
   - Los dias con agenda quedan marcados visualmente segun estado principal: pendiente, hecha o vencida.
   - La navegacion "< / >" permite cambiar de mes sin salir del dashboard.
-  - La rejilla muestra 5 semanas cuando el mes cabe completo y 6 solo cuando es imprescindible.
-  - La primera columna muestra el numero de semana ISO (Sem).
+  - La columna ISO de semanas se muestra de forma nativa en el calendario.
   - Ya no existe leyenda de estados ni preview inferior del dia seleccionado dentro de ese panel.
 - En modo Almacen:
   - "Ver almacen" navega a la pagina principal "Almacen" si existe en MainWindow.
@@ -142,9 +138,10 @@ GEOMETRIA ACTUAL
 - dashboardAgendaView, dashboardWarehouseView, dashboardOrdersView y dashboardSalesView no tienen fondo propio; se apoyan visualmente sobre el fondo general #EEF3F8 a traves de contenedores transparentes.
 - El dashboard de Agenda mantiene altura fija total sin scroll global.
 - dashboardTodayPanel y dashboardUpcomingPanel tienen la misma altura fija: 312 px.
-- dashboardMonthGrid usa altura dinamica segun semanas visibles del mes.
+- dashboardUpcomingPanel tiene ancho maximo 348 px y dashboardTodayPanel absorbe el ancho restante de la fila media.
+- dashboardMonthCalendar usa tamano fijo 276 x 196 dentro de dashboardUpcomingPanel.
 - La fila KPI usa cuatro tarjetas en una rejilla de una sola fila.
-- Las filas media e inferior usan proporcion 5:3 entre bloque izquierdo y derecho.
+- Las filas media e inferior usan proporcion 5:3 como base, con limite maximo explicito para dashboardUpcomingPanel.
 - dashboardKpiIcon mide 64 x 64 px.
 - Los iconos KPI renderizados se centran dentro de un area interna de 46 x 46 px.
 
@@ -157,7 +154,8 @@ ASPECTO VISUAL ACTUAL
 - Sidebar clara; solo el boton activo va en azul #2563EB.
 - Tarjetas KPI y paneles principales blancos con bordes suaves y radios amplios.
 - Empty states con fondo #F8FAFC y borde discontinuo #CBD5E1.
-- En la rejilla mensual de Agenda, la columna Sem es mas compacta que las columnas de dias y los botones de dia tienen mas aire horizontal y vertical.
+- El calendario mensual de Agenda usa celdas pintadas en paintCell(), con seleccion azul, colores por estado y dia actual en negrita.
+- Los chips de resumen del calendario son mas compactos para reducir el ancho util del panel.
 
 RELACION CON BACKEND / DATOS
 ----------------------------
@@ -178,7 +176,7 @@ ULTIMOS AJUSTES DE ESTRUCTURA Y ASPECTO
 - Incorporado el dashboard de Almacen con navegacion lateral y metricas principales en kg.
 - Incorporado el dashboard de Pedidos con navegacion lateral y metricas principales en kg.
 - Incorporado el dashboard de Ventas con navegacion lateral y foco principal en kg vendidos, variacion anual, clientes activos e islas activas.
-- Sustituido el antiguo bloque de proximos vencimientos de Agenda por un calendario mensual interactivo con resumen inferior y columna de numero de semana ISO.
+- Sustituido el antiguo bloque de proximos vencimientos de Agenda por un calendario mensual basado en QCalendarWidget, con resumen inferior y columna ISO de semanas.
 - Eliminadas la leyenda de estados y la preview inferior del dia seleccionado del panel mensual de Agenda.
-- Ajustada la rejilla mensual para usar 5 semanas cuando el mes cabe completo y 6 solo cuando es necesario, con espaciado vertical y horizontal revisado.
+- Reequilibrado el ancho de la fila media: dashboardUpcomingPanel primero, mas estrecho, y dashboardTodayPanel despues, absorbiendo el espacio restante.
 - Anadido el boton lateral Objetivos con icono goal.svg, pendiente de implementacion funcional.
