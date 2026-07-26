@@ -1476,6 +1476,7 @@ class DashboardPage(QWidget):
         calendar_block_width = 276
 
         heading_row = QWidget()
+        heading_row.setObjectName("dashboardCalendarHeadingBlock")
         heading_row.setFixedWidth(calendar_block_width)
         heading_row_layout = QHBoxLayout(heading_row)
         heading_row_layout.setContentsMargins(0, 0, 0, 0)
@@ -1487,6 +1488,7 @@ class DashboardPage(QWidget):
         layout.addWidget(heading_row, 0, Qt.AlignmentFlag.AlignHCenter)
 
         nav_row_host = QWidget()
+        nav_row_host.setObjectName("dashboardCalendarNavBlock")
         nav_row_host.setFixedWidth(calendar_block_width)
         nav_row = QHBoxLayout(nav_row_host)
         nav_row.setContentsMargins(0, 0, 0, 0)
