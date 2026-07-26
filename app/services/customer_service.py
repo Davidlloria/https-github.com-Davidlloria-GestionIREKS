@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 
 from app.core.database import engine
 from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
-from app.models import CodigoPostal, Cliente, Contacto, Isla, Localidad, Municipio, Provincia, Receta
+from app.models import ClienteAgenda, CodigoPostal, Cliente, Contacto, Isla, Localidad, Municipio, Provincia, Receta
 from app.schemas.customers import (
     AddressOption,
     CustomerAddressCatalogsPayload,
@@ -19,6 +19,7 @@ from app.schemas.customers import (
 )
 from app.services.import_service import ImportService
 from app.services.customer_contact_flow_service import CustomerContactFlowService
+from app.services.customer_agenda_service import CustomerAgendaService
 from app.viewmodels import CustomerViewModel
 
 
@@ -36,6 +37,7 @@ class CustomerService:
         self.vm = CustomerViewModel()
         self.import_service = ImportService()
         self.contact_flow_service = CustomerContactFlowService(engine=engine, customer_vm=self.vm)
+        self.agenda_service = CustomerAgendaService(engine=engine)
 
     def address_catalogs(self) -> AddressCatalogs:
         with Session(engine) as session:
@@ -185,6 +187,24 @@ class CustomerService:
         with Session(engine) as session:
             recipe = session.get(Receta, recipe_id)
         return str(getattr(recipe, "cliente_id", "") or "").strip() if recipe is not None else ""
+
+    def related_agenda(self, cliente_id: str) -> list[ClienteAgenda]:
+        return self.agenda_service.related_agenda(cliente_id)
+
+    def get_agenda_activity(self, agenda_id: str) -> ClienteAgenda | None:
+        return self.agenda_service.get_activity(agenda_id)
+
+    def upsert_agenda_activity(self, agenda_id: str, payload: dict) -> ClienteAgenda:
+        return self.agenda_service.upsert_activity(agenda_id, payload)
+
+    def create_agenda_activity(self, payload: dict) -> ClienteAgenda:
+        return self.agenda_service.create_activity(payload)
+
+    def update_agenda_activity(self, agenda_id: str, payload: dict) -> ClienteAgenda:
+        return self.agenda_service.update_activity(agenda_id, payload)
+
+    def delete_agenda_activity(self, agenda_id: str) -> bool:
+        return self.agenda_service.delete_activity(agenda_id)
 
     def create_contact(self, payload: dict) -> Contacto:
         return self.contact_flow_service.create_contact(payload)

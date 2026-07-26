@@ -296,6 +296,21 @@ class IngredienteBase(SQLModel):
     activo: bool = Field(default=True)
 
 
+class ClienteAgenda(TimeStampedModel, table=True):
+    __tablename__: ClassVar[str] = "clientes_agenda"
+
+    agenda_id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True, max_length=36)
+    cliente_id: str = Field(foreign_key="clientes.cliente_id", nullable=False, index=True, max_length=36)
+    fecha_actividad: date = Field(default_factory=date.today, nullable=False, index=True)
+    tipo: str = Field(default="nota", max_length=50, index=True)
+    estado: str = Field(default="pendiente", max_length=50, index=True)
+    resumen: str = Field(default="", max_length=255)
+    detalle: str = Field(default="")
+    fecha_seguimiento: Optional[date] = Field(default=None, nullable=True, index=True)
+    prioridad: str = Field(default="normal", max_length=50, index=True)
+    responsable: str = Field(default="", max_length=255)
+
+
 class Contacto(TimeStampedModel, table=True):
     __tablename__: ClassVar[str] = "contactos"
 
