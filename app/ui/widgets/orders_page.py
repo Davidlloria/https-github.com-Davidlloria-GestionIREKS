@@ -2242,6 +2242,8 @@ class OrdersPage(QWidget):
                     cell = NumericTableWidgetItem(value, pendiente)
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                     cell.setForeground(QBrush(QColor("#C62828")))
+                elif col_idx == 3:
+                    cell = NumericTableWidgetItem(value, self._pedido_sort_value(pedido_numero))
                 else:
                     cell = QTableWidgetItem(value)
                 self.pendientes_table.setItem(row_idx, col_idx, cell)
@@ -2877,8 +2879,26 @@ class OrdersPage(QWidget):
             return default
 
     @staticmethod
-    def _format_number_es_static(value: float, decimals: int = 2, suffix: str = "") -> str:
-        return OrderDocumentParser.format_number_es(value, decimals, suffix)
+    def _pedido_sort_value(value: str) -> float:
+        text_value = str(value or "").strip()
+        if not text_value:
+            return -1.0
+        digits = re.sub(r"\D+", "", text_value)
+        if digits:
+            try:
+                return float(int(digits))
+            except Exception:
+                return float("inf")
+        return float("inf")
+
+    @staticmethod
+    def _format_number_es_static(value: float, decimals: int = 2, suffix: str = "", *, signed: bool = False) -> str:
+        number = float(value or 0.0)
+        if signed:
+            text = f"{number:+,.{decimals}f}"
+            text = text.replace(",", "_").replace(".", ",").replace("_", ".")
+            return f"{text}{suffix}"
+        return OrderDocumentParser.format_number_es(number, decimals, suffix)
 
     def _format_number_es(self, value: float, decimals: int = 2, suffix: str = "") -> str:
         return OrdersPage._format_number_es_static(value, decimals, suffix)
