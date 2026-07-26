@@ -1477,6 +1477,10 @@ class DashboardPage(QWidget):
 
         heading_row = QWidget()
         heading_row.setObjectName("dashboardCalendarHeadingBlock")
+        heading_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        heading_row.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        heading_row.setAutoFillBackground(False)
+        heading_row.setStyleSheet("background: transparent; border: none;")
         heading_row.setFixedWidth(calendar_block_width)
         heading_row_layout = QHBoxLayout(heading_row)
         heading_row_layout.setContentsMargins(0, 0, 0, 0)
@@ -1489,6 +1493,10 @@ class DashboardPage(QWidget):
 
         nav_row_host = QWidget()
         nav_row_host.setObjectName("dashboardCalendarNavBlock")
+        nav_row_host.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        nav_row_host.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        nav_row_host.setAutoFillBackground(False)
+        nav_row_host.setStyleSheet("background: transparent; border: none;")
         nav_row_host.setFixedWidth(calendar_block_width)
         nav_row = QHBoxLayout(nav_row_host)
         nav_row.setContentsMargins(0, 0, 0, 0)
