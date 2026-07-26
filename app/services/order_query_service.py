@@ -244,11 +244,31 @@ class OrderQueryService:
         )
         for albaran_item, _albaran in albaran_rows:
             articulo_id = str(getattr(albaran_item, "articulo_id", "") or "").strip()
+            source_pedido_id = str(getattr(albaran_item, "pedido_id", "") or "").strip()
             cantidad = float(getattr(albaran_item, "articulo_cantidad", 0.0) or 0.0)
             if not articulo_id or cantidad <= 1e-9:
                 continue
             pending_queue = open_by_article.get(articulo_id, [])
             remaining = cantidad
+            if source_pedido_id and pending_queue:
+                own_index = next(
+                    (
+                        idx
+                        for idx, candidate in enumerate(pending_queue)
+                        if str(candidate.get("pedido_id") or "").strip() == source_pedido_id
+                    ),
+                    -1,
+                )
+                if own_index >= 0:
+                    target = pending_queue[own_index]
+                    target_remaining = float(target.get("remaining", 0.0) or 0.0)
+                    if target_remaining > 1e-9:
+                        applied = min(target_remaining, remaining)
+                        stats[(source_pedido_id, articulo_id)]["received"] += applied
+                        target["remaining"] = target_remaining - applied
+                        remaining -= applied
+                    if float(target.get("remaining", 0.0) or 0.0) <= 1e-9:
+                        pending_queue.pop(own_index)
             while remaining > 1e-9 and pending_queue:
                 target = pending_queue[0]
                 target_pedido_id = str(target.get("pedido_id") or "").strip()
