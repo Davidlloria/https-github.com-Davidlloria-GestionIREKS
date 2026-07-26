@@ -573,7 +573,8 @@ class DashboardPage(QWidget):
         middle_row.addWidget(today_panel, 5)
 
         self.upcoming_panel = self._build_upcoming_panel()
-        middle_row.addWidget(self.upcoming_panel, 3)
+        self.upcoming_panel.setMaximumWidth(348)
+        middle_row.addWidget(self.upcoming_panel, 2)
         layout.addLayout(middle_row)
 
         lower_row = QHBoxLayout()
@@ -1520,9 +1521,10 @@ class DashboardPage(QWidget):
         frame = QFrame()
         frame.setObjectName("dashboardCalendarSummaryChip")
         frame.setProperty("tone", tone)
+        frame.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(8, 3, 8, 3)
-        layout.setSpacing(6)
+        layout.setContentsMargins(6, 2, 6, 2)
+        layout.setSpacing(4)
         title_label = QLabel(title)
         title_label.setObjectName("dashboardCalendarSummaryTitle")
         layout.addWidget(title_label)
@@ -2214,6 +2216,7 @@ class DashboardPage(QWidget):
                 border-radius: 10px;
                 border: 1px solid #DCE4EF;
                 background: #FFFFFF;
+                min-width: 82px;
             }
             QFrame#dashboardCalendarSummaryChip[tone="blue"] {
                 background: #EFF6FF;
@@ -2229,12 +2232,12 @@ class DashboardPage(QWidget):
             }
             QLabel#dashboardCalendarSummaryTitle {
                 color: #334155;
-                font-size: 12px;
+                font-size: 11px;
                 font-weight: 600;
             }
             QLabel#dashboardCalendarSummaryValue {
                 color: #0F172A;
-                font-size: 18px;
+                font-size: 16px;
                 font-weight: 800;
             }
             QLabel#dashboardUpcomingDate {
