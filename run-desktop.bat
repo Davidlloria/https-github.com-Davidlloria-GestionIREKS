@@ -3,10 +3,16 @@ setlocal
 
 cd /d "%~dp0"
 
-if exist ".venv\Scripts\pythonw.exe" (
-    ".venv\Scripts\pythonw.exe" run.py
+if exist ".venv\Scripts\python.exe" (
+    ".venv\Scripts\python.exe" run.py
 ) else (
-    pythonw run.py
+    python run.py
+)
+
+if errorlevel 1 (
+    echo.
+    echo El arranque ha fallado con codigo %errorlevel%.
+    pause
 )
 
 endlocal
