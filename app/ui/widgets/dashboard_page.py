@@ -570,11 +570,11 @@ class DashboardPage(QWidget):
         self.today_link_btn.setProperty("btnRole", "secondary")
         self.today_link_btn.clicked.connect(self._open_full_agenda)
         today_panel.layout().addWidget(self.today_link_btn)
-        middle_row.addWidget(today_panel, 5)
 
         self.upcoming_panel = self._build_upcoming_panel()
         self.upcoming_panel.setMaximumWidth(348)
         middle_row.addWidget(self.upcoming_panel, 2)
+        middle_row.addWidget(today_panel, 5)
         layout.addLayout(middle_row)
 
         lower_row = QHBoxLayout()
