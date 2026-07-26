@@ -14,6 +14,21 @@ Estos son los iconos originalmente previstos para el dashboard de pedidos y que 
 | KPI `Incidencias` | `alert.svg` | sustituido temporalmente por `clock-3.svg` | Buscar o disenar un icono de alerta / incidencia. |
 | Boton header `Actualizar` en modo `Pedidos` | `package-open.svg` | sustituido temporalmente por `clipboard-list.svg` | Reutilizar el icono definitivo de pendiente / abierto cuando exista. |
 
+
+## Dashboard almacen
+
+Estos son los iconos previstos y actualmente utilizados por el dashboard de almacen.
+
+| Uso en UI | Icono previsto | Estado actual | Nota |
+|---|---|---|---|
+| KPI `Stock total` | `package.svg` | disponible en repo | OK. |
+| KPI `Riesgos` | `alert.svg` | disponible en repo | OK. |
+| KPI `Entradas mes` | `database-down.svg` | disponible en repo | OK. |
+| KPI `Salidas mes` | `database-up.svg` | disponible en repo | OK. |
+| Boton sidebar `Almacen` | `warehouse.svg` | disponible en repo | OK. |
+| Boton header `Ver almacen` | `warehouse.svg` | disponible en repo | OK. |
+| Boton header `Actualizar` en modo `Almacen` | `package-search.svg` | disponible en repo | OK. |
+
 ## Criterio para incorporarlos mas adelante
 
 - Guardarlos en `assets/icons/`.
