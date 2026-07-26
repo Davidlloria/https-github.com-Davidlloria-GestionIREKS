@@ -230,7 +230,7 @@ def test_list_order_items_returns_received_quantity_by_article(isolated_engine) 
 
 
 
-def test_list_order_items_uses_operational_received_assignment(isolated_engine) -> None:
+def test_list_order_items_uses_documented_received_quantity_for_same_order(isolated_engine) -> None:
     with Session(isolated_engine) as session:
         articulo_id = _seed_catalog(session)
         session.add(Pedido(pedido_id="pedido-1", almacen_id="alm-1", pedido_fecha=date(2026, 6, 1), pedido_numero="P-1"))
@@ -246,4 +246,4 @@ def test_list_order_items_uses_operational_received_assignment(isolated_engine) 
 
     assert len(rows) == 1
     assert pending_article_ids == {articulo_id}
-    assert received_by_article == {articulo_id: 0.0}
+    assert received_by_article == {articulo_id: 7.0}
