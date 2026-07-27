@@ -9,17 +9,26 @@ from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCalendarWidget,
+    QCheckBox,
+    QComboBox,
+    QDateEdit,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
     QSizePolicy,
+    QSpacerItem,
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -52,6 +61,272 @@ from app.services.warehouse_dashboard_service import (
 )
 
 BASE_DIR = Path(__file__).resolve().parents[3]
+
+
+class DashboardAgendaDialog(QDialog):
+    def __init__(self, page: "DashboardPage", *, agenda_id: str = "", default_customer_id: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(parent or page)
+        self._page = page
+        self._agenda_id = str(agenda_id or "").strip()
+        self._activity = page.customer_service.get_agenda_activity(self._agenda_id) if self._agenda_id else None
+        self.setWindowTitle("Nueva actividad" if self._activity is None else "Editar actividad")
+        self.setModal(True)
+        self.resize(620, 520)
+        self._build_ui(default_customer_id=default_customer_id)
+
+    def _build_ui(self, *, default_customer_id: str) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(14)
+
+        title = QLabel("Actividad de agenda")
+        layout.addWidget(title)
+
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        form.setFormAlignment(Qt.AlignmentFlag.AlignTop)
+        form.setHorizontalSpacing(14)
+        form.setVerticalSpacing(10)
+        layout.addLayout(form)
+
+        self.customer_combo = QComboBox()
+        self.customer_combo.setMinimumWidth(340)
+        for customer_id, label in self._page.customer_choices(include_inactive=self._activity is not None):
+            self.customer_combo.addItem(label, customer_id)
+        form.addRow("Cliente", self.customer_combo)
+
+        self.date_edit = QDateEdit()
+        self.date_edit.setCalendarPopup(True)
+        self.date_edit.setDisplayFormat("dd/MM/yyyy")
+        self._page.configure_dashboard_calendar(self.date_edit)
+        form.addRow("Fecha actividad", self.date_edit)
+
+        self.type_combo = QComboBox()
+        for key, label in self._page.agenda_type_options():
+            self.type_combo.addItem(label, key)
+        form.addRow("Tipo", self.type_combo)
+
+        self.state_combo = QComboBox()
+        for key, label in self._page.agenda_state_options():
+            self.state_combo.addItem(label, key)
+        form.addRow("Estado", self.state_combo)
+
+        self.priority_combo = QComboBox()
+        for value in ("Alta", "Media", "Normal", "Baja"):
+            self.priority_combo.addItem(value, value.lower())
+        form.addRow("Prioridad", self.priority_combo)
+
+        self.responsible_edit = QLineEdit()
+        form.addRow("Responsable", self.responsible_edit)
+
+        self.summary_edit = QLineEdit()
+        form.addRow("Resumen", self.summary_edit)
+
+        self.detail_edit = QTextEdit()
+        self.detail_edit.setMinimumHeight(120)
+        form.addRow("Detalle", self.detail_edit)
+
+        follow_up_row = QHBoxLayout()
+        follow_up_row.setContentsMargins(0, 0, 0, 0)
+        follow_up_row.setSpacing(10)
+        self.follow_up_check = QCheckBox("Tiene seguimiento")
+        self.follow_up_date = QDateEdit()
+        self.follow_up_date.setCalendarPopup(True)
+        self.follow_up_date.setDisplayFormat("dd/MM/yyyy")
+        self._page.configure_dashboard_calendar(self.follow_up_date)
+        self.follow_up_date.setEnabled(False)
+        self.follow_up_check.toggled.connect(self.follow_up_date.setEnabled)
+        follow_up_row.addWidget(self.follow_up_check)
+        follow_up_row.addWidget(self.follow_up_date)
+        follow_up_row.addStretch(1)
+        follow_up_container = QWidget()
+        follow_up_container.setLayout(follow_up_row)
+        form.addRow("Seguimiento", follow_up_container)
+
+        buttons = QDialogButtonBox()
+        buttons.addButton("Guardar", QDialogButtonBox.ButtonRole.AcceptRole)
+        buttons.addButton("Cancelar", QDialogButtonBox.ButtonRole.RejectRole)
+        self.delete_btn: QPushButton | None = None
+        if self._activity is not None:
+            self.delete_btn = buttons.addButton("Eliminar", QDialogButtonBox.ButtonRole.DestructiveRole)
+            self.delete_btn.clicked.connect(self._delete_current_activity)
+        buttons.accepted.connect(self._save)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self._load_activity(default_customer_id=default_customer_id)
+
+    def _load_activity(self, *, default_customer_id: str) -> None:
+        if self._activity is None:
+            default_index = self.customer_combo.findData(str(default_customer_id or "").strip())
+            if default_index >= 0:
+                self.customer_combo.setCurrentIndex(default_index)
+            self.date_edit.setDate(QDate.currentDate())
+            self.follow_up_date.setDate(QDate.currentDate())
+            self.type_combo.setCurrentIndex(max(0, self.type_combo.findData("seguimiento")))
+            self.state_combo.setCurrentIndex(max(0, self.state_combo.findData("pendiente")))
+            self.priority_combo.setCurrentIndex(max(0, self.priority_combo.findData("normal")))
+            return
+
+        customer_index = self.customer_combo.findData(str(getattr(self._activity, "cliente_id", "") or "").strip())
+        if customer_index >= 0:
+            self.customer_combo.setCurrentIndex(customer_index)
+        self.date_edit.setDate(self._page.qdate_from_value(getattr(self._activity, "fecha_actividad", None)))
+        self.follow_up_date.setDate(self._page.qdate_from_value(getattr(self._activity, "fecha_seguimiento", None), fallback_today=True))
+        self.type_combo.setCurrentIndex(max(0, self.type_combo.findData(str(getattr(self._activity, "tipo", "") or "nota"))))
+        self.state_combo.setCurrentIndex(max(0, self.state_combo.findData(str(getattr(self._activity, "estado", "") or "pendiente"))))
+        self.priority_combo.setCurrentIndex(max(0, self.priority_combo.findData(str(getattr(self._activity, "prioridad", "") or "normal").strip().lower())))
+        self.responsible_edit.setText(str(getattr(self._activity, "responsable", "") or ""))
+        self.summary_edit.setText(str(getattr(self._activity, "resumen", "") or ""))
+        self.detail_edit.setPlainText(str(getattr(self._activity, "detalle", "") or ""))
+        has_follow_up = getattr(self._activity, "fecha_seguimiento", None) is not None
+        self.follow_up_check.setChecked(has_follow_up)
+        self.follow_up_date.setEnabled(has_follow_up)
+
+    def _save(self) -> None:
+        customer_id = str(self.customer_combo.currentData() or "").strip()
+        if not customer_id:
+            QMessageBox.warning(self, "Agenda", "Selecciona un cliente.")
+            return
+        summary = self.summary_edit.text().strip()
+        detail = self.detail_edit.toPlainText().strip()
+        if not summary and not detail:
+            QMessageBox.warning(self, "Agenda", "El resumen o el detalle no pueden quedar vacÃ­os.")
+            return
+        payload = {
+            "cliente_id": customer_id,
+            "fecha_actividad": self.date_edit.date().toString("yyyy-MM-dd"),
+            "tipo": str(self.type_combo.currentData() or "nota"),
+            "estado": str(self.state_combo.currentData() or "pendiente"),
+            "resumen": summary,
+            "detalle": detail,
+            "fecha_seguimiento": self.follow_up_date.date().toString("yyyy-MM-dd") if self.follow_up_check.isChecked() else "",
+            "prioridad": str(self.priority_combo.currentData() or "normal"),
+            "responsable": self.responsible_edit.text().strip(),
+        }
+        try:
+            self._page.customer_service.upsert_agenda_activity(self._agenda_id, payload)
+        except Exception as exc:
+            QMessageBox.warning(self, "Agenda", f"No se pudo guardar la actividad: {exc}")
+            return
+        self.accept()
+
+    def _delete_current_activity(self) -> None:
+        if self._activity is None:
+            return
+        answer = QMessageBox.question(self, "Agenda", "La actividad se eliminará de la agenda.\n\n¿Continuar?")
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self._page.customer_service.delete_agenda_activity(str(getattr(self._activity, "agenda_id", "") or ""))
+        except Exception as exc:
+            QMessageBox.warning(self, "Agenda", f"No se pudo eliminar la actividad: {exc}")
+            return
+        self.accept()
+
+
+class DashboardAgendaOverviewDialog(QDialog):
+    def __init__(self, page: "DashboardPage", parent: QWidget | None = None) -> None:
+        super().__init__(parent or page)
+        self._page = page
+        self._changed = False
+        self.setWindowTitle("Agenda de clientes")
+        self.resize(1120, 640)
+        self._build_ui()
+        self.refresh()
+
+    @property
+    def changed(self) -> bool:
+        return self._changed
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(12)
+
+        title = QLabel("Agenda completa")
+        layout.addWidget(title)
+
+        self.summary_label = QLabel("")
+        layout.addWidget(self.summary_label)
+
+        self.table = QTableWidget(0, 8)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setAlternatingRowColors(True)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setHorizontalHeaderLabels(["Fecha", "Seguimiento", "Cliente", "Isla", "Tipo", "Estado", "Resumen", "Responsable"])
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.cellDoubleClicked.connect(self._edit_selected)
+        layout.addWidget(self.table, 1)
+
+        actions = QHBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.setSpacing(8)
+        self.new_btn = QPushButton("Nueva actividad")
+        self.new_btn.clicked.connect(self._create_activity)
+        actions.addWidget(self.new_btn)
+        self.edit_btn = QPushButton("Editar")
+        self.edit_btn.clicked.connect(self._edit_selected)
+        actions.addWidget(self.edit_btn)
+        actions.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
+        self.close_btn = QPushButton("Cerrar")
+        self.close_btn.clicked.connect(self.accept)
+        actions.addWidget(self.close_btn)
+        layout.addLayout(actions)
+
+    def refresh(self) -> None:
+        rows = self._page.dashboard_service.list_all_activities()
+        self.summary_label.setText(f"{len(rows)} actividad(es) activas en agenda.")
+        self.table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            values = [
+                self._page.format_date(row.fecha_actividad),
+                self._page.format_date(row.fecha_seguimiento, allow_blank=True),
+                self._page.customer_label(row.cliente_codigo, row.cliente_nombre),
+                row.isla_nombre or "Sin isla",
+                self._page.agenda_type_label(row.tipo),
+                self._page.agenda_state_label(row.estado),
+                row.resumen or row.detalle or "-",
+                row.responsable or "-",
+            ]
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                item.setData(Qt.ItemDataRole.UserRole, row.agenda_id)
+                self.table.setItem(row_index, column, item)
+        if rows:
+            self.table.selectRow(0)
+
+    def _selected_agenda_id(self) -> str:
+        selected = self.table.selectionModel().selectedRows()
+        if not selected:
+            return ""
+        item = self.table.item(selected[0].row(), 0)
+        return str(item.data(Qt.ItemDataRole.UserRole) or "").strip() if item is not None else ""
+
+    def _create_activity(self) -> None:
+        dialog = DashboardAgendaDialog(self._page, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._changed = True
+            self.refresh()
+
+    def _edit_selected(self, *_args) -> None:
+        agenda_id = self._selected_agenda_id()
+        if not agenda_id:
+            return
+        dialog = DashboardAgendaDialog(self._page, agenda_id=agenda_id, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._changed = True
+            self.refresh()
 
 
 class DashboardMonthCalendar(QCalendarWidget):
@@ -317,7 +592,7 @@ class DashboardPage(QWidget):
         reactivation_panel = self._build_table_panel('Clientes a reactivar', 'dashboardReactivationPanel')
         self.reactivation_table = QTableWidget(0, 5)
         self.reactivation_table.setObjectName('dashboardReactivationTable')
-        self.reactivation_table.setHorizontalHeaderLabels(['Cliente', 'Isla', 'Último contacto', 'Variación kg', 'Prioridad'])
+        self.reactivation_table.setHorizontalHeaderLabels(['Cliente', 'Isla', 'Ãšltimo contacto', 'VariaciÃ³n kg', 'Prioridad'])
         self._configure_table(self.reactivation_table)
         header = self.reactivation_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -585,7 +860,7 @@ class DashboardPage(QWidget):
         self.sales_kpi_notes: dict[str, QLabel] = {}
         for column, (key, title, tone, icon_name) in enumerate([
             ('total_kg', 'Kg vendidos', 'blue', 'scale.svg'),
-            ('delta_kg', 'Variación kg', 'blue', 'trending-down.svg'),
+            ('delta_kg', 'VariaciÃ³n kg', 'blue', 'trending-down.svg'),
             ('active_customers', 'Clientes activos', 'green', 'briefcase.svg'),
             ('active_islands', 'Islas activas', 'orange', 'map.svg'),
         ]):
@@ -603,7 +878,7 @@ class DashboardPage(QWidget):
         drops_panel = self._build_table_panel('Mayores bajadas por cliente', 'dashboardSalesDropsPanel')
         self.sales_drops_table = QTableWidget(0, 5)
         self.sales_drops_table.setObjectName('dashboardSalesDropsTable')
-        self.sales_drops_table.setHorizontalHeaderLabels(['Cliente', 'Isla', 'Kg ant.', 'Kg act.', 'Δ Kg'])
+        self.sales_drops_table.setHorizontalHeaderLabels(['Cliente', 'Isla', 'Kg ant.', 'Kg act.', 'Î” Kg'])
         self._configure_table(self.sales_drops_table)
         drops_header = self.sales_drops_table.horizontalHeader()
         drops_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -616,7 +891,7 @@ class DashboardPage(QWidget):
         islands_panel = self._build_table_panel('Ventas por isla', 'dashboardSalesIslandsPanel')
         self.sales_islands_table = QTableWidget(0, 5)
         self.sales_islands_table.setObjectName('dashboardSalesIslandsTable')
-        self.sales_islands_table.setHorizontalHeaderLabels(['Isla', 'Clientes', 'Kg act.', 'Δ Kg', '%'])
+        self.sales_islands_table.setHorizontalHeaderLabels(['Isla', 'Clientes', 'Kg act.', 'Î” Kg', '%'])
         self._configure_table(self.sales_islands_table)
         islands_header = self.sales_islands_table.horizontalHeader()
         islands_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -633,7 +908,7 @@ class DashboardPage(QWidget):
         types_panel = self._build_table_panel('Ventas por tipo de cliente', 'dashboardSalesTypesPanel')
         self.sales_types_table = QTableWidget(0, 5)
         self.sales_types_table.setObjectName('dashboardSalesTypesTable')
-        self.sales_types_table.setHorizontalHeaderLabels(['Tipo', 'Clientes', 'Kg act.', 'Δ Kg', '%'])
+        self.sales_types_table.setHorizontalHeaderLabels(['Tipo', 'Clientes', 'Kg act.', 'Î” Kg', '%'])
         self._configure_table(self.sales_types_table)
         types_header = self.sales_types_table.horizontalHeader()
         types_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -770,7 +1045,7 @@ class DashboardPage(QWidget):
         self._reload_island_table(snapshot.island_rows)
         self._reload_agenda_calendar_panel(self.dashboard_service.list_all_activities(), today_value=date.today())
         self.footer_label.setText(
-            f'Última actualización: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} · {snapshot.reactivation_metric_label}'
+            f'Ãšltima actualizaciÃ³n: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} Â· {snapshot.reactivation_metric_label}'
         )
 
     def _reload_today_panel(self, rows: list[DashboardActivityRow], selected_day: date) -> None:
@@ -785,7 +1060,7 @@ class DashboardPage(QWidget):
             self.today_panel_title.setText(f'Agenda del {self.format_date(selected_day)}')
         filtered = [row for row in rows if row.fecha_actividad == selected_day] if selected_day != date.today() else list(rows)
         if not filtered:
-            empty = QLabel('No hay actividades para el día seleccionado.')
+            empty = QLabel('No hay actividades para el dÃ­a seleccionado.')
             empty.setObjectName('dashboardEmptyLabel')
             empty.setWordWrap(True)
             empty.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
@@ -797,11 +1072,11 @@ class DashboardPage(QWidget):
             layout = QVBoxLayout(card)
             layout.setContentsMargins(10, 10, 10, 10)
             layout.setSpacing(4)
-            customer = QLabel(f'{row.cliente_codigo} · {row.cliente_nombre}')
+            customer = QLabel(f'{row.cliente_codigo} Â· {row.cliente_nombre}')
             customer.setObjectName('dashboardActivityCustomer')
             summary = QLabel(row.resumen)
             summary.setObjectName('dashboardActivitySummary')
-            detail = QLabel(f'{row.isla_nombre} · {row.estado}')
+            detail = QLabel(f'{row.isla_nombre} Â· {row.estado}')
             detail.setObjectName('dashboardActivityDetail')
             layout.addWidget(customer)
             layout.addWidget(summary)
@@ -812,7 +1087,7 @@ class DashboardPage(QWidget):
         self.reactivation_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
-                f'{row.cliente_codigo} · {row.cliente_nombre}',
+                f'{row.cliente_codigo} Â· {row.cliente_nombre}',
                 row.isla_nombre,
                 self.format_date(row.last_contact) if row.last_contact else 'Sin registro',
                 self._format_number_es(row.delta_kg, suffix=' kg', signed=True),
@@ -855,12 +1130,12 @@ class DashboardPage(QWidget):
         if self.current_dashboard == 'ventas':
             self._open_sales_page()
             return
-        QMessageBox.information(self, 'Agenda', 'La creaci?n de actividades se incorporar? en el siguiente corte limpio.')
+        self._open_new_activity()
     def _handle_secondary_action(self) -> None:
         if self.current_dashboard in {'pedidos', 'almacen', 'ventas'}:
             self.reload()
             return
-        QMessageBox.information(self, 'Agenda', 'La vista completa de agenda se incorporar? en el siguiente corte limpio.')
+        self._open_full_agenda()
     def _set_dashboard_mode(self, mode: str, *, reload: bool = True) -> None:
         clean_mode = mode if mode in {'agenda', 'pedidos', 'almacen', 'ventas'} else 'agenda'
         self.current_dashboard = clean_mode
@@ -994,7 +1269,7 @@ class DashboardPage(QWidget):
         self.sales_kpi_labels['total_kg'].setText(self._format_number_es(snapshot.total_kg))
         self.sales_kpi_notes['total_kg'].setText(f'kg vendidos en {snapshot.year}')
         self.sales_kpi_labels['delta_kg'].setText(self._format_number_es(snapshot.delta_kg, signed=True))
-        self.sales_kpi_notes['delta_kg'].setText(f'vs {snapshot.previous_year} · {self._format_number_es(snapshot.delta_pct, signed=True, suffix=" %")}')
+        self.sales_kpi_notes['delta_kg'].setText(f'vs {snapshot.previous_year} Â· {self._format_number_es(snapshot.delta_pct, signed=True, suffix=" %")}')
         self.sales_kpi_labels['active_customers'].setText(str(snapshot.active_customers))
         self.sales_kpi_notes['active_customers'].setText('clientes activos')
         self.sales_kpi_labels['active_islands'].setText(str(snapshot.active_islands))
@@ -1007,14 +1282,14 @@ class DashboardPage(QWidget):
         self._populate_sales_types_table(snapshot.type_rows)
         self._populate_sales_zero_table(snapshot.zero_consumption_rows)
         self.footer_label.setText(
-            f'Última actualización: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} · Ventas {snapshot.year} vs {snapshot.previous_year}'
+            f'Ãšltima actualizaciÃ³n: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} Â· Ventas {snapshot.year} vs {snapshot.previous_year}'
         )
 
     def _populate_sales_drops_table(self, rows: list[DashboardSalesCustomerRow]) -> None:
         self.sales_drops_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
-                f'{row.cliente_codigo} · {row.cliente_nombre}',
+                f'{row.cliente_codigo} Â· {row.cliente_nombre}',
                 row.isla,
                 self._format_number_es(row.kg_prev, suffix=' kg'),
                 self._format_number_es(row.kg_curr, suffix=' kg'),
@@ -1053,7 +1328,7 @@ class DashboardPage(QWidget):
         self.sales_zero_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
-                f'{row.cliente_codigo} · {row.cliente_nombre}',
+                f'{row.cliente_codigo} Â· {row.cliente_nombre}',
                 row.isla,
                 row.cliente_tipo,
                 self._format_number_es(row.kg_prev, suffix=' kg'),
@@ -1125,8 +1400,86 @@ class DashboardPage(QWidget):
         QMessageBox.information(self, 'Dashboard', 'La p?gina de Almac?n no est? disponible en esta ventana.')
 
 
+    def customer_choices(self, *, include_inactive: bool = False) -> list[tuple[str, str]]:
+        rows = self.customer_service.list('')
+        out: list[tuple[str, str]] = []
+        for row in rows:
+            if not include_inactive and getattr(row, 'activo', True) in {False, 0, '0', 'false', 'False'}:
+                continue
+            customer_id = str(getattr(row, 'cliente_id', '') or '').strip()
+            if not customer_id:
+                continue
+            label = self.customer_label(getattr(row, 'cliente_codigo', ''), str(getattr(row, 'cliente_nombre_comercial', '') or getattr(row, 'cliente_nombre_fiscal', '') or customer_id))
+            out.append((customer_id, label))
+        return out
+
+    @staticmethod
+    def agenda_type_options() -> list[tuple[str, str]]:
+        return [
+            ('visita_prevista', 'Visita prevista'),
+            ('visita_realizada', 'Visita realizada'),
+            ('llamada', 'Llamada'),
+            ('seguimiento', 'Seguimiento'),
+            ('desarrollo_futuro', 'Desarrollo futuro'),
+            ('incidencia', 'Incidencia'),
+            ('nota', 'Nota'),
+        ]
+
+    @staticmethod
+    def agenda_state_options() -> list[tuple[str, str]]:
+        return [('pendiente', 'Pendiente'), ('hecho', 'Hecha'), ('aplazado', 'Aplazada'), ('cancelado', 'Cancelada')]
+
+    def agenda_type_label(self, value: str) -> str:
+        return dict(self.agenda_type_options()).get(str(value or '').strip().lower(), str(value or '').strip() or 'Nota')
+
+    def agenda_state_label(self, value: str) -> str:
+        return dict(self.agenda_state_options()).get(str(value or '').strip().lower(), str(value or '').strip() or 'Pendiente')
+
+    def qdate_from_value(self, value: object, *, fallback_today: bool = False) -> QDate:
+        if isinstance(value, QDate):
+            return value
+        if hasattr(value, 'year') and hasattr(value, 'month') and hasattr(value, 'day'):
+            return QDate(int(value.year), int(value.month), int(value.day))
+        parsed = QDate.fromString(str(value or ''), 'yyyy-MM-dd')
+        if parsed.isValid():
+            return parsed
+        return QDate.currentDate() if fallback_today else QDate()
+
+    def configure_dashboard_calendar(self, date_edit: QDateEdit) -> None:
+        date_edit.setCalendarPopup(True)
+        date_edit.setDisplayFormat('dd/MM/yyyy')
+        calendar = date_edit.calendarWidget()
+        if calendar is not None:
+            calendar.setObjectName('dashboardPopupCalendar')
+
+    @staticmethod
+    def customer_label(code: object, name: str) -> str:
+        code_text = str(code or '').strip()
+        name_text = str(name or '').strip()
+        return f'{code_text} Â· {name_text}' if code_text else name_text
+
+    def _open_new_activity(self) -> None:
+        if not self.customer_choices():
+            QMessageBox.warning(self, 'Agenda', 'No hay clientes disponibles para registrar actividades.')
+            return
+        dialog = DashboardAgendaDialog(self, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.reload()
+
+    def _open_full_agenda(self) -> None:
+        dialog = DashboardAgendaOverviewDialog(self, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.changed:
+            self.reload()
+        elif dialog.changed:
+            self.reload()
+
+    def _open_activity_dialog(self, *, agenda_id: str = '', default_customer_id: str = '') -> None:
+        dialog = DashboardAgendaDialog(self, agenda_id=agenda_id, default_customer_id=default_customer_id, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.reload()
+
     def _show_placeholder_dashboard(self, name: str) -> None:
-        QMessageBox.information(self, 'Dashboard', f'El dashboard de {name} se implementará en una siguiente fase.')
+        QMessageBox.information(self, 'Dashboard', f'El dashboard de {name} se implementarÃ¡ en una siguiente fase.')
 
     def _open_sales_page(self) -> None:
         window = self.window()
@@ -1135,7 +1488,7 @@ class DashboardPage(QWidget):
         if isinstance(page_names, list) and callable(setter) and 'Ventas' in page_names:
             setter(page_names.index('Ventas'))
             return
-        QMessageBox.information(self, 'Dashboard', 'La página de Ventas no está disponible en esta ventana.')
+        QMessageBox.information(self, 'Dashboard', 'La pÃ¡gina de Ventas no estÃ¡ disponible en esta ventana.')
 
 
 
@@ -1172,12 +1525,12 @@ class DashboardPage(QWidget):
         return normalized or 'pending'
 
     @staticmethod
-    def format_date(value: date | None, *, long: bool = False) -> str:
+    def format_date(value: date | None, *, long: bool = False, allow_blank: bool = False) -> str:
         if value is None:
-            return ''
+            return '' if allow_blank else ''
         if long:
             months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-            weekdays = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+            weekdays = ['lunes', 'martes', 'miÃ©rcoles', 'jueves', 'viernes', 'sÃ¡bado', 'domingo']
             return f"{weekdays[value.weekday()]}, {value.day:02d} de {months[value.month - 1]} de {value.year}"
         return value.strftime('%d/%m/%Y')
 
