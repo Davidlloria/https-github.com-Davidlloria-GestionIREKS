@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QComboBox,
+    QCompleter,
     QDateEdit,
     QDialog,
     QDialogButtonBox,
@@ -1184,7 +1185,17 @@ class OrdersPage(QWidget):
         self.month_to_filter = QComboBox()
         self.month_to_filter.currentIndexChanged.connect(self.reload)
         self.almacen_filter = QComboBox()
+        self.almacen_filter.setEditable(True)
+        self.almacen_filter.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.almacen_filter.currentIndexChanged.connect(self.reload)
+        almacen_completer = self.almacen_filter.completer()
+        if almacen_completer is not None:
+            almacen_completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+            almacen_completer.setFilterMode(Qt.MatchFlag.MatchContains)
+            almacen_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        almacen_line_edit = self.almacen_filter.lineEdit()
+        if almacen_line_edit is not None:
+            almacen_line_edit.setPlaceholderText("Buscar cliente o distribuidor...")
 
         self.year_filter.setMinimumWidth(90)
         self.month_from_filter.setMinimumWidth(120)
@@ -1700,6 +1711,33 @@ class OrdersPage(QWidget):
         idx = self.almacen_filter.findData(current)
         self.almacen_filter.setCurrentIndex(idx if idx >= 0 else 0)
         self.almacen_filter.blockSignals(False)
+
+    def _selected_almacen_id(self) -> str:
+        current = str(self.almacen_filter.currentData() or "").strip()
+        if current:
+            return current
+        line_edit = self.almacen_filter.lineEdit()
+        typed_text = str(line_edit.text() if line_edit is not None else self.almacen_filter.currentText() or "").strip()
+        if not typed_text:
+            return ""
+        normalized_typed = typed_text.casefold()
+        exact_index = -1
+        partial_matches: list[int] = []
+        for index in range(self.almacen_filter.count()):
+            item_text = str(self.almacen_filter.itemText(index) or "").strip()
+            if not item_text or item_text.casefold() == "todos":
+                continue
+            normalized_item = item_text.casefold()
+            if normalized_item == normalized_typed:
+                exact_index = index
+                break
+            if normalized_typed in normalized_item:
+                partial_matches.append(index)
+        target_index = exact_index if exact_index >= 0 else (partial_matches[0] if len(partial_matches) == 1 else -1)
+        if target_index < 0:
+            return ""
+        self.almacen_filter.setCurrentIndex(target_index)
+        return str(self.almacen_filter.itemData(target_index) or "").strip()
 
     def _load_period_filters(self, pedidos: list[Pedido]) -> None:
         current_year = str(self.year_filter.currentData() or "")
@@ -2519,7 +2557,7 @@ class OrdersPage(QWidget):
             QMessageBox.warning(self, "Pedidos", f"No se pudo guardar.\n{exc}")
 
     def _new_order(self) -> None:
-        almacen_id = str(self.almacen_filter.currentData() or "").strip()
+        almacen_id = self._selected_almacen_id()
         if not almacen_id:
             QMessageBox.warning(self, "Pedidos", "Selecciona un Cliente/Distribuidor para crear el pedido.")
             return

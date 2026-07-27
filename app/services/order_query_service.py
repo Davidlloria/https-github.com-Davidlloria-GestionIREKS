@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 
 from app.core.database import engine
 from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
-from app.models import Albaran, AlbaranItem, Cliente, Fabricante, Familia, IngredienteIreks, Pedido, PedidoItem, PedidoPendiente, Subfamilia
+from app.models import Albaran, AlbaranItem, Cliente, Distribuidor, Fabricante, Familia, IngredienteIreks, Pedido, PedidoItem, PedidoPendiente, Subfamilia
 from app.schemas.orders import (
     OrderItemListResponse,
     OrderItemRead,
@@ -52,6 +52,36 @@ class WarehouseFilterOption:
 
 
 class OrderQueryService:
+    @staticmethod
+    def _warehouse_display_name(primary: str, secondary: str, fallback: str) -> str:
+        label = str(primary or "").strip() or str(secondary or "").strip()
+        return label or fallback
+
+    def _warehouse_name_map(self, clientes: list[Cliente], distribuidores: list[Distribuidor]) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        for row in distribuidores:
+            distribuidor_id = str(getattr(row, "distribuidor_id", "") or "").strip()
+            if not distribuidor_id:
+                continue
+            mapping[distribuidor_id] = self._warehouse_display_name(
+                str(getattr(row, "distribuidor_nombre_comercial", "") or "").strip(),
+                str(getattr(row, "distribuidor_razon_social", "") or "").strip(),
+                distribuidor_id,
+            )
+        for row in clientes:
+            tipo = str(getattr(row, "cliente_tipo", "") or "").strip().lower()
+            if tipo not in {"distribuidor", "directo", "cliente directo", "cliente_directo"}:
+                continue
+            cliente_id = str(getattr(row, "cliente_id", "") or "").strip()
+            if not cliente_id:
+                continue
+            mapping[cliente_id] = self._warehouse_display_name(
+                str(getattr(row, "cliente_nombre_comercial", "") or "").strip(),
+                str(getattr(row, "cliente_nombre_fiscal", "") or "").strip(),
+                cliente_id,
+            )
+        return mapping
+
     def list_active_ingredients(self) -> list[IngredienteIreks]:
         with Session(engine) as session:
             return list(
@@ -457,19 +487,12 @@ class OrderQueryService:
 
     def warehouse_filter_options(self) -> list[WarehouseFilterOption]:
         with Session(engine) as session:
-            rows = list(session.exec(select(Cliente).order_by(Cliente.cliente_nombre_comercial)))
+            clientes = list(session.exec(select(Cliente).order_by(Cliente.cliente_nombre_comercial)))
+            distribuidores = list(session.exec(select(Distribuidor).order_by(Distribuidor.distribuidor_nombre_comercial)))
+        name_map = self._warehouse_name_map(clientes, distribuidores)
         options = [WarehouseFilterOption("Todos", "")]
-        for row in rows:
-            tipo = str(getattr(row, "cliente_tipo", "") or "").strip().lower()
-            if tipo not in {"distribuidor", "directo", "cliente directo", "cliente_directo"}:
-                continue
-            cliente_id = str(getattr(row, "cliente_id", "") or "").strip()
-            if not cliente_id:
-                continue
-            label = str(getattr(row, "cliente_nombre_comercial", "") or "").strip() or str(
-                getattr(row, "cliente_nombre_fiscal", "") or ""
-            ).strip()
-            options.append(WarehouseFilterOption(label or cliente_id, cliente_id))
+        for value, label in sorted(name_map.items(), key=lambda item: item[1].casefold()):
+            options.append(WarehouseFilterOption(label, value))
         return options
 
     def list_raw_orders(self) -> list[Pedido]:
@@ -489,12 +512,8 @@ class OrderQueryService:
         pedidos = self.list_raw_orders()
         with Session(engine) as session:
             clientes = list(session.exec(select(Cliente)))
-        cliente_name_by_id = {
-            str(row.cliente_id or ""): (
-                str(row.cliente_nombre_comercial or "").strip() or str(row.cliente_nombre_fiscal or "").strip()
-            )
-            for row in clientes
-        }
+            distribuidores = list(session.exec(select(Distribuidor)))
+        cliente_name_by_id = self._warehouse_name_map(clientes, distribuidores)
 
         filtered = self._filter_orders(
             pedidos,

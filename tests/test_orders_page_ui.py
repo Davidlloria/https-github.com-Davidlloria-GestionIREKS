@@ -57,3 +57,21 @@ def test_pendientes_tab_uses_accumulated_pending_columns(monkeypatch) -> None:
     page.close()
     page.deleteLater()
     QApplication.processEvents()
+
+
+def test_new_order_uses_typed_almacen_filter_text(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(OrdersPage, "reload", lambda self: None)
+    page = OrdersPage()
+
+    page.almacen_filter.addItem("Todos", "")
+    page.almacen_filter.addItem("Distribuidor Norte", "dist-norte")
+    page.almacen_filter.addItem("Cliente Sur", "cli-sur")
+    page.almacen_filter.setCurrentIndex(0)
+    page.almacen_filter.lineEdit().setText("norte")
+
+    assert page._selected_almacen_id() == "dist-norte"
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
