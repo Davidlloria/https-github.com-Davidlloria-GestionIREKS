@@ -1,40 +1,59 @@
 # Dashboard icon backlog
 
-Fecha: 2026-07-26
-Rama de referencia: `feature/dashboard-orders-clean`
+Ultima actualizacion: 2026-07-27
+Rama de referencia principal: `main`
+Rama origen pendiente de extraccion: `feature/pedidos-window-tweaks`
 
-## Dashboard pedidos
+## Objetivo del backlog
 
-Estos son los iconos originalmente previstos para el dashboard de pedidos y que no estaban disponibles en `assets/icons/` en el momento de la implementacion.
+Registrar los iconos que faltan o que deben revisarse en cada movimiento de limpieza del dashboard, para restaurarlos de forma controlada mas adelante.
 
-| Uso en UI | Icono previsto | Estado actual | Nota |
+## Estado por movimientos ya cerrados
+
+### Dashboard agenda
+
+Sin backlog abierto especifico en este momento.
+
+### Dashboard pedidos
+
+Estado actual: sin faltantes criticos registrados.
+
+Notas:
+
+- durante la extraccion limpia se revisaron y restauraron los iconos del dashboard de pedidos
+- si aparece alguna desviacion visual nueva, se registrara como incidencia nueva y no se reabre este bloque sin motivo funcional
+
+### Dashboard almacen
+
+Estado actual: sin faltantes criticos registrados.
+
+Notas:
+
+- el dashboard de almacen ya tiene su corte limpio integrado en `main`
+- no quedan iconos pendientes documentados para este bloque
+
+## Proximo movimiento: dashboard ventas
+
+Iconos usados por el bloque en `feature/pedidos-window-tweaks` que no constan ahora mismo en `assets/icons/` de `main`:
+
+| Uso en UI | Icono esperado en rama feature | Estado en `main` | Nota |
 |---|---|---|---|
-| KPI `Kg recibidos` | `package-check.svg` | sustituido temporalmente por `circle-check.svg` | Buscar o disenar un icono de paquete recibido / validado. |
-| KPI `Kg pendientes` | `package-open.svg` | sustituido temporalmente por `clipboard-list.svg` | Buscar o disenar un icono de paquete pendiente / abierto. |
-| KPI `Incidencias` | `alert.svg` | sustituido temporalmente por `clock-3.svg` | Buscar o disenar un icono de alerta / incidencia. |
-| Boton header `Actualizar` en modo `Pedidos` | `package-open.svg` | sustituido temporalmente por `clipboard-list.svg` | Reutilizar el icono definitivo de pendiente / abierto cuando exista. |
+| Boton lateral `Ventas` | `bar-chart-3.svg` | no disponible | Incorporar antes o durante la extraccion limpia. |
+| Boton header principal en modo `Ventas` | `bar-chart-3.svg` | no disponible | Debe reutilizar el mismo icono del boton lateral. |
+| KPI `Variacion kg` | `trending-down.svg` | no disponible | Confirmar si se mantiene ese nombre o se sustituye por otro equivalente. |
+| KPI `Clientes activos` | `briefcase.svg` | no disponible | Pendiente de incorporar. |
+| KPI `Islas activas` | `map.svg` | no disponible | Pendiente de incorporar. |
 
+## Movimiento posterior previsto: dashboard objetivos
 
-## Dashboard almacen
-
-Estos son los iconos previstos y actualmente utilizados por el dashboard de almacen.
-
-| Uso en UI | Icono previsto | Estado actual | Nota |
+| Uso en UI | Icono esperado en rama feature | Estado en `main` | Nota |
 |---|---|---|---|
-| KPI `Stock total` | `package.svg` | disponible en repo | OK. |
-| KPI `Riesgos` | `alert.svg` | disponible en repo | OK. |
-| KPI `Entradas mes` | `database-down.svg` | disponible en repo | OK. |
-| KPI `Salidas mes` | `database-up.svg` | disponible en repo | OK. |
-| Boton sidebar `Almacen` | `warehouse.svg` | disponible en repo | OK. |
-| Boton header `Ver almacen` | `warehouse.svg` | disponible en repo | OK. |
-| Boton header `Actualizar` en modo `Almacen` | `package-search.svg` | disponible en repo | OK. |
+| Boton lateral `Objetivos` | `goal.svg` | no disponible | Registrar para incorporarlo cuando se extraiga el boton/placeholder. |
 
-## Criterio para incorporarlos mas adelante
+## Regla de actualizacion
 
-- Guardarlos en `assets/icons/`.
-- Mantener nombres exactos:
-  - `package-check.svg`
-  - `package-open.svg`
-  - `alert.svg`
-- Sustituir las referencias temporales en `app/ui/widgets/dashboard_page.py`.
-- Validar visualmente el dashboard de pedidos despues del cambio.
+Cada vez que se extraiga un bloque nuevo de dashboard:
+
+1. registrar aqui los iconos faltantes detectados en ese corte
+2. incorporarlos al repo cuando corresponda
+3. cerrar la entrada cuando el bloque quede integrado y validado en `main`
