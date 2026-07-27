@@ -32,17 +32,18 @@ Notas:
 - el dashboard de almacen ya tiene su corte limpio integrado en `main`
 - no quedan iconos pendientes documentados para este bloque
 
-## Proximo movimiento: dashboard ventas
+## Dashboard ventas
 
-Iconos usados por el bloque en `feature/pedidos-window-tweaks` que no constan ahora mismo en `assets/icons/` de `main`:
+Estado actual: extraido e integrado en `main`.
 
-| Uso en UI | Icono esperado en rama feature | Estado en `main` | Nota |
-|---|---|---|---|
-| Boton lateral `Ventas` | `bar-chart-3.svg` | no disponible | Incorporar antes o durante la extraccion limpia. |
-| Boton header principal en modo `Ventas` | `bar-chart-3.svg` | no disponible | Debe reutilizar el mismo icono del boton lateral. |
-| KPI `Variacion kg` | `trending-down.svg` | no disponible | Confirmar si se mantiene ese nombre o se sustituye por otro equivalente. |
-| KPI `Clientes activos` | `briefcase.svg` | no disponible | Pendiente de incorporar. |
-| KPI `Islas activas` | `map.svg` | no disponible | Pendiente de incorporar. |
+Iconos ya incorporados en este movimiento:
+
+- `bar-chart-3.svg`
+- `trending-down.svg`
+- `briefcase.svg`
+- `map.svg`
+
+No queda backlog abierto de iconos para este bloque en este momento.
 
 ## Movimiento posterior previsto: dashboard objetivos
 

@@ -28,7 +28,8 @@ Flujo acordado:
 | 2026-07-27 | `feature/pedidos-pendientes-clean` | `d3cb90705` mergeado | Cerrado |
 | 2026-07-27 | ajuste directo en `main` | `c0de65be9` nombres de almacen en pedidos | Cerrado |
 | 2026-07-27 | ajuste directo en `main` | `6c18cf3b6` priorizacion de distribuidores en filtros | Cerrado |
-| 2026-07-27 | ajuste directo en `main` | `8a4fa542d` deduplicacion de variantes tipo CADELSA/IGSA | Cerrado |
+| 2026-07-27 | ajuste directo en main | 8a4fa542d deduplicacion de variantes tipo CADELSA/IGSA | Cerrado |
+| 2026-07-27 | eature/dashboard-sales-clean | Merge branch 'feature/dashboard-sales-clean' | Cerrado |
 
 ## Estado actual de ramas locales
 
@@ -41,26 +42,15 @@ Flujo acordado:
 
 Orden recomendado de extraccion restante:
 
-1. `dashboard ventas`
-2. `dashboard objetivos` (boton y placeholder)
-3. revisar si queda algun ajuste comun de `dashboard_page.py`
-4. despues, bloques no dashboard: pedidos, almacen, clientes, ventas AI
+1. `dashboard objetivos` (boton y placeholder)`r`n2. revisar si queda algun ajuste comun de `dashboard_page.py``r`n3. despues, bloques no dashboard: pedidos, almacen, clientes, ventas AI
 
-## Estado del siguiente corte: `dashboard ventas`
+## Estado del siguiente corte: `dashboard objetivos`
 
 Situacion verificada el 2026-07-27:
 
-- commit base detectado: `5e37ed9cf` (`feat: add sales dashboard view`)
-- no es seguro cherry-pick directo
-- el bloque esta mezclado con otros cambios del mismo `dashboard_page.py`
-- la extraccion correcta debe ser manual sobre una rama nueva, partiendo de `main`
-
-Archivos minimos previstos para el corte:
-
-- `app/services/sales_dashboard_service.py`
-- `app/ui/widgets/dashboard_page.py`
-- `tests/test_dashboard_page_ui.py`
-- iconos estrictamente usados por la vista de ventas
+- `dashboard ventas` ya fue extraido, validado y mergeado en `main`
+- el siguiente bloque recomendado pasa a ser `dashboard objetivos` (solo boton y placeholder)
+- despues de ese corte convendra revisar si queda algun ajuste comun residual en `dashboard_page.py`
 
 ## Criterio operativo
 
