@@ -44,13 +44,14 @@ Orden recomendado de extraccion restante:
 
 1. `dashboard objetivos` (boton y placeholder)`r`n2. revisar si queda algun ajuste comun de `dashboard_page.py``r`n3. despues, bloques no dashboard: pedidos, almacen, clientes, ventas AI
 
-## Estado del siguiente corte: `dashboard objetivos`
+## Estado del siguiente corte: revision residual de `dashboard_page.py`
 
 Situacion verificada el 2026-07-27:
 
 - `dashboard ventas` ya fue extraido, validado y mergeado en `main`
-- el siguiente bloque recomendado pasa a ser `dashboard objetivos` (solo boton y placeholder)
-- despues de ese corte convendra revisar si queda algun ajuste comun residual en `dashboard_page.py`
+- `dashboard objetivos` ya fue extraido, validado y mergeado en `main`
+- antes de salir de la zona dashboard conviene revisar si queda algun ajuste comun residual dentro de `dashboard_page.py`
+- despues de esa revision, el siguiente frente pasa a bloques no dashboard: pedidos, almacen, clientes y ventas AI
 
 ## Criterio operativo
 

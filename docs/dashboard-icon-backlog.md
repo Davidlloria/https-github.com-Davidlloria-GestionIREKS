@@ -45,11 +45,15 @@ Iconos ya incorporados en este movimiento:
 
 No queda backlog abierto de iconos para este bloque en este momento.
 
-## Movimiento posterior previsto: dashboard objetivos
+## Dashboard objetivos
 
-| Uso en UI | Icono esperado en rama feature | Estado en `main` | Nota |
-|---|---|---|---|
-| Boton lateral `Objetivos` | `goal.svg` | no disponible | Registrar para incorporarlo cuando se extraiga el boton/placeholder. |
+Estado actual: extraido e integrado en `main`.
+
+Icono ya incorporado en este movimiento:
+
+- `goal.svg`
+
+No queda backlog abierto de iconos para este bloque en este momento.
 
 ## Regla de actualizacion
 
