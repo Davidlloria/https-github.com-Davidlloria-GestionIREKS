@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
+import re
 from typing import Any, cast
 
 from sqlmodel import Session, select
@@ -57,17 +58,30 @@ class OrderQueryService:
         label = str(primary or "").strip() or str(secondary or "").strip()
         return label or fallback
 
+    @staticmethod
+    def _warehouse_brand_key(label: str) -> str:
+        cleaned = re.sub(r"\[[^\]]*\]", " ", str(label or "").upper())
+        tokens = [token for token in re.split(r"[^A-Z0-9]+", cleaned) if token]
+        return tokens[0] if tokens else ""
+
     def _warehouse_name_map(self, clientes: list[Cliente], distribuidores: list[Distribuidor]) -> dict[str, str]:
         mapping: dict[str, str] = {}
+        distributor_brand_keys: set[str] = set()
+        distributor_labels_casefold: set[str] = set()
         for row in distribuidores:
             distribuidor_id = str(getattr(row, "distribuidor_id", "") or "").strip()
             if not distribuidor_id:
                 continue
-            mapping[distribuidor_id] = self._warehouse_display_name(
+            label = self._warehouse_display_name(
                 str(getattr(row, "distribuidor_nombre_comercial", "") or "").strip(),
                 str(getattr(row, "distribuidor_razon_social", "") or "").strip(),
                 distribuidor_id,
             )
+            mapping[distribuidor_id] = label
+            distributor_labels_casefold.add(label.casefold())
+            brand_key = self._warehouse_brand_key(label)
+            if brand_key:
+                distributor_brand_keys.add(brand_key)
         for row in clientes:
             tipo = str(getattr(row, "cliente_tipo", "") or "").strip().lower()
             if tipo not in {"distribuidor", "directo", "cliente directo", "cliente_directo"}:
@@ -80,7 +94,10 @@ class OrderQueryService:
                 str(getattr(row, "cliente_nombre_fiscal", "") or "").strip(),
                 cliente_id,
             )
-            if label.casefold() in {existing.casefold() for existing in mapping.values()}:
+            if label.casefold() in distributor_labels_casefold:
+                continue
+            brand_key = self._warehouse_brand_key(label)
+            if brand_key and brand_key in distributor_brand_keys:
                 continue
             mapping[cliente_id] = label
         return mapping

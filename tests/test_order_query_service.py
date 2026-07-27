@@ -289,3 +289,16 @@ def test_warehouse_filter_options_prefer_distributor_when_name_is_duplicated(iso
 
     igsa_options = [(row.label, row.value) for row in options if row.label == "IGSA"]
     assert igsa_options == [("IGSA", "dist-1")]
+
+
+def test_warehouse_filter_options_prefer_distributor_for_cadelsa_variants(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        session.add(Distribuidor(distribuidor_id="dist-1", distribuidor_codigo=1, distribuidor_nombre_comercial="CADELSA [LANZAROTE-FUERTEVENTURA]"))
+        session.add(Cliente(cliente_id="cli-1", cliente_codigo=2, cliente_nombre_comercial="CADELSA LZA", cliente_tipo="directo"))
+        session.commit()
+
+    service = OrderQueryService()
+    options = service.warehouse_filter_options()
+
+    cadelsa_options = [(row.label, row.value) for row in options if row.label.startswith("CADELSA")]
+    assert cadelsa_options == [("CADELSA [LANZAROTE-FUERTEVENTURA]", "dist-1")]
