@@ -19,6 +19,12 @@ from app.services.order_dashboard_service import (
     DashboardOrdersWarehouseRow,
     OrderDashboardSnapshot,
 )
+from app.services.sales_dashboard_service import (
+    DashboardSalesCustomerRow,
+    DashboardSalesIslandRow,
+    DashboardSalesTypeRow,
+    SalesDashboardSnapshot,
+)
 from app.services.warehouse_dashboard_service import (
     DashboardWarehouseMovementRow,
     DashboardWarehouseRiskRow,
@@ -104,6 +110,44 @@ class _StubOrderDashboardService:
             warehouse_rows=[DashboardOrdersWarehouseRow(almacen_id='alm-2', almacen_nombre='Cliente Centro', open_orders=3, pending_kg=1250.0, last_receipt=date(2026, 7, 21))],
             state_rows=[DashboardOrdersStateRow(status='Pendiente', count=4, kg=2100.0)],
             generated_at=datetime(2026, 7, 24, 10, 15, 0),
+        )
+
+
+
+class _StubSalesDashboardService:
+    def load_snapshot(self) -> SalesDashboardSnapshot:
+        return SalesDashboardSnapshot(
+            year=2026,
+            previous_year=2025,
+            total_kg=24500.0,
+            delta_kg=-1250.5,
+            delta_pct=-4.86,
+            active_customers=87,
+            active_islands=5,
+            customers_down=12,
+            customer_drop_rows=[
+                DashboardSalesCustomerRow(
+                    cliente_id='cli-31', cliente_codigo='431', cliente_nombre='Panaderia Azul', isla='Gran Canaria', cliente_tipo='Indirecto',
+                    kg_prev=1500.0, kg_curr=950.0, delta_kg=-550.0, delta_pct=-36.67,
+                )
+            ],
+            island_rows=[
+                DashboardSalesIslandRow(
+                    isla='Gran Canaria', customers=25, kg_prev=6400.0, kg_curr=7100.0, delta_kg=700.0, share_pct=28.98,
+                )
+            ],
+            type_rows=[
+                DashboardSalesTypeRow(
+                    cliente_tipo='Indirecto', customers=54, kg_curr=18400.0, delta_kg=-950.0, share_pct=75.10,
+                )
+            ],
+            zero_consumption_rows=[
+                DashboardSalesCustomerRow(
+                    cliente_id='cli-45', cliente_codigo='777', cliente_nombre='Cliente Dormido', isla='Lanzarote', cliente_tipo='Directo',
+                    kg_prev=250.0, kg_curr=0.0, delta_kg=-250.0, delta_pct=-100.0,
+                )
+            ],
+            generated_at=datetime(2026, 7, 24, 12, 45, 0),
         )
 
 
@@ -222,3 +266,32 @@ def test_dashboard_page_can_switch_to_warehouse_mode() -> None:
     page.close()
     page.deleteLater()
     QApplication.processEvents()
+
+
+def test_dashboard_page_can_switch_to_sales_mode() -> None:
+    _application()
+    page = DashboardPage(
+        customer_service=_StubCustomerService(),
+        dashboard_service=_StubDashboardService(),
+        sales_dashboard_service=_StubSalesDashboardService(),
+    )
+
+    page._set_dashboard_mode('ventas')
+
+    assert page.title_label.text() == 'Ventas'
+    assert page.dashboard_stack.currentWidget().objectName() == 'dashboardSalesView'
+    assert page.sales_kpi_labels['total_kg'].text() == '24.500,00'
+    assert page.sales_kpi_labels['delta_kg'].text() == '-1.250,50'
+    assert page.sales_kpi_labels['active_customers'].text() == '87'
+    assert page.sales_kpi_labels['active_islands'].text() == '5'
+    assert page.sales_drops_table.rowCount() == 1
+    assert page.sales_drops_table.item(0, 0).text() == '431 · Panaderia Azul'
+    assert page.sales_islands_table.rowCount() == 1
+    assert page.sales_types_table.rowCount() == 1
+    assert page.sales_zero_table.rowCount() == 1
+    assert 'Ventas 2026 vs 2025' in page.footer_label.text()
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+

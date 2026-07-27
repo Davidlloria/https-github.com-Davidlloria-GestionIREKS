@@ -38,6 +38,12 @@ from app.services.order_dashboard_service import (
     DashboardOrdersWarehouseRow,
     OrderDashboardService,
 )
+from app.services.sales_dashboard_service import (
+    DashboardSalesCustomerRow,
+    DashboardSalesIslandRow,
+    DashboardSalesTypeRow,
+    SalesDashboardService,
+)
 from app.services.warehouse_dashboard_service import (
     DashboardWarehouseMovementRow,
     DashboardWarehouseRiskRow,
@@ -118,6 +124,7 @@ class DashboardPage(QWidget):
         customer_service: CustomerService | None = None,
         dashboard_service: CustomerDashboardService | None = None,
         order_dashboard_service: OrderDashboardService | None = None,
+        sales_dashboard_service: SalesDashboardService | None = None,
         warehouse_dashboard_service: WarehouseDashboardService | None = None,
         parent: QWidget | None = None,
     ) -> None:
@@ -125,6 +132,7 @@ class DashboardPage(QWidget):
         self.customer_service = customer_service or CustomerService()
         self.dashboard_service = dashboard_service or CustomerDashboardService()
         self.order_dashboard_service = order_dashboard_service or OrderDashboardService()
+        self.sales_dashboard_service = sales_dashboard_service or SalesDashboardService()
         self.warehouse_dashboard_service = warehouse_dashboard_service or WarehouseDashboardService()
         self.setObjectName('dashboardPageRoot')
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -176,6 +184,13 @@ class DashboardPage(QWidget):
         almacen_btn.clicked.connect(lambda: self._set_dashboard_mode('almacen'))
         sidebar_layout.addWidget(almacen_btn)
         self.dashboard_nav_buttons['almacen'] = almacen_btn
+
+        ventas_btn = QPushButton('Ventas')
+        ventas_btn.setObjectName('dashboardSidebarButton')
+        ventas_btn.setMinimumHeight(58)
+        ventas_btn.clicked.connect(lambda: self._set_dashboard_mode('ventas'))
+        sidebar_layout.addWidget(ventas_btn)
+        self.dashboard_nav_buttons['ventas'] = ventas_btn
 
         sidebar_layout.addStretch(1)
         root_layout.addWidget(sidebar)
@@ -231,9 +246,11 @@ class DashboardPage(QWidget):
         self.dashboard_stack.setObjectName('dashboardContentStack')
         self.agenda_dashboard = self._build_agenda_dashboard()
         self.orders_dashboard = self._build_orders_dashboard()
+        self.sales_dashboard = self._build_sales_dashboard()
         self.warehouse_dashboard = self._build_warehouse_dashboard()
         self.dashboard_stack.addWidget(self.agenda_dashboard)
         self.dashboard_stack.addWidget(self.orders_dashboard)
+        self.dashboard_stack.addWidget(self.sales_dashboard)
         self.dashboard_stack.addWidget(self.warehouse_dashboard)
         self.content_layout.addWidget(self.dashboard_stack, 1)
 
@@ -546,6 +563,93 @@ class DashboardPage(QWidget):
 
 
 
+
+    def _build_sales_dashboard(self) -> QWidget:
+        widget = QWidget()
+        widget.setObjectName('dashboardSalesView')
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        kpi_row = QGridLayout()
+        kpi_row.setHorizontalSpacing(12)
+        kpi_row.setVerticalSpacing(12)
+        self.sales_kpi_labels: dict[str, QLabel] = {}
+        self.sales_kpi_notes: dict[str, QLabel] = {}
+        for column, (key, title, tone, icon_name) in enumerate([
+            ('total_kg', 'Kg vendidos', 'blue', 'scale.svg'),
+            ('delta_kg', 'Variación kg', 'blue', 'trending-down.svg'),
+            ('active_customers', 'Clientes activos', 'green', 'briefcase.svg'),
+            ('active_islands', 'Islas activas', 'orange', 'map.svg'),
+        ]):
+            card, value_label, note_label = self._build_kpi_card(title, tone, icon_name)
+            self.sales_kpi_labels[key] = value_label
+            self.sales_kpi_notes[key] = note_label
+            kpi_row.addWidget(card, 0, column)
+            kpi_row.setColumnStretch(column, 1)
+        layout.addLayout(kpi_row, 0)
+
+        upper_row = QHBoxLayout()
+        upper_row.setContentsMargins(0, 0, 0, 0)
+        upper_row.setSpacing(12)
+
+        drops_panel = self._build_table_panel('Mayores bajadas por cliente', 'dashboardSalesDropsPanel')
+        self.sales_drops_table = QTableWidget(0, 5)
+        self.sales_drops_table.setObjectName('dashboardSalesDropsTable')
+        self.sales_drops_table.setHorizontalHeaderLabels(['Cliente', 'Isla', 'Kg ant.', 'Kg act.', 'Δ Kg'])
+        self._configure_table(self.sales_drops_table)
+        drops_header = self.sales_drops_table.horizontalHeader()
+        drops_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        drops_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        for col in (2, 3, 4):
+            drops_header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        drops_panel.layout().addWidget(self.sales_drops_table)
+        upper_row.addWidget(drops_panel, 6)
+
+        islands_panel = self._build_table_panel('Ventas por isla', 'dashboardSalesIslandsPanel')
+        self.sales_islands_table = QTableWidget(0, 5)
+        self.sales_islands_table.setObjectName('dashboardSalesIslandsTable')
+        self.sales_islands_table.setHorizontalHeaderLabels(['Isla', 'Clientes', 'Kg act.', 'Δ Kg', '%'])
+        self._configure_table(self.sales_islands_table)
+        islands_header = self.sales_islands_table.horizontalHeader()
+        islands_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for col in (1, 2, 3, 4):
+            islands_header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        islands_panel.layout().addWidget(self.sales_islands_table)
+        upper_row.addWidget(islands_panel, 4)
+        layout.addLayout(upper_row, 1)
+
+        lower_row = QHBoxLayout()
+        lower_row.setContentsMargins(0, 0, 0, 0)
+        lower_row.setSpacing(12)
+
+        types_panel = self._build_table_panel('Ventas por tipo de cliente', 'dashboardSalesTypesPanel')
+        self.sales_types_table = QTableWidget(0, 5)
+        self.sales_types_table.setObjectName('dashboardSalesTypesTable')
+        self.sales_types_table.setHorizontalHeaderLabels(['Tipo', 'Clientes', 'Kg act.', 'Δ Kg', '%'])
+        self._configure_table(self.sales_types_table)
+        types_header = self.sales_types_table.horizontalHeader()
+        types_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for col in (1, 2, 3, 4):
+            types_header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        types_panel.layout().addWidget(self.sales_types_table)
+        lower_row.addWidget(types_panel, 6)
+
+        zero_panel = self._build_table_panel('Clientes sin consumo actual', 'dashboardSalesZeroPanel')
+        self.sales_zero_table = QTableWidget(0, 4)
+        self.sales_zero_table.setObjectName('dashboardSalesZeroTable')
+        self.sales_zero_table.setHorizontalHeaderLabels(['Cliente', 'Isla', 'Tipo', 'Kg ant.'])
+        self._configure_table(self.sales_zero_table)
+        zero_header = self.sales_zero_table.horizontalHeader()
+        zero_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        zero_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        zero_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        zero_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        zero_panel.layout().addWidget(self.sales_zero_table)
+        lower_row.addWidget(zero_panel, 4)
+        layout.addLayout(lower_row, 1)
+        return widget
+
     def _build_warehouse_dashboard(self) -> QWidget:
         widget = QWidget()
         widget.setObjectName('dashboardWarehouseView')
@@ -639,6 +743,8 @@ class DashboardPage(QWidget):
             self._reload_orders_dashboard()
         elif self.current_dashboard == 'almacen':
             self._reload_warehouse_dashboard()
+        elif self.current_dashboard == 'ventas':
+            self._reload_sales_dashboard()
         else:
             self._reload_agenda_dashboard()
     def _reload_agenda_dashboard(self) -> None:
@@ -739,14 +845,17 @@ class DashboardPage(QWidget):
         if self.current_dashboard == 'almacen':
             self._open_warehouse_page()
             return
+        if self.current_dashboard == 'ventas':
+            self._open_sales_page()
+            return
         QMessageBox.information(self, 'Agenda', 'La creaci?n de actividades se incorporar? en el siguiente corte limpio.')
     def _handle_secondary_action(self) -> None:
-        if self.current_dashboard in {'pedidos', 'almacen'}:
+        if self.current_dashboard in {'pedidos', 'almacen', 'ventas'}:
             self.reload()
             return
         QMessageBox.information(self, 'Agenda', 'La vista completa de agenda se incorporar? en el siguiente corte limpio.')
     def _set_dashboard_mode(self, mode: str, *, reload: bool = True) -> None:
-        clean_mode = mode if mode in {'agenda', 'pedidos', 'almacen'} else 'agenda'
+        clean_mode = mode if mode in {'agenda', 'pedidos', 'almacen', 'ventas'} else 'agenda'
         self.current_dashboard = clean_mode
         for key, button in self.dashboard_nav_buttons.items():
             active = key == clean_mode
@@ -755,8 +864,10 @@ class DashboardPage(QWidget):
                 icon_name = 'calendar-days.svg'
             elif key == 'pedidos':
                 icon_name = 'shopping-cart.svg'
-            else:
+            elif key == 'almacen':
                 icon_name = 'warehouse.svg'
+            else:
+                icon_name = 'bar-chart-3.svg'
             self._set_button_icon(button, icon_name, '#FFFFFF' if active else '#475569', 20)
             button.style().unpolish(button)
             button.style().polish(button)
@@ -765,8 +876,10 @@ class DashboardPage(QWidget):
             current_widget = self.agenda_dashboard
         elif clean_mode == 'pedidos':
             current_widget = self.orders_dashboard
-        else:
+        elif clean_mode == 'almacen':
             current_widget = self.warehouse_dashboard
+        else:
+            current_widget = self.sales_dashboard
         self.dashboard_stack.setCurrentWidget(current_widget)
         self._refresh_header_for_mode()
         if reload:
@@ -786,6 +899,13 @@ class DashboardPage(QWidget):
             self.full_agenda_btn.setText('Actualizar')
             self._set_button_icon(self.new_activity_btn, 'warehouse.svg', '#FFFFFF', 18)
             self._set_button_icon(self.full_agenda_btn, 'package-search.svg', '#2563EB', 18)
+        elif self.current_dashboard == 'ventas':
+            self.title_label.setText('Ventas')
+            self.date_label.setText(str(date.today().year))
+            self.new_activity_btn.setText('Ver ventas')
+            self.full_agenda_btn.setText('Actualizar')
+            self._set_button_icon(self.new_activity_btn, 'bar-chart-3.svg', '#FFFFFF', 18)
+            self._set_button_icon(self.full_agenda_btn, 'clipboard-list.svg', '#2563EB', 18)
         else:
             self.title_label.setText('Agenda')
             self.date_label.setText(self.format_date(date.today(), long=True))
@@ -860,6 +980,80 @@ class DashboardPage(QWidget):
 
 
 
+
+    def _reload_sales_dashboard(self) -> None:
+        snapshot = self.sales_dashboard_service.load_snapshot()
+        self.date_label.setText(f'{snapshot.year} vs {snapshot.previous_year}')
+        self.sales_kpi_labels['total_kg'].setText(self._format_number_es(snapshot.total_kg))
+        self.sales_kpi_notes['total_kg'].setText(f'kg vendidos en {snapshot.year}')
+        self.sales_kpi_labels['delta_kg'].setText(self._format_number_es(snapshot.delta_kg, signed=True))
+        self.sales_kpi_notes['delta_kg'].setText(f'vs {snapshot.previous_year} · {self._format_number_es(snapshot.delta_pct, signed=True, suffix=" %")}')
+        self.sales_kpi_labels['active_customers'].setText(str(snapshot.active_customers))
+        self.sales_kpi_notes['active_customers'].setText('clientes activos')
+        self.sales_kpi_labels['active_islands'].setText(str(snapshot.active_islands))
+        self.sales_kpi_notes['active_islands'].setText('islas activas')
+        delta_color = '#16A34A' if snapshot.delta_kg >= 0.0 else '#DC2626'
+        self.sales_kpi_labels['delta_kg'].setStyleSheet(f'color: {delta_color}; font-size: 28px; font-weight: 800;')
+        self.sales_kpi_notes['delta_kg'].setStyleSheet(f'color: {delta_color}; font-size: 13px; font-weight: 600;')
+        self._populate_sales_drops_table(snapshot.customer_drop_rows)
+        self._populate_sales_islands_table(snapshot.island_rows)
+        self._populate_sales_types_table(snapshot.type_rows)
+        self._populate_sales_zero_table(snapshot.zero_consumption_rows)
+        self.footer_label.setText(
+            f'Última actualización: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} · Ventas {snapshot.year} vs {snapshot.previous_year}'
+        )
+
+    def _populate_sales_drops_table(self, rows: list[DashboardSalesCustomerRow]) -> None:
+        self.sales_drops_table.setRowCount(len(rows))
+        for idx, row in enumerate(rows):
+            values = [
+                f'{row.cliente_codigo} · {row.cliente_nombre}',
+                row.isla,
+                self._format_number_es(row.kg_prev, suffix=' kg'),
+                self._format_number_es(row.kg_curr, suffix=' kg'),
+                self._format_number_es(row.delta_kg, suffix=' kg', signed=True),
+            ]
+            for col, value in enumerate(values):
+                self.sales_drops_table.setItem(idx, col, QTableWidgetItem(value))
+
+    def _populate_sales_islands_table(self, rows: list[DashboardSalesIslandRow]) -> None:
+        self.sales_islands_table.setRowCount(len(rows))
+        for idx, row in enumerate(rows):
+            values = [
+                row.isla,
+                str(row.customers),
+                self._format_number_es(row.kg_curr, suffix=' kg'),
+                self._format_number_es(row.delta_kg, suffix=' kg', signed=True),
+                self._format_number_es(row.share_pct, suffix=' %'),
+            ]
+            for col, value in enumerate(values):
+                self.sales_islands_table.setItem(idx, col, QTableWidgetItem(value))
+
+    def _populate_sales_types_table(self, rows: list[DashboardSalesTypeRow]) -> None:
+        self.sales_types_table.setRowCount(len(rows))
+        for idx, row in enumerate(rows):
+            values = [
+                row.cliente_tipo,
+                str(row.customers),
+                self._format_number_es(row.kg_curr, suffix=' kg'),
+                self._format_number_es(row.delta_kg, suffix=' kg', signed=True),
+                self._format_number_es(row.share_pct, suffix=' %'),
+            ]
+            for col, value in enumerate(values):
+                self.sales_types_table.setItem(idx, col, QTableWidgetItem(value))
+
+    def _populate_sales_zero_table(self, rows: list[DashboardSalesCustomerRow]) -> None:
+        self.sales_zero_table.setRowCount(len(rows))
+        for idx, row in enumerate(rows):
+            values = [
+                f'{row.cliente_codigo} · {row.cliente_nombre}',
+                row.isla,
+                row.cliente_tipo,
+                self._format_number_es(row.kg_prev, suffix=' kg'),
+            ]
+            for col, value in enumerate(values):
+                self.sales_zero_table.setItem(idx, col, QTableWidgetItem(value))
+
     def _reload_warehouse_dashboard(self) -> None:
         snapshot = self.warehouse_dashboard_service.load_snapshot()
         self.date_label.setText(self._month_caption(date(snapshot.year, snapshot.month, 1)))
@@ -922,6 +1116,15 @@ class DashboardPage(QWidget):
             setter(page_names.index('Almacen'))
             return
         QMessageBox.information(self, 'Dashboard', 'La p?gina de Almac?n no est? disponible en esta ventana.')
+
+    def _open_sales_page(self) -> None:
+        window = self.window()
+        page_names = getattr(window, 'page_names', None)
+        setter = getattr(window, '_set_current_page', None)
+        if isinstance(page_names, list) and callable(setter) and 'Ventas' in page_names:
+            setter(page_names.index('Ventas'))
+            return
+        QMessageBox.information(self, 'Dashboard', 'La página de Ventas no está disponible en esta ventana.')
 
 
 
@@ -1025,7 +1228,7 @@ class DashboardPage(QWidget):
                 background-color: #2563EB;
                 color: #FFFFFF;
             }
-            QWidget#dashboardContentHost, QWidget#dashboardContent, QWidget#dashboardAgendaView, QWidget#dashboardOrdersView, QWidget#dashboardWarehouseView, QStackedWidget#dashboardContentStack { background-color: transparent; }
+            QWidget#dashboardContentHost, QWidget#dashboardContent, QWidget#dashboardAgendaView, QWidget#dashboardOrdersView, QWidget#dashboardWarehouseView, QWidget#dashboardSalesView, QStackedWidget#dashboardContentStack { background-color: transparent; }
             QFrame#dashboardHeader { background-color: transparent; }
             QLabel#dashboardTitle { font-size: 30px; font-weight: 700; color: #0F172A; }
             QLabel#dashboardDateLabel { font-size: 14px; color: #64748B; }
@@ -1079,7 +1282,7 @@ class DashboardPage(QWidget):
             QFrame#dashboardCalendarSummaryChip[tone='red'] { background-color: #FEF2F2; border-color: #FECACA; }
             QLabel#dashboardCalendarSummaryTitle { color: #475569; font-size: 12px; font-weight: 600; }
             QLabel#dashboardCalendarSummaryValue { color: #0F172A; font-size: 16px; font-weight: 800; }
-            QTableWidget#dashboardReactivationTable, QTableWidget#dashboardIslandTable, QTableWidget#dashboardOrdersRecentTable, QTableWidget#dashboardOrdersPendingTable, QTableWidget#dashboardOrdersWarehouseTable, QTableWidget#dashboardOrdersStateTable, QTableWidget#dashboardWarehouseRiskTable, QTableWidget#dashboardWarehouseStockTable, QTableWidget#dashboardWarehouseEntriesTable, QTableWidget#dashboardWarehouseOutputsTable {
+            QTableWidget#dashboardReactivationTable, QTableWidget#dashboardIslandTable, QTableWidget#dashboardOrdersRecentTable, QTableWidget#dashboardOrdersPendingTable, QTableWidget#dashboardOrdersWarehouseTable, QTableWidget#dashboardOrdersStateTable, QTableWidget#dashboardWarehouseRiskTable, QTableWidget#dashboardWarehouseStockTable, QTableWidget#dashboardWarehouseEntriesTable, QTableWidget#dashboardWarehouseOutputsTable, QTableWidget#dashboardSalesDropsTable, QTableWidget#dashboardSalesIslandsTable, QTableWidget#dashboardSalesTypesTable, QTableWidget#dashboardSalesZeroTable {
                 background-color: #FFFFFF; alternate-background-color: #F8FAFC; border: none; color: #334155;
             }
             QHeaderView::section {
