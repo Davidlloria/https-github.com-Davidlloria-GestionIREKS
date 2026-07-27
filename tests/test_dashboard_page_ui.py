@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from datetime import date, datetime
@@ -31,6 +31,7 @@ from app.services.warehouse_dashboard_service import (
     DashboardWarehouseStockRow,
     WarehouseDashboardSnapshot,
 )
+import app.ui.widgets.dashboard_page as dashboard_page_module
 from app.ui.widgets.dashboard_page import DashboardPage
 
 _APP: QApplication | None = None
@@ -80,9 +81,27 @@ class _StubDashboardService:
         ]
 
 
+class _StubCustomerRow:
+    def __init__(self, cliente_id: str, cliente_codigo: int, cliente_nombre_comercial: str, activo: bool = True) -> None:
+        self.cliente_id = cliente_id
+        self.cliente_codigo = cliente_codigo
+        self.cliente_nombre_comercial = cliente_nombre_comercial
+        self.cliente_nombre_fiscal = cliente_nombre_comercial
+        self.activo = activo
+
+
 class _StubCustomerService:
     def list(self, _term: str):
-        return []
+        return [_StubCustomerRow('cli-1', 101, 'Panaderia Norte')]
+
+    def get_agenda_activity(self, _agenda_id: str):
+        return None
+
+    def upsert_agenda_activity(self, _agenda_id: str, _payload: dict):
+        return True
+
+    def delete_agenda_activity(self, _agenda_id: str):
+        return True
 
 
 class _StubOrderDashboardService:
@@ -285,7 +304,7 @@ def test_dashboard_page_can_switch_to_sales_mode() -> None:
     assert page.sales_kpi_labels['active_customers'].text() == '87'
     assert page.sales_kpi_labels['active_islands'].text() == '5'
     assert page.sales_drops_table.rowCount() == 1
-    assert page.sales_drops_table.item(0, 0).text() == '431 · Panaderia Azul'
+    assert page.sales_drops_table.item(0, 0).text() == '431 Â· Panaderia Azul'
     assert page.sales_islands_table.rowCount() == 1
     assert page.sales_types_table.rowCount() == 1
     assert page.sales_zero_table.rowCount() == 1
@@ -294,4 +313,42 @@ def test_dashboard_page_can_switch_to_sales_mode() -> None:
     page.close()
     page.deleteLater()
     QApplication.processEvents()
+
+def test_dashboard_page_agenda_actions_open_real_dialog_paths(monkeypatch) -> None:
+    _application()
+    page = DashboardPage(
+        customer_service=_StubCustomerService(),
+        dashboard_service=_StubDashboardService(),
+    )
+
+    calls: list[str] = []
+
+    class _FakeAgendaDialog:
+        def __init__(self, *args, **kwargs):
+            calls.append('new')
+
+        def exec(self):
+            return dashboard_page_module.QDialog.DialogCode.Accepted
+
+    class _FakeOverviewDialog:
+        changed = True
+
+        def __init__(self, *args, **kwargs):
+            calls.append('overview')
+
+        def exec(self):
+            return dashboard_page_module.QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(dashboard_page_module, 'DashboardAgendaDialog', _FakeAgendaDialog)
+    monkeypatch.setattr(dashboard_page_module, 'DashboardAgendaOverviewDialog', _FakeOverviewDialog)
+
+    page._handle_primary_action()
+    page._handle_secondary_action()
+
+    assert calls == ['new', 'overview']
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
 
