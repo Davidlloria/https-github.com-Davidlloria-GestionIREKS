@@ -192,6 +192,13 @@ class DashboardPage(QWidget):
         sidebar_layout.addWidget(ventas_btn)
         self.dashboard_nav_buttons['ventas'] = ventas_btn
 
+        objetivos_btn = QPushButton('Objetivos')
+        objetivos_btn.setObjectName('dashboardSidebarButton')
+        objetivos_btn.setMinimumHeight(58)
+        self._set_button_icon(objetivos_btn, 'goal.svg', '#475569', 20)
+        objetivos_btn.clicked.connect(lambda: self._show_placeholder_dashboard('Objetivos'))
+        sidebar_layout.addWidget(objetivos_btn)
+
         sidebar_layout.addStretch(1)
         root_layout.addWidget(sidebar)
 
@@ -1116,6 +1123,10 @@ class DashboardPage(QWidget):
             setter(page_names.index('Almacen'))
             return
         QMessageBox.information(self, 'Dashboard', 'La p?gina de Almac?n no est? disponible en esta ventana.')
+
+
+    def _show_placeholder_dashboard(self, name: str) -> None:
+        QMessageBox.information(self, 'Dashboard', f'El dashboard de {name} se implementará en una siguiente fase.')
 
     def _open_sales_page(self) -> None:
         window = self.window()
