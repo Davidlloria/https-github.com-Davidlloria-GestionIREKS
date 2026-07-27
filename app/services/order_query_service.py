@@ -75,11 +75,14 @@ class OrderQueryService:
             cliente_id = str(getattr(row, "cliente_id", "") or "").strip()
             if not cliente_id:
                 continue
-            mapping[cliente_id] = self._warehouse_display_name(
+            label = self._warehouse_display_name(
                 str(getattr(row, "cliente_nombre_comercial", "") or "").strip(),
                 str(getattr(row, "cliente_nombre_fiscal", "") or "").strip(),
                 cliente_id,
             )
+            if label.casefold() in {existing.casefold() for existing in mapping.values()}:
+                continue
+            mapping[cliente_id] = label
         return mapping
 
     def list_active_ingredients(self) -> list[IngredienteIreks]:

@@ -276,3 +276,16 @@ def test_list_order_rows_resolves_distributor_name(isolated_engine) -> None:
     assert len(rows) == 1
     assert rows[0].almacen_id == "dist-1"
     assert rows[0].almacen_nombre == "Distribuidor Norte"
+
+
+def test_warehouse_filter_options_prefer_distributor_when_name_is_duplicated(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        session.add(Distribuidor(distribuidor_id="dist-1", distribuidor_codigo=1, distribuidor_nombre_comercial="IGSA"))
+        session.add(Cliente(cliente_id="cli-1", cliente_codigo=2, cliente_nombre_comercial="IGSA", cliente_tipo="distribuidor"))
+        session.commit()
+
+    service = OrderQueryService()
+    options = service.warehouse_filter_options()
+
+    igsa_options = [(row.label, row.value) for row in options if row.label == "IGSA"]
+    assert igsa_options == [("IGSA", "dist-1")]
