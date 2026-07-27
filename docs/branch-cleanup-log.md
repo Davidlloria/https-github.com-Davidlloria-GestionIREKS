@@ -44,14 +44,14 @@ Orden recomendado de extraccion restante:
 
 1. `dashboard objetivos` (boton y placeholder)`r`n2. revisar si queda algun ajuste comun de `dashboard_page.py``r`n3. despues, bloques no dashboard: pedidos, almacen, clientes, ventas AI
 
-## Estado del siguiente corte: revision residual de `dashboard_page.py`
+## Estado del siguiente corte: salida de la zona dashboard
 
 Situacion verificada el 2026-07-27:
 
 - `dashboard ventas` ya fue extraido, validado y mergeado en `main`
 - `dashboard objetivos` ya fue extraido, validado y mergeado en `main`
-- antes de salir de la zona dashboard conviene revisar si queda algun ajuste comun residual dentro de `dashboard_page.py`
-- despues de esa revision, el siguiente frente pasa a bloques no dashboard: pedidos, almacen, clientes y ventas AI
+- `dashboard agenda` ya tiene operativas las acciones `Nueva actividad` y `Ver agenda completa`
+- a partir de aqui, el siguiente frente recomendado ya no es otro corte de dashboard, sino bloques no dashboard: pedidos, almacen, clientes y ventas AI
 
 ## Criterio operativo
 
