@@ -38,7 +38,7 @@ Flujo acordado:
 | 2026-07-31 | `feature/customer-agenda-service-test-clean` | `f91557a67` mergeado | Cerrado |
 | 2026-07-31 | `feature/customer-queries-clean` | `3b23acb8f` mergeado | Cerrado |
 | 2026-07-31 | `feature/orders-pending-received-clean` | `b3dbcb0f4` mergeado | Cerrado |
-| 2026-07-31 | `feature/customer-related-sales-clean` | pendiente | En validacion |
+| 2026-07-31 | `feature/customer-related-sales-clean` | `f04931683` mergeado | Cerrado |
 
 ## Estado actual de ramas locales
 
