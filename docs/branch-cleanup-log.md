@@ -35,6 +35,7 @@ Flujo acordado:
 | 2026-07-31 | `feature/warehouse-filters-clean` | `11264a8e8` mergeado | Cerrado |
 | 2026-07-31 | `feature/dashboard-agenda-calendar-refine-clean` | `42fd8a35e` mergeado | Cerrado |
 | 2026-07-31 | `feature/customer-recipes-ownership-clean` | `c9031af42` mergeado | Cerrado |
+| 2026-07-31 | `feature/customer-agenda-service-test-clean` | `f91557a67` mergeado | Cerrado |
 
 ## Estado actual de ramas locales
 
