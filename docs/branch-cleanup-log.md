@@ -28,8 +28,11 @@ Flujo acordado:
 | 2026-07-27 | `feature/pedidos-pendientes-clean` | `d3cb90705` mergeado | Cerrado |
 | 2026-07-27 | ajuste directo en `main` | `c0de65be9` nombres de almacen en pedidos | Cerrado |
 | 2026-07-27 | ajuste directo en `main` | `6c18cf3b6` priorizacion de distribuidores en filtros | Cerrado |
-| 2026-07-27 | ajuste directo en main | 8a4fa542d deduplicacion de variantes tipo CADELSA/IGSA | Cerrado |
-| 2026-07-27 | eature/dashboard-sales-clean | Merge branch 'feature/dashboard-sales-clean' | Cerrado |
+| 2026-07-27 | ajuste directo en `main` | `8a4fa542d` deduplicacion de variantes tipo CADELSA/IGSA | Cerrado |
+| 2026-07-27 | `feature/dashboard-sales-clean` | `86a18b183` mergeado | Cerrado |
+| 2026-07-27 | `feature/dashboard-goals-clean` | `94be53470` mergeado | Cerrado |
+| 2026-07-27 | `feature/dashboard-agenda-actions-clean` | `bf1765de3` mergeado | Cerrado |
+| 2026-07-31 | `feature/warehouse-filters-clean` | `11264a8e8` mergeado | Cerrado |
 
 ## Estado actual de ramas locales
 
@@ -42,7 +45,8 @@ Flujo acordado:
 
 Orden recomendado de extraccion restante:
 
-1. `dashboard objetivos` (boton y placeholder)`r`n2. revisar si queda algun ajuste comun de `dashboard_page.py``r`n3. despues, bloques no dashboard: pedidos, almacen, clientes, ventas AI
+1. revisar si queda algun ajuste comun de `dashboard_page.py`
+2. despues, bloques no dashboard: pedidos, clientes y ventas AI
 
 ## Estado del siguiente corte: salida de la zona dashboard
 
@@ -51,7 +55,7 @@ Situacion verificada el 2026-07-27:
 - `dashboard ventas` ya fue extraido, validado y mergeado en `main`
 - `dashboard objetivos` ya fue extraido, validado y mergeado en `main`
 - `dashboard agenda` ya tiene operativas las acciones `Nueva actividad` y `Ver agenda completa`
-- a partir de aqui, el siguiente frente recomendado ya no es otro corte de dashboard, sino bloques no dashboard: pedidos, almacen, clientes y ventas AI
+- a partir de aqui, el siguiente frente recomendado ya no es otro corte de dashboard, sino bloques no dashboard: pedidos, clientes y ventas AI
 
 ## Criterio operativo
 
