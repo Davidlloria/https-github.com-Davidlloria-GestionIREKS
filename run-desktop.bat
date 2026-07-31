@@ -9,4 +9,10 @@ if exist ".venv\Scripts\python.exe" (
     python run.py
 )
 
+if errorlevel 1 (
+    echo.
+    echo El arranque ha fallado con codigo %errorlevel%.
+    pause
+)
+
 endlocal
