@@ -194,3 +194,4 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
 - Restaurada la pestaña Ventas desde el placeholder a una tabla funcional con filtro de año.
 - Restaurada la comparativa anual con modal, gráfico y exportación PDF.
 - Corregida la geometría documentada de `detailLeftCard` y `detailRightCard` para que coincida con el código real.
+- Alineado el fondo real de `CustomersPageRoot` con la documentaci?n: transparente.
