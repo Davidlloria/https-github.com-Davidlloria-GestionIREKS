@@ -2610,6 +2610,15 @@ class CustomersPage(QWidget):
             QWidget#CustomersPageRoot {
                 background: #EEF3F8;
             }
+            QSplitter#customersMainSplitter {
+                background: #DCFCE7;
+                border: 0;
+            }
+            QSplitter#customersMainSplitter::handle {
+                background: transparent;
+                border: 0;
+                width: 0px;
+            }
             QFrame#crmCard, QWidget#crmCard {
                 background: #FFFFFF;
                 border: 1px solid #E2E8F0;
