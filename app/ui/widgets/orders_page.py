@@ -8,13 +8,13 @@ import re
 import tempfile
 from typing import Any, Callable, cast
 
-from PySide6.QtCore import QDate, QTimer, Qt
-from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtCore import QDate, QSize, QTimer, Qt
+from PySide6.QtGui import QBrush, QColor, QFont, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
-    QComboBox,
     QCompleter,
+    QComboBox,
     QDateEdit,
     QDialog,
     QDialogButtonBox,
@@ -65,6 +65,8 @@ from app.services.orders_documents_import_ui_service import (
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderLineInput, OrderService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
+
+BASE_DIR = Path(__file__).resolve().parents[3]
 
 MONTHS = [
     (1, "Enero"),
@@ -1164,10 +1166,6 @@ class OrdersPage(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        header = QLabel("Pedidos")
-        header.setProperty("role", "pageTitle")
-        layout.addWidget(header)
-
         splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(splitter, 1)
 
@@ -1215,7 +1213,7 @@ class OrdersPage(QWidget):
         almacen_row.addWidget(self.almacen_filter, 1)
         left_layout.addLayout(almacen_row)
 
-        self.new_btn = QPushButton("Nuevo pedido")
+        self.new_btn = QPushButton("Nuevo")
         self.new_btn.setProperty("btnRole", "success")
         self.edit_btn = QPushButton("Editar")
         self.edit_btn.setProperty("btnRole", "warning")
@@ -1227,6 +1225,15 @@ class OrdersPage(QWidget):
         self.send_mail_btn.setProperty("btnRole", "secondary")
         self.print_btn = QPushButton("Imprimir")
         self.print_btn.setProperty("btnRole", "secondary")
+        for button in (
+            self.new_btn,
+            self.edit_btn,
+            self.del_btn,
+            self.export_btn,
+            self.send_mail_btn,
+            self.print_btn,
+        ):
+            button.setIconSize(QSize(14, 14))
 
         self.new_btn.clicked.connect(self._new_order)
         self.edit_btn.clicked.connect(self._edit_order)
@@ -1310,6 +1317,7 @@ class OrdersPage(QWidget):
         self.import_factura_btn.clicked.connect(self._import_factura_for_selected_order)
         self.delete_factura_btn = QPushButton("Eliminar Factura")
         self.delete_factura_btn.setProperty("btnRole", "danger")
+        self.delete_factura_btn.setIconSize(QSize(14, 14))
         self.delete_factura_btn.setFixedHeight(24)
         self.delete_factura_btn.setEnabled(False)
         self.delete_factura_btn.clicked.connect(self._delete_selected_factura)
@@ -1328,6 +1336,7 @@ class OrdersPage(QWidget):
         self.edit_line_btn.clicked.connect(self._edit_order_line)
         self.del_line_btn = QPushButton("Eliminar")
         self.del_line_btn.setProperty("btnRole", "danger")
+        self.del_line_btn.setIconSize(QSize(14, 14))
         self.del_line_btn.setFixedHeight(24)
         self.del_line_btn.clicked.connect(self._delete_order_line)
         self.edit_order_btn = QPushButton("Editar pedido")
@@ -2298,7 +2307,7 @@ class OrdersPage(QWidget):
         year_filter = str(self.year_filter.currentData() or "")
         month_from = int(self.month_from_filter.currentData() or 0)
         month_to = int(self.month_to_filter.currentData() or 0)
-        almacen_filter = str(self.almacen_filter.currentData() or "")
+        almacen_filter = self._selected_almacen_id()
         self.rows = [
                 PedidoListRow(
                     pedido_id=row.pedido_id,
@@ -2841,6 +2850,15 @@ class OrdersPage(QWidget):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Pedidos", f"No se pudo eliminar.\n{exc}")
         self.reload()
+
+    def _show_orders_help(self) -> None:
+        QMessageBox.information(
+            self,
+            "Ayuda de pedidos",
+            "Usa la barra superior para crear, editar, eliminar, exportar, enviar o imprimir pedidos. "
+            "Los filtros acotan el listado y las pestañas muestran el pedido, sus albaranes, "
+            "facturas y artículos pendientes.",
+        )
 
     def _confirm_albaran_preview(self, header: dict[str, str], rows: list[dict[str, Any]]) -> bool:
         dialog = AlbaranPreviewDialog(header=header, items=rows, parent=self)

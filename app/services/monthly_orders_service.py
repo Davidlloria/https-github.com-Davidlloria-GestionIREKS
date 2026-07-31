@@ -5,7 +5,7 @@ from typing import Any
 from sqlmodel import Session, select
 
 from app.core.database import engine
-from app.models import IngredienteIreks, Pedido, PedidoItem
+from app.models import AlmacenMovimiento, IngredienteIreks, Pedido, PedidoItem
 
 
 @dataclass
@@ -67,11 +67,17 @@ class MonthlyOrdersService:
         search: str = "",
     ) -> list[AnnualProductOrderRow]:
         with Session(engine) as session:
-            return self.annual_product_matrix(session, year=year, almacen_id=almacen_id, search=search)
+            return self.annual_product_matrix(
+                session, year=year, almacen_id=almacen_id, search=search
+            )
 
-    def product_order_details_for(self, *, articulo_id: str, almacen_id: str = "") -> list[ProductOrderDetailRow]:
+    def product_order_details_for(
+        self, *, articulo_id: str, almacen_id: str = ""
+    ) -> list[ProductOrderDetailRow]:
         with Session(engine) as session:
-            return self.product_order_details(session, articulo_id=articulo_id, almacen_id=almacen_id)
+            return self.product_order_details(
+                session, articulo_id=articulo_id, almacen_id=almacen_id
+            )
 
     def available_years_for(self, *, almacen_id: str = "") -> list[int]:
         with Session(engine) as session:
@@ -90,7 +96,7 @@ class MonthlyOrdersService:
         if not target_articulo_id:
             return []
 
-        item_rows = self._load_order_items(
+        movements = self._load_received_entries(
             session,
             articulo_id=target_articulo_id,
             almacen_id=almacen_id,
@@ -98,33 +104,38 @@ class MonthlyOrdersService:
             date_to=date_to,
         )
         product = session.exec(
-            select(IngredienteIreks).where(IngredienteIreks.articulo_id == target_articulo_id)
+            select(IngredienteIreks).where(
+                IngredienteIreks.articulo_id == target_articulo_id
+            )
         ).first()
         unit_kg = float(getattr(product, "articulo_envase_peso_total", 0.0) or 0.0)
 
         grouped: dict[tuple[int, int], dict[str, Any]] = {}
-        for item, pedido in item_rows:
-            row_date = self._item_date(item, pedido)
+        for movement in movements:
+            row_date = self._movement_date(movement)
             if row_date is None:
                 continue
             key = (row_date.year, row_date.month)
             bucket = grouped.setdefault(
                 key,
                 {
-                    "order_ids": set(),
+                    "order_keys": set(),
                     "quantity": 0.0,
                     "last_order_date": None,
                     "last_order_number": "",
                 },
             )
-            pedido_id = str(getattr(item, "pedido_id", "") or "").strip()
-            if pedido_id:
-                bucket["order_ids"].add(pedido_id)
-            bucket["quantity"] += float(getattr(item, "articulo_cantidad", 0.0) or 0.0)
-            if bucket["last_order_date"] is None or row_date > bucket["last_order_date"]:
+            bucket["order_keys"].add(self._movement_order_key(movement))
+            bucket["quantity"] += float(getattr(movement, "cantidad", 0.0) or 0.0)
+            if (
+                bucket["last_order_date"] is None
+                or row_date > bucket["last_order_date"]
+            ):
                 bucket["last_order_date"] = row_date
                 bucket["last_order_number"] = str(
-                    getattr(item, "pedido_numero", "") or getattr(pedido, "pedido_numero", "") or ""
+                    getattr(movement, "pedido_numero", "")
+                    or getattr(movement, "pedido_albaran_numero", "")
+                    or ""
                 ).strip()
 
         result: list[ProductMonthlyOrderRow] = []
@@ -135,7 +146,7 @@ class MonthlyOrdersService:
                 ProductMonthlyOrderRow(
                     year=year,
                     month=month,
-                    order_count=len(bucket["order_ids"]),
+                    order_count=len(bucket["order_keys"]),
                     quantity=quantity,
                     kg=quantity * unit_kg,
                     last_order_date=bucket["last_order_date"],
@@ -154,23 +165,27 @@ class MonthlyOrdersService:
     ) -> list[AnnualProductOrderRow]:
         if year <= 0:
             return []
-        date_from = date(year, 1, 1)
-        date_to = date(year, 12, 31)
-        item_rows = self._load_order_items(
+        movements = self._load_received_entries(
             session,
             almacen_id=almacen_id,
-            date_from=date_from,
-            date_to=date_to,
+            date_from=date(year, 1, 1),
+            date_to=date(year, 12, 31),
         )
         articulo_ids = sorted(
             {
-                str(getattr(item, "articulo_id", "") or "").strip()
-                for item, _pedido in item_rows
-                if str(getattr(item, "articulo_id", "") or "").strip()
+                str(getattr(movement, "articulo_id", "") or "").strip()
+                for movement in movements
+                if str(getattr(movement, "articulo_id", "") or "").strip()
             }
         )
         products = (
-            list(session.exec(select(IngredienteIreks).where(IngredienteIreks.articulo_id.in_(articulo_ids))))
+            list(
+                session.exec(
+                    select(IngredienteIreks).where(
+                        IngredienteIreks.articulo_id.in_(articulo_ids)
+                    )
+                )
+            )
             if articulo_ids
             else []
         )
@@ -178,18 +193,22 @@ class MonthlyOrdersService:
         terms = [term for term in str(search or "").strip().lower().split() if term]
 
         grouped: dict[str, dict[str, Any]] = {}
-        for item, pedido in item_rows:
-            row_date = self._item_date(item, pedido)
-            if row_date is None:
-                continue
-            articulo_id = str(getattr(item, "articulo_id", "") or "").strip()
-            if not articulo_id:
+        for movement in movements:
+            row_date = self._movement_date(movement)
+            articulo_id = str(getattr(movement, "articulo_id", "") or "").strip()
+            if row_date is None or not articulo_id:
                 continue
             product = product_by_id.get(articulo_id)
-            referencia = str(getattr(product, "articulo_referencia_corta", "") or "").strip()
+            referencia = str(
+                getattr(product, "articulo_referencia_corta", "") or ""
+            ).strip()
             if not referencia:
-                referencia = str(getattr(product, "articulo_referencia", "") or "").strip()
-            descripcion = str(getattr(product, "articulo_descripcion", "") or "").strip()
+                referencia = str(
+                    getattr(product, "articulo_referencia", "") or ""
+                ).strip()
+            descripcion = str(
+                getattr(product, "articulo_descripcion", "") or ""
+            ).strip()
             searchable = " ".join([articulo_id, referencia, descripcion]).lower()
             if terms and not all(term in searchable for term in terms):
                 continue
@@ -199,18 +218,22 @@ class MonthlyOrdersService:
                 {
                     "referencia": referencia or articulo_id,
                     "descripcion": descripcion or articulo_id,
-                    "unit_kg": float(getattr(product, "articulo_envase_peso_total", 0.0) or 0.0),
+                    "unit_kg": float(
+                        getattr(product, "articulo_envase_peso_total", 0.0) or 0.0
+                    ),
                     "months": [0.0 for _ in range(12)],
-                    "order_ids": set(),
+                    "order_keys": set(),
                     "last_order_date": None,
                 },
             )
-            quantity = float(getattr(item, "articulo_cantidad", 0.0) or 0.0)
-            bucket["months"][row_date.month - 1] += quantity
-            pedido_id = str(getattr(item, "pedido_id", "") or "").strip()
-            if pedido_id:
-                bucket["order_ids"].add(pedido_id)
-            if bucket["last_order_date"] is None or row_date > bucket["last_order_date"]:
+            bucket["months"][row_date.month - 1] += float(
+                getattr(movement, "cantidad", 0.0) or 0.0
+            )
+            bucket["order_keys"].add(self._movement_order_key(movement))
+            if (
+                bucket["last_order_date"] is None
+                or row_date > bucket["last_order_date"]
+            ):
                 bucket["last_order_date"] = row_date
 
         result: list[AnnualProductOrderRow] = []
@@ -225,11 +248,13 @@ class MonthlyOrdersService:
                     monthly_quantities=monthly,
                     total_quantity=total_quantity,
                     total_kg=total_quantity * float(bucket["unit_kg"] or 0.0),
-                    order_count=len(bucket["order_ids"]),
+                    order_count=len(bucket["order_keys"]),
                     last_order_date=bucket["last_order_date"],
                 )
             )
-        return sorted(result, key=lambda row: (row.descripcion.lower(), row.referencia.lower()))
+        return sorted(
+            result, key=lambda row: (row.descripcion.lower(), row.referencia.lower())
+        )
 
     def product_order_details(
         self,
@@ -242,12 +267,12 @@ class MonthlyOrdersService:
         if not target_articulo_id:
             return []
         item_rows = self._load_order_items(
-            session,
-            articulo_id=target_articulo_id,
-            almacen_id=almacen_id,
+            session, articulo_id=target_articulo_id, almacen_id=almacen_id
         )
         product = session.exec(
-            select(IngredienteIreks).where(IngredienteIreks.articulo_id == target_articulo_id)
+            select(IngredienteIreks).where(
+                IngredienteIreks.articulo_id == target_articulo_id
+            )
         ).first()
         unit_kg = float(getattr(product, "articulo_envase_peso_total", 0.0) or 0.0)
 
@@ -258,7 +283,9 @@ class MonthlyOrdersService:
                 ProductOrderDetailRow(
                     pedido_id=str(getattr(item, "pedido_id", "") or "").strip(),
                     pedido_numero=str(
-                        getattr(item, "pedido_numero", "") or getattr(pedido, "pedido_numero", "") or ""
+                        getattr(item, "pedido_numero", "")
+                        or getattr(pedido, "pedido_numero", "")
+                        or ""
                     ).strip(),
                     pedido_albaran_numero=str(
                         getattr(item, "pedido_albaran_numero", "")
@@ -273,16 +300,16 @@ class MonthlyOrdersService:
         return result
 
     def available_years(self, session: Session, *, almacen_id: str = "") -> list[int]:
-        item_rows = self._load_order_items(session, almacen_id=almacen_id)
+        movements = self._load_received_entries(session, almacen_id=almacen_id)
         years = {
             row_date.year
-            for item, pedido in item_rows
-            for row_date in [self._item_date(item, pedido)]
+            for movement in movements
+            for row_date in [self._movement_date(movement)]
             if row_date is not None
         }
         return sorted(years, reverse=True)
 
-    def _load_order_items(
+    def _load_received_entries(
         self,
         session: Session,
         *,
@@ -290,21 +317,67 @@ class MonthlyOrdersService:
         almacen_id: str = "",
         date_from: date | None = None,
         date_to: date | None = None,
+    ) -> list[AlmacenMovimiento]:
+        stmt = select(AlmacenMovimiento).where(AlmacenMovimiento.cantidad > 0)
+        target_articulo_id = str(articulo_id or "").strip()
+        target_almacen_id = str(almacen_id or "").strip()
+        if target_articulo_id:
+            stmt = stmt.where(AlmacenMovimiento.articulo_id == target_articulo_id)
+        if target_almacen_id:
+            stmt = stmt.where(AlmacenMovimiento.almacen_id == target_almacen_id)
+        if date_from is not None:
+            stmt = stmt.where(AlmacenMovimiento.fecha_pedido >= date_from)
+        if date_to is not None:
+            stmt = stmt.where(AlmacenMovimiento.fecha_pedido <= date_to)
+        return list(
+            session.exec(
+                stmt.order_by(
+                    AlmacenMovimiento.fecha_pedido.desc(), AlmacenMovimiento.id.desc()
+                )
+            )
+        )
+
+    def _load_order_items(
+        self,
+        session: Session,
+        *,
+        articulo_id: str = "",
+        almacen_id: str = "",
     ) -> list[tuple[PedidoItem, Pedido]]:
-        stmt = select(PedidoItem, Pedido).join(Pedido, Pedido.pedido_id == PedidoItem.pedido_id)
+        stmt = select(PedidoItem, Pedido).join(
+            Pedido, Pedido.pedido_id == PedidoItem.pedido_id
+        )
         target_articulo_id = str(articulo_id or "").strip()
         target_almacen_id = str(almacen_id or "").strip()
         if target_articulo_id:
             stmt = stmt.where(PedidoItem.articulo_id == target_articulo_id)
         if target_almacen_id:
             stmt = stmt.where(Pedido.almacen_id == target_almacen_id)
-        if date_from is not None:
-            stmt = stmt.where(PedidoItem.pedido_item_fecha >= date_from)
-        if date_to is not None:
-            stmt = stmt.where(PedidoItem.pedido_item_fecha <= date_to)
-        stmt = stmt.order_by(PedidoItem.pedido_item_fecha.desc(), PedidoItem.pedido_id.desc())
+        stmt = stmt.order_by(
+            PedidoItem.pedido_item_fecha.desc(), PedidoItem.pedido_id.desc()
+        )
         return [(item, pedido) for item, pedido in session.exec(stmt)]
 
-    def _item_date(self, item: PedidoItem, pedido: Pedido) -> date | None:
-        value = getattr(item, "pedido_item_fecha", None) or getattr(pedido, "pedido_fecha", None)
+    @staticmethod
+    def _movement_date(movement: AlmacenMovimiento) -> date | None:
+        value = getattr(movement, "fecha_pedido", None)
+        return value if isinstance(value, date) else None
+
+    @staticmethod
+    def _movement_order_key(movement: AlmacenMovimiento) -> str:
+        pedido_numero = str(getattr(movement, "pedido_numero", "") or "").strip()
+        albaran_numero = str(
+            getattr(movement, "pedido_albaran_numero", "") or ""
+        ).strip()
+        if pedido_numero:
+            return f"pedido:{pedido_numero}"
+        if albaran_numero:
+            return f"albaran:{albaran_numero}"
+        return f"movimiento:{getattr(movement, 'id', '')}"
+
+    @staticmethod
+    def _item_date(item: PedidoItem, pedido: Pedido) -> date | None:
+        value = getattr(item, "pedido_item_fecha", None) or getattr(
+            pedido, "pedido_fecha", None
+        )
         return value if isinstance(value, date) else None

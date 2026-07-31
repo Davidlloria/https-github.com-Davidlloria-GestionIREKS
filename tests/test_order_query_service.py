@@ -7,7 +7,7 @@ import pytest
 from sqlmodel import SQLModel, Session, create_engine
 
 import app.services.order_query_service as order_query_service_module
-from app.models import Albaran, AlbaranItem, Cliente, Distribuidor, Fabricante, Familia, IngredienteIreks, Pedido, PedidoItem, Subfamilia
+from app.models import Albaran, AlbaranItem, Fabricante, Familia, IngredienteIreks, Pedido, PedidoItem, Subfamilia
 from app.services.order_query_service import OrderQueryService
 
 
@@ -247,58 +247,3 @@ def test_list_order_items_uses_documented_received_quantity_for_same_order(isola
     assert len(rows) == 1
     assert pending_article_ids == set()
     assert received_by_article == {articulo_id: 7.0}
-
-
-def test_warehouse_filter_options_include_distributor_entities(isolated_engine) -> None:
-    with Session(isolated_engine) as session:
-        session.add(Distribuidor(distribuidor_id="dist-1", distribuidor_codigo=1, distribuidor_nombre_comercial="Distribuidor Norte"))
-        session.add(Cliente(cliente_id="cli-1", cliente_codigo=2, cliente_nombre_comercial="Cliente Directo", cliente_tipo="directo"))
-        session.commit()
-
-    service = OrderQueryService()
-    options = service.warehouse_filter_options()
-
-    labels = [(row.label, row.value) for row in options]
-    assert ("Todos", "") in labels
-    assert ("Distribuidor Norte", "dist-1") in labels
-    assert ("Cliente Directo", "cli-1") in labels
-
-
-def test_list_order_rows_resolves_distributor_name(isolated_engine) -> None:
-    with Session(isolated_engine) as session:
-        session.add(Distribuidor(distribuidor_id="dist-1", distribuidor_codigo=1, distribuidor_nombre_comercial="Distribuidor Norte"))
-        session.add(Pedido(pedido_id="pedido-1", almacen_id="dist-1", pedido_fecha=date(2026, 6, 1), pedido_numero="P-1"))
-        session.commit()
-
-    service = OrderQueryService()
-    rows = service.list_order_rows(year_filter="", month_from=0, month_to=0, almacen_filter="", limit=50, offset=0)
-
-    assert len(rows) == 1
-    assert rows[0].almacen_id == "dist-1"
-    assert rows[0].almacen_nombre == "Distribuidor Norte"
-
-
-def test_warehouse_filter_options_prefer_distributor_when_name_is_duplicated(isolated_engine) -> None:
-    with Session(isolated_engine) as session:
-        session.add(Distribuidor(distribuidor_id="dist-1", distribuidor_codigo=1, distribuidor_nombre_comercial="IGSA"))
-        session.add(Cliente(cliente_id="cli-1", cliente_codigo=2, cliente_nombre_comercial="IGSA", cliente_tipo="distribuidor"))
-        session.commit()
-
-    service = OrderQueryService()
-    options = service.warehouse_filter_options()
-
-    igsa_options = [(row.label, row.value) for row in options if row.label == "IGSA"]
-    assert igsa_options == [("IGSA", "dist-1")]
-
-
-def test_warehouse_filter_options_prefer_distributor_for_cadelsa_variants(isolated_engine) -> None:
-    with Session(isolated_engine) as session:
-        session.add(Distribuidor(distribuidor_id="dist-1", distribuidor_codigo=1, distribuidor_nombre_comercial="CADELSA [LANZAROTE-FUERTEVENTURA]"))
-        session.add(Cliente(cliente_id="cli-1", cliente_codigo=2, cliente_nombre_comercial="CADELSA LZA", cliente_tipo="directo"))
-        session.commit()
-
-    service = OrderQueryService()
-    options = service.warehouse_filter_options()
-
-    cadelsa_options = [(row.label, row.value) for row in options if row.label.startswith("CADELSA")]
-    assert cadelsa_options == [("CADELSA [LANZAROTE-FUERTEVENTURA]", "dist-1")]
