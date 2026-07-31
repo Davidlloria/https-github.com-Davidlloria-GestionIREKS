@@ -58,22 +58,26 @@ Flujo acordado:
 
 ## Bloques pendientes detectados en `feature/pedidos-window-tweaks`
 
-## Corte en analisis: `sales AI`
+## Corte en analisis: bloques residuales de ventas
 
 Situacion verificada el 2026-07-31:
 
-- no existe endpoint FastAPI propio para `sales AI` en `feature/pedidos-window-tweaks`
-- el bloque esta montado sobre PySide6 legacy en `app/ui/widgets/sales_page.py`
-- el nucleo funcional nuevo esta en `app/services/sales_ai_assistant_service.py` y `app/services/sales_text_normalizer.py`
-- el test especifico pendiente esta en `tests/test_sales_ai_assistant_service.py`
-- el servicio depende de `OpenAIProcessService`, `OpenAISettingsService` y `SalesAnnualComparisonService`
-- el diff de `sales_page.py` es demasiado grande para extraerlo completo como siguiente corte minimo
-- siguiente corte recomendado: extraer primero servicio + normalizador + test, sin integrar todavia la UI legacy de ventas
+- `main` ya contiene `app/services/sales_ai_assistant_service.py`
+- `main` ya contiene `app/services/sales_text_normalizer.py`
+- `main` ya contiene `tests/test_sales_ai_assistant_service.py`
+- los siguientes frentes probados en `feature/pedidos-window-tweaks` no admiten ya cortes medios limpios por cherry-pick:
+  - `sales tools modal`
+  - `export sales analysis responses`
+  - `clients by selected product`
+- el codigo pendiente de ventas esta concentrado en `app/ui/widgets/sales_page.py`
+- los commits residuales de ventas mezclan UI, servicio y cobertura con un solape alto respecto a `main`
+- conclusion operativa: no seguir intentando cortes medios por commit dentro de `sales_page.py`
+- siguiente estrategia recomendada: extraccion manual dirigida por funcionalidad o evaluacion de cierre final de `feature/pedidos-window-tweaks`
 
 Orden recomendado de extraccion restante:
 
-1. revisar si queda algun ajuste comun de `dashboard_page.py`
-2. despues, bloques no dashboard: pedidos, clientes y ventas AI
+1. revisar si queda algun bloque no ventas fuera de `sales_page.py`
+2. si no queda, cambiar de estrategia para ventas: extraccion manual dirigida o cierre final controlado de la rama residual
 
 ## Estado del siguiente corte: salida de la zona dashboard
 
