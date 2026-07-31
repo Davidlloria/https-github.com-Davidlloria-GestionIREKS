@@ -1,11 +1,11 @@
 Lee primero:
 - AGENTS.md
-- worklog/progress-log.md
-- architecture/migration-roadmap.md
-- architecture-decisions.md
+- ../worklog/progress-log.md
+- ../architecture/migration-roadmap.md
+- ../architecture/architecture-decisions.md
 
-Resume en 10 líneas el estado actual de la migración usando `worklog/progress-log.md`
-como contexto corto y `architecture/migration-roadmap.md` como contexto estratégico.
+Resume en 10 líneas el estado actual de la migración usando `../worklog/progress-log.md`
+como contexto corto y `../architecture/migration-roadmap.md` como contexto estratégico.
 
 No hagas cambios todavía.
 
