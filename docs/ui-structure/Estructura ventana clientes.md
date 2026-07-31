@@ -57,7 +57,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo #EEF3F8)
                     │           ├── abreviatura de pedido
                     │           ├── estado Activo / Inactivo
                     │           └── prospección Sí / No
-                    └── crmCard (QWidget, fondo transparente, alto mínimo 300 px, expansión vertical)
+                    └── crmCard (QWidget, fondo naranja claro #FED7AA, borde #E2E8F0, radio 8 px, alto mínimo 300 px, expansión vertical)
                         └── customerTabs (QTabWidget, panel transparente; pestañas blanco #FFFFFF / gris #F8FAFC; activa azul #3B82F6)
                             ├── Contactos
                             │   ├── relatedContactsPanel (QWidget)
