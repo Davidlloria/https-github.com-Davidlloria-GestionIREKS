@@ -46,13 +46,15 @@ Flujo acordado:
 | 2026-07-31 | `feature/sales-reconciliation-warehouse-clean` | `8142e81be` mergeado | Cerrado |
 | 2026-07-31 | `feature/ingredients-warehouse-ui-clean` | `cfdbb73ee` mergeado | Cerrado |
 | 2026-07-31 | `feature/sales-analysis-dialog-clean` | `bc1464419` mergeado | Cerrado |
+| 2026-07-31 | `feature/customer-agenda-ui-clean` | `53a7abfc4` mergeado | Cerrado |
 
 ## Estado actual de ramas locales
 
 | Rama | Estado |
 |---|---|
-| `main` | activa, limpia |
+| `main` | activa |
 | `feature/pedidos-window-tweaks` | pendiente de vaciado por extracciones |
+| `feature/customer-agenda-ui-clean` | mergeada en `main`, pendiente de borrado local |
 
 ## Bloques pendientes detectados en `feature/pedidos-window-tweaks`
 
