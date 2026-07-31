@@ -2629,6 +2629,16 @@ class CustomersPage(QWidget):
                 border: 1px solid #D7DEE8;
                 border-radius: 8px;
             }
+            QSplitter#customersDetailSplitter {
+                background: #FEE2E2;
+                border: 0;
+            }
+            QSplitter#customersDetailSplitter::handle {
+                background: transparent;
+                border: 0;
+                width: 0px;
+                height: 0px;
+            }
             QFrame#crmCard, QWidget#crmCard {
                 background: #FFFFFF;
                 border: 1px solid #E2E8F0;
