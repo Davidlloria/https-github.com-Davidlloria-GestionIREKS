@@ -2608,7 +2608,7 @@ class CustomersPage(QWidget):
                 font-family: 'Segoe UI', 'Inter';
             }
             QWidget#CustomersPageRoot {
-                background: #EEF3F8;
+                background: #F3F4F6;
             }
             QFrame#crmCard, QWidget#crmCard {
                 background: #FFFFFF;
