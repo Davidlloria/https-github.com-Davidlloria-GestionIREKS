@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.core.database import engine
 from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
@@ -18,8 +18,8 @@ from app.schemas.customers import (
     CustomerUpdate,
 )
 from app.services.import_service import ImportService
-from app.services.customer_contact_flow_service import CustomerContactFlowService
 from app.services.customer_agenda_service import CustomerAgendaService
+from app.services.customer_contact_flow_service import CustomerContactFlowService
 from app.viewmodels import CustomerViewModel
 
 
@@ -36,8 +36,8 @@ class CustomerService:
     def __init__(self) -> None:
         self.vm = CustomerViewModel()
         self.import_service = ImportService()
-        self.contact_flow_service = CustomerContactFlowService(engine=engine, customer_vm=self.vm)
         self.agenda_service = CustomerAgendaService(engine=engine)
+        self.contact_flow_service = CustomerContactFlowService(engine=engine, customer_vm=self.vm)
 
     def address_catalogs(self) -> AddressCatalogs:
         with Session(engine) as session:
@@ -153,6 +153,10 @@ class CustomerService:
                     "SELECT COUNT(*) FROM recetas WHERE cliente_id = ?",
                     (customer_id,),
                 ).scalar_one(),
+                "agenda": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM clientes_agenda WHERE cliente_id = ?",
+                    (customer_id,),
+                ).scalar_one(),
                 "asistentes": conn.exec_driver_sql(
                     "SELECT COUNT(*) FROM asistentes WHERE cliente_id = ?",
                     (customer_id,),
@@ -161,6 +165,7 @@ class CustomerService:
         labels = {
             "contactos": "contacto(s)",
             "recetas": "receta(s)",
+            "agenda": "actividad(es) de agenda",
             "asistentes": "asistente(s) en cursos",
         }
         return [f"{count} {labels[name]}" for name, count in counts.items() if int(count or 0) > 0]
@@ -176,17 +181,13 @@ class CustomerService:
             return list(
                 session.exec(
                     select(Receta)
-                    .where(Receta.cliente_id == clean_id)
+                    .where(
+                        Receta.cliente_id == clean_id,
+                        col(Receta.es_base).is_(False),
+                    )
                     .order_by(Receta.nombre, Receta.version)
                 )
             )
-
-    def recipe_customer_id(self, recipe_id: int) -> str:
-        if recipe_id <= 0:
-            return ""
-        with Session(engine) as session:
-            recipe = session.get(Receta, recipe_id)
-        return str(getattr(recipe, "cliente_id", "") or "").strip() if recipe is not None else ""
 
     def related_agenda(self, cliente_id: str) -> list[ClienteAgenda]:
         return self.agenda_service.related_agenda(cliente_id)
