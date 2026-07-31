@@ -42,7 +42,9 @@ from sqlalchemy.exc import IntegrityError
 from app.models import CodigoPostal, Cliente, Contacto, Isla, Localidad, Municipio, Provincia, Receta
 from app.services.customer_report_document_helper import build_customer_report_html
 from app.services.customer_report_flow_service import CustomerReportFlowResult, CustomerReportFlowService
+from app.services.customer_query_service import CustomerQueryService
 from app.services.customer_service import CustomerService
+from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
 from app.services.customer_report_service import CustomerReportIntentService, CustomerReportResult, CustomerReportService
 from app.services.report_export_service import ReportExportService
 from app.ui.widgets.entity_dialog import EntityDialog
@@ -95,6 +97,9 @@ class CustomersPage(QWidget):
             report_service=self.customer_report_service,
         )
         self.report_export_service = ReportExportService()
+        self.customer_query_service = CustomerQueryService(
+            report_flow_service=self.customer_report_flow_service
+        )
         self.schema = [
             {"name": "cliente_nombre_comercial", "label": "Nombre comercial"},
             {"name": "cliente_nombre_fiscal", "label": "Nombre fiscal"},
@@ -253,6 +258,9 @@ class CustomersPage(QWidget):
         self.import_btn.setProperty("btnRole", "secondary")
         self.reports_btn = QPushButton("Listados")
         self.reports_btn.setProperty("btnRole", "primary")
+        self.queries_btn = QPushButton("Consultas")
+        self.queries_btn.setObjectName("customerQueriesButton")
+        self.queries_btn.setProperty("btnRole", "primary")
         self.refresh_btn = QPushButton("Refrescar")
         self.refresh_btn.setProperty("btnRole", "secondary")
         self.new_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogNewFolder))
@@ -261,6 +269,9 @@ class CustomersPage(QWidget):
         self.id_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogInfoView))
         self.import_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp))
         self.reports_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogListView))
+        self.queries_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "brain.svg")))
+        self.queries_btn.setIconSize(QSize(14, 14))
+        self.queries_btn.setToolTip("Abrir consultas de clientes")
         self.refresh_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
 
         self.new_btn.clicked.connect(self._new_entity)
@@ -269,6 +280,7 @@ class CustomersPage(QWidget):
         self.id_btn.clicked.connect(self._show_customer_id_dialog)
         self.import_btn.clicked.connect(self._import_entities)
         self.reports_btn.clicked.connect(self._open_customer_reports_dialog)
+        self.queries_btn.clicked.connect(self._open_customer_queries_dialog)
         self.refresh_btn.clicked.connect(self.reload)
 
         ribbon_layout.addWidget(self.new_btn)
@@ -279,6 +291,7 @@ class CustomersPage(QWidget):
         ribbon_layout.addWidget(self.id_btn)
         ribbon_layout.addWidget(self.import_btn)
         ribbon_layout.addWidget(self.reports_btn)
+        ribbon_layout.addWidget(self.queries_btn)
         ribbon_layout.addStretch(1)
         ribbon_layout.addWidget(self.refresh_btn)
         right_layout.addWidget(ribbon)
@@ -1154,6 +1167,11 @@ class CustomersPage(QWidget):
         layout.addWidget(self._build_reports_panel())
         dialog.show()
         self._reports_dialog = dialog
+
+    def _open_customer_queries_dialog(self) -> None:
+        dialog = CustomerQueriesDialog(service=self.customer_query_service, parent=self)
+        self._customer_queries_dialog = dialog
+        dialog.exec()
 
     def _build_upper_left_detail_panel(self) -> QWidget:
         panel = QWidget()
