@@ -8,7 +8,7 @@ Implementación principal:
 ## Estructura UI real
 
 ```text
-CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
+CustomersPage (QWidget, objectName: CustomersPageRoot, fondo #EEF3F8)
 └── layout principal (QVBoxLayout, márgenes 14 px, separación 10 px)
     ├── título de página "Clientes" (QLabel, actualmente oculto)
     ├── topRibbon (QFrame, fondo blanco #FFFFFF, borde #E2E8F1)
@@ -159,7 +159,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
 
 ## Aspecto visual actual
 
-- `CustomersPageRoot`, `detailTopArea` y `customersRightPanel` tienen fondo transparente.
+- `CustomersPageRoot` tiene fondo `#EEF3F8`; `detailTopArea` y `customersRightPanel` mantienen fondo transparente.
 - `customersLeftPanel` es blanco, con borde gris `#D7DEE8` y radio de 8 px.
 - `detailLeftCard` y `detailRightCard` son blancas, con borde gris y radio de 8 px.
 - La cinta superior usa botones compactos con colores por función e iconos.
@@ -194,4 +194,4 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo transparente)
 - Restaurada la pestaña Ventas desde el placeholder a una tabla funcional con filtro de año.
 - Restaurada la comparativa anual con modal, gráfico y exportación PDF.
 - Corregida la geometría documentada de `detailLeftCard` y `detailRightCard` para que coincida con el código real.
-- Alineado el fondo real de `CustomersPageRoot` con la documentaci?n: transparente.
+- Actualizado el fondo real de `CustomersPageRoot` a `#EEF3F8` y alineada la documentaci?n.
