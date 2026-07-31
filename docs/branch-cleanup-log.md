@@ -48,15 +48,18 @@ Flujo acordado:
 | 2026-07-31 | `feature/sales-analysis-dialog-clean` | `bc1464419` mergeado | Cerrado |
 | 2026-07-31 | `feature/customer-agenda-ui-clean` | `53a7abfc4` mergeado | Cerrado |
 | 2026-07-31 | `feature/orders-receipts-pending-clean` | `1c8c3b447` mergeado | Cerrado |
+| 2026-07-31 | `feature/pedidos-window-final-close` | `d0fe13075` mergeado | Cerrado |
+| 2026-07-31 | `feature/pedidos-window-tweaks` | cierre final controlado en `main` | Cerrado |
 
 ## Estado actual de ramas locales
 
 | Rama | Estado |
 |---|---|
 | `main` | activa |
-| `feature/pedidos-window-tweaks` | pendiente de vaciado por extracciones |
 
 ## Bloques pendientes detectados en `feature/pedidos-window-tweaks`
+
+No quedan bloques pendientes: la rama fue cerrada mediante integracion final controlada en `main` el 2026-07-31.
 
 ## Corte en analisis: bloques residuales de ventas
 
