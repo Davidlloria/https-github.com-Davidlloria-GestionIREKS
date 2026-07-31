@@ -222,23 +222,6 @@ class CustomerService:
     def delete_agenda_activity(self, agenda_id: str) -> bool:
         return self.agenda_service.delete_activity(agenda_id)
 
-    def related_agenda(self, cliente_id: str) -> list[ClienteAgenda]:
-        return self.agenda_service.related_agenda(cliente_id)
-
-    def get_agenda_activity(self, agenda_id: str) -> ClienteAgenda | None:
-        return self.agenda_service.get_activity(agenda_id)
-
-    def upsert_agenda_activity(self, agenda_id: str, payload: dict) -> ClienteAgenda:
-        return self.agenda_service.upsert_activity(agenda_id, payload)
-
-    def create_agenda_activity(self, payload: dict) -> ClienteAgenda:
-        return self.agenda_service.create_activity(payload)
-
-    def update_agenda_activity(self, agenda_id: str, payload: dict) -> ClienteAgenda:
-        return self.agenda_service.update_activity(agenda_id, payload)
-
-    def delete_agenda_activity(self, agenda_id: str) -> bool:
-        return self.agenda_service.delete_activity(agenda_id)
 
     def create_contact(self, payload: dict) -> Contacto:
         return self.contact_flow_service.create_contact(payload)
