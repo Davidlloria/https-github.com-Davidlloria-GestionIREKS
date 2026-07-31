@@ -2,7 +2,7 @@ from pathlib import Path
 import unicodedata
 
 from PySide6.QtCore import QSize, QTimer, Qt
-from PySide6.QtGui import QIcon, QTextDocument
+from PySide6.QtGui import QColor, QIcon, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -30,8 +31,14 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QToolTip,
 )
 from sqlalchemy.exc import IntegrityError
+
+try:
+    import pyqtgraph as pg
+except ModuleNotFoundError:  # pragma: no cover - dependency guard
+    pg = None
 
 from app.models import CodigoPostal, Cliente, Contacto, Isla, Localidad, Municipio, Provincia, Receta
 from app.services.customer_report_document_helper import build_customer_report_html
@@ -45,6 +52,166 @@ from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
 
 
 BASE_DIR = Path(__file__).resolve().parents[3]
+
+
+class CustomerSalesComparisonChartDialog(QDialog):
+    def __init__(self, *, rows: list, year: int, customer_name: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._rows = list(rows or [])
+        self._year = int(year)
+        self._hover_regions: list[dict[str, float | int]] = []
+        self._tooltip_text = ""
+        self._tooltip_global_position = None
+        self._tooltip_refresh_timer = QTimer(self)
+        self._tooltip_refresh_timer.setInterval(250)
+        self._tooltip_refresh_timer.timeout.connect(self._refresh_tooltip)
+        self.setWindowTitle("Gr\u00e1fico comparativo de ventas")
+        self.resize(980, 560)
+        self.setMinimumSize(720, 420)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+        title = QLabel(f"Comparativa de ventas en kg \u00b7 {customer_name}")
+        title.setProperty("role", "sectionTitle")
+        layout.addWidget(title)
+        subtitle = QLabel(f"Productos \u00b7 {self._year - 1} vs {self._year}")
+        subtitle.setStyleSheet("color: #667085;")
+        layout.addWidget(subtitle)
+
+        if pg is None:
+            unavailable = QLabel("No se puede mostrar el gr\u00e1fico porque pyqtgraph no est\u00e1 instalado.")
+            unavailable.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(unavailable, 1)
+        else:
+            self._plot = pg.PlotWidget(parent=self)
+            self._configure_plot()
+            layout.addWidget(self._plot, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _configure_plot(self) -> None:
+        self._plot.setBackground("#FFFFFF")
+        self._plot.setMenuEnabled(False)
+        self._plot.setMouseEnabled(x=False, y=False)
+        self._plot.setAntialiasing(True)
+        self._plot.hideButtons()
+        self._plot.showGrid(x=False, y=True, alpha=0.18)
+        plot_item = self._plot.getPlotItem()
+        plot_item.setLabel("left", "Kg")
+        plot_item.setLabel("bottom", "Producto")
+        plot_item.hideAxis("top")
+        plot_item.hideAxis("right")
+
+        positions = list(range(len(self._rows)))
+        prev_values = [float(getattr(row, "kg_prev", 0.0) or 0.0) for row in self._rows]
+        curr_values = [float(getattr(row, "kg_curr", 0.0) or 0.0) for row in self._rows]
+        width = 0.34
+        self._plot.addItem(
+            pg.BarGraphItem(
+                x=[position - 0.2 for position in positions],
+                height=prev_values,
+                width=width,
+                brush=QColor("#98A2B3"),
+                pen=QColor("#667085"),
+            )
+        )
+        self._plot.addItem(
+            pg.BarGraphItem(
+                x=[position + 0.2 for position in positions],
+                height=curr_values,
+                width=width,
+                brush=QColor("#0F766E"),
+                pen=QColor("#0B5F59"),
+            )
+        )
+
+        ticks = []
+        for position, row, prev_value, curr_value in zip(positions, self._rows, prev_values, curr_values):
+            label = str(getattr(row, "codigo", "") or getattr(row, "nombre", "") or position + 1).strip()
+            ticks.append((position, label[:16]))
+            self._hover_regions.extend(
+                [
+                    {"index": position, "x1": position - 0.2 - width / 2, "x2": position - 0.2 + width / 2, "value": prev_value},
+                    {"index": position, "x1": position + 0.2 - width / 2, "x2": position + 0.2 + width / 2, "value": curr_value},
+                ]
+            )
+
+        self._plot.getAxis("bottom").setTicks([ticks])
+        self._plot.setXRange(-0.7, max(len(self._rows) - 0.3, 0.7), padding=0)
+        legend = self._plot.addLegend(offset=(10, 10))
+        legend.setBrush(QColor(255, 255, 255, 225))
+        legend.setPen(QColor("#D0D5DD"))
+        legend.addItem(pg.BarGraphItem(x=[0], height=[1], width=1, brush=QColor("#98A2B3")), str(self._year - 1))
+        legend.addItem(pg.BarGraphItem(x=[0], height=[1], width=1, brush=QColor("#0F766E")), str(self._year))
+        self._plot.scene().sigMouseMoved.connect(self._show_tooltip)
+
+    def _show_tooltip(self, scene_pos) -> None:
+        view_box = self._plot.getPlotItem().vb
+        view_rect = view_box.sceneBoundingRect()
+        if not view_rect.left() <= scene_pos.x() <= view_rect.right():
+            self._clear_tooltip()
+            return
+        point = view_box.mapSceneToView(scene_pos)
+        x_value = float(point.x())
+        y_value = float(point.y())
+        for region in self._hover_regions:
+            height = float(region["value"])
+            if float(region["x1"]) <= x_value <= float(region["x2"]) and 0 <= y_value <= height:
+                row = self._rows[int(region["index"])]
+                name = str(getattr(row, "nombre", "") or getattr(row, "codigo", "") or "Producto").strip()
+                prev_text = self._format_kg(getattr(row, "kg_prev", 0.0))
+                curr_text = self._format_kg(getattr(row, "kg_curr", 0.0))
+                text = f"{name}\n{self._year - 1}: {prev_text} kg\n{self._year}: {curr_text} kg"
+                self._display_tooltip(scene_pos, text)
+                return
+        product_index = self._product_index_at_x(x_value)
+        if product_index is not None:
+            row = self._rows[product_index]
+            name = str(getattr(row, "nombre", "") or getattr(row, "codigo", "") or "Producto").strip()
+            self._display_tooltip(scene_pos, name)
+            return
+        self._clear_tooltip()
+
+    def _display_tooltip(self, scene_pos, text: str) -> None:
+        self._tooltip_text = str(text or "")
+        self._tooltip_global_position = self._tooltip_global_pos(scene_pos)
+        QToolTip.showText(self._tooltip_global_position, self._tooltip_text, self._plot)
+        self._tooltip_refresh_timer.start()
+
+    def _refresh_tooltip(self) -> None:
+        if not self._tooltip_text or self._tooltip_global_position is None:
+            return
+        QToolTip.showText(self._tooltip_global_position, self._tooltip_text, self._plot)
+
+    def _clear_tooltip(self) -> None:
+        self._tooltip_refresh_timer.stop()
+        self._tooltip_text = ""
+        self._tooltip_global_position = None
+        QToolTip.hideText()
+
+    def _tooltip_global_pos(self, scene_pos):
+        local_pos = self._plot.mapFromScene(scene_pos)
+        if hasattr(local_pos, "toPoint"):
+            local_pos = local_pos.toPoint()
+        return self._plot.mapToGlobal(local_pos)
+
+    def _product_index_at_x(self, x_value: float) -> int | None:
+        index = int(round(float(x_value)))
+        if 0 <= index < len(self._rows) and abs(float(x_value) - index) <= 0.45:
+            return index
+        return None
+
+    @staticmethod
+    def _format_kg(value: float | int | None) -> str:
+        number = float(value or 0.0)
+        return f"{number:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+
+    def leaveEvent(self, event) -> None:
+        self._clear_tooltip()
+        super().leaveEvent(event)
 
 
 class CustomersPage(QWidget):
