@@ -34,10 +34,16 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
 from sqlalchemy.exc import IntegrityError
+
+try:
+    import pyqtgraph as pg
+except ModuleNotFoundError:  # pragma: no cover - dependency guard
+    pg = None
 
 from app.models import CodigoPostal, Cliente, Contacto, Isla, Localidad, Municipio, Provincia, Receta
 from app.services.customer_report_document_helper import build_customer_report_html
@@ -50,6 +56,166 @@ from app.services.report_export_service import ReportExportService
 from app.ui.widgets.entity_dialog import EntityDialog
 
 BASE_DIR = Path(__file__).resolve().parents[3]
+
+
+class CustomerSalesComparisonChartDialog(QDialog):
+    def __init__(self, *, rows: list, year: int, customer_name: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._rows = list(rows or [])
+        self._year = int(year)
+        self._hover_regions: list[dict[str, float | int]] = []
+        self._tooltip_text = ""
+        self._tooltip_global_position = None
+        self._tooltip_refresh_timer = QTimer(self)
+        self._tooltip_refresh_timer.setInterval(250)
+        self._tooltip_refresh_timer.timeout.connect(self._refresh_tooltip)
+        self.setWindowTitle("Gráfico comparativo de ventas")
+        self.resize(980, 560)
+        self.setMinimumSize(720, 420)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+        title = QLabel(f"Comparativa de ventas en kg · {customer_name}")
+        title.setProperty("role", "sectionTitle")
+        layout.addWidget(title)
+        subtitle = QLabel(f"Productos · {self._year - 1} vs {self._year}")
+        subtitle.setStyleSheet("color: #667085;")
+        layout.addWidget(subtitle)
+
+        if pg is None:
+            unavailable = QLabel("No se puede mostrar el gráfico porque pyqtgraph no está instalado.")
+            unavailable.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(unavailable, 1)
+        else:
+            self._plot = pg.PlotWidget(parent=self)
+            self._configure_plot()
+            layout.addWidget(self._plot, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _configure_plot(self) -> None:
+        self._plot.setBackground("#FFFFFF")
+        self._plot.setMenuEnabled(False)
+        self._plot.setMouseEnabled(x=False, y=False)
+        self._plot.setAntialiasing(True)
+        self._plot.hideButtons()
+        self._plot.showGrid(x=False, y=True, alpha=0.18)
+        plot_item = self._plot.getPlotItem()
+        plot_item.setLabel("left", "Kg")
+        plot_item.setLabel("bottom", "Producto")
+        plot_item.hideAxis("top")
+        plot_item.hideAxis("right")
+
+        positions = list(range(len(self._rows)))
+        prev_values = [float(getattr(row, "kg_prev", 0.0) or 0.0) for row in self._rows]
+        curr_values = [float(getattr(row, "kg_curr", 0.0) or 0.0) for row in self._rows]
+        width = 0.34
+        self._plot.addItem(
+            pg.BarGraphItem(
+                x=[position - 0.2 for position in positions],
+                height=prev_values,
+                width=width,
+                brush=QColor("#98A2B3"),
+                pen=QColor("#667085"),
+            )
+        )
+        self._plot.addItem(
+            pg.BarGraphItem(
+                x=[position + 0.2 for position in positions],
+                height=curr_values,
+                width=width,
+                brush=QColor("#0F766E"),
+                pen=QColor("#0B5F59"),
+            )
+        )
+
+        ticks = []
+        for position, row, prev_value, curr_value in zip(positions, self._rows, prev_values, curr_values):
+            label = str(getattr(row, "codigo", "") or getattr(row, "nombre", "") or position + 1).strip()
+            ticks.append((position, label[:16]))
+            self._hover_regions.extend(
+                [
+                    {"index": position, "x1": position - 0.2 - width / 2, "x2": position - 0.2 + width / 2, "value": prev_value},
+                    {"index": position, "x1": position + 0.2 - width / 2, "x2": position + 0.2 + width / 2, "value": curr_value},
+                ]
+            )
+
+        self._plot.getAxis("bottom").setTicks([ticks])
+        self._plot.setXRange(-0.7, max(len(self._rows) - 0.3, 0.7), padding=0)
+        legend = self._plot.addLegend(offset=(10, 10))
+        legend.setBrush(QColor(255, 255, 255, 225))
+        legend.setPen(QColor("#D0D5DD"))
+        legend.addItem(pg.BarGraphItem(x=[0], height=[1], width=1, brush=QColor("#98A2B3")), str(self._year - 1))
+        legend.addItem(pg.BarGraphItem(x=[0], height=[1], width=1, brush=QColor("#0F766E")), str(self._year))
+        self._plot.scene().sigMouseMoved.connect(self._show_tooltip)
+
+    def _show_tooltip(self, scene_pos) -> None:
+        view_box = self._plot.getPlotItem().vb
+        view_rect = view_box.sceneBoundingRect()
+        if not view_rect.left() <= scene_pos.x() <= view_rect.right():
+            self._clear_tooltip()
+            return
+        point = view_box.mapSceneToView(scene_pos)
+        x_value = float(point.x())
+        y_value = float(point.y())
+        for region in self._hover_regions:
+            height = float(region["value"])
+            if float(region["x1"]) <= x_value <= float(region["x2"]) and 0 <= y_value <= height:
+                row = self._rows[int(region["index"])]
+                name = str(getattr(row, "nombre", "") or getattr(row, "codigo", "") or "Producto").strip()
+                prev_text = self._format_kg(getattr(row, "kg_prev", 0.0))
+                curr_text = self._format_kg(getattr(row, "kg_curr", 0.0))
+                text = f"{name}\n{self._year - 1}: {prev_text} kg\n{self._year}: {curr_text} kg"
+                self._display_tooltip(scene_pos, text)
+                return
+        product_index = self._product_index_at_x(x_value)
+        if product_index is not None:
+            row = self._rows[product_index]
+            name = str(getattr(row, "nombre", "") or getattr(row, "codigo", "") or "Producto").strip()
+            self._display_tooltip(scene_pos, name)
+            return
+        self._clear_tooltip()
+
+    def _display_tooltip(self, scene_pos, text: str) -> None:
+        self._tooltip_text = str(text or "")
+        self._tooltip_global_position = self._tooltip_global_pos(scene_pos)
+        QToolTip.showText(self._tooltip_global_position, self._tooltip_text, self._plot)
+        self._tooltip_refresh_timer.start()
+
+    def _refresh_tooltip(self) -> None:
+        if not self._tooltip_text or self._tooltip_global_position is None:
+            return
+        QToolTip.showText(self._tooltip_global_position, self._tooltip_text, self._plot)
+
+    def _clear_tooltip(self) -> None:
+        self._tooltip_refresh_timer.stop()
+        self._tooltip_text = ""
+        self._tooltip_global_position = None
+        QToolTip.hideText()
+
+    def _tooltip_global_pos(self, scene_pos):
+        local_pos = self._plot.mapFromScene(scene_pos)
+        if hasattr(local_pos, "toPoint"):
+            local_pos = local_pos.toPoint()
+        return self._plot.mapToGlobal(local_pos)
+
+    def _product_index_at_x(self, x_value: float) -> int | None:
+        index = int(round(float(x_value)))
+        if 0 <= index < len(self._rows) and abs(float(x_value) - index) <= 0.45:
+            return index
+        return None
+
+    @staticmethod
+    def _format_kg(value: float | int | None) -> str:
+        number = float(value or 0.0)
+        return f"{number:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+
+    def leaveEvent(self, event) -> None:
+        self._clear_tooltip()
+        super().leaveEvent(event)
 
 
 class AgendaIconDelegate(QStyledItemDelegate):
@@ -139,12 +305,16 @@ class CustomersPage(QWidget):
         self._is_loading_details = False
         self._related_context_menu_open = False
         self._loading_related_contacts = False
+        self._loading_related_sales = False
         self._loading_agenda = False
         self._agenda_filter_type: QComboBox | None = None
         self._agenda_filter_state: QComboBox | None = None
         self._agenda_filter_from: QDateEdit | None = None
         self._agenda_filter_to: QDateEdit | None = None
         self._agenda_filter_refresh_btn: QPushButton | None = None
+        self._related_sales_year_filter: QComboBox | None = None
+        self._related_sales_compare_btn: QPushButton | None = None
+        self._related_sales_rows: list = []
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
         self._search_timer.timeout.connect(self.reload)
@@ -387,7 +557,7 @@ class CustomersPage(QWidget):
         self.customer_tabs = QTabWidget()
         self.customer_tabs.setObjectName("customerTabs")
         self.customer_tabs.addTab(self._build_contacts_tab(), "Contactos")
-        self.customer_tabs.addTab(self._build_tab_placeholder("Historial y resumen de ventas."), "Ventas")
+        self.customer_tabs.addTab(self._build_sales_tab(), "Ventas")
         self.customer_tabs.addTab(self._build_recipes_tab(), "Recetas")
         self.customer_tabs.addTab(self._build_agenda_tab(), "Agenda")
         self.customer_tabs.setTabIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView))
@@ -504,6 +674,393 @@ class CustomersPage(QWidget):
         self.related_contacts_empty.setVisible(False)
         layout.addWidget(self.related_contacts_empty)
         return panel
+
+    def _build_sales_tab(self) -> QWidget:
+        panel = QWidget()
+        panel.setObjectName("customerSalesPanel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(8)
+
+        actions = QHBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.setSpacing(8)
+
+        self._related_sales_year_filter = QComboBox()
+        self._related_sales_year_filter.setObjectName("customerSalesYearFilter")
+        self._related_sales_year_filter.setFixedWidth(110)
+        self._related_sales_year_filter.currentIndexChanged.connect(self._refresh_related_sales)
+
+        self._related_sales_compare_btn = QPushButton("Comp.")
+        self._related_sales_compare_btn.setObjectName("customerSalesCompareButton")
+        self._related_sales_compare_btn.setEnabled(False)
+        self._related_sales_compare_btn.clicked.connect(self._open_related_sales_comparison)
+
+        actions.addWidget(self._related_sales_year_filter)
+        actions.addWidget(self._related_sales_compare_btn)
+        actions.addStretch(1)
+        layout.addLayout(actions)
+
+        self.related_sales_table = QTableWidget(0, 5)
+        self.related_sales_table.setObjectName("customerSalesTable")
+        self.related_sales_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.related_sales_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.related_sales_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.related_sales_table.setAlternatingRowColors(True)
+        self.related_sales_table.setSortingEnabled(True)
+        self.related_sales_table.verticalHeader().setVisible(False)
+        self.related_sales_table.setHorizontalHeaderLabels(["Referencia", "Descripción", "Unid.", "Kg", "€"])
+        sales_header = self.related_sales_table.horizontalHeader()
+        sales_header.setSectionsClickable(True)
+        sales_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        sales_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        sales_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        sales_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        sales_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self.related_sales_table.setColumnWidth(0, 110)
+        self.related_sales_table.setColumnWidth(2, 96)
+        self.related_sales_table.setColumnWidth(3, 108)
+        self.related_sales_table.setColumnWidth(4, 118)
+        self.related_sales_table.verticalHeader().setDefaultSectionSize(34)
+        layout.addWidget(self.related_sales_table, 1)
+
+        self.related_sales_totals = QTableWidget(1, 5)
+        self.related_sales_totals.setObjectName("customerSalesTotals")
+        self.related_sales_totals.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.related_sales_totals.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.related_sales_totals.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.related_sales_totals.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.related_sales_totals.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.related_sales_totals.verticalHeader().setVisible(False)
+        self.related_sales_totals.horizontalHeader().setVisible(False)
+        totals_header = self.related_sales_totals.horizontalHeader()
+        totals_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        totals_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        totals_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        totals_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        totals_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self.related_sales_totals.setColumnWidth(0, 110)
+        self.related_sales_totals.setColumnWidth(2, 96)
+        self.related_sales_totals.setColumnWidth(3, 108)
+        self.related_sales_totals.setColumnWidth(4, 118)
+        self.related_sales_totals.verticalHeader().setDefaultSectionSize(34)
+        self.related_sales_totals.setFixedHeight(40)
+        layout.addWidget(self.related_sales_totals)
+
+        self.related_sales_empty = QLabel("No hay ventas asociadas a este cliente para el año seleccionado.")
+        self.related_sales_empty.setObjectName("customerSalesEmpty")
+        self.related_sales_empty.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+        self.related_sales_empty.setWordWrap(True)
+        self.related_sales_empty.setVisible(False)
+        layout.addWidget(self.related_sales_empty)
+
+        self._reload_related_sales_years()
+        self._render_related_sales("")
+        return panel
+
+    def _reload_related_sales_years(self) -> None:
+        combo = self._related_sales_year_filter
+        if combo is None:
+            return
+        current_value = str(combo.currentData() or combo.currentText() or "").strip()
+        years = [int(year) for year in self.customer_service.related_sales_years() if int(year or 0) > 0]
+        years = sorted(set(years), reverse=True)
+        preferred_year = str(date.today().year)
+        combo.blockSignals(True)
+        combo.clear()
+        for year in years:
+            combo.addItem(str(year), year)
+        if years:
+            preferred_index = combo.findData(int(preferred_year))
+            if preferred_index < 0 and current_value.isdigit():
+                preferred_index = combo.findData(int(current_value))
+            if preferred_index < 0:
+                preferred_index = 0
+            combo.setCurrentIndex(preferred_index)
+        combo.blockSignals(False)
+
+    def _refresh_related_sales(self) -> None:
+        selected = self._selected_row()
+        self._render_related_sales(str(getattr(selected, "cliente_id", "") or "") if selected else "")
+
+    def _render_related_sales(self, cliente_id: str) -> None:
+        if not hasattr(self, "related_sales_table"):
+            return
+        year_filter = self._related_sales_year_filter
+        year = int(year_filter.currentData() or 0) if year_filter is not None else 0
+        if not str(cliente_id or "").strip() or year <= 0:
+            rows = []
+        else:
+            rows = self.customer_service.related_sales(str(cliente_id or "").strip(), year)
+
+        self._related_sales_rows = list(rows or [])
+        self._loading_related_sales = True
+        self.related_sales_table.setSortingEnabled(False)
+        try:
+            self.related_sales_table.setRowCount(len(self._related_sales_rows))
+            total_units = 0.0
+            total_kg = 0.0
+            total_euros = 0.0
+            for row_idx, item in enumerate(self._related_sales_rows):
+                units = float(getattr(item, "unidades_curr", 0.0) or 0.0)
+                kg = float(getattr(item, "kg_curr", 0.0) or 0.0)
+                euros = float(getattr(item, "euros_curr", 0.0) or 0.0)
+                total_units += units
+                total_kg += kg
+                total_euros += euros
+
+                code_item = QTableWidgetItem(str(getattr(item, "codigo", "") or ""))
+                name_item = QTableWidgetItem(str(getattr(item, "nombre", "") or ""))
+                units_item = QTableWidgetItem(self._format_sales_number(units))
+                kg_item = QTableWidgetItem(self._format_sales_number(kg))
+                euros_item = QTableWidgetItem(self._format_sales_number(euros))
+
+                code_item.setData(Qt.ItemDataRole.UserRole, str(getattr(item, "articulo_id", "") or ""))
+                units_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                kg_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                euros_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                units_item.setData(Qt.ItemDataRole.UserRole, units)
+                kg_item.setData(Qt.ItemDataRole.UserRole, kg)
+                euros_item.setData(Qt.ItemDataRole.UserRole, euros)
+
+                self.related_sales_table.setItem(row_idx, 0, code_item)
+                self.related_sales_table.setItem(row_idx, 1, name_item)
+                self.related_sales_table.setItem(row_idx, 2, units_item)
+                self.related_sales_table.setItem(row_idx, 3, kg_item)
+                self.related_sales_table.setItem(row_idx, 4, euros_item)
+
+            self.related_sales_totals.setItem(0, 0, QTableWidgetItem(""))
+            total_label = QTableWidgetItem("TOTALES")
+            total_units_item = QTableWidgetItem(self._format_sales_number(total_units))
+            total_kg_item = QTableWidgetItem(self._format_sales_number(total_kg))
+            total_euros_item = QTableWidgetItem(self._format_sales_number(total_euros))
+            total_units_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            total_kg_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            total_euros_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.related_sales_totals.setItem(0, 1, total_label)
+            self.related_sales_totals.setItem(0, 2, total_units_item)
+            self.related_sales_totals.setItem(0, 3, total_kg_item)
+            self.related_sales_totals.setItem(0, 4, total_euros_item)
+        finally:
+            self._loading_related_sales = False
+            self.related_sales_table.setSortingEnabled(True)
+
+        has_rows = bool(self._related_sales_rows)
+        self.related_sales_table.setVisible(has_rows)
+        self.related_sales_totals.setVisible(has_rows)
+        self.related_sales_empty.setVisible(not has_rows)
+        if self._related_sales_compare_btn is not None:
+            self._related_sales_compare_btn.setEnabled(bool(cliente_id) and year > 0 and has_rows)
+
+    @staticmethod
+    def _format_sales_number(value: float | int | None) -> str:
+        number = float(value or 0.0)
+        return f"{number:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+
+    def _open_related_sales_comparison(self) -> None:
+        selected = self._selected_row()
+        year_filter = self._related_sales_year_filter
+        year = int(year_filter.currentData() or 0) if year_filter is not None else 0
+        cliente_id = str(getattr(selected, "cliente_id", "") or "").strip() if selected else ""
+        customer_name = str(getattr(selected, "cliente_nombre_comercial", "") or "").strip() if selected else ""
+        if not cliente_id or year <= 0:
+            return
+        rows = self.customer_service.related_sales(cliente_id, year)
+        dialog = self._build_related_sales_comparison_dialog(rows=rows, year=year, customer_name=customer_name)
+        self._related_sales_comparison_dialog = dialog
+        dialog.exec()
+
+    def _build_related_sales_comparison_dialog(self, *, rows: list, year: int, customer_name: str) -> QDialog:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Comparativa de ventas")
+        dialog.resize(1540, 820)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+
+        title = QLabel(customer_name or "Cliente")
+        title.setProperty("role", "sectionTitle")
+        layout.addWidget(title)
+
+        groups = QTableWidget(1, 3)
+        groups.setObjectName("customerSalesComparisonGroups")
+        groups.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        groups.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        groups.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        groups.verticalHeader().setVisible(False)
+        groups.horizontalHeader().setVisible(False)
+        groups.setFixedHeight(44)
+        groups.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        groups.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        groups.setItem(0, 0, QTableWidgetItem(str(year - 1)))
+        groups.setItem(0, 1, QTableWidgetItem(str(year)))
+        groups.setItem(0, 2, QTableWidgetItem("Diferencia"))
+        for column in range(3):
+            item = groups.item(0, column)
+            if item is not None:
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        groups.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(groups)
+
+        table = QTableWidget(0, 11)
+        table.setObjectName("customerSalesComparisonTable")
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setAlternatingRowColors(True)
+        table.setSortingEnabled(False)
+        table.verticalHeader().setVisible(False)
+        table.setHorizontalHeaderLabels([
+            "Referencia", "Descripción",
+            "Unid.", "Kg", "€",
+            "Unid.", "Kg", "€",
+            "Δ Unid.", "Δ Kg", "Δ €",
+        ])
+        header = table.horizontalHeader()
+        header.setSectionsClickable(True)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        for column in range(2, 11):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+        table.setColumnWidth(0, 110)
+        table.setColumnWidth(2, 90)
+        table.setColumnWidth(3, 100)
+        table.setColumnWidth(4, 112)
+        table.setColumnWidth(5, 90)
+        table.setColumnWidth(6, 100)
+        table.setColumnWidth(7, 112)
+        table.setColumnWidth(8, 100)
+        table.setColumnWidth(9, 110)
+        table.setColumnWidth(10, 118)
+        table.verticalHeader().setDefaultSectionSize(34)
+        layout.addWidget(table, 1)
+
+        totals_table = QTableWidget(1, 11)
+        totals_table.setObjectName("customerSalesComparisonTotals")
+        totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        totals_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        totals_table.verticalHeader().setVisible(False)
+        totals_table.horizontalHeader().setVisible(False)
+        totals_table.setFixedHeight(40)
+        totals_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        totals_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        totals_header = totals_table.horizontalHeader()
+        totals_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        totals_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        for column in range(2, 11):
+            totals_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+        for column in range(11):
+            totals_table.setColumnWidth(column, table.columnWidth(column))
+        layout.addWidget(totals_table)
+
+        empty = QLabel("No hay datos de comparativa para este cliente.")
+        empty.setObjectName("customerSalesEmpty")
+        empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty.setVisible(False)
+        layout.addWidget(empty)
+
+        footer = QHBoxLayout()
+        footer.setContentsMargins(0, 0, 0, 0)
+        footer.setSpacing(8)
+        chart_btn = QPushButton("Graf.")
+        chart_btn.setObjectName("customerSalesComparisonChartButton")
+        chart_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "chart-no-axes-combined.svg")))
+        chart_btn.clicked.connect(lambda: self._open_related_sales_chart(rows=rows, year=year, customer_name=customer_name, parent=dialog))
+        pdf_btn = QPushButton("Pdf")
+        pdf_btn.setObjectName("customerSalesComparisonPdfButton")
+        pdf_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-text.svg")))
+        pdf_btn.clicked.connect(lambda: self._export_related_sales_comparison_pdf(rows=rows, year=year, customer_name=customer_name, parent=dialog))
+        close_btn = QPushButton("Cerrar")
+        close_btn.setObjectName("customerSalesComparisonCloseButton")
+        close_btn.clicked.connect(dialog.accept)
+        footer.addWidget(chart_btn)
+        footer.addWidget(pdf_btn)
+        footer.addStretch(1)
+        footer.addWidget(close_btn)
+        layout.addLayout(footer)
+
+        self._populate_related_sales_comparison_table(table=table, totals_table=totals_table, empty_label=empty, rows=rows)
+        return dialog
+
+    def _populate_related_sales_comparison_table(self, *, table: QTableWidget, totals_table: QTableWidget, empty_label: QLabel, rows: list) -> None:
+        table.setRowCount(len(rows))
+        totals = [0.0] * 9
+        for row_idx, item in enumerate(rows):
+            values = [
+                float(getattr(item, "unidades_prev", 0.0) or 0.0),
+                float(getattr(item, "kg_prev", 0.0) or 0.0),
+                float(getattr(item, "euros_prev", 0.0) or 0.0),
+                float(getattr(item, "unidades_curr", 0.0) or 0.0),
+                float(getattr(item, "kg_curr", 0.0) or 0.0),
+                float(getattr(item, "euros_curr", 0.0) or 0.0),
+                float(getattr(item, "delta_unidades", 0.0) or 0.0),
+                float(getattr(item, "delta_kg", 0.0) or 0.0),
+                float(getattr(item, "delta_euros", 0.0) or 0.0),
+            ]
+            totals = [total + value for total, value in zip(totals, values)]
+            base_items = [
+                QTableWidgetItem(str(getattr(item, "codigo", "") or "")),
+                QTableWidgetItem(str(getattr(item, "nombre", "") or "")),
+            ]
+            for col_idx, base_item in enumerate(base_items):
+                table.setItem(row_idx, col_idx, base_item)
+            for offset, value in enumerate(values, start=2):
+                number_item = QTableWidgetItem(self._format_sales_number(value))
+                number_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                number_item.setData(Qt.ItemDataRole.UserRole, value)
+                if offset >= 8:
+                    if value > 0:
+                        number_item.setForeground(QColor("#067647"))
+                    elif value < 0:
+                        number_item.setForeground(QColor("#B42318"))
+                table.setItem(row_idx, offset, number_item)
+
+        totals_table.setItem(0, 0, QTableWidgetItem(""))
+        totals_label = QTableWidgetItem("TOTALES")
+        totals_table.setItem(0, 1, totals_label)
+        for idx, value in enumerate(totals, start=2):
+            item = QTableWidgetItem(self._format_sales_number(value))
+            item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            if idx >= 8:
+                if value > 0:
+                    item.setForeground(QColor("#067647"))
+                elif value < 0:
+                    item.setForeground(QColor("#B42318"))
+            totals_table.setItem(0, idx, item)
+
+        has_rows = bool(rows)
+        table.setVisible(has_rows)
+        totals_table.setVisible(has_rows)
+        empty_label.setVisible(not has_rows)
+        table.setSortingEnabled(True)
+
+    def _open_related_sales_chart(self, *, rows: list, year: int, customer_name: str, parent: QWidget | None = None) -> None:
+        if not rows:
+            return
+        dialog = CustomerSalesComparisonChartDialog(rows=rows, year=year, customer_name=customer_name, parent=parent or self)
+        dialog.exec()
+
+    def _export_related_sales_comparison_pdf(self, *, rows: list, year: int, customer_name: str, parent: QWidget | None = None) -> None:
+        if not rows:
+            return
+        safe_customer_name = customer_name.strip() or "Cliente"
+        default_name = f"Comparativa - {year - 1} vs {year} - {safe_customer_name}"
+        default = str(self.report_export_service.default_path(default_name, "pdf"))
+        path, _ = QFileDialog.getSaveFileName(parent or self, "Guardar comparativa PDF", default, "PDF (*.pdf)")
+        if not path:
+            return
+        try:
+            out = self.report_export_service.export_customer_sales_comparison_pdf(
+                path,
+                customer_name=safe_customer_name,
+                year=year,
+                rows=rows,
+            )
+        except Exception as exc:
+            QMessageBox.warning(parent or self, "Comparativa PDF", f"No se pudo exportar el PDF.\n\n{exc}")
+            return
+        QMessageBox.information(parent or self, "Comparativa PDF", f"PDF generado correctamente.\n\n{out}")
 
     def _build_recipes_tab(self) -> QWidget:
         panel = QWidget()
@@ -1705,6 +2262,7 @@ class CustomersPage(QWidget):
             self.detail_activo.setChecked(False)
             self.detail_prospeccion_no.setChecked(True)
             self._render_related_contacts("")
+            self._render_related_sales("")
             self._render_related_recipes("")
             self._render_customer_agenda("")
             self._is_loading_details = False
@@ -1746,6 +2304,7 @@ class CustomersPage(QWidget):
         else:
             self.detail_prospeccion_no.setChecked(True)
         self._render_related_contacts(str(getattr(row, "cliente_id", "") or ""))
+        self._render_related_sales(str(getattr(row, "cliente_id", "") or ""))
         self._render_related_recipes(str(getattr(row, "cliente_id", "") or ""))
         self._render_customer_agenda(str(getattr(row, "cliente_id", "") or ""))
         self._is_loading_details = False
