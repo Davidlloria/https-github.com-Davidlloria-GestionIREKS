@@ -36,7 +36,7 @@ Flujo acordado:
 | 2026-07-31 | `feature/dashboard-agenda-calendar-refine-clean` | `42fd8a35e` mergeado | Cerrado |
 | 2026-07-31 | `feature/customer-recipes-ownership-clean` | `c9031af42` mergeado | Cerrado |
 | 2026-07-31 | `feature/customer-agenda-service-test-clean` | `f91557a67` mergeado | Cerrado |
-| 2026-07-31 | `feature/customer-queries-clean` | pendiente | En validacion |
+| 2026-07-31 | `feature/customer-queries-clean` | `3b23acb8f` mergeado | Cerrado |
 
 ## Estado actual de ramas locales
 
@@ -51,7 +51,6 @@ Orden recomendado de extraccion restante:
 
 1. revisar si queda algun ajuste comun de `dashboard_page.py`
 2. despues, bloques no dashboard: pedidos, clientes y ventas AI
-3. customer queries modal en curso como siguiente corte medio de clientes
 
 ## Estado del siguiente corte: salida de la zona dashboard
 
