@@ -332,6 +332,7 @@ class CustomersPage(QWidget):
 
     def _build_ui(self) -> None:
         self.setObjectName("CustomersPageRoot")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._apply_modern_styles()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 14, 14, 14)
@@ -516,31 +517,30 @@ class CustomersPage(QWidget):
         detail_layout.setContentsMargins(0, 0, 0, 0)
         detail_layout.setSpacing(10)
 
-        detail_title = QLabel("Detalle de cliente", detail_panel)
-        detail_title.setProperty("role", "sectionTitle")
-        self.detail_title = detail_title
-        self.detail_title.setGeometry(5, 0, 300, 24)
-        self.detail_tipo_header = QLabel("Clasificación del cliente", detail_panel)
-        self.detail_tipo_header.setProperty("role", "sectionTitle")
-        self.detail_tipo_header.setGeometry(0, 0, 300, 24)
-
         self.detail_panel = detail_panel
 
         left_card = QFrame(detail_panel)
         left_card.setObjectName("detailLeftCard")
         self.left_card = left_card
+        detail_title = QLabel("Detalle de cliente", left_card)
+        detail_title.setProperty("role", "sectionTitle")
+        self.detail_title = detail_title
         left_card_layout = QVBoxLayout(left_card)
-        left_card_layout.setContentsMargins(2, 2, 2, 2)
-        left_card_layout.setSpacing(0)
+        left_card_layout.setContentsMargins(12, 10, 12, 12)
+        left_card_layout.setSpacing(8)
+        left_card_layout.addWidget(self.detail_title, 0)
         left_detail_panel = self._build_upper_left_detail_panel()
         left_card_layout.addWidget(left_detail_panel, 1)
 
         right_card = QFrame(detail_panel)
         right_card.setObjectName("detailRightCard")
         self.right_card = right_card
+        self.detail_tipo_header = QLabel("Clasificación del cliente", right_card)
+        self.detail_tipo_header.setProperty("role", "sectionTitle")
         right_card_layout = QVBoxLayout(right_card)
-        right_card_layout.setContentsMargins(2, 2, 2, 2)
-        right_card_layout.setSpacing(0)
+        right_card_layout.setContentsMargins(12, 6, 12, 10)
+        right_card_layout.setSpacing(2)
+        right_card_layout.addWidget(self.detail_tipo_header, 0)
         right_detail_panel = self._build_upper_right_detail_panel()
         right_card_layout.addWidget(right_detail_panel, 1)
         self._layout_detail_cards_abs()
@@ -551,7 +551,7 @@ class CustomersPage(QWidget):
         tabs_panel.setMinimumHeight(300)
         tabs_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         tabs_layout = QVBoxLayout(tabs_panel)
-        tabs_layout.setContentsMargins(12, 12, 12, 12)
+        tabs_layout.setContentsMargins(5, 0, 5, 0)
         tabs_layout.setSpacing(8)
 
         self.customer_tabs = QTabWidget()
@@ -617,8 +617,8 @@ class CustomersPage(QWidget):
             return
         panel.setFixedWidth(932)
         # Coordenadas fijas dentro del detail_panel.
-        left_card.setGeometry(5, 25, 540, 270)
-        right_card.setGeometry(550, 25, 290, 270)
+        left_card.setGeometry(5, 0, 590, 300)
+        right_card.setGeometry(600, 0, 300, 300)
 
     def _build_tab_placeholder(self, text: str) -> QWidget:
         panel = QWidget()
@@ -1949,12 +1949,12 @@ class CustomersPage(QWidget):
         panel = getattr(self, "right_detail_panel", None)
         if panel is None:
             return
-        self.sectors_box.setGeometry(0, 6, 274, 128)
-        self.section_info.setGeometry(5, 125, 120, 24)
-        self.detail_tipo.setGeometry(5, 153, 120, 28)
-        self.lbl_abrev.setGeometry(145, 125, 120, 24)
-        self.detail_abreviatura.setGeometry(145, 153, 120, 28)
-        self.status_box.setGeometry(0, 190, 274, 76)
+        self.sectors_box.setGeometry(0, 0, 274, 128)
+        self.section_info.setGeometry(5, 119, 120, 24)
+        self.detail_tipo.setGeometry(5, 145, 120, 28)
+        self.lbl_abrev.setGeometry(145, 119, 120, 24)
+        self.detail_abreviatura.setGeometry(145, 145, 120, 28)
+        self.status_box.setGeometry(0, 182, 274, 76)
         self.detail_activo.setGeometry(8, 10, 124, 28)
         self.detail_inactivo.setGeometry(140, 10, 124, 28)
         self.lbl_prospeccion.setGeometry(8, 45, 110, 24)
@@ -2609,9 +2609,10 @@ class CustomersPage(QWidget):
             }
             QWidget#CustomersPageRoot {
                 background: #EEF3F8;
+                border: 0;
             }
             QSplitter#customersMainSplitter {
-                background: #DCFCE7;
+                background: transparent;
                 border: 0;
             }
             QSplitter#customersMainSplitter::handle {
@@ -2620,17 +2621,17 @@ class CustomersPage(QWidget):
                 width: 0px;
             }
             QWidget#customersLeftPanel {
-                background: transparent;
+                background: #FFFFFF;
                 border: 1px solid #D7DEE8;
                 border-radius: 8px;
             }
             QWidget#customersRightPanel {
                 background: transparent;
-                border: 1px solid #D7DEE8;
+                border: 0;
                 border-radius: 8px;
             }
             QSplitter#customersDetailSplitter {
-                background: #FEE2E2;
+                background: transparent;
                 border: 0;
             }
             QSplitter#customersDetailSplitter::handle {
@@ -2640,12 +2641,12 @@ class CustomersPage(QWidget):
                 height: 0px;
             }
             QWidget#detailTopArea {
-                background: #DBEAFE;
+                background: transparent;
                 border: 0;
             }
             QFrame#crmCard, QWidget#crmCard {
-                background: #FED7AA;
-                border: 1px solid #E2E8F0;
+                background: transparent;
+                border: 0;
                 border-radius: 8px;
             }
             QWidget#detailSubPanel {
@@ -2784,7 +2785,7 @@ class CustomersPage(QWidget):
             }
             QTabWidget#customerTabs::pane {
                 border: 0;
-                background: transparent;
+                background: #FFFFFF;
                 margin-top: 0px;
             }
             QTabWidget#customerTabs QTabBar {

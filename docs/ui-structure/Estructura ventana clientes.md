@@ -8,7 +8,7 @@ Implementación principal:
 ## Estructura UI real
 
 ```text
-CustomersPage (QWidget, objectName: CustomersPageRoot, fondo #EEF3F8)
+CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin borde, WA_StyledBackground=True)
 └── layout principal (QVBoxLayout, márgenes 14 px, separación 10 px)
     ├── título de página "Clientes" (QLabel, actualmente oculto)
     ├── topRibbon (QFrame, fondo blanco #FFFFFF, borde #E2E8F1)
@@ -24,8 +24,8 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo #EEF3F8)
     │   ├── customerQueriesButton (QPushButton, etiqueta "Consultas", icono `assets/icons/brain.svg`)
     │   ├── espacio flexible
     │   └── Ayuda (gris azulado #E2E8F0, texto #334155)
-    └── customersMainSplitter (QSplitter horizontal, fondo verde pastel #DCFCE7, tirador oculto)
-        ├── customersLeftPanel (QWidget, fondo transparente, borde #D7DEE8)
+    └── customersMainSplitter (QSplitter horizontal, fondo transparente, sin borde, tirador oculto)
+        ├── customersLeftPanel (QWidget, fondo blanco #FFFFFF, borde #D7DEE8)
         │   └── layout vertical (QVBoxLayout, márgenes 14 px, separación 10 px)
         │       ├── filtro de isla (QComboBox, blanco #FFFFFF, borde #D1D5DB, ancho 390 px)
         │       ├── fila de búsqueda
@@ -35,13 +35,12 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo #EEF3F8)
         │           ├── Cod. (60 px)
         │           ├── Nombre (268 px)
         │           └── Isla (48 px)
-        └── customersRightPanel (QWidget, fondo transparente, borde #D7DEE8)
+        └── customersRightPanel (QWidget, fondo transparente, sin borde)
             └── layout vertical sin márgenes
-                └── customersDetailSplitter (QSplitter vertical, fondo rojo pastel #FEE2E2, sin borde)
-                    ├── detailTopArea (QWidget, fondo azul claro #DBEAFE, ancho fijo 932 px, alto 300 px)
-                    │   ├── título "Detalle de cliente"
-                    │   ├── título "Clasificación del cliente"
-                    │   ├── detailLeftCard (QFrame, blanco #FFFFFF, borde #D7DEE8)
+                └── customersDetailSplitter (QSplitter vertical, fondo transparente, sin borde)
+                    ├── detailTopArea (QWidget, fondo transparente, sin borde, x=0, y=0, ancho 932 px, alto 300 px)
+                    │   ├── detailLeftCard (QFrame, blanco #FFFFFF, borde #D7DEE8, x=5, y=0, ancho 590 px, alto 300 px)
+                    │   │   ├── título "Detalle de cliente"
                     │   │   └── ficha principal del cliente
                     │   │       ├── código
                     │   │       ├── nombre comercial
@@ -50,15 +49,16 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo #EEF3F8)
                     │   │       ├── nombre fiscal
                     │   │       ├── provincia / isla / municipio
                     │   │       └── calle / CP / localidad
-                    │   └── detailRightCard (QFrame, blanco #FFFFFF, borde #D7DEE8)
+                    │   └── detailRightCard (QFrame, blanco #FFFFFF, borde #D7DEE8, x=600, y=0, ancho 300 px, alto 300 px)
+                    │       ├── título "Clasificación del cliente"
                     │       └── clasificación del cliente
                     │           ├── actividades / sectores seleccionables
                     │           ├── tipo de cliente
                     │           ├── abreviatura de pedido
                     │           ├── estado Activo / Inactivo
                     │           └── prospección Sí / No
-                    └── crmCard (QWidget, fondo naranja claro #FED7AA, borde #E2E8F0, radio 8 px, alto mínimo 300 px, expansión vertical)
-                        └── customerTabs (QTabWidget, panel transparente; pestañas blanco #FFFFFF / gris #F8FAFC; activa azul #3B82F6)
+                    └── crmCard (QWidget, fondo transparente, sin borde, radio 8 px, alto mínimo 300 px, expansión vertical)
+                        └── customerTabs (QTabWidget, panel blanco #FFFFFF; pestañas blanco #FFFFFF / gris #F8FAFC; activa azul #3B82F6, x=5, y=0, ancho=crmCard-10 px, alto=crmCard px)
                             ├── Contactos
                             │   ├── relatedContactsPanel (QWidget)
                             │   ├── relatedContactsTable (QTableWidget, 5 columnas)
@@ -148,21 +148,22 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo #EEF3F8)
 ## Geometría actual del detalle
 
 - El panel izquierdo del splitter principal queda limitado a un máximo de 400 px.
-- `detailTopArea` mide 932 × 300 px.
+- `detailTopArea`: x=0, y=0, ancho=932, alto=300.
 - Las dos tarjetas usan geometría absoluta dentro de `detailTopArea`:
-  - `detailLeftCard`: x=5, y=25, ancho=540, alto=270.
+- `detailLeftCard`: x=5, y=0, ancho=590, alto=300.
   - separación entre tarjetas: 5 px.
-  - `detailRightCard`: x=550, y=25, ancho=290, alto=270.
+- `detailRightCard`: x=600, y=0, ancho=300, alto=300.
 - El bloque inferior de pestañas tiene un mínimo de 300 px y ocupa el resto del alto.
 - Los tiradores de ambos splitters están ocultos y deshabilitados.
 - `resizeEvent` reaplica proporciones y geometrías para conservar el diseño.
 
 ## Aspecto visual actual
 
-- `CustomersPageRoot` tiene fondo `#EEF3F8`; `customersMainSplitter` usa fondo verde pastel `#DCFCE7`; `customersDetailSplitter` usa fondo rojo pastel `#FEE2E2`; `detailTopArea` usa fondo azul claro `#DBEAFE` y `customersRightPanel` tiene fondo transparente con borde `#D7DEE8`.
-- `customersLeftPanel` tiene fondo transparente, borde gris `#D7DEE8` y radio de 8 px.
+- `CustomersPageRoot` tiene fondo gris `#EEF3F8`, sin borde y `WA_StyledBackground=True`; `customersMainSplitter` usa fondo transparente y sin borde; `customersDetailSplitter` usa fondo transparente y sin borde; `detailTopArea` usa fondo transparente y sin borde; `customersRightPanel` tiene fondo transparente y sin borde.
+- `customersLeftPanel` tiene fondo blanco `#FFFFFF`, borde gris `#D7DEE8` y radio de 8 px.
 - `detailLeftCard` y `detailRightCard` son blancas, con borde gris y radio de 8 px.
-- `crmCard` usa fondo naranja claro `#FED7AA`, con borde `#E2E8F0` y radio de 8 px.
+- `crmCard` usa fondo transparente, sin borde y radio de 8 px.
+- `customerTabs`: x=5, y=0, ancho=crmCard-10, alto=crmCard (rellena `crmCard` completo, con márgenes laterales de 5 px y sin márgenes verticales).
 - La cinta superior usa botones compactos con colores por función e iconos.
 - Inputs y combos son blancos, con borde gris, radio de 8 px y foco azul.
 - La fila seleccionada de clientes usa fondo azul `#3A78CF` y texto blanco.
@@ -195,4 +196,4 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo #EEF3F8)
 - Restaurada la pestaña Ventas desde el placeholder a una tabla funcional con filtro de año.
 - Restaurada la comparativa anual con modal, gráfico y exportación PDF.
 - Corregida la geometría documentada de `detailLeftCard` y `detailRightCard` para que coincida con el código real.
-- Actualizado el fondo real de `CustomersPageRoot` a `#EEF3F8` y alineada la documentaci?n.
+- Actualizado el fondo real de `CustomersPageRoot` a `#EEF3F8` y alineada la documentación.
