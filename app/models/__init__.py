@@ -41,6 +41,7 @@ from app.models.entities import (
     TarifaPrecioIreks,
     Tecnico,
     VentaImportLote,
+    VentaClientesRaw,
     VentaMensualRaw,
 )
 
@@ -87,5 +88,6 @@ __all__ = [
     "RecetaVersion",
     "Escandallo",
     "VentaImportLote",
+    "VentaClientesRaw",
     "VentaMensualRaw",
 ]

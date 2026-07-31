@@ -8,7 +8,17 @@ import unicodedata
 from sqlmodel import Session, col, select
 
 from app.core.database import engine
-from app.models import Cliente, Distribuidor, Fabricante, Familia, IngredienteIreks, Subfamilia, VentaMensualRaw
+from app.models import (
+    Cliente,
+    Distribuidor,
+    Fabricante,
+    Familia,
+    IngredienteIreks,
+    Isla,
+    Subfamilia,
+    VentaClientesRaw,
+    VentaMensualRaw,
+)
 
 
 SALES_CLIENT_TYPES = {"distribuidor", "directo", "cliente directo", "cliente_directo"}
@@ -45,6 +55,27 @@ class SalesMonthlyComparisonPoint:
     month: int
     kilos_prev: float
     kilos_curr: float
+
+
+@dataclass
+class SalesCustomerAnnualComparisonRow:
+    cliente_id: str
+    cliente_codigo: str
+    cliente_nombre: str
+    kg_prev: float
+    kg_curr: float
+    delta_kg: float
+    delta_kg_pct: float
+
+
+@dataclass
+class SalesCustomerAnnualSalesRow:
+    cliente_id: str
+    isla: str
+    cliente_codigo: str
+    cliente_nombre: str
+    cliente_tipo: str
+    kg: float
 
 
 class SalesAnnualComparisonService:
@@ -91,6 +122,11 @@ class SalesAnnualComparisonService:
             reverse=True,
         )
 
+    def list_years_clientes(self) -> list[int]:
+        with Session(self._engine) as session:
+            years = list(session.exec(select(VentaClientesRaw.anio)))
+        return sorted({int(year or 0) for year in years if int(year or 0) > 0}, reverse=True)
+
     def list_filter_clients(self) -> list[Cliente]:
         with Session(self._engine) as session:
             rows = list(session.exec(select(Cliente).order_by(Cliente.cliente_nombre_comercial, Cliente.cliente_nombre_fiscal)))
@@ -98,6 +134,16 @@ class SalesAnnualComparisonService:
         for row in rows:
             tipo = str(getattr(row, "cliente_tipo", "") or "").strip().lower()
             if tipo in SALES_CLIENT_TYPES:
+                result.append(row)
+        return result
+
+    def list_filter_clients_indirect(self) -> list[Cliente]:
+        with Session(self._engine) as session:
+            rows = list(session.exec(select(Cliente).order_by(Cliente.cliente_nombre_comercial, Cliente.cliente_nombre_fiscal)))
+        result: list[Cliente] = []
+        for row in rows:
+            tipo = str(getattr(row, "cliente_tipo", "") or "").strip().lower()
+            if tipo not in SALES_CLIENT_TYPES:
                 result.append(row)
         return result
 
@@ -168,6 +214,53 @@ class SalesAnnualComparisonService:
                     .order_by(Subfamilia.articulo_subfamilia_nombre)
                 )
             )
+
+    def listar_ventas_anuales_clientes(
+        self,
+        year: int,
+        cliente_tipo: str = "",
+        isla: str = "",
+        direction: str = "asc",
+        zero_consumption: bool = False,
+    ) -> list[SalesCustomerAnnualSalesRow]:
+        current_year = int(year or 0)
+        if current_year <= 0:
+            return []
+        with Session(self._engine) as session:
+            raw_rows = list(session.exec(select(VentaClientesRaw).where(col(VentaClientesRaw.anio) == current_year)))
+            clients = list(session.exec(select(Cliente)))
+            islands = list(session.exec(select(Isla)))
+        return self._build_annual_customer_sales(
+            raw_rows,
+            clients,
+            islands,
+            cliente_tipo,
+            isla,
+            direction,
+            zero_consumption,
+        )
+
+    def listar_ranking_anual_clientes(
+        self,
+        year: int,
+        limit: int = 10,
+        direction: str = "asc",
+    ) -> list[SalesCustomerAnnualComparisonRow]:
+        current_year = int(year or 0)
+        if current_year <= 0:
+            return []
+        previous_year = current_year - 1
+        safe_limit = min(max(int(limit or 10), 1), 500)
+        with Session(self._engine) as session:
+            raw_rows = list(
+                session.exec(
+                    select(VentaClientesRaw).where(col(VentaClientesRaw.anio).in_([previous_year, current_year]))
+                )
+            )
+            clients = list(session.exec(select(Cliente)))
+            distributors = list(session.exec(select(Distribuidor)))
+        party_by_id, _party_search_by_id = self._build_sales_party_lookup(clients, distributors)
+        return self._build_annual_customer_ranking(raw_rows, party_by_id, current_year, safe_limit, direction)
 
     def listar_resumen_anual_igsa(
         self,
@@ -615,6 +708,163 @@ class SalesAnnualComparisonService:
             return 0
         month = text.split("-")[1]
         return int(month) if month.isdigit() else 0
+
+    def _build_annual_customer_sales(
+        self,
+        raw_rows,
+        clients,
+        islands,
+        cliente_tipo: str,
+        isla: str,
+        direction: str,
+        zero_consumption: bool = False,
+    ) -> list[SalesCustomerAnnualSalesRow]:
+        client_by_id = {str(row.cliente_id or "").strip(): row for row in clients}
+        island_by_id = {str(row.isla_id or "").strip(): str(row.isla_nombre or "") for row in islands}
+        clean_type = str(cliente_tipo or "").strip().lower()
+        clean_island = self._normalize_search_text(isla)
+        eligible_clients: dict[str, Cliente] = {}
+
+        for cliente_id, client in client_by_id.items():
+            row_type = str(getattr(client, "cliente_tipo", "") or "").strip()
+            if clean_type and row_type.lower() != clean_type:
+                continue
+            island_id = str(getattr(client, "cliente_direccion_isla_id", "") or "").strip()
+            island_name = island_by_id.get(island_id, "")
+            if clean_island and self._normalize_search_text(island_name) != clean_island:
+                continue
+            eligible_clients[cliente_id] = client
+
+        totals: dict[str, float] = defaultdict(float)
+        for raw_row in raw_rows:
+            cliente_id = str(getattr(raw_row, "cliente_id", "") or "").strip()
+            if cliente_id not in eligible_clients:
+                continue
+            totals[cliente_id] += float(getattr(raw_row, "kg", 0.0) or 0.0)
+
+        result: list[SalesCustomerAnnualSalesRow] = []
+        candidates = (
+            eligible_clients.items()
+            if zero_consumption
+            else ((cliente_id, eligible_clients[cliente_id]) for cliente_id in totals)
+        )
+        for cliente_id, client in candidates:
+            kg = float(totals.get(cliente_id, 0.0) or 0.0)
+            if zero_consumption and abs(kg) > 1e-9:
+                continue
+            island_id = str(getattr(client, "cliente_direccion_isla_id", "") or "").strip()
+            result.append(
+                SalesCustomerAnnualSalesRow(
+                    cliente_id=cliente_id,
+                    isla=island_by_id.get(island_id, ""),
+                    cliente_codigo=str(getattr(client, "cliente_codigo", "") or ""),
+                    cliente_nombre=str(
+                        getattr(client, "cliente_nombre_comercial", "")
+                        or getattr(client, "cliente_nombre_fiscal", "")
+                        or cliente_id
+                    ),
+                    cliente_tipo=str(getattr(client, "cliente_tipo", "") or ""),
+                    kg=kg,
+                )
+            )
+        kg_factor = -1.0 if str(direction or "asc").strip().lower() == "desc" else 1.0
+        result.sort(
+            key=lambda row: (
+                not bool(row.isla.strip()),
+                row.isla.lower(),
+                kg_factor * row.kg,
+                row.cliente_nombre.lower(),
+            )
+        )
+        return result
+
+    def _build_annual_customer_ranking(
+        self,
+        raw_rows,
+        party_by_id: dict[str, tuple[str, str]],
+        current_year: int,
+        safe_limit: int,
+        direction: str,
+    ) -> list[SalesCustomerAnnualComparisonRow]:
+        totals = defaultdict(lambda: {"kg_prev": 0.0, "kg_curr": 0.0})
+        for raw_row in raw_rows:
+            cliente_id = str(getattr(raw_row, "cliente_id", "") or "").strip()
+            if not cliente_id:
+                continue
+            key = "kg_curr" if int(getattr(raw_row, "anio", 0) or 0) == current_year else "kg_prev"
+            totals[cliente_id][key] += float(getattr(raw_row, "kg", 0.0) or 0.0)
+
+        result: list[SalesCustomerAnnualComparisonRow] = []
+        for cliente_id, values in totals.items():
+            code, name = party_by_id.get(cliente_id, ("", cliente_id))
+            kg_prev = float(values["kg_prev"] or 0.0)
+            kg_curr = float(values["kg_curr"] or 0.0)
+            delta_kg = kg_curr - kg_prev
+            result.append(
+                SalesCustomerAnnualComparisonRow(
+                    cliente_id=cliente_id,
+                    cliente_codigo=str(code or ""),
+                    cliente_nombre=str(name or cliente_id),
+                    kg_prev=kg_prev,
+                    kg_curr=kg_curr,
+                    delta_kg=delta_kg,
+                    delta_kg_pct=self._pct(delta_kg, kg_prev),
+                )
+            )
+        reverse = str(direction or "asc").strip().lower() == "desc"
+        result.sort(
+            key=lambda row: (row.delta_kg, row.cliente_nombre.lower(), row.cliente_codigo.lower()),
+            reverse=reverse,
+        )
+        return result[:safe_limit]
+
+    def _build_sales_party_lookup(
+        self,
+        clients: list[Cliente],
+        distributors: list[Distribuidor],
+    ) -> tuple[dict[str, tuple[str, str]], dict[str, str]]:
+        party_by_id: dict[str, tuple[str, str]] = {}
+        party_search_by_id: dict[str, str] = {}
+        for client in clients:
+            cid = str(client.cliente_id or "").strip()
+            if not cid:
+                continue
+            codigo = str(getattr(client, "cliente_codigo", "") or "").strip()
+            nombre = str(client.cliente_nombre_comercial or client.cliente_nombre_fiscal or cid).strip()
+            searchable = self._normalize_search_text(
+                " ".join(
+                    [
+                        codigo,
+                        str(client.cliente_nombre_comercial or ""),
+                        str(client.cliente_nombre_fiscal or ""),
+                        str(client.cliente_abreviatura or ""),
+                    ]
+                )
+            )
+            party_by_id[cid] = (codigo, nombre or cid)
+            party_search_by_id[cid] = searchable
+        for distributor in distributors:
+            did = str(getattr(distributor, "distribuidor_id", "") or "").strip()
+            if not did or did in party_by_id:
+                continue
+            codigo = str(getattr(distributor, "distribuidor_codigo", "") or "").strip()
+            nombre = str(
+                getattr(distributor, "distribuidor_nombre_comercial", "")
+                or getattr(distributor, "distribuidor_razon_social", "")
+                or did
+            ).strip()
+            searchable = self._normalize_search_text(
+                " ".join(
+                    [
+                        codigo,
+                        str(getattr(distributor, "distribuidor_nombre_comercial", "") or ""),
+                        str(getattr(distributor, "distribuidor_razon_social", "") or ""),
+                    ]
+                )
+            )
+            party_by_id[did] = (codigo, nombre or did)
+            party_search_by_id[did] = searchable
+        return party_by_id, party_search_by_id
 
     def _pct(self, delta: float, base: float) -> float:
         if abs(base) <= 1e-9:

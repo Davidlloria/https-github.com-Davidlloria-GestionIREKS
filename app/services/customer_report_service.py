@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.request import ProxyHandler, Request, build_opener
 
 from app.core.database import engine
+from app.services.customer_report_schema import CUSTOMER_REPORT_RESPONSE_FORMAT
 from app.services.openai_settings_service import OpenAISettingsService
 
 
@@ -98,6 +100,8 @@ class CustomerReportIntentService:
         self.api_key = str(api_key or cfg.get("api_key") or "").strip()
         self.model = str(model or "gpt-4.1-mini").strip()
         self.timeout = timeout
+        if api_key is not None:
+            self.api_key = str(api_key).strip()
 
     def parse(self, prompt: str) -> ReportIntentResult:
         text = str(prompt or "").strip()
@@ -128,6 +132,7 @@ class CustomerReportIntentService:
             "temperature": 0,
             "max_output_tokens": 500,
         }
+        payload["text"] = {"format": CUSTOMER_REPORT_RESPONSE_FORMAT}
         try:
             raw = json.dumps(payload).encode("utf-8")
             req = Request(self.BASE_URL, data=raw, method="POST")
@@ -205,6 +210,21 @@ class CustomerReportIntentService:
         if "grupo" in t or "sector" in t:
             columns.append("grupo")
 
+        sector_terms = {
+            "panader": "panaderia",
+            "pasteler": "pasteleria",
+            "helader": "heladeria",
+            "cafeter": "cafeteria",
+            "restaurant": "restaurante",
+            "hotel": "hotel",
+        }
+        for term, activity in sector_terms.items():
+            if term in t:
+                filters.append(ReportFilter("actividad", "contiene", activity))
+                if "actividad" not in columns:
+                    columns.append("actividad")
+                break
+
         intent.filters = filters
         intent.columns = self._unique_valid(columns)
         return intent
@@ -247,6 +267,11 @@ class CustomerReportIntentService:
             field_name = str(item.get("field") or "").strip()
             op = str(item.get("op") or "=").strip().lower()
             if field_name in REPORT_COLUMNS:
+                if field_name in {"actividad", "grupo"} and isinstance(item.get("value"), str):
+                    decomposed = unicodedata.normalize("NFKD", item["value"])
+                    item["value"] = "".join(
+                        char for char in decomposed if not unicodedata.combining(char)
+                    )
                 filters.append(ReportFilter(field_name, op, item.get("value")))
         intent.filters = filters or fallback.filters
         return intent
