@@ -1357,6 +1357,23 @@ class CustomersPage(QWidget):
         if hasattr(contacts_page, "_select_row_by_id"):
             contacts_page._select_row_by_id(contacto_id)
 
+    @staticmethod
+    def _sales_comparison_rows_in_table_order(table: QTableWidget, rows: list) -> list:
+        ordered_rows = []
+        for table_row in range(table.rowCount()):
+            reference_cell = table.item(table_row, 0)
+            source_index = reference_cell.data(Qt.ItemDataRole.UserRole) if reference_cell is not None else None
+            if isinstance(source_index, int) and 0 <= source_index < len(rows):
+                ordered_rows.append(rows[source_index])
+        return ordered_rows
+
+    @staticmethod
+    def _sales_comparison_pdf_filename(year: int, customer_name: str) -> str:
+        safe_customer = "".join(
+            "_" if character in '<>:"/\\|?*' else character for character in str(customer_name or "Cliente").strip()
+        ).rstrip(". ")
+        return f"Comparativa - {int(year) - 1} vs {int(year)} - {safe_customer or 'Cliente'}.pdf"
+
     def _apply_modern_styles(self) -> None:
         self.setStyleSheet(
             """

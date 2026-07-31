@@ -10,6 +10,7 @@ from openpyxl.styles import Font, PatternFill
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core.config import DATA_DIR
@@ -94,4 +95,132 @@ class ReportExportService:
         )
         story.append(table)
         doc.build(story)
+        return out
+
+    def export_customer_sales_comparison_pdf(
+        self,
+        path: str | Path,
+        *,
+        customer_name: str,
+        year: int,
+        rows: list[Any],
+    ) -> Path:
+        out = Path(path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        current_year = int(year)
+        previous_year = current_year - 1
+        doc = SimpleDocTemplate(
+            str(out),
+            pagesize=landscape(A4),
+            leftMargin=10 * mm,
+            rightMargin=10 * mm,
+            topMargin=10 * mm,
+            bottomMargin=12 * mm,
+        )
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle("SalesComparisonTitle", parent=styles["Title"], alignment=0, fontSize=15, leading=18)
+        subtitle_style = ParagraphStyle(
+            "SalesComparisonSubtitle",
+            parent=styles["Normal"],
+            textColor=colors.HexColor("#475467"),
+            fontSize=9,
+            leading=11,
+        )
+        cell_style = ParagraphStyle("SalesComparisonCell", parent=styles["BodyText"], fontSize=6.6, leading=8)
+
+        def number(value: Any) -> str:
+            return f"{float(value or 0.0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+        table_data: list[list[Any]] = [
+            ["", "", str(previous_year), "", "", str(current_year), "", "", "Diferencia", "", ""],
+            ["Referencia", "Descripción", "Unid.", "Kg", "€", "Unid.", "Kg", "€", "Δ Unid.", "Δ Kg", "Δ €"],
+        ]
+        totals = [0.0] * 9
+        delta_color_commands = []
+        for row in rows:
+            values = [
+                row.unidades_prev,
+                row.kg_prev,
+                row.euros_prev,
+                row.unidades_curr,
+                row.kg_curr,
+                row.euros_curr,
+                row.delta_unidades,
+                row.delta_kg,
+                row.delta_euros,
+            ]
+            totals = [total + float(value or 0.0) for total, value in zip(totals, values)]
+            table_row = len(table_data)
+            for column, value in enumerate(values[6:], start=8):
+                color = "#067647" if float(value or 0.0) > 0 else "#B42318" if float(value or 0.0) < 0 else "#111827"
+                delta_color_commands.append(("TEXTCOLOR", (column, table_row), (column, table_row), colors.HexColor(color)))
+            table_data.append(
+                [
+                    str(row.codigo or "").strip(),
+                    Paragraph(str(row.nombre or "").strip(), cell_style),
+                    *[number(value) for value in values],
+                ]
+            )
+        table_data.append(["TOTALES", "", *[number(value) for value in totals]])
+
+        table = Table(
+            table_data,
+            colWidths=[20 * mm, 47 * mm, 18 * mm, 20 * mm, 23 * mm, 18 * mm, 20 * mm, 23 * mm, 19 * mm, 21 * mm, 24 * mm],
+            repeatRows=2,
+            hAlign="LEFT",
+        )
+        last_row = len(table_data) - 1
+        table.setStyle(
+            TableStyle(
+                [
+                    ("SPAN", (2, 0), (4, 0)),
+                    ("SPAN", (5, 0), (7, 0)),
+                    ("SPAN", (8, 0), (10, 0)),
+                    ("SPAN", (0, last_row), (1, last_row)),
+                    ("BACKGROUND", (0, 0), (1, 1), colors.HexColor("#E8EEF7")),
+                    ("BACKGROUND", (2, 0), (4, 0), colors.HexColor("#475467")),
+                    ("BACKGROUND", (5, 0), (7, 0), colors.HexColor("#0F766E")),
+                    ("BACKGROUND", (8, 0), (10, 0), colors.HexColor("#E8EEF7")),
+                    ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#F2F4F7")),
+                    ("BACKGROUND", (0, last_row), (-1, last_row), colors.HexColor("#E8EEF7")),
+                    ("TEXTCOLOR", (2, 0), (7, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
+                    ("FONTNAME", (0, last_row), (-1, last_row), "Helvetica-Bold"),
+                    ("ALIGN", (0, 0), (-1, 1), "CENTER"),
+                    ("ALIGN", (2, 2), (-1, -1), "RIGHT"),
+                    ("ALIGN", (0, last_row), (0, last_row), "LEFT"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 6.6),
+                    ("LEADING", (0, 0), (-1, -1), 8),
+                    ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#D0D5DD")),
+                    ("ROWBACKGROUNDS", (0, 2), (-1, last_row - 1), [colors.white, colors.HexColor("#F8FAFC")]),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                    *delta_color_commands,
+                ]
+            )
+        )
+        for column, value in enumerate(totals[6:], start=8):
+            color = "#067647" if value > 0 else "#B42318" if value < 0 else "#111827"
+            table.setStyle(TableStyle([("TEXTCOLOR", (column, last_row), (column, last_row), colors.HexColor(color))]))
+
+        def add_page_number(canvas, document) -> None:
+            canvas.saveState()
+            canvas.setFont("Helvetica", 7)
+            canvas.setFillColor(colors.HexColor("#667085"))
+            canvas.drawRightString(document.pagesize[0] - 10 * mm, 6 * mm, f"Página {document.page}")
+            canvas.restoreState()
+
+        story = [
+            Paragraph("Comparativa de ventas", title_style),
+            Paragraph(
+                f"{customer_name} · {previous_year} vs {current_year} · Generado {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+                subtitle_style,
+            ),
+            Spacer(1, 5 * mm),
+            table,
+        ]
+        doc.build(story, onFirstPage=add_page_number, onLaterPages=add_page_number)
         return out
