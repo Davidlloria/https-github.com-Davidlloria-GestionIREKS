@@ -20,6 +20,7 @@ from app.schemas.customers import (
 from app.services.import_service import ImportService
 from app.services.customer_agenda_service import CustomerAgendaService
 from app.services.customer_contact_flow_service import CustomerContactFlowService
+from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
 from app.viewmodels import CustomerViewModel
 
 
@@ -38,6 +39,7 @@ class CustomerService:
         self.import_service = ImportService()
         self.agenda_service = CustomerAgendaService(engine=engine)
         self.contact_flow_service = CustomerContactFlowService(engine=engine, customer_vm=self.vm)
+        self.sales_summary_service = SalesAnnualComparisonService(db_engine=engine)
 
     def address_catalogs(self) -> AddressCatalogs:
         with Session(engine) as session:
@@ -188,6 +190,19 @@ class CustomerService:
                     .order_by(Receta.nombre, Receta.version)
                 )
             )
+
+    def related_sales_years(self) -> list[int]:
+        return self.sales_summary_service.list_years_clientes()
+
+    def related_sales(self, cliente_id: str, year: int) -> list[Any]:
+        clean_id = str(cliente_id or "").strip()
+        clean_year = int(year or 0)
+        if not clean_id or clean_year <= 0:
+            return []
+        return self.sales_summary_service.listar_resumen_anual_clientes(
+            year=clean_year,
+            cliente_id=clean_id,
+        )
 
     def related_agenda(self, cliente_id: str) -> list[ClienteAgenda]:
         return self.agenda_service.related_agenda(cliente_id)
