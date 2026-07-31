@@ -51,6 +51,18 @@ Flujo acordado:
 
 ## Bloques pendientes detectados en `feature/pedidos-window-tweaks`
 
+## Corte en analisis: `sales AI`
+
+Situacion verificada el 2026-07-31:
+
+- no existe endpoint FastAPI propio para `sales AI` en `feature/pedidos-window-tweaks`
+- el bloque esta montado sobre PySide6 legacy en `app/ui/widgets/sales_page.py`
+- el nucleo funcional nuevo esta en `app/services/sales_ai_assistant_service.py` y `app/services/sales_text_normalizer.py`
+- el test especifico pendiente esta en `tests/test_sales_ai_assistant_service.py`
+- el servicio depende de `OpenAIProcessService`, `OpenAISettingsService` y `SalesAnnualComparisonService`
+- el diff de `sales_page.py` es demasiado grande para extraerlo completo como siguiente corte minimo
+- siguiente corte recomendado: extraer primero servicio + normalizador + test, sin integrar todavia la UI legacy de ventas
+
 Orden recomendado de extraccion restante:
 
 1. revisar si queda algun ajuste comun de `dashboard_page.py`
