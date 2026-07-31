@@ -9,7 +9,7 @@ Responsable:
 ## 1) Preparacion de entorno
 
 - [ ] Rama objetivo sincronizada con `origin/main`.
-- [ ] Revisado `docs/local-environment.md` para la maquina objetivo.
+- [ ] Revisado `docs/setup/local-environment.md` para la maquina objetivo.
 - [ ] Chequeo de entorno ejecutado: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-env.ps1`.
 - [ ] Dependencias Python instaladas: `python -m pip install -r requirements.txt`.
 - [ ] Dependencias frontend instaladas: `cd frontend && npm ci`.

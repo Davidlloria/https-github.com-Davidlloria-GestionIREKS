@@ -6,7 +6,7 @@ Fecha de referencia: 2026-06-02.
 
 Basado en:
 
-- [AGENTS.md](./AGENTS.md)
+- [AGENTS.md](../internal/AGENTS.md)
 - [migration-roadmap.md](./migration-roadmap.md)
 - [migration-history.md](./migration-history.md)
 
