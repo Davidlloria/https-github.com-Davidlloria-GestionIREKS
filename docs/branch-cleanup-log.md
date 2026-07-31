@@ -41,7 +41,7 @@ Flujo acordado:
 | 2026-07-31 | `feature/customer-related-sales-clean` | `f04931683` mergeado | Cerrado |
 | 2026-07-31 | `feature/customer-sales-pdf-clean` | `9736ff40d` mergeado | Cerrado |
 | 2026-07-31 | `feature/customer-sales-chart-clean` | `8146a33ef` mergeado | Cerrado |
-| 2026-07-31 | `feature/sales-ai-core-clean` | pendiente | En validacion |
+| 2026-07-31 | `feature/sales-ai-core-clean` | `b080c6d53` mergeado | Cerrado |
 
 ## Estado actual de ramas locales
 
