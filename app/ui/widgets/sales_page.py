@@ -5,13 +5,14 @@ import math
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, Qt, QSize
-from PySide6.QtGui import QColor, QCursor, QFont, QIcon
+from PySide6.QtGui import QColor, QCursor, QFont, QIcon, QTextDocument
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QComboBox,
     QDialog,
     QApplication,
+    QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -28,13 +29,15 @@ from PySide6.QtWidgets import (
     QToolTip,
     QWidget,
 )
+from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 try:
     import pyqtgraph as pg
 except ModuleNotFoundError:  # pragma: no cover - dependency guard
     pg = None
 
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow, SalesMonthlyComparisonPoint
-from app.services.openai_process_service import OpenAIProcessService
+from app.services.report_export_service import ReportExportService
+from app.services.sales_ai_assistant_service import SalesQueryAssistantService
 from app.services.sales_reconciliation_service import SalesReconciliationService
 
 
@@ -560,10 +563,18 @@ class MonthlySalesDialog(QDialog):
 
 
 class SalesAnalysisDialog(QDialog):
-    def __init__(self, *, title: str, context_text: str, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        title: str,
+        defaults: dict[str, object],
+        sales_service: SalesAnnualComparisonService,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
-        self._context_text = str(context_text or "").strip()
-        self._service = OpenAIProcessService()
+        self._defaults = dict(defaults or {})
+        self._assistant = SalesQueryAssistantService(sales_service=sales_service)
+        self._report_export_service = ReportExportService()
         self.setWindowTitle(title)
         screen = self.screen() or QApplication.primaryScreen()
         if screen is not None:
@@ -578,7 +589,7 @@ class SalesAnalysisDialog(QDialog):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
 
-        title_label = QLabel("Análisis de ventas con ChatGPT")
+        title_label = QLabel("An?lisis de ventas con ChatGPT")
         title_font = QFont()
         title_font.setPointSize(12)
         title_font.setBold(True)
@@ -586,7 +597,7 @@ class SalesAnalysisDialog(QDialog):
         title_label.setStyleSheet("color: #111827;")
         layout.addWidget(title_label)
 
-        context_label = QLabel("Escribe la consulta y pulsa Consultar. La respuesta aparecerá debajo.")
+        context_label = QLabel("Escribe la consulta y pulsa Consultar. La respuesta aparecer? debajo.")
         context_label.setWordWrap(True)
         context_label.setStyleSheet("color: #6B7280;")
         layout.addWidget(context_label)
@@ -596,7 +607,7 @@ class SalesAnalysisDialog(QDialog):
         layout.addWidget(question_label)
 
         self.question_edit = QPlainTextEdit()
-        self.question_edit.setPlaceholderText("Ejemplo: resume los productos con mayor crecimiento y detecta caídas relevantes.")
+        self.question_edit.setPlaceholderText("Ejemplo: resume los productos con mayor crecimiento y detecta ca?das relevantes.")
         self.question_edit.setFixedHeight(120)
         layout.addWidget(self.question_edit)
 
@@ -606,7 +617,7 @@ class SalesAnalysisDialog(QDialog):
 
         self.response_edit = QPlainTextEdit()
         self.response_edit.setReadOnly(True)
-        self.response_edit.setPlaceholderText("La respuesta de ChatGPT aparecerá aquí.")
+        self.response_edit.setPlaceholderText("La respuesta de ChatGPT aparecer? aqu?.")
         layout.addWidget(self.response_edit, 1)
 
         bottom_row = QHBoxLayout()
@@ -614,13 +625,42 @@ class SalesAnalysisDialog(QDialog):
         bottom_row.setSpacing(8)
 
         self.consult_btn = QPushButton("Consultar")
+        self.consult_btn.setProperty("btnRole", "warning")
         self.consult_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.consult_btn.clicked.connect(self._consult)
         bottom_row.addWidget(self.consult_btn)
 
         bottom_row.addStretch(1)
 
+        center_actions = QWidget()
+        center_actions_layout = QHBoxLayout(center_actions)
+        center_actions_layout.setContentsMargins(0, 0, 0, 0)
+        center_actions_layout.setSpacing(8)
+
+        self.print_btn = QPushButton("Imprimir")
+        self.print_btn.setProperty("btnRole", "secondary")
+        self.print_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.print_btn.clicked.connect(self._print_response)
+        center_actions_layout.addWidget(self.print_btn)
+
+        self.export_excel_btn = QPushButton("Excel")
+        self.export_excel_btn.setProperty("btnRole", "secondary")
+        self.export_excel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_excel_btn.clicked.connect(self._export_response_excel)
+        center_actions_layout.addWidget(self.export_excel_btn)
+
+        self.export_pdf_btn = QPushButton("PDF")
+        self.export_pdf_btn.setProperty("btnRole", "secondary")
+        self.export_pdf_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_pdf_btn.clicked.connect(self._export_response_pdf)
+        center_actions_layout.addWidget(self.export_pdf_btn)
+
+        bottom_row.addWidget(center_actions)
+
+        bottom_row.addStretch(1)
+
         close_btn = QPushButton("Cerrar")
+        close_btn.setProperty("btnRole", "danger")
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.clicked.connect(self.reject)
         bottom_row.addWidget(close_btn)
@@ -629,14 +669,13 @@ class SalesAnalysisDialog(QDialog):
     def _consult(self) -> None:
         question = str(self.question_edit.toPlainText() or "").strip()
         if not question:
-            QMessageBox.warning(self, "Análisis de ventas", "Escribe una consulta antes de consultar a ChatGPT.")
+            QMessageBox.warning(self, "An?lisis de ventas", "Escribe una consulta antes de consultar a ChatGPT.")
             return
-        prompt = self._build_prompt(question)
         self.consult_btn.setEnabled(False)
         self.response_edit.setPlainText("Consultando ChatGPT...")
         QApplication.setOverrideCursor(QCursor(Qt.CursorShape.WaitCursor))
         try:
-            result = self._service.generate_process(prompt)
+            result = self._assistant.answer(question, {})
         finally:
             QApplication.restoreOverrideCursor()
             self.consult_btn.setEnabled(True)
@@ -645,16 +684,52 @@ class SalesAnalysisDialog(QDialog):
             output = "Sin respuesta."
         self.response_edit.setPlainText(output)
 
-    def _build_prompt(self, question: str) -> str:
-        return (
-            "Eres un analista de ventas experto en IREKS.\n"
-            "Responde en español, con foco práctico y directo.\n"
-            "Usa únicamente el contexto proporcionado y la pregunta del usuario.\n"
-            "No limites el análisis a una fila concreta: analiza la tabla completa de ventas cargada.\n"
-            "Si faltan datos, dilo con claridad sin inventar cifras.\n\n"
-            f"Contexto de ventas:\n{self._context_text}\n\n"
-            f"Consulta del usuario:\n{question}\n"
-        )
+    def _response_text(self) -> str:
+        return str(self.response_edit.toPlainText() or "").strip()
+
+    def _response_lines(self) -> list[str]:
+        text = self._response_text()
+        if not text:
+            return []
+        return [line.rstrip() for line in text.splitlines() if line.strip()]
+
+    def _export_response_excel(self) -> None:
+        lines = self._response_lines()
+        if not lines:
+            QMessageBox.warning(self, "An\u00e1lisis de ventas", "No hay respuesta para exportar.")
+            return
+        default = str(self._report_export_service.default_path(self.windowTitle(), "xlsx", folder="sales_analysis"))
+        path, _ = QFileDialog.getSaveFileName(self, "Exportar respuesta a Excel", default, "Excel (*.xlsx)")
+        if not path:
+            return
+        out = self._report_export_service.export_excel(path, self.windowTitle(), ["Respuesta"], [[line] for line in lines], sheet_title="Analisis ventas")
+        QMessageBox.information(self, "An\u00e1lisis de ventas", f"Excel exportado:\n{out}")
+
+    def _export_response_pdf(self) -> None:
+        lines = self._response_lines()
+        if not lines:
+            QMessageBox.warning(self, "An\u00e1lisis de ventas", "No hay respuesta para exportar.")
+            return
+        default = str(self._report_export_service.default_path(self.windowTitle(), "pdf", folder="sales_analysis"))
+        path, _ = QFileDialog.getSaveFileName(self, "Exportar respuesta a PDF", default, "PDF (*.pdf)")
+        if not path:
+            return
+        out = self._report_export_service.export_pdf(path, self.windowTitle(), ["Respuesta"], [[line] for line in lines])
+        QMessageBox.information(self, "An\u00e1lisis de ventas", f"PDF exportado:\n{out}")
+
+    def _print_response(self) -> None:
+        text = self._response_text()
+        if not text:
+            QMessageBox.warning(self, "An\u00e1lisis de ventas", "No hay respuesta para imprimir.")
+            return
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        printer.setPageOrientation(QPrinter.Orientation.Portrait)
+        dialog = QPrintDialog(printer, self)
+        if dialog.exec() != QPrintDialog.DialogCode.Accepted:
+            return
+        document = QTextDocument()
+        document.setPlainText(text)
+        document.print_(printer)
 
 
 class SalesPage(QWidget):
@@ -1941,80 +2016,39 @@ class SalesPage(QWidget):
             return
         client_name = self._current_client_name() or "Todos los clientes"
         dialog = SalesAnalysisDialog(
-            title=f"Análisis de ventas {year} | {client_name}",
-            context_text=self._build_sales_analysis_context(),
+            title=f"An?lisis de ventas {year} | {client_name}",
+            defaults=self._build_sales_analysis_defaults(),
+            sales_service=self.sales_summary_service,
             parent=self,
         )
         dialog.exec()
 
-    def _build_sales_analysis_context(self) -> str:
-        def combo_text(widget) -> str:
-            if widget is None:
-                return ""
-            try:
-                text = str(widget.currentText() or "").strip()
-            except Exception:
-                text = ""
-            return text
-
-        def line_edit_text(widget) -> str:
-            if widget is None:
-                return ""
-            try:
-                return str(widget.text() or "").strip()
-            except Exception:
-                return ""
-
-        year = self._current_year()
-        month = self._current_month()
-        acumulado = bool(getattr(self, "acumulado_check", None) and self.acumulado_check.isChecked())
-        cliente_id = self._current_client_id()
-        fabricante_id = self._current_manufacturer_id()
+    def _build_sales_analysis_defaults(self) -> dict[str, object]:
+        selected = self._selected_sales_row()
+        client_id = self._current_client_id()
+        client_name = self._current_client_name()
+        product_text = self._current_product_text()
+        manufacturer_id = self._current_manufacturer_id()
         family_id = self._current_family_id()
         subfamily_id = self._current_subfamily_id()
-        product_texto = self._current_product_text()
-
-        rows = self.sales_summary_service.listar_resumen_anual(
-            year=year,
-            month=month,
-            acumulado=acumulado,
-            cliente_id=cliente_id,
-            producto_texto=product_texto,
-            fabricante_id=fabricante_id,
-            familia_id=family_id,
-            subfamilia_id=subfamily_id,
-        )
-
-        lines = [
-            "Datos obtenidos directamente de la base de datos de ventas.",
-            "El análisis debe considerar toda la tabla resultante del servicio, no solo lo visible en pantalla.",
-            f"Año: {year}",
-            f"Cliente: {self._current_client_name() or 'Todos los clientes'}",
-            f"Mes: {combo_text(getattr(self, 'month_filter', None))}",
-            f"Acumulado: {'Sí' if acumulado else 'No'}",
-            f"Fabricante: {combo_text(getattr(self, 'manufacturer_filter', None))}",
-            f"Familia: {combo_text(getattr(self, 'family_filter', None))}",
-            f"Subfamilia: {combo_text(getattr(self, 'subfamily_filter', None))}",
-            f"Producto filtrado: {line_edit_text(getattr(self, 'product_filter', None)) or 'Sin filtro'}",
-            f"Filas analizadas desde DB: {len(rows)}",
-        ]
-        selected = self._selected_sales_row()
-        if selected is not None:
-            articulo_id, codigo, nombre = selected
-            lines.append(f"Producto seleccionado: {codigo} | {nombre} | ID {articulo_id}")
-
-        lines.append("")
-        lines.append("Tabla completa devuelta por el servicio:")
-        for row in rows:
-            lines.append(
-                f"- {row.codigo} | {row.nombre} | "
-                f"Kg {year - 1}: {self._fmt_num(row.kilos_prev)} | S/C {year - 1}: {self._fmt_num(row.sc_prev)} | Ventas {year - 1}: {self._fmt_money(row.ventas_prev)} | "
-                f"Kg {year}: {self._fmt_num(row.kilos_curr)} | S/C {year}: {self._fmt_num(row.sc_curr)} | Ventas {year}: {self._fmt_money(row.ventas_curr)} | "
-                f"Δ kg: {self._fmt_num(row.delta_kg)} | Δ kg %: {self._fmt_pct(row.delta_kg_pct)} | "
-                f"Δ €: {self._fmt_money(row.delta_ventas)} | Δ € %: {self._fmt_pct(row.delta_ventas_pct)}"
-            )
-
-        return "\n".join(lines).strip()
+        defaults: dict[str, object] = {
+            "year": self._current_year(),
+            "month": self._current_month(),
+            "acumulado": bool(getattr(self, "acumulado_check", None) and self.acumulado_check.isChecked()),
+            "cliente_id": client_id,
+            "cliente_texto": client_name if client_id else "",
+            "articulo_id": selected[0] if selected is not None else "",
+            "producto_texto": product_text,
+            "fabricante_id": manufacturer_id,
+            "familia_id": family_id,
+            "subfamilia_id": subfamily_id,
+            "limit": 200,
+        }
+        if client_name == "Todos los clientes":
+            defaults["cliente_texto"] = ""
+        if not product_text:
+            defaults["producto_texto"] = ""
+        return defaults
 
     def _fmt_num(self, value) -> str:
         number = float(value or 0.0)
