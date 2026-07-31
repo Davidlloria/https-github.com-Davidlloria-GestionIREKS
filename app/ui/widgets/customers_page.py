@@ -2619,6 +2619,11 @@ class CustomersPage(QWidget):
                 border: 0;
                 width: 0px;
             }
+            QWidget#customersLeftPanel {
+                background: transparent;
+                border: 1px solid #D7DEE8;
+                border-radius: 8px;
+            }
             QFrame#crmCard, QWidget#crmCard {
                 background: #FFFFFF;
                 border: 1px solid #E2E8F0;

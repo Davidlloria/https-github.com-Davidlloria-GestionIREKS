@@ -25,7 +25,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo #EEF3F8)
     │   ├── espacio flexible
     │   └── Ayuda (gris azulado #E2E8F0, texto #334155)
     └── customersMainSplitter (QSplitter horizontal, fondo verde pastel #DCFCE7, tirador oculto)
-        ├── customersLeftPanel (QWidget, blanco #FFFFFF, borde #D7DEE8)
+        ├── customersLeftPanel (QWidget, fondo transparente, borde #D7DEE8)
         │   └── layout vertical (QVBoxLayout, márgenes 14 px, separación 10 px)
         │       ├── filtro de isla (QComboBox, blanco #FFFFFF, borde #D1D5DB, ancho 390 px)
         │       ├── fila de búsqueda
@@ -160,7 +160,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo #EEF3F8)
 ## Aspecto visual actual
 
 - `CustomersPageRoot` tiene fondo `#EEF3F8`; `customersMainSplitter` usa fondo verde pastel `#DCFCE7`; `detailTopArea` y `customersRightPanel` mantienen fondo transparente.
-- `customersLeftPanel` es blanco, con borde gris `#D7DEE8` y radio de 8 px.
+- `customersLeftPanel` tiene fondo transparente, borde gris `#D7DEE8` y radio de 8 px.
 - `detailLeftCard` y `detailRightCard` son blancas, con borde gris y radio de 8 px.
 - La cinta superior usa botones compactos con colores por función e iconos.
 - Inputs y combos son blancos, con borde gris, radio de 8 px y foco azul.
