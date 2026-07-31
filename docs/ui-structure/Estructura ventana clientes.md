@@ -162,6 +162,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo #EEF3F8)
 - `CustomersPageRoot` tiene fondo `#EEF3F8`; `customersMainSplitter` usa fondo verde pastel `#DCFCE7`; `customersDetailSplitter` usa fondo rojo pastel `#FEE2E2`; `detailTopArea` usa fondo azul claro `#DBEAFE` y `customersRightPanel` tiene fondo transparente con borde `#D7DEE8`.
 - `customersLeftPanel` tiene fondo transparente, borde gris `#D7DEE8` y radio de 8 px.
 - `detailLeftCard` y `detailRightCard` son blancas, con borde gris y radio de 8 px.
+- `crmCard` usa fondo naranja claro `#FED7AA`, con borde `#E2E8F0` y radio de 8 px.
 - La cinta superior usa botones compactos con colores por función e iconos.
 - Inputs y combos son blancos, con borde gris, radio de 8 px y foco azul.
 - La fila seleccionada de clientes usa fondo azul `#3A78CF` y texto blanco.

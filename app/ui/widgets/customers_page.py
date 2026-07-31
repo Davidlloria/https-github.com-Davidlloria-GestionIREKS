@@ -2644,7 +2644,7 @@ class CustomersPage(QWidget):
                 border: 0;
             }
             QFrame#crmCard, QWidget#crmCard {
-                background: #FFFFFF;
+                background: #FED7AA;
                 border: 1px solid #E2E8F0;
                 border-radius: 8px;
             }
