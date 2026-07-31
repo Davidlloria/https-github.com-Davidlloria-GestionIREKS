@@ -75,8 +75,11 @@ from app.schemas.orders import (
 from app.schemas.sales import (
     SalesAnnualSummaryResponse,
     SalesAnnualSummaryRow,
+    SalesClientsAnnualSummaryResponse,
+    SalesClientsAnnualSummaryRow,
     SalesFilterOption,
     SalesFilterOptionsResponse,
+    SalesImportResponse,
     SalesYearOption,
     SalesYearOptionsResponse,
 )
@@ -215,6 +218,9 @@ __all__ = [
     "SalesFilterOptionsResponse",
     "SalesAnnualSummaryResponse",
     "SalesAnnualSummaryRow",
+    "SalesClientsAnnualSummaryResponse",
+    "SalesClientsAnnualSummaryRow",
+    "SalesImportResponse",
     "SalesYearOption",
     "SalesYearOptionsResponse",
     "TechnicianDetail",

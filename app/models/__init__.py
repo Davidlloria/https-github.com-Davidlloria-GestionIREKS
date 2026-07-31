@@ -40,8 +40,9 @@ from app.models.entities import (
     Subfamilia,
     TarifaPrecioIreks,
     Tecnico,
-    VentaImportLote,
+    VentaClientesImportLote,
     VentaClientesRaw,
+    VentaImportLote,
     VentaMensualRaw,
 )
 
@@ -87,7 +88,8 @@ __all__ = [
     "RecetaLinea",
     "RecetaVersion",
     "Escandallo",
-    "VentaImportLote",
+    "VentaClientesImportLote",
     "VentaClientesRaw",
+    "VentaImportLote",
     "VentaMensualRaw",
 ]

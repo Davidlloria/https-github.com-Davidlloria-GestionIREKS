@@ -254,6 +254,18 @@ class TarifaPrecioIreks(SQLModel, table=True):
     descuento_pct: float = Field(default=0.0, nullable=False)
 
 
+class VentaClientesImportLote(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "ventas_clientes_import_lotes"
+
+    lote_id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True, max_length=36)
+    fuente: str = Field(default="clientes", nullable=False, max_length=20, index=True)
+    anio: int = Field(default=0, nullable=False, index=True)
+    archivo_nombre: str = Field(default="", max_length=255)
+    archivo_hash: str = Field(default="", max_length=128, index=True)
+    estado: str = Field(default="importado", nullable=False, max_length=30, index=True)
+    creado_en: datetime = Field(default_factory=datetime.utcnow, nullable=False, index=True)
+
+
 class VentaClientesRaw(SQLModel, table=True):
     __tablename__: ClassVar[str] = "ventas_clientes_raw"
 
@@ -314,21 +326,6 @@ class IngredienteBase(SQLModel):
     activo: bool = Field(default=True)
 
 
-class ClienteAgenda(TimeStampedModel, table=True):
-    __tablename__: ClassVar[str] = "clientes_agenda"
-
-    agenda_id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True, max_length=36)
-    cliente_id: str = Field(foreign_key="clientes.cliente_id", nullable=False, index=True, max_length=36)
-    fecha_actividad: date = Field(default_factory=date.today, nullable=False, index=True)
-    tipo: str = Field(default="nota", max_length=50, index=True)
-    estado: str = Field(default="pendiente", max_length=50, index=True)
-    resumen: str = Field(default="", max_length=255)
-    detalle: str = Field(default="")
-    fecha_seguimiento: Optional[date] = Field(default=None, nullable=True, index=True)
-    prioridad: str = Field(default="normal", max_length=50, index=True)
-    responsable: str = Field(default="", max_length=255)
-
-
 class Contacto(TimeStampedModel, table=True):
     __tablename__: ClassVar[str] = "contactos"
 
@@ -341,6 +338,21 @@ class Contacto(TimeStampedModel, table=True):
     nif: str = Field(default="", max_length=50)
     telefono: str = Field(default="", max_length=50)
     email: str = Field(default="", max_length=255)
+
+
+class ClienteAgenda(TimeStampedModel, table=True):
+    __tablename__: ClassVar[str] = "clientes_agenda"
+
+    agenda_id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True, max_length=36)
+    cliente_id: str = Field(index=True, foreign_key="clientes.cliente_id", nullable=False, max_length=36)
+    fecha_actividad: date = Field(default_factory=date.today, nullable=False, index=True)
+    tipo: str = Field(default="nota", nullable=False, max_length=50, index=True)
+    estado: str = Field(default="pendiente", nullable=False, max_length=30, index=True)
+    resumen: str = Field(default="", max_length=255)
+    detalle: str = Field(default="")
+    fecha_seguimiento: Optional[date] = Field(default=None, nullable=True, index=True)
+    prioridad: str = Field(default="normal", nullable=False, max_length=20, index=True)
+    responsable: str = Field(default="", max_length=255)
 
 
 class Tecnico(TimeStampedModel, table=True):

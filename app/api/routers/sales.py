@@ -2,18 +2,24 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 
 from app.api.deps import get_sales_annual_comparison_service
+from app.api.deps import get_sales_reconciliation_service
+from app.api.uploads import upload_to_temp_file_path
 from app.schemas.sales import (
     SalesAnnualSummaryResponse,
     SalesAnnualSummaryRow,
+    SalesClientsAnnualSummaryResponse,
+    SalesClientsAnnualSummaryRow,
     SalesFilterOption,
     SalesFilterOptionsResponse,
+    SalesImportResponse,
     SalesYearOption,
     SalesYearOptionsResponse,
 )
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
+from app.services.sales_reconciliation_service import SalesReconciliationService
 
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -245,3 +251,69 @@ def annual_summary_igsa(
         total=len(rows),
         items=[SalesAnnualSummaryRow.model_validate(row, from_attributes=True) for row in rows],
     )
+
+
+@router.get("/annual-summary/clientes/years", response_model=SalesYearOptionsResponse)
+def annual_summary_clientes_years(
+    service: SalesAnnualComparisonService = Depends(get_sales_annual_comparison_service),
+) -> SalesYearOptionsResponse:
+    years = service.list_years_clientes()
+    return SalesYearOptionsResponse(
+        items=[SalesYearOption(year=year, label=str(year)) for year in years],
+    )
+
+
+@router.get("/annual-summary/clientes/filters/clients", response_model=SalesFilterOptionsResponse)
+def annual_summary_clientes_clients(
+    service: SalesAnnualComparisonService = Depends(get_sales_annual_comparison_service),
+) -> SalesFilterOptionsResponse:
+    rows = service.list_filter_clients_indirect()
+    return SalesFilterOptionsResponse(
+        items=[
+            SalesFilterOption(
+                id=str(row.cliente_id or ""),
+                name=str(row.cliente_nombre_comercial or row.cliente_nombre_fiscal or "").strip(),
+                code=str(getattr(row, "cliente_codigo", "") or ""),
+            )
+            for row in rows
+        ],
+    )
+
+
+@router.get("/annual-summary/clientes", response_model=SalesClientsAnnualSummaryResponse)
+def annual_summary_clientes(
+    year: Annotated[int, Query(ge=1)],
+    cliente_id: Annotated[str, Query(max_length=120)] = "",
+    producto_texto: Annotated[str, Query(max_length=120)] = "",
+    fabricante_id: Annotated[str, Query(max_length=120)] = "",
+    familia_id: Annotated[str, Query(max_length=120)] = "",
+    subfamilia_id: Annotated[str, Query(max_length=120)] = "",
+    service: SalesAnnualComparisonService = Depends(get_sales_annual_comparison_service),
+) -> SalesClientsAnnualSummaryResponse:
+    rows = service.listar_resumen_anual_clientes(
+        year=year,
+        cliente_id=cliente_id,
+        producto_texto=producto_texto,
+        fabricante_id=fabricante_id,
+        familia_id=familia_id,
+        subfamilia_id=subfamilia_id,
+    )
+    return SalesClientsAnnualSummaryResponse(
+        source="clientes",
+        year=year,
+        total=len(rows),
+        items=[SalesClientsAnnualSummaryRow.model_validate(row, from_attributes=True) for row in rows],
+    )
+
+
+@router.post("/clientes/import/upload", response_model=SalesImportResponse)
+async def import_clientes_upload(
+    file: UploadFile = File(...),
+    service: SalesReconciliationService = Depends(get_sales_reconciliation_service),
+) -> SalesImportResponse:
+    source = await upload_to_temp_file_path(file, field_name="file", allowed_suffixes={".xlsx", ".xlsm", ".xls"})
+    try:
+        result = service.import_clientes_excel(source)
+    finally:
+        source.unlink(missing_ok=True)
+    return SalesImportResponse.model_validate(result, from_attributes=True)
