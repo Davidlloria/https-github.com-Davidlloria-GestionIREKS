@@ -1225,6 +1225,8 @@ class OrdersPage(QWidget):
         self.send_mail_btn.setProperty("btnRole", "secondary")
         self.print_btn = QPushButton("Imprimir")
         self.print_btn.setProperty("btnRole", "secondary")
+        self.help_btn = QPushButton("Ayuda")
+        self.help_btn.setProperty("btnRole", "secondary")
         for button in (
             self.new_btn,
             self.edit_btn,
@@ -1232,7 +1234,9 @@ class OrdersPage(QWidget):
             self.export_btn,
             self.send_mail_btn,
             self.print_btn,
+            self.help_btn,
         ):
+            button.setFixedHeight(26)
             button.setIconSize(QSize(14, 14))
 
         self.new_btn.clicked.connect(self._new_order)
@@ -1241,9 +1245,11 @@ class OrdersPage(QWidget):
         self.export_btn.clicked.connect(self._export_selected_order_to_excel)
         self.send_mail_btn.clicked.connect(self._send_selected_order_by_outlook)
         self.print_btn.clicked.connect(self._print_selected_order)
+        self.help_btn.clicked.connect(self._show_orders_help)
 
         left_ribbon = QFrame()
         left_ribbon.setObjectName("topRibbon")
+        left_ribbon.setProperty("pageType", "contacts")
         left_ribbon.setFrameShape(QFrame.Shape.StyledPanel)
         left_ribbon_layout = QHBoxLayout(left_ribbon)
         left_ribbon_layout.setContentsMargins(8, 6, 8, 6)
@@ -1255,6 +1261,7 @@ class OrdersPage(QWidget):
         left_ribbon_layout.addWidget(self.send_mail_btn)
         left_ribbon_layout.addWidget(self.print_btn)
         left_ribbon_layout.addStretch(1)
+        left_ribbon_layout.addWidget(self.help_btn)
         left_layout.addWidget(left_ribbon)
 
         self.table = QTableWidget(0, 6)
@@ -1301,50 +1308,52 @@ class OrdersPage(QWidget):
         splitter.addWidget(left_panel)
 
         right_panel = QWidget()
+        right_panel.setObjectName("customersRightPanel")
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(6)
+        right_layout.setSpacing(10)
 
         self.import_albaran_btn = QPushButton("Imp. Albarán")
         self.import_albaran_btn.setProperty("btnRole", "warning")
-        self.import_albaran_btn.setFixedHeight(24)
+        self.import_albaran_btn.setFixedHeight(26)
         self.import_albaran_btn.setEnabled(False)
         self.import_albaran_btn.clicked.connect(self._import_albaran_for_selected_order)
         self.import_factura_btn = QPushButton("Imp. Factura")
         self.import_factura_btn.setProperty("btnRole", "warning")
-        self.import_factura_btn.setFixedHeight(24)
+        self.import_factura_btn.setFixedHeight(26)
         self.import_factura_btn.setEnabled(False)
         self.import_factura_btn.clicked.connect(self._import_factura_for_selected_order)
         self.delete_factura_btn = QPushButton("Eliminar Factura")
         self.delete_factura_btn.setProperty("btnRole", "danger")
         self.delete_factura_btn.setIconSize(QSize(14, 14))
-        self.delete_factura_btn.setFixedHeight(24)
+        self.delete_factura_btn.setFixedHeight(26)
         self.delete_factura_btn.setEnabled(False)
         self.delete_factura_btn.clicked.connect(self._delete_selected_factura)
         self.edit_factura_line_btn = QPushButton("Editar línea")
         self.edit_factura_line_btn.setProperty("btnRole", "primary")
-        self.edit_factura_line_btn.setFixedHeight(24)
+        self.edit_factura_line_btn.setFixedHeight(26)
         self.edit_factura_line_btn.setEnabled(False)
         self.edit_factura_line_btn.clicked.connect(self._edit_factura_line)
         self.add_line_btn = QPushButton("Añadir")
         self.add_line_btn.setProperty("btnRole", "success")
-        self.add_line_btn.setFixedHeight(24)
+        self.add_line_btn.setFixedHeight(26)
         self.add_line_btn.clicked.connect(self._add_order_line)
         self.edit_line_btn = QPushButton("Editar")
         self.edit_line_btn.setProperty("btnRole", "warning")
-        self.edit_line_btn.setFixedHeight(24)
+        self.edit_line_btn.setFixedHeight(26)
         self.edit_line_btn.clicked.connect(self._edit_order_line)
         self.del_line_btn = QPushButton("Eliminar")
         self.del_line_btn.setProperty("btnRole", "danger")
         self.del_line_btn.setIconSize(QSize(14, 14))
-        self.del_line_btn.setFixedHeight(24)
+        self.del_line_btn.setFixedHeight(26)
         self.del_line_btn.clicked.connect(self._delete_order_line)
         self.edit_order_btn = QPushButton("Editar pedido")
         self.edit_order_btn.setProperty("btnRole", "warning")
-        self.edit_order_btn.setFixedHeight(24)
+        self.edit_order_btn.setFixedHeight(26)
         self.edit_order_btn.clicked.connect(self._edit_order)
 
         right_splitter = QSplitter(Qt.Orientation.Vertical)
+        right_splitter.setObjectName("customersDetailSplitter")
         right_layout.addWidget(right_splitter, 1)
 
         detail_panel = QWidget()
@@ -1387,10 +1396,12 @@ class OrdersPage(QWidget):
         right_splitter.addWidget(detail_panel)
 
         tabs_panel = QWidget()
+        tabs_panel.setObjectName("crmCard")
         tabs_layout = QVBoxLayout(tabs_panel)
-        tabs_layout.setContentsMargins(0, 0, 0, 0)
-        tabs_layout.setSpacing(0)
+        tabs_layout.setContentsMargins(12, 12, 12, 12)
+        tabs_layout.setSpacing(8)
         tabs = QTabWidget()
+        tabs.setObjectName("customerTabs")
 
         pedido_tab = QWidget()
         pedido_tab_layout = QVBoxLayout(pedido_tab)

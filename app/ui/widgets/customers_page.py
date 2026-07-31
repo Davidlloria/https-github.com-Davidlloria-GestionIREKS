@@ -167,43 +167,135 @@ class CustomersPage(QWidget):
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
 
-        header = QLabel("👥  Clientes")
+        header = QLabel("Clientes")
         header.setProperty("role", "pageTitle")
         layout.addWidget(header)
+        header.hide()
+
+        ribbon = QFrame()
+        ribbon.setObjectName("topRibbon")
+        ribbon.setProperty("pageType", "contacts")
+        ribbon.setFrameShape(QFrame.Shape.StyledPanel)
+        ribbon_layout = QHBoxLayout(ribbon)
+        ribbon_layout.setContentsMargins(8, 6, 8, 6)
+        ribbon_layout.setSpacing(6)
+
+        self.new_btn = QPushButton("Nuevo")
+        self.new_btn.setProperty("btnRole", "success")
+        self.new_btn.setFixedHeight(26)
+        self.new_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-text.svg")))
+        self.new_btn.setIconSize(QSize(14, 14))
+
+        self.edit_btn = QPushButton("Editar")
+        self.edit_btn.setProperty("btnRole", "warning")
+        self.edit_btn.setFixedHeight(26)
+        self.edit_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-pen.svg")))
+        self.edit_btn.setIconSize(QSize(14, 14))
+
+        self.del_btn = QPushButton("Eliminar")
+        self.del_btn.setProperty("btnRole", "danger")
+        self.del_btn.setFixedHeight(26)
+        self.del_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
+        self.del_btn.setIconSize(QSize(14, 14))
+
+        self.print_btn = QPushButton("Imprimir")
+        self.print_btn.setProperty("btnRole", "secondary")
+        self.print_btn.setFixedHeight(26)
+        self.print_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "printer.svg")))
+        self.print_btn.setIconSize(QSize(14, 14))
+
+        self.export_btn = QPushButton("Exportar")
+        self.export_btn.setProperty("btnRole", "primary")
+        self.export_btn.setFixedHeight(26)
+        self.export_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "export.svg")))
+        self.export_btn.setIconSize(QSize(14, 14))
+
+        self.queries_btn = QPushButton("Consultas")
+        self.queries_btn.setObjectName("customerQueriesButton")
+        self.queries_btn.setProperty("btnRole", "primary")
+        self.queries_btn.setFixedHeight(26)
+        self.queries_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "brain.svg")))
+        self.queries_btn.setIconSize(QSize(14, 14))
+        self.queries_btn.setToolTip("Abrir consultas de clientes")
+
+        self.help_btn = QPushButton("Ayuda")
+        self.help_btn.setProperty("btnRole", "secondary")
+        self.help_btn.setFixedHeight(26)
+        self.help_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion))
+        self.help_btn.setIconSize(QSize(14, 14))
+        self.help_btn.clicked.connect(self._show_customer_help)
+
+        self.refresh_btn = QPushButton("Actualizar")
+        self.refresh_btn.setProperty("btnRole", "info")
+        self.refresh_btn.setFixedHeight(26)
+        self.refresh_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        self.refresh_btn.setIconSize(QSize(14, 14))
+
+        export_menu = QMenu(self)
+        export_listados_action = export_menu.addAction("Listados")
+        export_import_action = export_menu.addAction("Importar Excel/CSV")
+        export_id_action = export_menu.addAction("ID")
+        export_listados_action.triggered.connect(self._open_customer_reports_dialog)
+        export_import_action.triggered.connect(self._import_entities)
+        export_id_action.triggered.connect(self._show_customer_id_dialog)
+        self.export_btn.setMenu(export_menu)
+
+        self.new_btn.clicked.connect(self._new_entity)
+        self.edit_btn.clicked.connect(self._edit_entity)
+        self.del_btn.clicked.connect(self._delete_entity)
+        self.print_btn.clicked.connect(self._print_customer_report)
+        self.queries_btn.clicked.connect(self._open_customer_queries_dialog)
+        self.refresh_btn.clicked.connect(self.reload)
+
+        ribbon_layout.addWidget(self.new_btn)
+        ribbon_layout.addWidget(self.edit_btn)
+        ribbon_layout.addWidget(self.del_btn)
+        ribbon_layout.addWidget(self.print_btn)
+        ribbon_layout.addWidget(self.export_btn)
+        ribbon_layout.addWidget(self.refresh_btn)
+        ribbon_layout.addWidget(self.queries_btn)
+        ribbon_layout.addStretch(1)
+        ribbon_layout.addWidget(self.help_btn)
+        layout.addWidget(ribbon)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setObjectName("customersMainSplitter")
         self._main_splitter = splitter
         layout.addWidget(splitter, 1)
 
         left_panel = QWidget()
-        left_panel.setObjectName("crmCard")
+        left_panel.setObjectName("customersLeftPanel")
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(14, 14, 14, 14)
         left_layout.setSpacing(10)
 
+        self.island_filter = QComboBox()
+        self.island_filter.setFixedWidth(390)
+        self.island_filter.currentIndexChanged.connect(self.reload)
+        left_layout.addWidget(self.island_filter)
+
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Buscar cliente...")
         self.search_input.setFixedWidth(352)
+        self.search_input.setFixedHeight(30)
         self.search_input.textChanged.connect(self._schedule_reload)
         self.search_input.textChanged.connect(self._update_search_clear_button)
-        self.search_input.setFixedHeight(34)
+
         self.clear_search_btn = QPushButton()
         self.clear_search_btn.setObjectName("customerSearchClearButton")
-        self.clear_search_btn.setFixedSize(34, 34)
-        self.clear_search_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCloseButton))
+        self.clear_search_btn.setFixedSize(30, 30)
+        self.clear_search_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.clear_search_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "close-white.svg")))
         self.clear_search_btn.setIconSize(QSize(14, 14))
         self.clear_search_btn.setToolTip("Vaciar filtro")
         self.clear_search_btn.setEnabled(False)
         self.clear_search_btn.clicked.connect(self._clear_search_filter)
-        self.island_filter = QComboBox()
-        self.island_filter.setFixedWidth(390)
-        self.island_filter.currentIndexChanged.connect(self.reload)
+
         search_row = QHBoxLayout()
         search_row.setContentsMargins(0, 0, 0, 0)
         search_row.setSpacing(8)
         search_row.addWidget(self.search_input)
         search_row.addWidget(self.clear_search_btn)
-        left_layout.addWidget(self.island_filter)
         left_layout.addLayout(search_row)
 
         self.table = QTableWidget(0, 3)
@@ -235,74 +327,21 @@ class CustomersPage(QWidget):
         splitter.addWidget(left_panel)
 
         right_panel = QWidget()
+        right_panel.setObjectName("customersRightPanel")
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
 
-        ribbon = QFrame()
-        ribbon.setObjectName("crmCard")
-        ribbon.setFrameShape(QFrame.Shape.StyledPanel)
-        ribbon_layout = QHBoxLayout(ribbon)
-        ribbon_layout.setContentsMargins(12, 10, 12, 10)
-        ribbon_layout.setSpacing(8)
-
-        self.new_btn = QPushButton("Nuevo")
-        self.new_btn.setProperty("btnRole", "success")
-        self.edit_btn = QPushButton("Editar")
-        self.edit_btn.setProperty("btnRole", "warning")
-        self.del_btn = QPushButton("Eliminar")
-        self.del_btn.setProperty("btnRole", "danger")
-        self.id_btn = QPushButton("ID")
-        self.id_btn.setProperty("btnRole", "secondary")
-        self.import_btn = QPushButton("Importar Excel/CSV")
-        self.import_btn.setProperty("btnRole", "secondary")
-        self.reports_btn = QPushButton("Listados")
-        self.reports_btn.setProperty("btnRole", "primary")
-        self.queries_btn = QPushButton("Consultas")
-        self.queries_btn.setObjectName("customerQueriesButton")
-        self.queries_btn.setProperty("btnRole", "primary")
-        self.refresh_btn = QPushButton("Refrescar")
-        self.refresh_btn.setProperty("btnRole", "secondary")
-        self.new_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogNewFolder))
-        self.edit_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
-        self.del_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
-        self.id_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogInfoView))
-        self.import_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp))
-        self.reports_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogListView))
-        self.queries_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "brain.svg")))
-        self.queries_btn.setIconSize(QSize(14, 14))
-        self.queries_btn.setToolTip("Abrir consultas de clientes")
-        self.refresh_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
-
-        self.new_btn.clicked.connect(self._new_entity)
-        self.edit_btn.clicked.connect(self._edit_entity)
-        self.del_btn.clicked.connect(self._delete_entity)
-        self.id_btn.clicked.connect(self._show_customer_id_dialog)
-        self.import_btn.clicked.connect(self._import_entities)
-        self.reports_btn.clicked.connect(self._open_customer_reports_dialog)
-        self.queries_btn.clicked.connect(self._open_customer_queries_dialog)
-        self.refresh_btn.clicked.connect(self.reload)
-
-        ribbon_layout.addWidget(self.new_btn)
-        ribbon_layout.addSpacing(10)
-        ribbon_layout.addWidget(self.edit_btn)
-        ribbon_layout.addWidget(self.del_btn)
-        ribbon_layout.addSpacing(10)
-        ribbon_layout.addWidget(self.id_btn)
-        ribbon_layout.addWidget(self.import_btn)
-        ribbon_layout.addWidget(self.reports_btn)
-        ribbon_layout.addWidget(self.queries_btn)
-        ribbon_layout.addStretch(1)
-        ribbon_layout.addWidget(self.refresh_btn)
-        right_layout.addWidget(ribbon)
-
         right_splitter = QSplitter(Qt.Orientation.Vertical)
+        right_splitter.setObjectName("customersDetailSplitter")
         self._detail_splitter = right_splitter
         right_layout.addWidget(right_splitter, 1)
 
         detail_panel = QWidget()
         detail_panel.setObjectName("detailTopArea")
         detail_panel.setFixedHeight(300)
+        detail_panel.setFixedWidth(932)
+        detail_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         detail_layout = QVBoxLayout(detail_panel)
         detail_layout.setContentsMargins(0, 0, 0, 0)
         detail_layout.setSpacing(10)
@@ -313,12 +352,12 @@ class CustomersPage(QWidget):
         self.detail_title.setGeometry(5, 0, 300, 24)
         self.detail_tipo_header = QLabel("Clasificación del cliente", detail_panel)
         self.detail_tipo_header.setProperty("role", "sectionTitle")
-        self.detail_tipo_header.setGeometry(550, 0, 300, 24)
+        self.detail_tipo_header.setGeometry(0, 0, 300, 24)
 
         self.detail_panel = detail_panel
 
         left_card = QFrame(detail_panel)
-        left_card.setObjectName("crmCard")
+        left_card.setObjectName("detailLeftCard")
         self.left_card = left_card
         left_card_layout = QVBoxLayout(left_card)
         left_card_layout.setContentsMargins(2, 2, 2, 2)
@@ -327,7 +366,7 @@ class CustomersPage(QWidget):
         left_card_layout.addWidget(left_detail_panel, 1)
 
         right_card = QFrame(detail_panel)
-        right_card.setObjectName("crmCard")
+        right_card.setObjectName("detailRightCard")
         self.right_card = right_card
         right_card_layout = QVBoxLayout(right_card)
         right_card_layout.setContentsMargins(2, 2, 2, 2)
@@ -339,7 +378,8 @@ class CustomersPage(QWidget):
 
         tabs_panel = QWidget()
         tabs_panel.setObjectName("crmCard")
-        tabs_panel.setFixedHeight(300)
+        tabs_panel.setMinimumHeight(300)
+        tabs_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         tabs_layout = QVBoxLayout(tabs_panel)
         tabs_layout.setContentsMargins(12, 12, 12, 12)
         tabs_layout.setSpacing(8)
@@ -356,15 +396,14 @@ class CustomersPage(QWidget):
         self.customer_tabs.setTabIcon(3, self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
         tabs_layout.addWidget(self.customer_tabs)
         right_splitter.addWidget(tabs_panel)
-        right_splitter.setStretchFactor(0, 1)
-        right_splitter.setStretchFactor(1, 9)
+        right_splitter.setStretchFactor(0, 0)
+        right_splitter.setStretchFactor(1, 1)
         right_splitter.setChildrenCollapsible(False)
         right_splitter.setHandleWidth(0)
         right_splitter.handle(1).setEnabled(False)
         self._apply_fixed_detail_split()
 
         splitter.addWidget(right_panel)
-
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
         splitter.setChildrenCollapsible(False)
@@ -395,10 +434,9 @@ class CustomersPage(QWidget):
         splitter = self._detail_splitter
         if splitter is None:
             return
-        # Coordenadas fijas efectivas en el splitter vertical:
-        # panel superior y=0,h=300 / panel inferior y=300,h=300
+        # El detalle superior permanece fijo y la zona de pesta?as ocupa el resto.
         top_px = 300
-        bottom_px = 300
+        bottom_px = max(300, splitter.height() - top_px)
         splitter.setSizes([top_px, bottom_px])
 
     def _layout_detail_cards_abs(self) -> None:
@@ -407,6 +445,7 @@ class CustomersPage(QWidget):
         right_card = getattr(self, "right_card", None)
         if panel is None or left_card is None or right_card is None:
             return
+        panel.setFixedWidth(932)
         # Coordenadas fijas dentro del detail_panel.
         left_card.setGeometry(5, 25, 540, 270)
         right_card.setGeometry(550, 25, 290, 270)
@@ -2068,45 +2107,51 @@ class CustomersPage(QWidget):
                 border: 1px solid #3B82F6;
             }
             QPushButton {
-                min-height: 30px;
+                min-height: 26px;
                 border-radius: 8px;
-                padding: 5px 12px;
+                padding: 4px 10px;
             }
             QPushButton[btnRole="success"] {
-                background: #22C55E;
-                color: white;
-                border: 1px solid #16A34A;
+                background: #DCFCE7;
+                color: #166534;
+                border: 1px solid #86EFAC;
                 font-weight: 600;
             }
             QPushButton[btnRole="warning"] {
-                background: #F59E0B;
-                color: #111827;
-                border: 1px solid #D97706;
+                background: #FEF3C7;
+                color: #92400E;
+                border: 1px solid #FCD34D;
                 font-weight: 600;
             }
             QPushButton[btnRole="danger"] {
-                background: #EF4444;
-                color: white;
-                border: 1px solid #DC2626;
+                background: #FEE2E2;
+                color: #B91C1C;
+                border: 1px solid #FCA5A5;
                 font-weight: 600;
             }
             QPushButton[btnRole="secondary"] {
-                background: #FFFFFF;
+                background: #E2E8F0;
                 color: #334155;
                 border: 1px solid #CBD5E1;
                 font-weight: 500;
             }
             QPushButton[btnRole="primary"] {
-                background: #3B82F6;
-                color: #FFFFFF;
-                border: 1px solid #2563EB;
+                background: #DBEAFE;
+                color: #1D4ED8;
+                border: 1px solid #93C5FD;
+                font-weight: 600;
+            }
+            QPushButton[btnRole="info"] {
+                background: #F3E8FF;
+                color: #6B21A8;
+                border: 1px solid #D8B4FE;
                 font-weight: 600;
             }
             QPushButton#customerSearchClearButton {
-                min-width: 34px;
-                max-width: 34px;
-                min-height: 34px;
-                max-height: 34px;
+                min-width: 30px;
+                max-width: 30px;
+                min-height: 30px;
+                max-height: 30px;
                 padding: 0;
                 margin: 0;
                 border-radius: 8px;
@@ -2805,6 +2850,13 @@ class CustomersPage(QWidget):
             return
         out = self.report_export_service.export_pdf(path, report.title, report.headers, report.rows)
         QMessageBox.information(self, "Listados", f"PDF exportado:\n{out}")
+
+    def _show_customer_help(self) -> None:
+        QMessageBox.information(
+            self,
+            "Ayuda",
+            "Usa el listado de la izquierda para seleccionar un cliente y revisa sus datos, contactos, ventas, recetas y agenda en el panel derecho.",
+        )
 
     def _print_customer_report(self) -> None:
         report = self.customer_report_flow_service.last_report
