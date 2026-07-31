@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from app.services.sales_reconciliation_service import SalesReconciliationService
+from app.services.sales_reconciliation_service import ClientesImportPreview, SalesReconciliationService
 
 
 class _FakeExecResult:
@@ -174,3 +174,98 @@ def test_pdf_wrappers_delegate_to_flow_service() -> None:
     assert fake.calls[1][0] == "import_igsa_pdf_lines"
     assert fake.calls[1][2]["cliente_id"] == "cliente-1"
     assert callable(fake.calls[1][2]["sync_warehouse_callback"])
+
+
+def test_import_clientes_from_preview_uses_only_importable_rows(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "clientes.xlsx"
+    path.write_bytes(b"preview-test")
+
+    preview_rows = [
+        {
+            "source_row": 2,
+            "anio": 2026,
+            "cliente_id": "cliente-1",
+            "cliente_codigo": "C001",
+            "cliente_nombre": "Cliente Uno",
+            "articulo_codigo": "DIST-01",
+            "articulo_id": "prod-1",
+            "articulo_codigo_corto": "IREKS-01",
+            "articulo_descripcion": "Producto Uno",
+            "articulo_label": "IREKS-01 - Producto Uno",
+            "envase": 12.5,
+            "unidades": 4,
+            "kg": 50.0,
+            "precio_kg": 0.0,
+            "euros": 0.0,
+            "status": "warning",
+            "issue_text": "sin tarifa valida para el ano 2026 del producto IREKS IREKS-01 - Producto Uno; se importara con precio 0.",
+            "can_import": True,
+        },
+        {
+            "source_row": 3,
+            "anio": 2026,
+            "cliente_id": "cliente-2",
+            "cliente_codigo": "C002",
+            "cliente_nombre": "Cliente Dos",
+            "articulo_codigo": "DIST-02",
+            "articulo_id": "prod-2",
+            "articulo_codigo_corto": "",
+            "articulo_descripcion": "Producto Dos",
+            "articulo_label": "Producto Dos",
+            "envase": 0.0,
+            "unidades": 0.0,
+            "kg": 0.0,
+            "precio_kg": 0.0,
+            "euros": 0.0,
+            "status": "error",
+            "issue_text": "Cliente no valido o no indirecto (cliente-2).",
+            "can_import": False,
+        },
+    ]
+    preview = ClientesImportPreview(
+        total_rows=2,
+        valid_rows=1,
+        invalid_rows=1,
+        preview_rows=preview_rows,
+        issues=[preview_rows[0]["issue_text"], preview_rows[1]["issue_text"]],
+        anio=2026,
+        duplicate_rows=0,
+        import_rows=[preview_rows[0]],
+    )
+
+    fake_session_factory = _FakeSessionFactory()
+    monkeypatch.setattr("app.services.sales_reconciliation_service.Session", fake_session_factory)
+
+    service = SalesReconciliationService()
+    result = service._import_clientes_from_preview(path, preview, replace_existing=False)
+
+    assert result.ok is True
+    assert result.imported == 1
+    assert result.incidencias == 2
+    assert fake_session_factory.last_session is not None
+    inserted_rows = [obj for obj in fake_session_factory.last_session.added if obj.__class__.__name__ == "VentaClientesRaw"]
+    assert len(inserted_rows) == 1
+    assert inserted_rows[0].cliente_id == "cliente-1"
+    assert inserted_rows[0].articulo_id == "prod-1"
+    assert inserted_rows[0].precio_kg == 0.0
+    assert any("Cliente no valido" in line for line in result.warnings)
+
+
+def test_resolve_tarifa_precio_kg_converts_envase_price_to_kg_price(monkeypatch) -> None:
+    class _Tarifa:
+        precio_distribuidor = 41.95
+        precio_fabricante = 0.0
+
+    class _ExecResult:
+        def first(self):
+            return _Tarifa()
+
+    class _Session:
+        def exec(self, _stmt):
+            return _ExecResult()
+
+    service = SalesReconciliationService()
+
+    precio_kg = service._resolve_tarifa_precio_kg(_Session(), "product-1", 2025, envase_peso=12.5)
+
+    assert round(precio_kg, 2) == 3.36
