@@ -50,7 +50,7 @@ npm ci
 ```
 
 La guia completa de entorno local, variables y runtime esta en
-`docs/local-environment.md`.
+`docs/setup/local-environment.md`.
 
 ## Ejecucion
 
@@ -203,16 +203,16 @@ python -m pytest tests/test_architecture_boundaries.py -q
 
 Checklist de release (operativa de entrega):
 
-- `docs/release-checklist.md`
+- `docs/setup/release-checklist.md`
 
 Entorno local y runtime:
 
-- `docs/local-environment.md`
+- `docs/setup/local-environment.md`
 - `scripts/check-local-env.ps1`
 
 Seguimiento corto de progreso y traspaso de contexto:
 
-- `docs/progress-log.md`
+- `docs/worklog/worklog/progress-log.md`
 
 ## Estado actual
 
@@ -222,8 +222,8 @@ Seguimiento corto de progreso y traspaso de contexto:
   almacen y configuracion.
 - Frontend React inicial con vistas de consulta para clientes, ingredientes y
   almacen.
-- La hoja de ruta vive en `docs/migration-roadmap.md`.
-- El resumen corto de avance vive en `docs/progress-log.md`.
+- La hoja de ruta vive en `docs/architecture/architecture/migration-roadmap.md`.
+- El resumen corto de avance vive en `docs/worklog/worklog/progress-log.md`.
 
 ## Datos y seguridad
 

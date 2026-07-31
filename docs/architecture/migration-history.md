@@ -1,7 +1,7 @@
 # Roadmap de migracion UI / servicios / API
 
-> Para retomar trabajo rapido, leer primero `docs/progress-log.md`.
-> Usa `docs/migration-roadmap.md` para la direccion general y este archivo
+> Para retomar trabajo rapido, leer primero `docs/worklog/worklog/progress-log.md`.
+> Usa `docs/architecture/architecture/migration-roadmap.md` para la direccion general y este archivo
 > para el historial detallado de checkpoints y decisiones.
 
 ## Estado verificado
@@ -798,10 +798,10 @@ Fase 5 - Reducir dependencia del desktop.
   - `README.md` actualizado con comandos de backup normal, backup con `-Tag` y
     variante con `ExecutionPolicy Bypass`.
 - Checklist de entrega versionable:
-  - nuevo `docs/release-checklist.md` con pasos de pre-release, gates,
+  - nuevo `docs/setup/release-checklist.md` con pasos de pre-release, gates,
     smoke tests y evidencias minimas para PR/release.
 - Documentacion de entorno local:
-  - nuevo `docs/local-environment.md` con instalacion Python/Node,
+  - nuevo `docs/setup/local-environment.md` con instalacion Python/Node,
     configuracion local, variables de entorno y validacion;
   - `README.md` enlaza la guia y recomienda `venv` + `npm ci`.
 - Politica de runtime/Tesseract documentada:
@@ -819,7 +819,7 @@ Fase 5 - Reducir dependencia del desktop.
 - Chequeo automatizado de entorno local:
   - nuevo `scripts/check-local-env.ps1` para validar prerequisitos de arranque
     (Python, Node/npm, archivos base y OCR opcional);
-  - `README.md`, `docs/local-environment.md` y checklist de release incorporan
+  - `README.md`, `docs/setup/local-environment.md` y checklist de release incorporan
     su ejecucion como paso previo al gate completo.
 
 ## Hoja de ruta

@@ -29,7 +29,7 @@ entire migration history first.
 - Customer listing Excel export now comes from the backend and produces a real `.xlsx`.
 - Customer action buttons and modal actions now use standard Lucide icons.
 - A local `listados/` folder exists in the repo for test artifacts, with `.gitkeep` tracked.
-- The repo now has a dedicated handoff file at `docs/progress-log.md`.
+- The repo now has a dedicated handoff file at `docs/worklog/worklog/progress-log.md`.
 
 ## Recent Commits
 
@@ -41,19 +41,19 @@ entire migration history first.
 
 ## Important Files
 
-- [docs/migration-history.md](./migration-history.md)
-- [docs/migration-roadmap.md](./migration-roadmap.md)
-- [docs/debt-residual-report.md](./debt-residual-report.md)
-- [docs/release-checklist.md](./release-checklist.md)
-- [docs/local-environment.md](./local-environment.md)
+- [docs/architecture/architecture/migration-history.md](./architecture/migration-history.md)
+- [docs/architecture/architecture/migration-roadmap.md](./architecture/migration-roadmap.md)
+- [docs/architecture/architecture/debt-residual-report.md](./architecture/debt-residual-report.md)
+- [docs/setup/release-checklist.md](./release-checklist.md)
+- [docs/setup/local-environment.md](./local-environment.md)
 
 ## Next Useful Checks
 
 - Verify the customers screen on the React UI after icon and header alignment changes.
 - Keep the `listados/` folder clean of generated artifacts before commits.
 - If a new chat resumes work, start from this snapshot and then consult the roadmap.
-- If the next task is functional, start from `docs/migration-roadmap.md` and
-  `docs/migration-history.md` after reading this log.
+- If the next task is functional, start from `docs/architecture/architecture/migration-roadmap.md` and
+  `docs/architecture/architecture/migration-history.md` after reading this log.
 
 ## Handoff Block
 
@@ -64,5 +64,5 @@ Worktree: clean
 Focus: customer/listings flow, shared UI primitives, and remaining migration tasks.
 Recent changes: shared UI primitives added, standard button icons in place, header alignment fixed.
 Pending: keep listados/ clean, review next functional block from roadmap/history.
-Reference: docs/progress-log.md, docs/migration-roadmap.md, docs/migration-history.md
+Reference: docs/worklog/worklog/progress-log.md, docs/architecture/architecture/migration-roadmap.md, docs/architecture/architecture/migration-history.md
 ```

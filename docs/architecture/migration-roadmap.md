@@ -2,7 +2,7 @@
 
 ## Estado ejecutivo
 
-> Para retomadas rapidas, leer primero `docs/progress-log.md` y usar esta
+> Para retomadas rapidas, leer primero `docs/worklog/worklog/progress-log.md` y usar esta
 > roadmap como contexto estrategico de largo recorrido.
 
 - Fase actual: Fase 5 - Reducir dependencia del desktop.
@@ -323,7 +323,7 @@
 2. Atacar el siguiente bloque pequeno de labels de estado de mantenimiento en
    `ingredients_page.py` reportes/impresion sin introducir comportamiento
    nuevo.
-3. Mantener el historial detallado en `docs/migration-history.md`.
+3. Mantener el historial detallado en `docs/architecture/architecture/migration-history.md`.
 4. Seguir cerrando deuda tecnica solo cuando reduzca riesgo o desbloquee la
    migracion.
 5. Actualizar este documento despues de cada bloque pequeno validado.

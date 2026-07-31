@@ -7,8 +7,8 @@ Fecha de referencia: 2026-06-02.
 Basado en:
 
 - [AGENTS.md](./AGENTS.md)
-- [migration-roadmap.md](./migration-roadmap.md)
-- [migration-history.md](./migration-history.md)
+- [architecture/migration-roadmap.md](./architecture/migration-roadmap.md)
+- [architecture/migration-history.md](./architecture/migration-history.md)
 
 Este informe resume la deuda residual visible en los widgets desktop mas grandes y el retorno esperado de seguir extrayendo logica a servicios o helpers puros.
 

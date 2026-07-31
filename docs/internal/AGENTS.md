@@ -28,8 +28,8 @@ La migración ya dispone de:
 * Contratos API
 * Guardrails de arquitectura
 * Varios flujos legacy extraídos desde widgets hacia servicios
-* `docs/progress-log.md` como traspaso corto para retomadas rápidas
-* `migration-roadmap.md` y `docs/migration-history.md` como contexto cuando aporten decisiones activas
+* `docs/worklog/worklog/progress-log.md` como traspaso corto para retomadas rápidas
+* `architecture/migration-roadmap.md` y `docs/architecture/architecture/migration-history.md` como contexto cuando aporten decisiones activas
 
 La fase actual NO consiste en crear una arquitectura nueva.
 
