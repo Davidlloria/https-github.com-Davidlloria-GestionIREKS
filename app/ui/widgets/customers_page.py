@@ -2639,6 +2639,10 @@ class CustomersPage(QWidget):
                 width: 0px;
                 height: 0px;
             }
+            QWidget#detailTopArea {
+                background: #DBEAFE;
+                border: 0;
+            }
             QFrame#crmCard, QWidget#crmCard {
                 background: #FFFFFF;
                 border: 1px solid #E2E8F0;

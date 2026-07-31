@@ -38,7 +38,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo #EEF3F8)
         └── customersRightPanel (QWidget, fondo transparente, borde #D7DEE8)
             └── layout vertical sin márgenes
                 └── customersDetailSplitter (QSplitter vertical, fondo rojo pastel #FEE2E2, sin borde)
-                    ├── detailTopArea (QWidget, fondo transparente, ancho fijo 932 px, alto 300 px)
+                    ├── detailTopArea (QWidget, fondo azul claro #DBEAFE, ancho fijo 932 px, alto 300 px)
                     │   ├── título "Detalle de cliente"
                     │   ├── título "Clasificación del cliente"
                     │   ├── detailLeftCard (QFrame, blanco #FFFFFF, borde #D7DEE8)
@@ -159,7 +159,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo #EEF3F8)
 
 ## Aspecto visual actual
 
-- `CustomersPageRoot` tiene fondo `#EEF3F8`; `customersMainSplitter` usa fondo verde pastel `#DCFCE7`; `customersDetailSplitter` usa fondo rojo pastel `#FEE2E2`; `detailTopArea` mantiene fondo transparente y `customersRightPanel` tiene fondo transparente con borde `#D7DEE8`.
+- `CustomersPageRoot` tiene fondo `#EEF3F8`; `customersMainSplitter` usa fondo verde pastel `#DCFCE7`; `customersDetailSplitter` usa fondo rojo pastel `#FEE2E2`; `detailTopArea` usa fondo azul claro `#DBEAFE` y `customersRightPanel` tiene fondo transparente con borde `#D7DEE8`.
 - `customersLeftPanel` tiene fondo transparente, borde gris `#D7DEE8` y radio de 8 px.
 - `detailLeftCard` y `detailRightCard` son blancas, con borde gris y radio de 8 px.
 - La cinta superior usa botones compactos con colores por función e iconos.
