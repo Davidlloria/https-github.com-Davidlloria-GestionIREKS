@@ -139,12 +139,16 @@ class CustomersPage(QWidget):
         self._is_loading_details = False
         self._related_context_menu_open = False
         self._loading_related_contacts = False
+        self._loading_related_sales = False
         self._loading_agenda = False
         self._agenda_filter_type: QComboBox | None = None
         self._agenda_filter_state: QComboBox | None = None
         self._agenda_filter_from: QDateEdit | None = None
         self._agenda_filter_to: QDateEdit | None = None
         self._agenda_filter_refresh_btn: QPushButton | None = None
+        self._related_sales_year_filter: QComboBox | None = None
+        self._related_sales_compare_btn: QPushButton | None = None
+        self._related_sales_rows: list = []
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
         self._search_timer.timeout.connect(self.reload)
@@ -387,7 +391,7 @@ class CustomersPage(QWidget):
         self.customer_tabs = QTabWidget()
         self.customer_tabs.setObjectName("customerTabs")
         self.customer_tabs.addTab(self._build_contacts_tab(), "Contactos")
-        self.customer_tabs.addTab(self._build_tab_placeholder("Historial y resumen de ventas."), "Ventas")
+        self.customer_tabs.addTab(self._build_sales_tab(), "Ventas")
         self.customer_tabs.addTab(self._build_recipes_tab(), "Recetas")
         self.customer_tabs.addTab(self._build_agenda_tab(), "Agenda")
         self.customer_tabs.setTabIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView))
@@ -504,6 +508,187 @@ class CustomersPage(QWidget):
         self.related_contacts_empty.setVisible(False)
         layout.addWidget(self.related_contacts_empty)
         return panel
+
+    def _build_sales_tab(self) -> QWidget:
+        panel = QWidget()
+        panel.setObjectName("customerSalesPanel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(8)
+
+        actions = QHBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.setSpacing(8)
+
+        self._related_sales_year_filter = QComboBox()
+        self._related_sales_year_filter.setObjectName("customerSalesYearFilter")
+        self._related_sales_year_filter.setFixedWidth(110)
+        self._related_sales_year_filter.currentIndexChanged.connect(self._refresh_related_sales)
+
+        self._related_sales_compare_btn = QPushButton("Comp.")
+        self._related_sales_compare_btn.setObjectName("customerSalesCompareButton")
+        self._related_sales_compare_btn.setEnabled(False)
+
+        actions.addWidget(self._related_sales_year_filter)
+        actions.addWidget(self._related_sales_compare_btn)
+        actions.addStretch(1)
+        layout.addLayout(actions)
+
+        self.related_sales_table = QTableWidget(0, 5)
+        self.related_sales_table.setObjectName("customerSalesTable")
+        self.related_sales_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.related_sales_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.related_sales_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.related_sales_table.setAlternatingRowColors(True)
+        self.related_sales_table.setSortingEnabled(True)
+        self.related_sales_table.verticalHeader().setVisible(False)
+        self.related_sales_table.setHorizontalHeaderLabels(["Referencia", "Descripción", "Unid.", "Kg", "€"])
+        sales_header = self.related_sales_table.horizontalHeader()
+        sales_header.setSectionsClickable(True)
+        sales_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        sales_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        sales_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        sales_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        sales_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self.related_sales_table.setColumnWidth(0, 110)
+        self.related_sales_table.setColumnWidth(2, 96)
+        self.related_sales_table.setColumnWidth(3, 108)
+        self.related_sales_table.setColumnWidth(4, 118)
+        self.related_sales_table.verticalHeader().setDefaultSectionSize(34)
+        layout.addWidget(self.related_sales_table, 1)
+
+        self.related_sales_totals = QTableWidget(1, 5)
+        self.related_sales_totals.setObjectName("customerSalesTotals")
+        self.related_sales_totals.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.related_sales_totals.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.related_sales_totals.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.related_sales_totals.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.related_sales_totals.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.related_sales_totals.verticalHeader().setVisible(False)
+        self.related_sales_totals.horizontalHeader().setVisible(False)
+        totals_header = self.related_sales_totals.horizontalHeader()
+        totals_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        totals_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        totals_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        totals_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        totals_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self.related_sales_totals.setColumnWidth(0, 110)
+        self.related_sales_totals.setColumnWidth(2, 96)
+        self.related_sales_totals.setColumnWidth(3, 108)
+        self.related_sales_totals.setColumnWidth(4, 118)
+        self.related_sales_totals.verticalHeader().setDefaultSectionSize(34)
+        self.related_sales_totals.setFixedHeight(40)
+        layout.addWidget(self.related_sales_totals)
+
+        self.related_sales_empty = QLabel("No hay ventas asociadas a este cliente para el año seleccionado.")
+        self.related_sales_empty.setObjectName("customerSalesEmpty")
+        self.related_sales_empty.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+        self.related_sales_empty.setWordWrap(True)
+        self.related_sales_empty.setVisible(False)
+        layout.addWidget(self.related_sales_empty)
+
+        self._reload_related_sales_years()
+        self._render_related_sales("")
+        return panel
+
+    def _reload_related_sales_years(self) -> None:
+        combo = self._related_sales_year_filter
+        if combo is None:
+            return
+        current_value = str(combo.currentData() or combo.currentText() or "").strip()
+        years = [int(year) for year in self.customer_service.related_sales_years() if int(year or 0) > 0]
+        years = sorted(set(years), reverse=True)
+        preferred_year = str(date.today().year)
+        combo.blockSignals(True)
+        combo.clear()
+        for year in years:
+            combo.addItem(str(year), year)
+        if years:
+            preferred_index = combo.findData(int(preferred_year))
+            if preferred_index < 0 and current_value.isdigit():
+                preferred_index = combo.findData(int(current_value))
+            if preferred_index < 0:
+                preferred_index = 0
+            combo.setCurrentIndex(preferred_index)
+        combo.blockSignals(False)
+
+    def _refresh_related_sales(self) -> None:
+        selected = self._selected_row()
+        self._render_related_sales(str(getattr(selected, "cliente_id", "") or "") if selected else "")
+
+    def _render_related_sales(self, cliente_id: str) -> None:
+        if not hasattr(self, "related_sales_table"):
+            return
+        year_filter = self._related_sales_year_filter
+        year = int(year_filter.currentData() or 0) if year_filter is not None else 0
+        if not str(cliente_id or "").strip() or year <= 0:
+            rows = []
+        else:
+            rows = self.customer_service.related_sales(str(cliente_id or "").strip(), year)
+
+        self._related_sales_rows = list(rows or [])
+        self._loading_related_sales = True
+        self.related_sales_table.setSortingEnabled(False)
+        try:
+            self.related_sales_table.setRowCount(len(self._related_sales_rows))
+            total_units = 0.0
+            total_kg = 0.0
+            total_euros = 0.0
+            for row_idx, item in enumerate(self._related_sales_rows):
+                units = float(getattr(item, "unidades_curr", 0.0) or 0.0)
+                kg = float(getattr(item, "kg_curr", 0.0) or 0.0)
+                euros = float(getattr(item, "euros_curr", 0.0) or 0.0)
+                total_units += units
+                total_kg += kg
+                total_euros += euros
+
+                code_item = QTableWidgetItem(str(getattr(item, "codigo", "") or ""))
+                name_item = QTableWidgetItem(str(getattr(item, "nombre", "") or ""))
+                units_item = QTableWidgetItem(self._format_sales_number(units))
+                kg_item = QTableWidgetItem(self._format_sales_number(kg))
+                euros_item = QTableWidgetItem(self._format_sales_number(euros))
+
+                code_item.setData(Qt.ItemDataRole.UserRole, str(getattr(item, "articulo_id", "") or ""))
+                units_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                kg_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                euros_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                units_item.setData(Qt.ItemDataRole.UserRole, units)
+                kg_item.setData(Qt.ItemDataRole.UserRole, kg)
+                euros_item.setData(Qt.ItemDataRole.UserRole, euros)
+
+                self.related_sales_table.setItem(row_idx, 0, code_item)
+                self.related_sales_table.setItem(row_idx, 1, name_item)
+                self.related_sales_table.setItem(row_idx, 2, units_item)
+                self.related_sales_table.setItem(row_idx, 3, kg_item)
+                self.related_sales_table.setItem(row_idx, 4, euros_item)
+
+            self.related_sales_totals.setItem(0, 0, QTableWidgetItem(""))
+            total_label = QTableWidgetItem("TOTALES")
+            total_units_item = QTableWidgetItem(self._format_sales_number(total_units))
+            total_kg_item = QTableWidgetItem(self._format_sales_number(total_kg))
+            total_euros_item = QTableWidgetItem(self._format_sales_number(total_euros))
+            total_units_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            total_kg_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            total_euros_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.related_sales_totals.setItem(0, 1, total_label)
+            self.related_sales_totals.setItem(0, 2, total_units_item)
+            self.related_sales_totals.setItem(0, 3, total_kg_item)
+            self.related_sales_totals.setItem(0, 4, total_euros_item)
+        finally:
+            self._loading_related_sales = False
+            self.related_sales_table.setSortingEnabled(True)
+
+        has_rows = bool(self._related_sales_rows)
+        self.related_sales_table.setVisible(has_rows)
+        self.related_sales_totals.setVisible(has_rows)
+        self.related_sales_empty.setVisible(not has_rows)
+        if self._related_sales_compare_btn is not None:
+            self._related_sales_compare_btn.setEnabled(False)
+
+    @staticmethod
+    def _format_sales_number(value: float | int | None) -> str:
+        number = float(value or 0.0)
+        return f"{number:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
 
     def _build_recipes_tab(self) -> QWidget:
         panel = QWidget()
@@ -1705,6 +1890,7 @@ class CustomersPage(QWidget):
             self.detail_activo.setChecked(False)
             self.detail_prospeccion_no.setChecked(True)
             self._render_related_contacts("")
+            self._render_related_sales("")
             self._render_related_recipes("")
             self._render_customer_agenda("")
             self._is_loading_details = False
@@ -1746,6 +1932,7 @@ class CustomersPage(QWidget):
         else:
             self.detail_prospeccion_no.setChecked(True)
         self._render_related_contacts(str(getattr(row, "cliente_id", "") or ""))
+        self._render_related_sales(str(getattr(row, "cliente_id", "") or ""))
         self._render_related_recipes(str(getattr(row, "cliente_id", "") or ""))
         self._render_customer_agenda(str(getattr(row, "cliente_id", "") or ""))
         self._is_loading_details = False
