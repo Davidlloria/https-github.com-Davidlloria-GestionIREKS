@@ -82,7 +82,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                             │   │   ├── Kg
                             │   │   └── €
                             │   ├── customerSalesTotals (QTableWidget, fila fija de totales)
-                            │   ├── customerSalesEmpty (QLabel, visible si no hay ventas)
+                            ?   ??? customerSalesEmpty (QLabel, permanece oculto; la tabla de ventas se muestra siempre)
                             │   └── QDialog comparativa de ventas
                             │       ├── cabecera con nombre del cliente
                             │       ├── customerSalesComparisonGroups (QTableWidget, grupos: año anterior / año seleccionado / Diferencia)
