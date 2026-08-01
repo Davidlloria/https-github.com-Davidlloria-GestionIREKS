@@ -561,10 +561,10 @@ class CustomersPage(QWidget):
         self.customer_tabs.addTab(self._build_sales_tab(), "Ventas")
         self.customer_tabs.addTab(self._build_recipes_tab(), "Recetas")
         self.customer_tabs.addTab(self._build_agenda_tab(), "Agenda")
-        self.customer_tabs.setTabIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView))
-        self.customer_tabs.setTabIcon(1, self.style().standardIcon(QStyle.StandardPixmap.SP_DriveHDIcon))
-        self.customer_tabs.setTabIcon(2, self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
-        self.customer_tabs.setTabIcon(3, self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        self.customer_tabs.setTabIcon(0, QIcon(str(BASE_DIR / "assets" / "icons" / "contact.svg")))
+        self.customer_tabs.setTabIcon(1, QIcon(str(BASE_DIR / "assets" / "icons" / "badge-euro.svg")))
+        self.customer_tabs.setTabIcon(2, QIcon(str(BASE_DIR / "assets" / "icons" / "cooking-pot.svg")))
+        self.customer_tabs.setTabIcon(3, QIcon(str(BASE_DIR / "assets" / "icons" / "calendar-days.svg")))
         tabs_layout.addWidget(self.customer_tabs)
         right_splitter.addWidget(tabs_panel)
         right_splitter.setStretchFactor(0, 0)
@@ -1147,6 +1147,8 @@ class CustomersPage(QWidget):
         self._agenda_filter_to.setDate(self._agenda_qdate(date(current_year, 12, 31), fallback_today=False))
         for calendar_edit in (self._agenda_filter_from, self._agenda_filter_to):
             self._configure_agenda_calendar(calendar_edit)
+            if calendar_edit.lineEdit() is not None:
+                calendar_edit.lineEdit().setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         range_sep = QLabel(" - ")
         range_sep.setObjectName("customerAgendaRangeSep")
@@ -2901,7 +2903,7 @@ class CustomersPage(QWidget):
                 background: #FFFFFF;
                 color: #334155;
                 font-weight: 600;
-                font-size: 10px;
+                font-size: 11px;
             }
             QComboBox#customerAgendaFilter::drop-down, QDateEdit#customerAgendaFilterDate::drop-down {
                 border: none;

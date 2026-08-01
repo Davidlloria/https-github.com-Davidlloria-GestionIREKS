@@ -168,6 +168,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 - Las pestañas tienen fondo blanco/gris claro y la activa se identifica en azul.
 - Contactos, ventas, recetas y agenda usan tablas blancas con bordes suaves.
 - La Agenda muestra iconos circulares por tipo y estados con color.
+- Los filtros de agenda usan texto a 11 px; las fechas se muestran centradas en los QDateEdit.
 
 ## Diálogos y flujos relacionados
 
