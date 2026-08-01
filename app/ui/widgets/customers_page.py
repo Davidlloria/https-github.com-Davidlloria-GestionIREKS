@@ -354,7 +354,7 @@ class CustomersPage(QWidget):
         self.new_btn = QPushButton("Nuevo")
         self.new_btn.setProperty("btnRole", "success")
         self.new_btn.setFixedHeight(26)
-        self.new_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-text.svg")))
+        self.new_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "user-round-plus.svg")))
         self.new_btn.setIconSize(QSize(14, 14))
 
         self.edit_btn = QPushButton("Editar")
@@ -366,7 +366,7 @@ class CustomersPage(QWidget):
         self.del_btn = QPushButton("Eliminar")
         self.del_btn.setProperty("btnRole", "danger")
         self.del_btn.setFixedHeight(26)
-        self.del_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
+        self.del_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
         self.del_btn.setIconSize(QSize(14, 14))
 
         self.print_btn = QPushButton("Imprimir")
@@ -392,14 +392,14 @@ class CustomersPage(QWidget):
         self.help_btn = QPushButton("Ayuda")
         self.help_btn.setProperty("btnRole", "secondary")
         self.help_btn.setFixedHeight(26)
-        self.help_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion))
+        self.help_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "circle-question-mark.svg")))
         self.help_btn.setIconSize(QSize(14, 14))
         self.help_btn.clicked.connect(self._show_customer_help)
 
         self.refresh_btn = QPushButton("Actualizar")
         self.refresh_btn.setProperty("btnRole", "info")
         self.refresh_btn.setFixedHeight(26)
-        self.refresh_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        self.refresh_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "refresh-cw.svg")))
         self.refresh_btn.setIconSize(QSize(14, 14))
 
         export_menu = QMenu(self)
@@ -410,6 +410,10 @@ class CustomersPage(QWidget):
         export_import_action.triggered.connect(self._import_entities)
         export_id_action.triggered.connect(self._show_customer_id_dialog)
         self.export_btn.setMenu(export_menu)
+
+        ribbon_button_width = self.export_btn.sizeHint().width()
+        for button in (self.new_btn, self.edit_btn, self.del_btn, self.print_btn, self.export_btn, self.refresh_btn, self.queries_btn, self.help_btn):
+            button.setFixedWidth(ribbon_button_width)
 
         self.new_btn.clicked.connect(self._new_entity)
         self.edit_btn.clicked.connect(self._edit_entity)

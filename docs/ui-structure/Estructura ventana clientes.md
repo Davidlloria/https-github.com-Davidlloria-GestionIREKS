@@ -11,19 +11,18 @@ Implementación principal:
 CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin borde, WA_StyledBackground=True)
 └── layout principal (QVBoxLayout, márgenes 14 px, separación 10 px)
     ├── título de página "Clientes" (QLabel, actualmente oculto)
-    ├── topRibbon (QFrame, fondo blanco #FFFFFF, borde #E2E8F1)
-    │   ├── Nuevo (verde claro #DCFCE7, texto #166534)
-    │   ├── Editar (amarillo claro #FEF3C7, texto #92400E)
-    │   ├── Eliminar (rojo claro #FEE2E2, texto #B91C1C)
-    │   ├── Imprimir (gris azulado #E2E8F0, texto #334155)
-    │   ├── Exportar (QPushButton + QMenu, azul claro #DBEAFE, texto #1D4ED8)
+    │   ├── Nuevo (verde claro #DCFCE7, texto #166534, icono `assets/icons/user-round-plus.svg`, ancho normalizado al de Exportar)
+    │   ├── Editar (amarillo claro #FEF3C7, texto #92400E, icono `assets/icons/file-pen.svg`, ancho normalizado al de Exportar)
+    │   ├── Eliminar (rojo claro #FEE2E2, texto #B91C1C, icono `assets/icons/trash.svg`, ancho normalizado al de Exportar)
+    │   ├── Imprimir (gris azulado #E2E8F0, texto #334155, icono `assets/icons/printer.svg`, ancho normalizado al de Exportar)
+    │   ├── Exportar (QPushButton + QMenu, azul claro #DBEAFE, texto #1D4ED8, icono `assets/icons/export.svg`, ancho base del ribbon)
     │   │   ├── Listados
     │   │   ├── Importar Excel/CSV
     │   │   └── ID
-    │   ├── Actualizar (violeta claro #F3E8FF, texto #6B21A8)
-    │   ├── customerQueriesButton (QPushButton, etiqueta "Consultas", icono `assets/icons/brain.svg`)
+    │   ├── Actualizar (violeta claro #F3E8FF, texto #6B21A8, icono `assets/icons/refresh-cw.svg`, ancho normalizado al de Exportar)
+    │   ├── customerQueriesButton (QPushButton, etiqueta "Consultas", icono `assets/icons/brain.svg`, ancho normalizado al de Exportar)
     │   ├── espacio flexible
-    │   └── Ayuda (gris azulado #E2E8F0, texto #334155)
+    │   └── Ayuda (gris azulado #E2E8F0, texto #334155, icono `assets/icons/circle-question-mark.svg`, ancho normalizado al de Exportar)
     └── customersMainSplitter (QSplitter horizontal, fondo transparente, sin borde, tirador oculto)
         ├── customersLeftPanel (QWidget, fondo blanco #FFFFFF, borde #D7DEE8)
         │   └── layout vertical (QVBoxLayout, márgenes 14 px, separación 10 px)
