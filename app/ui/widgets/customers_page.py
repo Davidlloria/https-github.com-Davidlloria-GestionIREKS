@@ -565,6 +565,8 @@ class CustomersPage(QWidget):
         self.customer_tabs.addTab(self._build_sales_tab(), "Ventas")
         self.customer_tabs.addTab(self._build_recipes_tab(), "Recetas")
         self.customer_tabs.addTab(self._build_agenda_tab(), "Agenda")
+        self._customer_sales_tab_index = 1
+        self.customer_tabs.currentChanged.connect(self._handle_customer_tab_changed)
         self.customer_tabs.setTabIcon(0, QIcon(str(BASE_DIR / "assets" / "icons" / "contact.svg")))
         self.customer_tabs.setTabIcon(1, QIcon(str(BASE_DIR / "assets" / "icons" / "badge-euro.svg")))
         self.customer_tabs.setTabIcon(2, QIcon(str(BASE_DIR / "assets" / "icons" / "cooking-pot.svg")))
@@ -740,7 +742,7 @@ class CustomersPage(QWidget):
         self.related_sales_totals.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.related_sales_totals.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.related_sales_totals.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-        self.related_sales_totals.setShowGrid(False)
+        self.related_sales_totals.setShowGrid(True)
         self.related_sales_totals.verticalHeader().setVisible(False)
         self.related_sales_totals.horizontalHeader().setVisible(False)
         totals_header = self.related_sales_totals.horizontalHeader()
@@ -821,8 +823,8 @@ class CustomersPage(QWidget):
                 code_item = QTableWidgetItem(str(getattr(item, "codigo", "") or ""))
                 name_item = QTableWidgetItem(str(getattr(item, "nombre", "") or ""))
                 units_item = QTableWidgetItem(self._format_sales_number(units))
-                kg_item = QTableWidgetItem(self._format_sales_number(kg))
-                euros_item = QTableWidgetItem(self._format_sales_number(euros))
+                kg_item = QTableWidgetItem(self._format_sales_number(kg, suffix=" kg"))
+                euros_item = QTableWidgetItem(self._format_sales_number(euros, suffix=" €"))
 
                 code_item.setData(Qt.ItemDataRole.UserRole, str(getattr(item, "articulo_id", "") or ""))
                 units_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -841,8 +843,8 @@ class CustomersPage(QWidget):
             total_label = QTableWidgetItem("TOTALES")
             total_label.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             total_units_item = QTableWidgetItem(self._format_sales_number(total_units))
-            total_kg_item = QTableWidgetItem(self._format_sales_number(total_kg))
-            total_euros_item = QTableWidgetItem(self._format_sales_number(total_euros))
+            total_kg_item = QTableWidgetItem(self._format_sales_number(total_kg, suffix=" kg"))
+            total_euros_item = QTableWidgetItem(self._format_sales_number(total_euros, suffix=" €"))
             total_units_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             total_kg_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             total_euros_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -864,6 +866,11 @@ class CustomersPage(QWidget):
         self.related_sales_empty.setVisible(False)
         if self._related_sales_compare_btn is not None:
             self._related_sales_compare_btn.setEnabled(bool(cliente_id) and year > 0 and has_rows)
+        QTimer.singleShot(0, self._sync_related_sales_totals)
+
+    def _handle_customer_tab_changed(self, index: int) -> None:
+        if index == getattr(self, "_customer_sales_tab_index", -1):
+            QTimer.singleShot(0, self._sync_related_sales_totals)
 
     def _sync_related_sales_totals(self, *args) -> None:
         if not hasattr(self, "related_sales_table") or not hasattr(self, "related_sales_totals"):
@@ -876,9 +883,10 @@ class CustomersPage(QWidget):
             total_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
     @staticmethod
-    def _format_sales_number(value: float | int | None) -> str:
+    def _format_sales_number(value: float | int | None, suffix: str = "") -> str:
         number = float(value or 0.0)
-        return f"{number:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+        formatted = f"{number:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+        return f"{formatted}{suffix}"
 
     def _open_related_sales_comparison(self) -> None:
         selected = self._selected_row()
@@ -2896,7 +2904,7 @@ class CustomersPage(QWidget):
                 border: 1px solid #D8E3F2;
                 border-radius: 8px;
                 background: #EEF4FF;
-                gridline-color: transparent;
+                gridline-color: #D8E3F2;
             }
             QTableWidget#customerSalesTotals::item {
                 padding: 4px 8px;

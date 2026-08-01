@@ -74,13 +74,13 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                             │   ├── fila de acciones (QHBoxLayout)
                             │   │   ├── customerSalesYearFilter (QComboBox, selector de año)
                             │   │   └── customerSalesCompareButton (QPushButton "Comp.", se habilita si hay cliente, año y filas)
-                            │   ├── customerSalesTable (QTableWidget, 5 columnas ordenables, tableVariant="standard")
+                            │   ├── customerSalesTable (QTableWidget, 5 columnas ordenables, tableVariant="standard"; columna Kg con sufijo "kg"; columna € con sufijo "€")
                             │   │   ├── Referencia
                             │   │   ├── Descripción
                             │   │   ├── Unid.
                             │   │   ├── Kg
                             │   │   └── €
-                            │   ├── customerSalesTotals (QTableWidget, fila fija de totales, columnas sincronizadas con la tabla, columnas 1-2 unificadas visualmente, fondo pastel #EEF4FF, alto 34 px)
+                            │   ├── customerSalesTotals (QTableWidget, fila fija de totales, columnas sincronizadas con la tabla, columnas 1-2 unificadas visualmente, separadores verticales visibles, fondo pastel #EEF4FF, alto 34 px, Kg con sufijo "kg", € con sufijo "€", resincronización diferida al mostrar la pestaña)
                             │   ├── customerSalesEmpty (QLabel, permanece oculto; la tabla de ventas se muestra siempre)
                             │   └── QDialog comparativa de ventas
                             │       ├── cabecera con nombre del cliente
