@@ -738,21 +738,23 @@ class CustomersPage(QWidget):
         self.related_sales_totals.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.related_sales_totals.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.related_sales_totals.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.related_sales_totals.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.related_sales_totals.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.related_sales_totals.setShowGrid(False)
         self.related_sales_totals.verticalHeader().setVisible(False)
         self.related_sales_totals.horizontalHeader().setVisible(False)
         totals_header = self.related_sales_totals.horizontalHeader()
         totals_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        totals_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        totals_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         totals_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         totals_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         totals_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        self.related_sales_totals.setColumnWidth(0, 110)
-        self.related_sales_totals.setColumnWidth(2, 96)
-        self.related_sales_totals.setColumnWidth(3, 108)
-        self.related_sales_totals.setColumnWidth(4, 118)
-        self.related_sales_totals.verticalHeader().setDefaultSectionSize(34)
-        self.related_sales_totals.setFixedHeight(40)
+        self.related_sales_totals.verticalHeader().setDefaultSectionSize(30)
+        self.related_sales_totals.setFixedHeight(34)
         layout.addWidget(self.related_sales_totals)
+
+        sales_header.sectionResized.connect(self._sync_related_sales_totals)
+        self.related_sales_table.verticalScrollBar().rangeChanged.connect(self._sync_related_sales_totals)
 
         self.related_sales_empty = QLabel("No hay ventas asociadas a este cliente para el año seleccionado.")
         self.related_sales_empty.setObjectName("customerSalesEmpty")
@@ -836,18 +838,22 @@ class CustomersPage(QWidget):
                 self.related_sales_table.setItem(row_idx, 3, kg_item)
                 self.related_sales_table.setItem(row_idx, 4, euros_item)
 
-            self.related_sales_totals.setItem(0, 0, QTableWidgetItem(""))
             total_label = QTableWidgetItem("TOTALES")
+            total_label.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             total_units_item = QTableWidgetItem(self._format_sales_number(total_units))
             total_kg_item = QTableWidgetItem(self._format_sales_number(total_kg))
             total_euros_item = QTableWidgetItem(self._format_sales_number(total_euros))
             total_units_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             total_kg_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             total_euros_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            self.related_sales_totals.setItem(0, 1, total_label)
+            self.related_sales_totals.clearSpans()
+            self.related_sales_totals.setSpan(0, 0, 1, 2)
+            self.related_sales_totals.setItem(0, 0, total_label)
+            self.related_sales_totals.setItem(0, 1, QTableWidgetItem(""))
             self.related_sales_totals.setItem(0, 2, total_units_item)
             self.related_sales_totals.setItem(0, 3, total_kg_item)
             self.related_sales_totals.setItem(0, 4, total_euros_item)
+            self._sync_related_sales_totals()
         finally:
             self._loading_related_sales = False
             self.related_sales_table.setSortingEnabled(True)
@@ -858,6 +864,16 @@ class CustomersPage(QWidget):
         self.related_sales_empty.setVisible(False)
         if self._related_sales_compare_btn is not None:
             self._related_sales_compare_btn.setEnabled(bool(cliente_id) and year > 0 and has_rows)
+
+    def _sync_related_sales_totals(self, *args) -> None:
+        if not hasattr(self, "related_sales_table") or not hasattr(self, "related_sales_totals"):
+            return
+        for column in range(self.related_sales_table.columnCount()):
+            self.related_sales_totals.setColumnWidth(column, self.related_sales_table.columnWidth(column))
+
+        total_item = self.related_sales_totals.item(0, 0)
+        if total_item is not None:
+            total_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
     @staticmethod
     def _format_sales_number(value: float | int | None) -> str:
@@ -2875,6 +2891,22 @@ class CustomersPage(QWidget):
                 background: #F8FAFD;
                 border: 1px dashed #D6E0EE;
                 border-radius: 10px;
+            }
+            QTableWidget#customerSalesTotals {
+                border: 1px solid #D8E3F2;
+                border-radius: 8px;
+                background: #EEF4FF;
+                gridline-color: transparent;
+            }
+            QTableWidget#customerSalesTotals::item {
+                padding: 4px 8px;
+                background: #EEF4FF;
+                color: #1F2A44;
+                border: 0;
+            }
+            QTableWidget#customerSalesTotals::item:selected {
+                background: #EEF4FF;
+                color: #1F2A44;
             }
             QTableWidget#customerAgendaTable {
                 border: 1px solid #DCE4EF;
