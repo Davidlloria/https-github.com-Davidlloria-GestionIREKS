@@ -31,7 +31,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
         │       ├── fila de búsqueda
         │       │   ├── buscador "Buscar cliente..." (QLineEdit, blanco #FFFFFF, borde #D1D5DB, ancho 352 px)
         │       │   └── limpiar filtro (QPushButton rojo #EF4444, texto blanco, 30 × 30 px)
-        │       └── customersListTable (QTableWidget, blanco #FFFFFF, alterno #FAFBFF, selección #3A78CF, ancho 390 px)
+        │       └── customersListTable (QTableWidget, blanco #FFFFFF, alterno #FAFBFF, selección #3083FF, cabecera gris #D1D1D1 con esquina superior izquierda redondeada y separadores grises, ancho 390 px, tableVariant="standard")
         │           ├── Cod. (60 px)
         │           ├── Nombre (268 px)
         │           └── Isla (48 px)
@@ -58,9 +58,9 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                     │           ├── estado Activo / Inactivo
                     │           └── prospección Sí / No
                     └── crmCard (QWidget, fondo transparente, sin borde, radio 8 px, alto mínimo 300 px, expansión vertical)
-                        └── customerTabs (QTabWidget, panel blanco #FFFFFF; pestañas blanco #FFFFFF / gris #F8FAFC; activa azul #3B82F6, x=5, y=0, ancho=crmCard-10 px, alto=crmCard px)
+                        └── customerTabs (QTabWidget, panel verde #DCFCE7; pestañas blanco #FFFFFF / gris #F8FAFC; activa azul #3B82F6, x=5, y=5, ancho=crmCard-10 px, alto=crmCard-10 px)
                             ├── Contactos
-                            │   ├── relatedContactsPanel (QWidget)
+                            │   ├── relatedContactsPanel (QWidget, fondo verde #0BF75D)
                             │   ├── relatedContactsTable (QTableWidget, 5 columnas)
                             │   │   ├── Avatar
                             │   │   ├── Nombre
@@ -71,7 +71,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                             │   ├── menú contextual: alta / edición relacionada
                             │   └── relatedContactsEmpty (QLabel, estado vacío)
                             ├── Ventas
-                            │   ├── customerSalesPanel (QWidget)
+                            │   ├── customerSalesPanel (QWidget, fondo verde #0BF75D)
                             │   ├── fila de acciones (QHBoxLayout)
                             │   │   ├── customerSalesYearFilter (QComboBox, selector de año)
                             │   │   └── customerSalesCompareButton (QPushButton "Comp.", se habilita si hay cliente, año y filas)
@@ -107,6 +107,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                             │           │   └── exporta PDF mediante `ReportExportService.export_customer_sales_comparison_pdf(...)`
                             │           └── customerSalesComparisonCloseButton (QPushButton "Cerrar")
                             ├── Recetas
+                            │   ├── customerRecipesPanel (QWidget, fondo verde #0BF75D)
                             │   ├── relatedRecipesTable (QTableWidget, 3 columnas)
                             │   │   ├── Nº
                             │   │   ├── Receta
@@ -162,8 +163,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 - `CustomersPageRoot` tiene fondo gris `#EEF3F8`, sin borde y `WA_StyledBackground=True`; `customersMainSplitter` usa fondo transparente y sin borde; `customersDetailSplitter` usa fondo transparente y sin borde; `detailTopArea` usa fondo transparente y sin borde; `customersRightPanel` tiene fondo transparente y sin borde.
 - `customersLeftPanel` tiene fondo blanco `#FFFFFF`, borde gris `#D7DEE8` y radio de 8 px.
 - `detailLeftCard` y `detailRightCard` son blancas, con borde gris y radio de 8 px.
-- `crmCard` usa fondo transparente, sin borde y radio de 8 px.
-- `customerTabs`: x=5, y=0, ancho=crmCard-10, alto=crmCard (rellena `crmCard` completo, con márgenes laterales de 5 px y sin márgenes verticales).
+- `customerTabs`: x=5, y=5, ancho=crmCard-10, alto=crmCard-10, panel verde `#0BF75D` en las páginas internas (rellena `crmCard` con márgenes uniformes de 5 px).
 - La cinta superior usa botones compactos con colores por función e iconos.
 - Inputs y combos son blancos, con borde gris, radio de 8 px y foco azul.
 - La fila seleccionada de clientes usa fondo azul `#3A78CF` y texto blanco.

@@ -471,6 +471,7 @@ class CustomersPage(QWidget):
 
         self.table = QTableWidget(0, 3)
         self.table.setObjectName("customersListTable")
+        self.table.setProperty("tableVariant", "standard")
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -551,7 +552,7 @@ class CustomersPage(QWidget):
         tabs_panel.setMinimumHeight(300)
         tabs_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         tabs_layout = QVBoxLayout(tabs_panel)
-        tabs_layout.setContentsMargins(5, 0, 5, 0)
+        tabs_layout.setContentsMargins(5, 5, 5, 5)
         tabs_layout.setSpacing(8)
 
         self.customer_tabs = QTabWidget()
@@ -1064,6 +1065,7 @@ class CustomersPage(QWidget):
 
     def _build_recipes_tab(self) -> QWidget:
         panel = QWidget()
+        panel.setObjectName("customerRecipesPanel")
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(8)
@@ -2785,7 +2787,7 @@ class CustomersPage(QWidget):
             }
             QTabWidget#customerTabs::pane {
                 border: 0;
-                background: #FFFFFF;
+                background: transparente;
                 margin-top: 0px;
             }
             QTabWidget#customerTabs QTabBar {
@@ -2833,9 +2835,44 @@ class CustomersPage(QWidget):
                 border: none;
                 outline: 0;
             }
-            QTableWidget#customersListTable::item:selected {
-                background: #3A78CF;
+            QTableWidget[tableVariant="standard"] {
+                border: 1px solid #DCE4EF;
+                border-radius: 8px;
+                background: #FFFFFF;
+                alternate-background-color: #FAFBFF;
+                selection-background-color: #3083FF;
+                gridline-color: #EEF2F7;
+            }
+            QTableWidget[tableVariant="standard"]::item {
+                padding: 7px;
+            }
+            QTableWidget[tableVariant="standard"]::item:selected {
                 color: #FFFFFF;
+            }
+            QTableWidget[tableVariant="standard"]::item:focus {
+                border: none;
+                outline: 0;
+            }
+            QTableWidget[tableVariant="standard"] QHeaderView::section {
+                background: #D1D1D1;
+                color: #000000;
+                border: 0;
+                border-right: 1px solid #A3A3A3;
+                border-bottom: 1px solid #D1D1D1;
+                padding: 6px 8px;
+                border-radius: 0;
+            }
+            QTableWidget[tableVariant="standard"] QHeaderView::section:first {
+                border-top-left-radius: 8px;
+            }
+            QTableWidget[tableVariant="standard"] QHeaderView::section:last {
+                border-right: 0;
+            }
+            QWidget#relatedContactsPanel,
+            QWidget#customerSalesPanel,
+            QWidget#customerAgendaPanel,
+            QWidget#customerRecipesPanel {
+                background: #FFFFFF;
             }
             QTableWidget#relatedContactsTable {
                 border: 1px solid #DCE4EF;
