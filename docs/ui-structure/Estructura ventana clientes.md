@@ -74,7 +74,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                             │   ├── fila de acciones (QHBoxLayout)
                             │   │   ├── customerSalesYearFilter (QComboBox, selector de año)
                             │   │   └── customerSalesCompareButton (QPushButton "Comp.", se habilita si hay cliente, año y filas)
-                            │   ├── customerSalesTable (QTableWidget, 5 columnas ordenables)
+                            ?   ??? customerSalesTable (QTableWidget, 5 columnas ordenables, tableVariant="standard")
                             │   │   ├── Referencia
                             │   │   ├── Descripción
                             │   │   ├── Unid.

@@ -709,6 +709,7 @@ class CustomersPage(QWidget):
 
         self.related_sales_table = QTableWidget(0, 5)
         self.related_sales_table.setObjectName("customerSalesTable")
+        self.related_sales_table.setProperty("tableVariant", "standard")
         self.related_sales_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.related_sales_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.related_sales_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
