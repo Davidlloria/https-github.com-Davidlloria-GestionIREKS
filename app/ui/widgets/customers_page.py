@@ -1105,10 +1105,6 @@ class CustomersPage(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(8)
 
-        title = QLabel("Historial de actividades")
-        title.setObjectName("customerAgendaTitle")
-        layout.addWidget(title)
-
         filter_bar = QHBoxLayout()
         filter_bar.setContentsMargins(0, 0, 0, 0)
         filter_bar.setSpacing(10)
@@ -1204,13 +1200,6 @@ class CustomersPage(QWidget):
         self.agenda_table.customContextMenuRequested.connect(self._show_agenda_context_menu)
         layout.addWidget(self.agenda_table, 1)
 
-        self.agenda_empty = QLabel("No hay actividades registradas para este cliente.")
-        self.agenda_empty.setObjectName("customerAgendaEmpty")
-        self.agenda_empty.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
-        self.agenda_empty.setWordWrap(True)
-        self.agenda_empty.setVisible(False)
-        layout.addWidget(self.agenda_empty)
-
         if self._agenda_filter_type is not None:
             self._agenda_filter_type.currentIndexChanged.connect(self._refresh_agenda_view)
         if self._agenda_filter_state is not None:
@@ -1271,16 +1260,12 @@ class CustomersPage(QWidget):
         finally:
             self.agenda_table.blockSignals(False)
             self._loading_agenda = False
-        if hasattr(self, "agenda_empty"):
-            self.agenda_empty.setVisible(len(filtered_entries) == 0)
 
     def _refresh_agenda_view(self, *_args) -> None:
         selected = self._selected_row()
         if selected is None:
             if hasattr(self, "agenda_table"):
                 self.agenda_table.setRowCount(0)
-            if hasattr(self, "agenda_empty"):
-                self.agenda_empty.setVisible(True)
             return
         self._render_customer_agenda(str(getattr(selected, "cliente_id", "") or ""))
 
@@ -2907,12 +2892,6 @@ class CustomersPage(QWidget):
                 min-height: 16px;
                 font-weight: 600;
             }
-            QLabel#customerAgendaTitle {
-                color: #14213D;
-                font-size: 17px;
-                font-weight: 800;
-                padding: 0 2px 0 2px;
-            }
             QComboBox#customerAgendaFilter, QDateEdit#customerAgendaFilterDate {
                 min-height: 24px;
                 max-height: 24px;
@@ -3083,15 +3062,6 @@ class CustomersPage(QWidget):
             QCalendarWidget#customerAgendaPopupCalendar QAbstractSpinBox {
                 min-width: 66px;
                 max-width: 66px;
-            }
-            QLabel#customerAgendaEmpty {
-                color: #6E7E96;
-                font-size: 14px;
-                font-weight: 500;
-                padding: 18px 16px;
-                background: #F8FAFD;
-                border: 1px dashed #D6E0EE;
-                border-radius: 10px;
             }
             QHeaderView::section {
                 background: #F8FAFC;

@@ -115,7 +115,6 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                             │   ├── doble clic: abre la receta
                             │   └── relatedRecipesEmpty (QLabel, estado vacío)
                             └── Agenda
-                                ├── título "Historial de actividades"
                                 ├── fila de filtros
                                 │   ├── tipo
                                 │   ├── estado
@@ -131,7 +130,6 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                                 │   └── Seguimiento
                                 ├── doble clic: abre la actividad
                                 ├── menú contextual: Nueva / Editar / Eliminar
-                                └── customerAgendaEmpty (QLabel, estado vacío)
 ```
 
 ## Comportamiento actual
