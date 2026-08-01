@@ -641,6 +641,7 @@ class CustomersPage(QWidget):
 
         self.related_contacts_table = QTableWidget(0, 5)
         self.related_contacts_table.setObjectName("relatedContactsTable")
+        self.related_contacts_table.setProperty("tableVariant", "standard")
         self.related_contacts_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.related_contacts_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.related_contacts_table.setEditTriggers(
@@ -2873,29 +2874,6 @@ class CustomersPage(QWidget):
             QWidget#customerAgendaPanel,
             QWidget#customerRecipesPanel {
                 background: #FFFFFF;
-            }
-            QTableWidget#relatedContactsTable {
-                border: 1px solid #DCE4EF;
-                border-radius: 10px;
-                background: #FFFFFF;
-                gridline-color: #E8EDF5;
-            }
-            QTableWidget#relatedContactsTable::item {
-                padding: 8px 10px;
-            }
-            QTableWidget#relatedContactsTable::item:selected {
-                background: #3A78CF;
-                color: #FFFFFF;
-            }
-            QTableWidget#relatedContactsTable QHeaderView::section {
-                background: #F7F9FC;
-                color: #2F3E55;
-                border: 0;
-                border-right: 1px solid #E7ECF3;
-                border-bottom: 1px solid #DEE6F1;
-                padding: 6px 8px;
-                min-height: 30px;
-                font-weight: 600;
             }
             QLabel#relatedContactsEmpty {
                 color: #6E7E96;

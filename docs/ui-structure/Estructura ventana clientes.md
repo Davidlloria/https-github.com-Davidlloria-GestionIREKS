@@ -61,7 +61,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                         └── customerTabs (QTabWidget, panel verde #DCFCE7; pestañas blanco #FFFFFF / gris #F8FAFC; activa azul #3B82F6, x=5, y=5, ancho=crmCard-10 px, alto=crmCard-10 px)
                             ├── Contactos
                             │   ├── relatedContactsPanel (QWidget, fondo verde #0BF75D)
-                            │   ├── relatedContactsTable (QTableWidget, 5 columnas)
+                            │   ├── relatedContactsTable (QTableWidget, 5 columnas, tableVariant="standard")
                             │   │   ├── Avatar
                             │   │   ├── Nombre
                             │   │   ├── Cargo
