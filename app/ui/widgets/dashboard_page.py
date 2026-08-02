@@ -5,7 +5,7 @@ from html import escape
 from pathlib import Path
 
 from PySide6.QtCore import QDate, QEvent, QSize, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QIcon, QPageLayout, QPainter, QPixmap, QTextCharFormat, QTextDocument
+from PySide6.QtGui import QColor, QIcon, QPageLayout, QPainter, QPixmap, QTextCharFormat, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
@@ -31,8 +31,6 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSpacerItem,
     QStackedWidget,
-    QStyle,
-    QStyleOptionViewItem,
     QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
@@ -665,21 +663,6 @@ class DashboardSortableItem(QTableWidgetItem):
         return super().__lt__(other)
 
 
-class DashboardRowHoverDelegate(QStyledItemDelegate):
-    def __init__(self, table: QTableWidget, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._table = table
-
-    def paint(self, painter: QPainter, option, index) -> None:
-        hover = self._table.property('hoverRow')
-        hover_row = int(hover) if hover is not None else -1
-        if not option.state & QStyle.StateFlag.State_Selected and index.row() == hover_row:
-            option = QStyleOptionViewItem(option)
-            option.state &= ~QStyle.StateFlag.State_MouseOver
-            option.backgroundBrush = QBrush(QColor('#EFF6FF'))
-        super().paint(painter, option, index)
-
-
 class DashboardPage(QWidget):
     def __init__(
         self,
@@ -711,38 +694,9 @@ class DashboardPage(QWidget):
         self._build_ui()
         self.reload()
 
-    def eventFilter(self, watched, event) -> bool:
-        table = self._hover_table_for_viewport(watched)
-        if table is not None:
-            if event.type() == QEvent.Type.MouseMove:
-                index = table.indexAt(event.position().toPoint())
-                self._set_table_hover_row(table, index.row() if index.isValid() else -1)
-            elif event.type() == QEvent.Type.Leave:
-                self._set_table_hover_row(table, -1)
-        return super().eventFilter(watched, event)
-
-    def _hover_table_for_viewport(self, watched) -> QTableWidget | None:
-        for table_name in ('orders_recent_table', 'orders_pending_table'):
-            table = getattr(self, table_name, None)
-            if table is not None and watched is table.viewport():
-                return table
-        return None
-
-    def _set_table_hover_row(self, table: QTableWidget, row_index: int) -> None:
-        current = table.property('hoverRow')
-        current_row = int(current) if current is not None else -1
-        if current_row == row_index:
-            return
-        table.setProperty('hoverRow', row_index)
-        table.viewport().update()
-
-    def _configure_hover_select_table(self, table: QTableWidget) -> None:
+    def _configure_row_select_table(self, table: QTableWidget) -> None:
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        table.viewport().setMouseTracking(True)
-        table.viewport().installEventFilter(self)
-        table.setProperty('hoverRow', -1)
-        table.setItemDelegate(DashboardRowHoverDelegate(table, table))
 
     def _build_ui(self) -> None:
         root_layout = QHBoxLayout(self)
@@ -1167,7 +1121,7 @@ class DashboardPage(QWidget):
         self.orders_recent_table.setObjectName('dashboardOrdersRecentTable')
         self.orders_recent_table.setHorizontalHeaderLabels(['Pedido', 'Almacén', 'Sem', 'Fecha', 'Kg pedido', 'Kg recibido', 'Kg pend.'])
         self._configure_table(self.orders_recent_table)
-        self._configure_hover_select_table(self.orders_recent_table)
+        self._configure_row_select_table(self.orders_recent_table)
         self.orders_recent_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.orders_recent_table.customContextMenuRequested.connect(self._show_orders_recent_context_menu)
         recent_header = self.orders_recent_table.horizontalHeader()
@@ -1185,7 +1139,7 @@ class DashboardPage(QWidget):
         self.orders_pending_table.setObjectName('dashboardOrdersPendingTable')
         self.orders_pending_table.setHorizontalHeaderLabels(['Fecha', 'Pedido', 'Artículo', 'Kg pend.'])
         self._configure_table(self.orders_pending_table)
-        self._configure_hover_select_table(self.orders_pending_table)
+        self._configure_row_select_table(self.orders_pending_table)
         self.orders_pending_table.setSortingEnabled(True)
         pending_header = self.orders_pending_table.horizontalHeader()
         pending_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -1754,7 +1708,6 @@ class DashboardPage(QWidget):
         )
 
     def _populate_order_recent_table(self, rows: list[DashboardOrderRow]) -> None:
-        self._set_table_hover_row(self.orders_recent_table, -1)
         self.orders_recent_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
@@ -2334,9 +2287,6 @@ class DashboardPage(QWidget):
             }
             QTableWidget#dashboardOrdersRecentTable::item:selected, QTableWidget#dashboardOrdersPendingTable::item:selected {
                 background-color: #2F80ED; color: #FFFFFF;
-            }
-            QTableWidget#dashboardOrdersRecentTable::item:hover, QTableWidget#dashboardOrdersPendingTable::item:hover {
-                background-color: transparent;
             }
             QHeaderView::section {
                 background-color: #F8FAFC; color: #475569; padding: 7px; border: none;

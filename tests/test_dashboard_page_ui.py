@@ -584,7 +584,7 @@ def test_dashboard_page_can_switch_to_orders_mode() -> None:
     QApplication.processEvents()
 
 
-def test_dashboard_order_tables_hover_tracks_complete_row() -> None:
+def test_dashboard_order_tables_use_row_selection() -> None:
     _application()
     page = DashboardPage(
         customer_service=_StubCustomerService(),
@@ -594,17 +594,11 @@ def test_dashboard_order_tables_hover_tracks_complete_row() -> None:
     )
 
     page._set_dashboard_mode('pedidos')
-    page._set_table_hover_row(page.orders_recent_table, 0)
-    page._set_table_hover_row(page.orders_pending_table, 0)
+    page.orders_recent_table.selectRow(0)
+    page.orders_pending_table.selectRow(0)
 
-    assert page.orders_recent_table.property('hoverRow') == 0
-    assert page.orders_pending_table.property('hoverRow') == 0
-
-    page._set_table_hover_row(page.orders_recent_table, -1)
-    page._set_table_hover_row(page.orders_pending_table, -1)
-
-    assert page.orders_recent_table.property('hoverRow') == -1
-    assert page.orders_pending_table.property('hoverRow') == -1
+    assert page.orders_recent_table.selectionModel().selectedRows()[0].row() == 0
+    assert page.orders_pending_table.selectionModel().selectedRows()[0].row() == 0
 
     page.close()
     page.deleteLater()
