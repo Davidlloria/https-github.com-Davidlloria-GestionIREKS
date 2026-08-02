@@ -564,6 +564,8 @@ def test_dashboard_page_can_switch_to_orders_mode() -> None:
         )
     assert page.orders_pending_table.rowCount() == 2
     assert page.orders_pending_table.horizontalHeaderItem(2).text() == 'Artículo'
+    assert page.orders_pending_table.selectionBehavior() == QAbstractItemView.SelectionBehavior.SelectRows
+    assert page.orders_pending_table.selectionMode() == QAbstractItemView.SelectionMode.SingleSelection
     assert page.orders_pending_table.isSortingEnabled()
     assert page.orders_pending_table.item(0, 0).text() == '18/07/2026'
     assert page.orders_pending_table.item(1, 0).text() == '16/07/2026'
@@ -582,7 +584,7 @@ def test_dashboard_page_can_switch_to_orders_mode() -> None:
     QApplication.processEvents()
 
 
-def test_dashboard_recent_orders_hover_paints_complete_row() -> None:
+def test_dashboard_order_tables_hover_tracks_complete_row() -> None:
     _application()
     page = DashboardPage(
         customer_service=_StubCustomerService(),
@@ -593,12 +595,16 @@ def test_dashboard_recent_orders_hover_paints_complete_row() -> None:
 
     page._set_dashboard_mode('pedidos')
     page._set_table_hover_row(page.orders_recent_table, 0)
+    page._set_table_hover_row(page.orders_pending_table, 0)
 
     assert page.orders_recent_table.property('hoverRow') == 0
+    assert page.orders_pending_table.property('hoverRow') == 0
 
     page._set_table_hover_row(page.orders_recent_table, -1)
+    page._set_table_hover_row(page.orders_pending_table, -1)
 
     assert page.orders_recent_table.property('hoverRow') == -1
+    assert page.orders_pending_table.property('hoverRow') == -1
 
     page.close()
     page.deleteLater()

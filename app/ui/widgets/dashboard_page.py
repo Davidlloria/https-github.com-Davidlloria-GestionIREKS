@@ -712,13 +712,21 @@ class DashboardPage(QWidget):
         self.reload()
 
     def eventFilter(self, watched, event) -> bool:
-        if watched is getattr(getattr(self, 'orders_recent_table', None), 'viewport', lambda: None)():
+        table = self._hover_table_for_viewport(watched)
+        if table is not None:
             if event.type() == QEvent.Type.MouseMove:
-                index = self.orders_recent_table.indexAt(event.position().toPoint())
-                self._set_table_hover_row(self.orders_recent_table, index.row() if index.isValid() else -1)
+                index = table.indexAt(event.position().toPoint())
+                self._set_table_hover_row(table, index.row() if index.isValid() else -1)
             elif event.type() == QEvent.Type.Leave:
-                self._set_table_hover_row(self.orders_recent_table, -1)
+                self._set_table_hover_row(table, -1)
         return super().eventFilter(watched, event)
+
+    def _hover_table_for_viewport(self, watched) -> QTableWidget | None:
+        for table_name in ('orders_recent_table', 'orders_pending_table'):
+            table = getattr(self, table_name, None)
+            if table is not None and watched is table.viewport():
+                return table
+        return None
 
     def _set_table_hover_row(self, table: QTableWidget, row_index: int) -> None:
         current = table.property('hoverRow')
@@ -727,6 +735,14 @@ class DashboardPage(QWidget):
             return
         table.setProperty('hoverRow', row_index)
         table.viewport().update()
+
+    def _configure_hover_select_table(self, table: QTableWidget) -> None:
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.viewport().setMouseTracking(True)
+        table.viewport().installEventFilter(self)
+        table.setProperty('hoverRow', -1)
+        table.setItemDelegate(DashboardRowHoverDelegate(table, table))
 
     def _build_ui(self) -> None:
         root_layout = QHBoxLayout(self)
@@ -1151,14 +1167,9 @@ class DashboardPage(QWidget):
         self.orders_recent_table.setObjectName('dashboardOrdersRecentTable')
         self.orders_recent_table.setHorizontalHeaderLabels(['Pedido', 'Almacén', 'Sem', 'Fecha', 'Kg pedido', 'Kg recibido', 'Kg pend.'])
         self._configure_table(self.orders_recent_table)
-        self.orders_recent_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.orders_recent_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self._configure_hover_select_table(self.orders_recent_table)
         self.orders_recent_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.orders_recent_table.customContextMenuRequested.connect(self._show_orders_recent_context_menu)
-        self.orders_recent_table.viewport().setMouseTracking(True)
-        self.orders_recent_table.viewport().installEventFilter(self)
-        self.orders_recent_table.setProperty('hoverRow', -1)
-        self.orders_recent_table.setItemDelegate(DashboardRowHoverDelegate(self.orders_recent_table, self.orders_recent_table))
         recent_header = self.orders_recent_table.horizontalHeader()
         recent_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         recent_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -1174,6 +1185,7 @@ class DashboardPage(QWidget):
         self.orders_pending_table.setObjectName('dashboardOrdersPendingTable')
         self.orders_pending_table.setHorizontalHeaderLabels(['Fecha', 'Pedido', 'Artículo', 'Kg pend.'])
         self._configure_table(self.orders_pending_table)
+        self._configure_hover_select_table(self.orders_pending_table)
         self.orders_pending_table.setSortingEnabled(True)
         pending_header = self.orders_pending_table.horizontalHeader()
         pending_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -2317,11 +2329,14 @@ class DashboardPage(QWidget):
             QTableWidget#dashboardReactivationTable, QTableWidget#dashboardIslandTable, QTableWidget#dashboardOrdersRecentTable, QTableWidget#dashboardOrdersPendingTable, QTableWidget#dashboardOrdersWarehouseTable, QTableWidget#dashboardOrdersStateTable, QTableWidget#dashboardWarehouseRiskTable, QTableWidget#dashboardWarehouseStockTable, QTableWidget#dashboardWarehouseEntriesTable, QTableWidget#dashboardWarehouseOutputsTable, QTableWidget#dashboardSalesDropsTable, QTableWidget#dashboardSalesIslandsTable, QTableWidget#dashboardSalesTypesTable, QTableWidget#dashboardSalesZeroTable {
                 background-color: #FFFFFF; alternate-background-color: #F8FAFC; border: none; color: #334155;
             }
-            QTableWidget#dashboardOrdersRecentTable {
+            QTableWidget#dashboardOrdersRecentTable, QTableWidget#dashboardOrdersPendingTable {
                 selection-background-color: #2F80ED; selection-color: #FFFFFF;
             }
-            QTableWidget#dashboardOrdersRecentTable::item:selected {
+            QTableWidget#dashboardOrdersRecentTable::item:selected, QTableWidget#dashboardOrdersPendingTable::item:selected {
                 background-color: #2F80ED; color: #FFFFFF;
+            }
+            QTableWidget#dashboardOrdersRecentTable::item:hover, QTableWidget#dashboardOrdersPendingTable::item:hover {
+                background-color: transparent;
             }
             QHeaderView::section {
                 background-color: #F8FAFC; color: #475569; padding: 7px; border: none;
