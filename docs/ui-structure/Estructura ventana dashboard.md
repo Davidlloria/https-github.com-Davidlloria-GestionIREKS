@@ -280,14 +280,15 @@ Calendario mensual de Agenda
     ├── flechas nativas: cambio de mes
     ├── fecha actual: título Agenda de hoy
     ├── otra fecha: título Agenda del dd/mm/aaaa
-    ├── selección diaria: filtra por fecha efectiva `due_date`
+    ├── selección diaria: filtra siempre por `fecha_actividad`, con independencia del estado
+    ├── `fecha_seguimiento`: no desplaza la actividad en el calendario; queda reservada para dashboardReactivationPanel
     ├── número ISO de semana
     │   ├── clic detectado mediante filtro de eventos del viewport interno
     │   └── muestra todas las entradas de lunes a domingo
     ├── salida documental
     │   ├── fuente: todas las filas filtradas, incluidas las que están fuera del viewport
     │   ├── campos por evento
-    │   │   ├── fecha efectiva del evento
+    │   │   ├── fecha planificada del evento (`fecha_actividad`)
     │   │   ├── código · nombre del cliente
     │   │   ├── contenido: resumen y detalle disponibles
     │   │   └── estado traducido

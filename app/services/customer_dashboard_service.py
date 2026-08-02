@@ -29,7 +29,7 @@ class DashboardActivityRow:
 
     @property
     def due_date(self) -> date:
-        return self.fecha_seguimiento or self.fecha_actividad
+        return self.fecha_actividad
 
 
 @dataclass(slots=True)

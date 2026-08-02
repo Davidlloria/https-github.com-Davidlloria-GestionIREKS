@@ -316,7 +316,7 @@ def test_dashboard_page_selects_day_and_updates_title() -> None:
     QApplication.processEvents()
 
 
-def test_dashboard_page_uses_due_date_and_renders_activity_in_one_line() -> None:
+def test_dashboard_page_keeps_activity_on_its_planned_date_when_follow_up_exists() -> None:
     _application()
     service = _StubDashboardService()
     followed_up = DashboardActivityRow(
@@ -331,7 +331,7 @@ def test_dashboard_page_uses_due_date_and_renders_activity_in_one_line() -> None
         order_dashboard_service=_StubOrderDashboardService(), warehouse_dashboard_service=_StubWarehouseDashboardService(),
     )
 
-    page.set_selected_date(date(2026, 7, 23))
+    page.set_selected_date(date(2026, 7, 18))
 
     cards = page.findChildren(QFrame, 'dashboardActivityCard')
     assert len(cards) == 1
@@ -342,12 +342,13 @@ def test_dashboard_page_uses_due_date_and_renders_activity_in_one_line() -> None
     assert page.today_pdf_btn.isEnabled()
     assert page.today_print_btn.isEnabled()
     assert page._today_report_data() == (
-        'Agenda del 23/07/2026',
+        'Agenda del 18/07/2026',
         ['Fecha', 'Cliente', 'Contenido', 'Estado'],
-        [['23/07/2026', '586 · NPANADERIA', 'Concretar reunión', 'Hecha']],
+        [['18/07/2026', '586 · NPANADERIA', 'Concretar reunión', 'Hecha']],
     )
     assert '586 · NPANADERIA' in page._today_report_html()
-    assert page._agenda_day_tone(page._agenda_rows_for_date(date(2026, 7, 23)), today_value=date(2026, 7, 23)) == 'green'
+    assert page._agenda_day_tone(page._agenda_rows_for_date(date(2026, 7, 18)), today_value=date(2026, 7, 23)) == 'green'
+    assert page._agenda_rows_for_date(date(2026, 7, 23)) == []
 
     page.close()
     page.deleteLater()
