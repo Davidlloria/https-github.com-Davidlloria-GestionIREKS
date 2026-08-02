@@ -4,8 +4,9 @@ from datetime import date, timedelta
 from html import escape
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QEvent, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QPageLayout, QPainter, QPen, QPixmap, QTextCharFormat, QTextDocument
+from PySide6.QtCharts import QChart, QChartView, QPieSeries
+from PySide6.QtCore import QDate, QEvent, QMargins, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QIcon, QPageLayout, QPainter, QPixmap, QTextCharFormat, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
@@ -673,61 +674,79 @@ class DashboardDonutChart(QWidget):
         self._rows: list[DashboardTopArticleRow] = []
         self.setMinimumHeight(170)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+
+        self._series = QPieSeries()
+        self._series.setHoleSize(0.58)
+        self._series.setPieSize(0.82)
+        self._chart = QChart()
+        self._chart.addSeries(self._series)
+        self._chart.setBackgroundVisible(False)
+        self._chart.legend().hide()
+        self._chart.setMargins(QMargins(0, 0, 0, 0))
+
+        self._chart_view = QChartView(self._chart)
+        self._chart_view.setObjectName('dashboardOrdersTopArticlesChartView')
+        self._chart_view.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self._chart_view.setMinimumWidth(110)
+        self._chart_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        layout.addWidget(self._chart_view, 3)
+
+        self._legend_host = QWidget()
+        self._legend_host.setObjectName('dashboardOrdersTopArticlesLegend')
+        self._legend_layout = QVBoxLayout(self._legend_host)
+        self._legend_layout.setContentsMargins(0, 4, 0, 4)
+        self._legend_layout.setSpacing(4)
+        layout.addWidget(self._legend_host, 4)
 
     def set_rows(self, rows: list[DashboardTopArticleRow]) -> None:
         self._rows = list(rows[:5])
-        self.update()
-
-    def paintEvent(self, event) -> None:
-        super().paintEvent(event)
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        rect = self.rect().adjusted(8, 8, -8, -8)
+        self._series.clear()
+        self._clear_legend()
         total = sum(max(row.ordered_kg, 0.0) for row in self._rows)
         if total <= 1e-9:
-            painter.setPen(QColor('#64748B'))
-            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, 'Sin datos')
+            self._chart.setTitle('Sin datos')
             return
+        self._chart.setTitle(DashboardPage.format_kg(total))
+        self._chart.setTitleBrush(QColor('#0F172A'))
 
-        side = max(80, min(rect.height() - 6, rect.width() // 2 - 16))
-        donut_rect = QRectF(rect.left(), rect.top() + max(0, (rect.height() - side) // 2), side, side)
-        pen = QPen()
-        pen.setWidth(max(14, side // 7))
-        pen.setCapStyle(Qt.PenCapStyle.FlatCap)
-        start_angle = 90 * 16
         for index, row in enumerate(self._rows):
-            span = int(round(-360 * 16 * (max(row.ordered_kg, 0.0) / total)))
-            pen.setColor(QColor(self.COLORS[index % len(self.COLORS)]))
-            painter.setPen(pen)
-            painter.drawArc(donut_rect, start_angle, span)
-            start_angle += span
+            color = QColor(self.COLORS[index % len(self.COLORS)])
+            slice_item = self._series.append(row.article_name, max(row.ordered_kg, 0.0))
+            slice_item.setBrush(color)
+            slice_item.setPen(QColor('#FFFFFF'))
+            self._add_legend_row(color, row.article_name, DashboardPage.format_kg(row.ordered_kg))
 
-        painter.setPen(QColor('#0F172A'))
-        painter.drawText(donut_rect, Qt.AlignmentFlag.AlignCenter, f'{DashboardPage.format_kg(total)}')
+    def _clear_legend(self) -> None:
+        while self._legend_layout.count():
+            item = self._legend_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
 
-        legend_left = int(donut_rect.right()) + 18
-        legend_top = rect.top() + 6
-        line_height = 23
-        painter.setPen(QColor('#334155'))
-        for index, row in enumerate(self._rows):
-            y = legend_top + index * line_height
-            painter.setBrush(QColor(self.COLORS[index % len(self.COLORS)]))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(legend_left, y + 5, 10, 10, 3, 3)
-            painter.setPen(QColor('#334155'))
-            label_width = max(60, rect.right() - legend_left - 82)
-            painter.drawText(
-                QRectF(legend_left + 16, y, label_width, line_height),
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                row.article_name,
-            )
-            painter.setPen(QColor('#0F172A'))
-            painter.drawText(
-                QRectF(rect.right() - 66, y, 66, line_height),
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
-                DashboardPage.format_kg(row.ordered_kg),
-            )
-            painter.setPen(QColor('#334155'))
+    def _add_legend_row(self, color: QColor, label: str, value: str) -> None:
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(6)
+        swatch = QLabel()
+        swatch.setFixedSize(10, 10)
+        swatch.setStyleSheet(f'background-color: {color.name()}; border-radius: 3px;')
+        name = QLabel(label)
+        name.setObjectName('dashboardOrdersTopArticlesLegendName')
+        name.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        value_label = QLabel(value)
+        value_label.setObjectName('dashboardOrdersTopArticlesLegendValue')
+        value_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        row_layout.addWidget(swatch)
+        row_layout.addWidget(name, 1)
+        row_layout.addWidget(value_label)
+        self._legend_layout.addWidget(row)
+
+        if len(self._rows) == self._legend_layout.count():
+            self._legend_layout.addStretch(1)
 
 
 class DashboardPage(QWidget):
@@ -2360,6 +2379,12 @@ class DashboardPage(QWidget):
             }
             QTableWidget#dashboardOrdersRecentTable::item:selected, QTableWidget#dashboardOrdersPendingTable::item:selected {
                 background-color: #2F80ED; color: #FFFFFF;
+            }
+            QLabel#dashboardOrdersTopArticlesLegendName {
+                color: #334155; font-size: 11px;
+            }
+            QLabel#dashboardOrdersTopArticlesLegendValue {
+                color: #0F172A; font-size: 11px; font-weight: 700;
             }
             QHeaderView::section {
                 background-color: #F8FAFC; color: #475569; padding: 7px; border: none;
