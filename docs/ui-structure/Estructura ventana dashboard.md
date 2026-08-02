@@ -368,8 +368,9 @@ dashboardOrdersView
 │   │   └── dashboardOrdersTopArticlesDonut
 │   │       ├── gráfico donut con PySide6.QtCharts
 │   │       ├── fuente: 5 artículos con más kg pedidos del año
-│   │       ├── centro: total kg del top 5
-│   │       └── leyenda: nombre del artículo y kg pedidos
+│   │       ├── segmentos: porcentaje visible dentro de cada porción
+│   │       ├── centro: texto `Total` y total kg del top 5
+│   │       └── leyenda: color, nombre del artículo, kg pedidos y fila final `Total`
 │   ├── dashboardOrdersWarehousePanel
 │   │   └── dashboardOrdersWarehouseTable
 │   │       ├── Almacen

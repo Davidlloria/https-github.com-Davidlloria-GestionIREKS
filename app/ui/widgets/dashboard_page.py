@@ -4,9 +4,9 @@ from datetime import date, timedelta
 from html import escape
 from pathlib import Path
 
-from PySide6.QtCharts import QChart, QChartView, QPieSeries
+from PySide6.QtCharts import QChart, QChartView, QPieSeries, QPieSlice
 from PySide6.QtCore import QDate, QEvent, QMargins, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QPageLayout, QPainter, QPixmap, QTextCharFormat, QTextDocument
+from PySide6.QtGui import QColor, QFont, QIcon, QPageLayout, QPainter, QPixmap, QTextCharFormat, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
@@ -666,7 +666,7 @@ class DashboardSortableItem(QTableWidgetItem):
 
 
 class DashboardDonutChart(QWidget):
-    COLORS = ['#2563EB', '#16A34A', '#F97316', '#EF4444', '#8B5CF6']
+    COLORS = ['#2563EB', '#22A06B', '#F97316', '#EF4444', '#8B5CF6']
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -679,8 +679,8 @@ class DashboardDonutChart(QWidget):
         layout.setSpacing(10)
 
         self._series = QPieSeries()
-        self._series.setHoleSize(0.58)
-        self._series.setPieSize(0.82)
+        self._series.setHoleSize(0.50)
+        self._series.setPieSize(0.88)
         self._chart = QChart()
         self._chart.addSeries(self._series)
         self._chart.setBackgroundVisible(False)
@@ -694,11 +694,16 @@ class DashboardDonutChart(QWidget):
         self._chart_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self._chart_view, 3)
 
+        self._center_label = QLabel(self._chart_view)
+        self._center_label.setObjectName('dashboardOrdersTopArticlesCenter')
+        self._center_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._center_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
         self._legend_host = QWidget()
         self._legend_host.setObjectName('dashboardOrdersTopArticlesLegend')
         self._legend_layout = QVBoxLayout(self._legend_host)
-        self._legend_layout.setContentsMargins(0, 4, 0, 4)
-        self._legend_layout.setSpacing(4)
+        self._legend_layout.setContentsMargins(0, 2, 0, 2)
+        self._legend_layout.setSpacing(5)
         layout.addWidget(self._legend_host, 4)
 
     def set_rows(self, rows: list[DashboardTopArticleRow]) -> None:
@@ -707,17 +712,31 @@ class DashboardDonutChart(QWidget):
         self._clear_legend()
         total = sum(max(row.ordered_kg, 0.0) for row in self._rows)
         if total <= 1e-9:
-            self._chart.setTitle('Sin datos')
+            self._chart.setTitle('')
+            self._center_label.setText('Sin datos')
+            self._position_center_label()
             return
-        self._chart.setTitle(DashboardPage.format_kg(total))
-        self._chart.setTitleBrush(QColor('#0F172A'))
+        self._chart.setTitle('')
+        self._center_label.setText(f'Total\n{DashboardPage.format_kg(total)}')
 
+        label_font = QFont()
+        label_font.setPointSize(8)
+        label_font.setBold(True)
         for index, row in enumerate(self._rows):
             color = QColor(self.COLORS[index % len(self.COLORS)])
-            slice_item = self._series.append(row.article_name, max(row.ordered_kg, 0.0))
+            value = max(row.ordered_kg, 0.0)
+            slice_item = self._series.append(row.article_name, value)
             slice_item.setBrush(color)
             slice_item.setPen(QColor('#FFFFFF'))
+            slice_item.setLabel(f'{value / total:.0%}')
+            slice_item.setLabelVisible(value / total >= 0.04)
+            slice_item.setLabelPosition(QPieSlice.LabelPosition.LabelInsideHorizontal)
+            slice_item.setLabelColor(QColor('#FFFFFF'))
+            slice_item.setLabelFont(label_font)
             self._add_legend_row(color, row.article_name, DashboardPage.format_kg(row.ordered_kg))
+        self._add_total_legend_row(DashboardPage.format_kg(total))
+        self._legend_layout.addStretch(1)
+        self._position_center_label()
 
     def _clear_legend(self) -> None:
         while self._legend_layout.count():
@@ -740,13 +759,41 @@ class DashboardDonutChart(QWidget):
         value_label = QLabel(value)
         value_label.setObjectName('dashboardOrdersTopArticlesLegendValue')
         value_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        value_label.setMinimumWidth(64)
         row_layout.addWidget(swatch)
         row_layout.addWidget(name, 1)
         row_layout.addWidget(value_label)
         self._legend_layout.addWidget(row)
 
-        if len(self._rows) == self._legend_layout.count():
-            self._legend_layout.addStretch(1)
+    def _add_total_legend_row(self, value: str) -> None:
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(16, 4, 0, 0)
+        row_layout.setSpacing(6)
+        name = QLabel('Total')
+        name.setObjectName('dashboardOrdersTopArticlesLegendTotalName')
+        value_label = QLabel(value)
+        value_label.setObjectName('dashboardOrdersTopArticlesLegendTotalValue')
+        value_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        value_label.setMinimumWidth(64)
+        row_layout.addWidget(name, 1)
+        row_layout.addWidget(value_label)
+        self._legend_layout.addWidget(row)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._position_center_label()
+
+    def _position_center_label(self) -> None:
+        size = QSize(82, 48)
+        rect = self._chart_view.rect()
+        self._center_label.setGeometry(
+            max((rect.width() - size.width()) // 2, 0),
+            max((rect.height() - size.height()) // 2, 0),
+            size.width(),
+            size.height(),
+        )
+        self._center_label.raise_()
 
 
 class DashboardPage(QWidget):
@@ -2385,6 +2432,15 @@ class DashboardPage(QWidget):
             }
             QLabel#dashboardOrdersTopArticlesLegendValue {
                 color: #0F172A; font-size: 11px; font-weight: 700;
+            }
+            QLabel#dashboardOrdersTopArticlesCenter {
+                background: transparent; color: #0F172A; font-size: 11px; font-weight: 800;
+            }
+            QLabel#dashboardOrdersTopArticlesLegendTotalName {
+                color: #0F172A; font-size: 11px; font-weight: 800;
+            }
+            QLabel#dashboardOrdersTopArticlesLegendTotalValue {
+                color: #0F172A; font-size: 11px; font-weight: 800;
             }
             QHeaderView::section {
                 background-color: #F8FAFC; color: #475569; padding: 7px; border: none;
