@@ -4,6 +4,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QCalendarWidget, QDateEdit, QPushButton
 
 from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
@@ -101,8 +102,26 @@ def test_agenda_calendar_uses_unclipped_popup_configuration(monkeypatch) -> None
     assert calendar.objectName() == "customerAgendaPopupCalendar"
     assert calendar.minimumWidth() == 340
     assert calendar.minimumHeight() == 272
-    assert calendar.verticalHeaderFormat() == QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader
+    assert calendar.firstDayOfWeek() == Qt.DayOfWeek.Monday
+    assert calendar.isGridVisible()
+    assert calendar.horizontalHeaderFormat() == QCalendarWidget.HorizontalHeaderFormat.ShortDayNames
+    assert calendar.verticalHeaderFormat() == QCalendarWidget.VerticalHeaderFormat.ISOWeekNumbers
+    assert calendar.headerTextFormat().background().color().name() == "#5b8def"
+    assert calendar.weekdayTextFormat(Qt.DayOfWeek.Sunday).foreground().color().name() == "#d94c5c"
     assert "QCalendarWidget#customerAgendaPopupCalendar QAbstractItemView::item" in page.styleSheet()
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_agenda_type_options_include_demo(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    assert ("demo", "Demo") in page._agenda_type_options()
+    assert page._agenda_type_label("demo") == "Demo"
+
     page.close()
     page.deleteLater()
     QApplication.processEvents()

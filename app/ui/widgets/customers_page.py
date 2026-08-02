@@ -3,7 +3,7 @@ from datetime import date, datetime
 import unicodedata
 
 from PySide6.QtCore import QSize, QTimer, Qt
-from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap, QTextDocument
+from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap, QTextCharFormat, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
@@ -1866,6 +1866,7 @@ class CustomersPage(QWidget):
         icon_map = {
             "visita_realizada": "user-check.svg",
             "visita_prevista": "calendar-check.svg",
+            "demo": "calendar.svg",
             "llamada": "phone-call.svg",
             "seguimiento": "history.svg",
             "desarrollo_futuro": "lightbulb.svg",
@@ -1880,6 +1881,7 @@ class CustomersPage(QWidget):
         palette = {
             "visita_realizada": "#DCEBFF",
             "visita_prevista": "#EDE3FF",
+            "demo": "#E0F2FE",
             "llamada": "#DCF7EA",
             "seguimiento": "#DDF6F1",
             "desarrollo_futuro": "#FEF1D8",
@@ -1893,6 +1895,7 @@ class CustomersPage(QWidget):
         palette = {
             "visita_realizada": "#2563EB",
             "visita_prevista": "#7C3AED",
+            "demo": "#0369A1",
             "llamada": "#059669",
             "seguimiento": "#0F766E",
             "desarrollo_futuro": "#D97706",
@@ -2175,8 +2178,20 @@ class CustomersPage(QWidget):
         if calendar_widget is None:
             return
         calendar_widget.setMinimumSize(340, 272)
-        calendar_widget.setGridVisible(False)
-        calendar_widget.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+        calendar_widget.setFirstDayOfWeek(Qt.DayOfWeek.Monday)
+        calendar_widget.setGridVisible(True)
+        calendar_widget.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.ShortDayNames)
+        calendar_widget.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.ISOWeekNumbers)
+
+        header_format = QTextCharFormat()
+        header_format.setBackground(QColor("#5B8DEF"))
+        header_format.setForeground(QColor("#FFFFFF"))
+        calendar_widget.setHeaderTextFormat(header_format)
+
+        weekend_format = QTextCharFormat()
+        weekend_format.setForeground(QColor("#D94C5C"))
+        calendar_widget.setWeekdayTextFormat(Qt.DayOfWeek.Saturday, weekend_format)
+        calendar_widget.setWeekdayTextFormat(Qt.DayOfWeek.Sunday, weekend_format)
         calendar_widget.setObjectName("customerAgendaPopupCalendar")
 
     def _format_agenda_date(self, value: object, *, allow_blank: bool = False) -> str:
@@ -2197,6 +2212,7 @@ class CustomersPage(QWidget):
         return [
             ("visita_realizada", "Visita realizada"),
             ("visita_prevista", "Visita prevista"),
+            ("demo", "Demo"),
             ("llamada", "Llamada"),
             ("seguimiento", "Seguimiento"),
             ("desarrollo_futuro", "Desarrollo futuro"),
@@ -3570,7 +3586,7 @@ class CustomersPage(QWidget):
             QCalendarWidget#customerAgendaPopupCalendar QWidget#qt_calendar_navigationbar {
                 min-height: 30px;
                 max-height: 30px;
-                background: #FFFFFF;
+                background: #1769AA;
                 padding: 2px 6px;
             }
             QCalendarWidget QToolButton {
@@ -3588,7 +3604,21 @@ class CustomersPage(QWidget):
                 image: none;
             }
             QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_prevmonth,
-            QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_nextmonth,
+            QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_nextmonth {
+                min-width: 24px;
+                max-width: 24px;
+                min-height: 24px;
+                max-height: 24px;
+                padding: 0;
+                margin: 0 3px;
+                border: none;
+                border-radius: 12px;
+                background: #4D9B31;
+            }
+            QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_prevmonth:hover,
+            QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_nextmonth:hover {
+                background: #3F8128;
+            }
             QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_monthbutton,
             QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_yearbutton {
                 min-height: 24px;
@@ -3597,6 +3627,8 @@ class CustomersPage(QWidget):
                 margin: 0 3px;
                 border: none;
                 background: transparent;
+                color: #FFFFFF;
+                font-weight: 700;
                 font-size: 10px;
             }
             QCalendarWidget QComboBox {
@@ -3651,7 +3683,7 @@ class CustomersPage(QWidget):
             }
             QCalendarWidget#customerAgendaPopupCalendar QAbstractItemView::item {
                 padding: 0;
-                border: none;
+                border: 1px solid #D8DEE8;
             }
             QCalendarWidget#customerAgendaPopupCalendar QComboBox {
                 min-height: 22px;
