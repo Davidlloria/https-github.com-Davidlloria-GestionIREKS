@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -121,8 +122,18 @@ def test_customer_agenda_type_options_include_demo(monkeypatch) -> None:
     monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
     page = CustomersPage()
 
-    assert ("demo", "Demo") in page._agenda_type_options()
+    options = page._agenda_type_options()
+    assert ("visita", "Visita") in options
+    assert ("visita_realizada", "Visita realizada") not in options
+    assert ("visita_prevista", "Visita prevista") not in options
+    assert ("demo", "Demo") in options
+    assert page._agenda_type_label("visita_realizada") == "Visita"
+    assert page._agenda_type_label("visita_prevista") == "Visita"
     assert page._agenda_type_label("demo") == "Demo"
+
+    page._agenda_filter_type.setCurrentIndex(page._agenda_filter_type.findData("visita"))
+    assert page._agenda_matches_filters(SimpleNamespace(tipo="visita_realizada", estado="pendiente", fecha_actividad=None))
+    assert page._agenda_matches_filters(SimpleNamespace(tipo="visita_prevista", estado="hecho", fecha_actividad=None))
 
     page.close()
     page.deleteLater()

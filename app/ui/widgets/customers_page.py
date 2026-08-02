@@ -1872,7 +1872,7 @@ class CustomersPage(QWidget):
         if self._agenda_filter_to is not None:
             date_to = self._agenda_filter_to.date().toPython()
 
-        tipo = str(getattr(item, "tipo", "") or "").strip().lower()
+        tipo = self._normalize_agenda_type(getattr(item, "tipo", ""))
         estado = str(getattr(item, "estado", "") or "").strip().lower()
         actividad_fecha = self._agenda_entry_date(getattr(item, "fecha_actividad", None))
 
@@ -1904,10 +1904,9 @@ class CustomersPage(QWidget):
                 return None
 
     def _agenda_type_icon_path(self, value: str) -> Path:
-        normalized = str(value or "").strip().lower()
+        normalized = self._normalize_agenda_type(value)
         icon_map = {
-            "visita_realizada": "user-check.svg",
-            "visita_prevista": "calendar-check.svg",
+            "visita": "calendar-check.svg",
             "demo": "calendar.svg",
             "llamada": "phone-call.svg",
             "seguimiento": "history.svg",
@@ -1919,10 +1918,9 @@ class CustomersPage(QWidget):
         return BASE_DIR / "assets" / "icons" / icon_name
 
     def _agenda_type_color(self, value: str) -> str:
-        normalized = str(value or "").strip().lower()
+        normalized = self._normalize_agenda_type(value)
         palette = {
-            "visita_realizada": "#DCEBFF",
-            "visita_prevista": "#EDE3FF",
+            "visita": "#DCEBFF",
             "demo": "#E0F2FE",
             "llamada": "#DCF7EA",
             "seguimiento": "#DDF6F1",
@@ -1933,10 +1931,9 @@ class CustomersPage(QWidget):
         return palette.get(normalized, "#EEF2F7")
 
     def _agenda_type_accent_color(self, value: str) -> str:
-        normalized = str(value or "").strip().lower()
+        normalized = self._normalize_agenda_type(value)
         palette = {
-            "visita_realizada": "#2563EB",
-            "visita_prevista": "#7C3AED",
+            "visita": "#2563EB",
             "demo": "#0369A1",
             "llamada": "#059669",
             "seguimiento": "#0F766E",
@@ -2111,7 +2108,8 @@ class CustomersPage(QWidget):
             self._configure_agenda_calendar(calendar_edit)
 
         if activity is not None:
-            tipo_combo.setCurrentIndex(max(0, tipo_combo.findData(str(getattr(activity, "tipo", "") or "nota"))))
+            activity_type = self._normalize_agenda_type(getattr(activity, "tipo", "") or "nota")
+            tipo_combo.setCurrentIndex(max(0, tipo_combo.findData(activity_type)))
             estado_combo.setCurrentIndex(max(0, estado_combo.findData(str(getattr(activity, "estado", "") or "pendiente"))))
             resumen_edit.setText(str(getattr(activity, "resumen", "") or ""))
             detalle_edit.setPlainText(str(getattr(activity, "detalle", "") or ""))
@@ -2255,8 +2253,7 @@ class CustomersPage(QWidget):
 
     def _agenda_type_options(self) -> list[tuple[str, str]]:
         return [
-            ("visita_realizada", "Visita realizada"),
-            ("visita_prevista", "Visita prevista"),
+            ("visita", "Visita"),
             ("demo", "Demo"),
             ("llamada", "Llamada"),
             ("seguimiento", "Seguimiento"),
@@ -2275,7 +2272,15 @@ class CustomersPage(QWidget):
 
     def _agenda_type_label(self, value: str) -> str:
         options = dict(self._agenda_type_options())
-        return options.get(str(value or "").strip(), str(value or "").replace("_", " ").title())
+        normalized = self._normalize_agenda_type(value)
+        return options.get(normalized, normalized.replace("_", " ").title())
+
+    @staticmethod
+    def _normalize_agenda_type(value: object) -> str:
+        normalized = str(value or "").strip().lower()
+        if normalized in {"visita_realizada", "visita_prevista"}:
+            return "visita"
+        return normalized
 
     def _agenda_state_label(self, value: str) -> str:
         options = dict(self._agenda_state_options())
