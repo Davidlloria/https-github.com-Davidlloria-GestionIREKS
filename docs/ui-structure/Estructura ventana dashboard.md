@@ -185,12 +185,10 @@ dashboardAgendaView
 │   ├── dashboardUpcomingPanel
 │   │   ├── dashboardCalendarHeadingBlock
 │   │   │   └── dashboardPanelTitle: Agenda del mes
-│   │   ├── dashboardCalendarNavBlock
-│   │   │   ├── dashboardCalendarNavButton: <
-│   │   │   ├── dashboardMonthTitle
-│   │   │   └── dashboardCalendarNavButton: >
 │   │   ├── dashboardMonthCalendar
+│   │   │   └── navegación mensual nativa integrada
 │   │   └── dashboardCalendarSummaryChip
+│   │       ├── altura fija: 34 px
 │   │       ├── Pendientes
 │   │       ├── Hechas
 │   │       └── Vencidas
@@ -210,32 +208,44 @@ dashboardAgendaView
 ```text
 Calendario mensual de Agenda
 ├── dashboardUpcomingPanel
-│   ├── altura fija: 312 px
+│   ├── altura mínima: 312 px
+│   ├── tamaño horizontal: expandible
+│   ├── tamaño vertical: expandible
 │   └── ancho máximo explícito: no tiene
 ├── dashboardTodayPanel
 │   ├── altura mínima: 205 px
 │   └── proporción frente al calendario: 6 frente a 4
-├── Bloque centrado
-│   ├── cabecera: 276 px
-│   ├── navegación: 276 px
-│   └── calendario: 276 px
 ├── dashboardMonthCalendar
-│   ├── tamaño fijo: 276 x 196 px
+│   ├── tamaño mínimo: 320 x 220 px
+│   ├── política horizontal: Expanding
+│   ├── política vertical: Expanding
+│   ├── ocupa el espacio restante del dashboardUpcomingPanel
 │   ├── primer día: lunes
-│   ├── cabecera: una letra por día
+│   ├── cabecera: nombres cortos
 │   ├── columna ISO de semanas: visible
-│   ├── navegación nativa: oculta
-│   ├── cuadrícula nativa: oculta
+│   ├── navegación nativa: visible
+│   │   ├── barra azul
+│   │   ├── mes y año en blanco
+│   │   └── flechas circulares verdes
+│   ├── cuadrícula fina: visible
+│   ├── fines de semana: rojo
 │   └── edición directa: deshabilitada
-├── paintCell()
+├── DashboardCalendarDelegate
+│   ├── cabeceras de días: fondo azul
+│   ├── números de semana: fondo azul
 │   ├── azul: actividades pendientes
 │   ├── verde: existe alguna actividad completada
 │   ├── rojo: vencidas no completadas ni canceladas
 │   ├── gris: días fuera del mes
-│   ├── borde azul de 2 px: fecha seleccionada
+│   ├── fondo azul: fecha seleccionada
 │   └── negrita: día actual
+├── dashboardCalendarSummaryChip
+│   ├── altura fija: 34 px
+│   ├── márgenes internos: 10 / 3 / 10 / 3 px
+│   ├── reparto horizontal: tres partes iguales
+│   └── contenido conservado: título y valor
 └── Interacción
-    ├── botones < y >: cambio de mes
+    ├── flechas nativas: cambio de mes
     ├── fecha actual: título Agenda de hoy
     ├── otra fecha: título Agenda del dd/mm/aaaa
     └── tarjetas diarias

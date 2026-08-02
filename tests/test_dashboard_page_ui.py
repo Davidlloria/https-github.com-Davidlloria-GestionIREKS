@@ -5,7 +5,8 @@ from datetime import date, datetime
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QFrame, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QFrame, QSizePolicy, QWidget
 
 from app.services.customer_dashboard_service import (
     DashboardActivityRow,
@@ -32,7 +33,7 @@ from app.services.warehouse_dashboard_service import (
     WarehouseDashboardSnapshot,
 )
 import app.ui.widgets.dashboard_page as dashboard_page_module
-from app.ui.widgets.dashboard_page import DashboardPage
+from app.ui.widgets.dashboard_page import DashboardCalendarDelegate, DashboardPage
 
 _APP: QApplication | None = None
 
@@ -215,6 +216,22 @@ def test_dashboard_page_starts_in_agenda_mode() -> None:
     kpi_cards = page.findChildren(QFrame, 'dashboardKpiCard')
     assert len(kpi_cards) == 16
     assert all(card.minimumHeight() == 104 and card.maximumHeight() == 104 for card in kpi_cards)
+    calendar = page.agenda_month_calendar
+    assert page.findChild(QWidget, 'dashboardCalendarNavBlock') is None
+    assert calendar.isNavigationBarVisible()
+    assert calendar.isGridVisible()
+    assert calendar.firstDayOfWeek() == Qt.DayOfWeek.Monday
+    assert calendar.horizontalHeaderFormat() == QCalendarWidget.HorizontalHeaderFormat.ShortDayNames
+    assert calendar.verticalHeaderFormat() == QCalendarWidget.VerticalHeaderFormat.ISOWeekNumbers
+    assert calendar.minimumWidth() == 320
+    assert calendar.minimumHeight() == 220
+    assert calendar.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
+    assert calendar.sizePolicy().verticalPolicy() == QSizePolicy.Policy.Expanding
+    calendar_view = calendar.findChild(QAbstractItemView, 'qt_calendar_calendarview')
+    assert isinstance(calendar_view.itemDelegate(), DashboardCalendarDelegate)
+    summary_chips = page.findChildren(QFrame, 'dashboardCalendarSummaryChip')
+    assert len(summary_chips) == 3
+    assert all(chip.minimumHeight() == 34 and chip.maximumHeight() == 34 for chip in summary_chips)
     assert 'QFrame#dashboardHeader { background-color: transparent; border: none; }' in page.styleSheet()
     assert page.minimumSizeHint().width() <= 1180
 

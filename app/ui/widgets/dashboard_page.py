@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QRectF, QSize, Qt
-from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
+from PySide6.QtCore import QDate, QSize, Qt
+from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap, QTextCharFormat
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSpacerItem,
     QStackedWidget,
+    QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -329,82 +330,112 @@ class DashboardAgendaOverviewDialog(QDialog):
             self.refresh()
 
 
+class DashboardCalendarDelegate(QStyledItemDelegate):
+    def __init__(self, calendar: "DashboardMonthCalendar", page: "DashboardPage") -> None:
+        super().__init__(calendar)
+        self._calendar = calendar
+        self._page = page
+
+    def paint(self, painter: QPainter, option, index) -> None:
+        display = index.data(Qt.ItemDataRole.DisplayRole)
+        if display is None:
+            return
+
+        is_header = index.row() == 0 or index.column() == 0
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        if is_header:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor("#5B8DEF"))
+            painter.drawRoundedRect(option.rect.adjusted(2, 2, -2, -2), 4, 4)
+            header_color = QColor("#D94C5C") if index.row() == 0 and index.column() in {6, 7} else QColor("#FFFFFF")
+            font = option.font
+            font.setBold(True)
+            painter.setFont(font)
+            painter.setPen(header_color)
+            painter.drawText(option.rect, Qt.AlignmentFlag.AlignCenter, str(display))
+            painter.restore()
+            return
+
+        calendar_date = self._date_for_index(index.row(), index.column())
+        if not calendar_date.isValid():
+            painter.restore()
+            return
+        day_value = date(calendar_date.year(), calendar_date.month(), calendar_date.day())
+        rows_for_day = self._page._agenda_rows_for_date(day_value)
+        tone = self._page._agenda_day_tone(rows_for_day, today_value=date.today())
+        in_month = calendar_date.month() == self._calendar.monthShown() and calendar_date.year() == self._calendar.yearShown()
+        selected = calendar_date == self._calendar.selectedDate()
+        is_today = calendar_date == QDate.currentDate()
+        weekend = calendar_date.dayOfWeek() in {Qt.DayOfWeek.Saturday.value, Qt.DayOfWeek.Sunday.value}
+
+        background = QColor("#FFFFFF")
+        text_color = QColor("#D94C5C") if weekend else QColor("#0F172A")
+        if not in_month:
+            text_color = QColor("#A8B0BC")
+        elif tone == "blue":
+            background = QColor("#EFF6FF")
+            text_color = QColor("#1D4ED8")
+        elif tone == "green":
+            background = QColor("#F0FDF4")
+            text_color = QColor("#15803D")
+        elif tone == "red":
+            background = QColor("#FEF2F2")
+            text_color = QColor("#DC2626")
+
+        painter.fillRect(option.rect, QColor("#FFFFFF"))
+        if selected:
+            background = QColor("#5B8DEF")
+            text_color = QColor("#FFFFFF")
+        if selected or tone is not None:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(background)
+            painter.drawRoundedRect(option.rect.adjusted(3, 2, -3, -2), 4, 4)
+
+        font = option.font
+        font.setBold(is_today)
+        painter.setFont(font)
+        painter.setPen(text_color)
+        painter.drawText(option.rect, Qt.AlignmentFlag.AlignCenter, str(calendar_date.day()))
+        painter.restore()
+
+    def _date_for_index(self, row: int, column: int) -> QDate:
+        if row <= 0 or column <= 0:
+            return QDate()
+        month_start = QDate(self._calendar.yearShown(), self._calendar.monthShown(), 1)
+        first_day = self._calendar.firstDayOfWeek().value
+        offset = (month_start.dayOfWeek() - first_day) % 7
+        first_visible = month_start.addDays(-offset)
+        return first_visible.addDays(((row - 1) * 7) + (column - 1))
+
+
 class DashboardMonthCalendar(QCalendarWidget):
     def __init__(self, page: 'DashboardPage', parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._page = page
         self.setObjectName('dashboardMonthCalendar')
         self.setFirstDayOfWeek(Qt.DayOfWeek.Monday)
-        self.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.SingleLetterDayNames)
+        self.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.ShortDayNames)
         self.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.ISOWeekNumbers)
-        self.setNavigationBarVisible(False)
-        self.setGridVisible(False)
+        self.setNavigationBarVisible(True)
+        self.setGridVisible(True)
         self.setDateEditEnabled(False)
-        self.setFixedSize(276, 196)
+        self.setMinimumSize(320, 220)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-    def paintCell(self, painter: QPainter, rect, calendar_date: QDate) -> None:  # type: ignore[override]
-        day_value = date(calendar_date.year(), calendar_date.month(), calendar_date.day())
-        rows_for_day = self._page._agenda_rows_for_date(day_value)
-        today_value = date.today()
-        tone = self._page._agenda_day_tone(rows_for_day, today_value=today_value)
-        in_month = calendar_date.month() == self.monthShown() and calendar_date.year() == self.yearShown()
-        selected = calendar_date == self.selectedDate()
-        is_today = calendar_date == QDate.currentDate()
+        header_format = QTextCharFormat()
+        header_format.setBackground(QColor("#5B8DEF"))
+        header_format.setForeground(QColor("#FFFFFF"))
+        self.setHeaderTextFormat(header_format)
+        weekend_format = QTextCharFormat()
+        weekend_format.setForeground(QColor("#D94C5C"))
+        self.setWeekdayTextFormat(Qt.DayOfWeek.Saturday, weekend_format)
+        self.setWeekdayTextFormat(Qt.DayOfWeek.Sunday, weekend_format)
 
-        side = max(18, min(rect.width(), rect.height()) - 4)
-        cell_rect = QRectF(
-            rect.center().x() - (side / 2),
-            rect.center().y() - (side / 2),
-            side,
-            side,
-        )
-
-        background = QColor('#FFFFFF')
-        border = QColor('#E2E8F1')
-        text_color = QColor('#0F172A')
-        if not in_month:
-            background = QColor('#F8FAFC')
-            border = QColor('#EDF2F7')
-            text_color = QColor('#94A3B8')
-        elif tone == 'blue':
-            background = QColor('#EFF6FF')
-            border = QColor('#BFDBFE')
-            text_color = QColor('#1D4ED8')
-        elif tone == 'green':
-            background = QColor('#F0FDF4')
-            border = QColor('#BBF7D0')
-            text_color = QColor('#15803D')
-        elif tone == 'red':
-            background = QColor('#FEF2F2')
-            border = QColor('#FECACA')
-            text_color = QColor('#DC2626')
-        elif tone == 'muted':
-            background = QColor('#F8FAFC')
-            border = QColor('#CBD5E1')
-            text_color = QColor('#64748B')
-
-        if selected:
-            border = QColor('#2563EB')
-        border_width = 2 if selected else 1
-
-        painter.save()
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(Qt.GlobalColor.transparent)
-        painter.drawRect(rect)
-        painter.setBrush(background)
-        pen = painter.pen()
-        pen.setColor(border)
-        pen.setWidth(border_width)
-        painter.setPen(pen)
-        painter.drawRoundedRect(cell_rect, 8, 8)
-        font = painter.font()
-        font.setPointSize(9)
-        font.setBold(is_today)
-        painter.setFont(font)
-        painter.setPen(text_color)
-        painter.drawText(cell_rect, int(Qt.AlignmentFlag.AlignCenter), str(calendar_date.day()))
-        painter.restore()
+        calendar_view = self.findChild(QAbstractItemView, "qt_calendar_calendarview")
+        if calendar_view is not None:
+            self._delegate = DashboardCalendarDelegate(self, page)
+            calendar_view.setItemDelegate(self._delegate)
 
 
 class DashboardPage(QWidget):
@@ -717,12 +748,11 @@ class DashboardPage(QWidget):
         panel = QFrame()
         panel.setObjectName('dashboardUpcomingPanel')
         panel.setProperty('dashboardPanel', True)
-        panel.setFixedHeight(312)
+        panel.setMinimumHeight(312)
+        panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(8)
-
-        calendar_block_width = 276
 
         heading_row = QWidget()
         heading_row.setObjectName('dashboardCalendarHeadingBlock')
@@ -730,7 +760,6 @@ class DashboardPage(QWidget):
         heading_row.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         heading_row.setAutoFillBackground(False)
         heading_row.setStyleSheet('background: transparent; border: none;')
-        heading_row.setFixedWidth(calendar_block_width)
         heading_row_layout = QHBoxLayout(heading_row)
         heading_row_layout.setContentsMargins(0, 0, 0, 0)
         heading_row_layout.setSpacing(0)
@@ -738,39 +767,12 @@ class DashboardPage(QWidget):
         heading.setObjectName('dashboardPanelTitle')
         heading_row_layout.addWidget(heading, 0, Qt.AlignmentFlag.AlignLeft)
         heading_row_layout.addStretch(1)
-        layout.addWidget(heading_row, 0, Qt.AlignmentFlag.AlignHCenter)
-
-        nav_row_host = QWidget()
-        nav_row_host.setObjectName('dashboardCalendarNavBlock')
-        nav_row_host.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        nav_row_host.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        nav_row_host.setAutoFillBackground(False)
-        nav_row_host.setStyleSheet('background: transparent; border: none;')
-        nav_row_host.setFixedWidth(calendar_block_width)
-        nav_row = QHBoxLayout(nav_row_host)
-        nav_row.setContentsMargins(0, 0, 0, 0)
-        nav_row.setSpacing(8)
-        self.agenda_prev_month_btn = QPushButton('<')
-        self.agenda_prev_month_btn.setObjectName('dashboardCalendarNavButton')
-        self.agenda_prev_month_btn.clicked.connect(lambda: self._shift_agenda_calendar_month(-1))
-        nav_row.addWidget(self.agenda_prev_month_btn, 0)
-
-        self.agenda_month_label = QLabel('')
-        self.agenda_month_label.setObjectName('dashboardMonthTitle')
-        self.agenda_month_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        nav_row.addWidget(self.agenda_month_label, 1)
-
-        self.agenda_next_month_btn = QPushButton('>')
-        self.agenda_next_month_btn.setObjectName('dashboardCalendarNavButton')
-        self.agenda_next_month_btn.clicked.connect(lambda: self._shift_agenda_calendar_month(1))
-        nav_row.addWidget(self.agenda_next_month_btn, 0)
-        layout.addWidget(nav_row_host, 0, Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(heading_row, 0)
 
         self.agenda_month_calendar = DashboardMonthCalendar(self, panel)
         self.agenda_month_calendar.selectionChanged.connect(self._handle_agenda_calendar_selection_changed)
         self.agenda_month_calendar.currentPageChanged.connect(self._handle_agenda_calendar_page_changed)
-        layout.addWidget(self.agenda_month_calendar, 0, Qt.AlignmentFlag.AlignHCenter)
-        layout.addSpacing(6)
+        layout.addWidget(self.agenda_month_calendar, 1)
 
         summary_row = QHBoxLayout()
         summary_row.setContentsMargins(0, 0, 0, 0)
@@ -778,9 +780,9 @@ class DashboardPage(QWidget):
         self.pending_summary = self._build_summary_chip('Pendientes', 'blue')
         self.done_summary = self._build_summary_chip('Hechas', 'green')
         self.overdue_summary = self._build_summary_chip('Vencidas', 'red')
-        summary_row.addWidget(self.pending_summary[0])
-        summary_row.addWidget(self.done_summary[0])
-        summary_row.addWidget(self.overdue_summary[0])
+        summary_row.addWidget(self.pending_summary[0], 1)
+        summary_row.addWidget(self.done_summary[0], 1)
+        summary_row.addWidget(self.overdue_summary[0], 1)
         layout.addLayout(summary_row)
         return panel
 
@@ -788,11 +790,13 @@ class DashboardPage(QWidget):
         frame = QFrame()
         frame.setObjectName('dashboardCalendarSummaryChip')
         frame.setProperty('tone', tone)
+        frame.setFixedHeight(34)
         inner = QHBoxLayout(frame)
-        inner.setContentsMargins(10, 8, 10, 8)
+        inner.setContentsMargins(10, 3, 10, 3)
         inner.setSpacing(8)
         title_label = QLabel(title)
         title_label.setObjectName('dashboardCalendarSummaryTitle')
+        title_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         value_label = QLabel('0')
         value_label.setObjectName('dashboardCalendarSummaryValue')
         inner.addWidget(title_label)
@@ -1162,7 +1166,6 @@ class DashboardPage(QWidget):
     def _reload_agenda_calendar_panel(self, rows: list[DashboardActivityRow], *, today_value: date) -> None:
         self.agenda_calendar_rows = list(rows)
         month_start = self.agenda_calendar_month.replace(day=1)
-        self.agenda_month_label.setText(self._month_caption(month_start))
         self.agenda_month_calendar.blockSignals(True)
         self.agenda_month_calendar.setCurrentPage(month_start.year, month_start.month)
         if self.agenda_calendar_selected_date.year == month_start.year and self.agenda_calendar_selected_date.month == month_start.month:
@@ -1202,14 +1205,7 @@ class DashboardPage(QWidget):
 
     def _handle_agenda_calendar_page_changed(self, year: int, month: int) -> None:
         self.agenda_calendar_month = date(year, month, 1)
-        self.agenda_month_label.setText(self._month_caption(self.agenda_calendar_month))
         self._refresh_agenda_calendar(today_value=date.today())
-
-    def _shift_agenda_calendar_month(self, offset: int) -> None:
-        if offset < 0:
-            self.agenda_month_calendar.showPreviousMonth()
-        elif offset > 0:
-            self.agenda_month_calendar.showNextMonth()
 
     def set_selected_date(self, selected_day: date) -> None:
         self.agenda_calendar_selected_date = selected_day
@@ -1725,45 +1721,73 @@ class DashboardPage(QWidget):
             QLabel#dashboardActivityCustomer { color: #0F172A; font-size: 14px; font-weight: 700; }
             QLabel#dashboardActivitySummary { color: #1E293B; font-size: 13px; }
             QFrame#dashboardActivityCard { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
-            QWidget#dashboardCalendarHeadingBlock, QWidget#dashboardCalendarNavBlock { background-color: transparent; border: none; }
-            QLabel#dashboardMonthTitle {
-                color: #0F172A; font-size: 16px; font-weight: 700;
-            }
-            QPushButton#dashboardCalendarNavButton {
-                min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px;
-                border: 1px solid #D7E3F4; border-radius: 10px; background-color: #FFFFFF;
-                color: #2563EB; font-size: 16px; font-weight: 700;
-            }
-            QPushButton#dashboardCalendarNavButton:hover { background-color: #EFF6FF; }
+            QWidget#dashboardCalendarHeadingBlock { background-color: transparent; border: none; }
             QCalendarWidget#dashboardMonthCalendar {
-                background: transparent;
-                border: none;
+                background: #FFFFFF;
+                border: 1px solid #DCE4EF;
+                border-radius: 10px;
             }
             QCalendarWidget#dashboardMonthCalendar QWidget#qt_calendar_navigationbar {
-                height: 0px;
-                min-height: 0px;
-                max-height: 0px;
+                min-height: 26px;
+                max-height: 26px;
+                border: none;
+                background: #1769AA;
+                padding: 1px 5px;
+            }
+            QCalendarWidget#dashboardMonthCalendar QToolButton {
+                min-height: 20px;
+                max-height: 20px;
+                padding: 0;
+                margin: 0;
                 border: none;
                 background: transparent;
+                icon-size: 12px;
+            }
+            QCalendarWidget#dashboardMonthCalendar QToolButton::menu-indicator {
+                image: none;
+            }
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_prevmonth,
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_nextmonth {
+                min-width: 20px;
+                max-width: 20px;
+                border-radius: 10px;
+                background: #4D9B31;
+            }
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_prevmonth:hover,
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_nextmonth:hover {
+                background: #3F8128;
+            }
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_monthbutton,
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_yearbutton {
+                min-width: 72px;
+                max-width: 72px;
+                color: #FFFFFF;
+                font-size: 11px;
+                font-weight: 700;
+            }
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_yearbutton {
+                min-width: 48px;
+                max-width: 48px;
+            }
+            QCalendarWidget#dashboardMonthCalendar QAbstractSpinBox {
+                min-width: 64px;
+                max-width: 64px;
+                min-height: 20px;
+                max-height: 20px;
+                border: 1px solid #CBD5E1;
+                border-radius: 5px;
+                background: #FFFFFF;
+                color: #334155;
             }
             QCalendarWidget#dashboardMonthCalendar QTableView {
-                background: transparent;
+                background: #FFFFFF;
+                gridline-color: #D8DEE8;
                 outline: 0;
                 selection-background-color: transparent;
-                alternate-background-color: transparent;
-            }
-            QCalendarWidget#dashboardMonthCalendar QHeaderView::section {
-                background: transparent;
-                color: #475569;
-                border: none;
-                font-size: 10px;
-                font-weight: 700;
-                padding: 0px;
-                margin: 0px;
             }
             QCalendarWidget#dashboardMonthCalendar QAbstractItemView:enabled {
                 color: #0F172A;
-                font-size: 10px;
+                font-size: 11px;
                 selection-background-color: transparent;
                 selection-color: #0F172A;
             }
