@@ -14,7 +14,7 @@ Dashboard
 │   ├── DashboardAgendaDialog
 │   │   └── Alta y edición de actividades
 │   ├── DashboardAgendaPdfPreviewDialog
-│   │   └── Vista previa, guardado y cancelación del PDF de la selección de Agenda
+│   │   └── Vista completa de entradas, guardado y cancelación del PDF de Agenda
 │   └── DashboardAgendaOverviewDialog
 │       └── Listado completo de la agenda
 └── Servicios
@@ -285,10 +285,10 @@ Calendario mensual de Agenda
     │   ├── fuente: todas las filas filtradas, incluidas las que están fuera del viewport
     │   ├── columnas: Cliente / Resumen / Estado
     │   ├── PDF
-    │   │   ├── generación temporal mediante ReportExportService
-    │   │   ├── DashboardAgendaPdfPreviewDialog multipágina y ajustado al ancho
-    │   │   ├── Guardar: copia el documento a `exports/agenda_dashboard` o a la ruta elegida
-    │   │   └── Cancelar: cierra la vista previa y elimina el temporal
+    │   │   ├── DashboardAgendaPdfPreviewDialog con la lista completa de entradas
+    │   │   ├── tabla previa: Cliente / Resumen / Estado
+    │   │   ├── Guardar: genera el PDF mediante ReportExportService en la ruta elegida
+    │   │   └── Cancelar: cierra la vista previa sin generar archivos
     │   ├── impresión: QTextDocument y QPrintDialog
     │   └── acciones deshabilitadas cuando la selección está vacía
     └── tarjetas diarias o semanales en una sola línea

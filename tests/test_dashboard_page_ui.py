@@ -33,7 +33,6 @@ from app.services.order_dashboard_service import (
     DashboardOrdersWarehouseRow,
     OrderDashboardSnapshot,
 )
-from app.services.report_export_service import ReportExportService
 from app.services.sales_dashboard_service import (
     DashboardSalesCustomerRow,
     DashboardSalesIslandRow,
@@ -421,44 +420,39 @@ def test_dashboard_page_exports_the_visible_agenda_selection_to_pdf(monkeypatch)
 
 def test_dashboard_agenda_pdf_preview_can_save_or_cancel(monkeypatch) -> None:
     _application()
-
-    class _PreviewReportService:
-        def default_path(self, title: str, suffix: str, folder: str = '') -> Path:
-            assert (title, suffix, folder) == ('Agenda del 21/07/2026', 'pdf', 'agenda_dashboard')
-            return Path('agenda_guardada.pdf')
-
-        def export_pdf(self, path, title: str, headers: list[str], rows: list[list[str]]) -> Path:
-            return ReportExportService().export_pdf(path, title, headers, rows)
-
+    report_service = _StubReportExportService()
     dialog = dashboard_page_module.DashboardAgendaPdfPreviewDialog(
-        report_export_service=_PreviewReportService(),
+        report_export_service=report_service,
         title='Agenda del 21/07/2026',
         headers=['Cliente', 'Resumen', 'Estado'],
         rows=[['101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
     )
-    copied: dict[str, Path] = {}
     monkeypatch.setattr(
         dashboard_page_module.QFileDialog,
         'getSaveFileName',
         lambda *_args, **_kwargs: ('agenda_guardada.pdf', 'PDF (*.pdf)'),
     )
-    monkeypatch.setattr(
-        dashboard_page_module,
-        'copyfile',
-        lambda source, target: copied.update(source=Path(source), target=Path(target)),
-    )
     monkeypatch.setattr(dashboard_page_module.QMessageBox, 'information', lambda *_args, **_kwargs: None)
 
-    assert dialog.pdf_document.pageCount() == 1
+    assert dialog.entries_table.rowCount() == 1
+    assert dialog.entries_table.columnCount() == 3
+    assert dialog.entries_table.item(0, 0).text() == '101 · Panaderia Norte'
+    assert dialog.entries_table.item(0, 1).text() == 'Revision comercial'
+    assert dialog.entries_table.item(0, 2).text() == 'Pendiente'
     assert dialog.save_btn.text() == 'Guardar'
     assert dialog.cancel_btn.text() == 'Cancelar'
     dialog.save_btn.click()
 
-    assert copied['source'].name == 'agenda_preview.pdf'
-    assert copied['target'] == Path('agenda_guardada.pdf')
+    assert report_service.default_calls == [('Agenda del 21/07/2026', 'pdf', 'agenda_dashboard')]
+    assert report_service.export_calls == [(
+        'agenda_guardada.pdf',
+        'Agenda del 21/07/2026',
+        ['Cliente', 'Resumen', 'Estado'],
+        [['101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
+    )]
 
     cancel_dialog = dashboard_page_module.DashboardAgendaPdfPreviewDialog(
-        report_export_service=_PreviewReportService(),
+        report_export_service=_StubReportExportService(),
         title='Agenda del 21/07/2026',
         headers=['Cliente', 'Resumen', 'Estado'],
         rows=[['101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],

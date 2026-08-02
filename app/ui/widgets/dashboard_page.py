@@ -3,13 +3,9 @@ from __future__ import annotations
 from datetime import date, timedelta
 from html import escape
 from pathlib import Path
-from shutil import copyfile
-from tempfile import TemporaryDirectory
 
 from PySide6.QtCore import QDate, QEvent, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPageLayout, QPainter, QPixmap, QTextCharFormat, QTextDocument
-from PySide6.QtPdf import QPdfDocument
-from PySide6.QtPdfWidgets import QPdfView
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
@@ -86,34 +82,41 @@ class DashboardAgendaPdfPreviewDialog(QDialog):
         super().__init__(parent)
         self.report_export_service = report_export_service
         self.report_title = title
-        self._temp_dir = TemporaryDirectory(prefix='gestion_ireks_agenda_', ignore_cleanup_errors=True)
-        self._preview_path = Path(self._temp_dir.name) / 'agenda_preview.pdf'
-        try:
-            self.report_export_service.export_pdf(self._preview_path, title, headers, rows)
-        except Exception:
-            self._temp_dir.cleanup()
-            raise
+        self.report_headers = list(headers)
+        self.report_rows = [list(row) for row in rows]
 
         self.setObjectName('dashboardAgendaPdfPreviewDialog')
-        self.setWindowTitle(f'Vista previa PDF · {title}')
+        self.setWindowTitle(f'Vista previa de entradas · {title}')
         self.setModal(True)
-        self.resize(920, 720)
+        self.resize(920, 620)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(12)
 
-        self.pdf_view = QPdfView(self)
-        self.pdf_view.setObjectName('dashboardAgendaPdfPreviewView')
-        self.pdf_document = QPdfDocument(self.pdf_view)
-        self.pdf_view.setDocument(self.pdf_document)
-        self.pdf_view.setPageMode(QPdfView.PageMode.MultiPage)
-        self.pdf_view.setZoomMode(QPdfView.ZoomMode.FitToWidth)
-        load_error = self.pdf_document.load(str(self._preview_path))
-        if load_error != QPdfDocument.Error.None_:
-            self.pdf_document.close()
-            self._temp_dir.cleanup()
-            raise RuntimeError('No se pudo cargar la vista previa del PDF.')
-        layout.addWidget(self.pdf_view, 1)
+        heading = QLabel(title)
+        heading.setObjectName('dashboardAgendaPdfPreviewTitle')
+        layout.addWidget(heading)
+        summary = QLabel(f'{len(self.report_rows)} entrada(s) se guardarán en el documento PDF.')
+        summary.setObjectName('dashboardAgendaPdfPreviewSummary')
+        layout.addWidget(summary)
+
+        self.entries_table = QTableWidget(len(self.report_rows), len(self.report_headers), self)
+        self.entries_table.setObjectName('dashboardAgendaPdfPreviewTable')
+        self.entries_table.setHorizontalHeaderLabels(self.report_headers)
+        self.entries_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.entries_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.entries_table.setAlternatingRowColors(True)
+        self.entries_table.setWordWrap(False)
+        self.entries_table.verticalHeader().setVisible(False)
+        self.entries_table.verticalHeader().setDefaultSectionSize(34)
+        for row_index, row in enumerate(self.report_rows):
+            for column_index, value in enumerate(row):
+                self.entries_table.setItem(row_index, column_index, QTableWidgetItem(str(value)))
+        table_header = self.entries_table.horizontalHeader()
+        table_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        table_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        table_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        layout.addWidget(self.entries_table, 1)
 
         buttons = QDialogButtonBox(self)
         buttons.setObjectName('dashboardAgendaPdfPreviewButtons')
@@ -126,7 +129,13 @@ class DashboardAgendaPdfPreviewDialog(QDialog):
         layout.addWidget(buttons)
         self.setStyleSheet(
             'QDialog#dashboardAgendaPdfPreviewDialog { background: #F8FAFC; }'
-            'QPdfView#dashboardAgendaPdfPreviewView { background: #E2E8F0; border: 1px solid #CBD5E1; }'
+            'QLabel#dashboardAgendaPdfPreviewTitle { color: #0F172A; font-size: 18px; font-weight: 700; }'
+            'QLabel#dashboardAgendaPdfPreviewSummary { color: #475569; font-size: 13px; }'
+            'QTableWidget#dashboardAgendaPdfPreviewTable {'
+            ' background: #FFFFFF; alternate-background-color: #F8FAFC; color: #0F172A;'
+            ' border: 1px solid #CBD5E1; gridline-color: #E2E8F0; }'
+            'QTableWidget#dashboardAgendaPdfPreviewTable QHeaderView::section {'
+            ' background: #3A78CF; color: white; border: none; padding: 7px; font-weight: 700; }'
             'QPushButton#dashboardAgendaPdfSaveButton {'
             ' background: #16A34A; color: white; border: none; border-radius: 8px;'
             ' min-width: 96px; padding: 8px 14px; font-weight: 700; }'
@@ -145,19 +154,17 @@ class DashboardAgendaPdfPreviewDialog(QDialog):
         if not path:
             return
         try:
-            output = Path(path)
-            output.parent.mkdir(parents=True, exist_ok=True)
-            copyfile(self._preview_path, output)
+            output = self.report_export_service.export_pdf(
+                path,
+                self.report_title,
+                self.report_headers,
+                self.report_rows,
+            )
         except Exception as exc:
             QMessageBox.warning(self, 'Agenda', f'No se pudo guardar el PDF.\n\n{exc}')
             return
         QMessageBox.information(self, 'Agenda', f'PDF guardado correctamente.\n\n{output}')
         self.accept()
-
-    def done(self, result: int) -> None:
-        self.pdf_document.close()
-        self._temp_dir.cleanup()
-        super().done(result)
 
 
 class DashboardAgendaDialog(QDialog):
