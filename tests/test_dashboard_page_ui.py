@@ -6,7 +6,7 @@ from datetime import date, datetime
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QFrame, QSizePolicy, QWidget
+from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QFrame, QLabel, QSizePolicy, QWidget
 
 from app.services.customer_dashboard_service import (
     DashboardActivityRow,
@@ -237,6 +237,10 @@ def test_dashboard_page_starts_in_agenda_mode() -> None:
     summary_chips = page.findChildren(QFrame, 'dashboardCalendarSummaryChip')
     assert len(summary_chips) == 3
     assert all(chip.minimumHeight() == 34 and chip.maximumHeight() == 34 for chip in summary_chips)
+    summary_titles = page.findChildren(QLabel, 'dashboardCalendarSummaryTitle')
+    assert [label.text() for label in summary_titles] == ['Pendientes', 'Hechas', 'Vencidas']
+    assert all(label.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Minimum for label in summary_titles)
+    assert all(label.minimumSizeHint().width() > 0 for label in summary_titles)
     style_sheet = page.styleSheet()
     assert 'QFrame#dashboardHeader { background-color: transparent; border: none; }' in style_sheet
     assert 'QLabel#dashboardCalendarSummaryTitle { color: #000000;' in style_sheet

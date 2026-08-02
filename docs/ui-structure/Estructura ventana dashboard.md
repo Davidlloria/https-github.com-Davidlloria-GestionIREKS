@@ -252,7 +252,9 @@ Calendario mensual de Agenda
 │   ├── márgenes internos: 10 / 3 / 10 / 3 px
 │   ├── reparto horizontal: tres partes iguales
 │   ├── texto del título: negro
+│   ├── ancho del título: política Minimum para impedir que colapse
 │   ├── texto del valor: negro
+│   ├── ancho del valor: política Fixed
 │   └── contenido conservado: título y valor
 └── Interacción
     ├── flechas nativas: cambio de mes
