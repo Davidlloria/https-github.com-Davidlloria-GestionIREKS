@@ -30,6 +30,7 @@ from app.services.customer_dashboard_service import (
 )
 from app.services.order_dashboard_service import (
     DashboardOrderRow,
+    DashboardPendingArticleRow,
     DashboardOrdersStateRow,
     DashboardOrdersWarehouseRow,
     OrderDashboardSnapshot,
@@ -154,10 +155,9 @@ class _StubOrderDashboardService:
                 )
             ],
             pending_orders=[
-                DashboardOrderRow(
-                    pedido_id='ped-2', almacen_id='alm-2', almacen_nombre='Cliente Centro', pedido_fecha=date(2026, 7, 18),
-                    pedido_numero='P-002', semana=29, ordered_kg=850.0, received_kg=0.0, pending_kg=850.0, incident_kg=0.0,
-                    status='pendiente', last_receipt=None,
+                DashboardPendingArticleRow(
+                    pedido_id='ped-2', pedido_fecha=date(2026, 7, 18), pedido_numero='P-002',
+                    articulo_id='art-1', articulo_label='1001 · Harina Mix', pending_kg=850.0,
                 )
             ],
             warehouse_rows=[DashboardOrdersWarehouseRow(almacen_id='alm-2', almacen_nombre='Cliente Centro', open_orders=3, pending_kg=1250.0, last_receipt=date(2026, 7, 21))],
@@ -559,6 +559,11 @@ def test_dashboard_page_can_switch_to_orders_mode() -> None:
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
     assert page.orders_pending_table.rowCount() == 1
+    assert page.orders_pending_table.horizontalHeaderItem(2).text() == 'Artículo'
+    assert page.orders_pending_table.item(0, 2).text() == '1001 · Harina Mix'
+    assert page.orders_pending_table.item(0, 3).textAlignment() == (
+        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+    )
     assert page.orders_warehouse_table.rowCount() == 1
     assert page.orders_state_table.rowCount() == 1
     assert page.orders_kpi_labels['pending_kg'].text() == '1.875,50'

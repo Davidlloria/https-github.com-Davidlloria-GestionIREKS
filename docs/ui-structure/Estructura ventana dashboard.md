@@ -354,12 +354,12 @@ dashboardOrdersView
 │   │       ├── Kg recibido: alineado a la derecha
 │   │       ├── Kg pend.: alineado a la derecha
 │   │       └── interacción: hover y selección por fila completa, clic derecho `Ver pedido`
-│   └── dashboardOrdersPendingPanel
+│   └── dashboardOrdersPendingPanel: Artículos pendientes
 │       └── dashboardOrdersPendingTable
 │           ├── Fecha
 │           ├── Pedido
-│           ├── Almacen
-│           └── Kg pend.
+│           ├── Artículo
+│           └── Kg pend.: alineado a la izquierda
 ├── fila inferior (5:3)
 │   ├── dashboardOrdersWarehousePanel
 │   │   └── dashboardOrdersWarehouseTable

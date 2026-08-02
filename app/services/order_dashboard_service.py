@@ -38,6 +38,16 @@ class DashboardOrdersWarehouseRow:
 
 
 @dataclass
+class DashboardPendingArticleRow:
+    pedido_id: str
+    pedido_fecha: date
+    pedido_numero: str
+    articulo_id: str
+    articulo_label: str
+    pending_kg: float
+
+
+@dataclass
 class DashboardOrdersStateRow:
     status: str
     count: int
@@ -52,7 +62,7 @@ class OrderDashboardSnapshot:
     pending_kg: float
     incident_orders: int
     recent_orders: list[DashboardOrderRow]
-    pending_orders: list[DashboardOrderRow]
+    pending_orders: list[DashboardPendingArticleRow]
     warehouse_rows: list[DashboardOrdersWarehouseRow]
     state_rows: list[DashboardOrdersStateRow]
     generated_at: datetime
@@ -118,12 +128,21 @@ class OrderDashboardService:
             str(getattr(row, "articulo_id", "") or "").strip(): float(getattr(row, "articulo_envase_peso_total", 0.0) or 0.0)
             for row in articles
         }
+        article_labels = {
+            str(getattr(row, "articulo_id", "") or "").strip(): self._article_display_label(row)
+            for row in articles
+        }
         warehouse_names = self._build_warehouse_name_map(clients, distributors)
+        pedidos_by_id = {
+            str(getattr(row, "pedido_id", "") or "").strip(): row
+            for row in pedidos
+        }
         ordered_by_id = self.order_query_service.pedido_totals_kg(pedido_ids)
         received_by_id: dict[str, float] = defaultdict(float)
         pending_by_id: dict[str, float] = defaultdict(float)
         incident_by_id: dict[str, float] = defaultdict(float)
         last_receipt_by_id: dict[str, date] = {}
+        pending_article_rows: list[DashboardPendingArticleRow] = []
 
         for row in albaran_items:
             pedido_id = str(getattr(row, "pedido_id", "") or "").strip()
@@ -142,7 +161,20 @@ class OrderDashboardService:
             estado = str(getattr(row, "estado", "") or "").strip().lower()
             weight = weights.get(articulo_id, 0.0)
             if qty_pending > 1e-9 and estado != "exceso":
-                pending_by_id[pedido_id] += qty_pending * weight
+                pending_kg = qty_pending * weight
+                pending_by_id[pedido_id] += pending_kg
+                pedido = pedidos_by_id.get(pedido_id)
+                if pedido is not None and pending_kg > 1e-9:
+                    pending_article_rows.append(
+                        DashboardPendingArticleRow(
+                            pedido_id=pedido_id,
+                            pedido_fecha=self.order_query_service.parse_date(getattr(pedido, "pedido_fecha", None)),
+                            pedido_numero=str(getattr(pedido, "pedido_numero", "") or "").strip() or "S/N",
+                            articulo_id=articulo_id,
+                            articulo_label=article_labels.get(articulo_id, articulo_id or "S/N"),
+                            pending_kg=pending_kg,
+                        )
+                    )
             if estado == "exceso" or qty_pending < -1e-9:
                 incident_by_id[pedido_id] += abs(qty_pending) * weight if weight > 0 else abs(qty_pending)
 
@@ -183,8 +215,8 @@ class OrderDashboardService:
 
         recent_orders = sorted(rows, key=lambda row: (row.pedido_fecha, row.pedido_numero, row.pedido_id), reverse=True)[:8]
         pending_orders = sorted(
-            [row for row in rows if row.pending_kg > 1e-9 or row.status == "incidencia"],
-            key=lambda row: (-row.pending_kg, row.pedido_fecha, row.pedido_numero),
+            pending_article_rows,
+            key=lambda row: (-row.pending_kg, row.pedido_fecha, row.pedido_numero, row.articulo_label.casefold()),
         )[:8]
 
         warehouse_buckets: dict[str, DashboardOrdersWarehouseRow] = {}
@@ -241,6 +273,16 @@ class OrderDashboardService:
             state_rows=state_rows,
             generated_at=datetime.now(),
         )
+
+    @staticmethod
+    def _article_display_label(row: IngredienteIreks) -> str:
+        ref = str(getattr(row, "articulo_referencia_corta", "") or "").strip()
+        if not ref:
+            ref = str(getattr(row, "articulo_referencia", "") or "").strip()
+        name = str(getattr(row, "articulo_descripcion", "") or "").strip()
+        if ref and name:
+            return f"{ref} · {name}"
+        return ref or name or str(getattr(row, "articulo_id", "") or "").strip()
 
     @staticmethod
     def _warehouse_display_name(primary: str, secondary: str, fallback: str) -> str:

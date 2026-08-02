@@ -49,6 +49,7 @@ from app.services.customer_dashboard_service import (
 from app.services.customer_service import CustomerService
 from app.services.order_dashboard_service import (
     DashboardOrderRow,
+    DashboardPendingArticleRow,
     DashboardOrdersStateRow,
     DashboardOrdersWarehouseRow,
     OrderDashboardService,
@@ -687,7 +688,9 @@ class DashboardPage(QWidget):
         if watched is getattr(getattr(self, 'orders_recent_table', None), 'viewport', lambda: None)():
             if event.type() == QEvent.Type.MouseMove:
                 index = self.orders_recent_table.indexAt(event.position().toPoint())
-                self._set_orders_recent_hover_row(index.row() if index.isValid() else -1)
+                if index.isValid():
+                    self.orders_recent_table.selectRow(index.row())
+                self._set_orders_recent_hover_row(-1)
             elif event.type() == QEvent.Type.Leave:
                 self._set_orders_recent_hover_row(-1)
         return super().eventFilter(watched, event)
@@ -1149,10 +1152,10 @@ class DashboardPage(QWidget):
         recent_panel.layout().addWidget(self.orders_recent_table)
         upper_row.addWidget(recent_panel, 6)
 
-        pending_panel = self._build_table_panel('Más pendiente', 'dashboardOrdersPendingPanel')
+        pending_panel = self._build_table_panel('Artículos pendientes', 'dashboardOrdersPendingPanel')
         self.orders_pending_table = QTableWidget(0, 4)
         self.orders_pending_table.setObjectName('dashboardOrdersPendingTable')
-        self.orders_pending_table.setHorizontalHeaderLabels(['Fecha', 'Pedido', 'Almacén', 'Kg pend.'])
+        self.orders_pending_table.setHorizontalHeaderLabels(['Fecha', 'Pedido', 'Artículo', 'Kg pend.'])
         self._configure_table(self.orders_pending_table)
         pending_header = self.orders_pending_table.horizontalHeader()
         pending_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -1741,17 +1744,20 @@ class DashboardPage(QWidget):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.orders_recent_table.setItem(idx, col, item)
 
-    def _populate_order_pending_table(self, rows: list[DashboardOrderRow]) -> None:
+    def _populate_order_pending_table(self, rows: list[DashboardPendingArticleRow]) -> None:
         self.orders_pending_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
                 self.format_date(row.pedido_fecha),
                 row.pedido_numero,
-                row.almacen_nombre or row.almacen_id,
+                row.articulo_label,
                 self._format_number_es(row.pending_kg, suffix=' kg'),
             ]
             for col, value in enumerate(values):
-                self.orders_pending_table.setItem(idx, col, QTableWidgetItem(value))
+                item = QTableWidgetItem(value)
+                if col == 3:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                self.orders_pending_table.setItem(idx, col, item)
 
     def _populate_order_warehouse_table(self, rows: list[DashboardOrdersWarehouseRow]) -> None:
         self.orders_warehouse_table.setRowCount(len(rows))
