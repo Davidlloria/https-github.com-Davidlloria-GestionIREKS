@@ -176,7 +176,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 - La comparativa de ventas abre un QDialog propio desde la pestaña Ventas.
 - El gráfico de comparativa usa `CustomerSalesComparisonChartDialog`.
 - El PDF de comparativa usa `ReportExportService`.
-- Agenda: diálogo modal para crear o editar actividad con tipo (incluido `Demo`), fecha, estado, resumen, detalle y seguimiento. Los selectores de fecha muestran un calendario emergente con semana iniciada en lunes, números de semana, cuadrícula y fines de semana destacados.
+- Agenda: diálogo modal para crear o editar actividad con tipo (incluido `Demo`), fecha, estado, resumen, detalle y seguimiento. Los selectores de fecha muestran un calendario emergente compacto, con semana iniciada en lunes, cabeceras y números de semana sobre fondo azul, cuadrícula fina y fines de semana destacados en rojo.
 - Ayuda: diálogo explicativo de la ventana Clientes.
 
 ## Relación con backend / datos

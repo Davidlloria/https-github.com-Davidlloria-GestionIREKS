@@ -261,6 +261,48 @@ class AgendaIconDelegate(QStyledItemDelegate):
         return QSize(50, 32)
 
 
+class AgendaCalendarDelegate(QStyledItemDelegate):
+    """Paint calendar headers and dates without losing Qt's text formats to QSS."""
+
+    def paint(self, painter: QPainter, option, index) -> None:
+        display = index.data(Qt.ItemDataRole.DisplayRole)
+        if display is None:
+            return
+
+        is_header = index.row() == 0 or index.column() == 0
+        is_selected = bool(option.state & QStyle.StateFlag.State_Selected) and not is_header
+        background = index.data(Qt.ItemDataRole.BackgroundRole)
+        foreground = index.data(Qt.ItemDataRole.ForegroundRole)
+        if hasattr(background, "color"):
+            background = background.color()
+        if hasattr(foreground, "color"):
+            foreground = foreground.color()
+        if not isinstance(background, QColor) or not background.isValid():
+            background = QColor("#FFFFFF")
+        if not isinstance(foreground, QColor) or not foreground.isValid():
+            foreground = QColor("#0F172A")
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(Qt.PenStyle.NoPen)
+        if is_header:
+            painter.setBrush(background)
+            painter.drawRoundedRect(option.rect.adjusted(2, 2, -2, -2), 4, 4)
+        elif is_selected:
+            painter.setBrush(QColor("#5B8DEF"))
+            painter.drawRoundedRect(option.rect.adjusted(3, 2, -3, -2), 4, 4)
+            foreground = QColor("#FFFFFF")
+        else:
+            painter.fillRect(option.rect, background)
+
+        font = option.font
+        font.setBold(is_header)
+        painter.setFont(font)
+        painter.setPen(foreground)
+        painter.drawText(option.rect, Qt.AlignmentFlag.AlignCenter, str(display))
+        painter.restore()
+
+
 class CustomerEditorDialog(QDialog):
     _SECTOR_OPTIONS = [
         ("PANADERIA", "sectorChipPillPanaderia"),
@@ -2193,6 +2235,9 @@ class CustomersPage(QWidget):
         calendar_widget.setWeekdayTextFormat(Qt.DayOfWeek.Saturday, weekend_format)
         calendar_widget.setWeekdayTextFormat(Qt.DayOfWeek.Sunday, weekend_format)
         calendar_widget.setObjectName("customerAgendaPopupCalendar")
+        calendar_view = calendar_widget.findChild(QAbstractItemView, "qt_calendar_calendarview")
+        if calendar_view is not None:
+            calendar_view.setItemDelegate(AgendaCalendarDelegate(calendar_view))
 
     def _format_agenda_date(self, value: object, *, allow_blank: bool = False) -> str:
         text = str(value or "").strip()
@@ -3584,10 +3629,10 @@ class CustomersPage(QWidget):
                 color: #0F172A;
             }
             QCalendarWidget#customerAgendaPopupCalendar QWidget#qt_calendar_navigationbar {
-                min-height: 30px;
-                max-height: 30px;
+                min-height: 26px;
+                max-height: 26px;
                 background: #1769AA;
-                padding: 2px 6px;
+                padding: 1px 5px;
             }
             QCalendarWidget QToolButton {
                 min-width: 20px;
@@ -3605,14 +3650,14 @@ class CustomersPage(QWidget):
             }
             QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_prevmonth,
             QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_nextmonth {
-                min-width: 24px;
-                max-width: 24px;
-                min-height: 24px;
-                max-height: 24px;
+                min-width: 20px;
+                max-width: 20px;
+                min-height: 20px;
+                max-height: 20px;
                 padding: 0;
-                margin: 0 3px;
+                margin: 0 2px;
                 border: none;
-                border-radius: 12px;
+                border-radius: 10px;
                 background: #4D9B31;
             }
             QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_prevmonth:hover,
@@ -3623,8 +3668,8 @@ class CustomersPage(QWidget):
             QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_yearbutton {
                 min-height: 24px;
                 max-height: 24px;
-                padding: 0 8px;
-                margin: 0 3px;
+                padding: 0 3px;
+                margin: 0;
                 border: none;
                 background: transparent;
                 color: #FFFFFF;
@@ -3678,12 +3723,13 @@ class CustomersPage(QWidget):
                 image: url("__AGENDA_ARROW_ICON__");
             }
             QCalendarWidget QAbstractItemView {
-                selection-background-color: #3A78CF;
+                outline: none;
+                selection-background-color: #5B8DEF;
                 selection-color: #FFFFFF;
             }
             QCalendarWidget#customerAgendaPopupCalendar QAbstractItemView::item {
                 padding: 0;
-                border: 1px solid #D8DEE8;
+                border: none;
             }
             QCalendarWidget#customerAgendaPopupCalendar QComboBox {
                 min-height: 22px;
@@ -3694,12 +3740,12 @@ class CustomersPage(QWidget):
                 font-size: 10px;
             }
             QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_monthbutton {
-                min-width: 88px;
-                max-width: 88px;
+                min-width: 72px;
+                max-width: 72px;
             }
             QCalendarWidget#customerAgendaPopupCalendar QToolButton#qt_calendar_yearbutton {
-                min-width: 66px;
-                max-width: 66px;
+                min-width: 44px;
+                max-width: 44px;
             }
             QCalendarWidget#customerAgendaPopupCalendar QAbstractSpinBox {
                 min-width: 66px;

@@ -5,10 +5,10 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QCalendarWidget, QDateEdit, QPushButton
+from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QDateEdit, QPushButton
 
 from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
-from app.ui.widgets.customers_page import CustomersPage
+from app.ui.widgets.customers_page import AgendaCalendarDelegate, CustomersPage
 
 _APP: QApplication | None = None
 
@@ -108,6 +108,8 @@ def test_agenda_calendar_uses_unclipped_popup_configuration(monkeypatch) -> None
     assert calendar.verticalHeaderFormat() == QCalendarWidget.VerticalHeaderFormat.ISOWeekNumbers
     assert calendar.headerTextFormat().background().color().name() == "#5b8def"
     assert calendar.weekdayTextFormat(Qt.DayOfWeek.Sunday).foreground().color().name() == "#d94c5c"
+    calendar_view = calendar.findChild(QAbstractItemView, "qt_calendar_calendarview")
+    assert isinstance(calendar_view.itemDelegate(), AgendaCalendarDelegate)
     assert "QCalendarWidget#customerAgendaPopupCalendar QAbstractItemView::item" in page.styleSheet()
     page.close()
     page.deleteLater()
