@@ -193,3 +193,11 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 - Restaurada la comparativa anual con modal, gráfico y exportación PDF.
 - Corregida la geometría documentada de `detailLeftCard` y `detailRightCard` para que coincida con el código real.
 - Actualizado el fondo real de `CustomersPageRoot` a `#EEF3F8` y alineada la documentación.
+
+## Modales principales
+
+- Modal `Nuevo cliente` / `Editar cliente`: `QDialog`, fondo `#EEF3F8`, tamano fijo `958 x 418 px`.
+- Cuerpo con dos tarjetas centradas horizontalmente y con margen lateral equilibrado: `detailLeftCard` (`590 x 300 px`) y `detailRightCard` (`300 x 300 px`).
+- Tarjeta izquierda: mismo formato visual que el detalle del cliente para `Cod.`, `Nombre Comercial`, `Telef.`, `C.I.F.`, `Nombre Fiscal`, `Provincia`, `Isla`, `Municipio`, `Calle`, `C.P.` y `Localidad`.
+- Tarjeta derecha: mismo formato visual que la clasificacion del cliente para `Actividad`, `Tipo`, `Abrev. pedido`, `ACTIVO / INACTIVO` y `Prospeccion Si / No`.
+- Pie de acciones: `Cancelar` con estilo secundario gris azulado y `Guardar` con estilo primario azul.

@@ -250,6 +250,432 @@ class AgendaIconDelegate(QStyledItemDelegate):
         return QSize(50, 32)
 
 
+class CustomerEditorDialog(QDialog):
+    _SECTOR_OPTIONS = [
+        ("PANADERIA", "sectorChipPillPanaderia"),
+        ("PASTELERIA", "sectorChipPillPasteleria"),
+        ("HELADERIA", "sectorChipPillHeladeria"),
+        ("CAFETERIA", "sectorChipPillCafeteria"),
+        ("RESTAURANTE", "sectorChipPillRestaurante"),
+        ("HOTEL", "sectorChipPillHotel"),
+    ]
+
+    def __init__(
+        self,
+        *,
+        title: str,
+        provincias: list[Provincia],
+        islas: list[Isla],
+        municipios: list[Municipio],
+        codigos_postales: list[CodigoPostal],
+        localidades: list[Localidad],
+        initial: dict | None = None,
+        style_sheet: str = "",
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setObjectName("customerEditorDialog")
+        self.setWindowTitle(title)
+        self.setModal(True)
+        self.setFixedSize(958, 418)
+        self._title = title
+        self._initial = dict(initial or {})
+        self._preserved_payload = {
+            key: self._initial.get(key)
+            for key in ("cliente_email", "cliente_nombre_interno", "distribuidor_id")
+            if key in self._initial
+        }
+        self._provincias = list(provincias or [])
+        self._islas = list(islas or [])
+        self._municipios = list(municipios or [])
+        self._codigos_postales = list(codigos_postales or [])
+        self._localidades = list(localidades or [])
+        self._is_loading = False
+        self._base_style_sheet = style_sheet or ""
+
+        self._build_ui()
+        self._load_initial()
+
+    def _build_ui(self) -> None:
+        extra_style = """
+            QDialog#customerEditorDialog {
+                background: #EEF3F8;
+            }
+        """
+        if self._base_style_sheet:
+            self.setStyleSheet(self._base_style_sheet + "\n" + extra_style)
+        else:
+            self.setStyleSheet(extra_style)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        title = QLabel(self._title)
+        title.setProperty("role", "pageTitle")
+        layout.addWidget(title)
+
+        cards_row = QHBoxLayout()
+        cards_row.setContentsMargins(0, 0, 0, 0)
+        cards_row.setSpacing(10)
+
+        self.left_card = QFrame()
+        self.left_card.setObjectName("detailLeftCard")
+        self.left_card.setFixedSize(590, 300)
+        left_layout = QVBoxLayout(self.left_card)
+        left_layout.setContentsMargins(12, 10, 12, 12)
+        left_layout.setSpacing(8)
+        left_title = QLabel("Detalle de cliente")
+        left_title.setProperty("role", "sectionTitle")
+        left_layout.addWidget(left_title, 0)
+        self.left_panel = self._build_left_panel()
+        left_layout.addWidget(self.left_panel, 0)
+
+        self.right_card = QFrame()
+        self.right_card.setObjectName("detailRightCard")
+        self.right_card.setFixedSize(300, 300)
+        right_layout = QVBoxLayout(self.right_card)
+        right_layout.setContentsMargins(12, 6, 12, 10)
+        right_layout.setSpacing(2)
+        right_title = QLabel("Clasificacion del cliente")
+        right_title.setProperty("role", "sectionTitle")
+        right_layout.addWidget(right_title, 0)
+        self.right_panel = self._build_right_panel()
+        right_layout.addWidget(self.right_panel, 0)
+
+        cards_row.addStretch(1)
+        cards_row.addWidget(self.left_card, 0)
+        cards_row.addWidget(self.right_card, 0)
+        cards_row.addStretch(1)
+        layout.addLayout(cards_row)
+
+        buttons = QHBoxLayout()
+        buttons.setContentsMargins(0, 0, 0, 0)
+        buttons.setSpacing(8)
+        buttons.addStretch(1)
+
+        self.cancel_btn = QPushButton("Cancelar")
+        self.cancel_btn.setProperty("btnRole", "secondary")
+        self.cancel_btn.setFixedWidth(120)
+        self.cancel_btn.clicked.connect(self.reject)
+
+        self.save_btn = QPushButton("Guardar")
+        self.save_btn.setProperty("btnRole", "primary")
+        self.save_btn.setFixedWidth(120)
+        self.save_btn.clicked.connect(self.accept)
+
+        buttons.addWidget(self.cancel_btn)
+        buttons.addWidget(self.save_btn)
+        layout.addLayout(buttons)
+
+    def _build_left_panel(self) -> QWidget:
+        panel = QWidget()
+        panel.setObjectName("detailSubPanel")
+        panel.setFixedSize(554, 246)
+
+        self.lbl_cod = QLabel("Cod.", panel)
+        self.codigo_edit = QLineEdit(panel)
+        self.codigo_edit.setReadOnly(True)
+
+        self.lbl_nombre_comercial = QLabel("Nombre Comercial", panel)
+        self.nombre_comercial_edit = QLineEdit(panel)
+        self.nombre_comercial_edit.setFixedHeight(28)
+
+        self.lbl_telefono = QLabel("Telef.", panel)
+        self.telefono_edit = QLineEdit(panel)
+        self.telefono_edit.editingFinished.connect(self._format_phone_field)
+
+        self.lbl_cif = QLabel("C.I.F.", panel)
+        self.cif_edit = QLineEdit(panel)
+
+        self.lbl_nombre_fiscal = QLabel("Nombre Fiscal", panel)
+        self.nombre_fiscal_edit = QLineEdit(panel)
+
+        self.lbl_provincia = QLabel("Provincia", panel)
+        self.provincia_combo = QComboBox(panel)
+        self.lbl_isla = QLabel("Isla", panel)
+        self.isla_combo = QComboBox(panel)
+        self.lbl_municipio = QLabel("Municipio", panel)
+        self.municipio_combo = QComboBox(panel)
+
+        self.lbl_calle = QLabel("Calle", panel)
+        self.direccion_edit = QLineEdit(panel)
+        self.lbl_cp = QLabel("C.P.", panel)
+        self.cp_combo = QComboBox(panel)
+        self.lbl_localidad = QLabel("Localidad", panel)
+        self.localidad_combo = QComboBox(panel)
+
+        self._layout_left_panel()
+
+        self.provincia_combo.currentIndexChanged.connect(self._on_provincia_changed)
+        self.isla_combo.currentIndexChanged.connect(self._on_isla_changed)
+        self.municipio_combo.currentIndexChanged.connect(self._on_municipio_changed)
+        self.cp_combo.currentIndexChanged.connect(self._on_cp_changed)
+        return panel
+
+    def _layout_left_panel(self) -> None:
+        self.lbl_cod.setGeometry(5, 2, 80, 20)
+        self.lbl_nombre_comercial.setGeometry(95, 2, 455, 20)
+        self.codigo_edit.setGeometry(5, 26, 80, 28)
+        self.nombre_comercial_edit.setGeometry(95, 26, 455, 28)
+
+        self.lbl_telefono.setGeometry(5, 64, 120, 20)
+        self.lbl_cif.setGeometry(135, 64, 100, 20)
+        self.lbl_nombre_fiscal.setGeometry(245, 64, 305, 20)
+        self.telefono_edit.setGeometry(5, 86, 120, 28)
+        self.cif_edit.setGeometry(135, 86, 100, 28)
+        self.nombre_fiscal_edit.setGeometry(245, 86, 305, 28)
+
+        self.lbl_provincia.setGeometry(5, 126, 165, 20)
+        self.lbl_isla.setGeometry(175, 126, 100, 20)
+        self.lbl_municipio.setGeometry(285, 126, 260, 20)
+        self.provincia_combo.setGeometry(5, 150, 165, 28)
+        self.isla_combo.setGeometry(175, 150, 100, 28)
+        self.municipio_combo.setGeometry(285, 150, 260, 28)
+
+        self.lbl_calle.setGeometry(5, 190, 270, 20)
+        self.lbl_cp.setGeometry(285, 190, 80, 20)
+        self.lbl_localidad.setGeometry(375, 190, 175, 20)
+        self.direccion_edit.setGeometry(5, 214, 270, 28)
+        self.cp_combo.setGeometry(285, 214, 80, 28)
+        self.localidad_combo.setGeometry(375, 214, 175, 28)
+
+    def _build_right_panel(self) -> QWidget:
+        panel = QWidget()
+        panel.setObjectName("detailSubPanel")
+        panel.setFixedSize(274, 258)
+
+        self.sectors_box = QFrame(panel)
+        self.sectors_box.setObjectName("plainGroup")
+        self.sectors_box.setFixedHeight(128)
+        self.tipo_checks: dict[str, QCheckBox] = {}
+        for label, object_name in self._SECTOR_OPTIONS:
+            checkbox = QCheckBox(label, self.sectors_box)
+            checkbox.setObjectName(object_name)
+            checkbox.setMinimumHeight(28)
+            self.tipo_checks[label] = checkbox
+
+        self.section_info = QLabel("Tipo", panel)
+        self.section_info.setProperty("role", "blockTitle")
+        self.tipo_combo = QComboBox(panel)
+        self.tipo_combo.addItems(["", "directo", "indirecto", "distribuidor"])
+
+        self.lbl_abrev = QLabel("Abrev. pedido", panel)
+        self.abreviatura_edit = QLineEdit(panel)
+        self.abreviatura_edit.setMaxLength(20)
+
+        self.status_box = QFrame(panel)
+        self.status_box.setObjectName("plainGroup")
+        self.status_group = QButtonGroup(self)
+        self.activo_btn = QPushButton("ACTIVO", self.status_box)
+        self.inactivo_btn = QPushButton("INACTIVO", self.status_box)
+        self.activo_btn.setCheckable(True)
+        self.inactivo_btn.setCheckable(True)
+        self.activo_btn.setObjectName("stateChipActive")
+        self.inactivo_btn.setObjectName("stateChipInactive")
+        self.status_group.addButton(self.activo_btn)
+        self.status_group.addButton(self.inactivo_btn)
+
+        self.lbl_prospeccion = QLabel("Prospeccion", self.status_box)
+        self.prospeccion_group = QButtonGroup(self)
+        self.prospeccion_si = QRadioButton("Si", self.status_box)
+        self.prospeccion_no = QRadioButton("No", self.status_box)
+        self.prospeccion_group.addButton(self.prospeccion_si)
+        self.prospeccion_group.addButton(self.prospeccion_no)
+
+        self._layout_right_panel()
+        return panel
+
+    def _layout_right_panel(self) -> None:
+        self.sectors_box.setGeometry(0, 0, 274, 128)
+        self.section_info.setGeometry(5, 119, 120, 24)
+        self.tipo_combo.setGeometry(5, 145, 120, 28)
+        self.lbl_abrev.setGeometry(145, 119, 120, 24)
+        self.abreviatura_edit.setGeometry(145, 145, 120, 28)
+        self.status_box.setGeometry(0, 182, 274, 76)
+        self.activo_btn.setGeometry(8, 10, 124, 28)
+        self.inactivo_btn.setGeometry(140, 10, 124, 28)
+        self.lbl_prospeccion.setGeometry(8, 45, 110, 24)
+        self.prospeccion_si.setGeometry(130, 45, 50, 24)
+        self.prospeccion_no.setGeometry(190, 45, 60, 24)
+
+        self.tipo_checks["PANADERIA"].setGeometry(8, 10, 125, 24)
+        self.tipo_checks["PASTELERIA"].setGeometry(141, 10, 125, 24)
+        self.tipo_checks["HELADERIA"].setGeometry(8, 48, 125, 24)
+        self.tipo_checks["CAFETERIA"].setGeometry(141, 48, 125, 24)
+        self.tipo_checks["RESTAURANTE"].setGeometry(8, 86, 125, 24)
+        self.tipo_checks["HOTEL"].setGeometry(141, 86, 125, 24)
+
+    def _fill_combo(self, combo: QComboBox, items: list[tuple[str, str]], selected_value: str = "") -> None:
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("", "")
+        for label, value in items:
+            combo.addItem(label, value)
+        if selected_value:
+            idx = combo.findData(selected_value)
+            combo.setCurrentIndex(idx if idx >= 0 else 0)
+        else:
+            combo.setCurrentIndex(0)
+        combo.blockSignals(False)
+
+    def _populate_provincias(self, selected_id: str = "") -> None:
+        items = [(str(p.provincia_nombre or ""), str(p.provincia_id or "")) for p in self._provincias if p.provincia_nombre]
+        self._fill_combo(self.provincia_combo, items, selected_id)
+
+    def _populate_islas(self, provincia_id: str, selected_id: str = "") -> None:
+        items = [
+            (str(i.isla_nombre or ""), str(i.isla_id or ""))
+            for i in self._islas
+            if str(i.provincia_id or "") == str(provincia_id or "") and i.isla_nombre
+        ]
+        self._fill_combo(self.isla_combo, items, selected_id)
+
+    def _populate_municipios(self, isla_id: str, selected_id: str = "") -> None:
+        items = [
+            (str(m.municipio_nombre or ""), str(m.municipio_id or ""))
+            for m in self._municipios
+            if str(m.isla_id or "") == str(isla_id or "") and m.municipio_nombre
+        ]
+        self._fill_combo(self.municipio_combo, items, selected_id)
+
+    def _populate_cps(self, municipio_id: str, selected_cp: str = "") -> None:
+        items = [
+            (str(cp.codigo_postal or ""), str(cp.codigo_postal or ""))
+            for cp in self._codigos_postales
+            if str(cp.municipio_id or "") == str(municipio_id or "") and str(cp.codigo_postal or "").strip()
+        ]
+        unique_items: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        for label, value in items:
+            if value in seen:
+                continue
+            seen.add(value)
+            unique_items.append((label, value))
+        self._fill_combo(self.cp_combo, unique_items, selected_cp)
+
+    def _populate_localidades(self, codigo_postal: str, selected_localidad_id: str = "") -> None:
+        cp = str(codigo_postal or "").strip()
+        if not cp:
+            items: list[tuple[str, str]] = []
+        else:
+            items = [
+                (str(loc.localidad_nombre or ""), str(loc.localidad_id or ""))
+                for loc in self._localidades
+                if str(loc.codigo_postal or "").strip() == cp and loc.localidad_nombre
+            ]
+        self._fill_combo(self.localidad_combo, items, selected_localidad_id)
+
+    def _on_provincia_changed(self, _idx: int) -> None:
+        if self._is_loading:
+            return
+        provincia_id = str(self.provincia_combo.currentData() or "")
+        self._populate_islas(provincia_id, "")
+        self._populate_municipios("", "")
+        self._populate_cps("", "")
+        self._populate_localidades("", "")
+
+    def _on_isla_changed(self, _idx: int) -> None:
+        if self._is_loading:
+            return
+        isla_id = str(self.isla_combo.currentData() or "")
+        self._populate_municipios(isla_id, "")
+        self._populate_cps("", "")
+        self._populate_localidades("", "")
+
+    def _on_municipio_changed(self, _idx: int) -> None:
+        if self._is_loading:
+            return
+        municipio_id = str(self.municipio_combo.currentData() or "")
+        self._populate_cps(municipio_id, "")
+        self._populate_localidades("", "")
+
+    def _on_cp_changed(self, _idx: int) -> None:
+        if self._is_loading:
+            return
+        codigo_postal = str(self.cp_combo.currentData() or "")
+        self._populate_localidades(codigo_postal, "")
+
+    def _normalize_phone(self, raw: str) -> str:
+        digits = "".join(ch for ch in str(raw or "") if ch.isdigit())
+        if digits.startswith("34") and len(digits) == 11:
+            digits = digits[2:]
+        if len(digits) == 9:
+            return f"+34 {digits[:3]} {digits[3:6]} {digits[6:]}"
+        return str(raw or "").strip()
+
+    def _format_phone_field(self) -> None:
+        self.telefono_edit.setText(self._normalize_phone(self.telefono_edit.text()))
+
+    def _load_initial(self) -> None:
+        self._is_loading = True
+        self.codigo_edit.setText(str(self._initial.get("cliente_codigo", "") or ""))
+        self.nombre_comercial_edit.setText(str(self._initial.get("cliente_nombre_comercial", "") or ""))
+        self.telefono_edit.setText(self._normalize_phone(str(self._initial.get("cliente_telefono", "") or "")))
+        self.cif_edit.setText(str(self._initial.get("cliente_cif", "") or ""))
+        self.nombre_fiscal_edit.setText(str(self._initial.get("cliente_nombre_fiscal", "") or ""))
+        self.direccion_edit.setText(str(self._initial.get("cliente_direccion", "") or ""))
+        self.abreviatura_edit.setText(str(self._initial.get("cliente_abreviatura", "") or ""))
+
+        provincia_id = str(self._initial.get("cliente_direccion_provincia_id", "") or "")
+        isla_id = str(self._initial.get("cliente_direccion_isla_id", "") or "")
+        municipio_id = str(self._initial.get("cliente_direccion_municipio_id", "") or "")
+        codigo_postal = str(self._initial.get("cliente_direccion_cp", "") or "")
+        localidad_id = str(self._initial.get("cliente_direccion_localidad_id", "") or "")
+        self._populate_provincias(provincia_id)
+        self._populate_islas(provincia_id, isla_id)
+        self._populate_municipios(isla_id, municipio_id)
+        self._populate_cps(municipio_id, codigo_postal)
+        self._populate_localidades(codigo_postal, localidad_id)
+
+        grupos = (str(self._initial.get("cliente_actividad", "") or "")).upper()
+        for label, checkbox in self.tipo_checks.items():
+            checkbox.setChecked(label in grupos)
+
+        tipo = (str(self._initial.get("cliente_tipo", "") or "")).strip().lower()
+        idx_tipo = self.tipo_combo.findText(tipo)
+        self.tipo_combo.setCurrentIndex(idx_tipo if idx_tipo >= 0 else 0)
+
+        if bool(self._initial.get("activo", True)):
+            self.activo_btn.setChecked(True)
+        else:
+            self.inactivo_btn.setChecked(True)
+        if bool(self._initial.get("cliente_prospeccion", False)):
+            self.prospeccion_si.setChecked(True)
+        else:
+            self.prospeccion_no.setChecked(True)
+        self._is_loading = False
+
+    def accept(self) -> None:  # type: ignore[override]
+        self._format_phone_field()
+        super().accept()
+
+    def get_payload(self) -> dict:
+        payload = dict(self._preserved_payload)
+        payload.update(
+            {
+                "cliente_nombre_comercial": self.nombre_comercial_edit.text().strip(),
+                "cliente_telefono": self.telefono_edit.text().strip(),
+                "cliente_nombre_fiscal": self.nombre_fiscal_edit.text().strip(),
+                "cliente_direccion": self.direccion_edit.text().strip(),
+                "cliente_abreviatura": self.abreviatura_edit.text().strip().upper(),
+                "cliente_cif": self.cif_edit.text().strip(),
+                "cliente_direccion_cp": str(self.cp_combo.currentData() or "").strip(),
+                "cliente_direccion_provincia_id": str(self.provincia_combo.currentData() or "").strip(),
+                "cliente_direccion_isla_id": str(self.isla_combo.currentData() or "").strip(),
+                "cliente_direccion_municipio_id": str(self.municipio_combo.currentData() or "").strip(),
+                "cliente_direccion_localidad_id": str(self.localidad_combo.currentData() or "").strip(),
+                "cliente_tipo": (self.tipo_combo.currentText() or "").strip().lower(),
+                "cliente_actividad": ",".join(
+                    [label for label, checkbox in self.tipo_checks.items() if checkbox.isChecked()]
+                ),
+                "cliente_prospeccion": self.prospeccion_si.isChecked(),
+                "activo": self.activo_btn.isChecked(),
+            }
+        )
+        return payload
+
+
 class CustomersPage(QWidget):
     UNLINKED_CLIENT_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -3620,7 +4046,17 @@ class CustomersPage(QWidget):
         document.print_(printer)
 
     def _new_entity(self) -> None:
-        dialog = EntityDialog("Nuevo: Clientes", self.edit_schema, parent=self)
+        self._load_address_catalogs()
+        dialog = CustomerEditorDialog(
+            title="Nuevo cliente",
+            provincias=self.provincias,
+            islas=self.islas,
+            municipios=self.municipios,
+            codigos_postales=self.codigos_postales,
+            localidades=self.localidades,
+            style_sheet=self.styleSheet(),
+            parent=self,
+        )
         if dialog.exec():
             payload = dialog.get_payload()
             self._create(payload)
@@ -3631,8 +4067,20 @@ class CustomersPage(QWidget):
         if not row:
             QMessageBox.warning(self, "Atencion", "Selecciona un cliente.")
             return
+        self._load_address_catalogs()
         initial = {field["name"]: getattr(row, field["name"], None) for field in self.edit_schema}
-        dialog = EntityDialog("Editar: Clientes", self.edit_schema, initial=initial, parent=self)
+        initial["cliente_codigo"] = getattr(row, "cliente_codigo", "")
+        dialog = CustomerEditorDialog(
+            title="Editar cliente",
+            provincias=self.provincias,
+            islas=self.islas,
+            municipios=self.municipios,
+            codigos_postales=self.codigos_postales,
+            localidades=self.localidades,
+            initial=initial,
+            style_sheet=self.styleSheet(),
+            parent=self,
+        )
         if dialog.exec():
             payload = dialog.get_payload()
             self._update(row.cliente_id, payload)
