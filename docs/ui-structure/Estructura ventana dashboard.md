@@ -143,7 +143,7 @@ Componentes de dashboard
 │   └── separación: 12 px
 ├── Fila KPI
 │   └── cuatro dashboardKpiCard
-│       ├── altura fija: 118 px
+│       ├── altura fija: 104 px
 │       ├── márgenes internos: 16 / 14 / 16 / 14 px
 │       ├── dashboardKpiIconWrap: 62 x 62 px
 │       ├── SVG: 28 x 28 px

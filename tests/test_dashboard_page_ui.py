@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QApplication, QFrame, QWidget
 
 from app.services.customer_dashboard_service import (
     DashboardActivityRow,
@@ -212,6 +212,9 @@ def test_dashboard_page_starts_in_agenda_mode() -> None:
     assert not page.new_activity_btn.icon().isNull()
     assert not page.full_agenda_btn.icon().isNull()
     assert page.findChild(QWidget, 'dashboardSidebar').width() == 184
+    kpi_cards = page.findChildren(QFrame, 'dashboardKpiCard')
+    assert len(kpi_cards) == 16
+    assert all(card.minimumHeight() == 104 and card.maximumHeight() == 104 for card in kpi_cards)
     assert 'QFrame#dashboardHeader { background-color: transparent; border: none; }' in page.styleSheet()
     assert page.minimumSizeHint().width() <= 1180
 
