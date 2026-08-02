@@ -196,7 +196,10 @@ dashboardAgendaView
 │   │       ├── Hechas
 │   │       └── Vencidas
 │   └── dashboardTodayPanel
-│       ├── dashboardPanelTitle fijo en la parte superior
+│       ├── cabecera fija
+│       │   ├── dashboardPanelTitle
+│       │   ├── dashboardTodayPdfButton
+│       │   └── dashboardTodayPrintButton
 │       └── dashboardTodayScrollArea
 │           └── dashboardTodayItemsHost
 │               └── dashboardActivityCard o dashboardEmptyLabel
@@ -219,7 +222,10 @@ Calendario mensual de Agenda
 ├── dashboardTodayPanel
 │   ├── altura mínima: 205 px
 │   ├── proporción frente al calendario: 6 frente a 4
-│   ├── dashboardPanelTitle fuera del desplazamiento
+│   ├── cabecera fuera del desplazamiento
+│   │   ├── dashboardPanelTitle
+│   │   ├── dashboardTodayPdfButton: exporta toda la selección visible a PDF
+│   │   └── dashboardTodayPrintButton: imprime toda la selección visible
 │   └── dashboardTodayScrollArea
 │       ├── desplazamiento vertical solo para las tarjetas
 │       ├── contenido alineado arriba
@@ -273,6 +279,12 @@ Calendario mensual de Agenda
     ├── número ISO de semana
     │   ├── clic detectado mediante filtro de eventos del viewport interno
     │   └── muestra todas las entradas de lunes a domingo
+    ├── salida documental
+    │   ├── fuente: todas las filas filtradas, incluidas las que están fuera del viewport
+    │   ├── columnas: Cliente / Resumen / Estado
+    │   ├── PDF: ReportExportService en `exports/agenda_dashboard`
+    │   ├── impresión: QTextDocument y QPrintDialog
+    │   └── acciones deshabilitadas cuando la selección está vacía
     └── tarjetas diarias o semanales en una sola línea
         ├── código · nombre del cliente
         ├── resumen

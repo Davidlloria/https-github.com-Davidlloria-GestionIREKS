@@ -2,6 +2,7 @@
 
 import os
 from datetime import date, datetime
+from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -92,6 +93,20 @@ class _StubDashboardService:
                 prioridad='alta', responsable='Juan', created_at=datetime(2026, 7, 21, 8, 0, 0), updated_at=datetime(2026, 7, 21, 8, 0, 0),
             )
         ]
+
+
+class _StubReportExportService:
+    def __init__(self) -> None:
+        self.default_calls: list[tuple[str, str, str]] = []
+        self.export_calls: list[tuple[str, str, list[str], list[list[str]]]] = []
+
+    def default_path(self, title: str, suffix: str, folder: str = '') -> Path:
+        self.default_calls.append((title, suffix, folder))
+        return Path('agenda_dashboard.pdf')
+
+    def export_pdf(self, path: str, title: str, headers: list[str], rows: list[list[str]]) -> Path:
+        self.export_calls.append((path, title, headers, rows))
+        return Path(path)
 
 
 class _StubCustomerRow:
@@ -229,6 +244,8 @@ def test_dashboard_page_starts_in_agenda_mode() -> None:
     assert len(kpi_cards) == 16
     assert all(card.minimumHeight() == 104 and card.maximumHeight() == 104 for card in kpi_cards)
     assert page.findChild(QPushButton, 'dashboardPanelLinkButton') is None
+    assert page.findChild(QPushButton, 'dashboardTodayPdfButton') is page.today_pdf_btn
+    assert page.findChild(QPushButton, 'dashboardTodayPrintButton') is page.today_print_btn
     today_scroll = page.findChild(QScrollArea, 'dashboardTodayScrollArea')
     assert today_scroll is not None
     assert not today_scroll.isAncestorOf(page.today_panel_title)
@@ -314,7 +331,80 @@ def test_dashboard_page_uses_due_date_and_renders_activity_in_one_line() -> None
     assert cards[0].findChild(QLabel, 'dashboardActivityCustomer').text() == '586 · NPANADERIA'
     assert cards[0].findChild(QLabel, 'dashboardActivitySummary').text() == 'Concretar reunión'
     assert cards[0].findChild(QLabel, 'dashboardActivityState').text() == 'Hecha'
+    assert page.today_pdf_btn.isEnabled()
+    assert page.today_print_btn.isEnabled()
+    assert page._today_report_data() == (
+        'Agenda del 23/07/2026',
+        ['Cliente', 'Resumen', 'Estado'],
+        [['586 · NPANADERIA', 'Concretar reunión', 'Hecha']],
+    )
+    assert '586 · NPANADERIA' in page._today_report_html()
     assert page._agenda_day_tone(page._agenda_rows_for_date(date(2026, 7, 23)), today_value=date(2026, 7, 23)) == 'green'
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_dashboard_page_exports_the_visible_agenda_selection_to_pdf(monkeypatch) -> None:
+    _application()
+    report_service = _StubReportExportService()
+    page = DashboardPage(
+        customer_service=_StubCustomerService(), dashboard_service=_StubDashboardService(),
+        order_dashboard_service=_StubOrderDashboardService(), warehouse_dashboard_service=_StubWarehouseDashboardService(),
+        report_export_service=report_service,
+    )
+    page.set_selected_date(date(2026, 7, 21))
+    monkeypatch.setattr(
+        dashboard_page_module.QFileDialog,
+        'getSaveFileName',
+        lambda *_args, **_kwargs: ('seleccion_agenda.pdf', 'PDF (*.pdf)'),
+    )
+    monkeypatch.setattr(dashboard_page_module.QMessageBox, 'information', lambda *_args, **_kwargs: None)
+
+    page.today_pdf_btn.click()
+
+    assert report_service.default_calls == [('Agenda del 21/07/2026', 'pdf', 'agenda_dashboard')]
+    assert report_service.export_calls == [(
+        'seleccion_agenda.pdf',
+        'Agenda del 21/07/2026',
+        ['Cliente', 'Resumen', 'Estado'],
+        [['101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
+    )]
+    printed: dict[str, object] = {}
+
+    class _AcceptedPrintDialog:
+        class DialogCode:
+            Accepted = 1
+
+        def __init__(self, printer, parent) -> None:
+            printed['printer'] = printer
+            printed['parent'] = parent
+
+        def exec(self) -> int:
+            return self.DialogCode.Accepted
+
+    class _CapturedTextDocument:
+        def __init__(self, parent) -> None:
+            printed['document_parent'] = parent
+
+        def setHtml(self, value: str) -> None:
+            printed['html'] = value
+
+        def print_(self, printer) -> None:
+            printed['printed_with'] = printer
+
+    monkeypatch.setattr(dashboard_page_module, 'QPrintDialog', _AcceptedPrintDialog)
+    monkeypatch.setattr(dashboard_page_module, 'QTextDocument', _CapturedTextDocument)
+
+    page.today_print_btn.click()
+
+    assert printed['printed_with'] is printed['printer']
+    assert '101 · Panaderia Norte' in str(printed['html'])
+    assert 'Revision comercial' in str(printed['html'])
+    page._render_activity_cards([], empty_text='Sin actividades')
+    assert not page.today_pdf_btn.isEnabled()
+    assert not page.today_print_btn.isEnabled()
 
     page.close()
     page.deleteLater()

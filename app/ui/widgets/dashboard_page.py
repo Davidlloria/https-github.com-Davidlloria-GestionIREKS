@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from html import escape
 from pathlib import Path
 
 from PySide6.QtCore import QDate, QEvent, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap, QTextCharFormat
+from PySide6.QtGui import QColor, QIcon, QPageLayout, QPainter, QPixmap, QTextCharFormat, QTextDocument
+from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -16,6 +18,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QFrame,
+    QFileDialog,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
@@ -49,6 +52,7 @@ from app.services.order_dashboard_service import (
     DashboardOrdersWarehouseRow,
     OrderDashboardService,
 )
+from app.services.report_export_service import ReportExportService
 from app.services.sales_dashboard_service import (
     DashboardSalesCustomerRow,
     DashboardSalesIslandRow,
@@ -496,6 +500,7 @@ class DashboardPage(QWidget):
         order_dashboard_service: OrderDashboardService | None = None,
         sales_dashboard_service: SalesDashboardService | None = None,
         warehouse_dashboard_service: WarehouseDashboardService | None = None,
+        report_export_service: ReportExportService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -504,12 +509,14 @@ class DashboardPage(QWidget):
         self.order_dashboard_service = order_dashboard_service or OrderDashboardService()
         self.sales_dashboard_service = sales_dashboard_service or SalesDashboardService()
         self.warehouse_dashboard_service = warehouse_dashboard_service or WarehouseDashboardService()
+        self.report_export_service = report_export_service or ReportExportService()
         self.setObjectName('dashboardPageRoot')
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.agenda_calendar_selected_date = date.today()
         self.agenda_calendar_month = date.today().replace(day=1)
         self.agenda_calendar_week_range: tuple[date, date] | None = None
         self.agenda_calendar_rows: list[DashboardActivityRow] = []
+        self.today_report_rows: list[DashboardActivityRow] = []
         self.current_dashboard = 'agenda'
         self.dashboard_nav_buttons: dict[str, QPushButton] = {}
         self._build_ui()
@@ -764,7 +771,23 @@ class DashboardPage(QWidget):
         heading = QLabel(title)
         heading.setObjectName('dashboardPanelTitle')
         heading.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        layout.addWidget(heading, 0)
+        heading_layout = QHBoxLayout()
+        heading_layout.setContentsMargins(0, 0, 0, 0)
+        heading_layout.setSpacing(8)
+        heading_layout.addWidget(heading, 1)
+        self.today_pdf_btn = QPushButton('PDF')
+        self.today_pdf_btn.setObjectName('dashboardTodayPdfButton')
+        self.today_pdf_btn.setEnabled(False)
+        self._set_button_icon(self.today_pdf_btn, 'file-text.svg', '#1D4ED8', 15)
+        self.today_pdf_btn.clicked.connect(self._export_today_panel_pdf)
+        heading_layout.addWidget(self.today_pdf_btn, 0)
+        self.today_print_btn = QPushButton('Imprimir')
+        self.today_print_btn.setObjectName('dashboardTodayPrintButton')
+        self.today_print_btn.setEnabled(False)
+        self._set_button_icon(self.today_print_btn, 'printer.svg', '#1D4ED8', 15)
+        self.today_print_btn.clicked.connect(self._print_today_panel)
+        heading_layout.addWidget(self.today_print_btn, 0)
+        layout.addLayout(heading_layout, 0)
 
         scroll_area = QScrollArea()
         scroll_area.setObjectName('dashboardTodayScrollArea')
@@ -1195,6 +1218,10 @@ class DashboardPage(QWidget):
                 widget.deleteLater()
 
     def _render_activity_cards(self, rows: list[DashboardActivityRow], *, empty_text: str) -> None:
+        self.today_report_rows = list(rows)
+        has_rows = bool(self.today_report_rows)
+        self.today_pdf_btn.setEnabled(has_rows)
+        self.today_print_btn.setEnabled(has_rows)
         if not rows:
             empty = QLabel(empty_text)
             empty.setObjectName('dashboardEmptyLabel')
@@ -1222,6 +1249,67 @@ class DashboardPage(QWidget):
             layout.addWidget(summary, 1)
             layout.addWidget(state, 0)
             self.today_items_layout.addWidget(card)
+
+    def _today_report_data(self) -> tuple[str, list[str], list[list[str]]]:
+        title = self.today_panel_title.text().strip() or 'Agenda'
+        rows = [
+            [
+                f'{row.cliente_codigo} · {row.cliente_nombre}',
+                row.resumen or row.detalle or '-',
+                self.agenda_state_label(row.estado),
+            ]
+            for row in self.today_report_rows
+        ]
+        return title, ['Cliente', 'Resumen', 'Estado'], rows
+
+    def _export_today_panel_pdf(self) -> None:
+        if not self.today_report_rows:
+            QMessageBox.warning(self, 'Agenda', 'No hay actividades para exportar.')
+            return
+        title, headers, rows = self._today_report_data()
+        default_path = str(self.report_export_service.default_path(title, 'pdf', folder='agenda_dashboard'))
+        path, _ = QFileDialog.getSaveFileName(self, 'Exportar agenda a PDF', default_path, 'PDF (*.pdf)')
+        if not path:
+            return
+        try:
+            output = self.report_export_service.export_pdf(path, title, headers, rows)
+        except Exception as exc:
+            QMessageBox.warning(self, 'Agenda', f'No se pudo exportar el PDF.\n\n{exc}')
+            return
+        QMessageBox.information(self, 'Agenda', f'PDF exportado correctamente.\n\n{output}')
+
+    def _print_today_panel(self) -> None:
+        if not self.today_report_rows:
+            QMessageBox.warning(self, 'Agenda', 'No hay actividades para imprimir.')
+            return
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        printer.setPageOrientation(QPageLayout.Orientation.Portrait)
+        dialog = QPrintDialog(printer, self)
+        if dialog.exec() != QPrintDialog.DialogCode.Accepted:
+            return
+        document = QTextDocument(self)
+        document.setHtml(self._today_report_html())
+        document.print_(printer)
+
+    def _today_report_html(self) -> str:
+        title, headers, rows = self._today_report_data()
+        header_cells = ''.join(f'<th>{escape(value)}</th>' for value in headers)
+        body_rows = ''.join(
+            '<tr>' + ''.join(f'<td>{escape(str(value))}</td>' for value in row) + '</tr>'
+            for row in rows
+        )
+        return (
+            '<html><head><style>'
+            'body { font-family: "Segoe UI", sans-serif; color: #0F172A; }'
+            'h1 { font-size: 18px; margin-bottom: 14px; }'
+            'table { width: 100%; border-collapse: collapse; }'
+            'th { background: #3A78CF; color: white; text-align: left; }'
+            'th, td { border: 1px solid #D1D5DB; padding: 6px; font-size: 10px; }'
+            'tr:nth-child(even) { background: #F8FAFC; }'
+            '</style></head><body>'
+            f'<h1>{escape(title)}</h1><table><thead><tr>{header_cells}</tr></thead>'
+            f'<tbody>{body_rows}</tbody></table></body></html>'
+        )
 
     def _reload_reactivation_table(self, rows: list[DashboardReactivationRow]) -> None:
         self.reactivation_table.setRowCount(len(rows))
@@ -1808,6 +1896,16 @@ class DashboardPage(QWidget):
             QLabel#dashboardActivitySummary { color: #1E293B; font-size: 13px; }
             QFrame#dashboardActivityCard { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
             QScrollArea#dashboardTodayScrollArea, QWidget#dashboardTodayItemsHost { background: transparent; border: none; }
+            QPushButton#dashboardTodayPdfButton, QPushButton#dashboardTodayPrintButton {
+                background-color: #FFFFFF; color: #1D4ED8; border: 1px solid #CBD5E1;
+                border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: 600;
+            }
+            QPushButton#dashboardTodayPdfButton:hover, QPushButton#dashboardTodayPrintButton:hover {
+                background-color: #EFF6FF; border-color: #93C5FD;
+            }
+            QPushButton#dashboardTodayPdfButton:disabled, QPushButton#dashboardTodayPrintButton:disabled {
+                background-color: #F8FAFC; color: #94A3B8; border-color: #E2E8F0;
+            }
             QWidget#dashboardCalendarHeadingBlock { background-color: transparent; border: none; }
             QCalendarWidget#dashboardMonthCalendar {
                 background: #FFFFFF;
