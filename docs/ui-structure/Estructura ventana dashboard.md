@@ -193,9 +193,10 @@ dashboardAgendaView
 │   │       ├── Hechas
 │   │       └── Vencidas
 │   └── dashboardTodayPanel
-│       ├── dashboardPanelTitle dinámico
-│       ├── dashboardActivityCard o dashboardEmptyLabel
-│       └── dashboardPanelLinkButton: Ver toda la agenda
+│       ├── dashboardPanelTitle fijo en la parte superior
+│       └── dashboardTodayScrollArea
+│           └── dashboardTodayItemsHost
+│               └── dashboardActivityCard o dashboardEmptyLabel
 └── fila inferior (proporción 5:3)
     ├── dashboardReactivationPanel
     │   └── dashboardReactivationTable
@@ -214,7 +215,12 @@ Calendario mensual de Agenda
 │   └── ancho máximo explícito: no tiene
 ├── dashboardTodayPanel
 │   ├── altura mínima: 205 px
-│   └── proporción frente al calendario: 6 frente a 4
+│   ├── proporción frente al calendario: 6 frente a 4
+│   ├── dashboardPanelTitle fuera del desplazamiento
+│   └── dashboardTodayScrollArea
+│       ├── desplazamiento vertical solo para las tarjetas
+│       ├── contenido alineado arriba
+│       └── sin botón de enlace inferior
 ├── dashboardMonthCalendar
 │   ├── tamaño mínimo: 320 x 220 px
 │   ├── política horizontal: Expanding
@@ -260,10 +266,12 @@ Calendario mensual de Agenda
     ├── flechas nativas: cambio de mes
     ├── fecha actual: título Agenda de hoy
     ├── otra fecha: título Agenda del dd/mm/aaaa
-    └── tarjetas diarias
-        ├── cliente
+    ├── selección diaria: filtra por fecha efectiva `due_date`
+    ├── número ISO de semana: muestra todas las entradas de lunes a domingo
+    └── tarjetas diarias o semanales en una sola línea
+        ├── código · nombre del cliente
         ├── resumen
-        ├── detalle
+        ├── estado traducido
         └── dashboardEmptyLabel cuando no hay datos
 ```
 

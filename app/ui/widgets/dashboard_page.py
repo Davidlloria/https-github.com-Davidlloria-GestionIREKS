@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QSize, Qt
+from PySide6.QtCore import QDate, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap, QTextCharFormat
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSpacerItem,
     QStackedWidget,
@@ -192,7 +193,7 @@ class DashboardAgendaDialog(QDialog):
         summary = self.summary_edit.text().strip()
         detail = self.detail_edit.toPlainText().strip()
         if not summary and not detail:
-            QMessageBox.warning(self, "Agenda", "El resumen o el detalle no pueden quedar vacÃ­os.")
+            QMessageBox.warning(self, "Agenda", "El resumen o el detalle no pueden quedar vacíos.")
             return
         payload = {
             "cliente_id": customer_id,
@@ -432,6 +433,8 @@ class DashboardCalendarDelegate(QStyledItemDelegate):
 
 
 class DashboardMonthCalendar(QCalendarWidget):
+    weekSelected = Signal(object, object, int)
+
     def __init__(self, page: 'DashboardPage', parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._page = page
@@ -458,6 +461,18 @@ class DashboardMonthCalendar(QCalendarWidget):
         if calendar_view is not None:
             self._delegate = DashboardCalendarDelegate(self, page)
             calendar_view.setItemDelegate(self._delegate)
+            calendar_view.clicked.connect(self._handle_calendar_view_clicked)
+
+    def _handle_calendar_view_clicked(self, index) -> None:
+        if index.row() <= 0 or index.column() != 0:
+            return
+        monday_qdate = self._delegate._date_for_index(index.row(), 1)
+        if not monday_qdate.isValid():
+            return
+        week_start = date(monday_qdate.year(), monday_qdate.month(), monday_qdate.day())
+        week_end = week_start + timedelta(days=6)
+        week_number = monday_qdate.weekNumber()[0]
+        self.weekSelected.emit(week_start, week_end, week_number)
 
 
 class DashboardPage(QWidget):
@@ -481,6 +496,7 @@ class DashboardPage(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.agenda_calendar_selected_date = date.today()
         self.agenda_calendar_month = date.today().replace(day=1)
+        self.agenda_calendar_week_range: tuple[date, date] | None = None
         self.agenda_calendar_rows: list[DashboardActivityRow] = []
         self.current_dashboard = 'agenda'
         self.dashboard_nav_buttons: dict[str, QPushButton] = {}
@@ -646,10 +662,6 @@ class DashboardPage(QWidget):
             'dashboardTodayPanel',
             empty_text='Hoy no hay actividades registradas.',
         )
-        self.today_link_btn = QPushButton('Ver toda la agenda')
-        self.today_link_btn.setObjectName('dashboardPanelLinkButton')
-        self.today_link_btn.clicked.connect(self._handle_secondary_action)
-        today_panel.layout().addWidget(self.today_link_btn)
         middle_row.addWidget(self.upcoming_panel, 4)
         middle_row.addWidget(today_panel, 6)
         layout.addLayout(middle_row, 3)
@@ -661,7 +673,7 @@ class DashboardPage(QWidget):
         reactivation_panel = self._build_table_panel('Clientes a reactivar', 'dashboardReactivationPanel')
         self.reactivation_table = QTableWidget(0, 5)
         self.reactivation_table.setObjectName('dashboardReactivationTable')
-        self.reactivation_table.setHorizontalHeaderLabels(['Cliente', 'Isla', 'Ãšltimo contacto', 'VariaciÃ³n kg', 'Prioridad'])
+        self.reactivation_table.setHorizontalHeaderLabels(['Cliente', 'Isla', 'Último contacto', 'Variación kg', 'Prioridad'])
         self._configure_table(self.reactivation_table)
         header = self.reactivation_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -739,17 +751,27 @@ class DashboardPage(QWidget):
         layout.setSpacing(10)
         heading = QLabel(title)
         heading.setObjectName('dashboardPanelTitle')
-        heading.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        layout.addWidget(heading)
-        container = QVBoxLayout()
+        heading.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        layout.addWidget(heading, 0)
+
+        scroll_area = QScrollArea()
+        scroll_area.setObjectName('dashboardTodayScrollArea')
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_content = QWidget()
+        scroll_content.setObjectName('dashboardTodayItemsHost')
+        container = QVBoxLayout(scroll_content)
         container.setContentsMargins(0, 0, 0, 0)
         container.setSpacing(8)
+        container.setAlignment(Qt.AlignmentFlag.AlignTop)
         empty = QLabel(empty_text)
         empty.setObjectName('dashboardEmptyLabel')
         empty.setWordWrap(True)
         empty.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         container.addWidget(empty)
-        layout.addLayout(container)
+        scroll_area.setWidget(scroll_content)
+        layout.addWidget(scroll_area, 1)
         return panel, container, heading
 
     def _build_table_panel(self, title: str, object_name: str) -> QFrame:
@@ -794,6 +816,7 @@ class DashboardPage(QWidget):
         self.agenda_month_calendar = DashboardMonthCalendar(self, panel)
         self.agenda_month_calendar.selectionChanged.connect(self._handle_agenda_calendar_selection_changed)
         self.agenda_month_calendar.currentPageChanged.connect(self._handle_agenda_calendar_page_changed)
+        self.agenda_month_calendar.weekSelected.connect(self._handle_agenda_calendar_week_selected)
         layout.addWidget(self.agenda_month_calendar, 1)
 
         summary_row = QHBoxLayout()
@@ -870,7 +893,7 @@ class DashboardPage(QWidget):
         recent_panel = self._build_table_panel('Pedidos recientes', 'dashboardOrdersRecentPanel')
         self.orders_recent_table = QTableWidget(0, 7)
         self.orders_recent_table.setObjectName('dashboardOrdersRecentTable')
-        self.orders_recent_table.setHorizontalHeaderLabels(['Pedido', 'Almac?n', 'Fecha', 'Kg pedido', 'Kg recibido', 'Kg pend.', 'Estado'])
+        self.orders_recent_table.setHorizontalHeaderLabels(['Pedido', 'Almacén', 'Fecha', 'Kg pedido', 'Kg recibido', 'Kg pend.', 'Estado'])
         self._configure_table(self.orders_recent_table)
         recent_header = self.orders_recent_table.horizontalHeader()
         recent_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -881,10 +904,10 @@ class DashboardPage(QWidget):
         recent_panel.layout().addWidget(self.orders_recent_table)
         upper_row.addWidget(recent_panel, 6)
 
-        pending_panel = self._build_table_panel('M?s pendiente', 'dashboardOrdersPendingPanel')
+        pending_panel = self._build_table_panel('Más pendiente', 'dashboardOrdersPendingPanel')
         self.orders_pending_table = QTableWidget(0, 4)
         self.orders_pending_table.setObjectName('dashboardOrdersPendingTable')
-        self.orders_pending_table.setHorizontalHeaderLabels(['Fecha', 'Pedido', 'Almac?n', 'Kg pend.'])
+        self.orders_pending_table.setHorizontalHeaderLabels(['Fecha', 'Pedido', 'Almacén', 'Kg pend.'])
         self._configure_table(self.orders_pending_table)
         pending_header = self.orders_pending_table.horizontalHeader()
         pending_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -899,10 +922,10 @@ class DashboardPage(QWidget):
         lower_row.setContentsMargins(0, 0, 0, 0)
         lower_row.setSpacing(12)
 
-        warehouse_panel = self._build_table_panel('M?s pendiente por almac?n', 'dashboardOrdersWarehousePanel')
+        warehouse_panel = self._build_table_panel('Más pendiente por almacén', 'dashboardOrdersWarehousePanel')
         self.orders_warehouse_table = QTableWidget(0, 4)
         self.orders_warehouse_table.setObjectName('dashboardOrdersWarehouseTable')
-        self.orders_warehouse_table.setHorizontalHeaderLabels(['Almac?n', 'Abiertos', 'Kg pend.', '?lt. recepci?n'])
+        self.orders_warehouse_table.setHorizontalHeaderLabels(['Almacén', 'Abiertos', 'Kg pend.', 'Últ. recepción'])
         self._configure_table(self.orders_warehouse_table)
         warehouse_header = self.orders_warehouse_table.horizontalHeader()
         warehouse_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -943,7 +966,7 @@ class DashboardPage(QWidget):
         self.sales_kpi_notes: dict[str, QLabel] = {}
         for column, (key, title, tone, icon_name) in enumerate([
             ('total_kg', 'Kg vendidos', 'blue', 'scale.svg'),
-            ('delta_kg', 'VariaciÃ³n kg', 'blue', 'trending-down.svg'),
+            ('delta_kg', 'Variación kg', 'blue', 'trending-down.svg'),
             ('active_customers', 'Clientes activos', 'green', 'briefcase.svg'),
             ('active_islands', 'Islas activas', 'orange', 'map.svg'),
         ]):
@@ -1046,7 +1069,7 @@ class DashboardPage(QWidget):
         risk_panel = self._build_table_panel('Riesgos de stock y caducidad', 'dashboardWarehouseRiskPanel')
         self.warehouse_risk_table = QTableWidget(0, 7)
         self.warehouse_risk_table.setObjectName('dashboardWarehouseRiskTable')
-        self.warehouse_risk_table.setHorizontalHeaderLabels(['Almac?n', 'Ref.', 'Producto', 'Lote', 'Caduca', 'Kg', 'Estado'])
+        self.warehouse_risk_table.setHorizontalHeaderLabels(['Almacén', 'Ref.', 'Producto', 'Lote', 'Caduca', 'Kg', 'Estado'])
         self._configure_table(self.warehouse_risk_table)
         risk_header = self.warehouse_risk_table.horizontalHeader()
         risk_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -1057,10 +1080,10 @@ class DashboardPage(QWidget):
         risk_panel.layout().addWidget(self.warehouse_risk_table)
         upper_row.addWidget(risk_panel, 6)
 
-        stock_panel = self._build_table_panel('Stock por almac?n', 'dashboardWarehouseStockPanel')
+        stock_panel = self._build_table_panel('Stock por almacén', 'dashboardWarehouseStockPanel')
         self.warehouse_stock_table = QTableWidget(0, 3)
         self.warehouse_stock_table.setObjectName('dashboardWarehouseStockTable')
-        self.warehouse_stock_table.setHorizontalHeaderLabels(['Almac?n', 'Art?culos', 'Stock kg'])
+        self.warehouse_stock_table.setHorizontalHeaderLabels(['Almacén', 'Artículos', 'Stock kg'])
         self._configure_table(self.warehouse_stock_table)
         stock_header = self.warehouse_stock_table.horizontalHeader()
         stock_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -1076,7 +1099,7 @@ class DashboardPage(QWidget):
         entries_panel = self._build_table_panel('Entradas del mes', 'dashboardWarehouseEntriesPanel')
         self.warehouse_entries_table = QTableWidget(0, 5)
         self.warehouse_entries_table.setObjectName('dashboardWarehouseEntriesTable')
-        self.warehouse_entries_table.setHorizontalHeaderLabels(['Fecha', 'Almac?n', 'Ref.', 'Producto', 'Kg'])
+        self.warehouse_entries_table.setHorizontalHeaderLabels(['Fecha', 'Almacén', 'Ref.', 'Producto', 'Kg'])
         self._configure_table(self.warehouse_entries_table)
         entries_header = self.warehouse_entries_table.horizontalHeader()
         entries_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -1090,7 +1113,7 @@ class DashboardPage(QWidget):
         outputs_panel = self._build_table_panel('Salidas del mes', 'dashboardWarehouseOutputsPanel')
         self.warehouse_outputs_table = QTableWidget(0, 5)
         self.warehouse_outputs_table.setObjectName('dashboardWarehouseOutputsTable')
-        self.warehouse_outputs_table.setHorizontalHeaderLabels(['Fecha', 'Almac?n', 'Ref.', 'Producto', 'Kg'])
+        self.warehouse_outputs_table.setHorizontalHeaderLabels(['Fecha', 'Almacén', 'Ref.', 'Producto', 'Kg'])
         self._configure_table(self.warehouse_outputs_table)
         outputs_header = self.warehouse_outputs_table.horizontalHeader()
         outputs_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -1114,6 +1137,7 @@ class DashboardPage(QWidget):
             self._reload_agenda_dashboard()
     def _reload_agenda_dashboard(self) -> None:
         snapshot = self.dashboard_service.load_snapshot()
+        activity_rows = self.dashboard_service.list_all_activities()
         self.date_label.setText(self.format_date(date.today(), long=True))
         self.kpi_labels['pending_today'].setText(str(snapshot.pending_today))
         self.kpi_notes['pending_today'].setText('actividades')
@@ -1123,54 +1147,75 @@ class DashboardPage(QWidget):
         self.kpi_notes['completed_today'].setText('actividades')
         self.kpi_labels['customers_without_follow_up'].setText(str(snapshot.customers_without_follow_up))
         self.kpi_notes['customers_without_follow_up'].setText('clientes')
-        self._reload_today_panel(snapshot.today_items, self.agenda_calendar_selected_date)
+        if self.agenda_calendar_week_range is None:
+            self._reload_today_panel(activity_rows, self.agenda_calendar_selected_date)
+        else:
+            week_start, week_end = self.agenda_calendar_week_range
+            self._reload_week_panel(activity_rows, week_start, week_end)
         self._reload_reactivation_table(snapshot.reactivation_rows)
         self._reload_island_table(snapshot.island_rows)
-        self._reload_agenda_calendar_panel(self.dashboard_service.list_all_activities(), today_value=date.today())
+        self._reload_agenda_calendar_panel(activity_rows, today_value=date.today())
         self.footer_label.setText(
-            f'Ãšltima actualizaciÃ³n: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} Â· {snapshot.reactivation_metric_label}'
+            f'Última actualización: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} · {snapshot.reactivation_metric_label}'
         )
 
     def _reload_today_panel(self, rows: list[DashboardActivityRow], selected_day: date) -> None:
+        self._clear_today_items()
+        self.today_panel_title.setText('Agenda de hoy' if selected_day == date.today() else f'Agenda del {self.format_date(selected_day)}')
+        filtered = [row for row in rows if row.due_date == selected_day]
+        self._render_activity_cards(filtered, empty_text='No hay actividades para el día seleccionado.')
+
+    def _reload_week_panel(self, rows: list[DashboardActivityRow], week_start: date, week_end: date) -> None:
+        self._clear_today_items()
+        week_number = week_start.isocalendar().week
+        self.today_panel_title.setText(
+            f'Agenda semana {week_number} · {self.format_date(week_start)} - {self.format_date(week_end)}'
+        )
+        filtered = [row for row in rows if week_start <= row.due_date <= week_end]
+        self._render_activity_cards(filtered, empty_text='No hay actividades para la semana seleccionada.')
+
+    def _clear_today_items(self) -> None:
         while self.today_items_layout.count():
             item = self.today_items_layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
+                widget.setParent(None)
                 widget.deleteLater()
-        if selected_day == date.today():
-            self.today_panel_title.setText('Agenda de hoy')
-        else:
-            self.today_panel_title.setText(f'Agenda del {self.format_date(selected_day)}')
-        filtered = [row for row in rows if row.fecha_actividad == selected_day] if selected_day != date.today() else list(rows)
-        if not filtered:
-            empty = QLabel('No hay actividades para el dÃ­a seleccionado.')
+
+    def _render_activity_cards(self, rows: list[DashboardActivityRow], *, empty_text: str) -> None:
+        if not rows:
+            empty = QLabel(empty_text)
             empty.setObjectName('dashboardEmptyLabel')
             empty.setWordWrap(True)
             empty.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             self.today_items_layout.addWidget(empty)
             return
-        for row in filtered:
+        for row in rows:
             card = QFrame()
             card.setObjectName('dashboardActivityCard')
-            layout = QVBoxLayout(card)
+            layout = QHBoxLayout(card)
             layout.setContentsMargins(10, 10, 10, 10)
-            layout.setSpacing(4)
-            customer = QLabel(f'{row.cliente_codigo} Â· {row.cliente_nombre}')
+            layout.setSpacing(12)
+            customer = QLabel(f'{row.cliente_codigo} · {row.cliente_nombre}')
             customer.setObjectName('dashboardActivityCustomer')
-            summary = QLabel(row.resumen)
+            customer.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+            summary = QLabel(row.resumen or row.detalle or '-')
             summary.setObjectName('dashboardActivitySummary')
-            detail = QLabel(f'{row.isla_nombre} Â· {row.estado}')
-            detail.setObjectName('dashboardActivityDetail')
-            layout.addWidget(customer)
-            layout.addWidget(summary)
-            layout.addWidget(detail)
+            summary.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            state = QLabel(self.agenda_state_label(row.estado))
+            state.setObjectName('dashboardActivityState')
+            state.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            state.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+            layout.addWidget(customer, 0)
+            layout.addWidget(summary, 1)
+            layout.addWidget(state, 0)
             self.today_items_layout.addWidget(card)
 
     def _reload_reactivation_table(self, rows: list[DashboardReactivationRow]) -> None:
         self.reactivation_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
-                f'{row.cliente_codigo} Â· {row.cliente_nombre}',
+                f'{row.cliente_codigo} · {row.cliente_nombre}',
                 row.isla_nombre,
                 self.format_date(row.last_contact) if row.last_contact else 'Sin registro',
                 self._format_number_es(row.delta_kg, suffix=' kg', signed=True),
@@ -1226,11 +1271,16 @@ class DashboardPage(QWidget):
         selected = self.agenda_month_calendar.selectedDate()
         self.set_selected_date(date(selected.year(), selected.month(), selected.day()))
 
+    def _handle_agenda_calendar_week_selected(self, week_start: date, week_end: date, _week_number: int) -> None:
+        self.agenda_calendar_week_range = (week_start, week_end)
+        self._reload_week_panel(self.dashboard_service.list_all_activities(), week_start, week_end)
+
     def _handle_agenda_calendar_page_changed(self, year: int, month: int) -> None:
         self.agenda_calendar_month = date(year, month, 1)
         self._refresh_agenda_calendar(today_value=date.today())
 
     def set_selected_date(self, selected_day: date) -> None:
+        self.agenda_calendar_week_range = None
         self.agenda_calendar_selected_date = selected_day
         self._reload_today_panel(self.dashboard_service.list_all_activities(), selected_day)
         self._reload_agenda_calendar_panel(self.dashboard_service.list_all_activities(), today_value=date.today())
@@ -1326,7 +1376,7 @@ class DashboardPage(QWidget):
         self._populate_order_warehouse_table(snapshot.warehouse_rows)
         self._populate_order_state_table(snapshot.state_rows)
         self.footer_label.setText(
-            f'?ltima actualizaci?n: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} ? Dashboard pedidos {snapshot.year}'
+            f'Última actualización: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} · Dashboard pedidos {snapshot.year}'
         )
 
     def _populate_order_recent_table(self, rows: list[DashboardOrderRow]) -> None:
@@ -1384,7 +1434,7 @@ class DashboardPage(QWidget):
         self.sales_kpi_labels['total_kg'].setText(self._format_number_es(snapshot.total_kg))
         self.sales_kpi_notes['total_kg'].setText(f'kg vendidos en {snapshot.year}')
         self.sales_kpi_labels['delta_kg'].setText(self._format_number_es(snapshot.delta_kg, signed=True))
-        self.sales_kpi_notes['delta_kg'].setText(f'vs {snapshot.previous_year} Â· {self._format_number_es(snapshot.delta_pct, signed=True, suffix=" %")}')
+        self.sales_kpi_notes['delta_kg'].setText(f'vs {snapshot.previous_year} · {self._format_number_es(snapshot.delta_pct, signed=True, suffix=" %")}')
         self.sales_kpi_labels['active_customers'].setText(str(snapshot.active_customers))
         self.sales_kpi_notes['active_customers'].setText('clientes activos')
         self.sales_kpi_labels['active_islands'].setText(str(snapshot.active_islands))
@@ -1397,14 +1447,14 @@ class DashboardPage(QWidget):
         self._populate_sales_types_table(snapshot.type_rows)
         self._populate_sales_zero_table(snapshot.zero_consumption_rows)
         self.footer_label.setText(
-            f'Ãšltima actualizaciÃ³n: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} Â· Ventas {snapshot.year} vs {snapshot.previous_year}'
+            f'Última actualización: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} · Ventas {snapshot.year} vs {snapshot.previous_year}'
         )
 
     def _populate_sales_drops_table(self, rows: list[DashboardSalesCustomerRow]) -> None:
         self.sales_drops_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
-                f'{row.cliente_codigo} Â· {row.cliente_nombre}',
+                f'{row.cliente_codigo} · {row.cliente_nombre}',
                 row.isla,
                 self._format_number_es(row.kg_prev, suffix=' kg'),
                 self._format_number_es(row.kg_curr, suffix=' kg'),
@@ -1443,7 +1493,7 @@ class DashboardPage(QWidget):
         self.sales_zero_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
-                f'{row.cliente_codigo} Â· {row.cliente_nombre}',
+                f'{row.cliente_codigo} · {row.cliente_nombre}',
                 row.isla,
                 row.cliente_tipo,
                 self._format_number_es(row.kg_prev, suffix=' kg'),
@@ -1466,7 +1516,7 @@ class DashboardPage(QWidget):
         self._populate_warehouse_stock_table(snapshot.warehouse_rows)
         self._populate_warehouse_movement_table(self.warehouse_entries_table, snapshot.entry_rows)
         self._populate_warehouse_movement_table(self.warehouse_outputs_table, snapshot.output_rows)
-        self.footer_label.setText(f'?ltima actualizaci?n: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} ? umbral bajo stock: {self._format_number_es(snapshot.low_stock_threshold_units)} uds.')
+        self.footer_label.setText(f'Última actualización: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} · umbral bajo stock: {self._format_number_es(snapshot.low_stock_threshold_units)} uds.')
 
 
 
@@ -1512,7 +1562,7 @@ class DashboardPage(QWidget):
         if isinstance(page_names, list) and callable(setter) and 'Almacen' in page_names:
             setter(page_names.index('Almacen'))
             return
-        QMessageBox.information(self, 'Dashboard', 'La p?gina de Almac?n no est? disponible en esta ventana.')
+        QMessageBox.information(self, 'Dashboard', 'La página de Almacén no está disponible en esta ventana.')
 
 
     def customer_choices(self, *, include_inactive: bool = False) -> list[tuple[str, str]]:
@@ -1571,7 +1621,7 @@ class DashboardPage(QWidget):
     def customer_label(code: object, name: str) -> str:
         code_text = str(code or '').strip()
         name_text = str(name or '').strip()
-        return f'{code_text} Â· {name_text}' if code_text else name_text
+        return f'{code_text} · {name_text}' if code_text else name_text
 
     def _open_new_activity(self) -> None:
         if not self.customer_choices():
@@ -1594,7 +1644,7 @@ class DashboardPage(QWidget):
             self.reload()
 
     def _show_placeholder_dashboard(self, name: str) -> None:
-        QMessageBox.information(self, 'Dashboard', f'El dashboard de {name} se implementarÃ¡ en una siguiente fase.')
+        QMessageBox.information(self, 'Dashboard', f'El dashboard de {name} se implementará en una siguiente fase.')
 
     def _open_sales_page(self) -> None:
         window = self.window()
@@ -1603,7 +1653,7 @@ class DashboardPage(QWidget):
         if isinstance(page_names, list) and callable(setter) and 'Ventas' in page_names:
             setter(page_names.index('Ventas'))
             return
-        QMessageBox.information(self, 'Dashboard', 'La pÃ¡gina de Ventas no estÃ¡ disponible en esta ventana.')
+        QMessageBox.information(self, 'Dashboard', 'La página de Ventas no está disponible en esta ventana.')
 
 
 
@@ -1645,7 +1695,7 @@ class DashboardPage(QWidget):
             return '' if allow_blank else ''
         if long:
             months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-            weekdays = ['lunes', 'martes', 'miÃ©rcoles', 'jueves', 'viernes', 'sÃ¡bado', 'domingo']
+            weekdays = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
             return f"{weekdays[value.weekday()]}, {value.day:02d} de {months[value.month - 1]} de {value.year}"
         return value.strftime('%d/%m/%Y')
 
@@ -1715,12 +1765,12 @@ class DashboardPage(QWidget):
                 background-color: #2563EB; color: #FFFFFF; border: 1px solid #2563EB;
                 border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700;
             }
-            QPushButton#dashboardFullAgendaButton, QPushButton#dashboardPanelLinkButton {
+            QPushButton#dashboardFullAgendaButton {
                 background-color: #FFFFFF; color: #1D4ED8; border: 1px solid #CBD5E1;
                 border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700;
             }
             QPushButton#dashboardNewActivityButton:hover { background-color: #1D4ED8; }
-            QPushButton#dashboardFullAgendaButton:hover, QPushButton#dashboardPanelLinkButton:hover {
+            QPushButton#dashboardFullAgendaButton:hover {
                 background-color: #EFF6FF; border-color: #93C5FD;
             }
             QFrame#dashboardKpiCard, QFrame[dashboardPanel='true'] {
@@ -1738,12 +1788,13 @@ class DashboardPage(QWidget):
             QFrame#dashboardKpiIconWrap[tone='orange'] { background-color: #FFF7ED; }
             QLabel#dashboardKpiTitle, QLabel#dashboardPanelTitle { color: #1E293B; font-size: 15px; font-weight: 700; }
             QLabel#dashboardKpiValue { color: #0F172A; font-size: 28px; font-weight: 800; }
-            QLabel#dashboardKpiNote, QLabel#dashboardFooterLabel, QLabel#dashboardEmptyLabel, QLabel#dashboardActivityDetail {
+            QLabel#dashboardKpiNote, QLabel#dashboardFooterLabel, QLabel#dashboardEmptyLabel, QLabel#dashboardActivityState {
                 color: #64748B; font-size: 13px;
             }
             QLabel#dashboardActivityCustomer { color: #0F172A; font-size: 14px; font-weight: 700; }
             QLabel#dashboardActivitySummary { color: #1E293B; font-size: 13px; }
             QFrame#dashboardActivityCard { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
+            QScrollArea#dashboardTodayScrollArea, QWidget#dashboardTodayItemsHost { background: transparent; border: none; }
             QWidget#dashboardCalendarHeadingBlock { background-color: transparent; border: none; }
             QCalendarWidget#dashboardMonthCalendar {
                 background: #FFFFFF;

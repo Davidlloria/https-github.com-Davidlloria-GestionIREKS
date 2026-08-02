@@ -5,8 +5,19 @@ from datetime import date, datetime
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QFrame, QLabel, QSizePolicy, QWidget
+from PySide6.QtCore import QDate, Qt
+from PySide6.QtWidgets import (
+    QApplication,
+    QAbstractItemView,
+    QCalendarWidget,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QWidget,
+)
 
 from app.services.customer_dashboard_service import (
     DashboardActivityRow,
@@ -209,13 +220,18 @@ def test_dashboard_page_starts_in_agenda_mode() -> None:
     assert page.full_agenda_btn.objectName() == 'dashboardFullAgendaButton'
     assert page.reactivation_table.rowCount() == 1
     assert page.island_table.rowCount() == 1
-    assert 'Variaci?n kg' in page.footer_label.text()
+    assert 'Última actualización:' in page.footer_label.text()
     assert not page.new_activity_btn.icon().isNull()
     assert not page.full_agenda_btn.icon().isNull()
     assert page.findChild(QWidget, 'dashboardSidebar').width() == 184
     kpi_cards = page.findChildren(QFrame, 'dashboardKpiCard')
     assert len(kpi_cards) == 16
     assert all(card.minimumHeight() == 104 and card.maximumHeight() == 104 for card in kpi_cards)
+    assert page.findChild(QPushButton, 'dashboardPanelLinkButton') is None
+    today_scroll = page.findChild(QScrollArea, 'dashboardTodayScrollArea')
+    assert today_scroll is not None
+    assert not today_scroll.isAncestorOf(page.today_panel_title)
+    assert page.today_items_layout.alignment() == Qt.AlignmentFlag.AlignTop
     calendar = page.agenda_month_calendar
     assert page.findChild(QWidget, 'dashboardCalendarNavBlock') is None
     assert calendar.isNavigationBarVisible()
@@ -267,6 +283,75 @@ def test_dashboard_page_selects_day_and_updates_title() -> None:
     assert page.today_panel_title.text() == 'Agenda del 21/07/2026'
     assert len(page._agenda_rows_for_date(date(2026, 7, 21))) == 1
     assert page._agenda_day_tone(page._agenda_rows_for_date(date(2026, 7, 21)), today_value=date(2026, 7, 20)) == 'blue'
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_dashboard_page_uses_due_date_and_renders_activity_in_one_line() -> None:
+    _application()
+    service = _StubDashboardService()
+    followed_up = DashboardActivityRow(
+        agenda_id='ag-2', cliente_id='cli-2', cliente_codigo=586, cliente_nombre='NPANADERIA',
+        isla_nombre='Tenerife', fecha_actividad=date(2026, 7, 18), fecha_seguimiento=date(2026, 7, 23),
+        tipo='seguimiento', estado='hecho', resumen='Concretar reunión', detalle='', prioridad='normal',
+        responsable='Ana', created_at=datetime(2026, 7, 18, 8, 0, 0), updated_at=datetime(2026, 7, 23, 8, 0, 0),
+    )
+    service.list_all_activities = lambda: [followed_up]
+    page = DashboardPage(
+        customer_service=_StubCustomerService(), dashboard_service=service,
+        order_dashboard_service=_StubOrderDashboardService(), warehouse_dashboard_service=_StubWarehouseDashboardService(),
+    )
+
+    page.set_selected_date(date(2026, 7, 23))
+
+    cards = page.findChildren(QFrame, 'dashboardActivityCard')
+    assert len(cards) == 1
+    assert isinstance(cards[0].layout(), QHBoxLayout)
+    assert cards[0].findChild(QLabel, 'dashboardActivityCustomer').text() == '586 · NPANADERIA'
+    assert cards[0].findChild(QLabel, 'dashboardActivitySummary').text() == 'Concretar reunión'
+    assert cards[0].findChild(QLabel, 'dashboardActivityState').text() == 'Hecha'
+    assert page._agenda_day_tone(page._agenda_rows_for_date(date(2026, 7, 23)), today_value=date(2026, 7, 23)) == 'green'
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_dashboard_page_week_number_click_lists_the_whole_week() -> None:
+    _application()
+    service = _StubDashboardService()
+    week_rows = [
+        DashboardActivityRow(
+            agenda_id=f'ag-{day}', cliente_id=f'cli-{day}', cliente_codigo=100 + day, cliente_nombre=f'Cliente {day}',
+            isla_nombre='Gran Canaria', fecha_actividad=date(2026, 7, day), fecha_seguimiento=None,
+            tipo='seguimiento', estado='pendiente', resumen=f'Actividad {day}', detalle='', prioridad='normal',
+            responsable='Ana', created_at=datetime(2026, 7, day, 8, 0, 0), updated_at=datetime(2026, 7, day, 8, 0, 0),
+        )
+        for day in (20, 22, 26, 27)
+    ]
+    service.list_all_activities = lambda: week_rows
+    page = DashboardPage(
+        customer_service=_StubCustomerService(), dashboard_service=service,
+        order_dashboard_service=_StubOrderDashboardService(), warehouse_dashboard_service=_StubWarehouseDashboardService(),
+    )
+    calendar = page.agenda_month_calendar
+    calendar.setCurrentPage(2026, 7)
+    calendar_view = calendar.findChild(QAbstractItemView, 'qt_calendar_calendarview')
+    delegate = calendar_view.itemDelegate()
+    week_row = next(
+        row for row in range(1, 7)
+        if delegate._date_for_index(row, 1) == QDate(2026, 7, 20)
+    )
+
+    calendar_view.clicked.emit(calendar_view.model().index(week_row, 0))
+
+    assert page.today_panel_title.text() == 'Agenda semana 30 · 20/07/2026 - 26/07/2026'
+    assert len(page.findChildren(QFrame, 'dashboardActivityCard')) == 3
+    assert [label.text() for label in page.findChildren(QLabel, 'dashboardActivitySummary')] == [
+        'Actividad 20', 'Actividad 22', 'Actividad 26'
+    ]
 
     page.close()
     page.deleteLater()
@@ -338,7 +423,7 @@ def test_dashboard_page_can_switch_to_sales_mode() -> None:
     assert page.sales_kpi_labels['active_customers'].text() == '87'
     assert page.sales_kpi_labels['active_islands'].text() == '5'
     assert page.sales_drops_table.rowCount() == 1
-    assert page.sales_drops_table.item(0, 0).text() == '431 Â· Panaderia Azul'
+    assert page.sales_drops_table.item(0, 0).text() == '431 · Panaderia Azul'
     assert page.sales_islands_table.rowCount() == 1
     assert page.sales_types_table.rowCount() == 1
     assert page.sales_zero_table.rowCount() == 1
