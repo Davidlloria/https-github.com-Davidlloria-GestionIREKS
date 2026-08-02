@@ -83,8 +83,8 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                             │   ├── customerSalesTotals (QTableWidget, fila fija de totales, columnas sincronizadas con la tabla, columnas 1-2 unificadas visualmente, separadores verticales visibles, fondo pastel #EEF4FF, alto 34 px, Kg con sufijo "kg", € con sufijo "€", resincronización diferida al mostrar la pestaña)
                             │   ├── customerSalesEmpty (QLabel, permanece oculto; la tabla de ventas se muestra siempre)
                             │   └── QDialog comparativa de ventas (tamaño inicial 1360 × 720 px)
-                            │       ├── cabecera con nombre del cliente
-                            │       ├── customerSalesComparisonGroups (QTableWidget, grupos: año anterior / año seleccionado / Diferencia)
+                            │       ├── cabecera con nombre del cliente y contexto de comparación (órden: año anterior vs año actual · Unid. / Kg / €)
+                            │       ├── customerSalesComparisonGroupsBar (QWidget con pastillas sincronizadas: año anterior / año actual / Diferencia)
                             │       ├── customerSalesComparisonTable (QTableWidget, 11 columnas ordenables)
                             │       │   ├── Referencia
                             │       │   ├── Descripción
@@ -97,7 +97,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                             │       │   ├── Δ Unid.
                             │       │   ├── Δ Kg
                             │       │   └── Δ €
-                            │       ├── customerSalesComparisonTotals (QTableWidget, fila fija de totales)
+                            │       ├── customerSalesComparisonTotals (QTableWidget, fila fija de totales, columnas sincronizadas, primeras 2 columnas unificadas, fondo pastel #EEF4FF, Kg con sufijo "kg", € con sufijo "€")
                             │       ├── customerSalesEmpty (QLabel, visible si la comparativa no tiene filas)
                             │       └── pie en una línea (QHBoxLayout)
                             │           ├── customerSalesComparisonChartButton (QPushButton "Graf.", icono `assets/icons/chart-no-axes-combined.svg`)

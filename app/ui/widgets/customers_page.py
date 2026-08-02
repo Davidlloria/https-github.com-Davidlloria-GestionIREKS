@@ -909,29 +909,31 @@ class CustomersPage(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
 
-        title = QLabel(customer_name or "Cliente")
+        title = QLabel(f"{customer_name or 'Cliente'} · Comparativa {year - 1} vs {year} · Unid. / Kg / €")
         title.setProperty("role", "sectionTitle")
         layout.addWidget(title)
 
-        groups = QTableWidget(1, 3)
-        groups.setObjectName("customerSalesComparisonGroups")
-        groups.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        groups.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        groups.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        groups.verticalHeader().setVisible(False)
-        groups.horizontalHeader().setVisible(False)
-        groups.setFixedHeight(44)
-        groups.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        groups.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        groups.setItem(0, 0, QTableWidgetItem(str(year - 1)))
-        groups.setItem(0, 1, QTableWidgetItem(str(year)))
-        groups.setItem(0, 2, QTableWidgetItem("Diferencia"))
-        for column in range(3):
-            item = groups.item(0, column)
-            if item is not None:
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        groups.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(groups)
+        groups_bar = QWidget()
+        groups_bar.setObjectName("customerSalesComparisonGroupsBar")
+        groups_bar_layout = QHBoxLayout(groups_bar)
+        groups_bar_layout.setContentsMargins(0, 0, 0, 0)
+        groups_bar_layout.setSpacing(0)
+        groups_spacer = QWidget()
+        groups_spacer.setObjectName("customerSalesComparisonGroupsSpacer")
+        groups_prev = QLabel(str(year - 1))
+        groups_prev.setObjectName("customerSalesComparisonGroupPrev")
+        groups_prev.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        groups_curr = QLabel(str(year))
+        groups_curr.setObjectName("customerSalesComparisonGroupCurr")
+        groups_curr.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        groups_delta = QLabel("Diferencia")
+        groups_delta.setObjectName("customerSalesComparisonGroupDelta")
+        groups_delta.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        groups_bar_layout.addWidget(groups_spacer)
+        groups_bar_layout.addWidget(groups_prev)
+        groups_bar_layout.addWidget(groups_curr)
+        groups_bar_layout.addWidget(groups_delta)
+        layout.addWidget(groups_bar)
 
         table = QTableWidget(0, 11)
         table.setObjectName("customerSalesComparisonTable")
@@ -971,19 +973,22 @@ class CustomersPage(QWidget):
         totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         totals_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        totals_table.setShowGrid(True)
         totals_table.verticalHeader().setVisible(False)
         totals_table.horizontalHeader().setVisible(False)
-        totals_table.setFixedHeight(40)
+        totals_table.setFixedHeight(34)
         totals_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         totals_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        totals_table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        totals_table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         totals_header = totals_table.horizontalHeader()
-        totals_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        totals_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        for column in range(2, 11):
-            totals_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
         for column in range(11):
-            totals_table.setColumnWidth(column, table.columnWidth(column))
+            totals_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+        totals_table.verticalHeader().setDefaultSectionSize(30)
         layout.addWidget(totals_table)
+
+        header.sectionResized.connect(lambda *_: self._sync_related_sales_comparison_layout(table=table, totals_table=totals_table, groups_spacer=groups_spacer, groups_prev=groups_prev, groups_curr=groups_curr, groups_delta=groups_delta))
+        table.verticalScrollBar().rangeChanged.connect(lambda *_: self._sync_related_sales_comparison_layout(table=table, totals_table=totals_table, groups_spacer=groups_spacer, groups_prev=groups_prev, groups_curr=groups_curr, groups_delta=groups_delta))
 
         empty = QLabel("No hay datos de comparativa para este cliente.")
         empty.setObjectName("customerSalesEmpty")
@@ -1012,6 +1017,7 @@ class CustomersPage(QWidget):
         layout.addLayout(footer)
 
         self._populate_related_sales_comparison_table(table=table, totals_table=totals_table, empty_label=empty, rows=rows)
+        QTimer.singleShot(0, lambda: self._sync_related_sales_comparison_layout(table=table, totals_table=totals_table, groups_spacer=groups_spacer, groups_prev=groups_prev, groups_curr=groups_curr, groups_delta=groups_delta))
         return dialog
 
     def _populate_related_sales_comparison_table(self, *, table: QTableWidget, totals_table: QTableWidget, empty_label: QLabel, rows: list) -> None:
@@ -1037,7 +1043,8 @@ class CustomersPage(QWidget):
             for col_idx, base_item in enumerate(base_items):
                 table.setItem(row_idx, col_idx, base_item)
             for offset, value in enumerate(values, start=2):
-                number_item = QTableWidgetItem(self._format_sales_number(value))
+                suffix = " kg" if offset in (3, 6, 9) else " €" if offset in (4, 7, 10) else ""
+                number_item = QTableWidgetItem(self._format_sales_number(value, suffix=suffix))
                 number_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 number_item.setData(Qt.ItemDataRole.UserRole, value)
                 if offset >= 8:
@@ -1047,11 +1054,15 @@ class CustomersPage(QWidget):
                         number_item.setForeground(QColor("#B42318"))
                 table.setItem(row_idx, offset, number_item)
 
-        totals_table.setItem(0, 0, QTableWidgetItem(""))
         totals_label = QTableWidgetItem("TOTALES")
-        totals_table.setItem(0, 1, totals_label)
+        totals_label.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        totals_table.clearSpans()
+        totals_table.setSpan(0, 0, 1, 2)
+        totals_table.setItem(0, 0, totals_label)
+        totals_table.setItem(0, 1, QTableWidgetItem(""))
         for idx, value in enumerate(totals, start=2):
-            item = QTableWidgetItem(self._format_sales_number(value))
+            suffix = " kg" if idx in (3, 6, 9) else " €" if idx in (4, 7, 10) else ""
+            item = QTableWidgetItem(self._format_sales_number(value, suffix=suffix))
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             if idx >= 8:
                 if value > 0:
@@ -1059,12 +1070,34 @@ class CustomersPage(QWidget):
                 elif value < 0:
                     item.setForeground(QColor("#B42318"))
             totals_table.setItem(0, idx, item)
+        self._sync_related_sales_comparison_layout(table=table, totals_table=totals_table, groups_spacer=None, groups_prev=None, groups_curr=None, groups_delta=None)
 
         has_rows = bool(rows)
         table.setVisible(has_rows)
         totals_table.setVisible(has_rows)
         empty_label.setVisible(not has_rows)
         table.setSortingEnabled(True)
+
+    def _sync_related_sales_comparison_layout(self, *, table: QTableWidget, totals_table: QTableWidget, groups_spacer: QWidget | None, groups_prev: QLabel | None, groups_curr: QLabel | None, groups_delta: QLabel | None) -> None:
+        for column in range(table.columnCount()):
+            totals_table.setColumnWidth(column, table.columnWidth(column))
+
+        total_item = totals_table.item(0, 0)
+        if total_item is not None:
+            total_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
+        if groups_spacer is None or groups_prev is None or groups_curr is None or groups_delta is None:
+            return
+
+        left_width = table.columnWidth(0) + table.columnWidth(1)
+        prev_width = sum(table.columnWidth(column) for column in range(2, 5))
+        curr_width = sum(table.columnWidth(column) for column in range(5, 8))
+        delta_width = sum(table.columnWidth(column) for column in range(8, 11))
+
+        groups_spacer.setFixedWidth(max(0, left_width))
+        groups_prev.setFixedWidth(max(0, prev_width))
+        groups_curr.setFixedWidth(max(0, curr_width))
+        groups_delta.setFixedWidth(max(0, delta_width))
 
     def _open_related_sales_chart(self, *, rows: list, year: int, customer_name: str, parent: QWidget | None = None) -> None:
         if not rows:
@@ -2899,6 +2932,55 @@ class CustomersPage(QWidget):
                 background: #F8FAFD;
                 border: 1px dashed #D6E0EE;
                 border-radius: 10px;
+            }
+            QWidget#customerSalesComparisonGroupsBar {
+                background: transparent;
+            }
+            QWidget#customerSalesComparisonGroupsSpacer {
+                background: transparent;
+                border: none;
+            }
+            QLabel#customerSalesComparisonGroupPrev,
+            QLabel#customerSalesComparisonGroupCurr,
+            QLabel#customerSalesComparisonGroupDelta {
+                min-height: 28px;
+                max-height: 28px;
+                padding: 0 10px;
+                border-radius: 8px;
+                font-weight: 700;
+                color: #1F2A44;
+                border: 1px solid transparent;
+            }
+            QLabel#customerSalesComparisonGroupPrev {
+                background: #E8F0FE;
+                border-color: #BFDBFE;
+                color: #1D4ED8;
+            }
+            QLabel#customerSalesComparisonGroupCurr {
+                background: #DCFCE7;
+                border-color: #BBF7D0;
+                color: #15803D;
+            }
+            QLabel#customerSalesComparisonGroupDelta {
+                background: #F3E8FF;
+                border-color: #DDD6FE;
+                color: #7C3AED;
+            }
+            QTableWidget#customerSalesComparisonTotals {
+                border: 1px solid #D8E3F2;
+                border-radius: 8px;
+                background: #EEF4FF;
+                gridline-color: #D8E3F2;
+            }
+            QTableWidget#customerSalesComparisonTotals::item {
+                padding: 4px 8px;
+                background: #EEF4FF;
+                color: #1F2A44;
+                border: 0;
+            }
+            QTableWidget#customerSalesComparisonTotals::item:selected {
+                background: #EEF4FF;
+                color: #1F2A44;
             }
             QTableWidget#customerSalesTotals {
                 border: 1px solid #D8E3F2;
