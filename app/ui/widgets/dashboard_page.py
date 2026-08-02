@@ -5,7 +5,7 @@ from html import escape
 from pathlib import Path
 
 from PySide6.QtCore import QDate, QEvent, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QPageLayout, QPainter, QPixmap, QTextCharFormat, QTextDocument
+from PySide6.QtGui import QBrush, QColor, QIcon, QPageLayout, QPainter, QPixmap, QTextCharFormat, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
@@ -679,8 +679,36 @@ class DashboardPage(QWidget):
         self.today_report_rows: list[DashboardActivityRow] = []
         self.current_dashboard = 'agenda'
         self.dashboard_nav_buttons: dict[str, QPushButton] = {}
+        self._orders_recent_hover_row = -1
         self._build_ui()
         self.reload()
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched is getattr(getattr(self, 'orders_recent_table', None), 'viewport', lambda: None)():
+            if event.type() == QEvent.Type.MouseMove:
+                index = self.orders_recent_table.indexAt(event.position().toPoint())
+                self._set_orders_recent_hover_row(index.row() if index.isValid() else -1)
+            elif event.type() == QEvent.Type.Leave:
+                self._set_orders_recent_hover_row(-1)
+        return super().eventFilter(watched, event)
+
+    def _set_orders_recent_hover_row(self, row_index: int) -> None:
+        if row_index == self._orders_recent_hover_row:
+            return
+        self._paint_orders_recent_hover_row(self._orders_recent_hover_row, hover=False)
+        self._orders_recent_hover_row = row_index
+        self._paint_orders_recent_hover_row(self._orders_recent_hover_row, hover=True)
+
+    def _paint_orders_recent_hover_row(self, row_index: int, *, hover: bool) -> None:
+        if row_index < 0 or not hasattr(self, 'orders_recent_table'):
+            return
+        if row_index >= self.orders_recent_table.rowCount():
+            return
+        brush = QBrush(QColor('#EFF6FF')) if hover else QBrush()
+        for column in range(self.orders_recent_table.columnCount()):
+            item = self.orders_recent_table.item(row_index, column)
+            if item is not None:
+                item.setBackground(brush)
 
     def _build_ui(self) -> None:
         root_layout = QHBoxLayout(self)
@@ -1109,6 +1137,8 @@ class DashboardPage(QWidget):
         self.orders_recent_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.orders_recent_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.orders_recent_table.customContextMenuRequested.connect(self._show_orders_recent_context_menu)
+        self.orders_recent_table.viewport().setMouseTracking(True)
+        self.orders_recent_table.viewport().installEventFilter(self)
         recent_header = self.orders_recent_table.horizontalHeader()
         recent_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         recent_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -1691,6 +1721,7 @@ class DashboardPage(QWidget):
         )
 
     def _populate_order_recent_table(self, rows: list[DashboardOrderRow]) -> None:
+        self._set_orders_recent_hover_row(-1)
         self.orders_recent_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [

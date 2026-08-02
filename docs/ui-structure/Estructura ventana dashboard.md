@@ -353,7 +353,7 @@ dashboardOrdersView
 │   │       ├── Kg pedido: alineado a la derecha
 │   │       ├── Kg recibido: alineado a la derecha
 │   │       ├── Kg pend.: alineado a la derecha
-│   │       └── interacción: selección por fila completa y clic derecho `Ver pedido`
+│   │       └── interacción: hover y selección por fila completa, clic derecho `Ver pedido`
 │   └── dashboardOrdersPendingPanel
 │       └── dashboardOrdersPendingTable
 │           ├── Fecha

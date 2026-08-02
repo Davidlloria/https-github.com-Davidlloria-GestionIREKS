@@ -570,6 +570,31 @@ def test_dashboard_page_can_switch_to_orders_mode() -> None:
     QApplication.processEvents()
 
 
+def test_dashboard_recent_orders_hover_paints_complete_row() -> None:
+    _application()
+    page = DashboardPage(
+        customer_service=_StubCustomerService(),
+        dashboard_service=_StubDashboardService(),
+        order_dashboard_service=_StubOrderDashboardService(),
+        warehouse_dashboard_service=_StubWarehouseDashboardService(),
+    )
+
+    page._set_dashboard_mode('pedidos')
+    page._set_orders_recent_hover_row(0)
+
+    for col in range(page.orders_recent_table.columnCount()):
+        assert page.orders_recent_table.item(0, col).background().color().name().upper() == '#EFF6FF'
+
+    page._set_orders_recent_hover_row(-1)
+
+    for col in range(page.orders_recent_table.columnCount()):
+        assert page.orders_recent_table.item(0, col).background().style() == Qt.BrushStyle.NoBrush
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
 def test_dashboard_recent_order_navigation_selects_order_page_row() -> None:
     _application()
     selected_pages: list[int] = []
