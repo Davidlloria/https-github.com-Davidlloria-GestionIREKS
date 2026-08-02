@@ -133,6 +133,10 @@ def test_customer_dashboard_service_builds_snapshot(tmp_path) -> None:
 
     service = CustomerDashboardService(engine=engine)
 
+    activities = {row.agenda_id: row for row in service.list_all_activities()}
+    assert activities["ag-2"].due_date == date(2026, 7, 19)
+    assert activities["ag-2"].fecha_seguimiento == date(2026, 7, 20)
+
     snapshot = service.load_snapshot(today=date(2026, 7, 21), horizon_days=7, reactivation_days=30, reactivation_limit=10)
 
     assert snapshot.pending_today == 1

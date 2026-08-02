@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
+from html import escape
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QRectF, QSize, Qt
-from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
+from PySide6.QtCore import QDate, QEvent, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QIcon, QPageLayout, QPainter, QPixmap, QTextCharFormat, QTextDocument
+from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -16,6 +18,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QFrame,
+    QFileDialog,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
@@ -23,9 +26,11 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSpacerItem,
     QStackedWidget,
+    QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -47,6 +52,7 @@ from app.services.order_dashboard_service import (
     DashboardOrdersWarehouseRow,
     OrderDashboardService,
 )
+from app.services.report_export_service import ReportExportService
 from app.services.sales_dashboard_service import (
     DashboardSalesCustomerRow,
     DashboardSalesIslandRow,
@@ -61,6 +67,145 @@ from app.services.warehouse_dashboard_service import (
 )
 
 BASE_DIR = Path(__file__).resolve().parents[3]
+
+
+class DashboardAgendaPdfPreviewDialog(QDialog):
+    def __init__(
+        self,
+        *,
+        report_export_service: ReportExportService,
+        title: str,
+        headers: list[str],
+        rows: list[list[str]],
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.report_export_service = report_export_service
+        self.report_title = title
+        self.report_headers = list(headers)
+        self.report_rows = [list(row) for row in rows]
+
+        self.setObjectName('dashboardAgendaPdfPreviewDialog')
+        self.setWindowTitle(f'Vista previa de entradas · {title}')
+        self.setModal(True)
+        self.resize(920, 620)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(12)
+
+        heading = QLabel(title)
+        heading.setObjectName('dashboardAgendaPdfPreviewTitle')
+        layout.addWidget(heading)
+        summary = QLabel(f'{len(self.report_rows)} entrada(s) se guardarán en el documento PDF.')
+        summary.setObjectName('dashboardAgendaPdfPreviewSummary')
+        layout.addWidget(summary)
+
+        self.entries_scroll = QScrollArea(self)
+        self.entries_scroll.setObjectName('dashboardAgendaPdfPreviewScroll')
+        self.entries_scroll.setWidgetResizable(True)
+        self.entries_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        entries_host = QWidget()
+        entries_host.setObjectName('dashboardAgendaPdfPreviewHost')
+        entries_layout = QVBoxLayout(entries_host)
+        entries_layout.setContentsMargins(0, 0, 0, 0)
+        entries_layout.setSpacing(8)
+        entries_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        for row in self.report_rows:
+            values = [str(value or '') for value in row]
+            values.extend([''] * (4 - len(values)))
+            event_date, customer_text, content_text, state_text = values[:4]
+            card = QFrame()
+            card.setObjectName('dashboardAgendaPdfPreviewCard')
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(12, 10, 12, 11)
+            card_layout.setSpacing(7)
+            top_line = QHBoxLayout()
+            top_line.setContentsMargins(0, 0, 0, 0)
+            top_line.setSpacing(12)
+            date_label = QLabel(event_date)
+            date_label.setObjectName('dashboardAgendaPdfPreviewDate')
+            date_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+            customer_label = QLabel(customer_text)
+            customer_label.setObjectName('dashboardAgendaPdfPreviewCustomer')
+            customer_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            state_label = QLabel(state_text)
+            state_label.setObjectName('dashboardAgendaPdfPreviewState')
+            state_label.setProperty('tone', ReportExportService.agenda_state_tone(state_text))
+            state_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            state_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+            top_line.addWidget(date_label)
+            top_line.addWidget(customer_label, 1)
+            top_line.addWidget(state_label)
+            content_label = QLabel(content_text)
+            content_label.setObjectName('dashboardAgendaPdfPreviewContent')
+            content_label.setWordWrap(True)
+            content_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            content_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            card_layout.addLayout(top_line)
+            card_layout.addWidget(content_label)
+            entries_layout.addWidget(card)
+        self.entries_scroll.setWidget(entries_host)
+        layout.addWidget(self.entries_scroll, 1)
+
+        buttons = QDialogButtonBox(self)
+        buttons.setObjectName('dashboardAgendaPdfPreviewButtons')
+        self.save_btn = buttons.addButton('Guardar', QDialogButtonBox.ButtonRole.AcceptRole)
+        self.save_btn.setObjectName('dashboardAgendaPdfSaveButton')
+        self.cancel_btn = buttons.addButton('Cancelar', QDialogButtonBox.ButtonRole.RejectRole)
+        self.cancel_btn.setObjectName('dashboardAgendaPdfCancelButton')
+        self.save_btn.clicked.connect(self._save_pdf)
+        self.cancel_btn.clicked.connect(self.reject)
+        layout.addWidget(buttons)
+        self.setStyleSheet(
+            'QDialog#dashboardAgendaPdfPreviewDialog { background: #F8FAFC; }'
+            'QLabel#dashboardAgendaPdfPreviewTitle { color: #0F172A; font-size: 18px; font-weight: 700; }'
+            'QLabel#dashboardAgendaPdfPreviewSummary { color: #475569; font-size: 13px; }'
+            'QScrollArea#dashboardAgendaPdfPreviewScroll, QWidget#dashboardAgendaPdfPreviewHost {'
+            ' background: transparent; border: none; }'
+            'QFrame#dashboardAgendaPdfPreviewCard {'
+            ' background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 10px; }'
+            'QLabel#dashboardAgendaPdfPreviewDate { color: #334155; font-size: 13px; font-weight: 600; }'
+            'QLabel#dashboardAgendaPdfPreviewCustomer { color: #0F172A; font-size: 13px; font-weight: 700; }'
+            'QLabel#dashboardAgendaPdfPreviewState {'
+            ' color: #475569; background: #F1F5F9; border: 1px solid #CBD5E1;'
+            ' border-radius: 8px; padding: 3px 8px; font-size: 13px; font-weight: 700; }'
+            'QLabel#dashboardAgendaPdfPreviewState[tone="pending"] {'
+            ' color: #1D4ED8; background: #DBEAFE; border-color: #93C5FD; }'
+            'QLabel#dashboardAgendaPdfPreviewState[tone="completed"] {'
+            ' color: #15803D; background: #DCFCE7; border-color: #86EFAC; }'
+            'QLabel#dashboardAgendaPdfPreviewState[tone="postponed"] {'
+            ' color: #C2410C; background: #FFEDD5; border-color: #FDBA74; }'
+            'QLabel#dashboardAgendaPdfPreviewState[tone="cancelled"] {'
+            ' color: #B91C1C; background: #FEE2E2; border-color: #FCA5A5; }'
+            'QLabel#dashboardAgendaPdfPreviewContent { color: #1E293B; font-size: 13px; }'
+            'QPushButton#dashboardAgendaPdfSaveButton {'
+            ' background: #16A34A; color: white; border: none; border-radius: 8px;'
+            ' min-width: 96px; padding: 8px 14px; font-weight: 700; }'
+            'QPushButton#dashboardAgendaPdfSaveButton:hover { background: #15803D; }'
+            'QPushButton#dashboardAgendaPdfCancelButton {'
+            ' background: #FFFFFF; color: #B91C1C; border: 1px solid #FCA5A5; border-radius: 8px;'
+            ' min-width: 96px; padding: 8px 14px; font-weight: 700; }'
+            'QPushButton#dashboardAgendaPdfCancelButton:hover { background: #FEF2F2; }'
+        )
+
+    def _save_pdf(self) -> None:
+        default_path = str(
+            self.report_export_service.default_path(self.report_title, 'pdf', folder='agenda_dashboard')
+        )
+        path, _ = QFileDialog.getSaveFileName(self, 'Guardar agenda en PDF', default_path, 'PDF (*.pdf)')
+        if not path:
+            return
+        try:
+            output = self.report_export_service.export_dashboard_agenda_pdf(
+                path,
+                self.report_title,
+                self.report_rows,
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, 'Agenda', f'No se pudo guardar el PDF.\n\n{exc}')
+            return
+        QMessageBox.information(self, 'Agenda', f'PDF guardado correctamente.\n\n{output}')
+        self.accept()
 
 
 class DashboardAgendaDialog(QDialog):
@@ -191,7 +336,7 @@ class DashboardAgendaDialog(QDialog):
         summary = self.summary_edit.text().strip()
         detail = self.detail_edit.toPlainText().strip()
         if not summary and not detail:
-            QMessageBox.warning(self, "Agenda", "El resumen o el detalle no pueden quedar vacÃ­os.")
+            QMessageBox.warning(self, "Agenda", "El resumen o el detalle no pueden quedar vacíos.")
             return
         payload = {
             "cliente_id": customer_id,
@@ -329,82 +474,180 @@ class DashboardAgendaOverviewDialog(QDialog):
             self.refresh()
 
 
+class DashboardCalendarDelegate(QStyledItemDelegate):
+    HEADER_TEXT_COLOR = "#FFFFFF"
+    SELECTED_BACKGROUND = "#F1F5F9"
+    SELECTED_BORDER = "#475569"
+    TODAY_BACKGROUND = "#FDE68A"
+    TODAY_BORDER = "#F59E0B"
+
+    def __init__(self, calendar: "DashboardMonthCalendar", page: "DashboardPage") -> None:
+        super().__init__(calendar)
+        self._calendar = calendar
+        self._page = page
+
+    def paint(self, painter: QPainter, option, index) -> None:
+        display = index.data(Qt.ItemDataRole.DisplayRole)
+        if display is None:
+            return
+
+        is_header = index.row() == 0 or index.column() == 0
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        if is_header:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor("#5B8DEF"))
+            painter.drawRoundedRect(option.rect.adjusted(2, 2, -2, -2), 4, 4)
+            font = option.font
+            font.setBold(True)
+            painter.setFont(font)
+            painter.setPen(QColor(self.HEADER_TEXT_COLOR))
+            painter.drawText(option.rect, Qt.AlignmentFlag.AlignCenter, str(display))
+            painter.restore()
+            return
+
+        calendar_date = self._date_for_index(index.row(), index.column())
+        if not calendar_date.isValid():
+            painter.restore()
+            return
+        day_value = date(calendar_date.year(), calendar_date.month(), calendar_date.day())
+        rows_for_day = self._page._agenda_rows_for_date(day_value)
+        tone = self._page._agenda_day_tone(rows_for_day, today_value=date.today())
+        in_month = calendar_date.month() == self._calendar.monthShown() and calendar_date.year() == self._calendar.yearShown()
+        selected = calendar_date == self._calendar.selectedDate()
+        is_today = calendar_date == QDate.currentDate()
+        weekend = calendar_date.dayOfWeek() in {Qt.DayOfWeek.Saturday.value, Qt.DayOfWeek.Sunday.value}
+
+        background = QColor("#FFFFFF")
+        text_color = QColor("#D94C5C") if weekend else QColor("#0F172A")
+        if not in_month:
+            text_color = QColor("#A8B0BC")
+        elif tone == "blue":
+            background = QColor("#EFF6FF")
+            text_color = QColor("#1D4ED8")
+        elif tone == "green":
+            background = QColor("#F0FDF4")
+            text_color = QColor("#15803D")
+        elif tone == "red":
+            background = QColor("#FEF2F2")
+            text_color = QColor("#DC2626")
+
+        border_color: QColor | None = None
+        border_width = 0
+        if is_today:
+            background = QColor(self.TODAY_BACKGROUND)
+            text_color = QColor("#78350F")
+            border_color = QColor(self.TODAY_BORDER)
+            border_width = 1
+        if selected:
+            if not is_today:
+                background = QColor(self.SELECTED_BACKGROUND)
+                text_color = QColor("#0F172A")
+            border_color = QColor(self.SELECTED_BORDER)
+            border_width = 2
+
+        painter.fillRect(option.rect, QColor("#FFFFFF"))
+        if selected or is_today or tone is not None:
+            if border_color is None:
+                painter.setPen(Qt.PenStyle.NoPen)
+            else:
+                pen = painter.pen()
+                pen.setColor(border_color)
+                pen.setWidth(border_width)
+                painter.setPen(pen)
+            painter.setBrush(background)
+            painter.drawRoundedRect(option.rect.adjusted(3, 2, -3, -2), 4, 4)
+
+        font = option.font
+        font.setBold(is_today)
+        painter.setFont(font)
+        painter.setPen(text_color)
+        painter.drawText(option.rect, Qt.AlignmentFlag.AlignCenter, str(calendar_date.day()))
+        painter.restore()
+
+    def _date_for_index(self, row: int, column: int) -> QDate:
+        if row <= 0 or column <= 0:
+            return QDate()
+        month_start = QDate(self._calendar.yearShown(), self._calendar.monthShown(), 1)
+        first_day = self._calendar.firstDayOfWeek().value
+        offset = (month_start.dayOfWeek() - first_day) % 7
+        first_visible = month_start.addDays(-offset)
+        return first_visible.addDays(((row - 1) * 7) + (column - 1))
+
+
 class DashboardMonthCalendar(QCalendarWidget):
+    weekSelected = Signal(object, object, int)
+
     def __init__(self, page: 'DashboardPage', parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._page = page
         self.setObjectName('dashboardMonthCalendar')
         self.setFirstDayOfWeek(Qt.DayOfWeek.Monday)
-        self.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.SingleLetterDayNames)
+        self.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.ShortDayNames)
         self.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.ISOWeekNumbers)
-        self.setNavigationBarVisible(False)
-        self.setGridVisible(False)
+        self.setNavigationBarVisible(True)
+        self.setGridVisible(True)
         self.setDateEditEnabled(False)
-        self.setFixedSize(276, 196)
+        self.setMinimumSize(320, 220)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-    def paintCell(self, painter: QPainter, rect, calendar_date: QDate) -> None:  # type: ignore[override]
-        day_value = date(calendar_date.year(), calendar_date.month(), calendar_date.day())
-        rows_for_day = self._page._agenda_rows_for_date(day_value)
-        today_value = date.today()
-        tone = self._page._agenda_day_tone(rows_for_day, today_value=today_value)
-        in_month = calendar_date.month() == self.monthShown() and calendar_date.year() == self.yearShown()
-        selected = calendar_date == self.selectedDate()
-        is_today = calendar_date == QDate.currentDate()
+        header_format = QTextCharFormat()
+        header_format.setBackground(QColor("#5B8DEF"))
+        header_format.setForeground(QColor("#FFFFFF"))
+        self.setHeaderTextFormat(header_format)
+        weekend_format = QTextCharFormat()
+        weekend_format.setForeground(QColor("#D94C5C"))
+        self.setWeekdayTextFormat(Qt.DayOfWeek.Saturday, weekend_format)
+        self.setWeekdayTextFormat(Qt.DayOfWeek.Sunday, weekend_format)
 
-        side = max(18, min(rect.width(), rect.height()) - 4)
-        cell_rect = QRectF(
-            rect.center().x() - (side / 2),
-            rect.center().y() - (side / 2),
-            side,
-            side,
-        )
+        calendar_view = self.findChild(QAbstractItemView, "qt_calendar_calendarview")
+        if calendar_view is not None:
+            self._delegate = DashboardCalendarDelegate(self, page)
+            calendar_view.setItemDelegate(self._delegate)
+            self._calendar_view = calendar_view
+            self._calendar_viewport = calendar_view.viewport()
+            self._calendar_viewport.installEventFilter(self)
 
-        background = QColor('#FFFFFF')
-        border = QColor('#E2E8F1')
-        text_color = QColor('#0F172A')
-        if not in_month:
-            background = QColor('#F8FAFC')
-            border = QColor('#EDF2F7')
-            text_color = QColor('#94A3B8')
-        elif tone == 'blue':
-            background = QColor('#EFF6FF')
-            border = QColor('#BFDBFE')
-            text_color = QColor('#1D4ED8')
-        elif tone == 'green':
-            background = QColor('#F0FDF4')
-            border = QColor('#BBF7D0')
-            text_color = QColor('#15803D')
-        elif tone == 'red':
-            background = QColor('#FEF2F2')
-            border = QColor('#FECACA')
-            text_color = QColor('#DC2626')
-        elif tone == 'muted':
-            background = QColor('#F8FAFC')
-            border = QColor('#CBD5E1')
-            text_color = QColor('#64748B')
+    def eventFilter(self, watched, event) -> bool:
+        if (
+            watched is getattr(self, '_calendar_viewport', None)
+            and event.type() == QEvent.Type.MouseButtonRelease
+            and event.button() == Qt.MouseButton.LeftButton
+        ):
+            index = self._calendar_view.indexAt(event.position().toPoint())
+            self._emit_week_for_index(index)
+        return super().eventFilter(watched, event)
 
-        if selected:
-            border = QColor('#2563EB')
-        border_width = 2 if selected else 1
+    def _emit_week_for_index(self, index) -> None:
+        if index.row() <= 0 or index.column() != 0:
+            return
+        monday_qdate = self._delegate._date_for_index(index.row(), 1)
+        if not monday_qdate.isValid():
+            return
+        week_start = date(monday_qdate.year(), monday_qdate.month(), monday_qdate.day())
+        week_end = week_start + timedelta(days=6)
+        week_number = monday_qdate.weekNumber()[0]
+        self.weekSelected.emit(week_start, week_end, week_number)
 
-        painter.save()
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(Qt.GlobalColor.transparent)
-        painter.drawRect(rect)
-        painter.setBrush(background)
-        pen = painter.pen()
-        pen.setColor(border)
-        pen.setWidth(border_width)
-        painter.setPen(pen)
-        painter.drawRoundedRect(cell_rect, 8, 8)
-        font = painter.font()
-        font.setPointSize(9)
-        font.setBold(is_today)
-        painter.setFont(font)
-        painter.setPen(text_color)
-        painter.drawText(cell_rect, int(Qt.AlignmentFlag.AlignCenter), str(calendar_date.day()))
-        painter.restore()
+
+class DashboardActivityCard(QFrame):
+    editRequested = Signal(str)
+
+    def __init__(self, agenda_id: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.agenda_id = str(agenda_id or '').strip()
+        self.setObjectName('dashboardActivityCard')
+        self.setProperty('agendaId', self.agenda_id)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.RightButton and self.agenda_id:
+            self.editRequested.emit(self.agenda_id)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def contextMenuEvent(self, event) -> None:
+        event.accept()
 
 
 class DashboardPage(QWidget):
@@ -416,6 +659,7 @@ class DashboardPage(QWidget):
         order_dashboard_service: OrderDashboardService | None = None,
         sales_dashboard_service: SalesDashboardService | None = None,
         warehouse_dashboard_service: WarehouseDashboardService | None = None,
+        report_export_service: ReportExportService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -424,11 +668,14 @@ class DashboardPage(QWidget):
         self.order_dashboard_service = order_dashboard_service or OrderDashboardService()
         self.sales_dashboard_service = sales_dashboard_service or SalesDashboardService()
         self.warehouse_dashboard_service = warehouse_dashboard_service or WarehouseDashboardService()
+        self.report_export_service = report_export_service or ReportExportService()
         self.setObjectName('dashboardPageRoot')
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.agenda_calendar_selected_date = date.today()
         self.agenda_calendar_month = date.today().replace(day=1)
+        self.agenda_calendar_week_range: tuple[date, date] | None = None
         self.agenda_calendar_rows: list[DashboardActivityRow] = []
+        self.today_report_rows: list[DashboardActivityRow] = []
         self.current_dashboard = 'agenda'
         self.dashboard_nav_buttons: dict[str, QPushButton] = {}
         self._build_ui()
@@ -593,10 +840,6 @@ class DashboardPage(QWidget):
             'dashboardTodayPanel',
             empty_text='Hoy no hay actividades registradas.',
         )
-        self.today_link_btn = QPushButton('Ver toda la agenda')
-        self.today_link_btn.setObjectName('dashboardPanelLinkButton')
-        self.today_link_btn.clicked.connect(self._handle_secondary_action)
-        today_panel.layout().addWidget(self.today_link_btn)
         middle_row.addWidget(self.upcoming_panel, 4)
         middle_row.addWidget(today_panel, 6)
         layout.addLayout(middle_row, 3)
@@ -608,7 +851,7 @@ class DashboardPage(QWidget):
         reactivation_panel = self._build_table_panel('Clientes a reactivar', 'dashboardReactivationPanel')
         self.reactivation_table = QTableWidget(0, 5)
         self.reactivation_table.setObjectName('dashboardReactivationTable')
-        self.reactivation_table.setHorizontalHeaderLabels(['Cliente', 'Isla', 'Ãšltimo contacto', 'VariaciÃ³n kg', 'Prioridad'])
+        self.reactivation_table.setHorizontalHeaderLabels(['Cliente', 'Isla', 'Último contacto', 'Variación kg', 'Prioridad'])
         self._configure_table(self.reactivation_table)
         header = self.reactivation_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -635,8 +878,8 @@ class DashboardPage(QWidget):
         card = QFrame()
         card.setObjectName('dashboardKpiCard')
         card.setProperty('tone', tone)
-        card.setMinimumHeight(118)
-        card.setMaximumHeight(118)
+        card.setMinimumHeight(104)
+        card.setMaximumHeight(104)
         card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout = QHBoxLayout(card)
         layout.setContentsMargins(16, 14, 16, 14)
@@ -697,17 +940,45 @@ class DashboardPage(QWidget):
         layout.setSpacing(10)
         heading = QLabel(title)
         heading.setObjectName('dashboardPanelTitle')
-        heading.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        layout.addWidget(heading)
-        container = QVBoxLayout()
+        heading.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        heading_layout = QHBoxLayout()
+        heading_layout.setContentsMargins(0, 0, 0, 0)
+        heading_layout.setSpacing(8)
+        heading_layout.addWidget(heading, 1)
+        self.today_pdf_btn = QPushButton('PDF')
+        self.today_pdf_btn.setObjectName('dashboardTodayPdfButton')
+        self.today_pdf_btn.setFixedWidth(96)
+        self.today_pdf_btn.setEnabled(False)
+        self._set_button_icon(self.today_pdf_btn, 'file-text.svg', '#FFFFFF', 15)
+        self.today_pdf_btn.clicked.connect(self._export_today_panel_pdf)
+        heading_layout.addWidget(self.today_pdf_btn, 0)
+        self.today_print_btn = QPushButton('Imprimir')
+        self.today_print_btn.setObjectName('dashboardTodayPrintButton')
+        self.today_print_btn.setFixedWidth(96)
+        self.today_print_btn.setEnabled(False)
+        self._set_button_icon(self.today_print_btn, 'printer.svg', '#FFFFFF', 15)
+        self.today_print_btn.clicked.connect(self._print_today_panel)
+        heading_layout.addWidget(self.today_print_btn, 0)
+        layout.addLayout(heading_layout, 0)
+
+        scroll_area = QScrollArea()
+        scroll_area.setObjectName('dashboardTodayScrollArea')
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_content = QWidget()
+        scroll_content.setObjectName('dashboardTodayItemsHost')
+        container = QVBoxLayout(scroll_content)
         container.setContentsMargins(0, 0, 0, 0)
         container.setSpacing(8)
+        container.setAlignment(Qt.AlignmentFlag.AlignTop)
         empty = QLabel(empty_text)
         empty.setObjectName('dashboardEmptyLabel')
         empty.setWordWrap(True)
         empty.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         container.addWidget(empty)
-        layout.addLayout(container)
+        scroll_area.setWidget(scroll_content)
+        layout.addWidget(scroll_area, 1)
         return panel, container, heading
 
     def _build_table_panel(self, title: str, object_name: str) -> QFrame:
@@ -728,12 +999,11 @@ class DashboardPage(QWidget):
         panel = QFrame()
         panel.setObjectName('dashboardUpcomingPanel')
         panel.setProperty('dashboardPanel', True)
-        panel.setFixedHeight(312)
+        panel.setMinimumHeight(312)
+        panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(8)
-
-        calendar_block_width = 276
 
         heading_row = QWidget()
         heading_row.setObjectName('dashboardCalendarHeadingBlock')
@@ -741,7 +1011,6 @@ class DashboardPage(QWidget):
         heading_row.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         heading_row.setAutoFillBackground(False)
         heading_row.setStyleSheet('background: transparent; border: none;')
-        heading_row.setFixedWidth(calendar_block_width)
         heading_row_layout = QHBoxLayout(heading_row)
         heading_row_layout.setContentsMargins(0, 0, 0, 0)
         heading_row_layout.setSpacing(0)
@@ -749,39 +1018,13 @@ class DashboardPage(QWidget):
         heading.setObjectName('dashboardPanelTitle')
         heading_row_layout.addWidget(heading, 0, Qt.AlignmentFlag.AlignLeft)
         heading_row_layout.addStretch(1)
-        layout.addWidget(heading_row, 0, Qt.AlignmentFlag.AlignHCenter)
-
-        nav_row_host = QWidget()
-        nav_row_host.setObjectName('dashboardCalendarNavBlock')
-        nav_row_host.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        nav_row_host.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        nav_row_host.setAutoFillBackground(False)
-        nav_row_host.setStyleSheet('background: transparent; border: none;')
-        nav_row_host.setFixedWidth(calendar_block_width)
-        nav_row = QHBoxLayout(nav_row_host)
-        nav_row.setContentsMargins(0, 0, 0, 0)
-        nav_row.setSpacing(8)
-        self.agenda_prev_month_btn = QPushButton('<')
-        self.agenda_prev_month_btn.setObjectName('dashboardCalendarNavButton')
-        self.agenda_prev_month_btn.clicked.connect(lambda: self._shift_agenda_calendar_month(-1))
-        nav_row.addWidget(self.agenda_prev_month_btn, 0)
-
-        self.agenda_month_label = QLabel('')
-        self.agenda_month_label.setObjectName('dashboardMonthTitle')
-        self.agenda_month_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        nav_row.addWidget(self.agenda_month_label, 1)
-
-        self.agenda_next_month_btn = QPushButton('>')
-        self.agenda_next_month_btn.setObjectName('dashboardCalendarNavButton')
-        self.agenda_next_month_btn.clicked.connect(lambda: self._shift_agenda_calendar_month(1))
-        nav_row.addWidget(self.agenda_next_month_btn, 0)
-        layout.addWidget(nav_row_host, 0, Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(heading_row, 0)
 
         self.agenda_month_calendar = DashboardMonthCalendar(self, panel)
         self.agenda_month_calendar.selectionChanged.connect(self._handle_agenda_calendar_selection_changed)
         self.agenda_month_calendar.currentPageChanged.connect(self._handle_agenda_calendar_page_changed)
-        layout.addWidget(self.agenda_month_calendar, 0, Qt.AlignmentFlag.AlignHCenter)
-        layout.addSpacing(6)
+        self.agenda_month_calendar.weekSelected.connect(self._handle_agenda_calendar_week_selected)
+        layout.addWidget(self.agenda_month_calendar, 1)
 
         summary_row = QHBoxLayout()
         summary_row.setContentsMargins(0, 0, 0, 0)
@@ -789,9 +1032,9 @@ class DashboardPage(QWidget):
         self.pending_summary = self._build_summary_chip('Pendientes', 'blue')
         self.done_summary = self._build_summary_chip('Hechas', 'green')
         self.overdue_summary = self._build_summary_chip('Vencidas', 'red')
-        summary_row.addWidget(self.pending_summary[0])
-        summary_row.addWidget(self.done_summary[0])
-        summary_row.addWidget(self.overdue_summary[0])
+        summary_row.addWidget(self.pending_summary[0], 1)
+        summary_row.addWidget(self.done_summary[0], 1)
+        summary_row.addWidget(self.overdue_summary[0], 1)
         layout.addLayout(summary_row)
         return panel
 
@@ -799,13 +1042,16 @@ class DashboardPage(QWidget):
         frame = QFrame()
         frame.setObjectName('dashboardCalendarSummaryChip')
         frame.setProperty('tone', tone)
+        frame.setFixedHeight(34)
         inner = QHBoxLayout(frame)
-        inner.setContentsMargins(10, 8, 10, 8)
+        inner.setContentsMargins(10, 3, 10, 3)
         inner.setSpacing(8)
         title_label = QLabel(title)
         title_label.setObjectName('dashboardCalendarSummaryTitle')
+        title_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
         value_label = QLabel('0')
         value_label.setObjectName('dashboardCalendarSummaryValue')
+        value_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         inner.addWidget(title_label)
         inner.addStretch(1)
         inner.addWidget(value_label)
@@ -856,7 +1102,7 @@ class DashboardPage(QWidget):
         recent_panel = self._build_table_panel('Pedidos recientes', 'dashboardOrdersRecentPanel')
         self.orders_recent_table = QTableWidget(0, 7)
         self.orders_recent_table.setObjectName('dashboardOrdersRecentTable')
-        self.orders_recent_table.setHorizontalHeaderLabels(['Pedido', 'Almac?n', 'Fecha', 'Kg pedido', 'Kg recibido', 'Kg pend.', 'Estado'])
+        self.orders_recent_table.setHorizontalHeaderLabels(['Pedido', 'Almacén', 'Fecha', 'Kg pedido', 'Kg recibido', 'Kg pend.', 'Estado'])
         self._configure_table(self.orders_recent_table)
         recent_header = self.orders_recent_table.horizontalHeader()
         recent_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -867,10 +1113,10 @@ class DashboardPage(QWidget):
         recent_panel.layout().addWidget(self.orders_recent_table)
         upper_row.addWidget(recent_panel, 6)
 
-        pending_panel = self._build_table_panel('M?s pendiente', 'dashboardOrdersPendingPanel')
+        pending_panel = self._build_table_panel('Más pendiente', 'dashboardOrdersPendingPanel')
         self.orders_pending_table = QTableWidget(0, 4)
         self.orders_pending_table.setObjectName('dashboardOrdersPendingTable')
-        self.orders_pending_table.setHorizontalHeaderLabels(['Fecha', 'Pedido', 'Almac?n', 'Kg pend.'])
+        self.orders_pending_table.setHorizontalHeaderLabels(['Fecha', 'Pedido', 'Almacén', 'Kg pend.'])
         self._configure_table(self.orders_pending_table)
         pending_header = self.orders_pending_table.horizontalHeader()
         pending_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -885,10 +1131,10 @@ class DashboardPage(QWidget):
         lower_row.setContentsMargins(0, 0, 0, 0)
         lower_row.setSpacing(12)
 
-        warehouse_panel = self._build_table_panel('M?s pendiente por almac?n', 'dashboardOrdersWarehousePanel')
+        warehouse_panel = self._build_table_panel('Más pendiente por almacén', 'dashboardOrdersWarehousePanel')
         self.orders_warehouse_table = QTableWidget(0, 4)
         self.orders_warehouse_table.setObjectName('dashboardOrdersWarehouseTable')
-        self.orders_warehouse_table.setHorizontalHeaderLabels(['Almac?n', 'Abiertos', 'Kg pend.', '?lt. recepci?n'])
+        self.orders_warehouse_table.setHorizontalHeaderLabels(['Almacén', 'Abiertos', 'Kg pend.', 'Últ. recepción'])
         self._configure_table(self.orders_warehouse_table)
         warehouse_header = self.orders_warehouse_table.horizontalHeader()
         warehouse_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -929,7 +1175,7 @@ class DashboardPage(QWidget):
         self.sales_kpi_notes: dict[str, QLabel] = {}
         for column, (key, title, tone, icon_name) in enumerate([
             ('total_kg', 'Kg vendidos', 'blue', 'scale.svg'),
-            ('delta_kg', 'VariaciÃ³n kg', 'blue', 'trending-down.svg'),
+            ('delta_kg', 'Variación kg', 'blue', 'trending-down.svg'),
             ('active_customers', 'Clientes activos', 'green', 'briefcase.svg'),
             ('active_islands', 'Islas activas', 'orange', 'map.svg'),
         ]):
@@ -1032,7 +1278,7 @@ class DashboardPage(QWidget):
         risk_panel = self._build_table_panel('Riesgos de stock y caducidad', 'dashboardWarehouseRiskPanel')
         self.warehouse_risk_table = QTableWidget(0, 7)
         self.warehouse_risk_table.setObjectName('dashboardWarehouseRiskTable')
-        self.warehouse_risk_table.setHorizontalHeaderLabels(['Almac?n', 'Ref.', 'Producto', 'Lote', 'Caduca', 'Kg', 'Estado'])
+        self.warehouse_risk_table.setHorizontalHeaderLabels(['Almacén', 'Ref.', 'Producto', 'Lote', 'Caduca', 'Kg', 'Estado'])
         self._configure_table(self.warehouse_risk_table)
         risk_header = self.warehouse_risk_table.horizontalHeader()
         risk_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -1043,10 +1289,10 @@ class DashboardPage(QWidget):
         risk_panel.layout().addWidget(self.warehouse_risk_table)
         upper_row.addWidget(risk_panel, 6)
 
-        stock_panel = self._build_table_panel('Stock por almac?n', 'dashboardWarehouseStockPanel')
+        stock_panel = self._build_table_panel('Stock por almacén', 'dashboardWarehouseStockPanel')
         self.warehouse_stock_table = QTableWidget(0, 3)
         self.warehouse_stock_table.setObjectName('dashboardWarehouseStockTable')
-        self.warehouse_stock_table.setHorizontalHeaderLabels(['Almac?n', 'Art?culos', 'Stock kg'])
+        self.warehouse_stock_table.setHorizontalHeaderLabels(['Almacén', 'Artículos', 'Stock kg'])
         self._configure_table(self.warehouse_stock_table)
         stock_header = self.warehouse_stock_table.horizontalHeader()
         stock_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -1062,7 +1308,7 @@ class DashboardPage(QWidget):
         entries_panel = self._build_table_panel('Entradas del mes', 'dashboardWarehouseEntriesPanel')
         self.warehouse_entries_table = QTableWidget(0, 5)
         self.warehouse_entries_table.setObjectName('dashboardWarehouseEntriesTable')
-        self.warehouse_entries_table.setHorizontalHeaderLabels(['Fecha', 'Almac?n', 'Ref.', 'Producto', 'Kg'])
+        self.warehouse_entries_table.setHorizontalHeaderLabels(['Fecha', 'Almacén', 'Ref.', 'Producto', 'Kg'])
         self._configure_table(self.warehouse_entries_table)
         entries_header = self.warehouse_entries_table.horizontalHeader()
         entries_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -1076,7 +1322,7 @@ class DashboardPage(QWidget):
         outputs_panel = self._build_table_panel('Salidas del mes', 'dashboardWarehouseOutputsPanel')
         self.warehouse_outputs_table = QTableWidget(0, 5)
         self.warehouse_outputs_table.setObjectName('dashboardWarehouseOutputsTable')
-        self.warehouse_outputs_table.setHorizontalHeaderLabels(['Fecha', 'Almac?n', 'Ref.', 'Producto', 'Kg'])
+        self.warehouse_outputs_table.setHorizontalHeaderLabels(['Fecha', 'Almacén', 'Ref.', 'Producto', 'Kg'])
         self._configure_table(self.warehouse_outputs_table)
         outputs_header = self.warehouse_outputs_table.horizontalHeader()
         outputs_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -1100,6 +1346,7 @@ class DashboardPage(QWidget):
             self._reload_agenda_dashboard()
     def _reload_agenda_dashboard(self) -> None:
         snapshot = self.dashboard_service.load_snapshot()
+        activity_rows = self.dashboard_service.list_all_activities()
         self.date_label.setText(self.format_date(date.today(), long=True))
         self.kpi_labels['pending_today'].setText(str(snapshot.pending_today))
         self.kpi_notes['pending_today'].setText('actividades')
@@ -1109,54 +1356,167 @@ class DashboardPage(QWidget):
         self.kpi_notes['completed_today'].setText('actividades')
         self.kpi_labels['customers_without_follow_up'].setText(str(snapshot.customers_without_follow_up))
         self.kpi_notes['customers_without_follow_up'].setText('clientes')
-        self._reload_today_panel(snapshot.today_items, self.agenda_calendar_selected_date)
+        if self.agenda_calendar_week_range is None:
+            self._reload_today_panel(activity_rows, self.agenda_calendar_selected_date)
+        else:
+            week_start, week_end = self.agenda_calendar_week_range
+            self._reload_week_panel(activity_rows, week_start, week_end)
         self._reload_reactivation_table(snapshot.reactivation_rows)
         self._reload_island_table(snapshot.island_rows)
-        self._reload_agenda_calendar_panel(self.dashboard_service.list_all_activities(), today_value=date.today())
+        self._reload_agenda_calendar_panel(activity_rows, today_value=date.today())
         self.footer_label.setText(
-            f'Ãšltima actualizaciÃ³n: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} Â· {snapshot.reactivation_metric_label}'
+            f'Última actualización: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} · {snapshot.reactivation_metric_label}'
         )
 
     def _reload_today_panel(self, rows: list[DashboardActivityRow], selected_day: date) -> None:
+        self._clear_today_items()
+        self.today_panel_title.setText('Agenda de hoy' if selected_day == date.today() else f'Agenda del {self.format_date(selected_day)}')
+        filtered = [row for row in rows if row.due_date == selected_day]
+        self._render_activity_cards(filtered, empty_text='No hay actividades para el día seleccionado.')
+
+    def _reload_week_panel(self, rows: list[DashboardActivityRow], week_start: date, week_end: date) -> None:
+        self._clear_today_items()
+        week_number = week_start.isocalendar().week
+        self.today_panel_title.setText(
+            f'Agenda semana {week_number} · {self.format_date(week_start)} - {self.format_date(week_end)}'
+        )
+        filtered = [row for row in rows if week_start <= row.due_date <= week_end]
+        self._render_activity_cards(filtered, empty_text='No hay actividades para la semana seleccionada.')
+
+    def _clear_today_items(self) -> None:
         while self.today_items_layout.count():
             item = self.today_items_layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
+                widget.setParent(None)
                 widget.deleteLater()
-        if selected_day == date.today():
-            self.today_panel_title.setText('Agenda de hoy')
-        else:
-            self.today_panel_title.setText(f'Agenda del {self.format_date(selected_day)}')
-        filtered = [row for row in rows if row.fecha_actividad == selected_day] if selected_day != date.today() else list(rows)
-        if not filtered:
-            empty = QLabel('No hay actividades para el dÃ­a seleccionado.')
+
+    def _render_activity_cards(self, rows: list[DashboardActivityRow], *, empty_text: str) -> None:
+        self.today_report_rows = list(rows)
+        has_rows = bool(self.today_report_rows)
+        self.today_pdf_btn.setEnabled(has_rows)
+        self.today_print_btn.setEnabled(has_rows)
+        if not rows:
+            empty = QLabel(empty_text)
             empty.setObjectName('dashboardEmptyLabel')
             empty.setWordWrap(True)
             empty.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             self.today_items_layout.addWidget(empty)
             return
-        for row in filtered:
-            card = QFrame()
-            card.setObjectName('dashboardActivityCard')
-            layout = QVBoxLayout(card)
+        for row in rows:
+            card = DashboardActivityCard(row.agenda_id)
+            card.setToolTip('Clic derecho para editar la actividad')
+            card.editRequested.connect(self._edit_dashboard_activity)
+            layout = QHBoxLayout(card)
             layout.setContentsMargins(10, 10, 10, 10)
-            layout.setSpacing(4)
-            customer = QLabel(f'{row.cliente_codigo} Â· {row.cliente_nombre}')
+            layout.setSpacing(12)
+            customer = QLabel(f'{row.cliente_codigo} · {row.cliente_nombre}')
             customer.setObjectName('dashboardActivityCustomer')
-            summary = QLabel(row.resumen)
+            customer.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+            summary = QLabel(row.resumen or row.detalle or '-')
             summary.setObjectName('dashboardActivitySummary')
-            detail = QLabel(f'{row.isla_nombre} Â· {row.estado}')
-            detail.setObjectName('dashboardActivityDetail')
-            layout.addWidget(customer)
-            layout.addWidget(summary)
-            layout.addWidget(detail)
+            summary.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            state = QLabel(self.agenda_state_label(row.estado))
+            state.setObjectName('dashboardActivityState')
+            state.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            state.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+            for label in (customer, summary, state):
+                label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            layout.addWidget(customer, 0)
+            layout.addWidget(summary, 1)
+            layout.addWidget(state, 0)
             self.today_items_layout.addWidget(card)
+
+    def _today_report_data(self) -> tuple[str, list[str], list[list[str]]]:
+        title = self.today_panel_title.text().strip() or 'Agenda'
+        rows = [
+            [
+                self.format_date(row.due_date),
+                f'{row.cliente_codigo} · {row.cliente_nombre}',
+                self._agenda_event_content(row),
+                self.agenda_state_label(row.estado),
+            ]
+            for row in self.today_report_rows
+        ]
+        return title, ['Fecha', 'Cliente', 'Contenido', 'Estado'], rows
+
+    @staticmethod
+    def _agenda_event_content(row: DashboardActivityRow) -> str:
+        summary = str(row.resumen or '').strip()
+        detail = str(row.detalle or '').strip()
+        if summary and detail and summary.casefold() != detail.casefold():
+            return f'{summary} — {detail}'
+        return summary or detail or '-'
+
+    def _export_today_panel_pdf(self) -> None:
+        if not self.today_report_rows:
+            QMessageBox.warning(self, 'Agenda', 'No hay actividades para exportar.')
+            return
+        title, headers, rows = self._today_report_data()
+        try:
+            dialog = DashboardAgendaPdfPreviewDialog(
+                report_export_service=self.report_export_service,
+                title=title,
+                headers=headers,
+                rows=rows,
+                parent=self,
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, 'Agenda', f'No se pudo generar la vista previa del PDF.\n\n{exc}')
+            return
+        dialog.exec()
+
+    def _print_today_panel(self) -> None:
+        if not self.today_report_rows:
+            QMessageBox.warning(self, 'Agenda', 'No hay actividades para imprimir.')
+            return
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        printer.setPageOrientation(QPageLayout.Orientation.Portrait)
+        dialog = QPrintDialog(printer, self)
+        if dialog.exec() != QPrintDialog.DialogCode.Accepted:
+            return
+        document = QTextDocument(self)
+        document.setHtml(self._today_report_html())
+        document.print_(printer)
+
+    def _today_report_html(self) -> str:
+        title, _headers, rows = self._today_report_data()
+        cards = ''.join(
+            '<table class="card" width="100%" cellspacing="0" cellpadding="0">'
+            '<tr class="top">'
+            f'<td class="date">{escape(str(row[0]))}</td>'
+            f'<td class="customer">{escape(str(row[1]))}</td>'
+            f'<td class="state {ReportExportService.agenda_state_tone(row[3])}" align="right">{escape(str(row[3]))}</td>'
+            '</tr>'
+            f'<tr><td class="content" colspan="3">{escape(str(row[2])).replace(chr(10), "<br/>")}</td></tr>'
+            '</table><div class="gap"></div>'
+            for row in rows
+        )
+        return (
+            '<html><head><style>'
+            'body { font-family: "Segoe UI", sans-serif; color: #0F172A; }'
+            'h1 { font-size: 18px; margin-bottom: 14px; }'
+            '.card { width: 100%; border: 1px solid #CBD5E1; background: #F8FAFC; page-break-inside: avoid; }'
+            '.card td { padding: 7px 9px; font-size: 10px; }'
+            '.top td { padding-bottom: 4px; }'
+            '.date { width: 16%; color: #334155; font-weight: 600; }'
+            '.customer { color: #0F172A; font-weight: 700; }'
+            '.state { width: 16%; color: #475569; background: #F1F5F9; font-weight: 700; }'
+            '.state.pending { color: #1D4ED8; background: #DBEAFE; }'
+            '.state.completed { color: #15803D; background: #DCFCE7; }'
+            '.state.postponed { color: #C2410C; background: #FFEDD5; }'
+            '.state.cancelled { color: #B91C1C; background: #FEE2E2; }'
+            '.content { padding-top: 4px; color: #1E293B; }'
+            '.gap { height: 7px; }'
+            '</style></head><body>'
+            f'<h1>{escape(title)}</h1>{cards}</body></html>'
+        )
 
     def _reload_reactivation_table(self, rows: list[DashboardReactivationRow]) -> None:
         self.reactivation_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
-                f'{row.cliente_codigo} Â· {row.cliente_nombre}',
+                f'{row.cliente_codigo} · {row.cliente_nombre}',
                 row.isla_nombre,
                 self.format_date(row.last_contact) if row.last_contact else 'Sin registro',
                 self._format_number_es(row.delta_kg, suffix=' kg', signed=True),
@@ -1175,7 +1535,6 @@ class DashboardPage(QWidget):
     def _reload_agenda_calendar_panel(self, rows: list[DashboardActivityRow], *, today_value: date) -> None:
         self.agenda_calendar_rows = list(rows)
         month_start = self.agenda_calendar_month.replace(day=1)
-        self.agenda_month_label.setText(self._month_caption(month_start))
         self.agenda_month_calendar.blockSignals(True)
         self.agenda_month_calendar.setCurrentPage(month_start.year, month_start.month)
         if self.agenda_calendar_selected_date.year == month_start.year and self.agenda_calendar_selected_date.month == month_start.month:
@@ -1213,18 +1572,16 @@ class DashboardPage(QWidget):
         selected = self.agenda_month_calendar.selectedDate()
         self.set_selected_date(date(selected.year(), selected.month(), selected.day()))
 
+    def _handle_agenda_calendar_week_selected(self, week_start: date, week_end: date, _week_number: int) -> None:
+        self.agenda_calendar_week_range = (week_start, week_end)
+        self._reload_week_panel(self.dashboard_service.list_all_activities(), week_start, week_end)
+
     def _handle_agenda_calendar_page_changed(self, year: int, month: int) -> None:
         self.agenda_calendar_month = date(year, month, 1)
-        self.agenda_month_label.setText(self._month_caption(self.agenda_calendar_month))
         self._refresh_agenda_calendar(today_value=date.today())
 
-    def _shift_agenda_calendar_month(self, offset: int) -> None:
-        if offset < 0:
-            self.agenda_month_calendar.showPreviousMonth()
-        elif offset > 0:
-            self.agenda_month_calendar.showNextMonth()
-
     def set_selected_date(self, selected_day: date) -> None:
+        self.agenda_calendar_week_range = None
         self.agenda_calendar_selected_date = selected_day
         self._reload_today_panel(self.dashboard_service.list_all_activities(), selected_day)
         self._reload_agenda_calendar_panel(self.dashboard_service.list_all_activities(), today_value=date.today())
@@ -1324,7 +1681,7 @@ class DashboardPage(QWidget):
         self._populate_order_warehouse_table(snapshot.warehouse_rows)
         self._populate_order_state_table(snapshot.state_rows)
         self.footer_label.setText(
-            f'?ltima actualizaci?n: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} ? Dashboard pedidos {snapshot.year}'
+            f'Última actualización: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} · Dashboard pedidos {snapshot.year}'
         )
 
     def _populate_order_recent_table(self, rows: list[DashboardOrderRow]) -> None:
@@ -1382,7 +1739,7 @@ class DashboardPage(QWidget):
         self.sales_kpi_labels['total_kg'].setText(self._format_number_es(snapshot.total_kg))
         self.sales_kpi_notes['total_kg'].setText(f'kg vendidos en {snapshot.year}')
         self.sales_kpi_labels['delta_kg'].setText(self._format_number_es(snapshot.delta_kg, signed=True))
-        self.sales_kpi_notes['delta_kg'].setText(f'vs {snapshot.previous_year} Â· {self._format_number_es(snapshot.delta_pct, signed=True, suffix=" %")}')
+        self.sales_kpi_notes['delta_kg'].setText(f'vs {snapshot.previous_year} · {self._format_number_es(snapshot.delta_pct, signed=True, suffix=" %")}')
         self.sales_kpi_labels['active_customers'].setText(str(snapshot.active_customers))
         self.sales_kpi_notes['active_customers'].setText('clientes activos')
         self.sales_kpi_labels['active_islands'].setText(str(snapshot.active_islands))
@@ -1395,14 +1752,14 @@ class DashboardPage(QWidget):
         self._populate_sales_types_table(snapshot.type_rows)
         self._populate_sales_zero_table(snapshot.zero_consumption_rows)
         self.footer_label.setText(
-            f'Ãšltima actualizaciÃ³n: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} Â· Ventas {snapshot.year} vs {snapshot.previous_year}'
+            f'Última actualización: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} · Ventas {snapshot.year} vs {snapshot.previous_year}'
         )
 
     def _populate_sales_drops_table(self, rows: list[DashboardSalesCustomerRow]) -> None:
         self.sales_drops_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
-                f'{row.cliente_codigo} Â· {row.cliente_nombre}',
+                f'{row.cliente_codigo} · {row.cliente_nombre}',
                 row.isla,
                 self._format_number_es(row.kg_prev, suffix=' kg'),
                 self._format_number_es(row.kg_curr, suffix=' kg'),
@@ -1441,7 +1798,7 @@ class DashboardPage(QWidget):
         self.sales_zero_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
-                f'{row.cliente_codigo} Â· {row.cliente_nombre}',
+                f'{row.cliente_codigo} · {row.cliente_nombre}',
                 row.isla,
                 row.cliente_tipo,
                 self._format_number_es(row.kg_prev, suffix=' kg'),
@@ -1464,7 +1821,7 @@ class DashboardPage(QWidget):
         self._populate_warehouse_stock_table(snapshot.warehouse_rows)
         self._populate_warehouse_movement_table(self.warehouse_entries_table, snapshot.entry_rows)
         self._populate_warehouse_movement_table(self.warehouse_outputs_table, snapshot.output_rows)
-        self.footer_label.setText(f'?ltima actualizaci?n: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} ? umbral bajo stock: {self._format_number_es(snapshot.low_stock_threshold_units)} uds.')
+        self.footer_label.setText(f'Última actualización: {snapshot.generated_at.strftime("%d/%m/%Y %H:%M")} · umbral bajo stock: {self._format_number_es(snapshot.low_stock_threshold_units)} uds.')
 
 
 
@@ -1510,7 +1867,7 @@ class DashboardPage(QWidget):
         if isinstance(page_names, list) and callable(setter) and 'Almacen' in page_names:
             setter(page_names.index('Almacen'))
             return
-        QMessageBox.information(self, 'Dashboard', 'La p?gina de Almac?n no est? disponible en esta ventana.')
+        QMessageBox.information(self, 'Dashboard', 'La página de Almacén no está disponible en esta ventana.')
 
 
     def customer_choices(self, *, include_inactive: bool = False) -> list[tuple[str, str]]:
@@ -1569,7 +1926,7 @@ class DashboardPage(QWidget):
     def customer_label(code: object, name: str) -> str:
         code_text = str(code or '').strip()
         name_text = str(name or '').strip()
-        return f'{code_text} Â· {name_text}' if code_text else name_text
+        return f'{code_text} · {name_text}' if code_text else name_text
 
     def _open_new_activity(self) -> None:
         if not self.customer_choices():
@@ -1591,8 +1948,11 @@ class DashboardPage(QWidget):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.reload()
 
+    def _edit_dashboard_activity(self, agenda_id: str) -> None:
+        self._open_activity_dialog(agenda_id=agenda_id)
+
     def _show_placeholder_dashboard(self, name: str) -> None:
-        QMessageBox.information(self, 'Dashboard', f'El dashboard de {name} se implementarÃ¡ en una siguiente fase.')
+        QMessageBox.information(self, 'Dashboard', f'El dashboard de {name} se implementará en una siguiente fase.')
 
     def _open_sales_page(self) -> None:
         window = self.window()
@@ -1601,7 +1961,7 @@ class DashboardPage(QWidget):
         if isinstance(page_names, list) and callable(setter) and 'Ventas' in page_names:
             setter(page_names.index('Ventas'))
             return
-        QMessageBox.information(self, 'Dashboard', 'La pÃ¡gina de Ventas no estÃ¡ disponible en esta ventana.')
+        QMessageBox.information(self, 'Dashboard', 'La página de Ventas no está disponible en esta ventana.')
 
 
 
@@ -1643,7 +2003,7 @@ class DashboardPage(QWidget):
             return '' if allow_blank else ''
         if long:
             months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-            weekdays = ['lunes', 'martes', 'miÃ©rcoles', 'jueves', 'viernes', 'sÃ¡bado', 'domingo']
+            weekdays = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
             return f"{weekdays[value.weekday()]}, {value.day:02d} de {months[value.month - 1]} de {value.year}"
         return value.strftime('%d/%m/%Y')
 
@@ -1705,20 +2065,21 @@ class DashboardPage(QWidget):
                 background-color: #2563EB;
                 color: #FFFFFF;
             }
-            QWidget#dashboardContentHost, QWidget#dashboardContent, QWidget#dashboardAgendaView, QWidget#dashboardOrdersView, QWidget#dashboardWarehouseView, QWidget#dashboardSalesView, QStackedWidget#dashboardContentStack { background-color: transparent; }
-            QFrame#dashboardHeader { background-color: transparent; }
+            QWidget#dashboardContentHost, QWidget#dashboardContent, QWidget#dashboardAgendaView, QWidget#dashboardOrdersView, QWidget#dashboardWarehouseView, QWidget#dashboardSalesView { background-color: transparent; }
+            QStackedWidget#dashboardContentStack { background-color: transparent; border: none; }
+            QFrame#dashboardHeader { background-color: transparent; border: none; }
             QLabel#dashboardTitle { font-size: 30px; font-weight: 700; color: #0F172A; }
             QLabel#dashboardDateLabel { font-size: 14px; color: #64748B; }
             QPushButton#dashboardNewActivityButton {
                 background-color: #2563EB; color: #FFFFFF; border: 1px solid #2563EB;
                 border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700;
             }
-            QPushButton#dashboardFullAgendaButton, QPushButton#dashboardPanelLinkButton {
+            QPushButton#dashboardFullAgendaButton {
                 background-color: #FFFFFF; color: #1D4ED8; border: 1px solid #CBD5E1;
                 border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700;
             }
             QPushButton#dashboardNewActivityButton:hover { background-color: #1D4ED8; }
-            QPushButton#dashboardFullAgendaButton:hover, QPushButton#dashboardPanelLinkButton:hover {
+            QPushButton#dashboardFullAgendaButton:hover {
                 background-color: #EFF6FF; border-color: #93C5FD;
             }
             QFrame#dashboardKpiCard, QFrame[dashboardPanel='true'] {
@@ -1737,51 +2098,92 @@ class DashboardPage(QWidget):
             QLabel#dashboardKpiTitle, QLabel#dashboardPanelTitle { color: #1E293B; font-size: 15px; font-weight: 700; }
             QLabel#dashboardKpiValue { color: #0F172A; font-size: 28px; font-weight: 800; }
             QLabel#dashboardKpiUnit { color: #0F172A; font-size: 22px; font-weight: 800; }
-            QLabel#dashboardKpiNote, QLabel#dashboardFooterLabel, QLabel#dashboardEmptyLabel, QLabel#dashboardActivityDetail {
+            QLabel#dashboardKpiNote, QLabel#dashboardFooterLabel, QLabel#dashboardEmptyLabel, QLabel#dashboardActivityState {
                 color: #64748B; font-size: 13px;
             }
             QLabel#dashboardActivityCustomer { color: #0F172A; font-size: 14px; font-weight: 700; }
             QLabel#dashboardActivitySummary { color: #1E293B; font-size: 13px; }
             QFrame#dashboardActivityCard { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
-            QWidget#dashboardCalendarHeadingBlock, QWidget#dashboardCalendarNavBlock { background-color: transparent; border: none; }
-            QLabel#dashboardMonthTitle {
-                color: #0F172A; font-size: 16px; font-weight: 700;
+            QScrollArea#dashboardTodayScrollArea, QWidget#dashboardTodayItemsHost { background: transparent; border: none; }
+            QPushButton#dashboardTodayPdfButton, QPushButton#dashboardTodayPrintButton {
+                color: #FFFFFF; border: none;
+                border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: 600;
             }
-            QPushButton#dashboardCalendarNavButton {
-                min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px;
-                border: 1px solid #D7E3F4; border-radius: 10px; background-color: #FFFFFF;
-                color: #2563EB; font-size: 16px; font-weight: 700;
+            QPushButton#dashboardTodayPdfButton { background-color: #2563EB; }
+            QPushButton#dashboardTodayPdfButton:hover { background-color: #1D4ED8; }
+            QPushButton#dashboardTodayPrintButton { background-color: #16A34A; }
+            QPushButton#dashboardTodayPrintButton:hover { background-color: #15803D; }
+            QPushButton#dashboardTodayPdfButton:disabled, QPushButton#dashboardTodayPrintButton:disabled {
+                background-color: #F8FAFC; color: #94A3B8; border-color: #E2E8F0;
             }
-            QPushButton#dashboardCalendarNavButton:hover { background-color: #EFF6FF; }
+            QWidget#dashboardCalendarHeadingBlock { background-color: transparent; border: none; }
             QCalendarWidget#dashboardMonthCalendar {
-                background: transparent;
-                border: none;
+                background: #FFFFFF;
+                border: 1px solid #DCE4EF;
+                border-radius: 10px;
             }
             QCalendarWidget#dashboardMonthCalendar QWidget#qt_calendar_navigationbar {
-                height: 0px;
-                min-height: 0px;
-                max-height: 0px;
+                min-height: 26px;
+                max-height: 26px;
+                border: 1px solid #CBD5E1;
+                border-radius: 10px;
+                background: transparent;
+                padding: 1px 5px;
+            }
+            QCalendarWidget#dashboardMonthCalendar QToolButton {
+                min-height: 20px;
+                max-height: 20px;
+                padding: 0;
+                margin: 0;
                 border: none;
                 background: transparent;
+                icon-size: 12px;
+            }
+            QCalendarWidget#dashboardMonthCalendar QToolButton::menu-indicator {
+                image: none;
+            }
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_prevmonth,
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_nextmonth {
+                min-width: 20px;
+                max-width: 20px;
+                border-radius: 10px;
+                background: #4D9B31;
+            }
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_prevmonth:hover,
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_nextmonth:hover {
+                background: #3F8128;
+            }
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_monthbutton,
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_yearbutton {
+                min-width: 72px;
+                max-width: 72px;
+                color: #000000;
+                font-size: 13px;
+                font-weight: 700;
+            }
+            QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_yearbutton {
+                min-width: 48px;
+                max-width: 48px;
+            }
+            QCalendarWidget#dashboardMonthCalendar QAbstractSpinBox {
+                min-width: 64px;
+                max-width: 64px;
+                min-height: 20px;
+                max-height: 20px;
+                border: 1px solid #CBD5E1;
+                border-radius: 5px;
+                background: #FFFFFF;
+                color: #334155;
             }
             QCalendarWidget#dashboardMonthCalendar QTableView {
-                background: transparent;
+                background: #FFFFFF;
+                gridline-color: #D8DEE8;
                 outline: 0;
                 selection-background-color: transparent;
-                alternate-background-color: transparent;
-            }
-            QCalendarWidget#dashboardMonthCalendar QHeaderView::section {
-                background: transparent;
-                color: #475569;
-                border: none;
-                font-size: 10px;
-                font-weight: 700;
-                padding: 0px;
-                margin: 0px;
             }
             QCalendarWidget#dashboardMonthCalendar QAbstractItemView:enabled {
                 color: #0F172A;
-                font-size: 10px;
+                font-size: 11px;
                 selection-background-color: transparent;
                 selection-color: #0F172A;
             }
@@ -1791,8 +2193,8 @@ class DashboardPage(QWidget):
             QFrame#dashboardCalendarSummaryChip[tone='blue'] { background-color: #EFF6FF; border-color: #BFDBFE; }
             QFrame#dashboardCalendarSummaryChip[tone='green'] { background-color: #F0FDF4; border-color: #BBF7D0; }
             QFrame#dashboardCalendarSummaryChip[tone='red'] { background-color: #FEF2F2; border-color: #FECACA; }
-            QLabel#dashboardCalendarSummaryTitle { color: #475569; font-size: 12px; font-weight: 600; }
-            QLabel#dashboardCalendarSummaryValue { color: #0F172A; font-size: 16px; font-weight: 800; }
+            QLabel#dashboardCalendarSummaryTitle { color: #000000; font-size: 12px; font-weight: 600; }
+            QLabel#dashboardCalendarSummaryValue { color: #000000; font-size: 16px; font-weight: 800; }
             QTableWidget#dashboardReactivationTable, QTableWidget#dashboardIslandTable, QTableWidget#dashboardOrdersRecentTable, QTableWidget#dashboardOrdersPendingTable, QTableWidget#dashboardOrdersWarehouseTable, QTableWidget#dashboardOrdersStateTable, QTableWidget#dashboardWarehouseRiskTable, QTableWidget#dashboardWarehouseStockTable, QTableWidget#dashboardWarehouseEntriesTable, QTableWidget#dashboardWarehouseOutputsTable, QTableWidget#dashboardSalesDropsTable, QTableWidget#dashboardSalesIslandsTable, QTableWidget#dashboardSalesTypesTable, QTableWidget#dashboardSalesZeroTable {
                 background-color: #FFFFFF; alternate-background-color: #F8FAFC; border: none; color: #334155;
             }
