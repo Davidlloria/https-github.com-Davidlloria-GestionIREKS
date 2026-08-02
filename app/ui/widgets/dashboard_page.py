@@ -100,24 +100,51 @@ class DashboardAgendaPdfPreviewDialog(QDialog):
         summary.setObjectName('dashboardAgendaPdfPreviewSummary')
         layout.addWidget(summary)
 
-        self.entries_table = QTableWidget(len(self.report_rows), len(self.report_headers), self)
-        self.entries_table.setObjectName('dashboardAgendaPdfPreviewTable')
-        self.entries_table.setHorizontalHeaderLabels(self.report_headers)
-        self.entries_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.entries_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        self.entries_table.setAlternatingRowColors(True)
-        self.entries_table.setWordWrap(False)
-        self.entries_table.verticalHeader().setVisible(False)
-        self.entries_table.verticalHeader().setDefaultSectionSize(34)
-        for row_index, row in enumerate(self.report_rows):
-            for column_index, value in enumerate(row):
-                self.entries_table.setItem(row_index, column_index, QTableWidgetItem(str(value)))
-        table_header = self.entries_table.horizontalHeader()
-        table_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        table_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        table_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        layout.addWidget(self.entries_table, 1)
+        self.entries_scroll = QScrollArea(self)
+        self.entries_scroll.setObjectName('dashboardAgendaPdfPreviewScroll')
+        self.entries_scroll.setWidgetResizable(True)
+        self.entries_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        entries_host = QWidget()
+        entries_host.setObjectName('dashboardAgendaPdfPreviewHost')
+        entries_layout = QVBoxLayout(entries_host)
+        entries_layout.setContentsMargins(0, 0, 0, 0)
+        entries_layout.setSpacing(8)
+        entries_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        for row in self.report_rows:
+            values = [str(value or '') for value in row]
+            values.extend([''] * (4 - len(values)))
+            event_date, customer_text, content_text, state_text = values[:4]
+            card = QFrame()
+            card.setObjectName('dashboardAgendaPdfPreviewCard')
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(12, 10, 12, 11)
+            card_layout.setSpacing(7)
+            top_line = QHBoxLayout()
+            top_line.setContentsMargins(0, 0, 0, 0)
+            top_line.setSpacing(12)
+            date_label = QLabel(event_date)
+            date_label.setObjectName('dashboardAgendaPdfPreviewDate')
+            date_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+            customer_label = QLabel(customer_text)
+            customer_label.setObjectName('dashboardAgendaPdfPreviewCustomer')
+            customer_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            state_label = QLabel(state_text)
+            state_label.setObjectName('dashboardAgendaPdfPreviewState')
+            state_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            state_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+            top_line.addWidget(date_label)
+            top_line.addWidget(customer_label, 1)
+            top_line.addWidget(state_label)
+            content_label = QLabel(content_text)
+            content_label.setObjectName('dashboardAgendaPdfPreviewContent')
+            content_label.setWordWrap(True)
+            content_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            content_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            card_layout.addLayout(top_line)
+            card_layout.addWidget(content_label)
+            entries_layout.addWidget(card)
+        self.entries_scroll.setWidget(entries_host)
+        layout.addWidget(self.entries_scroll, 1)
 
         buttons = QDialogButtonBox(self)
         buttons.setObjectName('dashboardAgendaPdfPreviewButtons')
@@ -132,11 +159,14 @@ class DashboardAgendaPdfPreviewDialog(QDialog):
             'QDialog#dashboardAgendaPdfPreviewDialog { background: #F8FAFC; }'
             'QLabel#dashboardAgendaPdfPreviewTitle { color: #0F172A; font-size: 18px; font-weight: 700; }'
             'QLabel#dashboardAgendaPdfPreviewSummary { color: #475569; font-size: 13px; }'
-            'QTableWidget#dashboardAgendaPdfPreviewTable {'
-            ' background: #FFFFFF; alternate-background-color: #F8FAFC; color: #0F172A;'
-            ' border: 1px solid #CBD5E1; gridline-color: #E2E8F0; }'
-            'QTableWidget#dashboardAgendaPdfPreviewTable QHeaderView::section {'
-            ' background: #3A78CF; color: white; border: none; padding: 7px; font-weight: 700; }'
+            'QScrollArea#dashboardAgendaPdfPreviewScroll, QWidget#dashboardAgendaPdfPreviewHost {'
+            ' background: transparent; border: none; }'
+            'QFrame#dashboardAgendaPdfPreviewCard {'
+            ' background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 10px; }'
+            'QLabel#dashboardAgendaPdfPreviewDate { color: #334155; font-size: 13px; font-weight: 600; }'
+            'QLabel#dashboardAgendaPdfPreviewCustomer { color: #0F172A; font-size: 13px; font-weight: 700; }'
+            'QLabel#dashboardAgendaPdfPreviewState { color: #475569; font-size: 13px; font-weight: 700; }'
+            'QLabel#dashboardAgendaPdfPreviewContent { color: #1E293B; font-size: 13px; }'
             'QPushButton#dashboardAgendaPdfSaveButton {'
             ' background: #16A34A; color: white; border: none; border-radius: 8px;'
             ' min-width: 96px; padding: 8px 14px; font-weight: 700; }'
@@ -155,10 +185,9 @@ class DashboardAgendaPdfPreviewDialog(QDialog):
         if not path:
             return
         try:
-            output = self.report_export_service.export_pdf(
+            output = self.report_export_service.export_dashboard_agenda_pdf(
                 path,
                 self.report_title,
-                self.report_headers,
                 self.report_rows,
             )
         except Exception as exc:
@@ -1404,23 +1433,32 @@ class DashboardPage(QWidget):
         document.print_(printer)
 
     def _today_report_html(self) -> str:
-        title, headers, rows = self._today_report_data()
-        header_cells = ''.join(f'<th>{escape(value)}</th>' for value in headers)
-        body_rows = ''.join(
-            '<tr>' + ''.join(f'<td>{escape(str(value))}</td>' for value in row) + '</tr>'
+        title, _headers, rows = self._today_report_data()
+        cards = ''.join(
+            '<table class="card" width="100%" cellspacing="0" cellpadding="0">'
+            '<tr class="top">'
+            f'<td class="date">{escape(str(row[0]))}</td>'
+            f'<td class="customer">{escape(str(row[1]))}</td>'
+            f'<td class="state" align="right">{escape(str(row[3]))}</td>'
+            '</tr>'
+            f'<tr><td class="content" colspan="3">{escape(str(row[2])).replace(chr(10), "<br/>")}</td></tr>'
+            '</table><div class="gap"></div>'
             for row in rows
         )
         return (
             '<html><head><style>'
             'body { font-family: "Segoe UI", sans-serif; color: #0F172A; }'
             'h1 { font-size: 18px; margin-bottom: 14px; }'
-            'table { width: 100%; border-collapse: collapse; }'
-            'th { background: #3A78CF; color: white; text-align: left; }'
-            'th, td { border: 1px solid #D1D5DB; padding: 6px; font-size: 10px; }'
-            'tr:nth-child(even) { background: #F8FAFC; }'
+            '.card { width: 100%; border: 1px solid #CBD5E1; background: #F8FAFC; page-break-inside: avoid; }'
+            '.card td { padding: 7px 9px; font-size: 10px; }'
+            '.top td { padding-bottom: 4px; }'
+            '.date { width: 16%; color: #334155; font-weight: 600; }'
+            '.customer { color: #0F172A; font-weight: 700; }'
+            '.state { width: 16%; color: #475569; font-weight: 700; }'
+            '.content { padding-top: 4px; color: #1E293B; }'
+            '.gap { height: 7px; }'
             '</style></head><body>'
-            f'<h1>{escape(title)}</h1><table><thead><tr>{header_cells}</tr></thead>'
-            f'<tbody>{body_rows}</tbody></table></body></html>'
+            f'<h1>{escape(title)}</h1>{cards}</body></html>'
         )
 
     def _reload_reactivation_table(self, rows: list[DashboardReactivationRow]) -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from xml.sax.saxutils import escape as xml_escape
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
@@ -11,7 +12,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core.config import DATA_DIR
 
@@ -94,6 +95,75 @@ class ReportExportService:
             )
         )
         story.append(table)
+        doc.build(story)
+        return out
+
+    def export_dashboard_agenda_pdf(self, path: str | Path, title: str, rows: list[list[Any]]) -> Path:
+        out = Path(path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        doc = SimpleDocTemplate(
+            str(out),
+            pagesize=landscape(A4),
+            leftMargin=24,
+            rightMargin=24,
+            topMargin=24,
+            bottomMargin=24,
+        )
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle('DashboardAgendaTitle', parent=styles['Title'], alignment=0)
+        date_style = ParagraphStyle('DashboardAgendaDate', parent=styles['BodyText'], fontSize=9, leading=11)
+        customer_style = ParagraphStyle(
+            'DashboardAgendaCustomer', parent=styles['BodyText'], fontSize=9, leading=11, fontName='Helvetica-Bold'
+        )
+        state_style = ParagraphStyle(
+            'DashboardAgendaState', parent=styles['BodyText'], fontSize=9, leading=11, alignment=2, textColor=colors.HexColor('#475569')
+        )
+        content_style = ParagraphStyle(
+            'DashboardAgendaContent', parent=styles['BodyText'], fontSize=10, leading=14, textColor=colors.HexColor('#1E293B')
+        )
+        story = [Paragraph(xml_escape(str(title or 'Agenda')), title_style), Spacer(1, 10)]
+        date_width = 28 * mm
+        state_width = 28 * mm
+        customer_width = doc.width - date_width - state_width
+        for raw_row in rows:
+            values = [str(value or '') for value in raw_row]
+            values.extend([''] * (4 - len(values)))
+            event_date, customer, content, state = values[:4]
+            top_line = Table(
+                [[
+                    Paragraph(xml_escape(event_date), date_style),
+                    Paragraph(xml_escape(customer), customer_style),
+                    Paragraph(xml_escape(state), state_style),
+                ]],
+                colWidths=[date_width, customer_width, state_width],
+            )
+            top_line.setStyle(
+                TableStyle([
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                    ('TOPPADDING', (0, 0), (-1, -1), 0),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+                ])
+            )
+            card = Table(
+                [[top_line], [Paragraph(xml_escape(content).replace('\n', '<br/>'), content_style)]],
+                colWidths=[doc.width],
+            )
+            card.setStyle(
+                TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+                    ('BOX', (0, 0), (-1, -1), 0.75, colors.HexColor('#CBD5E1')),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                    ('TOPPADDING', (0, 0), (-1, 0), 8),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
+                    ('TOPPADDING', (0, 1), (-1, 1), 5),
+                    ('BOTTOMPADDING', (0, 1), (-1, 1), 9),
+                ])
+            )
+            story.append(KeepTogether([card, Spacer(1, 7)]))
         doc.build(story)
         return out
 

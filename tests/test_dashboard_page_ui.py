@@ -99,6 +99,7 @@ class _StubReportExportService:
     def __init__(self) -> None:
         self.default_calls: list[tuple[str, str, str]] = []
         self.export_calls: list[tuple[str, str, list[str], list[list[str]]]] = []
+        self.agenda_pdf_calls: list[tuple[str, str, list[list[str]]]] = []
 
     def default_path(self, title: str, suffix: str, folder: str = '') -> Path:
         self.default_calls.append((title, suffix, folder))
@@ -106,6 +107,10 @@ class _StubReportExportService:
 
     def export_pdf(self, path: str, title: str, headers: list[str], rows: list[list[str]]) -> Path:
         self.export_calls.append((path, title, headers, rows))
+        return Path(path)
+
+    def export_dashboard_agenda_pdf(self, path: str, title: str, rows: list[list[str]]) -> Path:
+        self.agenda_pdf_calls.append((path, title, rows))
         return Path(path)
 
 
@@ -426,12 +431,15 @@ def test_dashboard_page_exports_the_visible_agenda_selection_to_pdf(monkeypatch)
 def test_dashboard_agenda_pdf_preview_can_save_or_cancel(monkeypatch) -> None:
     _application()
     report_service = _StubReportExportService()
+    long_content = 'Revision comercial con todos los acuerdos y próximos pasos. ' * 12
     dialog = dashboard_page_module.DashboardAgendaPdfPreviewDialog(
         report_export_service=report_service,
         title='Agenda del 21/07/2026',
         headers=['Fecha', 'Cliente', 'Contenido', 'Estado'],
-        rows=[['21/07/2026', '101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
+        rows=[['21/07/2026', '101 · Panaderia Norte', long_content, 'Pendiente']],
     )
+    dialog.show()
+    QApplication.processEvents()
     monkeypatch.setattr(
         dashboard_page_module.QFileDialog,
         'getSaveFileName',
@@ -439,22 +447,26 @@ def test_dashboard_agenda_pdf_preview_can_save_or_cancel(monkeypatch) -> None:
     )
     monkeypatch.setattr(dashboard_page_module.QMessageBox, 'information', lambda *_args, **_kwargs: None)
 
-    assert dialog.entries_table.rowCount() == 1
-    assert dialog.entries_table.columnCount() == 4
-    assert dialog.entries_table.item(0, 0).text() == '21/07/2026'
-    assert dialog.entries_table.item(0, 1).text() == '101 · Panaderia Norte'
-    assert dialog.entries_table.item(0, 2).text() == 'Revision comercial'
-    assert dialog.entries_table.item(0, 3).text() == 'Pendiente'
+    cards = dialog.findChildren(QFrame, 'dashboardAgendaPdfPreviewCard')
+    assert len(cards) == 1
+    assert cards[0].findChild(QLabel, 'dashboardAgendaPdfPreviewDate').text() == '21/07/2026'
+    assert cards[0].findChild(QLabel, 'dashboardAgendaPdfPreviewCustomer').text() == '101 · Panaderia Norte'
+    content_label = cards[0].findChild(QLabel, 'dashboardAgendaPdfPreviewContent')
+    assert content_label.text() == long_content
+    assert content_label.wordWrap()
+    assert content_label.height() > content_label.fontMetrics().height()
+    state_label = cards[0].findChild(QLabel, 'dashboardAgendaPdfPreviewState')
+    assert state_label.text() == 'Pendiente'
+    assert state_label.alignment() & Qt.AlignmentFlag.AlignRight
     assert dialog.save_btn.text() == 'Guardar'
     assert dialog.cancel_btn.text() == 'Cancelar'
     dialog.save_btn.click()
 
     assert report_service.default_calls == [('Agenda del 21/07/2026', 'pdf', 'agenda_dashboard')]
-    assert report_service.export_calls == [(
+    assert report_service.agenda_pdf_calls == [(
         'agenda_guardada.pdf',
         'Agenda del 21/07/2026',
-        ['Fecha', 'Cliente', 'Contenido', 'Estado'],
-        [['21/07/2026', '101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
+        [['21/07/2026', '101 · Panaderia Norte', long_content, 'Pendiente']],
     )]
 
     cancel_dialog = dashboard_page_module.DashboardAgendaPdfPreviewDialog(

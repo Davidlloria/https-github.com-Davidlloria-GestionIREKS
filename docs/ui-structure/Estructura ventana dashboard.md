@@ -14,13 +14,14 @@ Dashboard
 │   ├── DashboardAgendaDialog
 │   │   └── Alta y edición de actividades
 │   ├── DashboardAgendaPdfPreviewDialog
-│   │   └── Vista completa de entradas, guardado y cancelación del PDF de Agenda
+│   │   └── Vista completa en tarjetas, guardado y cancelación del PDF de Agenda
 │   └── DashboardAgendaOverviewDialog
 │       └── Listado completo de la agenda
 └── Servicios
     ├── app/services/customer_dashboard_service.py
     ├── app/services/customer_service.py
     ├── app/services/order_dashboard_service.py
+    ├── app/services/report_export_service.py
     ├── app/services/sales_dashboard_service.py
     └── app/services/warehouse_dashboard_service.py
 ```
@@ -289,11 +290,13 @@ Calendario mensual de Agenda
     │   │   ├── contenido: resumen y detalle disponibles
     │   │   └── estado traducido
     │   ├── PDF
-    │   │   ├── DashboardAgendaPdfPreviewDialog con la lista completa de entradas
-    │   │   ├── tabla previa: Fecha / Cliente / Contenido / Estado
-    │   │   ├── Guardar: genera el PDF mediante ReportExportService en la ruta elegida
+    │   │   ├── DashboardAgendaPdfPreviewDialog con la lista completa de tarjetas
+    │   │   ├── tarjeta de vista previa
+    │   │   │   ├── línea 1: Fecha / código · cliente / Estado alineado a la derecha
+    │   │   │   └── línea 2: Contenido con ajuste de línea y altura dinámica
+    │   │   ├── Guardar: genera tarjetas PDF mediante ReportExportService en la ruta elegida
     │   │   └── Cancelar: cierra la vista previa sin generar archivos
-    │   ├── impresión: QTextDocument y QPrintDialog
+    │   ├── impresión: tarjetas HTML mediante QTextDocument y QPrintDialog
     │   └── acciones deshabilitadas cuando la selección está vacía
     └── tarjetas diarias o semanales en una sola línea
         ├── código · nombre del cliente
