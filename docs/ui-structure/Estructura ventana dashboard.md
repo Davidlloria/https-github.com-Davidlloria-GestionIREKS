@@ -205,7 +205,8 @@ dashboardAgendaView
 │       │   └── dashboardTodayPrintButton (96 px, verde)
 │       └── dashboardTodayScrollArea
 │           └── dashboardTodayItemsHost
-│               └── dashboardActivityCard o dashboardEmptyLabel
+│               ├── dashboardActivityCard o dashboardEmptyLabel
+│               └── clic derecho en dashboardActivityCard: abre DashboardAgendaDialog en modo edición
 └── fila inferior (proporción 5:3)
     ├── dashboardReactivationPanel
     │   └── dashboardReactivationTable
@@ -232,7 +233,8 @@ Calendario mensual de Agenda
 │   └── dashboardTodayScrollArea
 │       ├── desplazamiento vertical solo para las tarjetas
 │       ├── contenido alineado arriba
-│       └── sin botón de enlace inferior
+│       ├── sin botón de enlace inferior
+│       └── clic derecho en una tarjeta: edita la actividad asociada por agenda_id
 ├── dashboardMonthCalendar
 │   ├── tamaño mínimo: 320 x 220 px
 │   ├── política horizontal: Expanding

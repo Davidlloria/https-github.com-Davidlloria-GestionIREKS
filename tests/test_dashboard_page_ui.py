@@ -643,3 +643,64 @@ def test_dashboard_page_agenda_actions_open_real_dialog_paths(monkeypatch) -> No
     QApplication.processEvents()
 
 
+def test_dashboard_activity_card_right_click_opens_edit_dialog(monkeypatch) -> None:
+    _application()
+    page = DashboardPage(
+        customer_service=_StubCustomerService(),
+        dashboard_service=_StubDashboardService(),
+    )
+    page.set_selected_date(date(2026, 7, 21))
+    page.resize(1180, 850)
+    page.show()
+    QApplication.processEvents()
+
+    card = page.findChild(QFrame, 'dashboardActivityCard')
+    assert card is not None
+    assert card.property('agendaId') == 'ag-1'
+    for label_name in ('dashboardActivityCustomer', 'dashboardActivitySummary', 'dashboardActivityState'):
+        label = card.findChild(QLabel, label_name)
+        assert label is not None
+        assert label.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+    dialog_calls: list[str] = []
+    dialog_result = {'value': dashboard_page_module.QDialog.DialogCode.Rejected}
+    reload_calls: list[bool] = []
+
+    class _FakeAgendaDialog:
+        def __init__(self, *args, **kwargs):
+            dialog_calls.append(kwargs.get('agenda_id', ''))
+
+        def exec(self):
+            return dialog_result['value']
+
+    monkeypatch.setattr(dashboard_page_module, 'DashboardAgendaDialog', _FakeAgendaDialog)
+    monkeypatch.setattr(page, 'reload', lambda: reload_calls.append(True))
+
+    QTest.mouseClick(
+        card,
+        Qt.MouseButton.RightButton,
+        Qt.KeyboardModifier.NoModifier,
+        card.rect().center(),
+    )
+    QApplication.processEvents()
+
+    assert dialog_calls == ['ag-1']
+    assert reload_calls == []
+
+    dialog_result['value'] = dashboard_page_module.QDialog.DialogCode.Accepted
+    QTest.mouseClick(
+        card,
+        Qt.MouseButton.RightButton,
+        Qt.KeyboardModifier.NoModifier,
+        card.rect().center(),
+    )
+    QApplication.processEvents()
+
+    assert dialog_calls == ['ag-1', 'ag-1']
+    assert reload_calls == [True]
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+

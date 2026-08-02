@@ -630,6 +630,26 @@ class DashboardMonthCalendar(QCalendarWidget):
         self.weekSelected.emit(week_start, week_end, week_number)
 
 
+class DashboardActivityCard(QFrame):
+    editRequested = Signal(str)
+
+    def __init__(self, agenda_id: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.agenda_id = str(agenda_id or '').strip()
+        self.setObjectName('dashboardActivityCard')
+        self.setProperty('agendaId', self.agenda_id)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.RightButton and self.agenda_id:
+            self.editRequested.emit(self.agenda_id)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def contextMenuEvent(self, event) -> None:
+        event.accept()
+
+
 class DashboardPage(QWidget):
     def __init__(
         self,
@@ -1371,8 +1391,9 @@ class DashboardPage(QWidget):
             self.today_items_layout.addWidget(empty)
             return
         for row in rows:
-            card = QFrame()
-            card.setObjectName('dashboardActivityCard')
+            card = DashboardActivityCard(row.agenda_id)
+            card.setToolTip('Clic derecho para editar la actividad')
+            card.editRequested.connect(self._edit_dashboard_activity)
             layout = QHBoxLayout(card)
             layout.setContentsMargins(10, 10, 10, 10)
             layout.setSpacing(12)
@@ -1386,6 +1407,8 @@ class DashboardPage(QWidget):
             state.setObjectName('dashboardActivityState')
             state.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             state.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+            for label in (customer, summary, state):
+                label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             layout.addWidget(customer, 0)
             layout.addWidget(summary, 1)
             layout.addWidget(state, 0)
@@ -1907,6 +1930,9 @@ class DashboardPage(QWidget):
         dialog = DashboardAgendaDialog(self, agenda_id=agenda_id, default_customer_id=default_customer_id, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.reload()
+
+    def _edit_dashboard_activity(self, agenda_id: str) -> None:
+        self._open_activity_dialog(agenda_id=agenda_id)
 
     def _show_placeholder_dashboard(self, name: str) -> None:
         QMessageBox.information(self, 'Dashboard', f'El dashboard de {name} se implementará en una siguiente fase.')
