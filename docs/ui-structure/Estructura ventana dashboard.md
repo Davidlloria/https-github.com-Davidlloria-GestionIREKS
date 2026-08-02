@@ -224,25 +224,35 @@ Calendario mensual de Agenda
 │   ├── cabecera: nombres cortos
 │   ├── columna ISO de semanas: visible
 │   ├── navegación nativa: visible
-│   │   ├── barra azul
-│   │   ├── mes y año en blanco
+│   │   ├── fondo transparente
+│   │   ├── borde gris con esquinas redondeadas
+│   │   ├── mes y año en negro a 13 px
 │   │   └── flechas circulares verdes
 │   ├── cuadrícula fina: visible
 │   ├── fines de semana: rojo
 │   └── edición directa: deshabilitada
 ├── DashboardCalendarDelegate
 │   ├── cabeceras de días: fondo azul
+│   ├── texto de todas las cabeceras: blanco
 │   ├── números de semana: fondo azul
 │   ├── azul: actividades pendientes
 │   ├── verde: existe alguna actividad completada
 │   ├── rojo: vencidas no completadas ni canceladas
 │   ├── gris: días fuera del mes
-│   ├── fondo azul: fecha seleccionada
-│   └── negrita: día actual
+│   ├── fecha seleccionada
+│   │   ├── fondo gris claro
+│   │   ├── borde gris oscuro de 2 px
+│   │   └── texto negro
+│   └── día actual
+│       ├── fondo amarillo
+│       ├── borde ámbar
+│       └── texto oscuro en negrita
 ├── dashboardCalendarSummaryChip
 │   ├── altura fija: 34 px
 │   ├── márgenes internos: 10 / 3 / 10 / 3 px
 │   ├── reparto horizontal: tres partes iguales
+│   ├── texto del título: negro
+│   ├── texto del valor: negro
 │   └── contenido conservado: título y valor
 └── Interacción
     ├── flechas nativas: cambio de mes

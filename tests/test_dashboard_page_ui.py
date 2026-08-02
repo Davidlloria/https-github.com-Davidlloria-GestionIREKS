@@ -229,10 +229,19 @@ def test_dashboard_page_starts_in_agenda_mode() -> None:
     assert calendar.sizePolicy().verticalPolicy() == QSizePolicy.Policy.Expanding
     calendar_view = calendar.findChild(QAbstractItemView, 'qt_calendar_calendarview')
     assert isinstance(calendar_view.itemDelegate(), DashboardCalendarDelegate)
+    assert DashboardCalendarDelegate.HEADER_TEXT_COLOR == '#FFFFFF'
+    assert DashboardCalendarDelegate.SELECTED_BACKGROUND == '#F1F5F9'
+    assert DashboardCalendarDelegate.SELECTED_BORDER == '#475569'
+    assert DashboardCalendarDelegate.TODAY_BACKGROUND == '#FDE68A'
+    assert DashboardCalendarDelegate.TODAY_BORDER == '#F59E0B'
     summary_chips = page.findChildren(QFrame, 'dashboardCalendarSummaryChip')
     assert len(summary_chips) == 3
     assert all(chip.minimumHeight() == 34 and chip.maximumHeight() == 34 for chip in summary_chips)
-    assert 'QFrame#dashboardHeader { background-color: transparent; border: none; }' in page.styleSheet()
+    style_sheet = page.styleSheet()
+    assert 'QFrame#dashboardHeader { background-color: transparent; border: none; }' in style_sheet
+    assert 'QLabel#dashboardCalendarSummaryTitle { color: #000000;' in style_sheet
+    assert 'QLabel#dashboardCalendarSummaryValue { color: #000000;' in style_sheet
+    assert 'color: #000000;\n                font-size: 13px;' in style_sheet
     assert page.minimumSizeHint().width() <= 1180
 
     page.close()

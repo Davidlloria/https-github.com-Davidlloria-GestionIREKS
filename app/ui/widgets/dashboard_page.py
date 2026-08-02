@@ -331,6 +331,12 @@ class DashboardAgendaOverviewDialog(QDialog):
 
 
 class DashboardCalendarDelegate(QStyledItemDelegate):
+    HEADER_TEXT_COLOR = "#FFFFFF"
+    SELECTED_BACKGROUND = "#F1F5F9"
+    SELECTED_BORDER = "#475569"
+    TODAY_BACKGROUND = "#FDE68A"
+    TODAY_BORDER = "#F59E0B"
+
     def __init__(self, calendar: "DashboardMonthCalendar", page: "DashboardPage") -> None:
         super().__init__(calendar)
         self._calendar = calendar
@@ -348,11 +354,10 @@ class DashboardCalendarDelegate(QStyledItemDelegate):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QColor("#5B8DEF"))
             painter.drawRoundedRect(option.rect.adjusted(2, 2, -2, -2), 4, 4)
-            header_color = QColor("#D94C5C") if index.row() == 0 and index.column() in {6, 7} else QColor("#FFFFFF")
             font = option.font
             font.setBold(True)
             painter.setFont(font)
-            painter.setPen(header_color)
+            painter.setPen(QColor(self.HEADER_TEXT_COLOR))
             painter.drawText(option.rect, Qt.AlignmentFlag.AlignCenter, str(display))
             painter.restore()
             return
@@ -383,12 +388,29 @@ class DashboardCalendarDelegate(QStyledItemDelegate):
             background = QColor("#FEF2F2")
             text_color = QColor("#DC2626")
 
-        painter.fillRect(option.rect, QColor("#FFFFFF"))
+        border_color: QColor | None = None
+        border_width = 0
+        if is_today:
+            background = QColor(self.TODAY_BACKGROUND)
+            text_color = QColor("#78350F")
+            border_color = QColor(self.TODAY_BORDER)
+            border_width = 1
         if selected:
-            background = QColor("#5B8DEF")
-            text_color = QColor("#FFFFFF")
-        if selected or tone is not None:
-            painter.setPen(Qt.PenStyle.NoPen)
+            if not is_today:
+                background = QColor(self.SELECTED_BACKGROUND)
+                text_color = QColor("#0F172A")
+            border_color = QColor(self.SELECTED_BORDER)
+            border_width = 2
+
+        painter.fillRect(option.rect, QColor("#FFFFFF"))
+        if selected or is_today or tone is not None:
+            if border_color is None:
+                painter.setPen(Qt.PenStyle.NoPen)
+            else:
+                pen = painter.pen()
+                pen.setColor(border_color)
+                pen.setWidth(border_width)
+                painter.setPen(pen)
             painter.setBrush(background)
             painter.drawRoundedRect(option.rect.adjusted(3, 2, -3, -2), 4, 4)
 
@@ -1730,8 +1752,9 @@ class DashboardPage(QWidget):
             QCalendarWidget#dashboardMonthCalendar QWidget#qt_calendar_navigationbar {
                 min-height: 26px;
                 max-height: 26px;
-                border: none;
-                background: #1769AA;
+                border: 1px solid #CBD5E1;
+                border-radius: 10px;
+                background: transparent;
                 padding: 1px 5px;
             }
             QCalendarWidget#dashboardMonthCalendar QToolButton {
@@ -1761,8 +1784,8 @@ class DashboardPage(QWidget):
             QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_yearbutton {
                 min-width: 72px;
                 max-width: 72px;
-                color: #FFFFFF;
-                font-size: 11px;
+                color: #000000;
+                font-size: 13px;
                 font-weight: 700;
             }
             QCalendarWidget#dashboardMonthCalendar QToolButton#qt_calendar_yearbutton {
@@ -1797,8 +1820,8 @@ class DashboardPage(QWidget):
             QFrame#dashboardCalendarSummaryChip[tone='blue'] { background-color: #EFF6FF; border-color: #BFDBFE; }
             QFrame#dashboardCalendarSummaryChip[tone='green'] { background-color: #F0FDF4; border-color: #BBF7D0; }
             QFrame#dashboardCalendarSummaryChip[tone='red'] { background-color: #FEF2F2; border-color: #FECACA; }
-            QLabel#dashboardCalendarSummaryTitle { color: #475569; font-size: 12px; font-weight: 600; }
-            QLabel#dashboardCalendarSummaryValue { color: #0F172A; font-size: 16px; font-weight: 800; }
+            QLabel#dashboardCalendarSummaryTitle { color: #000000; font-size: 12px; font-weight: 600; }
+            QLabel#dashboardCalendarSummaryValue { color: #000000; font-size: 16px; font-weight: 800; }
             QTableWidget#dashboardReactivationTable, QTableWidget#dashboardIslandTable, QTableWidget#dashboardOrdersRecentTable, QTableWidget#dashboardOrdersPendingTable, QTableWidget#dashboardOrdersWarehouseTable, QTableWidget#dashboardOrdersStateTable, QTableWidget#dashboardWarehouseRiskTable, QTableWidget#dashboardWarehouseStockTable, QTableWidget#dashboardWarehouseEntriesTable, QTableWidget#dashboardWarehouseOutputsTable, QTableWidget#dashboardSalesDropsTable, QTableWidget#dashboardSalesIslandsTable, QTableWidget#dashboardSalesTypesTable, QTableWidget#dashboardSalesZeroTable {
                 background-color: #FFFFFF; alternate-background-color: #F8FAFC; border: none; color: #334155;
             }
