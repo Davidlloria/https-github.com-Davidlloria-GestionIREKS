@@ -1102,13 +1102,14 @@ class DashboardPage(QWidget):
         recent_panel = self._build_table_panel('Pedidos recientes', 'dashboardOrdersRecentPanel')
         self.orders_recent_table = QTableWidget(0, 7)
         self.orders_recent_table.setObjectName('dashboardOrdersRecentTable')
-        self.orders_recent_table.setHorizontalHeaderLabels(['Pedido', 'Almacén', 'Fecha', 'Kg pedido', 'Kg recibido', 'Kg pend.', 'Estado'])
+        self.orders_recent_table.setHorizontalHeaderLabels(['Pedido', 'Almacén', 'Sem', 'Fecha', 'Kg pedido', 'Kg recibido', 'Kg pend.'])
         self._configure_table(self.orders_recent_table)
         recent_header = self.orders_recent_table.horizontalHeader()
         recent_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         recent_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         recent_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        for col in (3, 4, 5, 6):
+        recent_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        for col in (4, 5, 6):
             recent_header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         recent_panel.layout().addWidget(self.orders_recent_table)
         upper_row.addWidget(recent_panel, 6)
@@ -1690,14 +1691,17 @@ class DashboardPage(QWidget):
             values = [
                 row.pedido_numero,
                 row.almacen_nombre or row.almacen_id,
+                str(row.semana),
                 self.format_date(row.pedido_fecha),
                 self._format_number_es(row.ordered_kg, suffix=' kg'),
                 self._format_number_es(row.received_kg, suffix=' kg'),
                 self._format_number_es(row.pending_kg, suffix=' kg'),
-                row.status.capitalize(),
             ]
             for col, value in enumerate(values):
-                self.orders_recent_table.setItem(idx, col, QTableWidgetItem(value))
+                item = QTableWidgetItem(value)
+                if col in (4, 5, 6):
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                self.orders_recent_table.setItem(idx, col, item)
 
     def _populate_order_pending_table(self, rows: list[DashboardOrderRow]) -> None:
         self.orders_pending_table.setRowCount(len(rows))

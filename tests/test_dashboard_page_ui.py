@@ -545,6 +545,15 @@ def test_dashboard_page_can_switch_to_orders_mode() -> None:
     assert page.title_label.text() == 'Pedidos'
     assert page.dashboard_stack.currentWidget().objectName() == 'dashboardOrdersView'
     assert page.orders_recent_table.rowCount() == 1
+    assert [
+        page.orders_recent_table.horizontalHeaderItem(col).text()
+        for col in range(page.orders_recent_table.columnCount())
+    ] == ['Pedido', 'Almacén', 'Sem', 'Fecha', 'Kg pedido', 'Kg recibido', 'Kg pend.']
+    assert page.orders_recent_table.item(0, 2).text() == '30'
+    for col in (4, 5, 6):
+        assert page.orders_recent_table.item(0, col).textAlignment() == (
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
     assert page.orders_pending_table.rowCount() == 1
     assert page.orders_warehouse_table.rowCount() == 1
     assert page.orders_state_table.rowCount() == 1

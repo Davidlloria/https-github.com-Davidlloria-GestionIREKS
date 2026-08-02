@@ -348,11 +348,11 @@ dashboardOrdersView
 │   │   └── dashboardOrdersRecentTable
 │   │       ├── Pedido
 │   │       ├── Almacen
+│   │       ├── Sem
 │   │       ├── Fecha
-│   │       ├── Kg pedido
-│   │       ├── Kg recibido
-│   │       ├── Kg pend.
-│   │       └── Estado
+│   │       ├── Kg pedido: alineado a la derecha
+│   │       ├── Kg recibido: alineado a la derecha
+│   │       └── Kg pend.: alineado a la derecha
 │   └── dashboardOrdersPendingPanel
 │       └── dashboardOrdersPendingTable
 │           ├── Fecha
