@@ -155,7 +155,9 @@ Componentes de dashboard
 │       ├── SVG: 28 x 28 px
 │       ├── contenido
 │       │   ├── título
-│       │   ├── valor
+│       │   ├── fila de valor
+│       │   │   ├── valor
+│       │   │   └── unidad opcional
 │       │   └── nota
 │       └── tone
 │           ├── blue
@@ -338,8 +340,8 @@ Tablas de Agenda
 dashboardOrdersView
 ├── KPI
 │   ├── Pedidos
-│   ├── Kg recibidos
-│   ├── Kg pendientes
+│   ├── Kg recibidos: valor numérico y unidad `kg` en labels separados
+│   ├── Kg pendientes: valor numérico y unidad `kg` en labels separados
 │   └── Incidencias
 ├── fila superior (6:4)
 │   ├── dashboardOrdersRecentPanel

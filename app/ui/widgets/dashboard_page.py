@@ -577,7 +577,7 @@ class DashboardPage(QWidget):
             ('completed_today', 'Completadas hoy', 'green', 'circle-check.svg'),
             ('customers_without_follow_up', 'Clientes sin seguimiento', 'orange', 'users.svg'),
         ]):
-            card, value_label, note_label = self._build_kpi_card(title, tone, icon_name)
+            card, value_label, _unit_label, note_label = self._build_kpi_card(title, tone, icon_name)
             self.kpi_labels[key] = value_label
             self.kpi_notes[key] = note_label
             kpi_row.addWidget(card, 0, column)
@@ -631,7 +631,7 @@ class DashboardPage(QWidget):
         layout.addLayout(lower_row, 2)
         return widget
 
-    def _build_kpi_card(self, title: str, tone: str, icon_name: str) -> tuple[QFrame, QLabel, QLabel]:
+    def _build_kpi_card(self, title: str, tone: str, icon_name: str) -> tuple[QFrame, QLabel, QLabel, QLabel]:
         card = QFrame()
         card.setObjectName('dashboardKpiCard')
         card.setProperty('tone', tone)
@@ -663,18 +663,29 @@ class DashboardPage(QWidget):
         title_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         value_label = QLabel('0')
         value_label.setObjectName('dashboardKpiValue')
+        value_label.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Preferred)
+        unit_label = QLabel('')
+        unit_label.setObjectName('dashboardKpiUnit')
+        unit_label.setVisible(False)
+        unit_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         note_label = QLabel('')
         note_label.setObjectName('dashboardKpiNote')
         note_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        value_row = QHBoxLayout()
+        value_row.setContentsMargins(0, 0, 0, 0)
+        value_row.setSpacing(5)
+        value_row.addWidget(value_label, 1)
+        value_row.addWidget(unit_label, 0, Qt.AlignmentFlag.AlignBottom)
+        value_row.addStretch(1)
         text_layout.addWidget(title_label)
         text_layout.addSpacing(2)
-        text_layout.addWidget(value_label)
+        text_layout.addLayout(value_row)
         text_layout.addWidget(note_label)
         text_layout.addStretch(1)
 
         layout.addWidget(icon_wrap, 0, Qt.AlignmentFlag.AlignTop)
         layout.addLayout(text_layout, 1)
-        return card, value_label, note_label
+        return card, value_label, unit_label, note_label
 
     def _build_list_panel(self, title: str, object_name: str, *, empty_text: str) -> tuple[QFrame, QVBoxLayout, QLabel]:
         panel = QFrame()
@@ -822,6 +833,7 @@ class DashboardPage(QWidget):
         kpi_row.setHorizontalSpacing(12)
         kpi_row.setVerticalSpacing(12)
         self.orders_kpi_labels: dict[str, QLabel] = {}
+        self.orders_kpi_units: dict[str, QLabel] = {}
         self.orders_kpi_notes: dict[str, QLabel] = {}
         for column, (key, title, tone, icon_name) in enumerate([
             ('total_orders', 'Pedidos', 'blue', 'shopping-cart.svg'),
@@ -829,8 +841,9 @@ class DashboardPage(QWidget):
             ('pending_kg', 'Kg pendientes', 'orange', 'clipboard-list.svg'),
             ('incident_orders', 'Incidencias', 'red', 'clock-3.svg'),
         ]):
-            card, value_label, note_label = self._build_kpi_card(title, tone, icon_name)
+            card, value_label, unit_label, note_label = self._build_kpi_card(title, tone, icon_name)
             self.orders_kpi_labels[key] = value_label
+            self.orders_kpi_units[key] = unit_label
             self.orders_kpi_notes[key] = note_label
             kpi_row.addWidget(card, 0, column)
             kpi_row.setColumnStretch(column, 1)
@@ -920,7 +933,7 @@ class DashboardPage(QWidget):
             ('active_customers', 'Clientes activos', 'green', 'briefcase.svg'),
             ('active_islands', 'Islas activas', 'orange', 'map.svg'),
         ]):
-            card, value_label, note_label = self._build_kpi_card(title, tone, icon_name)
+            card, value_label, _unit_label, note_label = self._build_kpi_card(title, tone, icon_name)
             self.sales_kpi_labels[key] = value_label
             self.sales_kpi_notes[key] = note_label
             kpi_row.addWidget(card, 0, column)
@@ -1006,7 +1019,7 @@ class DashboardPage(QWidget):
             ('entries_month_kg', 'Entradas mes', 'green', 'database-down.svg'),
             ('outputs_month_kg', 'Salidas mes', 'orange', 'database-up.svg'),
         ]):
-            card, value_label, note_label = self._build_kpi_card(title, tone, icon_name)
+            card, value_label, _unit_label, note_label = self._build_kpi_card(title, tone, icon_name)
             self.warehouse_kpi_labels[key] = value_label
             self.warehouse_kpi_notes[key] = note_label
             kpi_row.addWidget(card, 0, column)
@@ -1296,9 +1309,13 @@ class DashboardPage(QWidget):
         self.date_label.setText(str(snapshot.year))
         self.orders_kpi_labels['total_orders'].setText(str(snapshot.total_orders))
         self.orders_kpi_notes['total_orders'].setText('pedido(s)')
-        self.orders_kpi_labels['received_kg'].setText(self._format_number_es(snapshot.received_kg, suffix=' kg'))
+        self.orders_kpi_labels['received_kg'].setText(self._format_number_es(snapshot.received_kg))
+        self.orders_kpi_units['received_kg'].setText('kg')
+        self.orders_kpi_units['received_kg'].setVisible(True)
         self.orders_kpi_notes['received_kg'].setText('kg recibidos')
-        self.orders_kpi_labels['pending_kg'].setText(self._format_number_es(snapshot.pending_kg, suffix=' kg'))
+        self.orders_kpi_labels['pending_kg'].setText(self._format_number_es(snapshot.pending_kg))
+        self.orders_kpi_units['pending_kg'].setText('kg')
+        self.orders_kpi_units['pending_kg'].setVisible(True)
         self.orders_kpi_notes['pending_kg'].setText('kg pendientes')
         self.orders_kpi_labels['incident_orders'].setText(str(snapshot.incident_orders))
         self.orders_kpi_notes['incident_orders'].setText('pedido(s)')
@@ -1719,6 +1736,7 @@ class DashboardPage(QWidget):
             QFrame#dashboardKpiIconWrap[tone='orange'] { background-color: #FFF7ED; }
             QLabel#dashboardKpiTitle, QLabel#dashboardPanelTitle { color: #1E293B; font-size: 15px; font-weight: 700; }
             QLabel#dashboardKpiValue { color: #0F172A; font-size: 28px; font-weight: 800; }
+            QLabel#dashboardKpiUnit { color: #0F172A; font-size: 22px; font-weight: 800; }
             QLabel#dashboardKpiNote, QLabel#dashboardFooterLabel, QLabel#dashboardEmptyLabel, QLabel#dashboardActivityDetail {
                 color: #64748B; font-size: 13px;
             }

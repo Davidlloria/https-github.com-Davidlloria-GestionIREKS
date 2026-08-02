@@ -256,7 +256,9 @@ def test_dashboard_page_can_switch_to_orders_mode() -> None:
     assert page.orders_pending_table.rowCount() == 1
     assert page.orders_warehouse_table.rowCount() == 1
     assert page.orders_state_table.rowCount() == 1
-    assert page.orders_kpi_labels['pending_kg'].text() == '1.875,50 kg'
+    assert page.orders_kpi_labels['pending_kg'].text() == '1.875,50'
+    assert page.orders_kpi_units['pending_kg'].text() == 'kg'
+    assert not page.orders_kpi_units['pending_kg'].isHidden()
 
     page.close()
     page.deleteLater()
