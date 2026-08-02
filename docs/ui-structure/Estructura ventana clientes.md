@@ -140,7 +140,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 - `customerSalesYearFilter` carga años disponibles desde `CustomerService.related_sales_years()`.
 - La pestaña Ventas carga datos desde `CustomerService.related_sales(cliente_id, year)`.
 - `customerSalesCompareButton` solo se habilita si hay comparativa posible.
-- La comparativa colorea deltas positivos en verde `#067647` y negativos en rojo `#B42318`.
+- La comparativa colorea deltas positivos en verde `#067647` y negativos en rojo `#B42318`, también en la fila de totales.
 - El gráfico depende opcionalmente de `pyqtgraph`; si no está instalado, el diálogo informa de ello.
 
 ## Geometría actual del detalle

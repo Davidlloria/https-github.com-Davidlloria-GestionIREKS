@@ -2975,12 +2975,10 @@ class CustomersPage(QWidget):
             QTableWidget#customerSalesComparisonTotals::item {
                 padding: 4px 8px;
                 background: #EEF4FF;
-                color: #1F2A44;
                 border: 0;
             }
             QTableWidget#customerSalesComparisonTotals::item:selected {
                 background: #EEF4FF;
-                color: #1F2A44;
             }
             QTableWidget#customerSalesTotals {
                 border: 1px solid #D8E3F2;
