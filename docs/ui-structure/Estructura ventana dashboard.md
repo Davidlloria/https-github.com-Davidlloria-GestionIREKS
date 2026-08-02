@@ -283,10 +283,14 @@ Calendario mensual de Agenda
     │   └── muestra todas las entradas de lunes a domingo
     ├── salida documental
     │   ├── fuente: todas las filas filtradas, incluidas las que están fuera del viewport
-    │   ├── columnas: Cliente / Resumen / Estado
+    │   ├── campos por evento
+    │   │   ├── fecha efectiva del evento
+    │   │   ├── código · nombre del cliente
+    │   │   ├── contenido: resumen y detalle disponibles
+    │   │   └── estado traducido
     │   ├── PDF
     │   │   ├── DashboardAgendaPdfPreviewDialog con la lista completa de entradas
-    │   │   ├── tabla previa: Cliente / Resumen / Estado
+    │   │   ├── tabla previa: Fecha / Cliente / Contenido / Estado
     │   │   ├── Guardar: genera el PDF mediante ReportExportService en la ruta elegida
     │   │   └── Cancelar: cierra la vista previa sin generar archivos
     │   ├── impresión: QTextDocument y QPrintDialog

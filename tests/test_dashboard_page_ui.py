@@ -338,8 +338,8 @@ def test_dashboard_page_uses_due_date_and_renders_activity_in_one_line() -> None
     assert page.today_print_btn.isEnabled()
     assert page._today_report_data() == (
         'Agenda del 23/07/2026',
-        ['Cliente', 'Resumen', 'Estado'],
-        [['586 · NPANADERIA', 'Concretar reunión', 'Hecha']],
+        ['Fecha', 'Cliente', 'Contenido', 'Estado'],
+        [['23/07/2026', '586 · NPANADERIA', 'Concretar reunión', 'Hecha']],
     )
     assert '586 · NPANADERIA' in page._today_report_html()
     assert page._agenda_day_tone(page._agenda_rows_for_date(date(2026, 7, 23)), today_value=date(2026, 7, 23)) == 'green'
@@ -374,8 +374,13 @@ def test_dashboard_page_exports_the_visible_agenda_selection_to_pdf(monkeypatch)
 
     assert preview['report_export_service'] is report_service
     assert preview['title'] == 'Agenda del 21/07/2026'
-    assert preview['headers'] == ['Cliente', 'Resumen', 'Estado']
-    assert preview['rows'] == [['101 · Panaderia Norte', 'Revision comercial', 'Pendiente']]
+    assert preview['headers'] == ['Fecha', 'Cliente', 'Contenido', 'Estado']
+    assert preview['rows'] == [[
+        '21/07/2026',
+        '101 · Panaderia Norte',
+        'Revision comercial — Revisar consumo semanal',
+        'Pendiente',
+    ]]
     assert preview['parent'] is page
     assert preview['executed'] is True
     printed: dict[str, object] = {}
@@ -424,8 +429,8 @@ def test_dashboard_agenda_pdf_preview_can_save_or_cancel(monkeypatch) -> None:
     dialog = dashboard_page_module.DashboardAgendaPdfPreviewDialog(
         report_export_service=report_service,
         title='Agenda del 21/07/2026',
-        headers=['Cliente', 'Resumen', 'Estado'],
-        rows=[['101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
+        headers=['Fecha', 'Cliente', 'Contenido', 'Estado'],
+        rows=[['21/07/2026', '101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
     )
     monkeypatch.setattr(
         dashboard_page_module.QFileDialog,
@@ -435,10 +440,11 @@ def test_dashboard_agenda_pdf_preview_can_save_or_cancel(monkeypatch) -> None:
     monkeypatch.setattr(dashboard_page_module.QMessageBox, 'information', lambda *_args, **_kwargs: None)
 
     assert dialog.entries_table.rowCount() == 1
-    assert dialog.entries_table.columnCount() == 3
-    assert dialog.entries_table.item(0, 0).text() == '101 · Panaderia Norte'
-    assert dialog.entries_table.item(0, 1).text() == 'Revision comercial'
-    assert dialog.entries_table.item(0, 2).text() == 'Pendiente'
+    assert dialog.entries_table.columnCount() == 4
+    assert dialog.entries_table.item(0, 0).text() == '21/07/2026'
+    assert dialog.entries_table.item(0, 1).text() == '101 · Panaderia Norte'
+    assert dialog.entries_table.item(0, 2).text() == 'Revision comercial'
+    assert dialog.entries_table.item(0, 3).text() == 'Pendiente'
     assert dialog.save_btn.text() == 'Guardar'
     assert dialog.cancel_btn.text() == 'Cancelar'
     dialog.save_btn.click()
@@ -447,15 +453,15 @@ def test_dashboard_agenda_pdf_preview_can_save_or_cancel(monkeypatch) -> None:
     assert report_service.export_calls == [(
         'agenda_guardada.pdf',
         'Agenda del 21/07/2026',
-        ['Cliente', 'Resumen', 'Estado'],
-        [['101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
+        ['Fecha', 'Cliente', 'Contenido', 'Estado'],
+        [['21/07/2026', '101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
     )]
 
     cancel_dialog = dashboard_page_module.DashboardAgendaPdfPreviewDialog(
         report_export_service=_StubReportExportService(),
         title='Agenda del 21/07/2026',
-        headers=['Cliente', 'Resumen', 'Estado'],
-        rows=[['101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
+        headers=['Fecha', 'Cliente', 'Contenido', 'Estado'],
+        rows=[['21/07/2026', '101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
     )
     cancel_dialog.cancel_btn.click()
     assert cancel_dialog.result() == dashboard_page_module.QDialog.DialogCode.Rejected

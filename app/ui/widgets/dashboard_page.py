@@ -114,8 +114,9 @@ class DashboardAgendaPdfPreviewDialog(QDialog):
                 self.entries_table.setItem(row_index, column_index, QTableWidgetItem(str(value)))
         table_header = self.entries_table.horizontalHeader()
         table_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        table_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        table_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        table_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        table_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self.entries_table, 1)
 
         buttons = QDialogButtonBox(self)
@@ -1354,13 +1355,22 @@ class DashboardPage(QWidget):
         title = self.today_panel_title.text().strip() or 'Agenda'
         rows = [
             [
+                self.format_date(row.due_date),
                 f'{row.cliente_codigo} · {row.cliente_nombre}',
-                row.resumen or row.detalle or '-',
+                self._agenda_event_content(row),
                 self.agenda_state_label(row.estado),
             ]
             for row in self.today_report_rows
         ]
-        return title, ['Cliente', 'Resumen', 'Estado'], rows
+        return title, ['Fecha', 'Cliente', 'Contenido', 'Estado'], rows
+
+    @staticmethod
+    def _agenda_event_content(row: DashboardActivityRow) -> str:
+        summary = str(row.resumen or '').strip()
+        detail = str(row.detalle or '').strip()
+        if summary and detail and summary.casefold() != detail.casefold():
+            return f'{summary} — {detail}'
+        return summary or detail or '-'
 
     def _export_today_panel_pdf(self) -> None:
         if not self.today_report_rows:
