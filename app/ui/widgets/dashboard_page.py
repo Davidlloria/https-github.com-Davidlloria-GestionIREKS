@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -1104,6 +1105,10 @@ class DashboardPage(QWidget):
         self.orders_recent_table.setObjectName('dashboardOrdersRecentTable')
         self.orders_recent_table.setHorizontalHeaderLabels(['Pedido', 'Almacén', 'Sem', 'Fecha', 'Kg pedido', 'Kg recibido', 'Kg pend.'])
         self._configure_table(self.orders_recent_table)
+        self.orders_recent_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.orders_recent_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.orders_recent_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.orders_recent_table.customContextMenuRequested.connect(self._show_orders_recent_context_menu)
         recent_header = self.orders_recent_table.horizontalHeader()
         recent_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         recent_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -1699,6 +1704,8 @@ class DashboardPage(QWidget):
             ]
             for col, value in enumerate(values):
                 item = QTableWidgetItem(value)
+                if col == 0:
+                    item.setData(Qt.ItemDataRole.UserRole, row.pedido_id)
                 if col in (4, 5, 6):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.orders_recent_table.setItem(idx, col, item)
@@ -1853,6 +1860,28 @@ class DashboardPage(QWidget):
             for column, value in enumerate(values):
                 table.setItem(row_index, column, QTableWidgetItem(value))
 
+    def _recent_order_id_for_row(self, row_index: int) -> str:
+        if row_index < 0 or row_index >= self.orders_recent_table.rowCount():
+            return ''
+        item = self.orders_recent_table.item(row_index, 0)
+        return str(item.data(Qt.ItemDataRole.UserRole) or '').strip() if item is not None else ''
+
+    def _show_orders_recent_context_menu(self, pos) -> None:
+        index = self.orders_recent_table.indexAt(pos)
+        if not index.isValid():
+            return
+        row_index = index.row()
+        self.orders_recent_table.selectRow(row_index)
+        pedido_id = self._recent_order_id_for_row(row_index)
+        if not pedido_id:
+            return
+
+        menu = QMenu(self)
+        action_view = menu.addAction('Ver pedido')
+        chosen = menu.exec(self.orders_recent_table.viewport().mapToGlobal(pos))
+        if chosen == action_view:
+            self._open_order_from_dashboard(pedido_id)
+
     def _open_orders_page(self) -> None:
         window = self.window()
         page_names = getattr(window, 'page_names', None)
@@ -1861,6 +1890,27 @@ class DashboardPage(QWidget):
             setter(page_names.index('Pedidos'))
             return
         QMessageBox.information(self, 'Pedidos', 'La vista completa de pedidos no est? disponible desde este contexto.')
+
+    def _open_order_from_dashboard(self, pedido_id: str) -> None:
+        clean_pedido_id = str(pedido_id or '').strip()
+        if not clean_pedido_id:
+            return
+        window = self.window()
+        page_names = getattr(window, 'page_names', None)
+        pages = getattr(window, 'pages', None)
+        setter = getattr(window, '_set_current_page', None)
+        if not (isinstance(page_names, list) and callable(setter) and 'Pedidos' in page_names):
+            QMessageBox.information(self, 'Pedidos', 'La vista completa de pedidos no est? disponible desde este contexto.')
+            return
+
+        page_index = page_names.index('Pedidos')
+        setter(page_index)
+        orders_page = pages.widget(page_index) if pages is not None and hasattr(pages, 'widget') else None
+        selector = getattr(orders_page, '_select_by_id', None)
+        if callable(selector):
+            selector(clean_pedido_id)
+            return
+        QMessageBox.information(self, 'Pedidos', 'No se pudo seleccionar el pedido en la vista de Pedidos.')
 
 
 

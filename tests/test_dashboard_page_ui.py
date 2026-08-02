@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QMainWindow,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -545,10 +546,13 @@ def test_dashboard_page_can_switch_to_orders_mode() -> None:
     assert page.title_label.text() == 'Pedidos'
     assert page.dashboard_stack.currentWidget().objectName() == 'dashboardOrdersView'
     assert page.orders_recent_table.rowCount() == 1
+    assert page.orders_recent_table.selectionBehavior() == QAbstractItemView.SelectionBehavior.SelectRows
+    assert page.orders_recent_table.selectionMode() == QAbstractItemView.SelectionMode.SingleSelection
     assert [
         page.orders_recent_table.horizontalHeaderItem(col).text()
         for col in range(page.orders_recent_table.columnCount())
     ] == ['Pedido', 'Almacén', 'Sem', 'Fecha', 'Kg pedido', 'Kg recibido', 'Kg pend.']
+    assert page._recent_order_id_for_row(0) == 'ped-1'
     assert page.orders_recent_table.item(0, 2).text() == '30'
     for col in (4, 5, 6):
         assert page.orders_recent_table.item(0, col).textAlignment() == (
@@ -563,6 +567,50 @@ def test_dashboard_page_can_switch_to_orders_mode() -> None:
 
     page.close()
     page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_dashboard_recent_order_navigation_selects_order_page_row() -> None:
+    _application()
+    selected_pages: list[int] = []
+    selected_orders: list[str] = []
+
+    class _OrdersPage(QWidget):
+        def _select_by_id(self, pedido_id: str) -> None:
+            selected_orders.append(pedido_id)
+
+    class _Pages:
+        def widget(self, index: int) -> QWidget:
+            assert index == 1
+            return orders_page
+
+    class _Window(QMainWindow):
+        page_names = ['Inicio', 'Pedidos']
+        pages = _Pages()
+
+        def _set_current_page(self, index: int) -> None:
+            selected_pages.append(index)
+
+    orders_page = _OrdersPage()
+    window = _Window()
+    page = DashboardPage(
+        customer_service=_StubCustomerService(),
+        dashboard_service=_StubDashboardService(),
+        order_dashboard_service=_StubOrderDashboardService(),
+        warehouse_dashboard_service=_StubWarehouseDashboardService(),
+    )
+    window.setCentralWidget(page)
+
+    page._open_order_from_dashboard('order-1')
+
+    assert selected_pages == [1]
+    assert selected_orders == ['order-1']
+
+    page.close()
+    window.close()
+    page.deleteLater()
+    orders_page.deleteLater()
+    window.deleteLater()
     QApplication.processEvents()
 
 
