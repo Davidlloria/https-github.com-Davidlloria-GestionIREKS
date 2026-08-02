@@ -82,7 +82,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                             │   │   └── €
                             │   ├── customerSalesTotals (QTableWidget, fila fija de totales, columnas sincronizadas con la tabla, columnas 1-2 unificadas visualmente, separadores verticales visibles, fondo pastel #EEF4FF, alto 34 px, Kg con sufijo "kg", € con sufijo "€", resincronización diferida al mostrar la pestaña)
                             │   ├── customerSalesEmpty (QLabel, permanece oculto; la tabla de ventas se muestra siempre)
-                            │   └── QDialog comparativa de ventas
+                            │   └── QDialog comparativa de ventas (tamaño inicial 1360 × 720 px)
                             │       ├── cabecera con nombre del cliente
                             │       ├── customerSalesComparisonGroups (QTableWidget, grupos: año anterior / año seleccionado / Diferencia)
                             │       ├── customerSalesComparisonTable (QTableWidget, 11 columnas ordenables)

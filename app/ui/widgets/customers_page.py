@@ -904,7 +904,7 @@ class CustomersPage(QWidget):
     def _build_related_sales_comparison_dialog(self, *, rows: list, year: int, customer_name: str) -> QDialog:
         dialog = QDialog(self)
         dialog.setWindowTitle("Comparativa de ventas")
-        dialog.resize(1540, 820)
+        dialog.resize(1360, 720)
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
