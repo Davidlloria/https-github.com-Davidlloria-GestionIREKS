@@ -1,187 +1,618 @@
 # Ventana Dashboard - PySide6 / Backend
 
-## Implementacion principal
+## Implementación principal
 
-- UI: `app/ui/widgets/dashboard_page.py`
-- Servicios:
-  - `app/services/customer_dashboard_service.py`
-  - `app/services/customer_service.py`
-  - `app/services/order_dashboard_service.py`
-  - `app/services/sales_dashboard_service.py`
-  - `app/services/warehouse_dashboard_service.py`
+```text
+Dashboard
+├── UI
+│   └── app/ui/widgets/dashboard_page.py
+├── Clases visuales
+│   ├── DashboardPage
+│   │   └── Página principal y selector de dashboards
+│   ├── DashboardMonthCalendar
+│   │   └── Calendario mensual personalizado de Agenda
+│   ├── DashboardAgendaDialog
+│   │   └── Alta y edición de actividades
+│   ├── DashboardAgendaPdfPreviewDialog
+│   │   └── Vista completa en tarjetas, guardado y cancelación del PDF de Agenda
+│   └── DashboardAgendaOverviewDialog
+│       └── Listado completo de la agenda
+└── Servicios
+    ├── app/services/customer_dashboard_service.py
+    ├── app/services/customer_service.py
+    ├── app/services/order_dashboard_service.py
+    ├── app/services/report_export_service.py
+    ├── app/services/sales_dashboard_service.py
+    └── app/services/warehouse_dashboard_service.py
+```
 
-## Estructura UI
+## Árbol estructural actual
 
-- `DashboardPage` (`QWidget`, `objectName=dashboardPageRoot`, fondo `#EEF3F8`)
-  - layout principal (`QHBoxLayout`, margenes `0 px`, separacion `0 px`)
-  - `dashboardSidebar` (`QFrame`, ancho fijo `188 px`, fondo `#F8FAFC`, borde derecho `#E2E8F0`)
-    - `QVBoxLayout` (margenes `12/16/12/16 px`, separacion `12 px`)
-    - `dashboardSidebarBrand` (`QLabel`, solo logo IREKS, centrado, fondo transparente, sin borde)
-    - `dashboardSidebarButton` activo (`QPushButton`, modo activo: Agenda / Almacen / Pedidos / Ventas / Objetivos, fondo `#2563EB`, texto `#FFFFFF`)
-    - `dashboardSidebarButton` inactivo Agenda (`QPushButton`, icono `calendar-days.svg`, fondo transparente, texto `#334155`)
-    - `dashboardSidebarButton` inactivo Almacen (`QPushButton`, icono `box.svg`, fondo transparente, texto `#334155`)
-    - `dashboardSidebarButton` inactivo Pedidos (`QPushButton`, icono `shopping-cart.svg`, fondo transparente, texto `#334155`)
-    - `dashboardSidebarButton` inactivo Ventas (`QPushButton`, icono `bar-chart-3.svg`, fondo transparente, texto `#334155`)
-    - `dashboardSidebarButton` Objetivos (`QPushButton`, icono `goal.svg`, fondo transparente, texto `#334155`, placeholder)
-    - espacio flexible
-  - `dashboardContentHost` (`QWidget`, fondo transparente)
-    - `dashboardContent` (`QWidget`, fondo transparente)
-      - `content_layout` (`QVBoxLayout`, margenes `16/14/16/14 px`, separacion `14 px`, sin fondo propio)
-      - `dashboardHeader` (`QFrame`, fondo transparente)
-        - `QHBoxLayout` (margenes `0 px`, separacion `10 px`, fondo transparente)
-        - bloque de cabecera (`QVBoxLayout`, separacion `4 px`)
-          - `dashboardTitle` (`QLabel`, texto `#0F172A`, `26 px`, negrita `700`)
-          - `dashboardDateLabel` (`QLabel`, fecha larga en espanol, texto `#475569`, `13 px`)
-        - `dashboardNewActivityButton` (`QPushButton`, `btnRole=primary`, icono variable por modo)
-        - `dashboardFullAgendaButton` (`QPushButton`, `btnRole=secondary`, icono variable por modo)
-      - `dashboardContentStack` (`QStackedWidget`, fondo transparente, sin borde)
-        - `dashboardAgendaView` (`QWidget`, fondo transparente)
-          - `QVBoxLayout` (margenes `0 px`, separacion `14 px`)
-          - fila KPI (`QGridLayout`, separacion horizontal `12 px`, vertical `12 px`)
-          - fila media (`QHBoxLayout`, separacion `14 px`)
-            - `dashboardUpcomingPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`, alto fijo `312 px`, ancho maximo `348 px`)
-              - `dashboardCalendarHeadingBlock` (`QWidget`, fondo transparente, ancho fijo `276 px`, centrado en panel)
-                - `dashboardPanelTitle` (`QLabel`, texto `Agenda del mes`, alineado a la izquierda del bloque y de la rejilla)
-              - `dashboardCalendarNavBlock` (`QWidget`, fondo transparente, ancho fijo `276 px`, centrado en panel)
-                - fila navegacion (`QHBoxLayout`)
-                  - `dashboardCalendarNavButton` (`QPushButton`, texto `<`, alineado al borde izquierdo de la rejilla)
-                  - `dashboardMonthTitle` (`QLabel`, mes visible en espanol, centrado)
-                  - `dashboardCalendarNavButton` (`QPushButton`, texto `>`)
-              - `dashboardMonthCalendar` (`QCalendarWidget` personalizado, tamano fijo `276 x 196`)
-                - cabecera semanal nativa (`L / M / X / J / V / S / D`)
-                - columna ISO de semanas nativa (`Sem`)
-                - celdas personalizadas en `paintCell()` con estado, seleccion y dia actual
-              - fila resumen (`QHBoxLayout`, separacion `6 px`)
-                - `dashboardCalendarSummaryChip` (`QFrame`, resumen `Pendientes / Hechas / Vencidas`)
-            - `dashboardTodayPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`, alto fijo `312 px`)
-              - `dashboardPanelTitle` (`QLabel`, dinamico: `Agenda de hoy` o `Agenda del dd/mm/aaaa` segun fecha seleccionada)
-              - listado de actividades del dia seleccionado en `dashboardMonthCalendar`
-          - fila inferior (`QHBoxLayout`, separacion `14 px`)
-            - `dashboardReactivationPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardReactivationTable` (`QTableWidget`, fondo `#FFFFFF`, borde `#E2E8F1`, radio `10 px`)
-            - `dashboardIslandPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardIslandTable` (`QTableWidget`, fondo `#FFFFFF`, borde `#E2E8F1`, radio `10 px`)
-        - `dashboardWarehouseView` (`QWidget`, fondo transparente)
-          - `QVBoxLayout` (margenes `0 px`, separacion `14 px`)
-          - fila KPI (`QGridLayout`)
-          - fila media (`QHBoxLayout`, separacion `14 px`)
-            - `dashboardWarehouseRiskPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardWarehouseRiskTable` (`QTableWidget`; columnas: `Almacen / Ref / Producto / Lote / Caduca / Kg / Estado`)
-            - `dashboardWarehouseStockPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardWarehouseStockTable` (`QTableWidget`; columnas: `Almacen / Articulos / Stock kg`)
-          - fila inferior (`QHBoxLayout`, separacion `14 px`)
-            - `dashboardWarehouseEntriesPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardWarehouseEntriesTable` (`QTableWidget`; columnas: `Fecha / Almacen / Ref / Producto / Kg`)
-            - `dashboardWarehouseOutputsPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardWarehouseOutputsTable` (`QTableWidget`; columnas: `Fecha / Almacen / Ref / Producto / Kg`)
-        - `dashboardOrdersView` (`QWidget`, fondo transparente)
-          - `QVBoxLayout` (margenes `0 px`, separacion `14 px`)
-          - fila KPI (`QGridLayout`)
-          - fila media (`QHBoxLayout`, separacion `14 px`)
-            - `dashboardOrdersRecentPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardOrdersRecentTable` (`QTableWidget`; columnas: `Pedido / Almacen / Fecha / Kg pedido / Kg recibido / Kg pend. / Estado`)
-            - `dashboardOrdersPendingPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardOrdersPendingTable` (`QTableWidget`; columnas: `Fecha / Pedido / Almacen / Kg pend.`)
-          - fila inferior (`QHBoxLayout`, separacion `14 px`)
-            - `dashboardOrdersWarehousePanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardOrdersWarehouseTable` (`QTableWidget`; columnas: `Almacen / Abiertos / Kg pend. / Ult. recepcion`)
-            - `dashboardOrdersStatePanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardOrdersStateTable` (`QTableWidget`; columnas: `Estado / Pedidos / Kg`)
-        - `dashboardSalesView` (`QWidget`, fondo transparente)
-          - `QVBoxLayout` (margenes `0 px`, separacion `14 px`)
-          - fila KPI (`QGridLayout`)
-          - fila media (`QHBoxLayout`, separacion `14 px`)
-            - `dashboardSalesDropsPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardSalesDropsTable` (`QTableWidget`; columnas: `Cliente / Isla / Kg ant. / Kg act. / Delta Kg`)
-            - `dashboardSalesIslandsPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardSalesIslandsTable` (`QTableWidget`; columnas: `Isla / Clientes / Kg act. / Delta Kg / %`)
-          - fila inferior (`QHBoxLayout`, separacion `14 px`)
-            - `dashboardSalesTypesPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardSalesTypesTable` (`QTableWidget`; columnas: `Tipo / Clientes / Kg act. / Delta Kg / %`)
-            - `dashboardSalesZeroPanel` (`QFrame`, fondo `#FFFFFF`, borde `#DCE4EF`, radio `14 px`)
-              - `dashboardSalesZeroTable` (`QTableWidget`; columnas: `Cliente / Isla / Tipo / Kg ant.`)
-        - `dashboardObjectivesView` (placeholder actual si existe en stack / pendiente de implementacion funcional)
-      - `dashboardFooterLabel` (`QLabel`, texto `#64748B`)
+```text
+DashboardPage (QWidget, dashboardPageRoot)
+└── root_layout (QHBoxLayout)
+    ├── dashboardSidebar (QFrame, 184 px)
+    │   ├── dashboardSidebarBrand (QLabel, logo IREKS)
+    │   ├── Agenda (dashboardSidebarButton)
+    │   ├── Pedidos (dashboardSidebarButton)
+    │   ├── Almacen (dashboardSidebarButton)
+    │   ├── Ventas (dashboardSidebarButton)
+    │   ├── Objetivos (dashboardSidebarButton, placeholder)
+    │   └── stretch
+    └── dashboardContentHost (QWidget)
+        └── dashboardContent (QWidget)
+            ├── dashboardHeader (QFrame)
+            │   ├── bloque de título y fecha
+            │   │   ├── dashboardTitle
+            │   │   └── dashboardDateLabel
+            │   ├── dashboardNewActivityButton
+            │   └── dashboardFullAgendaButton
+            ├── dashboardContentStack (QStackedWidget)
+            │   ├── aspecto
+            │   │   ├── fondo transparente
+            │   │   └── sin borde
+            │   ├── dashboardAgendaView
+            │   ├── dashboardOrdersView
+            │   ├── dashboardSalesView
+            │   └── dashboardWarehouseView
+            └── dashboardFooterLabel
+```
 
-## Comportamiento funcional actual
+## Contenedor principal y navegación
 
-- El dashboard arranca por defecto en Agenda.
-- El boton lateral activo sincroniza el modo visible dentro de `dashboardContentStack`.
-- Modos implementados actualmente:
-  - Agenda
-  - Almacen
-  - Pedidos
-  - Ventas
-- Boton lateral adicional actualmente en placeholder:
-  - Objetivos
-- En modo Agenda:
-  - `Nueva actividad` abre `DashboardAgendaDialog`.
-  - `Ver agenda completa` abre `DashboardAgendaOverviewDialog`.
-  - La fila media muestra primero `dashboardUpcomingPanel` y despues `dashboardTodayPanel`.
-  - El panel mensual usa un `QCalendarWidget` personalizado.
-  - El titulo y la fila de navegacion del calendario comparten el mismo ancho util que `dashboardMonthCalendar` para alinear su borde izquierdo con la rejilla.
-  - La fecha seleccionada por defecto en el calendario es el dia en curso.
-  - `dashboardTodayPanel` muestra siempre la agenda de la fecha seleccionada en el calendario.
-  - Su titulo cambia entre `Agenda de hoy` y `Agenda del dd/mm/aaaa` segun la fecha activa.
-  - Los dias con agenda quedan marcados visualmente segun estado principal: pendiente, hecha o vencida.
-  - La navegacion `< / >` permite cambiar de mes sin salir del dashboard.
-  - La columna ISO de semanas se muestra de forma nativa en el calendario.
-  - Ya no existe leyenda de estados ni preview inferior del dia seleccionado dentro de ese panel.
-- En modo Almacen:
-  - `Ver almacen` navega a la pagina principal `Almacen` si existe en `MainWindow`.
-  - `Actualizar` recarga el snapshot del dashboard de almacen.
-- En modo Pedidos:
-  - `Ver pedidos` navega a la pagina principal `Pedidos` si existe en `MainWindow`.
-  - `Actualizar` recarga el snapshot del dashboard de pedidos.
-- En modo Ventas:
-  - `Ver ventas` navega a la pagina principal `Ventas` si existe en `MainWindow`.
-  - `Actualizar` recarga el snapshot del dashboard de ventas.
-- El boton lateral `Objetivos` muestra por ahora un `QMessageBox` informativo hasta que se implemente ese dashboard.
-- Las tablas del dashboard son de solo lectura, con seleccion por fila y sin edicion directa.
+```text
+dashboardPageRoot
+├── Aspecto
+│   ├── fondo: #EEF3F8
+│   └── fuente: Segoe UI
+├── root_layout
+│   ├── tipo: QHBoxLayout
+│   ├── márgenes: 0 px
+│   └── separación: 0 px
+├── dashboardSidebar
+│   ├── ancho fijo: 184 px
+│   ├── layout: QVBoxLayout
+│   ├── márgenes: 16 / 22 / 16 / 18 px
+│   ├── separación: 24 px
+│   ├── fondo: #F8FAFC
+│   ├── borde derecho: #E2E8F0
+│   ├── logo IREKS: 144 px de ancho
+│   └── botones: altura mínima de 58 px
+├── Orden de navegación
+│   ├── Agenda
+│   ├── Pedidos
+│   ├── Almacen
+│   ├── Ventas
+│   └── Objetivos
+├── Iconos laterales
+│   ├── Agenda: calendar-days.svg
+│   ├── Pedidos: shopping-cart.svg
+│   ├── Almacen: warehouse.svg
+│   ├── Ventas: bar-chart-3.svg
+│   └── Objetivos: goal.svg
+├── Estado activo
+│   ├── fondo: #2563EB
+│   └── texto e icono: blanco
+├── dashboardContent
+│   ├── márgenes: 22 / 16 / 22 / 12 px
+│   └── separación vertical: 12 px
+└── Elementos no utilizados
+    ├── QSplitter: no existe
+    ├── QScrollArea global: no existe
+    └── React: no interviene
+```
 
-## Geometria actual
+## Cabecera común
 
-- `dashboardSidebar` tiene ancho fijo de `188 px`.
-- `dashboardContent` reparte el resto del ancho disponible sin splitter visible.
-- `dashboardAgendaView`, `dashboardWarehouseView`, `dashboardOrdersView` y `dashboardSalesView` no tienen fondo propio; se apoyan visualmente sobre el fondo general `#EEF3F8` a traves de contenedores transparentes.
-- El dashboard de Agenda mantiene altura fija total sin scroll global.
-- `dashboardTodayPanel` y `dashboardUpcomingPanel` tienen la misma altura fija: `312 px`.
-- `dashboardUpcomingPanel` tiene ancho maximo `348 px` y `dashboardTodayPanel` absorbe el ancho restante de la fila media.
-- `dashboardMonthCalendar` usa tamano fijo `276 x 196` dentro de `dashboardUpcomingPanel`.
-- La fila KPI usa cuatro tarjetas en una rejilla de una sola fila.
-- Las filas media e inferior usan proporcion `5:3` como base, con limite maximo explicito para `dashboardUpcomingPanel`.
-- `dashboardKpiIcon` mide `64 x 64 px`.
-- Los iconos KPI renderizados se centran dentro de un area interna de `46 x 46 px`.
+```text
+dashboardHeader
+├── Aspecto
+│   ├── fondo: transparente
+│   └── borde: ninguno
+├── dashboardTitle
+│   ├── contenido: título del modo
+│   ├── tamaño: 30 px
+│   └── peso: 700
+├── dashboardDateLabel
+│   ├── contenido: fecha, mes o año contextual
+│   └── tamaño: 14 px
+├── dashboardNewActivityButton
+│   └── acción primaria azul
+├── dashboardFullAgendaButton
+│   └── acción secundaria blanca
+└── Variantes por modo
+    ├── Agenda
+    │   ├── auxiliar: fecha larga actual
+    │   ├── primaria: Nueva actividad
+    │   └── secundaria: Ver agenda completa
+    ├── Pedidos
+    │   ├── auxiliar: año del snapshot
+    │   ├── primaria: Ver pedidos
+    │   └── secundaria: Actualizar
+    ├── Almacen
+    │   ├── auxiliar: mes y año del snapshot
+    │   ├── primaria: Ver almacen
+    │   └── secundaria: Actualizar
+    └── Ventas
+        ├── auxiliar: año actual frente al anterior
+        ├── primaria: Ver ventas
+        └── secundaria: Actualizar
+```
 
-## Aspecto visual actual
+## Componentes compartidos
 
-- Fondo general del dashboard: `#EEF3F8`.
-- `dashboardContentHost`, `dashboardContent`, `dashboardAgendaView`, `dashboardWarehouseView`, `dashboardOrdersView` y `dashboardSalesView`: fondo transparente.
-- `dashboardContentStack`: fondo transparente, sin borde.
-- Sidebar clara; solo el boton activo va en azul `#2563EB`.
-- Tarjetas KPI y paneles principales blancos con bordes suaves y radios amplios.
-- Empty states con fondo `#F8FAFC` y borde discontinuo `#CBD5E1`.
-- El calendario mensual de Agenda usa celdas pintadas en `paintCell()`, con seleccion azul, colores por estado y dia actual en negrita.
-- Los chips de resumen del calendario son mas compactos para reducir el ancho util del panel.
+```text
+Componentes de dashboard
+├── Vista de cada modo
+│   ├── layout: QVBoxLayout
+│   ├── márgenes: 0 px
+│   └── separación: 12 px
+├── Fila KPI
+│   └── cuatro dashboardKpiCard
+│       ├── altura fija: 104 px
+│       ├── márgenes internos: 16 / 14 / 16 / 14 px
+│       ├── dashboardKpiIconWrap: 62 x 62 px
+│       ├── SVG: 28 x 28 px
+│       ├── contenido
+│       │   ├── título
+│       │   ├── valor
+│       │   └── nota
+│       └── tone
+│           ├── blue
+│           ├── red
+│           ├── green
+│           └── orange
+├── Paneles dashboardPanel=true
+│   ├── fondo: blanco
+│   ├── borde: #DCE4EF
+│   ├── radio: 16 px
+│   ├── márgenes internos: 14 px
+│   └── separación: 10 px
+└── Tablas embebidas
+    ├── solo lectura
+    ├── sin selección
+    ├── sin cuadrícula
+    ├── sin ajuste de línea
+    ├── filas alternas
+    ├── cabecera: altura mínima de 34 px
+    └── filas: 32 px
+```
 
-## Relacion con backend / datos
+## Vista Agenda
 
-- `DashboardPage` no depende del frontend React.
-- `CustomerDashboardService` aporta los KPIs, agenda de hoy, actividades base para el calendario mensual, clientes a reactivar y agenda por isla.
-- `WarehouseDashboardService` aporta KPIs y tablas agregadas de stock, riesgos, entradas y salidas de almacen en kg.
-- `OrderDashboardService` aporta KPIs y tablas agregadas del seguimiento de pedidos.
-- `SalesDashboardService` aporta KPIs y tablas agregadas de ventas anuales por cliente, isla y tipo de cliente, siempre con kg como metrica principal.
-- `CustomerService` se usa para cargar clientes y para alta, edicion y borrado de actividades de agenda.
-- La agenda del dashboard trabaja directamente contra la base local desde PySide6/backend.
+```text
+dashboardAgendaView
+├── fila KPI (4 tarjetas)
+│   ├── Pendientes hoy
+│   ├── Vencidas
+│   ├── Completadas hoy
+│   └── Clientes sin seguimiento
+├── fila media (proporción 4:6)
+│   ├── dashboardUpcomingPanel
+│   │   ├── dashboardCalendarHeadingBlock
+│   │   │   └── dashboardPanelTitle: Agenda del mes
+│   │   ├── dashboardMonthCalendar
+│   │   │   └── navegación mensual nativa integrada
+│   │   └── dashboardCalendarSummaryChip
+│   │       ├── altura fija: 34 px
+│   │       ├── Pendientes
+│   │       ├── Hechas
+│   │       └── Vencidas
+│   └── dashboardTodayPanel
+│       ├── cabecera fija
+│       │   ├── dashboardPanelTitle
+│       │   ├── dashboardTodayPdfButton (96 px, azul)
+│       │   └── dashboardTodayPrintButton (96 px, verde)
+│       └── dashboardTodayScrollArea
+│           └── dashboardTodayItemsHost
+│               ├── dashboardActivityCard o dashboardEmptyLabel
+│               └── clic derecho en dashboardActivityCard: abre DashboardAgendaDialog en modo edición
+└── fila inferior (proporción 5:3)
+    ├── dashboardReactivationPanel
+    │   └── dashboardReactivationTable
+    └── dashboardIslandPanel
+        └── dashboardIslandTable
+```
 
-## Ultimos ajustes de estructura y aspecto
+### Calendario mensual
 
-- Nombrados explicitamente los contenedores reales de vistas: `dashboardAgendaView`, `dashboardWarehouseView`, `dashboardOrdersView` y `dashboardSalesView`.
-- Documentado que fila KPI, fila media y fila inferior cuelgan de esos widgets de vista, no de `content_layout` directamente.
-- Incorporado el dashboard de Almacen con navegacion lateral y metricas principales en kg.
-- Incorporado el dashboard de Pedidos con navegacion lateral y metricas principales en kg.
-- Incorporado el dashboard de Ventas con navegacion lateral y foco principal en kg vendidos, variacion anual, clientes activos e islas activas.
-- Sustituido el antiguo bloque de proximos vencimientos de Agenda por un calendario mensual basado en `QCalendarWidget`, con resumen inferior y columna ISO de semanas.
-- Eliminadas la leyenda de estados y la preview inferior del dia seleccionado del panel mensual de Agenda.
-- Reequilibrado el ancho de la fila media: `dashboardUpcomingPanel` primero, mas estrecho, y `dashboardTodayPanel` despues, absorbiendo el espacio restante.
-- Anadido el boton lateral Objetivos con icono `goal.svg`, pendiente de implementacion funcional.
+```text
+Calendario mensual de Agenda
+├── dashboardUpcomingPanel
+│   ├── altura mínima: 312 px
+│   ├── tamaño horizontal: expandible
+│   ├── tamaño vertical: expandible
+│   └── ancho máximo explícito: no tiene
+├── dashboardTodayPanel
+│   ├── altura mínima: 205 px
+│   ├── proporción frente al calendario: 6 frente a 4
+│   ├── cabecera fuera del desplazamiento
+│   │   ├── dashboardPanelTitle
+│   │   ├── dashboardTodayPdfButton: 96 px, azul, abre vista previa
+│   │   └── dashboardTodayPrintButton: 96 px, verde, imprime toda la selección visible
+│   └── dashboardTodayScrollArea
+│       ├── desplazamiento vertical solo para las tarjetas
+│       ├── contenido alineado arriba
+│       ├── sin botón de enlace inferior
+│       └── clic derecho en una tarjeta: edita la actividad asociada por agenda_id
+├── dashboardMonthCalendar
+│   ├── tamaño mínimo: 320 x 220 px
+│   ├── política horizontal: Expanding
+│   ├── política vertical: Expanding
+│   ├── ocupa el espacio restante del dashboardUpcomingPanel
+│   ├── primer día: lunes
+│   ├── cabecera: nombres cortos
+│   ├── columna ISO de semanas: visible
+│   ├── navegación nativa: visible
+│   │   ├── fondo transparente
+│   │   ├── borde gris con esquinas redondeadas
+│   │   ├── mes y año en negro a 13 px
+│   │   └── flechas circulares verdes
+│   ├── cuadrícula fina: visible
+│   ├── fines de semana: rojo
+│   └── edición directa: deshabilitada
+├── DashboardCalendarDelegate
+│   ├── cabeceras de días: fondo azul
+│   ├── texto de todas las cabeceras: blanco
+│   ├── números de semana: fondo azul
+│   ├── azul: actividades pendientes
+│   ├── verde: existe alguna actividad completada
+│   ├── rojo: vencidas no completadas ni canceladas
+│   ├── gris: días fuera del mes
+│   ├── fecha seleccionada
+│   │   ├── fondo gris claro
+│   │   ├── borde gris oscuro de 2 px
+│   │   └── texto negro
+│   └── día actual
+│       ├── fondo amarillo
+│       ├── borde ámbar
+│       └── texto oscuro en negrita
+├── dashboardCalendarSummaryChip
+│   ├── altura fija: 34 px
+│   ├── márgenes internos: 10 / 3 / 10 / 3 px
+│   ├── reparto horizontal: tres partes iguales
+│   ├── texto del título: negro
+│   ├── ancho del título: política Minimum para impedir que colapse
+│   ├── texto del valor: negro
+│   ├── ancho del valor: política Fixed
+│   └── contenido conservado: título y valor
+└── Interacción
+    ├── flechas nativas: cambio de mes
+    ├── fecha actual: título Agenda de hoy
+    ├── otra fecha: título Agenda del dd/mm/aaaa
+    ├── selección diaria: filtra siempre por `fecha_actividad`, con independencia del estado
+    ├── `fecha_seguimiento`: no desplaza la actividad en el calendario; queda reservada para dashboardReactivationPanel
+    ├── número ISO de semana
+    │   ├── clic detectado mediante filtro de eventos del viewport interno
+    │   └── muestra todas las entradas de lunes a domingo
+    ├── salida documental
+    │   ├── fuente: todas las filas filtradas, incluidas las que están fuera del viewport
+    │   ├── campos por evento
+    │   │   ├── fecha planificada del evento (`fecha_actividad`)
+    │   │   ├── código · nombre del cliente
+    │   │   ├── contenido: resumen y detalle disponibles
+    │   │   └── estado traducido
+    │   ├── PDF
+    │   │   ├── DashboardAgendaPdfPreviewDialog con la lista completa de tarjetas
+    │   │   ├── tarjeta de vista previa
+    │   │   │   ├── línea 1: Fecha / código · cliente / Estado alineado a la derecha
+    │   │   │   └── línea 2: Contenido con ajuste de línea y altura dinámica
+    │   │   ├── color del estado
+    │   │   │   ├── Pendiente: azul
+    │   │   │   ├── Hecha: verde
+    │   │   │   ├── Aplazada: naranja
+    │   │   │   └── Cancelada: rojo
+    │   │   ├── ancho interior descuenta los márgenes laterales de la tarjeta
+    │   │   ├── Guardar: genera tarjetas PDF mediante ReportExportService en la ruta elegida
+    │   │   └── Cancelar: cierra la vista previa sin generar archivos
+    │   ├── impresión: tarjetas HTML mediante QTextDocument y QPrintDialog
+    │   └── acciones deshabilitadas cuando la selección está vacía
+    └── tarjetas diarias o semanales en una sola línea
+        ├── código · nombre del cliente
+        ├── resumen
+        ├── estado traducido
+        └── dashboardEmptyLabel cuando no hay datos
+```
+
+### Tablas de Agenda
+
+```text
+Tablas de Agenda
+├── dashboardReactivationTable
+│   ├── Cliente
+│   ├── Isla
+│   ├── Último contacto
+│   ├── Variación kg
+│   └── Prioridad
+└── dashboardIslandTable
+    ├── Isla
+    ├── Pend.
+    ├── Aplaz.
+    ├── Hechas
+    └── Total
+```
+
+## Vista Pedidos
+
+```text
+dashboardOrdersView
+├── KPI
+│   ├── Pedidos
+│   ├── Kg recibidos
+│   ├── Kg pendientes
+│   └── Incidencias
+├── fila superior (6:4)
+│   ├── dashboardOrdersRecentPanel
+│   │   └── dashboardOrdersRecentTable
+│   │       ├── Pedido
+│   │       ├── Almacen
+│   │       ├── Fecha
+│   │       ├── Kg pedido
+│   │       ├── Kg recibido
+│   │       ├── Kg pend.
+│   │       └── Estado
+│   └── dashboardOrdersPendingPanel
+│       └── dashboardOrdersPendingTable
+│           ├── Fecha
+│           ├── Pedido
+│           ├── Almacen
+│           └── Kg pend.
+├── fila inferior (5:3)
+│   ├── dashboardOrdersWarehousePanel
+│   │   └── dashboardOrdersWarehouseTable
+│   │       ├── Almacen
+│   │       ├── Abiertos
+│   │       ├── Kg pend.
+│   │       └── Últ. recepción
+│   └── dashboardOrdersStatePanel
+│       └── dashboardOrdersStateTable
+│           ├── Estado
+│           ├── Pedidos
+│           └── Kg
+└── Acciones
+    ├── Ver pedidos: navega a la página Pedidos
+    └── Actualizar: recarga el snapshot
+```
+
+## Vista Ventas
+
+```text
+dashboardSalesView
+├── KPI
+│   ├── Kg vendidos
+│   ├── Variación kg
+│   ├── Clientes activos
+│   └── Islas activas
+├── fila superior (6:4)
+│   ├── dashboardSalesDropsPanel
+│   │   └── dashboardSalesDropsTable
+│   │       ├── Cliente
+│   │       ├── Isla
+│   │       ├── Kg ant.
+│   │       ├── Kg act.
+│   │       └── Δ Kg
+│   └── dashboardSalesIslandsPanel
+│       └── dashboardSalesIslandsTable
+│           ├── Isla
+│           ├── Clientes
+│           ├── Kg act.
+│           ├── Δ Kg
+│           └── %
+├── fila inferior (6:4)
+│   ├── dashboardSalesTypesPanel
+│   │   └── dashboardSalesTypesTable
+│   │       ├── Tipo
+│   │       ├── Clientes
+│   │       ├── Kg act.
+│   │       ├── Δ Kg
+│   │       └── %
+│   └── dashboardSalesZeroPanel
+│       └── dashboardSalesZeroTable
+│           ├── Cliente
+│           ├── Isla
+│           ├── Tipo
+│           └── Kg ant.
+├── KPI Variación kg
+│   ├── verde: positiva o cero
+│   └── rojo: negativa
+└── Acciones
+    ├── Ver ventas: navega a la página Ventas
+    └── Actualizar: recarga el snapshot
+```
+
+## Vista Almacen
+
+```text
+dashboardWarehouseView
+├── KPI
+│   ├── Stock total
+│   ├── Riesgos
+│   ├── Entradas mes
+│   └── Salidas mes
+├── fila superior (6:4)
+│   ├── dashboardWarehouseRiskPanel
+│   │   └── dashboardWarehouseRiskTable
+│   │       ├── Almacen
+│   │       ├── Ref.
+│   │       ├── Producto
+│   │       ├── Lote
+│   │       ├── Caduca
+│   │       ├── Kg
+│   │       └── Estado
+│   └── dashboardWarehouseStockPanel
+│       └── dashboardWarehouseStockTable
+│           ├── Almacen
+│           ├── Artículos
+│           └── Stock kg
+├── fila inferior (5:5)
+│   ├── dashboardWarehouseEntriesPanel
+│   │   └── dashboardWarehouseEntriesTable
+│   │       ├── Fecha
+│   │       ├── Almacen
+│   │       ├── Ref.
+│   │       ├── Producto
+│   │       └── Kg
+│   └── dashboardWarehouseOutputsPanel
+│       └── dashboardWarehouseOutputsTable
+│           ├── Fecha
+│           ├── Almacen
+│           ├── Ref.
+│           ├── Producto
+│           └── Kg
+└── Acciones
+    ├── Ver almacen: navega a la página Almacen
+    └── Actualizar: recarga el snapshot
+```
+
+## Modal Nueva actividad / Editar actividad
+
+```text
+DashboardAgendaDialog (QDialog modal)
+├── Geometría
+│   ├── tamaño inicial: 620 x 520 px
+│   └── redimensionable: sí
+├── título: Actividad de agenda
+├── QFormLayout
+│   ├── Cliente (QComboBox)
+│   │   ├── ancho mínimo: 340 px
+│   │   ├── alta: excluye clientes inactivos
+│   │   └── edición: incluye clientes inactivos
+│   ├── Fecha actividad (QDateEdit)
+│   ├── Tipo (QComboBox)
+│   │   ├── Visita prevista
+│   │   ├── Visita realizada
+│   │   ├── Llamada
+│   │   ├── Seguimiento
+│   │   ├── Desarrollo futuro
+│   │   ├── Incidencia
+│   │   └── Nota
+│   ├── Estado (QComboBox)
+│   │   ├── Pendiente
+│   │   ├── Hecha
+│   │   ├── Aplazada
+│   │   └── Cancelada
+│   ├── Prioridad (QComboBox)
+│   │   ├── Alta
+│   │   ├── Media
+│   │   ├── Normal
+│   │   └── Baja
+│   ├── Responsable (QLineEdit)
+│   ├── Resumen (QLineEdit)
+│   ├── Detalle (QTextEdit)
+│   │   └── altura mínima: 120 px
+│   └── Seguimiento
+│       ├── Tiene seguimiento (QCheckBox)
+│       └── fecha de seguimiento (QDateEdit)
+├── Selectores de fecha
+│   ├── popup: activo
+│   ├── formato: dd/MM/yyyy
+│   └── calendario interno: dashboardPopupCalendar
+├── Valores iniciales de alta
+│   ├── fecha actividad: día actual
+│   ├── fecha seguimiento: día actual
+│   ├── tipo: Seguimiento
+│   ├── estado: Pendiente
+│   ├── prioridad: Normal
+│   └── seguimiento: desactivado
+├── QDialogButtonBox
+│   ├── Guardar
+│   ├── Cancelar
+│   └── Eliminar (solo en edición)
+└── Persistencia
+    ├── validación: cliente obligatorio
+    ├── validación: resumen o detalle obligatorio
+    └── servicio: CustomerService
+```
+
+## Modal Agenda completa
+
+```text
+DashboardAgendaOverviewDialog (QDialog)
+├── Geometría
+│   └── tamaño inicial: 1120 x 640 px
+├── título: Agenda completa
+├── summary_label
+│   └── N actividad(es) activas en agenda
+├── table (QTableWidget)
+│   ├── solo lectura
+│   ├── selección: una fila
+│   ├── filas alternas
+│   └── columnas
+│       ├── Fecha
+│       ├── Seguimiento
+│       ├── Cliente
+│       ├── Isla
+│       ├── Tipo
+│       ├── Estado
+│       ├── Resumen
+│       └── Responsable
+├── fila de acciones
+│   ├── Nueva actividad
+│   ├── Editar
+│   ├── stretch
+│   └── Cerrar
+└── Comportamiento
+    ├── doble clic: editar actividad seleccionada
+    ├── Nueva actividad: abre DashboardAgendaDialog en alta
+    ├── Editar: abre DashboardAgendaDialog en edición
+    ├── cambio guardado: refresca el listado
+    └── cierre tras cambios: recarga DashboardPage
+```
+
+## Flujo de carga y datos
+
+```text
+Flujo del Dashboard
+├── Inicio
+│   ├── modo inicial: Agenda
+│   └── reload(): actualiza solo el modo activo
+├── CustomerDashboardService
+│   ├── KPI de agenda
+│   ├── actividades
+│   ├── clientes a reactivar
+│   └── resumen por isla
+├── CustomerService
+│   ├── carga de clientes
+│   ├── alta de agenda
+│   ├── edición de agenda
+│   └── borrado de agenda
+├── OrderDashboardService
+│   ├── KPI de pedidos
+│   ├── pedidos recientes
+│   ├── pendientes
+│   └── agregados por almacén y estado
+├── SalesDashboardService
+│   ├── KPI anuales
+│   └── agregados por cliente, isla y tipo
+├── WarehouseDashboardService
+│   ├── KPI de stock
+│   ├── riesgos
+│   └── movimientos mensuales
+├── dashboardFooterLabel
+│   └── hora de generación y contexto del snapshot
+└── Plataforma
+    ├── PySide6 / backend local
+    ├── base de datos local
+    └── sin dependencia del frontend React
+```
+
+## Estado funcional actual
+
+```text
+Estado del Dashboard
+├── Modos implementados
+│   ├── Agenda
+│   ├── Pedidos
+│   ├── Ventas
+│   └── Almacen
+├── Modo pendiente
+│   └── Objetivos
+│       ├── no existe en dashboardContentStack
+│       └── muestra un QMessageBox informativo
+├── Desplazamiento
+│   ├── QScrollArea global: no existe
+│   └── QTableWidget: conserva scroll nativo cuando se necesita
+└── Mutaciones
+    ├── vistas agregadas: consulta
+    └── diálogos de agenda: alta, edición y borrado
+```
