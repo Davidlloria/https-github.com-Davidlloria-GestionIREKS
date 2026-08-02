@@ -294,6 +294,12 @@ Calendario mensual de Agenda
     │   │   ├── tarjeta de vista previa
     │   │   │   ├── línea 1: Fecha / código · cliente / Estado alineado a la derecha
     │   │   │   └── línea 2: Contenido con ajuste de línea y altura dinámica
+    │   │   ├── color del estado
+    │   │   │   ├── Pendiente: azul
+    │   │   │   ├── Hecha: verde
+    │   │   │   ├── Aplazada: naranja
+    │   │   │   └── Cancelada: rojo
+    │   │   ├── ancho interior descuenta los márgenes laterales de la tarjeta
     │   │   ├── Guardar: genera tarjetas PDF mediante ReportExportService en la ruta elegida
     │   │   └── Cancelar: cierra la vista previa sin generar archivos
     │   ├── impresión: tarjetas HTML mediante QTextDocument y QPrintDialog

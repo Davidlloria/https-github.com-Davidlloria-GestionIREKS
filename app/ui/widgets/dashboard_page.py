@@ -130,6 +130,7 @@ class DashboardAgendaPdfPreviewDialog(QDialog):
             customer_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             state_label = QLabel(state_text)
             state_label.setObjectName('dashboardAgendaPdfPreviewState')
+            state_label.setProperty('tone', ReportExportService.agenda_state_tone(state_text))
             state_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             state_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
             top_line.addWidget(date_label)
@@ -165,7 +166,17 @@ class DashboardAgendaPdfPreviewDialog(QDialog):
             ' background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 10px; }'
             'QLabel#dashboardAgendaPdfPreviewDate { color: #334155; font-size: 13px; font-weight: 600; }'
             'QLabel#dashboardAgendaPdfPreviewCustomer { color: #0F172A; font-size: 13px; font-weight: 700; }'
-            'QLabel#dashboardAgendaPdfPreviewState { color: #475569; font-size: 13px; font-weight: 700; }'
+            'QLabel#dashboardAgendaPdfPreviewState {'
+            ' color: #475569; background: #F1F5F9; border: 1px solid #CBD5E1;'
+            ' border-radius: 8px; padding: 3px 8px; font-size: 13px; font-weight: 700; }'
+            'QLabel#dashboardAgendaPdfPreviewState[tone="pending"] {'
+            ' color: #1D4ED8; background: #DBEAFE; border-color: #93C5FD; }'
+            'QLabel#dashboardAgendaPdfPreviewState[tone="completed"] {'
+            ' color: #15803D; background: #DCFCE7; border-color: #86EFAC; }'
+            'QLabel#dashboardAgendaPdfPreviewState[tone="postponed"] {'
+            ' color: #C2410C; background: #FFEDD5; border-color: #FDBA74; }'
+            'QLabel#dashboardAgendaPdfPreviewState[tone="cancelled"] {'
+            ' color: #B91C1C; background: #FEE2E2; border-color: #FCA5A5; }'
             'QLabel#dashboardAgendaPdfPreviewContent { color: #1E293B; font-size: 13px; }'
             'QPushButton#dashboardAgendaPdfSaveButton {'
             ' background: #16A34A; color: white; border: none; border-radius: 8px;'
@@ -1439,7 +1450,7 @@ class DashboardPage(QWidget):
             '<tr class="top">'
             f'<td class="date">{escape(str(row[0]))}</td>'
             f'<td class="customer">{escape(str(row[1]))}</td>'
-            f'<td class="state" align="right">{escape(str(row[3]))}</td>'
+            f'<td class="state {ReportExportService.agenda_state_tone(row[3])}" align="right">{escape(str(row[3]))}</td>'
             '</tr>'
             f'<tr><td class="content" colspan="3">{escape(str(row[2])).replace(chr(10), "<br/>")}</td></tr>'
             '</table><div class="gap"></div>'
@@ -1454,7 +1465,11 @@ class DashboardPage(QWidget):
             '.top td { padding-bottom: 4px; }'
             '.date { width: 16%; color: #334155; font-weight: 600; }'
             '.customer { color: #0F172A; font-weight: 700; }'
-            '.state { width: 16%; color: #475569; font-weight: 700; }'
+            '.state { width: 16%; color: #475569; background: #F1F5F9; font-weight: 700; }'
+            '.state.pending { color: #1D4ED8; background: #DBEAFE; }'
+            '.state.completed { color: #15803D; background: #DCFCE7; }'
+            '.state.postponed { color: #C2410C; background: #FFEDD5; }'
+            '.state.cancelled { color: #B91C1C; background: #FEE2E2; }'
             '.content { padding-top: 4px; color: #1E293B; }'
             '.gap { height: 7px; }'
             '</style></head><body>'

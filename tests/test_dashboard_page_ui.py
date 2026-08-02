@@ -457,6 +457,7 @@ def test_dashboard_agenda_pdf_preview_can_save_or_cancel(monkeypatch) -> None:
     assert content_label.height() > content_label.fontMetrics().height()
     state_label = cards[0].findChild(QLabel, 'dashboardAgendaPdfPreviewState')
     assert state_label.text() == 'Pendiente'
+    assert state_label.property('tone') == 'pending'
     assert state_label.alignment() & Qt.AlignmentFlag.AlignRight
     assert dialog.save_btn.text() == 'Guardar'
     assert dialog.cancel_btn.text() == 'Cancelar'
