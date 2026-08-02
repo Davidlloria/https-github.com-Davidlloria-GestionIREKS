@@ -218,6 +218,17 @@ class CustomerSalesComparisonChartDialog(QDialog):
         super().leaveEvent(event)
 
 
+class NumericSortableTableWidgetItem(QTableWidgetItem):
+    def __init__(self, text: str, numeric_value: float) -> None:
+        super().__init__(text)
+        self._numeric_value = float(numeric_value)
+
+    def __lt__(self, other) -> bool:
+        if isinstance(other, NumericSortableTableWidgetItem):
+            return self._numeric_value < other._numeric_value
+        return super().__lt__(other)
+
+
 class AgendaIconDelegate(QStyledItemDelegate):
     def __init__(self, page: "CustomersPage", parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -1332,7 +1343,7 @@ class CustomersPage(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
 
-        title = QLabel(f"{customer_name or 'Cliente'} · Comparativa {year - 1} vs {year} · Unid. / Kg / €")
+        title = QLabel(f"{customer_name or 'Cliente'} - Comparativa {year - 1} vs {year}")
         title.setProperty("role", "sectionTitle")
         layout.addWidget(title)
 
@@ -1479,7 +1490,7 @@ class CustomersPage(QWidget):
                 table.setItem(row_idx, col_idx, base_item)
             for offset, value in enumerate(values, start=2):
                 suffix = " kg" if offset in (3, 6, 9) else " €" if offset in (4, 7, 10) else ""
-                number_item = QTableWidgetItem(self._format_sales_number(value, suffix=suffix))
+                number_item = NumericSortableTableWidgetItem(self._format_sales_number(value, suffix=suffix), value)
                 number_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 number_item.setData(Qt.ItemDataRole.UserRole, value)
                 if offset >= 8:

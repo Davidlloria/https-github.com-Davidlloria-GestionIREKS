@@ -190,7 +190,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 ## Últimos ajustes relevantes
 
 - Restaurada la pestaña Ventas desde el placeholder a una tabla funcional con filtro de año.
-- Restaurada la comparativa anual con modal, gráfico y exportación PDF.
+- Restaurada la comparativa anual con modal, grafico y exportacion PDF; el titulo muestra solo cliente y anos, y las columnas numericas ordenan por valor real.
 - Corregida la geometría documentada de `detailLeftCard` y `detailRightCard` para que coincida con el código real.
 - Actualizado el fondo real de `CustomersPageRoot` a `#EEF3F8` y alineada la documentación.
 
