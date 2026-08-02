@@ -357,11 +357,15 @@ class CustomerEditorDialog(QDialog):
         self.cancel_btn = QPushButton("Cancelar")
         self.cancel_btn.setProperty("btnRole", "secondary")
         self.cancel_btn.setFixedWidth(120)
+        self.cancel_btn.setAutoDefault(False)
+        self.cancel_btn.setDefault(False)
         self.cancel_btn.clicked.connect(self.reject)
 
         self.save_btn = QPushButton("Guardar")
         self.save_btn.setProperty("btnRole", "primary")
         self.save_btn.setFixedWidth(120)
+        self.save_btn.setAutoDefault(False)
+        self.save_btn.setDefault(False)
         self.save_btn.clicked.connect(self.accept)
 
         buttons.addWidget(self.cancel_btn)
@@ -2454,7 +2458,7 @@ class CustomersPage(QWidget):
             self.detail_direccion,
             self.detail_abreviatura,
         ):
-            line_edit.textEdited.connect(self._schedule_autosave)
+            line_edit.editingFinished.connect(self._schedule_autosave)
         for checkbox in self.tipo_checks.values():
             checkbox.toggled.connect(self._schedule_autosave)
         self.detail_tipo.currentTextChanged.connect(self._schedule_autosave)
