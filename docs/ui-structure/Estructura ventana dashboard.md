@@ -100,6 +100,9 @@ dashboardPageRoot
 
 ```text
 dashboardHeader
+├── Aspecto
+│   ├── fondo: transparente
+│   └── borde: ninguno
 ├── dashboardTitle
 │   ├── contenido: título del modo
 │   ├── tamaño: 30 px

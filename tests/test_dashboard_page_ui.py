@@ -212,6 +212,7 @@ def test_dashboard_page_starts_in_agenda_mode() -> None:
     assert not page.new_activity_btn.icon().isNull()
     assert not page.full_agenda_btn.icon().isNull()
     assert page.findChild(QWidget, 'dashboardSidebar').width() == 184
+    assert 'QFrame#dashboardHeader { background-color: transparent; border: none; }' in page.styleSheet()
     assert page.minimumSizeHint().width() <= 1180
 
     page.close()
