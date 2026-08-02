@@ -157,7 +157,11 @@ class _StubOrderDashboardService:
             pending_orders=[
                 DashboardPendingArticleRow(
                     pedido_id='ped-2', pedido_fecha=date(2026, 7, 18), pedido_numero='P-002',
-                    articulo_id='art-1', articulo_label='1001 · Harina Mix', pending_kg=850.0,
+                    articulo_id='art-1', articulo_label='Harina Mix', article_name='Harina Mix', pending_kg=850.0,
+                ),
+                DashboardPendingArticleRow(
+                    pedido_id='ped-3', pedido_fecha=date(2026, 7, 16), pedido_numero='P-003',
+                    articulo_id='art-2', articulo_label='Mejorante Pan', article_name='Mejorante Pan', pending_kg=125.0,
                 )
             ],
             warehouse_rows=[DashboardOrdersWarehouseRow(almacen_id='alm-2', almacen_nombre='Cliente Centro', open_orders=3, pending_kg=1250.0, last_receipt=date(2026, 7, 21))],
@@ -558,11 +562,14 @@ def test_dashboard_page_can_switch_to_orders_mode() -> None:
         assert page.orders_recent_table.item(0, col).textAlignment() == (
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
-    assert page.orders_pending_table.rowCount() == 1
+    assert page.orders_pending_table.rowCount() == 2
     assert page.orders_pending_table.horizontalHeaderItem(2).text() == 'Artículo'
-    assert page.orders_pending_table.item(0, 2).text() == '1001 · Harina Mix'
+    assert page.orders_pending_table.isSortingEnabled()
+    assert page.orders_pending_table.item(0, 0).text() == '18/07/2026'
+    assert page.orders_pending_table.item(1, 0).text() == '16/07/2026'
+    assert page.orders_pending_table.item(0, 2).text() == 'Harina Mix'
     assert page.orders_pending_table.item(0, 3).textAlignment() == (
-        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
     )
     assert page.orders_warehouse_table.rowCount() == 1
     assert page.orders_state_table.rowCount() == 1
@@ -585,15 +592,13 @@ def test_dashboard_recent_orders_hover_paints_complete_row() -> None:
     )
 
     page._set_dashboard_mode('pedidos')
-    page._set_orders_recent_hover_row(0)
+    page._set_table_hover_row(page.orders_recent_table, 0)
 
-    for col in range(page.orders_recent_table.columnCount()):
-        assert page.orders_recent_table.item(0, col).background().color().name().upper() == '#EFF6FF'
+    assert page.orders_recent_table.property('hoverRow') == 0
 
-    page._set_orders_recent_hover_row(-1)
+    page._set_table_hover_row(page.orders_recent_table, -1)
 
-    for col in range(page.orders_recent_table.columnCount()):
-        assert page.orders_recent_table.item(0, col).background().style() == Qt.BrushStyle.NoBrush
+    assert page.orders_recent_table.property('hoverRow') == -1
 
     page.close()
     page.deleteLater()

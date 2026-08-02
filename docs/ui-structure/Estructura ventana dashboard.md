@@ -358,8 +358,12 @@ dashboardOrdersView
 │       └── dashboardOrdersPendingTable
 │           ├── Fecha
 │           ├── Pedido
-│           ├── Artículo
-│           └── Kg pend.: alineado a la izquierda
+│           ├── Artículo: nombre sin código
+│           ├── Kg pend.: alineado a la derecha
+│           └── ordenación: cabeceras activas, por defecto fecha descendente
+│   └── selección visual
+│       ├── hover de fila: azul claro
+│       └── fila seleccionada: azul
 ├── fila inferior (5:3)
 │   ├── dashboardOrdersWarehousePanel
 │   │   └── dashboardOrdersWarehouseTable

@@ -44,6 +44,7 @@ class DashboardPendingArticleRow:
     pedido_numero: str
     articulo_id: str
     articulo_label: str
+    article_name: str
     pending_kg: float
 
 
@@ -172,6 +173,7 @@ class OrderDashboardService:
                             pedido_numero=str(getattr(pedido, "pedido_numero", "") or "").strip() or "S/N",
                             articulo_id=articulo_id,
                             articulo_label=article_labels.get(articulo_id, articulo_id or "S/N"),
+                            article_name=article_labels.get(articulo_id, articulo_id or "S/N"),
                             pending_kg=pending_kg,
                         )
                     )
@@ -276,13 +278,8 @@ class OrderDashboardService:
 
     @staticmethod
     def _article_display_label(row: IngredienteIreks) -> str:
-        ref = str(getattr(row, "articulo_referencia_corta", "") or "").strip()
-        if not ref:
-            ref = str(getattr(row, "articulo_referencia", "") or "").strip()
         name = str(getattr(row, "articulo_descripcion", "") or "").strip()
-        if ref and name:
-            return f"{ref} · {name}"
-        return ref or name or str(getattr(row, "articulo_id", "") or "").strip()
+        return name or str(getattr(row, "articulo_id", "") or "").strip()
 
     @staticmethod
     def _warehouse_display_name(primary: str, secondary: str, fallback: str) -> str:

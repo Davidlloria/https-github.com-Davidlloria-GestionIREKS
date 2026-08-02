@@ -31,6 +31,8 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSpacerItem,
     QStackedWidget,
+    QStyle,
+    QStyleOptionViewItem,
     QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
@@ -652,6 +654,32 @@ class DashboardActivityCard(QFrame):
         event.accept()
 
 
+class DashboardSortableItem(QTableWidgetItem):
+    def __init__(self, text: str, sort_value: object) -> None:
+        super().__init__(text)
+        self._sort_value = sort_value
+
+    def __lt__(self, other: QTableWidgetItem) -> bool:
+        if isinstance(other, DashboardSortableItem):
+            return self._sort_value < other._sort_value
+        return super().__lt__(other)
+
+
+class DashboardRowHoverDelegate(QStyledItemDelegate):
+    def __init__(self, table: QTableWidget, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._table = table
+
+    def paint(self, painter: QPainter, option, index) -> None:
+        hover = self._table.property('hoverRow')
+        hover_row = int(hover) if hover is not None else -1
+        if not option.state & QStyle.StateFlag.State_Selected and index.row() == hover_row:
+            option = QStyleOptionViewItem(option)
+            option.state &= ~QStyle.StateFlag.State_MouseOver
+            option.backgroundBrush = QBrush(QColor('#EFF6FF'))
+        super().paint(painter, option, index)
+
+
 class DashboardPage(QWidget):
     def __init__(
         self,
@@ -680,7 +708,6 @@ class DashboardPage(QWidget):
         self.today_report_rows: list[DashboardActivityRow] = []
         self.current_dashboard = 'agenda'
         self.dashboard_nav_buttons: dict[str, QPushButton] = {}
-        self._orders_recent_hover_row = -1
         self._build_ui()
         self.reload()
 
@@ -688,30 +715,18 @@ class DashboardPage(QWidget):
         if watched is getattr(getattr(self, 'orders_recent_table', None), 'viewport', lambda: None)():
             if event.type() == QEvent.Type.MouseMove:
                 index = self.orders_recent_table.indexAt(event.position().toPoint())
-                if index.isValid():
-                    self.orders_recent_table.selectRow(index.row())
-                self._set_orders_recent_hover_row(-1)
+                self._set_table_hover_row(self.orders_recent_table, index.row() if index.isValid() else -1)
             elif event.type() == QEvent.Type.Leave:
-                self._set_orders_recent_hover_row(-1)
+                self._set_table_hover_row(self.orders_recent_table, -1)
         return super().eventFilter(watched, event)
 
-    def _set_orders_recent_hover_row(self, row_index: int) -> None:
-        if row_index == self._orders_recent_hover_row:
+    def _set_table_hover_row(self, table: QTableWidget, row_index: int) -> None:
+        current = table.property('hoverRow')
+        current_row = int(current) if current is not None else -1
+        if current_row == row_index:
             return
-        self._paint_orders_recent_hover_row(self._orders_recent_hover_row, hover=False)
-        self._orders_recent_hover_row = row_index
-        self._paint_orders_recent_hover_row(self._orders_recent_hover_row, hover=True)
-
-    def _paint_orders_recent_hover_row(self, row_index: int, *, hover: bool) -> None:
-        if row_index < 0 or not hasattr(self, 'orders_recent_table'):
-            return
-        if row_index >= self.orders_recent_table.rowCount():
-            return
-        brush = QBrush(QColor('#EFF6FF')) if hover else QBrush()
-        for column in range(self.orders_recent_table.columnCount()):
-            item = self.orders_recent_table.item(row_index, column)
-            if item is not None:
-                item.setBackground(brush)
+        table.setProperty('hoverRow', row_index)
+        table.viewport().update()
 
     def _build_ui(self) -> None:
         root_layout = QHBoxLayout(self)
@@ -1142,6 +1157,8 @@ class DashboardPage(QWidget):
         self.orders_recent_table.customContextMenuRequested.connect(self._show_orders_recent_context_menu)
         self.orders_recent_table.viewport().setMouseTracking(True)
         self.orders_recent_table.viewport().installEventFilter(self)
+        self.orders_recent_table.setProperty('hoverRow', -1)
+        self.orders_recent_table.setItemDelegate(DashboardRowHoverDelegate(self.orders_recent_table, self.orders_recent_table))
         recent_header = self.orders_recent_table.horizontalHeader()
         recent_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         recent_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -1157,6 +1174,7 @@ class DashboardPage(QWidget):
         self.orders_pending_table.setObjectName('dashboardOrdersPendingTable')
         self.orders_pending_table.setHorizontalHeaderLabels(['Fecha', 'Pedido', 'Artículo', 'Kg pend.'])
         self._configure_table(self.orders_pending_table)
+        self.orders_pending_table.setSortingEnabled(True)
         pending_header = self.orders_pending_table.horizontalHeader()
         pending_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         pending_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
@@ -1724,7 +1742,7 @@ class DashboardPage(QWidget):
         )
 
     def _populate_order_recent_table(self, rows: list[DashboardOrderRow]) -> None:
-        self._set_orders_recent_hover_row(-1)
+        self._set_table_hover_row(self.orders_recent_table, -1)
         self.orders_recent_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
@@ -1745,6 +1763,7 @@ class DashboardPage(QWidget):
                 self.orders_recent_table.setItem(idx, col, item)
 
     def _populate_order_pending_table(self, rows: list[DashboardPendingArticleRow]) -> None:
+        self.orders_pending_table.setSortingEnabled(False)
         self.orders_pending_table.setRowCount(len(rows))
         for idx, row in enumerate(rows):
             values = [
@@ -1754,10 +1773,19 @@ class DashboardPage(QWidget):
                 self._format_number_es(row.pending_kg, suffix=' kg'),
             ]
             for col, value in enumerate(values):
-                item = QTableWidgetItem(value)
+                if col == 0:
+                    item = DashboardSortableItem(value, row.pedido_fecha)
+                elif col == 2:
+                    item = QTableWidgetItem(row.article_name)
+                elif col == 3:
+                    item = DashboardSortableItem(value, row.pending_kg)
+                else:
+                    item = QTableWidgetItem(value)
                 if col == 3:
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.orders_pending_table.setItem(idx, col, item)
+        self.orders_pending_table.setSortingEnabled(True)
+        self.orders_pending_table.sortItems(0, Qt.SortOrder.DescendingOrder)
 
     def _populate_order_warehouse_table(self, rows: list[DashboardOrdersWarehouseRow]) -> None:
         self.orders_warehouse_table.setRowCount(len(rows))
@@ -2288,6 +2316,12 @@ class DashboardPage(QWidget):
             QLabel#dashboardCalendarSummaryValue { color: #000000; font-size: 16px; font-weight: 800; }
             QTableWidget#dashboardReactivationTable, QTableWidget#dashboardIslandTable, QTableWidget#dashboardOrdersRecentTable, QTableWidget#dashboardOrdersPendingTable, QTableWidget#dashboardOrdersWarehouseTable, QTableWidget#dashboardOrdersStateTable, QTableWidget#dashboardWarehouseRiskTable, QTableWidget#dashboardWarehouseStockTable, QTableWidget#dashboardWarehouseEntriesTable, QTableWidget#dashboardWarehouseOutputsTable, QTableWidget#dashboardSalesDropsTable, QTableWidget#dashboardSalesIslandsTable, QTableWidget#dashboardSalesTypesTable, QTableWidget#dashboardSalesZeroTable {
                 background-color: #FFFFFF; alternate-background-color: #F8FAFC; border: none; color: #334155;
+            }
+            QTableWidget#dashboardOrdersRecentTable {
+                selection-background-color: #2F80ED; selection-color: #FFFFFF;
+            }
+            QTableWidget#dashboardOrdersRecentTable::item:selected {
+                background-color: #2F80ED; color: #FFFFFF;
             }
             QHeaderView::section {
                 background-color: #F8FAFC; color: #475569; padding: 7px; border: none;
