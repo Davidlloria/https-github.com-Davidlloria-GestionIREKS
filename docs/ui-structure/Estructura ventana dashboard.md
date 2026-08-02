@@ -45,6 +45,9 @@ DashboardPage (QWidget, dashboardPageRoot)
             │   ├── dashboardNewActivityButton
             │   └── dashboardFullAgendaButton
             ├── dashboardContentStack (QStackedWidget)
+            │   ├── aspecto
+            │   │   ├── fondo transparente
+            │   │   └── sin borde
             │   ├── dashboardAgendaView
             │   ├── dashboardOrdersView
             │   ├── dashboardSalesView

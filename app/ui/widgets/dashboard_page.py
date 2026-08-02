@@ -1757,7 +1757,8 @@ class DashboardPage(QWidget):
                 background-color: #2563EB;
                 color: #FFFFFF;
             }
-            QWidget#dashboardContentHost, QWidget#dashboardContent, QWidget#dashboardAgendaView, QWidget#dashboardOrdersView, QWidget#dashboardWarehouseView, QWidget#dashboardSalesView, QStackedWidget#dashboardContentStack { background-color: transparent; }
+            QWidget#dashboardContentHost, QWidget#dashboardContent, QWidget#dashboardAgendaView, QWidget#dashboardOrdersView, QWidget#dashboardWarehouseView, QWidget#dashboardSalesView { background-color: transparent; }
+            QStackedWidget#dashboardContentStack { background-color: transparent; border: none; }
             QFrame#dashboardHeader { background-color: transparent; border: none; }
             QLabel#dashboardTitle { font-size: 30px; font-weight: 700; color: #0F172A; }
             QLabel#dashboardDateLabel { font-size: 14px; color: #64748B; }

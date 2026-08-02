@@ -259,6 +259,7 @@ def test_dashboard_page_starts_in_agenda_mode() -> None:
     assert all(label.minimumSizeHint().width() > 0 for label in summary_titles)
     style_sheet = page.styleSheet()
     assert 'QFrame#dashboardHeader { background-color: transparent; border: none; }' in style_sheet
+    assert 'QStackedWidget#dashboardContentStack { background-color: transparent; border: none; }' in style_sheet
     assert 'QLabel#dashboardCalendarSummaryTitle { color: #000000;' in style_sheet
     assert 'QLabel#dashboardCalendarSummaryValue { color: #000000;' in style_sheet
     assert 'color: #000000;\n                font-size: 13px;' in style_sheet
