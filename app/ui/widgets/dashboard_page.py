@@ -3,9 +3,13 @@ from __future__ import annotations
 from datetime import date, timedelta
 from html import escape
 from pathlib import Path
+from shutil import copyfile
+from tempfile import TemporaryDirectory
 
 from PySide6.QtCore import QDate, QEvent, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPageLayout, QPainter, QPixmap, QTextCharFormat, QTextDocument
+from PySide6.QtPdf import QPdfDocument
+from PySide6.QtPdfWidgets import QPdfView
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
@@ -67,6 +71,93 @@ from app.services.warehouse_dashboard_service import (
 )
 
 BASE_DIR = Path(__file__).resolve().parents[3]
+
+
+class DashboardAgendaPdfPreviewDialog(QDialog):
+    def __init__(
+        self,
+        *,
+        report_export_service: ReportExportService,
+        title: str,
+        headers: list[str],
+        rows: list[list[str]],
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.report_export_service = report_export_service
+        self.report_title = title
+        self._temp_dir = TemporaryDirectory(prefix='gestion_ireks_agenda_', ignore_cleanup_errors=True)
+        self._preview_path = Path(self._temp_dir.name) / 'agenda_preview.pdf'
+        try:
+            self.report_export_service.export_pdf(self._preview_path, title, headers, rows)
+        except Exception:
+            self._temp_dir.cleanup()
+            raise
+
+        self.setObjectName('dashboardAgendaPdfPreviewDialog')
+        self.setWindowTitle(f'Vista previa PDF · {title}')
+        self.setModal(True)
+        self.resize(920, 720)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(12)
+
+        self.pdf_view = QPdfView(self)
+        self.pdf_view.setObjectName('dashboardAgendaPdfPreviewView')
+        self.pdf_document = QPdfDocument(self.pdf_view)
+        self.pdf_view.setDocument(self.pdf_document)
+        self.pdf_view.setPageMode(QPdfView.PageMode.MultiPage)
+        self.pdf_view.setZoomMode(QPdfView.ZoomMode.FitToWidth)
+        load_error = self.pdf_document.load(str(self._preview_path))
+        if load_error != QPdfDocument.Error.None_:
+            self.pdf_document.close()
+            self._temp_dir.cleanup()
+            raise RuntimeError('No se pudo cargar la vista previa del PDF.')
+        layout.addWidget(self.pdf_view, 1)
+
+        buttons = QDialogButtonBox(self)
+        buttons.setObjectName('dashboardAgendaPdfPreviewButtons')
+        self.save_btn = buttons.addButton('Guardar', QDialogButtonBox.ButtonRole.AcceptRole)
+        self.save_btn.setObjectName('dashboardAgendaPdfSaveButton')
+        self.cancel_btn = buttons.addButton('Cancelar', QDialogButtonBox.ButtonRole.RejectRole)
+        self.cancel_btn.setObjectName('dashboardAgendaPdfCancelButton')
+        self.save_btn.clicked.connect(self._save_pdf)
+        self.cancel_btn.clicked.connect(self.reject)
+        layout.addWidget(buttons)
+        self.setStyleSheet(
+            'QDialog#dashboardAgendaPdfPreviewDialog { background: #F8FAFC; }'
+            'QPdfView#dashboardAgendaPdfPreviewView { background: #E2E8F0; border: 1px solid #CBD5E1; }'
+            'QPushButton#dashboardAgendaPdfSaveButton {'
+            ' background: #16A34A; color: white; border: none; border-radius: 8px;'
+            ' min-width: 96px; padding: 8px 14px; font-weight: 700; }'
+            'QPushButton#dashboardAgendaPdfSaveButton:hover { background: #15803D; }'
+            'QPushButton#dashboardAgendaPdfCancelButton {'
+            ' background: #FFFFFF; color: #B91C1C; border: 1px solid #FCA5A5; border-radius: 8px;'
+            ' min-width: 96px; padding: 8px 14px; font-weight: 700; }'
+            'QPushButton#dashboardAgendaPdfCancelButton:hover { background: #FEF2F2; }'
+        )
+
+    def _save_pdf(self) -> None:
+        default_path = str(
+            self.report_export_service.default_path(self.report_title, 'pdf', folder='agenda_dashboard')
+        )
+        path, _ = QFileDialog.getSaveFileName(self, 'Guardar agenda en PDF', default_path, 'PDF (*.pdf)')
+        if not path:
+            return
+        try:
+            output = Path(path)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            copyfile(self._preview_path, output)
+        except Exception as exc:
+            QMessageBox.warning(self, 'Agenda', f'No se pudo guardar el PDF.\n\n{exc}')
+            return
+        QMessageBox.information(self, 'Agenda', f'PDF guardado correctamente.\n\n{output}')
+        self.accept()
+
+    def done(self, result: int) -> None:
+        self.pdf_document.close()
+        self._temp_dir.cleanup()
+        super().done(result)
 
 
 class DashboardAgendaDialog(QDialog):
@@ -777,14 +868,16 @@ class DashboardPage(QWidget):
         heading_layout.addWidget(heading, 1)
         self.today_pdf_btn = QPushButton('PDF')
         self.today_pdf_btn.setObjectName('dashboardTodayPdfButton')
+        self.today_pdf_btn.setFixedWidth(96)
         self.today_pdf_btn.setEnabled(False)
-        self._set_button_icon(self.today_pdf_btn, 'file-text.svg', '#1D4ED8', 15)
+        self._set_button_icon(self.today_pdf_btn, 'file-text.svg', '#FFFFFF', 15)
         self.today_pdf_btn.clicked.connect(self._export_today_panel_pdf)
         heading_layout.addWidget(self.today_pdf_btn, 0)
         self.today_print_btn = QPushButton('Imprimir')
         self.today_print_btn.setObjectName('dashboardTodayPrintButton')
+        self.today_print_btn.setFixedWidth(96)
         self.today_print_btn.setEnabled(False)
-        self._set_button_icon(self.today_print_btn, 'printer.svg', '#1D4ED8', 15)
+        self._set_button_icon(self.today_print_btn, 'printer.svg', '#FFFFFF', 15)
         self.today_print_btn.clicked.connect(self._print_today_panel)
         heading_layout.addWidget(self.today_print_btn, 0)
         layout.addLayout(heading_layout, 0)
@@ -1267,16 +1360,18 @@ class DashboardPage(QWidget):
             QMessageBox.warning(self, 'Agenda', 'No hay actividades para exportar.')
             return
         title, headers, rows = self._today_report_data()
-        default_path = str(self.report_export_service.default_path(title, 'pdf', folder='agenda_dashboard'))
-        path, _ = QFileDialog.getSaveFileName(self, 'Exportar agenda a PDF', default_path, 'PDF (*.pdf)')
-        if not path:
-            return
         try:
-            output = self.report_export_service.export_pdf(path, title, headers, rows)
+            dialog = DashboardAgendaPdfPreviewDialog(
+                report_export_service=self.report_export_service,
+                title=title,
+                headers=headers,
+                rows=rows,
+                parent=self,
+            )
         except Exception as exc:
-            QMessageBox.warning(self, 'Agenda', f'No se pudo exportar el PDF.\n\n{exc}')
+            QMessageBox.warning(self, 'Agenda', f'No se pudo generar la vista previa del PDF.\n\n{exc}')
             return
-        QMessageBox.information(self, 'Agenda', f'PDF exportado correctamente.\n\n{output}')
+        dialog.exec()
 
     def _print_today_panel(self) -> None:
         if not self.today_report_rows:
@@ -1897,12 +1992,13 @@ class DashboardPage(QWidget):
             QFrame#dashboardActivityCard { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
             QScrollArea#dashboardTodayScrollArea, QWidget#dashboardTodayItemsHost { background: transparent; border: none; }
             QPushButton#dashboardTodayPdfButton, QPushButton#dashboardTodayPrintButton {
-                background-color: #FFFFFF; color: #1D4ED8; border: 1px solid #CBD5E1;
+                color: #FFFFFF; border: none;
                 border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: 600;
             }
-            QPushButton#dashboardTodayPdfButton:hover, QPushButton#dashboardTodayPrintButton:hover {
-                background-color: #EFF6FF; border-color: #93C5FD;
-            }
+            QPushButton#dashboardTodayPdfButton { background-color: #2563EB; }
+            QPushButton#dashboardTodayPdfButton:hover { background-color: #1D4ED8; }
+            QPushButton#dashboardTodayPrintButton { background-color: #16A34A; }
+            QPushButton#dashboardTodayPrintButton:hover { background-color: #15803D; }
             QPushButton#dashboardTodayPdfButton:disabled, QPushButton#dashboardTodayPrintButton:disabled {
                 background-color: #F8FAFC; color: #94A3B8; border-color: #E2E8F0;
             }

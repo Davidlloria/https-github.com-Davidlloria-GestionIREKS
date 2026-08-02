@@ -13,6 +13,8 @@ Dashboard
 │   │   └── Calendario mensual personalizado de Agenda
 │   ├── DashboardAgendaDialog
 │   │   └── Alta y edición de actividades
+│   ├── DashboardAgendaPdfPreviewDialog
+│   │   └── Vista previa, guardado y cancelación del PDF de la selección de Agenda
 │   └── DashboardAgendaOverviewDialog
 │       └── Listado completo de la agenda
 └── Servicios
@@ -198,8 +200,8 @@ dashboardAgendaView
 │   └── dashboardTodayPanel
 │       ├── cabecera fija
 │       │   ├── dashboardPanelTitle
-│       │   ├── dashboardTodayPdfButton
-│       │   └── dashboardTodayPrintButton
+│       │   ├── dashboardTodayPdfButton (96 px, azul)
+│       │   └── dashboardTodayPrintButton (96 px, verde)
 │       └── dashboardTodayScrollArea
 │           └── dashboardTodayItemsHost
 │               └── dashboardActivityCard o dashboardEmptyLabel
@@ -224,8 +226,8 @@ Calendario mensual de Agenda
 │   ├── proporción frente al calendario: 6 frente a 4
 │   ├── cabecera fuera del desplazamiento
 │   │   ├── dashboardPanelTitle
-│   │   ├── dashboardTodayPdfButton: exporta toda la selección visible a PDF
-│   │   └── dashboardTodayPrintButton: imprime toda la selección visible
+│   │   ├── dashboardTodayPdfButton: 96 px, azul, abre vista previa
+│   │   └── dashboardTodayPrintButton: 96 px, verde, imprime toda la selección visible
 │   └── dashboardTodayScrollArea
 │       ├── desplazamiento vertical solo para las tarjetas
 │       ├── contenido alineado arriba
@@ -282,7 +284,11 @@ Calendario mensual de Agenda
     ├── salida documental
     │   ├── fuente: todas las filas filtradas, incluidas las que están fuera del viewport
     │   ├── columnas: Cliente / Resumen / Estado
-    │   ├── PDF: ReportExportService en `exports/agenda_dashboard`
+    │   ├── PDF
+    │   │   ├── generación temporal mediante ReportExportService
+    │   │   ├── DashboardAgendaPdfPreviewDialog multipágina y ajustado al ancho
+    │   │   ├── Guardar: copia el documento a `exports/agenda_dashboard` o a la ruta elegida
+    │   │   └── Cancelar: cierra la vista previa y elimina el temporal
     │   ├── impresión: QTextDocument y QPrintDialog
     │   └── acciones deshabilitadas cuando la selección está vacía
     └── tarjetas diarias o semanales en una sola línea

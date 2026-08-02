@@ -33,6 +33,7 @@ from app.services.order_dashboard_service import (
     DashboardOrdersWarehouseRow,
     OrderDashboardSnapshot,
 )
+from app.services.report_export_service import ReportExportService
 from app.services.sales_dashboard_service import (
     DashboardSalesCustomerRow,
     DashboardSalesIslandRow,
@@ -246,6 +247,7 @@ def test_dashboard_page_starts_in_agenda_mode() -> None:
     assert page.findChild(QPushButton, 'dashboardPanelLinkButton') is None
     assert page.findChild(QPushButton, 'dashboardTodayPdfButton') is page.today_pdf_btn
     assert page.findChild(QPushButton, 'dashboardTodayPrintButton') is page.today_print_btn
+    assert page.today_pdf_btn.width() == page.today_print_btn.width() == 96
     today_scroll = page.findChild(QScrollArea, 'dashboardTodayScrollArea')
     assert today_scroll is not None
     assert not today_scroll.isAncestorOf(page.today_panel_title)
@@ -278,6 +280,8 @@ def test_dashboard_page_starts_in_agenda_mode() -> None:
     style_sheet = page.styleSheet()
     assert 'QFrame#dashboardHeader { background-color: transparent; border: none; }' in style_sheet
     assert 'QStackedWidget#dashboardContentStack { background-color: transparent; border: none; }' in style_sheet
+    assert 'QPushButton#dashboardTodayPdfButton { background-color: #2563EB; }' in style_sheet
+    assert 'QPushButton#dashboardTodayPrintButton { background-color: #16A34A; }' in style_sheet
     assert 'QLabel#dashboardCalendarSummaryTitle { color: #000000;' in style_sheet
     assert 'QLabel#dashboardCalendarSummaryValue { color: #000000;' in style_sheet
     assert 'color: #000000;\n                font-size: 13px;' in style_sheet
@@ -355,22 +359,26 @@ def test_dashboard_page_exports_the_visible_agenda_selection_to_pdf(monkeypatch)
         report_export_service=report_service,
     )
     page.set_selected_date(date(2026, 7, 21))
-    monkeypatch.setattr(
-        dashboard_page_module.QFileDialog,
-        'getSaveFileName',
-        lambda *_args, **_kwargs: ('seleccion_agenda.pdf', 'PDF (*.pdf)'),
-    )
-    monkeypatch.setattr(dashboard_page_module.QMessageBox, 'information', lambda *_args, **_kwargs: None)
+    preview: dict[str, object] = {}
+
+    class _CapturedPreviewDialog:
+        def __init__(self, **kwargs) -> None:
+            preview.update(kwargs)
+
+        def exec(self) -> int:
+            preview['executed'] = True
+            return 0
+
+    monkeypatch.setattr(dashboard_page_module, 'DashboardAgendaPdfPreviewDialog', _CapturedPreviewDialog)
 
     page.today_pdf_btn.click()
 
-    assert report_service.default_calls == [('Agenda del 21/07/2026', 'pdf', 'agenda_dashboard')]
-    assert report_service.export_calls == [(
-        'seleccion_agenda.pdf',
-        'Agenda del 21/07/2026',
-        ['Cliente', 'Resumen', 'Estado'],
-        [['101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
-    )]
+    assert preview['report_export_service'] is report_service
+    assert preview['title'] == 'Agenda del 21/07/2026'
+    assert preview['headers'] == ['Cliente', 'Resumen', 'Estado']
+    assert preview['rows'] == [['101 · Panaderia Norte', 'Revision comercial', 'Pendiente']]
+    assert preview['parent'] is page
+    assert preview['executed'] is True
     printed: dict[str, object] = {}
 
     class _AcceptedPrintDialog:
@@ -408,6 +416,55 @@ def test_dashboard_page_exports_the_visible_agenda_selection_to_pdf(monkeypatch)
 
     page.close()
     page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_dashboard_agenda_pdf_preview_can_save_or_cancel(monkeypatch) -> None:
+    _application()
+
+    class _PreviewReportService:
+        def default_path(self, title: str, suffix: str, folder: str = '') -> Path:
+            assert (title, suffix, folder) == ('Agenda del 21/07/2026', 'pdf', 'agenda_dashboard')
+            return Path('agenda_guardada.pdf')
+
+        def export_pdf(self, path, title: str, headers: list[str], rows: list[list[str]]) -> Path:
+            return ReportExportService().export_pdf(path, title, headers, rows)
+
+    dialog = dashboard_page_module.DashboardAgendaPdfPreviewDialog(
+        report_export_service=_PreviewReportService(),
+        title='Agenda del 21/07/2026',
+        headers=['Cliente', 'Resumen', 'Estado'],
+        rows=[['101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
+    )
+    copied: dict[str, Path] = {}
+    monkeypatch.setattr(
+        dashboard_page_module.QFileDialog,
+        'getSaveFileName',
+        lambda *_args, **_kwargs: ('agenda_guardada.pdf', 'PDF (*.pdf)'),
+    )
+    monkeypatch.setattr(
+        dashboard_page_module,
+        'copyfile',
+        lambda source, target: copied.update(source=Path(source), target=Path(target)),
+    )
+    monkeypatch.setattr(dashboard_page_module.QMessageBox, 'information', lambda *_args, **_kwargs: None)
+
+    assert dialog.pdf_document.pageCount() == 1
+    assert dialog.save_btn.text() == 'Guardar'
+    assert dialog.cancel_btn.text() == 'Cancelar'
+    dialog.save_btn.click()
+
+    assert copied['source'].name == 'agenda_preview.pdf'
+    assert copied['target'] == Path('agenda_guardada.pdf')
+
+    cancel_dialog = dashboard_page_module.DashboardAgendaPdfPreviewDialog(
+        report_export_service=_PreviewReportService(),
+        title='Agenda del 21/07/2026',
+        headers=['Cliente', 'Resumen', 'Estado'],
+        rows=[['101 · Panaderia Norte', 'Revision comercial', 'Pendiente']],
+    )
+    cancel_dialog.cancel_btn.click()
+    assert cancel_dialog.result() == dashboard_page_module.QDialog.DialogCode.Rejected
     QApplication.processEvents()
 
 
