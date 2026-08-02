@@ -355,70 +355,64 @@ class CustomersPage(QWidget):
         self.new_btn.setProperty("btnRole", "success")
         self.new_btn.setFixedHeight(26)
         self.new_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "user-round-plus.svg")))
-        self.new_btn.setIconSize(QSize(14, 14))
+        self.new_btn.setIconSize(QSize(16, 16))
 
         self.edit_btn = QPushButton("Editar")
         self.edit_btn.setProperty("btnRole", "warning")
         self.edit_btn.setFixedHeight(26)
         self.edit_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-pen.svg")))
-        self.edit_btn.setIconSize(QSize(14, 14))
+        self.edit_btn.setIconSize(QSize(16, 16))
 
         self.del_btn = QPushButton("Eliminar")
         self.del_btn.setProperty("btnRole", "danger")
         self.del_btn.setFixedHeight(26)
         self.del_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
-        self.del_btn.setIconSize(QSize(14, 14))
+        self.del_btn.setIconSize(QSize(16, 16))
 
-        self.print_btn = QPushButton("Imprimir")
+        self.print_btn = QPushButton("Listados")
         self.print_btn.setProperty("btnRole", "secondary")
         self.print_btn.setFixedHeight(26)
-        self.print_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "printer.svg")))
-        self.print_btn.setIconSize(QSize(14, 14))
-
-        self.export_btn = QPushButton("Exportar")
-        self.export_btn.setProperty("btnRole", "primary")
-        self.export_btn.setFixedHeight(26)
-        self.export_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "export.svg")))
-        self.export_btn.setIconSize(QSize(14, 14))
+        self.print_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "list.svg")))
+        self.print_btn.setIconSize(QSize(16, 16))
 
         self.queries_btn = QPushButton("Consultas")
         self.queries_btn.setObjectName("customerQueriesButton")
         self.queries_btn.setProperty("btnRole", "primary")
         self.queries_btn.setFixedHeight(26)
         self.queries_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "brain.svg")))
-        self.queries_btn.setIconSize(QSize(14, 14))
+        self.queries_btn.setIconSize(QSize(16, 16))
         self.queries_btn.setToolTip("Abrir consultas de clientes")
 
         self.help_btn = QPushButton("Ayuda")
         self.help_btn.setProperty("btnRole", "secondary")
         self.help_btn.setFixedHeight(26)
         self.help_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "circle-question-mark.svg")))
-        self.help_btn.setIconSize(QSize(14, 14))
+        self.help_btn.setIconSize(QSize(16, 16))
         self.help_btn.clicked.connect(self._show_customer_help)
 
         self.refresh_btn = QPushButton("Actualizar")
         self.refresh_btn.setProperty("btnRole", "info")
         self.refresh_btn.setFixedHeight(26)
         self.refresh_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "refresh-cw.svg")))
-        self.refresh_btn.setIconSize(QSize(14, 14))
+        self.refresh_btn.setIconSize(QSize(16, 16))
 
-        export_menu = QMenu(self)
-        export_listados_action = export_menu.addAction("Listados")
-        export_import_action = export_menu.addAction("Importar Excel/CSV")
-        export_id_action = export_menu.addAction("ID")
-        export_listados_action.triggered.connect(self._open_customer_reports_dialog)
-        export_import_action.triggered.connect(self._import_entities)
-        export_id_action.triggered.connect(self._show_customer_id_dialog)
-        self.export_btn.setMenu(export_menu)
-
-        ribbon_button_width = self.export_btn.sizeHint().width()
-        for button in (self.new_btn, self.edit_btn, self.del_btn, self.print_btn, self.export_btn, self.refresh_btn, self.queries_btn, self.help_btn):
+        ribbon_buttons = (
+            self.new_btn,
+            self.edit_btn,
+            self.del_btn,
+            self.print_btn,
+            self.refresh_btn,
+            self.queries_btn,
+            self.help_btn,
+        )
+        ribbon_button_width = max(button.sizeHint().width() for button in ribbon_buttons)
+        for button in ribbon_buttons:
             button.setFixedWidth(ribbon_button_width)
 
         self.new_btn.clicked.connect(self._new_entity)
         self.edit_btn.clicked.connect(self._edit_entity)
         self.del_btn.clicked.connect(self._delete_entity)
-        self.print_btn.clicked.connect(self._print_customer_report)
+        self.print_btn.clicked.connect(self._open_customer_reports_dialog)
         self.queries_btn.clicked.connect(self._open_customer_queries_dialog)
         self.refresh_btn.clicked.connect(self.reload)
 
@@ -426,7 +420,6 @@ class CustomersPage(QWidget):
         ribbon_layout.addWidget(self.edit_btn)
         ribbon_layout.addWidget(self.del_btn)
         ribbon_layout.addWidget(self.print_btn)
-        ribbon_layout.addWidget(self.export_btn)
         ribbon_layout.addWidget(self.refresh_btn)
         ribbon_layout.addWidget(self.queries_btn)
         ribbon_layout.addStretch(1)

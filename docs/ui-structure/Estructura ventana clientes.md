@@ -11,18 +11,14 @@ Implementación principal:
 CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin borde, WA_StyledBackground=True)
 └── layout principal (QVBoxLayout, márgenes 14 px, separación 10 px)
     ├── título de página "Clientes" (QLabel, actualmente oculto)
-    │   ├── Nuevo (verde claro #DCFCE7, texto #166534, icono `assets/icons/user-round-plus.svg`, ancho normalizado al de Exportar)
-    │   ├── Editar (amarillo claro #FEF3C7, texto #92400E, icono `assets/icons/file-pen.svg`, ancho normalizado al de Exportar)
-    │   ├── Eliminar (rojo claro #FEE2E2, texto #B91C1C, icono `assets/icons/trash.svg`, ancho normalizado al de Exportar)
-    │   ├── Imprimir (gris azulado #E2E8F0, texto #334155, icono `assets/icons/printer.svg`, ancho normalizado al de Exportar)
-    │   ├── Exportar (QPushButton + QMenu, azul claro #DBEAFE, texto #1D4ED8, icono `assets/icons/export.svg`, ancho base del ribbon)
-    │   │   ├── Listados
-    │   │   ├── Importar Excel/CSV
-    │   │   └── ID
-    │   ├── Actualizar (violeta claro #F3E8FF, texto #6B21A8, icono `assets/icons/refresh-cw.svg`, ancho normalizado al de Exportar)
-    │   ├── customerQueriesButton (QPushButton, etiqueta "Consultas", icono `assets/icons/brain.svg`, ancho normalizado al de Exportar)
+    │   ├── Nuevo (verde claro #DCFCE7, texto #166534, icono `assets/icons/user-round-plus.svg`, ancho fijo común del ribbon, icono 16 px)
+    │   ├── Editar (amarillo claro #FEF3C7, texto #92400E, icono `assets/icons/file-pen.svg`, ancho fijo común del ribbon, icono 16 px)
+    │   ├── Eliminar (rojo claro #FEE2E2, texto #B91C1C, icono `assets/icons/trash.svg`, ancho fijo común del ribbon, icono 16 px)
+    │   ├── Listados (gris azulado #E2E8F0, texto #334155, icono `assets/icons/list.svg`, ancho fijo común del ribbon, icono 16 px)
+    │   ├── Actualizar (violeta claro #F3E8FF, texto #6B21A8, icono `assets/icons/refresh-cw.svg`, ancho fijo común del ribbon, icono 16 px)
+    │   ├── customerQueriesButton (QPushButton, etiqueta "Consultas", icono `assets/icons/brain.svg`, ancho fijo común del ribbon, icono 16 px)
     │   ├── espacio flexible
-    │   └── Ayuda (gris azulado #E2E8F0, texto #334155, icono `assets/icons/circle-question-mark.svg`, ancho normalizado al de Exportar)
+    │   └── Ayuda (gris azulado #E2E8F0, texto #334155, icono `assets/icons/circle-question-mark.svg`, ancho fijo común del ribbon, icono 16 px)
     └── customersMainSplitter (QSplitter horizontal, fondo transparente, sin borde, tirador oculto)
         ├── customersLeftPanel (QWidget, fondo blanco #FFFFFF, borde #D7DEE8)
         │   └── layout vertical (QVBoxLayout, márgenes 14 px, separación 10 px)
