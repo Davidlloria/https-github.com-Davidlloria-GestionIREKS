@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QSize, Qt, Signal
+from PySide6.QtCore import QDate, QEvent, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap, QTextCharFormat
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
@@ -461,9 +461,21 @@ class DashboardMonthCalendar(QCalendarWidget):
         if calendar_view is not None:
             self._delegate = DashboardCalendarDelegate(self, page)
             calendar_view.setItemDelegate(self._delegate)
-            calendar_view.clicked.connect(self._handle_calendar_view_clicked)
+            self._calendar_view = calendar_view
+            self._calendar_viewport = calendar_view.viewport()
+            self._calendar_viewport.installEventFilter(self)
 
-    def _handle_calendar_view_clicked(self, index) -> None:
+    def eventFilter(self, watched, event) -> bool:
+        if (
+            watched is getattr(self, '_calendar_viewport', None)
+            and event.type() == QEvent.Type.MouseButtonRelease
+            and event.button() == Qt.MouseButton.LeftButton
+        ):
+            index = self._calendar_view.indexAt(event.position().toPoint())
+            self._emit_week_for_index(index)
+        return super().eventFilter(watched, event)
+
+    def _emit_week_for_index(self, index) -> None:
         if index.row() <= 0 or index.column() != 0:
             return
         monday_qdate = self._delegate._date_for_index(index.row(), 1)

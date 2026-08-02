@@ -270,7 +270,9 @@ Calendario mensual de Agenda
     ├── fecha actual: título Agenda de hoy
     ├── otra fecha: título Agenda del dd/mm/aaaa
     ├── selección diaria: filtra por fecha efectiva `due_date`
-    ├── número ISO de semana: muestra todas las entradas de lunes a domingo
+    ├── número ISO de semana
+    │   ├── clic detectado mediante filtro de eventos del viewport interno
+    │   └── muestra todas las entradas de lunes a domingo
     └── tarjetas diarias o semanales en una sola línea
         ├── código · nombre del cliente
         ├── resumen

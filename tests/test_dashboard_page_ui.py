@@ -6,6 +6,7 @@ from datetime import date, datetime
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QDate, Qt
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
     QApplication,
     QAbstractItemView,
@@ -338,7 +339,10 @@ def test_dashboard_page_week_number_click_lists_the_whole_week() -> None:
         order_dashboard_service=_StubOrderDashboardService(), warehouse_dashboard_service=_StubWarehouseDashboardService(),
     )
     calendar = page.agenda_month_calendar
+    page.resize(1180, 850)
+    page.show()
     calendar.setCurrentPage(2026, 7)
+    QApplication.processEvents()
     calendar_view = calendar.findChild(QAbstractItemView, 'qt_calendar_calendarview')
     delegate = calendar_view.itemDelegate()
     week_row = next(
@@ -346,7 +350,14 @@ def test_dashboard_page_week_number_click_lists_the_whole_week() -> None:
         if delegate._date_for_index(row, 1) == QDate(2026, 7, 20)
     )
 
-    calendar_view.clicked.emit(calendar_view.model().index(week_row, 0))
+    week_index = calendar_view.model().index(week_row, 0)
+    QTest.mouseClick(
+        calendar_view.viewport(),
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+        calendar_view.visualRect(week_index).center(),
+    )
+    QApplication.processEvents()
 
     assert page.today_panel_title.text() == 'Agenda semana 30 · 20/07/2026 - 26/07/2026'
     assert len(page.findChildren(QFrame, 'dashboardActivityCard')) == 3
