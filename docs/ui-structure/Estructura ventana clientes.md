@@ -99,12 +99,14 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                             │       │   └── Δ €
                             │       ├── customerSalesComparisonTotals (QTableWidget, fila fija de totales, columnas sincronizadas, primeras 2 columnas unificadas, fondo pastel #EEF4FF, Kg con sufijo "kg", € con sufijo "€")
                             │       ├── customerSalesEmpty (QLabel, visible si la comparativa no tiene filas)
-                            │       └── pie en una línea (QHBoxLayout)
-                            │           ├── customerSalesComparisonChartButton (QPushButton "Graf.", icono `assets/icons/chart-no-axes-combined.svg`)
+                            │       └── pie en una línea (QHBoxLayout, botones con ancho fijo común y color por acción)
+                            │           ├── customerSalesComparisonChartButton (QPushButton "Graf.", icono `assets/icons/chart-no-axes-combined.svg`, color info)
                             │           │   └── abre `CustomerSalesComparisonChartDialog` con barras comparativas en kg
-                            │           ├── customerSalesComparisonPdfButton (QPushButton "Pdf", icono `assets/icons/file-text.svg`)
+                            │           ├── customerSalesComparisonExcelButton (QPushButton "Excel", icono `assets/icons/sheet.svg`, color success)
+                            │           │   └── exporta Excel mediante `ReportExportService.export_excel(...)`
+                            │           ├── customerSalesComparisonPdfButton (QPushButton "Pdf", icono `assets/icons/file-text.svg`, color primary)
                             │           │   └── exporta PDF mediante `ReportExportService.export_customer_sales_comparison_pdf(...)`
-                            │           └── customerSalesComparisonCloseButton (QPushButton "Cerrar")
+                            │           └── customerSalesComparisonCloseButton (QPushButton "Cerrar", color danger)
                             ├── Recetas
                             │   ├── customerRecipesPanel (QWidget, fondo verde #0BF75D)
                             │   ├── relatedRecipesTable (QTableWidget, 3 columnas)

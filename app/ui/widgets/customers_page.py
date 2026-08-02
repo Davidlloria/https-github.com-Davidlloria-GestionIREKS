@@ -1001,16 +1001,28 @@ class CustomersPage(QWidget):
         footer.setSpacing(8)
         chart_btn = QPushButton("Graf.")
         chart_btn.setObjectName("customerSalesComparisonChartButton")
+        chart_btn.setProperty("btnRole", "info")
         chart_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "chart-no-axes-combined.svg")))
         chart_btn.clicked.connect(lambda: self._open_related_sales_chart(rows=rows, year=year, customer_name=customer_name, parent=dialog))
+        excel_btn = QPushButton("Excel")
+        excel_btn.setObjectName("customerSalesComparisonExcelButton")
+        excel_btn.setProperty("btnRole", "success")
+        excel_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "sheet.svg")))
+        excel_btn.clicked.connect(lambda: self._export_related_sales_comparison_excel(rows=rows, year=year, customer_name=customer_name, parent=dialog))
         pdf_btn = QPushButton("Pdf")
         pdf_btn.setObjectName("customerSalesComparisonPdfButton")
+        pdf_btn.setProperty("btnRole", "primary")
         pdf_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-text.svg")))
         pdf_btn.clicked.connect(lambda: self._export_related_sales_comparison_pdf(rows=rows, year=year, customer_name=customer_name, parent=dialog))
         close_btn = QPushButton("Cerrar")
         close_btn.setObjectName("customerSalesComparisonCloseButton")
+        close_btn.setProperty("btnRole", "danger")
         close_btn.clicked.connect(dialog.accept)
+        comparison_footer_width = max(button.sizeHint().width() for button in (chart_btn, excel_btn, pdf_btn, close_btn))
+        for button in (chart_btn, excel_btn, pdf_btn, close_btn):
+            button.setFixedWidth(comparison_footer_width)
         footer.addWidget(chart_btn)
+        footer.addWidget(excel_btn)
         footer.addWidget(pdf_btn)
         footer.addStretch(1)
         footer.addWidget(close_btn)
@@ -1104,6 +1116,43 @@ class CustomersPage(QWidget):
             return
         dialog = CustomerSalesComparisonChartDialog(rows=rows, year=year, customer_name=customer_name, parent=parent or self)
         dialog.exec()
+
+    def _export_related_sales_comparison_excel(self, *, rows: list, year: int, customer_name: str, parent: QWidget | None = None) -> None:
+        if not rows:
+            return
+        safe_customer_name = customer_name.strip() or "Cliente"
+        default_name = f"Comparativa - {year - 1} vs {year} - {safe_customer_name}"
+        default = str(self.report_export_service.default_path(default_name, "xlsx"))
+        path, _ = QFileDialog.getSaveFileName(parent or self, "Guardar comparativa Excel", default, "Excel (*.xlsx)")
+        if not path:
+            return
+        headers = [
+            "Referencia", "Descripción",
+            f"Unid. {year - 1}", f"Kg {year - 1}", f"€ {year - 1}",
+            f"Unid. {year}", f"Kg {year}", f"€ {year}",
+            "Δ Unid.", "Δ Kg", "Δ €",
+        ]
+        export_rows = []
+        for row in rows:
+            export_rows.append([
+                str(getattr(row, "codigo", "") or "").strip(),
+                str(getattr(row, "nombre", "") or "").strip(),
+                self._format_sales_number(getattr(row, "unidades_prev", 0.0) or 0.0),
+                self._format_sales_number(getattr(row, "kg_prev", 0.0) or 0.0, suffix=" kg"),
+                self._format_sales_number(getattr(row, "euros_prev", 0.0) or 0.0, suffix=" €"),
+                self._format_sales_number(getattr(row, "unidades_curr", 0.0) or 0.0),
+                self._format_sales_number(getattr(row, "kg_curr", 0.0) or 0.0, suffix=" kg"),
+                self._format_sales_number(getattr(row, "euros_curr", 0.0) or 0.0, suffix=" €"),
+                self._format_sales_number(getattr(row, "delta_unidades", 0.0) or 0.0),
+                self._format_sales_number(getattr(row, "delta_kg", 0.0) or 0.0, suffix=" kg"),
+                self._format_sales_number(getattr(row, "delta_euros", 0.0) or 0.0, suffix=" €"),
+            ])
+        try:
+            out = self.report_export_service.export_excel(path, default_name, headers, export_rows, sheet_title="Comparativa ventas")
+        except Exception as exc:
+            QMessageBox.warning(parent or self, "Comparativa Excel", f"No se pudo exportar el Excel.\n\n{exc}")
+            return
+        QMessageBox.information(parent or self, "Comparativa Excel", f"Excel generado correctamente.\n\n{out}")
 
     def _export_related_sales_comparison_pdf(self, *, rows: list, year: int, customer_name: str, parent: QWidget | None = None) -> None:
         if not rows:
