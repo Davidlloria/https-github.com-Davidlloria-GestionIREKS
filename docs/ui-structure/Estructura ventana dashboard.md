@@ -353,7 +353,7 @@ dashboardOrdersView
 │   │       ├── Kg pedido: alineado a la derecha
 │   │       ├── Kg recibido: alineado a la derecha
 │   │       ├── Kg pend.: alineado a la derecha
-│   │       └── interacción: hover y selección por fila completa, clic derecho `Ver pedido`
+│   │       └── interacción: selección por fila completa, clic derecho `Ver pedido`
 │   └── dashboardOrdersPendingPanel: Artículos pendientes
 │       └── dashboardOrdersPendingTable
 │           ├── Fecha
@@ -363,7 +363,13 @@ dashboardOrdersView
 │           └── ordenación: cabeceras activas, por defecto fecha descendente
 │   └── selección visual en dashboardOrdersRecentTable y dashboardOrdersPendingTable
 │       └── fila seleccionada: azul
-├── fila inferior (5:3)
+├── fila inferior (4:4:3)
+│   ├── dashboardOrdersTopArticlesPanel
+│   │   └── dashboardOrdersTopArticlesDonut
+│   │       ├── gráfico donut con QPainter
+│   │       ├── fuente: 5 artículos con más kg pedidos del año
+│   │       ├── centro: total kg del top 5
+│   │       └── leyenda: nombre del artículo y kg pedidos
 │   ├── dashboardOrdersWarehousePanel
 │   │   └── dashboardOrdersWarehouseTable
 │   │       ├── Almacen

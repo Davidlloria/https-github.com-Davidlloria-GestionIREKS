@@ -4,8 +4,8 @@ from datetime import date, timedelta
 from html import escape
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QEvent, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QPageLayout, QPainter, QPixmap, QTextCharFormat, QTextDocument
+from PySide6.QtCore import QDate, QEvent, QRectF, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QIcon, QPageLayout, QPainter, QPen, QPixmap, QTextCharFormat, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
@@ -52,6 +52,7 @@ from app.services.order_dashboard_service import (
     DashboardPendingArticleRow,
     DashboardOrdersStateRow,
     DashboardOrdersWarehouseRow,
+    DashboardTopArticleRow,
     OrderDashboardService,
 )
 from app.services.report_export_service import ReportExportService
@@ -663,6 +664,72 @@ class DashboardSortableItem(QTableWidgetItem):
         return super().__lt__(other)
 
 
+class DashboardDonutChart(QWidget):
+    COLORS = ['#2563EB', '#16A34A', '#F97316', '#EF4444', '#8B5CF6']
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName('dashboardOrdersTopArticlesDonut')
+        self._rows: list[DashboardTopArticleRow] = []
+        self.setMinimumHeight(170)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+    def set_rows(self, rows: list[DashboardTopArticleRow]) -> None:
+        self._rows = list(rows[:5])
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = self.rect().adjusted(8, 8, -8, -8)
+        total = sum(max(row.ordered_kg, 0.0) for row in self._rows)
+        if total <= 1e-9:
+            painter.setPen(QColor('#64748B'))
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, 'Sin datos')
+            return
+
+        side = max(80, min(rect.height() - 6, rect.width() // 2 - 16))
+        donut_rect = QRectF(rect.left(), rect.top() + max(0, (rect.height() - side) // 2), side, side)
+        pen = QPen()
+        pen.setWidth(max(14, side // 7))
+        pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+        start_angle = 90 * 16
+        for index, row in enumerate(self._rows):
+            span = int(round(-360 * 16 * (max(row.ordered_kg, 0.0) / total)))
+            pen.setColor(QColor(self.COLORS[index % len(self.COLORS)]))
+            painter.setPen(pen)
+            painter.drawArc(donut_rect, start_angle, span)
+            start_angle += span
+
+        painter.setPen(QColor('#0F172A'))
+        painter.drawText(donut_rect, Qt.AlignmentFlag.AlignCenter, f'{DashboardPage.format_kg(total)}')
+
+        legend_left = int(donut_rect.right()) + 18
+        legend_top = rect.top() + 6
+        line_height = 23
+        painter.setPen(QColor('#334155'))
+        for index, row in enumerate(self._rows):
+            y = legend_top + index * line_height
+            painter.setBrush(QColor(self.COLORS[index % len(self.COLORS)]))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(legend_left, y + 5, 10, 10, 3, 3)
+            painter.setPen(QColor('#334155'))
+            label_width = max(60, rect.right() - legend_left - 82)
+            painter.drawText(
+                QRectF(legend_left + 16, y, label_width, line_height),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                row.article_name,
+            )
+            painter.setPen(QColor('#0F172A'))
+            painter.drawText(
+                QRectF(rect.right() - 66, y, 66, line_height),
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                DashboardPage.format_kg(row.ordered_kg),
+            )
+            painter.setPen(QColor('#334155'))
+
+
 class DashboardPage(QWidget):
     def __init__(
         self,
@@ -1154,6 +1221,11 @@ class DashboardPage(QWidget):
         lower_row.setContentsMargins(0, 0, 0, 0)
         lower_row.setSpacing(12)
 
+        top_articles_panel = self._build_table_panel('Top artículos pedidos', 'dashboardOrdersTopArticlesPanel')
+        self.orders_top_articles_donut = DashboardDonutChart()
+        top_articles_panel.layout().addWidget(self.orders_top_articles_donut, 1)
+        lower_row.addWidget(top_articles_panel, 4)
+
         warehouse_panel = self._build_table_panel('Más pendiente por almacén', 'dashboardOrdersWarehousePanel')
         self.orders_warehouse_table = QTableWidget(0, 4)
         self.orders_warehouse_table.setObjectName('dashboardOrdersWarehouseTable')
@@ -1165,7 +1237,7 @@ class DashboardPage(QWidget):
         warehouse_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         warehouse_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         warehouse_panel.layout().addWidget(self.orders_warehouse_table)
-        lower_row.addWidget(warehouse_panel, 5)
+        lower_row.addWidget(warehouse_panel, 4)
 
         state_panel = self._build_table_panel('Resumen por estado', 'dashboardOrdersStatePanel')
         self.orders_state_table = QTableWidget(0, 3)
@@ -1701,6 +1773,7 @@ class DashboardPage(QWidget):
         self.orders_kpi_notes['incident_orders'].setText('pedido(s)')
         self._populate_order_recent_table(snapshot.recent_orders)
         self._populate_order_pending_table(snapshot.pending_orders)
+        self.orders_top_articles_donut.set_rows(snapshot.top_articles)
         self._populate_order_warehouse_table(snapshot.warehouse_rows)
         self._populate_order_state_table(snapshot.state_rows)
         self.footer_label.setText(

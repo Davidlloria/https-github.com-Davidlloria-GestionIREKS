@@ -8,7 +8,7 @@ from typing import Any, cast
 from sqlmodel import Session, select
 
 from app.core.database import engine
-from app.models import AlbaranItem, Cliente, Distribuidor, IngredienteIreks, Pedido, PedidoPendiente
+from app.models import AlbaranItem, Cliente, Distribuidor, IngredienteIreks, Pedido, PedidoItem, PedidoPendiente
 from app.services.order_query_service import OrderQueryService
 
 
@@ -49,6 +49,13 @@ class DashboardPendingArticleRow:
 
 
 @dataclass
+class DashboardTopArticleRow:
+    articulo_id: str
+    article_name: str
+    ordered_kg: float
+
+
+@dataclass
 class DashboardOrdersStateRow:
     status: str
     count: int
@@ -64,6 +71,7 @@ class OrderDashboardSnapshot:
     incident_orders: int
     recent_orders: list[DashboardOrderRow]
     pending_orders: list[DashboardPendingArticleRow]
+    top_articles: list[DashboardTopArticleRow]
     warehouse_rows: list[DashboardOrdersWarehouseRow]
     state_rows: list[DashboardOrdersStateRow]
     generated_at: datetime
@@ -90,6 +98,7 @@ class OrderDashboardService:
                 incident_orders=0,
                 recent_orders=[],
                 pending_orders=[],
+                top_articles=[],
                 warehouse_rows=[],
                 state_rows=[],
                 generated_at=datetime.now(),
@@ -103,6 +112,11 @@ class OrderDashboardService:
                     select(AlbaranItem).where(cast(Any, AlbaranItem.pedido_id).in_(pedido_ids))
                 )
             )
+            pedido_items = list(
+                session.exec(
+                    select(PedidoItem).where(cast(Any, PedidoItem.pedido_id).in_(pedido_ids))
+                )
+            )
             pendientes = list(
                 session.exec(
                     select(PedidoPendiente).where(cast(Any, PedidoPendiente.pedido_id).in_(pedido_ids))
@@ -111,7 +125,7 @@ class OrderDashboardService:
             article_ids = sorted(
                 {
                     str(getattr(row, "articulo_id", "") or "").strip()
-                    for row in [*albaran_items, *pendientes]
+                    for row in [*albaran_items, *pedido_items, *pendientes]
                     if str(getattr(row, "articulo_id", "") or "").strip()
                 }
             )
@@ -144,6 +158,14 @@ class OrderDashboardService:
         incident_by_id: dict[str, float] = defaultdict(float)
         last_receipt_by_id: dict[str, date] = {}
         pending_article_rows: list[DashboardPendingArticleRow] = []
+        ordered_by_article: dict[str, float] = defaultdict(float)
+
+        for row in pedido_items:
+            articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+            qty = float(getattr(row, "articulo_cantidad", 0.0) or 0.0)
+            ordered_kg = qty * weights.get(articulo_id, 0.0)
+            if ordered_kg > 1e-9:
+                ordered_by_article[articulo_id] += ordered_kg
 
         for row in albaran_items:
             pedido_id = str(getattr(row, "pedido_id", "") or "").strip()
@@ -220,6 +242,17 @@ class OrderDashboardService:
             pending_article_rows,
             key=lambda row: (-row.pending_kg, row.pedido_fecha, row.pedido_numero, row.articulo_label.casefold()),
         )[:8]
+        top_articles = [
+            DashboardTopArticleRow(
+                articulo_id=articulo_id,
+                article_name=article_labels.get(articulo_id, articulo_id or "S/N"),
+                ordered_kg=float(ordered_kg),
+            )
+            for articulo_id, ordered_kg in sorted(
+                ordered_by_article.items(),
+                key=lambda item: (-item[1], article_labels.get(item[0], item[0]).casefold()),
+            )[:5]
+        ]
 
         warehouse_buckets: dict[str, DashboardOrdersWarehouseRow] = {}
         for row in rows:
@@ -271,6 +304,7 @@ class OrderDashboardService:
             incident_orders=sum(1 for row in rows if row.status == "incidencia"),
             recent_orders=recent_orders,
             pending_orders=pending_orders,
+            top_articles=top_articles,
             warehouse_rows=warehouse_rows,
             state_rows=state_rows,
             generated_at=datetime.now(),

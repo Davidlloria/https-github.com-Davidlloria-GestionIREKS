@@ -33,6 +33,7 @@ from app.services.order_dashboard_service import (
     DashboardPendingArticleRow,
     DashboardOrdersStateRow,
     DashboardOrdersWarehouseRow,
+    DashboardTopArticleRow,
     OrderDashboardSnapshot,
 )
 from app.services.sales_dashboard_service import (
@@ -163,6 +164,10 @@ class _StubOrderDashboardService:
                     pedido_id='ped-3', pedido_fecha=date(2026, 7, 16), pedido_numero='P-003',
                     articulo_id='art-2', articulo_label='Mejorante Pan', article_name='Mejorante Pan', pending_kg=125.0,
                 )
+            ],
+            top_articles=[
+                DashboardTopArticleRow(articulo_id='art-1', article_name='Harina Mix', ordered_kg=1500.0),
+                DashboardTopArticleRow(articulo_id='art-2', article_name='Mejorante Pan', ordered_kg=950.0),
             ],
             warehouse_rows=[DashboardOrdersWarehouseRow(almacen_id='alm-2', almacen_nombre='Cliente Centro', open_orders=3, pending_kg=1250.0, last_receipt=date(2026, 7, 21))],
             state_rows=[DashboardOrdersStateRow(status='Pendiente', count=4, kg=2100.0)],
@@ -573,6 +578,9 @@ def test_dashboard_page_can_switch_to_orders_mode() -> None:
     assert page.orders_pending_table.item(0, 3).textAlignment() == (
         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
     )
+    assert page.findChild(QFrame, 'dashboardOrdersTopArticlesPanel') is not None
+    assert page.orders_top_articles_donut.objectName() == 'dashboardOrdersTopArticlesDonut'
+    assert len(page.orders_top_articles_donut._rows) == 2
     assert page.orders_warehouse_table.rowCount() == 1
     assert page.orders_state_table.rowCount() == 1
     assert page.orders_kpi_labels['pending_kg'].text() == '1.875,50'
