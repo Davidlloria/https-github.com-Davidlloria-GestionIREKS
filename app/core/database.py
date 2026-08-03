@@ -52,6 +52,7 @@ def _set_sqlite_pragmas(dbapi_connection, _connection_record) -> None:  # type: 
 CLIENTE_COLUMNS = [
     "cliente_id",
     "cliente_codigo",
+    "cliente_codigo_distribuidor",
     "cliente_nombre_comercial",
     "cliente_nombre_fiscal",
     "cliente_nombre_interno",
@@ -69,6 +70,7 @@ CLIENTE_COLUMNS = [
     "cliente_actividad",
     "cliente_prospeccion",
     "distribuidor_id",
+    "distribuidor_comercial_id",
     "activo",
 ]
 
@@ -417,6 +419,16 @@ def _extract_cliente_value(row: Sequence[Any], idx: dict[str, int], key: str) ->
     return "" if val is None else str(val).strip()
 
 
+def _extract_cliente_int_value(row: Sequence[Any], idx: dict[str, int], key: str) -> int | None:
+    raw = _extract_cliente_value(row, idx, key)
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except Exception:
+        return None
+
+
 def _migrate_client_table() -> None:
     with engine.begin() as conn:
         tables = {row[0] for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
@@ -504,6 +516,7 @@ def _migrate_client_table() -> None:
                 (
                     cliente_id,
                     code,
+                    _extract_cliente_int_value(row, idx, "cliente_codigo_distribuidor"),
                     nombre_comercial,
                     nombre_fiscal,
                     cliente_nombre_interno,
@@ -521,6 +534,7 @@ def _migrate_client_table() -> None:
                     cliente_actividad,
                     cliente_prospeccion,
                     distribuidor_id,
+                    _extract_cliente_value(row, idx, "distribuidor_comercial_id"),
                     activo,
                 )
             )
@@ -541,6 +555,7 @@ def _migrate_client_table() -> None:
             CREATE TABLE clientes (
                 cliente_id TEXT PRIMARY KEY NOT NULL,
                 cliente_codigo INTEGER NOT NULL UNIQUE,
+                cliente_codigo_distribuidor INTEGER,
                 cliente_nombre_comercial TEXT NOT NULL DEFAULT '',
                 cliente_nombre_fiscal TEXT NOT NULL DEFAULT '',
                 cliente_nombre_interno TEXT NOT NULL DEFAULT '',
@@ -558,6 +573,7 @@ def _migrate_client_table() -> None:
                 cliente_actividad TEXT NOT NULL DEFAULT '',
                 cliente_prospeccion BOOLEAN NOT NULL DEFAULT 0,
                 distribuidor_id TEXT NOT NULL DEFAULT '',
+                distribuidor_comercial_id TEXT NOT NULL DEFAULT '',
                 activo BOOLEAN NOT NULL DEFAULT 1
             )
             """
@@ -566,12 +582,12 @@ def _migrate_client_table() -> None:
             conn.exec_driver_sql(
                 """
                 INSERT INTO clientes (
-                    cliente_id, cliente_codigo, cliente_nombre_comercial, cliente_nombre_fiscal, cliente_nombre_interno, cliente_abreviatura,
+                    cliente_id, cliente_codigo, cliente_codigo_distribuidor, cliente_nombre_comercial, cliente_nombre_fiscal, cliente_nombre_interno, cliente_abreviatura,
                     cliente_cif, cliente_telefono, cliente_email, cliente_direccion, cliente_direccion_cp,
                     cliente_direccion_localidad_id, cliente_direccion_municipio_id, cliente_direccion_provincia_id,
-                    cliente_direccion_isla_id, cliente_tipo, cliente_actividad, cliente_prospeccion, distribuidor_id, activo
+                    cliente_direccion_isla_id, cliente_tipo, cliente_actividad, cliente_prospeccion, distribuidor_id, distribuidor_comercial_id, activo
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 item,
             )

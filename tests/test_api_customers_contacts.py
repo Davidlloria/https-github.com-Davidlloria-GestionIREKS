@@ -30,14 +30,18 @@ def test_customers_crud_endpoints(api_client: TestClient) -> None:
         "/customers",
         json={
             "cliente_id": "customer-1",
+            "cliente_codigo_distribuidor": 9901,
             "cliente_nombre_comercial": "Panaderia Norte",
             "cliente_nombre_fiscal": "Panaderia Norte SL",
             "cliente_email": "info@example.com",
+            "distribuidor_comercial_id": "commercial-1",
         },
     )
     assert created.status_code == 201
     assert created.json()["cliente_id"] == "customer-1"
     assert created.json()["cliente_codigo"] == 1
+    assert created.json()["cliente_codigo_distribuidor"] == 9901
+    assert created.json()["distribuidor_comercial_id"] == "commercial-1"
 
     listed = api_client.get("/customers", params={"q": "Norte"})
     assert listed.status_code == 200
@@ -47,10 +51,17 @@ def test_customers_crud_endpoints(api_client: TestClient) -> None:
 
     updated = api_client.patch(
         "/customers/customer-1",
-        json={"cliente_nombre_comercial": "Panaderia Norte Centro", "activo": False},
+        json={
+            "cliente_nombre_comercial": "Panaderia Norte Centro",
+            "cliente_codigo_distribuidor": 9902,
+            "distribuidor_comercial_id": "commercial-2",
+            "activo": False,
+        },
     )
     assert updated.status_code == 200
     assert updated.json()["cliente_nombre_comercial"] == "Panaderia Norte Centro"
+    assert updated.json()["cliente_codigo_distribuidor"] == 9902
+    assert updated.json()["distribuidor_comercial_id"] == "commercial-2"
     assert updated.json()["activo"] is False
 
     detail = api_client.get("/customers/customer-1")

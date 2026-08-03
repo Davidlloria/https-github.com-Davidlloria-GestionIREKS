@@ -19,6 +19,7 @@ class Cliente(SQLModel, table=True):
 
     cliente_id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True, max_length=36)
     cliente_codigo: int = Field(default=0, index=True, unique=True, nullable=False)
+    cliente_codigo_distribuidor: Optional[int] = Field(default=None)
     cliente_nombre_comercial: str = Field(default="", max_length=255)
     cliente_nombre_fiscal: str = Field(default="", max_length=255)
     cliente_nombre_interno: str = Field(default="", max_length=255)
@@ -36,6 +37,7 @@ class Cliente(SQLModel, table=True):
     cliente_actividad: str = Field(default="", max_length=100)
     cliente_prospeccion: bool = Field(default=False)
     distribuidor_id: str = Field(default="", max_length=36)
+    distribuidor_comercial_id: str = Field(default="", max_length=36)
     activo: bool = Field(default=True)
 
     @property
