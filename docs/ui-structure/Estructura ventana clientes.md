@@ -25,8 +25,8 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
         │       ├── filtro de isla (QComboBox, blanco #FFFFFF, borde #D1D5DB, ancho 390 px)
         │       ├── fila de búsqueda
         │       │   ├── buscador "Buscar cliente..." (QLineEdit, blanco #FFFFFF, borde #D1D5DB, ancho 220 px)
-        │       │   ├── contador `encontrados/totales` (QLabel, objectName `customerSearchCounterLabel`, formato `xxx/yyy`)
-        │       │   └── limpiar filtro (QPushButton rojo #EF4444, texto blanco, 30 × 30 px, alineado al final de la fila)
+        │       │   ├── limpiar filtro (QPushButton rojo #EF4444, texto blanco, 30 × 30 px)
+        │       │   └── contador `encontrados/totales` (QLabel, objectName `customerSearchCounterLabel`, formato `xxx/yyy`, ocupa el espacio restante)
         │       └── customersListTable (QTableWidget, blanco #FFFFFF, alterno #FAFBFF, selección #3083FF, cabecera gris #D1D1D1 con esquina superior izquierda redondeada y separadores grises, ancho 390 px, tableVariant="standard")
         │           ├── Cod. (60 px)
         │           ├── Nombre (268 px)

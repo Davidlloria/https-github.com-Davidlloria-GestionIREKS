@@ -952,8 +952,8 @@ class CustomersPage(QWidget):
         search_row.setContentsMargins(0, 0, 0, 0)
         search_row.setSpacing(8)
         search_row.addWidget(self.search_input)
-        search_row.addWidget(self.search_counter_label, 1)
         search_row.addWidget(self.clear_search_btn)
+        search_row.addWidget(self.search_counter_label, 1)
         left_layout.addLayout(search_row)
 
         self.table = QTableWidget(0, 3)
