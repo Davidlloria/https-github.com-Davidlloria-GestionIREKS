@@ -186,3 +186,35 @@ def test_customer_merge_rejects_same_customer(isolated_engine) -> None:
 
     with pytest.raises(ValueError, match="no pueden ser el mismo"):
         service.merge_customers("same", "same")
+
+
+def test_customer_merge_preview_counts_equivalent_target_sales(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        session.add(Cliente(cliente_id="source", cliente_codigo=558, cliente_nombre_comercial="HELADERIA LA TEJITA"))
+        session.add(Cliente(cliente_id="target", cliente_codigo=240, cliente_nombre_comercial="Heladería La Tejita"))
+        session.add(
+            VentaClientesRaw(
+                raw_id="raw-target",
+                lote_id="lote-1",
+                cliente_id="target",
+                anio=2025,
+                articulo_codigo_origen="ART-1",
+                articulo_id="art-1",
+                articulo_descripcion_origen="Producto",
+                kg=12.0,
+                euros=30.0,
+            )
+        )
+        session.commit()
+
+    service = CustomerService()
+    preview = service.preview_merge("source", "target")
+
+    assert preview.counts["ventas_clientes"] == 1
+
+    result = service.merge_customers("source", "target")
+
+    assert result.deleted_source is True
+    with Session(isolated_engine) as session:
+        assert session.get(Cliente, "source") is None
+        assert session.get(VentaClientesRaw, "raw-target").cliente_id == "target"

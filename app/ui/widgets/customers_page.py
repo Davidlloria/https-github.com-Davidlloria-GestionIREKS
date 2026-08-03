@@ -4043,7 +4043,7 @@ class CustomersPage(QWidget):
             f"Origen: {preview.source_label}",
             f"Destino: {preview.target_label}",
             "",
-            "Datos que se moveran al destino:",
+            "Datos relacionados detectados:",
         ]
         counts = getattr(preview, "counts", {}) or {}
         for key, label in labels.items():
