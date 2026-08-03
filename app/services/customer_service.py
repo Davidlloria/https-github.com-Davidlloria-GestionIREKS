@@ -163,12 +163,17 @@ class CustomerService:
                     "SELECT COUNT(*) FROM asistentes WHERE cliente_id = ?",
                     (customer_id,),
                 ).scalar_one(),
+                "ventas_clientes": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM ventas_clientes_raw WHERE cliente_id = ?",
+                    (customer_id,),
+                ).scalar_one(),
             }
         labels = {
             "contactos": "contacto(s)",
             "recetas": "receta(s)",
             "agenda": "actividad(es) de agenda",
             "asistentes": "asistente(s) en cursos",
+            "ventas_clientes": "venta(s) de clientes",
         }
         return [f"{count} {labels[name]}" for name, count in counts.items() if int(count or 0) > 0]
 

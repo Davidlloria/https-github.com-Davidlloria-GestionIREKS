@@ -8,7 +8,7 @@ from sqlmodel import SQLModel, Session, create_engine
 
 import app.services.customer_agenda_service as customer_agenda_service_module
 import app.services.customer_service as customer_service_module
-from app.models import Cliente, ClienteAgenda
+from app.models import Cliente, ClienteAgenda, VentaClientesRaw
 from app.services.customer_agenda_service import CustomerAgendaService
 from app.services.customer_service import CustomerService
 
@@ -96,3 +96,27 @@ def test_customer_delete_blockers_include_agenda_rows(isolated_engine) -> None:
     blockers = service.delete_blockers("cli-1")
 
     assert "1 actividad(es) de agenda" in blockers
+
+
+def test_customer_delete_blockers_include_sales_rows(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        session.add(Cliente(cliente_id="cli-1", cliente_codigo=1, cliente_nombre_comercial="Cliente Demo"))
+        session.add(
+            VentaClientesRaw(
+                raw_id="raw-1",
+                lote_id="lote-1",
+                cliente_id="cli-1",
+                anio=2025,
+                articulo_codigo_origen="ART-1",
+                articulo_id="art-1",
+                articulo_descripcion_origen="Producto",
+                kg=12.0,
+                euros=30.0,
+            )
+        )
+        session.commit()
+
+    service = CustomerService()
+    blockers = service.delete_blockers("cli-1")
+
+    assert "1 venta(s) de clientes" in blockers
