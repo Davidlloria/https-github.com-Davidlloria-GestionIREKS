@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import unicodedata
 
 from sqlmodel import Session, col, select
 
@@ -31,6 +32,20 @@ class AddressCatalogs:
     municipios: list[Municipio]
     codigos_postales: list[CodigoPostal]
     localidades: list[Localidad]
+
+
+@dataclass(frozen=True)
+class CustomerMergePreview:
+    source_customer_id: str
+    target_customer_id: str
+    source_label: str
+    target_label: str
+    counts: dict[str, int]
+
+
+@dataclass(frozen=True)
+class CustomerMergeResult(CustomerMergePreview):
+    deleted_source: bool
 
 
 class CustomerService:
@@ -144,6 +159,59 @@ class CustomerService:
         with Session(engine) as session:
             return self.vm.delete(session, entity_id)
 
+    def preview_merge(self, source_customer_id: str, target_customer_id: str) -> CustomerMergePreview:
+        source_id, target_id = self._validate_merge_ids(source_customer_id, target_customer_id)
+        with engine.begin() as conn:
+            source = self._customer_merge_row(conn, source_id)
+            target = self._customer_merge_row(conn, target_id)
+            if source is None:
+                raise ValueError("Cliente origen no encontrado.")
+            if target is None:
+                raise ValueError("Cliente destino no encontrado.")
+            return CustomerMergePreview(
+                source_customer_id=source_id,
+                target_customer_id=target_id,
+                source_label=self._customer_merge_label(source),
+                target_label=self._customer_merge_label(target),
+                counts=self._customer_merge_counts(conn, source_id, target_id),
+            )
+
+    def merge_customers(self, source_customer_id: str, target_customer_id: str) -> CustomerMergeResult:
+        source_id, target_id = self._validate_merge_ids(source_customer_id, target_customer_id)
+        with engine.begin() as conn:
+            source = self._customer_merge_row(conn, source_id)
+            target = self._customer_merge_row(conn, target_id)
+            if source is None:
+                raise ValueError("Cliente origen no encontrado.")
+            if target is None:
+                raise ValueError("Cliente destino no encontrado.")
+            counts = self._customer_merge_counts(conn, source_id, target_id)
+            for table_name in ("contactos", "recetas", "clientes_agenda", "asistentes", "ventas_clientes_raw"):
+                if table_name == "ventas_clientes_raw":
+                    continue
+                conn.exec_driver_sql(
+                    f"UPDATE {table_name} SET cliente_id = ? WHERE cliente_id = ?",
+                    (target_id, source_id),
+                )
+            sales_source_ids = self._customer_merge_sales_source_ids(conn, source_id, target_id, include_target=False)
+            for sales_source_id in sorted(sales_source_ids):
+                conn.exec_driver_sql(
+                    "UPDATE ventas_clientes_raw SET cliente_id = ? WHERE cliente_id = ?",
+                    (target_id, sales_source_id),
+                )
+            deleted = conn.exec_driver_sql(
+                "DELETE FROM clientes WHERE cliente_id = ?",
+                (source_id,),
+            ).rowcount
+            return CustomerMergeResult(
+                source_customer_id=source_id,
+                target_customer_id=target_id,
+                source_label=self._customer_merge_label(source),
+                target_label=self._customer_merge_label(target),
+                counts=counts,
+                deleted_source=bool(deleted),
+            )
+
     def delete_blockers(self, customer_id: str) -> list[str]:
         with engine.begin() as conn:
             counts = {
@@ -163,14 +231,114 @@ class CustomerService:
                     "SELECT COUNT(*) FROM asistentes WHERE cliente_id = ?",
                     (customer_id,),
                 ).scalar_one(),
+                "ventas_clientes": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM ventas_clientes_raw WHERE cliente_id = ?",
+                    (customer_id,),
+                ).scalar_one(),
             }
         labels = {
             "contactos": "contacto(s)",
             "recetas": "receta(s)",
             "agenda": "actividad(es) de agenda",
             "asistentes": "asistente(s) en cursos",
+            "ventas_clientes": "venta(s) de clientes",
         }
         return [f"{count} {labels[name]}" for name, count in counts.items() if int(count or 0) > 0]
+
+    def _validate_merge_ids(self, source_customer_id: str, target_customer_id: str) -> tuple[str, str]:
+        source_id = str(source_customer_id or "").strip()
+        target_id = str(target_customer_id or "").strip()
+        if not source_id:
+            raise ValueError("Cliente origen no indicado.")
+        if not target_id:
+            raise ValueError("Cliente destino no indicado.")
+        if source_id == target_id:
+            raise ValueError("El cliente origen y destino no pueden ser el mismo.")
+        return source_id, target_id
+
+    def _customer_merge_row(self, conn, customer_id: str):
+        return conn.exec_driver_sql(
+            """
+            SELECT cliente_id, cliente_codigo, cliente_nombre_comercial, cliente_nombre_fiscal
+            FROM clientes
+            WHERE cliente_id = ?
+            """,
+            (customer_id,),
+        ).fetchone()
+
+    def _customer_merge_label(self, row) -> str:
+        code = str(row[1] or "").strip()
+        name = str(row[2] or row[3] or "").strip()
+        return f"{code} - {name}".strip(" -")
+
+    def _customer_merge_counts(self, conn, source_customer_id: str, target_customer_id: str = "") -> dict[str, int]:
+        sales_source_ids = self._customer_merge_sales_source_ids(conn, source_customer_id, target_customer_id, include_target=True)
+        queries = {
+            "contactos": "SELECT COUNT(*) FROM contactos WHERE cliente_id = ?",
+            "recetas": "SELECT COUNT(*) FROM recetas WHERE cliente_id = ?",
+            "agenda": "SELECT COUNT(*) FROM clientes_agenda WHERE cliente_id = ?",
+            "asistentes": "SELECT COUNT(*) FROM asistentes WHERE cliente_id = ?",
+        }
+        counts = {
+            name: int(conn.exec_driver_sql(query, (customer_id,)).scalar_one() or 0)
+            for name, query in queries.items()
+            for customer_id in [source_customer_id]
+        }
+        counts["ventas_clientes"] = sum(
+            int(
+                conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM ventas_clientes_raw WHERE cliente_id = ?",
+                    (sales_source_id,),
+                ).scalar_one()
+                or 0
+            )
+            for sales_source_id in sales_source_ids
+        )
+        return counts
+
+    def _customer_merge_sales_source_ids(
+        self,
+        conn,
+        source_customer_id: str,
+        target_customer_id: str = "",
+        *,
+        include_target: bool,
+    ) -> set[str]:
+        source_id = str(source_customer_id or "").strip()
+        target_id = str(target_customer_id or "").strip()
+        source = self._customer_merge_row(conn, source_id)
+        if source is None:
+            return {source_id} if source_id else set()
+        search_terms = {
+            self._normalize_merge_text(source[2]),
+            self._normalize_merge_text(source[3]),
+        }
+        search_terms = {term for term in search_terms if term}
+        ids = {source_id}
+        if search_terms:
+            rows = conn.exec_driver_sql(
+                """
+                SELECT cliente_id, cliente_codigo, cliente_nombre_comercial, cliente_nombre_fiscal, cliente_abreviatura
+                FROM clientes
+                """
+            ).fetchall()
+            for row in rows:
+                row_id = str(row[0] or "").strip()
+                if not row_id:
+                    continue
+                searchable = self._normalize_merge_text(
+                    " ".join(str(value or "") for value in (row[1], row[2], row[3], row[4]))
+                )
+                if any(term in searchable or searchable in term for term in search_terms):
+                    ids.add(row_id)
+        if not include_target:
+            ids.discard(target_id)
+        return ids
+
+    def _normalize_merge_text(self, value: object) -> str:
+        text = str(value or "").strip().lower()
+        decomposed = unicodedata.normalize("NFKD", text)
+        return "".join(char for char in decomposed if not unicodedata.combining(char))
 
     def related_contacts(self, cliente_id: str) -> list[Contacto]:
         return self.contact_flow_service.related_contacts(cliente_id)

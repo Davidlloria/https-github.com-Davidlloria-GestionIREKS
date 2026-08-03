@@ -52,6 +52,7 @@ def _set_sqlite_pragmas(dbapi_connection, _connection_record) -> None:  # type: 
 CLIENTE_COLUMNS = [
     "cliente_id",
     "cliente_codigo",
+    "cliente_codigo_distribuidor",
     "cliente_nombre_comercial",
     "cliente_nombre_fiscal",
     "cliente_nombre_interno",
@@ -69,6 +70,7 @@ CLIENTE_COLUMNS = [
     "cliente_actividad",
     "cliente_prospeccion",
     "distribuidor_id",
+    "distribuidor_comercial_id",
     "activo",
 ]
 
@@ -417,6 +419,16 @@ def _extract_cliente_value(row: Sequence[Any], idx: dict[str, int], key: str) ->
     return "" if val is None else str(val).strip()
 
 
+def _extract_cliente_int_value(row: Sequence[Any], idx: dict[str, int], key: str) -> int | None:
+    raw = _extract_cliente_value(row, idx, key)
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except Exception:
+        return None
+
+
 def _migrate_client_table() -> None:
     with engine.begin() as conn:
         tables = {row[0] for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
@@ -504,6 +516,7 @@ def _migrate_client_table() -> None:
                 (
                     cliente_id,
                     code,
+                    _extract_cliente_int_value(row, idx, "cliente_codigo_distribuidor"),
                     nombre_comercial,
                     nombre_fiscal,
                     cliente_nombre_interno,
@@ -521,6 +534,7 @@ def _migrate_client_table() -> None:
                     cliente_actividad,
                     cliente_prospeccion,
                     distribuidor_id,
+                    _extract_cliente_value(row, idx, "distribuidor_comercial_id"),
                     activo,
                 )
             )
@@ -541,6 +555,7 @@ def _migrate_client_table() -> None:
             CREATE TABLE clientes (
                 cliente_id TEXT PRIMARY KEY NOT NULL,
                 cliente_codigo INTEGER NOT NULL UNIQUE,
+                cliente_codigo_distribuidor INTEGER,
                 cliente_nombre_comercial TEXT NOT NULL DEFAULT '',
                 cliente_nombre_fiscal TEXT NOT NULL DEFAULT '',
                 cliente_nombre_interno TEXT NOT NULL DEFAULT '',
@@ -558,6 +573,7 @@ def _migrate_client_table() -> None:
                 cliente_actividad TEXT NOT NULL DEFAULT '',
                 cliente_prospeccion BOOLEAN NOT NULL DEFAULT 0,
                 distribuidor_id TEXT NOT NULL DEFAULT '',
+                distribuidor_comercial_id TEXT NOT NULL DEFAULT '',
                 activo BOOLEAN NOT NULL DEFAULT 1
             )
             """
@@ -566,12 +582,12 @@ def _migrate_client_table() -> None:
             conn.exec_driver_sql(
                 """
                 INSERT INTO clientes (
-                    cliente_id, cliente_codigo, cliente_nombre_comercial, cliente_nombre_fiscal, cliente_nombre_interno, cliente_abreviatura,
+                    cliente_id, cliente_codigo, cliente_codigo_distribuidor, cliente_nombre_comercial, cliente_nombre_fiscal, cliente_nombre_interno, cliente_abreviatura,
                     cliente_cif, cliente_telefono, cliente_email, cliente_direccion, cliente_direccion_cp,
                     cliente_direccion_localidad_id, cliente_direccion_municipio_id, cliente_direccion_provincia_id,
-                    cliente_direccion_isla_id, cliente_tipo, cliente_actividad, cliente_prospeccion, distribuidor_id, activo
+                    cliente_direccion_isla_id, cliente_tipo, cliente_actividad, cliente_prospeccion, distribuidor_id, distribuidor_comercial_id, activo
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 item,
             )
@@ -720,6 +736,75 @@ def _migrate_contactos_cliente_fk() -> None:
             END;
             """
         )
+        conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+
+
+def _migrate_clientes_agenda_cliente_fk() -> None:
+    with engine.begin() as conn:
+        tables = {row[0] for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        if "clientes_agenda" not in tables or "clientes" not in tables:
+            return
+        foreign_keys = conn.exec_driver_sql("PRAGMA foreign_key_list(clientes_agenda)").fetchall()
+        if not any(row[2] == "clientes_old_schema" for row in foreign_keys):
+            return
+
+        conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_clientes_agenda_fecha_actividad")
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_clientes_agenda_fecha_seguimiento")
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_clientes_agenda_tipo")
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_clientes_agenda_estado")
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_clientes_agenda_prioridad")
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_clientes_agenda_cliente_id")
+        conn.exec_driver_sql("ALTER TABLE clientes_agenda RENAME TO clientes_agenda_old_schema")
+        conn.exec_driver_sql(
+            """
+            CREATE TABLE clientes_agenda (
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                agenda_id VARCHAR(36) NOT NULL,
+                cliente_id VARCHAR(36) NOT NULL,
+                fecha_actividad DATE NOT NULL,
+                tipo VARCHAR(50) NOT NULL,
+                estado VARCHAR(30) NOT NULL,
+                resumen VARCHAR(255) NOT NULL,
+                detalle VARCHAR NOT NULL,
+                fecha_seguimiento DATE,
+                prioridad VARCHAR(20) NOT NULL,
+                responsable VARCHAR(255) NOT NULL,
+                PRIMARY KEY (agenda_id),
+                FOREIGN KEY(cliente_id) REFERENCES clientes (cliente_id)
+            )
+            """
+        )
+        conn.exec_driver_sql(
+            """
+            INSERT INTO clientes_agenda (
+                created_at, updated_at, agenda_id, cliente_id, fecha_actividad,
+                tipo, estado, resumen, detalle, fecha_seguimiento, prioridad, responsable
+            )
+            SELECT
+                COALESCE(created_at, CURRENT_TIMESTAMP),
+                COALESCE(updated_at, CURRENT_TIMESTAMP),
+                agenda_id,
+                cliente_id,
+                COALESCE(fecha_actividad, CURRENT_DATE),
+                COALESCE(tipo, 'nota'),
+                COALESCE(estado, 'pendiente'),
+                COALESCE(resumen, ''),
+                COALESCE(detalle, ''),
+                fecha_seguimiento,
+                COALESCE(prioridad, 'normal'),
+                COALESCE(responsable, '')
+            FROM clientes_agenda_old_schema
+            """
+        )
+        conn.exec_driver_sql("DROP TABLE clientes_agenda_old_schema")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_clientes_agenda_fecha_actividad ON clientes_agenda (fecha_actividad)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_clientes_agenda_fecha_seguimiento ON clientes_agenda (fecha_seguimiento)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_clientes_agenda_tipo ON clientes_agenda (tipo)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_clientes_agenda_estado ON clientes_agenda (estado)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_clientes_agenda_prioridad ON clientes_agenda (prioridad)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_clientes_agenda_cliente_id ON clientes_agenda (cliente_id)")
         conn.exec_driver_sql("PRAGMA foreign_keys=ON")
 
 
@@ -1902,6 +1987,7 @@ def init_db() -> None:
     _migrate_client_table()
     _migrate_contact_columns()
     _migrate_contactos_cliente_fk()
+    _migrate_clientes_agenda_cliente_fk()
     _migrate_asistentes_columns()
     _migrate_asistentes_fks()
     _migrate_tecnicos_columns()

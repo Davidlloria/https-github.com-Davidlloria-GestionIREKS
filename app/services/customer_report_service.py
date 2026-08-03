@@ -13,6 +13,7 @@ from app.services.openai_settings_service import OpenAISettingsService
 
 
 REPORT_COLUMNS: dict[str, tuple[str, str]] = {
+    "cliente_id": ("ID cliente", "c.cliente_id"),
     "codigo": ("Cod.", "c.cliente_codigo"),
     "nombre_comercial": ("Nombre comercial", "c.cliente_nombre_comercial"),
     "nombre_fiscal": ("Nombre fiscal", "c.cliente_nombre_fiscal"),
@@ -171,6 +172,9 @@ class CustomerReportIntentService:
 
         if "prospe" in t:
             filters.append(ReportFilter("prospeccion", "=", not any(word in t for word in ("no prospe", "sin prospe"))))
+
+        if "id del cliente" in t or "cliente id" in t or "uuid del cliente" in t or "identificador del cliente" in t:
+            columns.append("cliente_id")
 
         wants_contact_name = "nombre del contacto" in t or "nombres de contacto" in t or "contacto principal" in t
         if "sin contacto" in t:
