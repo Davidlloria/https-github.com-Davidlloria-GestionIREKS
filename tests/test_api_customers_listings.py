@@ -93,6 +93,21 @@ def test_customer_listings_endpoint_returns_report_data(api_client: TestClient) 
     assert payload_blank_island["rows"]
 
 
+def test_customer_listings_endpoint_can_include_customer_id(api_client: TestClient) -> None:
+    assert TEST_ENGINE is not None
+    with Session(TEST_ENGINE) as session:
+        _seed_customer_data(session)
+
+    response = api_client.post("/customers/listings", json={"prompt": "clientes activos con id del cliente"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert "ID cliente" in payload["headers"]
+    id_index = payload["headers"].index("ID cliente")
+    assert payload["rows"][0][id_index] == "cli-1"
+
+
 def test_customer_listings_pdf_export_returns_pdf_file(api_client: TestClient) -> None:
     assert TEST_ENGINE is not None
     with Session(TEST_ENGINE) as session:
