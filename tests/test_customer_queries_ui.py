@@ -90,6 +90,24 @@ def test_customers_top_ribbon_contains_queries_button(monkeypatch) -> None:
     QApplication.processEvents()
 
 
+def test_customers_search_row_has_counter(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    assert page.search_input.minimumWidth() == 220
+    assert page.search_input.maximumWidth() == 220
+    assert page.search_counter_label.objectName() == "customerSearchCounterLabel"
+    assert page.search_counter_label.text() == "0/0"
+
+    page._update_search_counter(12, 720)
+
+    assert page.search_counter_label.text() == "12/720"
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
 def test_agenda_calendar_uses_unclipped_popup_configuration(monkeypatch) -> None:
     _application()
     monkeypatch.setattr(CustomersPage, "reload", lambda self: None)

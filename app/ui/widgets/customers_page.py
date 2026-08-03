@@ -927,10 +927,16 @@ class CustomersPage(QWidget):
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Buscar cliente...")
-        self.search_input.setFixedWidth(352)
+        self.search_input.setFixedWidth(220)
         self.search_input.setFixedHeight(30)
         self.search_input.textChanged.connect(self._schedule_reload)
         self.search_input.textChanged.connect(self._update_search_clear_button)
+
+        self.search_counter_label = QLabel("0/0")
+        self.search_counter_label.setObjectName("customerSearchCounterLabel")
+        self.search_counter_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.search_counter_label.setFixedHeight(30)
+        self.search_counter_label.setToolTip("Registros encontrados / registros totales")
 
         self.clear_search_btn = QPushButton()
         self.clear_search_btn.setObjectName("customerSearchClearButton")
@@ -946,6 +952,7 @@ class CustomersPage(QWidget):
         search_row.setContentsMargins(0, 0, 0, 0)
         search_row.setSpacing(8)
         search_row.addWidget(self.search_input)
+        search_row.addWidget(self.search_counter_label, 1)
         search_row.addWidget(self.clear_search_btn)
         left_layout.addLayout(search_row)
 
@@ -2697,6 +2704,10 @@ class CustomersPage(QWidget):
         self.search_input.clear()
         self.search_input.setFocus()
 
+    def _update_search_counter(self, found: int, total: int) -> None:
+        if hasattr(self, "search_counter_label"):
+            self.search_counter_label.setText(f"{max(0, int(found))}/{max(0, int(total))}")
+
     def _list(self, term: str) -> list:
         return self.customer_service.list(term)
 
@@ -2725,7 +2736,8 @@ class CustomersPage(QWidget):
         self._load_address_catalogs()
         self._populate_island_filter()
         term = self.search_input.text().strip()
-        self.rows = self._list(term)
+        all_rows = self._list("")
+        self.rows = self._list(term) if term else list(all_rows)
         selected_isla_id = str(self.island_filter.currentData() or "").strip() if hasattr(self, "island_filter") else ""
         if selected_isla_id:
             self.rows = [
@@ -2733,6 +2745,7 @@ class CustomersPage(QWidget):
                 for row in self.rows
                 if str(getattr(row, "cliente_direccion_isla_id", "") or "").strip() == selected_isla_id
             ]
+        self._update_search_counter(len(self.rows), len(all_rows))
         self._render_table()
         if not self._restore_customer_selection(preferred_customer_id):
             self._restore_customer_selection(self._last_selected_customer_id)
@@ -3366,6 +3379,17 @@ class CustomersPage(QWidget):
                 background: #F8FAFC;
                 color: #94A3B8;
                 border: 1px solid #CBD5E1;
+            }
+            QLabel#customerSearchCounterLabel {
+                min-height: 30px;
+                max-height: 30px;
+                padding: 0 8px;
+                border: 1px solid #D1D5DB;
+                border-radius: 8px;
+                background: #F8FAFC;
+                color: #334155;
+                font-size: 12px;
+                font-weight: 700;
             }
             QPushButton#relatedAddContactBtn {
                 background: #3E78D8;
