@@ -739,6 +739,75 @@ def _migrate_contactos_cliente_fk() -> None:
         conn.exec_driver_sql("PRAGMA foreign_keys=ON")
 
 
+def _migrate_clientes_agenda_cliente_fk() -> None:
+    with engine.begin() as conn:
+        tables = {row[0] for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        if "clientes_agenda" not in tables or "clientes" not in tables:
+            return
+        foreign_keys = conn.exec_driver_sql("PRAGMA foreign_key_list(clientes_agenda)").fetchall()
+        if not any(row[2] == "clientes_old_schema" for row in foreign_keys):
+            return
+
+        conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_clientes_agenda_fecha_actividad")
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_clientes_agenda_fecha_seguimiento")
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_clientes_agenda_tipo")
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_clientes_agenda_estado")
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_clientes_agenda_prioridad")
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_clientes_agenda_cliente_id")
+        conn.exec_driver_sql("ALTER TABLE clientes_agenda RENAME TO clientes_agenda_old_schema")
+        conn.exec_driver_sql(
+            """
+            CREATE TABLE clientes_agenda (
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                agenda_id VARCHAR(36) NOT NULL,
+                cliente_id VARCHAR(36) NOT NULL,
+                fecha_actividad DATE NOT NULL,
+                tipo VARCHAR(50) NOT NULL,
+                estado VARCHAR(30) NOT NULL,
+                resumen VARCHAR(255) NOT NULL,
+                detalle VARCHAR NOT NULL,
+                fecha_seguimiento DATE,
+                prioridad VARCHAR(20) NOT NULL,
+                responsable VARCHAR(255) NOT NULL,
+                PRIMARY KEY (agenda_id),
+                FOREIGN KEY(cliente_id) REFERENCES clientes (cliente_id)
+            )
+            """
+        )
+        conn.exec_driver_sql(
+            """
+            INSERT INTO clientes_agenda (
+                created_at, updated_at, agenda_id, cliente_id, fecha_actividad,
+                tipo, estado, resumen, detalle, fecha_seguimiento, prioridad, responsable
+            )
+            SELECT
+                COALESCE(created_at, CURRENT_TIMESTAMP),
+                COALESCE(updated_at, CURRENT_TIMESTAMP),
+                agenda_id,
+                cliente_id,
+                COALESCE(fecha_actividad, CURRENT_DATE),
+                COALESCE(tipo, 'nota'),
+                COALESCE(estado, 'pendiente'),
+                COALESCE(resumen, ''),
+                COALESCE(detalle, ''),
+                fecha_seguimiento,
+                COALESCE(prioridad, 'normal'),
+                COALESCE(responsable, '')
+            FROM clientes_agenda_old_schema
+            """
+        )
+        conn.exec_driver_sql("DROP TABLE clientes_agenda_old_schema")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_clientes_agenda_fecha_actividad ON clientes_agenda (fecha_actividad)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_clientes_agenda_fecha_seguimiento ON clientes_agenda (fecha_seguimiento)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_clientes_agenda_tipo ON clientes_agenda (tipo)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_clientes_agenda_estado ON clientes_agenda (estado)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_clientes_agenda_prioridad ON clientes_agenda (prioridad)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_clientes_agenda_cliente_id ON clientes_agenda (cliente_id)")
+        conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+
+
 def _ensure_indexes() -> None:
     with engine.begin() as conn:
         tables = {row[0] for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
@@ -1918,6 +1987,7 @@ def init_db() -> None:
     _migrate_client_table()
     _migrate_contact_columns()
     _migrate_contactos_cliente_fk()
+    _migrate_clientes_agenda_cliente_fk()
     _migrate_asistentes_columns()
     _migrate_asistentes_fks()
     _migrate_tecnicos_columns()
