@@ -172,6 +172,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 
 - Nuevo / Editar cliente: `EntityDialog` con el esquema de `Cliente`.
 - Eliminar cliente: confirmación antes de borrar.
+- Fusionar cliente: acción del menú contextual de `customersListTable`; abre `customerMergeDialog` con cliente origen bloqueado, selector de cliente destino, resumen de dependencias a mover y confirmación final antes de ejecutar `CustomerService.merge_customers()`.
 - Listados: diálogo asistido mediante `CustomerReportFlowService`.
 - `customerQueriesDialog` (QDialog modal): consultas read-only sobre clientes.
 - La comparativa de ventas abre un QDialog propio desde la pestaña Ventas.
