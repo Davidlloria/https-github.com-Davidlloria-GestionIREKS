@@ -4082,10 +4082,14 @@ class CustomersPage(QWidget):
         source_label.setObjectName("customerMergeSourceLabel")
         layout.addWidget(source_label)
 
+        target_filter = QLineEdit()
+        target_filter.setObjectName("customerMergeTargetFilter")
+        target_filter.setPlaceholderText("Filtrar destino por codigo o nombre...")
+        layout.addWidget(QLabel("Filtro destino"))
+        layout.addWidget(target_filter)
+
         target_combo = QComboBox()
         target_combo.setObjectName("customerMergeTargetCombo")
-        for item in candidates:
-            target_combo.addItem(self._customer_merge_row_label(item), str(getattr(item, "cliente_id", "") or "").strip())
         layout.addWidget(QLabel("Cliente destino"))
         layout.addWidget(target_combo)
 
@@ -4103,8 +4107,28 @@ class CustomersPage(QWidget):
 
         state = {"preview": None}
 
+        def refill_targets() -> None:
+            term = self._normalize_filter_text(target_filter.text())
+            current_id = str(target_combo.currentData() or "").strip()
+            target_combo.blockSignals(True)
+            target_combo.clear()
+            for item in candidates:
+                label = self._customer_merge_row_label(item)
+                if term and term not in self._normalize_filter_text(label):
+                    continue
+                target_combo.addItem(label, str(getattr(item, "cliente_id", "") or "").strip())
+            idx = target_combo.findData(current_id)
+            target_combo.setCurrentIndex(idx if idx >= 0 else (0 if target_combo.count() else -1))
+            target_combo.blockSignals(False)
+            update_preview()
+
         def update_preview() -> None:
             target_id = str(target_combo.currentData() or "").strip()
+            if not target_id:
+                state["preview"] = None
+                summary.setText("No hay clientes destino que coincidan con el filtro.")
+                merge_btn.setEnabled(False)
+                return
             try:
                 preview = self.customer_service.preview_merge(source_id, target_id)
             except Exception as exc:  # noqa: BLE001
@@ -4116,10 +4140,11 @@ class CustomersPage(QWidget):
             summary.setText(self._customer_merge_summary_text(preview))
             merge_btn.setEnabled(True)
 
+        target_filter.textChanged.connect(refill_targets)
         target_combo.currentIndexChanged.connect(update_preview)
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
-        update_preview()
+        refill_targets()
         if not dialog.exec():
             return
 
@@ -4152,6 +4177,11 @@ class CustomersPage(QWidget):
         code = str(getattr(row, "cliente_codigo", "") or "").strip()
         name = str(getattr(row, "cliente_nombre_comercial", "") or getattr(row, "cliente_nombre_fiscal", "") or "").strip()
         return f"{code} - {name}".strip(" -")
+
+    def _normalize_filter_text(self, value: str) -> str:
+        text = str(value or "").strip().lower()
+        decomposed = unicodedata.normalize("NFKD", text)
+        return "".join(char for char in decomposed if not unicodedata.combining(char))
 
     def _show_customers_context_menu(self, pos) -> None:
         index = self.table.indexAt(pos)

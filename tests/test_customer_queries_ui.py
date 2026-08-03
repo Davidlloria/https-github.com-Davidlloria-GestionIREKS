@@ -135,6 +135,19 @@ def test_customer_merge_summary_lists_dependencies(monkeypatch) -> None:
     QApplication.processEvents()
 
 
+def test_customer_merge_filter_normalizes_text(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    assert page._normalize_filter_text("  CADELSA Lanzaróte  ") == "cadelsa lanzarote"
+    assert page._normalize_filter_text("518 - CADELSA LZA") == "518 - cadelsa lza"
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
 def test_agenda_calendar_uses_unclipped_popup_configuration(monkeypatch) -> None:
     _application()
     monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
