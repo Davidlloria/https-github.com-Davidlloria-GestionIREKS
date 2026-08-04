@@ -122,3 +122,35 @@ def test_product_report_local_parser_adds_distributor_reference_columns() -> Non
     assert "precio_fabricante" in intent.columns
     assert "precio_distribuidor" in intent.columns
     assert "descuento" in intent.columns
+
+
+def test_product_report_includes_article_uuid_when_requested(tmp_path, monkeypatch) -> None:
+    engine = _isolated_engine(tmp_path)
+    monkeypatch.setattr(product_reports, "engine", engine)
+    with Session(engine) as session:
+        session.add(
+            IngredienteIreks(
+                articulo_id="uuid-art-1",
+                articulo_referencia_corta="D999",
+                articulo_descripcion="Producto con UUID",
+            )
+        )
+        session.commit()
+
+    report = ProductReportService().run(
+        ProductReportIntent(
+            columns=["articulo_id", "referencia_corta", "descripcion"],
+            order_by=["referencia_corta"],
+        )
+    )
+
+    assert report.headers == ["UUID articulo", "Ref. corta", "Descripcion"]
+    assert report.rows == [["uuid-art-1", "D999", "Producto con UUID"]]
+
+
+def test_product_report_local_parser_adds_article_uuid_column() -> None:
+    intent = ProductReportIntentService(api_key="")._fallback_parse(
+        "Listado de productos con UUID, referencia corta y descripcion"
+    )
+
+    assert "articulo_id" in intent.columns
