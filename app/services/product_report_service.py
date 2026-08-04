@@ -88,6 +88,7 @@ COALESCE((
 
 
 PRODUCT_REPORT_COLUMNS: dict[str, tuple[str, str]] = {
+    "articulo_id": ("UUID articulo", "p.articulo_id"),
     "articulo": (
         "Articulo",
         "COALESCE(p.articulo_referencia, '') || ' ' || COALESCE(p.articulo_referencia_corta, '') || ' ' || COALESCE(p.articulo_descripcion, '')",
@@ -163,6 +164,7 @@ PRODUCT_REPORT_COLUMN_BLOCKS: dict[str, list[str]] = {
     ],
 }
 TEXT_FIELDS = {
+    "articulo_id",
     "referencia",
     "referencia_corta",
     "articulo",
@@ -266,7 +268,8 @@ class ProductReportIntentService:
                         "Si piden referencias de distribuidor incluye referencia_distribuidor y descripcion_distribuidor. "
                         "Campos utiles: presentacion es envase; contenido es unidades dentro de la presentacion; "
                         "unidad_contenido puede ser BOLSA, BOTELLA, SACO; total_presentacion es kg por presentacion; "
-                        "total_pallet es kg por pallet. Si piden articulos por descripcion usa descripcion; "
+                        "total_pallet es kg por pallet. Si piden UUID, ID tecnico o identificador del articulo usa articulo_id. "
+                        "Si piden articulos por descripcion usa descripcion; "
                         "si piden articulos por referencia usa referencia o referencia_corta; "
                         "si piden una busqueda general por texto usa articulo con operador contiene. Devuelve solo este JSON: "
                         '{"title": "...", "columns": ["referencia_corta"], "filters": [{"field": "activo", "op": "=", "value": true}], '
@@ -334,6 +337,7 @@ class ProductReportIntentService:
             self._add_column_block(columns, "referencias_distribuidor")
 
         for key, words in {
+            "articulo_id": ("uuid", "id tecnico", "identificador articulo", "identificador del articulo", "articulo id", "articulo_id"),
             "referencia": ("referencia", "ref "),
             "referencia_corta": ("ref corta", "referencia corta"),
             "descripcion": ("descripcion", "descripcion articulo", "nombre"),
