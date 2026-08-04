@@ -108,6 +108,36 @@ def test_customer_listings_endpoint_can_include_customer_id(api_client: TestClie
     assert payload["rows"][0][id_index] == "cli-1"
 
 
+def test_customer_listings_distributor_code_field_does_not_filter_to_distributors(api_client: TestClient) -> None:
+    assert TEST_ENGINE is not None
+    with Session(TEST_ENGINE) as session:
+        _seed_customer_data(session)
+        session.add(
+            Cliente(
+                cliente_id="cli-2",
+                cliente_codigo=102,
+                cliente_codigo_distribuidor="9002-003",
+                cliente_nombre_comercial="Cliente Dos",
+                cliente_tipo="distribuidor",
+                activo=True,
+            )
+        )
+        session.commit()
+
+    response = api_client.post(
+        "/customers/listings",
+        json={"prompt": "listado de todos los clientes, campos uuid, cod, codigo cliente distribuidor, nombre"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert payload["headers"] == ["ID cliente", "Cod.", "Codigo cliente distribuidor", "Nombre comercial"]
+    assert len(payload["rows"]) == 2
+    assert [row[payload["headers"].index("ID cliente")] for row in payload["rows"]] == ["cli-1", "cli-2"]
+    assert payload["rows"][1][payload["headers"].index("Codigo cliente distribuidor")] == "9002-003"
+
+
 def test_customer_listings_pdf_export_returns_pdf_file(api_client: TestClient) -> None:
     assert TEST_ENGINE is not None
     with Session(TEST_ENGINE) as session:

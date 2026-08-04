@@ -15,6 +15,7 @@ from app.services.openai_settings_service import OpenAISettingsService
 REPORT_COLUMNS: dict[str, tuple[str, str]] = {
     "cliente_id": ("ID cliente", "c.cliente_id"),
     "codigo": ("Cod.", "c.cliente_codigo"),
+    "codigo_distribuidor": ("Codigo cliente distribuidor", "c.cliente_codigo_distribuidor"),
     "nombre_comercial": ("Nombre comercial", "c.cliente_nombre_comercial"),
     "nombre_fiscal": ("Nombre fiscal", "c.cliente_nombre_fiscal"),
     "telefono": ("Telefono", "c.cliente_telefono"),
@@ -46,6 +47,8 @@ REPORT_COLUMNS: dict[str, tuple[str, str]] = {
 DEFAULT_REPORT_COLUMNS = ["codigo", "nombre_comercial", "telefono", "isla", "tipo", "activo"]
 COUNT_FIELDS = {"contactos", "recetas", "asistentes"}
 TEXT_FIELDS = {
+    "cliente_id",
+    "codigo_distribuidor",
     "nombre_comercial",
     "nombre_fiscal",
     "telefono",
@@ -156,13 +159,25 @@ class CustomerReportIntentService:
         t = self._normalize(text)
         intent = CustomerReportIntent(title=f"Listado: {text[:80]}")
         filters: list[ReportFilter] = []
-        columns = list(DEFAULT_REPORT_COLUMNS)
+        explicit_columns = any(marker in t for marker in ("campos", "columnas", "solo los campos", "solo campos"))
+        columns = [] if explicit_columns else list(DEFAULT_REPORT_COLUMNS)
+        if "todos los clientes" in t or "todos clientes" in t or "listado de todos" in t:
+            intent.limit = 5000
+
+        wants_distributor_code = (
+            "codigo cliente distribuidor" in t
+            or "codigo de cliente distribuidor" in t
+            or "codigo del cliente distribuidor" in t
+            or "codigo distribuidor" in t
+            or "codigo de distribuidor" in t
+            or "codigo del distribuidor" in t
+        )
 
         if "indirect" in t:
             filters.append(ReportFilter("tipo", "=", "indirecto"))
         elif "direct" in t:
             filters.append(ReportFilter("tipo", "=", "directo"))
-        elif "distribuidor" in t:
+        elif "distribuidor" in t and not wants_distributor_code:
             filters.append(ReportFilter("tipo", "=", "distribuidor"))
 
         if "inactivo" in t or "baja" in t:
@@ -173,8 +188,22 @@ class CustomerReportIntentService:
         if "prospe" in t:
             filters.append(ReportFilter("prospeccion", "=", not any(word in t for word in ("no prospe", "sin prospe"))))
 
-        if "id del cliente" in t or "cliente id" in t or "uuid del cliente" in t or "identificador del cliente" in t:
+        if (
+            "id del cliente" in t
+            or "cliente id" in t
+            or "uuid" in t
+            or "uuid del cliente" in t
+            or "identificador del cliente" in t
+        ):
             columns.append("cliente_id")
+        if " cod," in f" {t}," or " cod " in f" {t} " or "codigo interno" in t:
+            columns.append("codigo")
+        if wants_distributor_code:
+            columns.append("codigo_distribuidor")
+        if " nombre," in f" {t}," or " nombre " in f" {t} ":
+            columns.append("nombre_comercial")
+        if explicit_columns and not columns:
+            columns = list(DEFAULT_REPORT_COLUMNS)
 
         wants_contact_name = "nombre del contacto" in t or "nombres de contacto" in t or "contacto principal" in t
         if "sin contacto" in t:

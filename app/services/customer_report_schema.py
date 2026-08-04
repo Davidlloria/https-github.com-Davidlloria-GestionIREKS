@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 REPORT_COLUMNS = (
-    'cliente_id', 'codigo', 'nombre_comercial', 'nombre_fiscal', 'telefono', 'email', 'isla',
+    'cliente_id', 'codigo', 'codigo_distribuidor', 'nombre_comercial', 'nombre_fiscal', 'telefono', 'email', 'isla',
     'municipio', 'localidad', 'tipo', 'actividad', 'grupo', 'prospeccion', 'activo',
     'nombre_contacto', 'contactos', 'recetas', 'asistentes',
 )

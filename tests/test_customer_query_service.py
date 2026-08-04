@@ -83,6 +83,16 @@ def test_local_customer_parser_recognizes_activity_and_island() -> None:
     assert ("isla", "contiene", "lanzarote") in filters
 
 
+def test_local_customer_parser_does_not_filter_type_when_requesting_distributor_code() -> None:
+    result = CustomerReportIntentService(api_key="").parse(
+        "listado de todos los clientes, campos uuid, cod, codigo cliente distribuidor, nombre"
+    )
+
+    assert result.intent.filters == []
+    assert result.intent.columns == ["cliente_id", "codigo", "codigo_distribuidor", "nombre_comercial"]
+    assert result.intent.limit == 5000
+
+
 def test_sales_customer_list_query_uses_year_type_and_kg() -> None:
     service = CustomerQueryService()
     intent = service.interpret(
