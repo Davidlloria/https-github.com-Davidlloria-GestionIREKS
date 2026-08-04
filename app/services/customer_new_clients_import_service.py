@@ -89,6 +89,11 @@ class CustomerNewClientsImportPreviewService:
                     """
                 ).fetchall()
             }
+            customers_by_distributor_code: dict[str, list[dict[str, Any]]] = {}
+            for customer in customers_by_id.values():
+                distributor_code = str(customer["cliente_codigo_distribuidor"] or "").strip()
+                if distributor_code:
+                    customers_by_distributor_code.setdefault(distributor_code, []).append(customer)
             used_codes = {
                 int(row[0])
                 for row in conn.exec_driver_sql(
@@ -185,6 +190,40 @@ class CustomerNewClientsImportPreviewService:
                         cliente_codigo_distribuidor=distributor_code,
                         nombre_comercial_propuesto=name,
                         messages=messages,
+                    )
+                )
+                continue
+
+            existing_by_distributor_code = customers_by_distributor_code.get(distributor_code, [])
+            if len(existing_by_distributor_code) == 1:
+                existing = existing_by_distributor_code[0]
+                current_code = int(existing["cliente_codigo"] or 0)
+                items.append(
+                    CustomerImportPreviewItem(
+                        row_number=row["row_number"],
+                        action="update",
+                        cliente_id=str(existing["cliente_id"] or ""),
+                        cliente_codigo_actual=current_code,
+                        cliente_codigo_propuesto=current_code,
+                        cliente_codigo_excel=excel_code,
+                        cliente_codigo_distribuidor=distributor_code,
+                        nombre_comercial_actual=str(existing["cliente_nombre_comercial"] or ""),
+                        nombre_comercial_propuesto=name,
+                        messages=["Cliente localizado por codigo de distribuidor."],
+                    )
+                )
+                continue
+            if len(existing_by_distributor_code) > 1:
+                items.append(
+                    CustomerImportPreviewItem(
+                        row_number=row["row_number"],
+                        action="error",
+                        cliente_codigo_excel=excel_code,
+                        cliente_codigo_distribuidor=distributor_code,
+                        nombre_comercial_propuesto=name,
+                        messages=[
+                            "Codigo distribuidor ya existe en varios clientes de la DB; no se puede resolver destino."
+                        ],
                     )
                 )
                 continue

@@ -151,3 +151,28 @@ def test_apply_updates_existing_and_creates_new_customers(tmp_path, monkeypatch)
     assert customers[18].cliente_nombre_comercial == "Nombre nuevo"
     assert customers[19].cliente_codigo_distribuidor == "9002"
     assert customers[19].cliente_nombre_comercial == "Cliente nuevo"
+
+
+def test_preview_matches_blank_uuid_rows_by_existing_distributor_code(tmp_path, monkeypatch) -> None:
+    engine = _isolated_engine(tmp_path)
+    monkeypatch.setattr(import_service, "engine", engine)
+    with Session(engine) as session:
+        session.add(
+            Cliente(
+                cliente_id="created-before",
+                cliente_codigo=19,
+                cliente_codigo_distribuidor="9002",
+                cliente_nombre_comercial="Cliente nuevo anterior",
+            )
+        )
+        session.commit()
+
+    workbook_path = tmp_path / "clientes.xlsx"
+    _write_workbook(workbook_path, [["", "", "9002", "Cliente nuevo"]])
+
+    result = CustomerNewClientsImportPreviewService().preview(workbook_path)
+
+    assert result.creates == 0
+    assert result.updates == 1
+    assert result.items[0].cliente_id == "created-before"
+    assert result.items[0].messages == ["Cliente localizado por codigo de distribuidor."]
