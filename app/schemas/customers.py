@@ -8,7 +8,7 @@ from .base import AppSchema, PaginatedResponse
 
 
 class CustomerBase(AppSchema):
-    cliente_codigo_distribuidor: int | None = None
+    cliente_codigo_distribuidor: str | None = None
     cliente_nombre_comercial: str = ""
     cliente_nombre_fiscal: str = ""
     cliente_nombre_interno: str = ""
@@ -50,7 +50,7 @@ class CustomerCreate(CustomerBase):
 
 class CustomerUpdate(AppSchema):
     cliente_codigo: int | None = None
-    cliente_codigo_distribuidor: int | None = None
+    cliente_codigo_distribuidor: str | None = None
     cliente_nombre_comercial: str | None = None
     cliente_nombre_fiscal: str | None = None
     cliente_nombre_interno: str | None = None

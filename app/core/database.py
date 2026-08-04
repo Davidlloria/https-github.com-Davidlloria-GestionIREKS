@@ -443,7 +443,11 @@ def _migrate_client_table() -> None:
             columns = [row[1] for row in info]
         is_exact = set(columns) == set(CLIENTE_COLUMNS) and len(columns) == len(CLIENTE_COLUMNS)
         pk_ok = any(row[1] == "cliente_id" and int(row[5] or 0) == 1 for row in info)
-        if is_exact and pk_ok:
+        distributor_code_text_ok = any(
+            row[1] == "cliente_codigo_distribuidor" and str(row[2] or "").upper() == "TEXT"
+            for row in info
+        )
+        if is_exact and pk_ok and distributor_code_text_ok:
             return
 
         rows = conn.exec_driver_sql("SELECT * FROM clientes").fetchall()
@@ -516,7 +520,7 @@ def _migrate_client_table() -> None:
                 (
                     cliente_id,
                     code,
-                    _extract_cliente_int_value(row, idx, "cliente_codigo_distribuidor"),
+                    _extract_cliente_value(row, idx, "cliente_codigo_distribuidor"),
                     nombre_comercial,
                     nombre_fiscal,
                     cliente_nombre_interno,
@@ -555,7 +559,7 @@ def _migrate_client_table() -> None:
             CREATE TABLE clientes (
                 cliente_id TEXT PRIMARY KEY NOT NULL,
                 cliente_codigo INTEGER NOT NULL UNIQUE,
-                cliente_codigo_distribuidor INTEGER,
+                cliente_codigo_distribuidor TEXT,
                 cliente_nombre_comercial TEXT NOT NULL DEFAULT '',
                 cliente_nombre_fiscal TEXT NOT NULL DEFAULT '',
                 cliente_nombre_interno TEXT NOT NULL DEFAULT '',
