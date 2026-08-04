@@ -19,7 +19,7 @@ class Cliente(SQLModel, table=True):
 
     cliente_id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True, max_length=36)
     cliente_codigo: int = Field(default=0, index=True, unique=True, nullable=False)
-    cliente_codigo_distribuidor: Optional[int] = Field(default=None)
+    cliente_codigo_distribuidor: Optional[str] = Field(default=None, max_length=50)
     cliente_nombre_comercial: str = Field(default="", max_length=255)
     cliente_nombre_fiscal: str = Field(default="", max_length=255)
     cliente_nombre_interno: str = Field(default="", max_length=255)
