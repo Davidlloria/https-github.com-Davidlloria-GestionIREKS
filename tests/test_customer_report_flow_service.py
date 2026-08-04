@@ -105,7 +105,7 @@ def test_generate_report_propagates_run_error_status() -> None:
     result = service.generate_report("clientes")
 
     assert result.status == "error"
-    assert "boom" in result.message
+    assert result.message == "No se pudo generar el listado."
     assert service.last_report is None
 
 
@@ -166,3 +166,51 @@ def test_intent_service_ignores_inherited_proxy_settings(monkeypatch: pytest.Mon
     assert result.used_ai is True
     assert captured_handlers
     assert captured_handlers[0].proxies == {}
+
+
+def test_intent_service_keeps_full_limit_when_ai_returns_500_for_all_customers(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakeResponse:
+        def __init__(self, body: str) -> None:
+            self._body = body.encode("utf-8")
+
+        def __enter__(self) -> "_FakeResponse":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return self._body
+
+    class _FakeOpener:
+        def open(self, req, timeout=None) -> _FakeResponse:
+            body = json.dumps(
+                {
+                    "output_text": json.dumps(
+                        {
+                            "title": "Listado de todos los clientes",
+                            "columns": ["cliente_id", "codigo", "codigo_distribuidor", "nombre_comercial"],
+                            "filters": [],
+                            "order_by": ["codigo"],
+                            "limit": 500,
+                        }
+                    )
+                }
+            )
+            return _FakeResponse(body)
+
+    monkeypatch.setattr(customer_report_service_module, "build_opener", lambda handler: _FakeOpener())
+    monkeypatch.setattr(
+        customer_report_service_module.OpenAISettingsService,
+        "load",
+        lambda self: {"api_key": "test-key", "use_ai_translation": True},
+    )
+
+    service = customer_report_service_module.CustomerReportIntentService()
+    result = service.parse(
+        "listado de todos los clientes, campos uuid, cod, codigo cliente distribuidor, nombre"
+    )
+
+    assert result.used_ai is True
+    assert result.intent.limit == 5000
+    assert result.intent.filters == []

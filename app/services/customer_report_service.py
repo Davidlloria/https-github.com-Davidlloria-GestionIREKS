@@ -125,6 +125,7 @@ class CustomerReportIntentService:
                         "No generes SQL. Usa solo estos campos: "
                         f"{', '.join(REPORT_COLUMNS)}. "
                         "Operadores permitidos: =, !=, contiene, empieza, >, >=, <, <=. "
+                        "Si piden todos los clientes o listado completo usa limit 5000. "
                         "Devuelve solo este JSON: "
                         'Si piden nombre del contacto usa el campo "nombre_contacto"; si piden numero de contactos usa "contactos". '
                         '{"title": "...", "columns": ["codigo"], "filters": [{"field": "activo", "op": "=", "value": true}], '
@@ -290,9 +291,10 @@ class CustomerReportIntentService:
         if not intent.order_by:
             intent.order_by = ["codigo"]
         try:
-            intent.limit = max(1, min(5000, int(data.get("limit") or fallback.limit or 500)))
+            parsed_limit = max(1, min(5000, int(data.get("limit") or fallback.limit or 500)))
+            intent.limit = max(parsed_limit, fallback.limit) if fallback.limit > 500 else parsed_limit
         except Exception:
-            intent.limit = 500
+            intent.limit = fallback.limit if fallback.limit > 500 else 500
         filters: list[ReportFilter] = []
         for item in data.get("filters") or []:
             if not isinstance(item, dict):
