@@ -90,6 +90,64 @@ def test_customers_top_ribbon_contains_queries_button(monkeypatch) -> None:
     QApplication.processEvents()
 
 
+def test_customers_search_row_has_counter(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    assert page.search_input.minimumWidth() == 220
+    assert page.search_input.maximumWidth() == 220
+    assert page.search_counter_label.objectName() == "customerSearchCounterLabel"
+    assert page.search_counter_label.text() == "0/0"
+
+    page._update_search_counter(12, 720)
+
+    assert page.search_counter_label.text() == "12/720"
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_merge_summary_lists_dependencies(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+    preview = SimpleNamespace(
+        source_label="1 - Origen",
+        target_label="2 - Destino",
+        counts={
+            "contactos": 1,
+            "recetas": 2,
+            "agenda": 3,
+            "asistentes": 4,
+            "ventas_clientes": 5,
+        },
+    )
+
+    text = page._customer_merge_summary_text(preview)
+
+    assert "Origen: 1 - Origen" in text
+    assert "Destino: 2 - Destino" in text
+    assert "- Ventas clientes: 5" in text
+    assert "se eliminara el cliente origen" in text
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_merge_filter_normalizes_text(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    assert page._normalize_filter_text("  CADELSA Lanzaróte  ") == "cadelsa lanzarote"
+    assert page._normalize_filter_text("518 - CADELSA LZA") == "518 - cadelsa lza"
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
 def test_agenda_calendar_uses_unclipped_popup_configuration(monkeypatch) -> None:
     _application()
     monkeypatch.setattr(CustomersPage, "reload", lambda self: None)

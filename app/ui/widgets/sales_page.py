@@ -58,8 +58,8 @@ from app.services.db_export_service import DbExportService
 from app.services.report_export_service import ReportExportService
 from app.services.sales_reconciliation_service import SalesReconciliationService
 from app.services.settings_sales_import_service import SettingsSalesImportService
+from app.services.sales_tools_service import SalesToolsHistoryRow, SalesToolsService
 from app.core.config import DATA_DIR
-from app.core.database import engine
 
 
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -1028,16 +1028,6 @@ class SalesClientSelectDialog(QDialog):
         return self._selected_client_id, self._selected_client_name
 
 
-@dataclass(frozen=True)
-class SalesToolsHistoryRow:
-    created_at: str
-    action: str
-    detail: str
-    status: str
-    message: str
-    warnings_json: str
-
-
 class SalesToolsDialog(QDialog):
     def __init__(
         self,
@@ -1056,6 +1046,7 @@ class SalesToolsDialog(QDialog):
         self._export_service = DbExportService()
         self._import_service = SettingsSalesImportService()
         self._sales_reconciliation_service = SalesReconciliationService()
+        self._sales_tools_service = SalesToolsService()
         self._history_limit = 40
         self._history_rows_cache: list[SalesToolsHistoryRow] = []
         self._build_ui()
@@ -1382,29 +1373,7 @@ class SalesToolsDialog(QDialog):
         return "Importación", IMPORT_ICON_PATH
 
     def _ensure_history_table(self) -> None:
-        with engine.begin() as conn:
-            conn.exec_driver_sql(
-                """
-                CREATE TABLE IF NOT EXISTS sales_tools_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    created_at TEXT NOT NULL,
-                    action TEXT NOT NULL,
-                    detail TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    message TEXT NOT NULL DEFAULT '',
-                    warnings_json TEXT NOT NULL DEFAULT '[]'
-                )
-                """
-            )
-            columns = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(sales_tools_history)").fetchall()}
-            if "warnings_json" not in columns:
-                conn.exec_driver_sql("ALTER TABLE sales_tools_history ADD COLUMN warnings_json TEXT NOT NULL DEFAULT '[]'")
-            conn.exec_driver_sql(
-                """
-                CREATE INDEX IF NOT EXISTS idx_sales_tools_history_created_at
-                ON sales_tools_history (created_at DESC, id DESC)
-                """
-            )
+        self._sales_tools_service.ensure_history_table()
 
     def _record_history(
         self,
@@ -1418,44 +1387,19 @@ class SalesToolsDialog(QDialog):
         self._ensure_history_table()
         created_at = datetime.now().isoformat(timespec="seconds")
         warnings_json = json.dumps(list(warnings or []), ensure_ascii=False)
-        with engine.begin() as conn:
-            conn.exec_driver_sql(
-                """
-                INSERT INTO sales_tools_history (created_at, action, detail, status, message, warnings_json)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (created_at, action, detail, status, message, warnings_json),
-            )
+        self._sales_tools_service.record_history(
+            created_at=created_at,
+            action=action,
+            detail=detail,
+            status=status,
+            message=message,
+            warnings_json=warnings_json,
+        )
 
     def _load_history_rows(self, limit: int | None = None) -> list[SalesToolsHistoryRow]:
-        self._ensure_history_table()
         safe_limit = self._history_limit if limit is None else max(1, min(int(limit), 200))
         action_filter = str(self.history_filter_combo.currentData() or "all").strip().lower()
-        where_clause = ""
-        params: list[object] = [safe_limit]
-        if action_filter in {"export", "import", "revert"}:
-            where_clause = "WHERE action = ?"
-            params = [action_filter, safe_limit]
-        query = f"""
-            SELECT created_at, action, detail, status, message, warnings_json
-            FROM sales_tools_history
-            {where_clause}
-            ORDER BY created_at DESC, id DESC
-            LIMIT ?
-        """
-        with engine.begin() as conn:
-            rows = conn.exec_driver_sql(query, tuple(params)).fetchall()
-        return [
-            SalesToolsHistoryRow(
-                created_at=str(row[0] or ""),
-                action=str(row[1] or ""),
-                detail=str(row[2] or ""),
-                status=str(row[3] or ""),
-                message=str(row[4] or ""),
-                warnings_json=str(row[5] or "[]"),
-            )
-            for row in rows
-        ]
+        return self._sales_tools_service.load_history_rows(limit=safe_limit, action_filter=action_filter)
 
     def _refresh_history(self) -> None:
         rows = self._load_history_rows()
@@ -2119,12 +2063,9 @@ class SalesToolsDialog(QDialog):
                 cell.font = Font(bold=True, color="FF14213D")
                 cell.fill = PatternFill("solid", fgColor="E8EEF7")
                 cell.alignment = Alignment(horizontal="left", vertical="center")
-            query = self._build_export_query(table_name, columns)
-            with engine.begin() as conn:
-                result = conn.exec_driver_sql(query)
-                for row in result:
-                    ws.append([self._normalize_export_value(value) for value in row])
-                    total_rows += 1
+            for row in self._sales_tools_service.read_table_rows(table_name, columns):
+                ws.append([self._normalize_export_value(value) for value in row])
+                total_rows += 1
             ws.freeze_panes = "A2"
             self._fit_export_sheet(ws)
         if not used_tables:
@@ -2132,13 +2073,6 @@ class SalesToolsDialog(QDialog):
         destination.parent.mkdir(parents=True, exist_ok=True)
         workbook.save(destination)
         return total_rows, used_tables
-
-    def _build_export_query(self, table_name: str, columns: list[str]) -> str:
-        quoted_cols = ", ".join(self._quote_identifier(col) for col in columns)
-        return f"SELECT {quoted_cols} FROM {self._quote_identifier(table_name)}"
-
-    def _quote_identifier(self, value: str) -> str:
-        return '"' + str(value).replace('"', '""') + '"'
 
     def _normalize_export_value(self, value):
         if isinstance(value, (date, datetime)):

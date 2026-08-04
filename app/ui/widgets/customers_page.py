@@ -927,10 +927,16 @@ class CustomersPage(QWidget):
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Buscar cliente...")
-        self.search_input.setFixedWidth(352)
+        self.search_input.setFixedWidth(220)
         self.search_input.setFixedHeight(30)
         self.search_input.textChanged.connect(self._schedule_reload)
         self.search_input.textChanged.connect(self._update_search_clear_button)
+
+        self.search_counter_label = QLabel("0/0")
+        self.search_counter_label.setObjectName("customerSearchCounterLabel")
+        self.search_counter_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.search_counter_label.setFixedHeight(30)
+        self.search_counter_label.setToolTip("Registros encontrados / registros totales")
 
         self.clear_search_btn = QPushButton()
         self.clear_search_btn.setObjectName("customerSearchClearButton")
@@ -947,6 +953,7 @@ class CustomersPage(QWidget):
         search_row.setSpacing(8)
         search_row.addWidget(self.search_input)
         search_row.addWidget(self.clear_search_btn)
+        search_row.addWidget(self.search_counter_label, 1)
         left_layout.addLayout(search_row)
 
         self.table = QTableWidget(0, 3)
@@ -2697,6 +2704,10 @@ class CustomersPage(QWidget):
         self.search_input.clear()
         self.search_input.setFocus()
 
+    def _update_search_counter(self, found: int, total: int) -> None:
+        if hasattr(self, "search_counter_label"):
+            self.search_counter_label.setText(f"{max(0, int(found))}/{max(0, int(total))}")
+
     def _list(self, term: str) -> list:
         return self.customer_service.list(term)
 
@@ -2725,7 +2736,8 @@ class CustomersPage(QWidget):
         self._load_address_catalogs()
         self._populate_island_filter()
         term = self.search_input.text().strip()
-        self.rows = self._list(term)
+        all_rows = self._list("")
+        self.rows = self._list(term) if term else list(all_rows)
         selected_isla_id = str(self.island_filter.currentData() or "").strip() if hasattr(self, "island_filter") else ""
         if selected_isla_id:
             self.rows = [
@@ -2733,6 +2745,7 @@ class CustomersPage(QWidget):
                 for row in self.rows
                 if str(getattr(row, "cliente_direccion_isla_id", "") or "").strip() == selected_isla_id
             ]
+        self._update_search_counter(len(self.rows), len(all_rows))
         self._render_table()
         if not self._restore_customer_selection(preferred_customer_id):
             self._restore_customer_selection(self._last_selected_customer_id)
@@ -3366,6 +3379,17 @@ class CustomersPage(QWidget):
                 background: #F8FAFC;
                 color: #94A3B8;
                 border: 1px solid #CBD5E1;
+            }
+            QLabel#customerSearchCounterLabel {
+                min-height: 30px;
+                max-height: 30px;
+                padding: 0 8px;
+                border: 1px solid #D1D5DB;
+                border-radius: 8px;
+                background: #F8FAFC;
+                color: #334155;
+                font-size: 12px;
+                font-weight: 700;
             }
             QPushButton#relatedAddContactBtn {
                 background: #3E78D8;
@@ -4007,6 +4031,158 @@ class CustomersPage(QWidget):
                 self.table.selectRow(row)
                 break
 
+    def _customer_merge_summary_text(self, preview) -> str:
+        labels = {
+            "contactos": "Contactos",
+            "recetas": "Recetas",
+            "agenda": "Agenda",
+            "asistentes": "Asistentes",
+            "ventas_clientes": "Ventas clientes",
+        }
+        lines = [
+            f"Origen: {preview.source_label}",
+            f"Destino: {preview.target_label}",
+            "",
+            "Datos relacionados detectados:",
+        ]
+        counts = getattr(preview, "counts", {}) or {}
+        for key, label in labels.items():
+            lines.append(f"- {label}: {int(counts.get(key, 0) or 0)}")
+        lines.append("")
+        lines.append("Al confirmar se eliminara el cliente origen.")
+        return "\n".join(lines)
+
+    def _merge_selected_customer(self) -> None:
+        source = self._selected_row()
+        if not source:
+            QMessageBox.warning(self, "Clientes", "Selecciona un cliente origen.")
+            return
+        source_id = str(getattr(source, "cliente_id", "") or "").strip()
+        if not source_id:
+            QMessageBox.warning(self, "Clientes", "El cliente origen no tiene ID.")
+            return
+
+        candidates = [
+            row
+            for row in self._list("")
+            if str(getattr(row, "cliente_id", "") or "").strip() and str(getattr(row, "cliente_id", "") or "").strip() != source_id
+        ]
+        if not candidates:
+            QMessageBox.warning(self, "Clientes", "No hay clientes destino disponibles.")
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Fusionar cliente")
+        dialog.setModal(True)
+        dialog.setObjectName("customerMergeDialog")
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(10)
+
+        source_label = QLabel(f"Cliente origen: {self._customer_merge_row_label(source)}")
+        source_label.setObjectName("customerMergeSourceLabel")
+        layout.addWidget(source_label)
+
+        target_filter = QLineEdit()
+        target_filter.setObjectName("customerMergeTargetFilter")
+        target_filter.setPlaceholderText("Filtrar destino por codigo o nombre...")
+        layout.addWidget(QLabel("Filtro destino"))
+        layout.addWidget(target_filter)
+
+        target_combo = QComboBox()
+        target_combo.setObjectName("customerMergeTargetCombo")
+        layout.addWidget(QLabel("Cliente destino"))
+        layout.addWidget(target_combo)
+
+        summary = QLabel()
+        summary.setObjectName("customerMergeSummary")
+        summary.setWordWrap(True)
+        layout.addWidget(summary)
+
+        buttons = QDialogButtonBox()
+        merge_btn = buttons.addButton("Fusionar", QDialogButtonBox.ButtonRole.AcceptRole)
+        cancel_btn = buttons.addButton("Cancelar", QDialogButtonBox.ButtonRole.RejectRole)
+        merge_btn.setProperty("btnRole", "danger")
+        cancel_btn.setProperty("btnRole", "secondary")
+        layout.addWidget(buttons)
+
+        state = {"preview": None}
+
+        def refill_targets() -> None:
+            term = self._normalize_filter_text(target_filter.text())
+            current_id = str(target_combo.currentData() or "").strip()
+            target_combo.blockSignals(True)
+            target_combo.clear()
+            for item in candidates:
+                label = self._customer_merge_row_label(item)
+                if term and term not in self._normalize_filter_text(label):
+                    continue
+                target_combo.addItem(label, str(getattr(item, "cliente_id", "") or "").strip())
+            idx = target_combo.findData(current_id)
+            target_combo.setCurrentIndex(idx if idx >= 0 else (0 if target_combo.count() else -1))
+            target_combo.blockSignals(False)
+            update_preview()
+
+        def update_preview() -> None:
+            target_id = str(target_combo.currentData() or "").strip()
+            if not target_id:
+                state["preview"] = None
+                summary.setText("No hay clientes destino que coincidan con el filtro.")
+                merge_btn.setEnabled(False)
+                return
+            try:
+                preview = self.customer_service.preview_merge(source_id, target_id)
+            except Exception as exc:  # noqa: BLE001
+                state["preview"] = None
+                summary.setText(f"No se pudo preparar la fusion: {exc}")
+                merge_btn.setEnabled(False)
+                return
+            state["preview"] = preview
+            summary.setText(self._customer_merge_summary_text(preview))
+            merge_btn.setEnabled(True)
+
+        target_filter.textChanged.connect(refill_targets)
+        target_combo.currentIndexChanged.connect(update_preview)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        refill_targets()
+        if not dialog.exec():
+            return
+
+        preview = state.get("preview")
+        target_id = str(target_combo.currentData() or "").strip()
+        if preview is None or not target_id:
+            QMessageBox.warning(self, "Clientes", "No se pudo preparar la fusion.")
+            return
+        answer = QMessageBox.question(
+            self,
+            "Confirmar fusion",
+            self._customer_merge_summary_text(preview),
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            result = self.customer_service.merge_customers(source_id, target_id)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Clientes", f"No se pudo fusionar el cliente:\n{exc}")
+            return
+        QMessageBox.information(
+            self,
+            "Clientes",
+            "Fusion completada.\n\n" + self._customer_merge_summary_text(result),
+        )
+        self.reload()
+        self._select_row_by_id(target_id)
+
+    def _customer_merge_row_label(self, row) -> str:
+        code = str(getattr(row, "cliente_codigo", "") or "").strip()
+        name = str(getattr(row, "cliente_nombre_comercial", "") or getattr(row, "cliente_nombre_fiscal", "") or "").strip()
+        return f"{code} - {name}".strip(" -")
+
+    def _normalize_filter_text(self, value: str) -> str:
+        text = str(value or "").strip().lower()
+        decomposed = unicodedata.normalize("NFKD", text)
+        return "".join(char for char in decomposed if not unicodedata.combining(char))
+
     def _show_customers_context_menu(self, pos) -> None:
         index = self.table.indexAt(pos)
         if index.isValid():
@@ -4019,6 +4195,7 @@ class CustomersPage(QWidget):
         menu.addSeparator()
         action_edit = menu.addAction("Editar")
         action_delete = menu.addAction("Eliminar")
+        action_merge = menu.addAction("Fusionar cliente")
         menu.addSeparator()
         action_copy_id = menu.addAction("Copiar ID")
         action_copy_name = menu.addAction("Copiar nombre")
@@ -4027,7 +4204,7 @@ class CustomersPage(QWidget):
         action_clear_filter = menu.addAction("Vaciar filtro")
         action_refresh = menu.addAction("Refrescar")
 
-        for action in (action_edit, action_delete, action_copy_id, action_copy_name, action_show_id):
+        for action in (action_edit, action_delete, action_merge, action_copy_id, action_copy_name, action_show_id):
             action.setEnabled(has_row)
         action_clear_filter.setEnabled(bool(self.search_input.text().strip()))
 
@@ -4040,6 +4217,9 @@ class CustomersPage(QWidget):
             return
         if chosen == action_delete:
             self._delete_entity()
+            return
+        if chosen == action_merge:
+            self._merge_selected_customer()
             return
         if chosen == action_copy_id and row is not None:
             QApplication.clipboard().setText(str(getattr(row, "cliente_id", "") or ""))
