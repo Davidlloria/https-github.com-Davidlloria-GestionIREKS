@@ -4199,12 +4199,21 @@ class CustomersPage(QWidget):
         menu.addSeparator()
         action_copy_id = menu.addAction("Copiar ID")
         action_copy_name = menu.addAction("Copiar nombre")
+        action_show_distributor_code = menu.addAction("Ver codigo cliente distribuidor")
         action_show_id = menu.addAction("Ver ID")
         menu.addSeparator()
         action_clear_filter = menu.addAction("Vaciar filtro")
         action_refresh = menu.addAction("Refrescar")
 
-        for action in (action_edit, action_delete, action_merge, action_copy_id, action_copy_name, action_show_id):
+        for action in (
+            action_edit,
+            action_delete,
+            action_merge,
+            action_copy_id,
+            action_copy_name,
+            action_show_distributor_code,
+            action_show_id,
+        ):
             action.setEnabled(has_row)
         action_clear_filter.setEnabled(bool(self.search_input.text().strip()))
 
@@ -4226,6 +4235,9 @@ class CustomersPage(QWidget):
             return
         if chosen == action_copy_name and row is not None:
             QApplication.clipboard().setText(str(getattr(row, "cliente_nombre_comercial", "") or ""))
+            return
+        if chosen == action_show_distributor_code:
+            self._show_customer_distributor_code_dialog()
             return
         if chosen == action_show_id:
             self._show_customer_id_dialog()
@@ -4430,6 +4442,44 @@ class CustomersPage(QWidget):
 
         layout.addWidget(label)
         layout.addWidget(id_field)
+        layout.addLayout(buttons)
+        dialog.resize(460, 130)
+        dialog.exec()
+
+    def _show_customer_distributor_code_dialog(self) -> None:
+        row = self._selected_row()
+        if not row:
+            QMessageBox.warning(self, "Clientes", "Selecciona un cliente.")
+            return
+
+        distributor_code = str(getattr(row, "cliente_codigo_distribuidor", "") or "").strip()
+        display_value = distributor_code or "No informado"
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Codigo cliente distribuidor")
+        dialog.setModal(True)
+        layout = QVBoxLayout(dialog)
+
+        label = QLabel("Codigo cliente distribuidor")
+        code_field = QLineEdit(display_value)
+        code_field.setReadOnly(True)
+        code_field.setCursorPosition(0)
+        code_field.setSelection(0, 0)
+
+        buttons = QHBoxLayout()
+        copy_btn = QPushButton("Copiar")
+        close_btn = QPushButton("Cerrar")
+        copy_btn.setProperty("btnRole", "secondary")
+        close_btn.setProperty("btnRole", "secondary")
+        copy_btn.setEnabled(bool(distributor_code))
+        copy_btn.clicked.connect(lambda: QApplication.clipboard().setText(distributor_code))
+        close_btn.clicked.connect(dialog.accept)
+        buttons.addWidget(copy_btn)
+        buttons.addStretch(1)
+        buttons.addWidget(close_btn)
+
+        layout.addWidget(label)
+        layout.addWidget(code_field)
         layout.addLayout(buttons)
         dialog.resize(460, 130)
         dialog.exec()
