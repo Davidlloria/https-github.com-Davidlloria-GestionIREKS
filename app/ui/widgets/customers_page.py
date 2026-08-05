@@ -2711,8 +2711,8 @@ class CustomersPage(QWidget):
     def _list(self, term: str) -> list:
         return self.customer_service.list(term)
 
-    def _create(self, payload: dict) -> None:
-        self.customer_service.create(payload)
+    def _create(self, payload: dict):
+        return self.customer_service.create(payload)
 
     def _update(self, entity_id: str, payload: dict) -> None:
         self.customer_service.update(entity_id, payload)
@@ -4195,6 +4195,7 @@ class CustomersPage(QWidget):
         menu.addSeparator()
         action_edit = menu.addAction("Editar")
         action_delete = menu.addAction("Eliminar")
+        action_duplicate = menu.addAction("Duplicar cliente")
         action_merge = menu.addAction("Fusionar cliente")
         menu.addSeparator()
         action_copy_id = menu.addAction("Copiar ID")
@@ -4209,6 +4210,7 @@ class CustomersPage(QWidget):
         for action in (
             action_edit,
             action_delete,
+            action_duplicate,
             action_merge,
             action_copy_id,
             action_copy_name,
@@ -4228,6 +4230,9 @@ class CustomersPage(QWidget):
             return
         if chosen == action_delete:
             self._delete_entity()
+            return
+        if chosen == action_duplicate:
+            self._duplicate_selected_customer()
             return
         if chosen == action_merge:
             self._merge_selected_customer()
@@ -4380,6 +4385,61 @@ class CustomersPage(QWidget):
             payload = dialog.get_payload()
             self._update(row.cliente_id, payload)
             self.reload()
+
+    def _duplicate_selected_customer(self) -> None:
+        row = self._selected_row()
+        if not row:
+            QMessageBox.warning(self, "Atencion", "Selecciona un cliente.")
+            return
+
+        source_label = self._customer_merge_row_label(row)
+        answer = QMessageBox.question(
+            self,
+            "Duplicar cliente",
+            (
+                f"Duplicar cliente {source_label}?\n\n"
+                "Se copiara solo el detalle del cliente.\n"
+                "No se copiaran contactos, ventas, recetas ni agenda.\n"
+                "El duplicado tendra UUID y codigo de cliente nuevos."
+            ),
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        detail_fields = (
+            "cliente_codigo_distribuidor",
+            "cliente_nombre_comercial",
+            "cliente_nombre_fiscal",
+            "cliente_nombre_interno",
+            "cliente_abreviatura",
+            "cliente_cif",
+            "cliente_telefono",
+            "cliente_email",
+            "cliente_direccion",
+            "cliente_direccion_cp",
+            "cliente_direccion_localidad_id",
+            "cliente_direccion_municipio_id",
+            "cliente_direccion_provincia_id",
+            "cliente_direccion_isla_id",
+            "cliente_tipo",
+            "cliente_actividad",
+            "cliente_prospeccion",
+            "distribuidor_id",
+            "distribuidor_comercial_id",
+            "activo",
+        )
+        payload = {field: getattr(row, field, None) for field in detail_fields}
+
+        try:
+            created = self._create(payload)
+        except Exception as exc:
+            QMessageBox.warning(self, "Clientes", f"No se pudo duplicar el cliente:\n{exc}")
+            return
+
+        created_id = str(getattr(created, "cliente_id", "") or "").strip()
+        self.reload()
+        if created_id:
+            self._select_row_by_id(created_id)
 
     def _delete_entity(self) -> None:
         row = self._selected_row()
