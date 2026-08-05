@@ -4200,6 +4200,7 @@ class CustomersPage(QWidget):
         action_copy_id = menu.addAction("Copiar ID")
         action_copy_name = menu.addAction("Copiar nombre")
         action_show_distributor_code = menu.addAction("Ver codigo cliente distribuidor")
+        action_edit_distributor_code = menu.addAction("Editar codigo cliente distribuidor")
         action_show_id = menu.addAction("Ver ID")
         menu.addSeparator()
         action_clear_filter = menu.addAction("Vaciar filtro")
@@ -4212,6 +4213,7 @@ class CustomersPage(QWidget):
             action_copy_id,
             action_copy_name,
             action_show_distributor_code,
+            action_edit_distributor_code,
             action_show_id,
         ):
             action.setEnabled(has_row)
@@ -4238,6 +4240,9 @@ class CustomersPage(QWidget):
             return
         if chosen == action_show_distributor_code:
             self._show_customer_distributor_code_dialog()
+            return
+        if chosen == action_edit_distributor_code:
+            self._edit_customer_distributor_code_dialog()
             return
         if chosen == action_show_id:
             self._show_customer_id_dialog()
@@ -4482,6 +4487,92 @@ class CustomersPage(QWidget):
         layout.addWidget(code_field)
         layout.addLayout(buttons)
         dialog.resize(460, 130)
+        dialog.exec()
+
+    def _find_customer_by_distributor_code(self, distributor_code: str, current_customer_id: str) -> object | None:
+        normalized_code = str(distributor_code or "").strip().casefold()
+        if not normalized_code:
+            return None
+
+        candidates = list(getattr(self, "_all_rows", []) or []) + list(getattr(self, "rows", []) or [])
+        seen_ids: set[str] = set()
+        for candidate in candidates:
+            candidate_id = str(getattr(candidate, "cliente_id", "") or "").strip()
+            if not candidate_id or candidate_id in seen_ids or candidate_id == current_customer_id:
+                continue
+            seen_ids.add(candidate_id)
+            candidate_code = str(getattr(candidate, "cliente_codigo_distribuidor", "") or "").strip().casefold()
+            if candidate_code == normalized_code:
+                return candidate
+        return None
+
+    def _edit_customer_distributor_code_dialog(self) -> None:
+        row = self._selected_row()
+        if not row:
+            QMessageBox.warning(self, "Clientes", "Selecciona un cliente.")
+            return
+
+        customer_id = str(getattr(row, "cliente_id", "") or "").strip()
+        if not customer_id:
+            QMessageBox.warning(self, "Clientes", "El cliente no tiene ID.")
+            return
+
+        current_code = str(getattr(row, "cliente_codigo_distribuidor", "") or "").strip()
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Editar codigo cliente distribuidor")
+        dialog.setModal(True)
+        layout = QVBoxLayout(dialog)
+
+        label = QLabel("Codigo cliente distribuidor")
+        code_field = QLineEdit(current_code)
+        code_field.setPlaceholderText("Codigo asignado por el distribuidor")
+        code_field.setCursorPosition(0)
+        code_field.selectAll()
+
+        buttons = QHBoxLayout()
+        save_btn = QPushButton("Guardar")
+        cancel_btn = QPushButton("Cancelar")
+        save_btn.setProperty("btnRole", "primary")
+        cancel_btn.setProperty("btnRole", "secondary")
+        buttons.addStretch(1)
+        buttons.addWidget(save_btn)
+        buttons.addWidget(cancel_btn)
+
+        layout.addWidget(label)
+        layout.addWidget(code_field)
+        layout.addLayout(buttons)
+        dialog.resize(460, 130)
+
+        def save() -> None:
+            new_code = code_field.text().strip()
+            duplicate = self._find_customer_by_distributor_code(new_code, customer_id)
+            if duplicate is not None:
+                duplicate_label = self._customer_merge_row_label(duplicate)
+                QMessageBox.warning(
+                    dialog,
+                    "Clientes",
+                    f"El codigo cliente distribuidor ya esta asignado a:\n{duplicate_label}",
+                )
+                return
+
+            if new_code == current_code:
+                dialog.accept()
+                return
+
+            try:
+                self._update(customer_id, {"cliente_codigo_distribuidor": new_code})
+            except Exception as exc:
+                QMessageBox.warning(dialog, "Clientes", f"No se pudo guardar el codigo:\n{exc}")
+                return
+
+            dialog.accept()
+            self.reload()
+            self._select_row_by_id(customer_id)
+
+        save_btn.clicked.connect(save)
+        cancel_btn.clicked.connect(dialog.reject)
+        code_field.returnPressed.connect(save)
         dialog.exec()
 
     def _import_entities(self) -> None:
