@@ -1873,7 +1873,34 @@ class SalesToolsDialog(QDialog):
                 ),
             )
 
+        def save_errors() -> None:
+            lines = [str(item).strip() for item in list(getattr(preview, "issues", []) or []) if str(item).strip()]
+            if not lines:
+                QMessageBox.information(dialog, "Errores", "No hay errores para guardar.")
+                return
+            default = DATA_DIR / "exports" / "ventas_clientes" / f"errores_{source.stem}.txt"
+            default.parent.mkdir(parents=True, exist_ok=True)
+            path, _ = QFileDialog.getSaveFileName(
+                dialog,
+                "Guardar lista de errores",
+                str(default),
+                "Texto (*.txt)",
+            )
+            if not path:
+                return
+            try:
+                Path(path).write_text("\n".join(lines), encoding="utf-8")
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(dialog, "Errores", f"No se pudo guardar la lista de errores:\n{exc}")
+                return
+            QMessageBox.information(dialog, "Errores", f"Lista de errores guardada:\n{path}")
+
         actions = QHBoxLayout()
+        save_errors_btn = QPushButton("Guardar errores")
+        save_errors_btn.setProperty("btnRole", "secondary")
+        save_errors_btn.setEnabled(bool(getattr(preview, "issues", None)))
+        save_errors_btn.clicked.connect(save_errors)
+        actions.addWidget(save_errors_btn)
         actions.addStretch(1)
         import_btn = QPushButton("Importar")
         import_btn.setProperty("btnRole", "success")
