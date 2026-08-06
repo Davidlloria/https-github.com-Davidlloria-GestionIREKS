@@ -46,9 +46,49 @@ COALESCE((
     LIMIT 1
 ), 0)
 """
+DIST_REF_EXPR = """
+COALESCE((
+    SELECT GROUP_CONCAT(rd.articulo_referencia_distribuidor, ' | ')
+    FROM referencias_distribuidor rd
+    WHERE rd.articulo_id = p.articulo_id
+      AND COALESCE(rd.articulo_referencia_distribuidor, '') != ''
+), '')
+"""
+DIST_DESC_EXPR = """
+COALESCE((
+    SELECT GROUP_CONCAT(rd.articulo_descripcion_distribuidor, ' | ')
+    FROM referencias_distribuidor rd
+    WHERE rd.articulo_id = p.articulo_id
+      AND COALESCE(rd.articulo_descripcion_distribuidor, '') != ''
+), '')
+"""
+DIST_DATA_EXPR = """
+COALESCE((
+    SELECT GROUP_CONCAT(
+        TRIM(
+            COALESCE(rd.articulo_referencia_distribuidor, '')
+            || CASE
+                WHEN COALESCE(rd.articulo_referencia_distribuidor, '') != ''
+                 AND COALESCE(rd.articulo_descripcion_distribuidor, '') != ''
+                THEN ' - '
+                ELSE ''
+            END
+            || COALESCE(rd.articulo_descripcion_distribuidor, '')
+        ),
+        ' | '
+    )
+    FROM referencias_distribuidor rd
+    WHERE rd.articulo_id = p.articulo_id
+      AND (
+        COALESCE(rd.articulo_referencia_distribuidor, '') != ''
+        OR COALESCE(rd.articulo_descripcion_distribuidor, '') != ''
+      )
+), '')
+"""
 
 
 PRODUCT_REPORT_COLUMNS: dict[str, tuple[str, str]] = {
+    "articulo_id": ("UUID articulo", "p.articulo_id"),
     "articulo": (
         "Articulo",
         "COALESCE(p.articulo_referencia, '') || ' ' || COALESCE(p.articulo_referencia_corta, '') || ' ' || COALESCE(p.articulo_descripcion, '')",
@@ -80,6 +120,9 @@ PRODUCT_REPORT_COLUMNS: dict[str, tuple[str, str]] = {
     "precio_fabricante": ("Precio fabricante", PRICE_FAB_EXPR),
     "precio_distribuidor": ("Precio distribuidor", PRICE_DIST_EXPR),
     "descuento": ("Descuento %", PRICE_DISCOUNT_EXPR),
+    "referencia_distribuidor": ("Ref. distribuidor", DIST_REF_EXPR),
+    "descripcion_distribuidor": ("Desc. distribuidor", DIST_DESC_EXPR),
+    "datos_distribuidor": ("Datos distribuidor", DIST_DATA_EXPR),
 }
 
 DEFAULT_PRODUCT_REPORT_COLUMNS = ["referencia_corta", "descripcion", "familia", "subfamilia", "total_presentacion", "activo"]
@@ -115,8 +158,13 @@ PRODUCT_REPORT_COLUMN_BLOCKS: dict[str, list[str]] = {
         "precio_distribuidor",
         "descuento",
     ],
+    "referencias_distribuidor": [
+        "referencia_distribuidor",
+        "descripcion_distribuidor",
+    ],
 }
 TEXT_FIELDS = {
+    "articulo_id",
     "referencia",
     "referencia_corta",
     "articulo",
@@ -131,6 +179,9 @@ TEXT_FIELDS = {
     "pallet",
     "observaciones_transporte",
     "categoria",
+    "referencia_distribuidor",
+    "descripcion_distribuidor",
+    "datos_distribuidor",
 }
 BOOL_FIELDS = {"activo", "en_lista"}
 NUMERIC_FIELDS = {
@@ -214,9 +265,11 @@ class ProductReportIntentService:
                         "presentaciones_pallet, unidades_pallet, total_pallet y observaciones_transporte. "
                         "Si piden logistica incluye solo los campos de pallet/transporte. "
                         "Si piden tarifa incluye tarifa_ano, precio_fabricante, precio_distribuidor y descuento. "
+                        "Si piden referencias de distribuidor incluye referencia_distribuidor y descripcion_distribuidor. "
                         "Campos utiles: presentacion es envase; contenido es unidades dentro de la presentacion; "
                         "unidad_contenido puede ser BOLSA, BOTELLA, SACO; total_presentacion es kg por presentacion; "
-                        "total_pallet es kg por pallet. Si piden articulos por descripcion usa descripcion; "
+                        "total_pallet es kg por pallet. Si piden UUID, ID tecnico o identificador del articulo usa articulo_id. "
+                        "Si piden articulos por descripcion usa descripcion; "
                         "si piden articulos por referencia usa referencia o referencia_corta; "
                         "si piden una busqueda general por texto usa articulo con operador contiene. Devuelve solo este JSON: "
                         '{"title": "...", "columns": ["referencia_corta"], "filters": [{"field": "activo", "op": "=", "value": true}], '
@@ -269,8 +322,22 @@ class ProductReportIntentService:
             self._add_column_block(columns, "logistica")
         if "tarifa" in t or "precios" in t or "precio" in t:
             self._add_column_block(columns, "tarifa")
+        if (
+            "referencia distribuidor" in t
+            or "referencias distribuidor" in t
+            or "referencia de distribuidor" in t
+            or "referencias de distribuidor" in t
+            or "referencia del distribuidor" in t
+            or "referencias del distribuidor" in t
+            or "descripcion distribuidor" in t
+            or "descripcion del distribuidor" in t
+            or "datos distribuidor" in t
+            or "datos del distribuidor" in t
+        ):
+            self._add_column_block(columns, "referencias_distribuidor")
 
         for key, words in {
+            "articulo_id": ("uuid", "id tecnico", "identificador articulo", "identificador del articulo", "articulo id", "articulo_id"),
             "referencia": ("referencia", "ref "),
             "referencia_corta": ("ref corta", "referencia corta"),
             "descripcion": ("descripcion", "descripcion articulo", "nombre"),
@@ -292,6 +359,9 @@ class ProductReportIntentService:
             "precio_fabricante": ("precio fabricante", "precio ireks"),
             "precio_distribuidor": ("precio distribuidor",),
             "descuento": ("descuento",),
+            "referencia_distribuidor": ("referencia distribuidor", "referencia del distribuidor"),
+            "descripcion_distribuidor": ("descripcion distribuidor", "descripcion del distribuidor"),
+            "datos_distribuidor": ("datos distribuidor", "datos del distribuidor"),
         }.items():
             if any(word in t for word in words) and key not in columns:
                 columns.append(key)

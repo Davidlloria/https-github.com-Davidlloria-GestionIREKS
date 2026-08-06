@@ -8,7 +8,7 @@ from typing import Any, cast
 from sqlmodel import Session, select
 
 from app.core.database import engine
-from app.models import AlbaranItem, Cliente, Distribuidor, IngredienteIreks, Pedido, PedidoPendiente
+from app.models import AlbaranItem, Cliente, Distribuidor, IngredienteIreks, Pedido, PedidoItem, PedidoPendiente
 from app.services.order_query_service import OrderQueryService
 
 
@@ -38,6 +38,24 @@ class DashboardOrdersWarehouseRow:
 
 
 @dataclass
+class DashboardPendingArticleRow:
+    pedido_id: str
+    pedido_fecha: date
+    pedido_numero: str
+    articulo_id: str
+    articulo_label: str
+    article_name: str
+    pending_kg: float
+
+
+@dataclass
+class DashboardTopArticleRow:
+    articulo_id: str
+    article_name: str
+    ordered_kg: float
+
+
+@dataclass
 class DashboardOrdersStateRow:
     status: str
     count: int
@@ -52,7 +70,8 @@ class OrderDashboardSnapshot:
     pending_kg: float
     incident_orders: int
     recent_orders: list[DashboardOrderRow]
-    pending_orders: list[DashboardOrderRow]
+    pending_orders: list[DashboardPendingArticleRow]
+    top_articles: list[DashboardTopArticleRow]
     warehouse_rows: list[DashboardOrdersWarehouseRow]
     state_rows: list[DashboardOrdersStateRow]
     generated_at: datetime
@@ -79,6 +98,7 @@ class OrderDashboardService:
                 incident_orders=0,
                 recent_orders=[],
                 pending_orders=[],
+                top_articles=[],
                 warehouse_rows=[],
                 state_rows=[],
                 generated_at=datetime.now(),
@@ -92,6 +112,11 @@ class OrderDashboardService:
                     select(AlbaranItem).where(cast(Any, AlbaranItem.pedido_id).in_(pedido_ids))
                 )
             )
+            pedido_items = list(
+                session.exec(
+                    select(PedidoItem).where(cast(Any, PedidoItem.pedido_id).in_(pedido_ids))
+                )
+            )
             pendientes = list(
                 session.exec(
                     select(PedidoPendiente).where(cast(Any, PedidoPendiente.pedido_id).in_(pedido_ids))
@@ -100,7 +125,7 @@ class OrderDashboardService:
             article_ids = sorted(
                 {
                     str(getattr(row, "articulo_id", "") or "").strip()
-                    for row in [*albaran_items, *pendientes]
+                    for row in [*albaran_items, *pedido_items, *pendientes]
                     if str(getattr(row, "articulo_id", "") or "").strip()
                 }
             )
@@ -118,12 +143,29 @@ class OrderDashboardService:
             str(getattr(row, "articulo_id", "") or "").strip(): float(getattr(row, "articulo_envase_peso_total", 0.0) or 0.0)
             for row in articles
         }
+        article_labels = {
+            str(getattr(row, "articulo_id", "") or "").strip(): self._article_display_label(row)
+            for row in articles
+        }
         warehouse_names = self._build_warehouse_name_map(clients, distributors)
+        pedidos_by_id = {
+            str(getattr(row, "pedido_id", "") or "").strip(): row
+            for row in pedidos
+        }
         ordered_by_id = self.order_query_service.pedido_totals_kg(pedido_ids)
         received_by_id: dict[str, float] = defaultdict(float)
         pending_by_id: dict[str, float] = defaultdict(float)
         incident_by_id: dict[str, float] = defaultdict(float)
         last_receipt_by_id: dict[str, date] = {}
+        pending_article_rows: list[DashboardPendingArticleRow] = []
+        ordered_by_article: dict[str, float] = defaultdict(float)
+
+        for row in pedido_items:
+            articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+            qty = float(getattr(row, "articulo_cantidad", 0.0) or 0.0)
+            ordered_kg = qty * weights.get(articulo_id, 0.0)
+            if ordered_kg > 1e-9:
+                ordered_by_article[articulo_id] += ordered_kg
 
         for row in albaran_items:
             pedido_id = str(getattr(row, "pedido_id", "") or "").strip()
@@ -142,7 +184,21 @@ class OrderDashboardService:
             estado = str(getattr(row, "estado", "") or "").strip().lower()
             weight = weights.get(articulo_id, 0.0)
             if qty_pending > 1e-9 and estado != "exceso":
-                pending_by_id[pedido_id] += qty_pending * weight
+                pending_kg = qty_pending * weight
+                pending_by_id[pedido_id] += pending_kg
+                pedido = pedidos_by_id.get(pedido_id)
+                if pedido is not None and pending_kg > 1e-9:
+                    pending_article_rows.append(
+                        DashboardPendingArticleRow(
+                            pedido_id=pedido_id,
+                            pedido_fecha=self.order_query_service.parse_date(getattr(pedido, "pedido_fecha", None)),
+                            pedido_numero=str(getattr(pedido, "pedido_numero", "") or "").strip() or "S/N",
+                            articulo_id=articulo_id,
+                            articulo_label=article_labels.get(articulo_id, articulo_id or "S/N"),
+                            article_name=article_labels.get(articulo_id, articulo_id or "S/N"),
+                            pending_kg=pending_kg,
+                        )
+                    )
             if estado == "exceso" or qty_pending < -1e-9:
                 incident_by_id[pedido_id] += abs(qty_pending) * weight if weight > 0 else abs(qty_pending)
 
@@ -183,9 +239,20 @@ class OrderDashboardService:
 
         recent_orders = sorted(rows, key=lambda row: (row.pedido_fecha, row.pedido_numero, row.pedido_id), reverse=True)[:8]
         pending_orders = sorted(
-            [row for row in rows if row.pending_kg > 1e-9 or row.status == "incidencia"],
-            key=lambda row: (-row.pending_kg, row.pedido_fecha, row.pedido_numero),
+            pending_article_rows,
+            key=lambda row: (-row.pending_kg, row.pedido_fecha, row.pedido_numero, row.articulo_label.casefold()),
         )[:8]
+        top_articles = [
+            DashboardTopArticleRow(
+                articulo_id=articulo_id,
+                article_name=article_labels.get(articulo_id, articulo_id or "S/N"),
+                ordered_kg=float(ordered_kg),
+            )
+            for articulo_id, ordered_kg in sorted(
+                ordered_by_article.items(),
+                key=lambda item: (-item[1], article_labels.get(item[0], item[0]).casefold()),
+            )[:5]
+        ]
 
         warehouse_buckets: dict[str, DashboardOrdersWarehouseRow] = {}
         for row in rows:
@@ -237,10 +304,16 @@ class OrderDashboardService:
             incident_orders=sum(1 for row in rows if row.status == "incidencia"),
             recent_orders=recent_orders,
             pending_orders=pending_orders,
+            top_articles=top_articles,
             warehouse_rows=warehouse_rows,
             state_rows=state_rows,
             generated_at=datetime.now(),
         )
+
+    @staticmethod
+    def _article_display_label(row: IngredienteIreks) -> str:
+        name = str(getattr(row, "articulo_descripcion", "") or "").strip()
+        return name or str(getattr(row, "articulo_id", "") or "").strip()
 
     @staticmethod
     def _warehouse_display_name(primary: str, secondary: str, fallback: str) -> str:

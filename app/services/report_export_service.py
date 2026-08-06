@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from xml.sax.saxutils import escape as xml_escape
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
@@ -11,12 +12,41 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core.config import DATA_DIR
 
 
 class ReportExportService:
+    AGENDA_STATE_PALETTE = {
+        'pending': ('#1D4ED8', '#DBEAFE', '#93C5FD'),
+        'completed': ('#15803D', '#DCFCE7', '#86EFAC'),
+        'postponed': ('#C2410C', '#FFEDD5', '#FDBA74'),
+        'cancelled': ('#B91C1C', '#FEE2E2', '#FCA5A5'),
+        'default': ('#475569', '#F1F5F9', '#CBD5E1'),
+    }
+
+    @staticmethod
+    def agenda_state_tone(value: Any) -> str:
+        normalized = str(value or '').strip().casefold()
+        if normalized in {'hecha', 'hecho', 'completada', 'completado'}:
+            return 'completed'
+        if normalized in {'aplazada', 'aplazado'}:
+            return 'postponed'
+        if normalized in {'cancelada', 'cancelado'}:
+            return 'cancelled'
+        if normalized == 'pendiente':
+            return 'pending'
+        return 'default'
+
+    @staticmethod
+    def dashboard_agenda_card_widths(document_width: float) -> tuple[float, float, float, float]:
+        card_horizontal_padding = 20.0
+        date_width = 28 * mm
+        state_width = 32 * mm
+        customer_width = document_width - card_horizontal_padding - date_width - state_width
+        return date_width, customer_width, state_width, card_horizontal_padding
+
     def default_path(self, title: str, suffix: str, folder: str = "listados_clientes") -> Path:
         reports_dir = DATA_DIR / "exports" / folder
         reports_dir.mkdir(parents=True, exist_ok=True)
@@ -94,6 +124,84 @@ class ReportExportService:
             )
         )
         story.append(table)
+        doc.build(story)
+        return out
+
+    def export_dashboard_agenda_pdf(self, path: str | Path, title: str, rows: list[list[Any]]) -> Path:
+        out = Path(path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        doc = SimpleDocTemplate(
+            str(out),
+            pagesize=landscape(A4),
+            leftMargin=24,
+            rightMargin=24,
+            topMargin=24,
+            bottomMargin=24,
+        )
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle('DashboardAgendaTitle', parent=styles['Title'], alignment=0)
+        date_style = ParagraphStyle('DashboardAgendaDate', parent=styles['BodyText'], fontSize=9, leading=11)
+        customer_style = ParagraphStyle(
+            'DashboardAgendaCustomer', parent=styles['BodyText'], fontSize=9, leading=11, fontName='Helvetica-Bold'
+        )
+        state_style = ParagraphStyle(
+            'DashboardAgendaState', parent=styles['BodyText'], fontSize=9, leading=11, alignment=2, fontName='Helvetica-Bold'
+        )
+        content_style = ParagraphStyle(
+            'DashboardAgendaContent', parent=styles['BodyText'], fontSize=10, leading=14, textColor=colors.HexColor('#1E293B')
+        )
+        story = [Paragraph(xml_escape(str(title or 'Agenda')), title_style), Spacer(1, 10)]
+        date_width, customer_width, state_width, _card_horizontal_padding = self.dashboard_agenda_card_widths(doc.width)
+        for raw_row in rows:
+            values = [str(value or '') for value in raw_row]
+            values.extend([''] * (4 - len(values)))
+            event_date, customer, content, state = values[:4]
+            state_tone = self.agenda_state_tone(state)
+            state_text_color, state_background, state_border = self.AGENDA_STATE_PALETTE[state_tone]
+            row_state_style = ParagraphStyle(
+                f'DashboardAgendaState_{state_tone}', parent=state_style, textColor=colors.HexColor(state_text_color)
+            )
+            top_line = Table(
+                [[
+                    Paragraph(xml_escape(event_date), date_style),
+                    Paragraph(xml_escape(customer), customer_style),
+                    Paragraph(xml_escape(state), row_state_style),
+                ]],
+                colWidths=[date_width, customer_width, state_width],
+            )
+            top_line.setStyle(
+                TableStyle([
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                    ('TOPPADDING', (0, 0), (-1, -1), 0),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+                    ('BACKGROUND', (2, 0), (2, 0), colors.HexColor(state_background)),
+                    ('BOX', (2, 0), (2, 0), 0.5, colors.HexColor(state_border)),
+                    ('LEFTPADDING', (2, 0), (2, 0), 6),
+                    ('RIGHTPADDING', (2, 0), (2, 0), 6),
+                    ('TOPPADDING', (2, 0), (2, 0), 3),
+                    ('BOTTOMPADDING', (2, 0), (2, 0), 3),
+                ])
+            )
+            card = Table(
+                [[top_line], [Paragraph(xml_escape(content).replace('\n', '<br/>'), content_style)]],
+                colWidths=[doc.width],
+            )
+            card.setStyle(
+                TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+                    ('BOX', (0, 0), (-1, -1), 0.75, colors.HexColor('#CBD5E1')),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                    ('TOPPADDING', (0, 0), (-1, 0), 8),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
+                    ('TOPPADDING', (0, 1), (-1, 1), 5),
+                    ('BOTTOMPADDING', (0, 1), (-1, 1), 9),
+                ])
+            )
+            story.append(KeepTogether([card, Spacer(1, 7)]))
         doc.build(story)
         return out
 
