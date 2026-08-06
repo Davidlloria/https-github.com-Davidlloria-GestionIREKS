@@ -106,10 +106,14 @@ class IgsaWorkbookParsedLine:
 class ClientesWorkbookParsedLine:
     source_row: int
     anio: int
+    mes: int
+    mes_nombre: str
     cliente_id: str
     cliente_codigo: str
+    cliente_codigo_distribuidor: str
     cliente_nombre: str
     articulo_id: str
+    articulo_codigo_excel: str
     articulo_descripcion: str
     unidades: float
 
@@ -837,12 +841,17 @@ class SalesReconciliationService:
             row = {
                 "source_row": item.source_row,
                 "anio": int(item.anio or year or 0),
+                "mes": int(item.mes or 12),
+                "mes_nombre": str(item.mes_nombre or "").strip(),
                 "cliente_id": item.cliente_id,
                 "cliente_codigo": cliente_codigo,
+                "cliente_codigo_distribuidor": item.cliente_codigo_distribuidor,
                 "cliente_nombre": cliente_nombre,
                 "articulo_codigo": articulo_codigo,
                 "articulo_id": articulo_id,
                 "articulo_codigo_corto": articulo_codigo_corto,
+                "articulo_codigo_excel": item.articulo_codigo_excel,
+                "articulo_descripcion_excel": item.articulo_descripcion,
                 "articulo_descripcion": articulo_descripcion,
                 "articulo_label": articulo_label,
                 "envase": float(envase or 0.0),
@@ -866,7 +875,13 @@ class SalesReconciliationService:
                 if self._is_indirect_client(row)
             }
             product_refs = self._build_clientes_product_reference_lookup(session)
-            product_ids = sorted({product_id for product_id in product_refs.values() if product_id})
+            product_ids = sorted(
+                {
+                    product_id
+                    for product_id in set(product_refs.values()) | {str(item.articulo_id or "").strip() for item in parsed_rows}
+                    if product_id
+                }
+            )
             products = {}
             if product_ids:
                 products = {
@@ -913,15 +928,15 @@ class SalesReconciliationService:
                     invalid_rows += 1
                     continue
 
-                product_id = self._resolve_clientes_product_id(item.articulo_id, product_refs)
+                product_id = self._resolve_clientes_product_id(item.articulo_id, product_refs, products)
                 if not product_id:
-                    message = f"Articulo sin referencia IREKS para codigo distribuidor {item.articulo_id}."
+                    message = f"Articulo IREKS no encontrado para UUID Producto {item.articulo_id}."
                     issues.append(f"Fila {item.source_row} - {cliente_nombre} - {item.articulo_id}: {message}")
                     append_row(
                         item=item,
                         cliente_nombre=cliente_nombre,
                         cliente_codigo=cliente_codigo,
-                        articulo_codigo=item.articulo_id,
+                        articulo_codigo=item.articulo_codigo_excel or item.articulo_id,
                         articulo_id="",
                         articulo_codigo_corto="",
                         articulo_descripcion=item.articulo_descripcion,
@@ -940,7 +955,9 @@ class SalesReconciliationService:
 
                 product = products.get(product_id)
                 short_code, product_name, product_label = self._clientes_product_label(product, item.articulo_descripcion)
-                product_weight = float(getattr(product, "articulo_envase_peso", 0.0) or 0.0)
+                product_weight = float(getattr(product, "articulo_envase_peso_total", 0.0) or 0.0)
+                if product_weight <= 0:
+                    product_weight = float(getattr(product, "articulo_envase_peso", 0.0) or 0.0)
                 if product_weight <= 0:
                     message = f"Producto sin peso de envase en la ficha IREKS {product_label or product_id}."
                     issues.append(f"Fila {item.source_row} - {cliente_nombre} - {short_code or product_id}: {message}")
@@ -948,7 +965,7 @@ class SalesReconciliationService:
                         item=item,
                         cliente_nombre=cliente_nombre,
                         cliente_codigo=cliente_codigo,
-                        articulo_codigo=item.articulo_id,
+                        articulo_codigo=short_code or item.articulo_codigo_excel or item.articulo_id,
                         articulo_id=product_id,
                         articulo_codigo_corto=short_code,
                         articulo_descripcion=product_name,
@@ -1004,6 +1021,7 @@ class SalesReconciliationService:
                 signature = self._clientes_row_signature(
                     item.cliente_id,
                     row_year,
+                    item.mes,
                     product_id,
                     item.unidades,
                     product_weight,
@@ -1023,7 +1041,7 @@ class SalesReconciliationService:
                     item=item,
                     cliente_nombre=cliente_nombre,
                     cliente_codigo=cliente_codigo,
-                    articulo_codigo=item.articulo_id,
+                    articulo_codigo=short_code or item.articulo_codigo_excel or item.articulo_id,
                     articulo_id=product_id,
                     articulo_codigo_corto=short_code,
                     articulo_descripcion=product_name,
@@ -1094,19 +1112,21 @@ class SalesReconciliationService:
                 if existing is not None:
                     return SalesOpResult(True, "El archivo ya estaba importado.", imported=0, incidencias=0)
 
-            replacement_keys: set[tuple[str, int, str]] = set()
+            replacement_keys: set[tuple[str, int, int, str]] = set()
             if replace_existing:
                 for item in preview_rows:
                     cliente_id = str(item.get("cliente_id") or "").strip()
                     articulo_id = str(item.get("articulo_id") or "").strip()
                     anio = int(item.get("anio") or lote_year or 0)
-                    if not cliente_id or not articulo_id or anio <= 0:
+                    mes = int(item.get("mes") or 12)
+                    if not cliente_id or not articulo_id or anio <= 0 or mes <= 0:
                         continue
-                    replacement_keys.add((cliente_id, anio, articulo_id))
-                for cliente_id, anio, articulo_id in replacement_keys:
+                    replacement_keys.add((cliente_id, anio, mes, articulo_id))
+                for cliente_id, anio, mes, articulo_id in replacement_keys:
                     for raw_row in session.exec(
                         select(VentaClientesRaw).where(
                             VentaClientesRaw.anio == anio,
+                            VentaClientesRaw.mes == mes,
                             VentaClientesRaw.cliente_id == cliente_id,
                             VentaClientesRaw.articulo_id == articulo_id,
                         )
@@ -1130,11 +1150,13 @@ class SalesReconciliationService:
                 if status not in {"ok", "warning"}:
                     continue
                 row_year = int(item.get("anio") or lote_year or 0)
+                row_month = int(item.get("mes") or 12)
                 row = VentaClientesRaw(
                     raw_id=str(uuid4()),
                     lote_id=lote.lote_id,
                     cliente_id=str(item.get("cliente_id") or "").strip(),
                     anio=row_year,
+                    mes=row_month,
                     articulo_codigo_origen=str(item.get("articulo_codigo") or "").strip(),
                     articulo_id=str(item.get("articulo_id") or "").strip(),
                     articulo_descripcion_origen=str(item.get("articulo_descripcion") or "").strip(),
@@ -1146,18 +1168,28 @@ class SalesReconciliationService:
                     payload_json=json.dumps(
                         {
                             "source_row": item.get("source_row"),
+                            "source_sheet": "Ventas_Bruto",
+                            "source_month": str(item.get("mes_nombre") or "").strip(),
                             "cliente_id": str(item.get("cliente_id") or "").strip(),
                             "cliente_codigo": str(item.get("cliente_codigo") or "").strip(),
+                            "cliente_codigo_distribuidor": str(item.get("cliente_codigo_distribuidor") or "").strip(),
                             "cliente_nombre": str(item.get("cliente_nombre") or "").strip(),
                             "articulo_id": str(item.get("articulo_codigo") or "").strip(),
                             "articulo_id_interno": str(item.get("articulo_id") or "").strip(),
                             "articulo_codigo_corto": str(item.get("articulo_codigo_corto") or "").strip(),
+                            "articulo_codigo_excel": str(item.get("articulo_codigo_excel") or "").strip(),
+                            "articulo_descripcion_excel": str(item.get("articulo_descripcion_excel") or "").strip(),
                             "articulo_descripcion": str(item.get("articulo_descripcion") or "").strip(),
                             "anio": row_year,
+                            "mes": row_month,
                             "articulo_envase_peso": float(item.get("envase") or 0.0),
+                            "envase_snapshot": float(item.get("envase") or 0.0),
                             "unidades": float(item.get("unidades") or 0.0),
                             "precio_kg": float(item.get("precio_kg") or 0.0),
+                            "precio_kg_snapshot": float(item.get("precio_kg") or 0.0),
+                            "kg_calculado": float(item.get("kg") or 0.0),
                             "euros": float(item.get("euros") or 0.0),
+                            "euros_calculado": float(item.get("euros") or 0.0),
                         },
                         ensure_ascii=False,
                     ),
@@ -1190,35 +1222,34 @@ class SalesReconciliationService:
         self,
         cliente_id: object,
         anio: object,
+        mes: object,
         articulo_id: object,
         unidades: object,
         envase: object,
         precio_kg: object,
         euros: object,
-    ) -> tuple[str, int, str, float, float, float, float]:
+    ) -> tuple[str, int, int, str]:
         return (
             str(cliente_id or "").strip(),
             self._to_int(anio),
+            self._to_int(mes) or 12,
             str(articulo_id or "").strip(),
-            round(self._to_float(unidades), 6),
-            round(self._to_float(envase), 6),
-            round(self._to_float(precio_kg), 6),
-            round(self._to_float(euros), 6),
         )
 
-    def _load_clientes_import_signatures(self, session: Session) -> set[tuple[str, int, str, float, float, float, float]]:
-        signatures: set[tuple[str, int, str, float, float, float, float]] = set()
+    def _load_clientes_import_signatures(self, session: Session) -> set[tuple[str, int, int, str]]:
+        signatures: set[tuple[str, int, int, str]] = set()
         rows = list(session.exec(select(VentaClientesRaw)).all())
         for row in rows:
             payload = self._safe_json_dict(str(getattr(row, "payload_json", "") or ""))
             cliente_id = str(payload.get("cliente_id") or getattr(row, "cliente_id", "") or "").strip()
             anio = self._to_int(payload.get("anio") or getattr(row, "anio", 0))
+            mes = self._to_int(payload.get("mes") or getattr(row, "mes", 12)) or 12
             articulo_id = str(payload.get("articulo_id_interno") or getattr(row, "articulo_id", "") or "").strip()
             unidades = payload.get("unidades", getattr(row, "unidades", 0.0))
             envase = payload.get("articulo_envase_peso", getattr(row, "envase", 0.0))
             precio_kg = payload.get("precio_kg", getattr(row, "precio_kg", 0.0))
             euros = payload.get("euros", getattr(row, "euros", 0.0))
-            signatures.add(self._clientes_row_signature(cliente_id, anio, articulo_id, unidades, envase, precio_kg, euros))
+            signatures.add(self._clientes_row_signature(cliente_id, anio, mes, articulo_id, unidades, envase, precio_kg, euros))
         return signatures
 
     def _clientes_product_label(
@@ -1514,7 +1545,7 @@ class SalesReconciliationService:
         if not workbook.sheetnames:
             raise ValueError("El Excel de ventas de clientes no contiene hojas.")
 
-        sheet = workbook[workbook.sheetnames[0]]
+        sheet = workbook["Ventas_Bruto"] if "Ventas_Bruto" in workbook.sheetnames else workbook[workbook.sheetnames[0]]
         rows = list(sheet.iter_rows(values_only=True))
         if len(rows) < 2:
             return [], 0
@@ -1537,7 +1568,7 @@ class SalesReconciliationService:
             if match:
                 year = int(match.group(0))
         if year <= 0:
-            raise ValueError("No se pudo determinar el año del Excel de ventas de clientes.")
+            year = 0
 
         def find_index(*names: str) -> int:
             norm_names = {self._normalize_key(name) for name in names}
@@ -1546,42 +1577,76 @@ class SalesReconciliationService:
                     return idx
             return -1
 
+        month_names = {
+            "enero": 1,
+            "febrero": 2,
+            "marzo": 3,
+            "abril": 4,
+            "mayo": 5,
+            "junio": 6,
+            "julio": 7,
+            "agosto": 8,
+            "septiembre": 9,
+            "setiembre": 9,
+            "octubre": 10,
+            "noviembre": 11,
+            "diciembre": 12,
+        }
+        month_columns: list[tuple[int, int, str]] = []
+        for idx, cell in enumerate(header):
+            normalized = self._normalize_key(cell)
+            if normalized in month_names:
+                month_columns.append((idx, month_names[normalized], str(rows[0][idx] or "").strip().upper()))
+
         idx_anio = find_index("año", "anio", "year")
-        idx_cliente_id = find_index("cliente_id")
-        idx_cliente_codigo = find_index("codigo")
+        idx_cliente_id = find_index("uuid cliente", "cliente_id", "cliente id")
+        idx_cliente_codigo = find_index("codigo ireks", "codigo", "cliente codigo")
+        idx_cliente_codigo_distribuidor = find_index("codigo igsa", "codigo distribuidor", "codigo cliente distribuidor")
         idx_cliente_nombre = find_index("cliente")
-        idx_articulo = find_index("articulo")
-        idx_descripcion = find_index("descripcion art.")
-        idx_unidades = find_index("unidades")
-        if idx_unidades < 0:
-            idx_unidades = find_index(str(year))
-        if min(idx_anio, idx_cliente_id, idx_cliente_codigo, idx_cliente_nombre, idx_articulo, idx_descripcion, idx_unidades) < 0:
+        idx_articulo = find_index("uuid producto", "articulo_id", "articulo id")
+        idx_articulo_codigo = find_index("codigo producto", "codigo articulo")
+        idx_descripcion = find_index("nombre producto", "nombre porducto", "descripcion art.", "descripcion articulo")
+        if min(idx_anio, idx_cliente_id, idx_cliente_codigo, idx_cliente_nombre, idx_articulo) < 0 or not month_columns:
             raise ValueError("El Excel de ventas de clientes no tiene el formato esperado.")
 
         parsed_rows: list[ClientesWorkbookParsedLine] = []
+        detected_year = 0
         for source_row, row in enumerate(rows[1:], start=2):
             row_year = self._to_int(row[idx_anio])
+            if row_year > 0 and detected_year <= 0:
+                detected_year = row_year
             cliente_id = str(row[idx_cliente_id] or "").strip()
-            articulo_id = self._normalize_code(row[idx_articulo])
-            unidades = self._to_float(row[idx_unidades])
-            if row_year <= 0 or not cliente_id or not articulo_id or unidades <= 0:
+            articulo_id = str(row[idx_articulo] or "").strip()
+            if row_year <= 0 or not cliente_id or not articulo_id:
                 continue
             cliente_nombre = str(row[idx_cliente_nombre] or "").strip()
             cliente_codigo = str(row[idx_cliente_codigo] or "").strip()
-            articulo_descripcion = str(row[idx_descripcion] or "").strip()
-            parsed_rows.append(
-                ClientesWorkbookParsedLine(
-                    source_row=source_row,
-                    anio=row_year,
-                    cliente_id=cliente_id,
-                    cliente_codigo=cliente_codigo,
-                    cliente_nombre=cliente_nombre,
-                    articulo_id=articulo_id,
-                    articulo_descripcion=articulo_descripcion,
-                    unidades=unidades,
-                )
+            cliente_codigo_distribuidor = (
+                str(row[idx_cliente_codigo_distribuidor] or "").strip() if idx_cliente_codigo_distribuidor >= 0 else ""
             )
-        return parsed_rows, parsed_rows[0].anio if parsed_rows else year
+            articulo_codigo_excel = str(row[idx_articulo_codigo] or "").strip() if idx_articulo_codigo >= 0 else ""
+            articulo_descripcion = str(row[idx_descripcion] or "").strip() if idx_descripcion >= 0 else ""
+            for month_idx, month_number, month_name in month_columns:
+                unidades = self._to_float(row[month_idx] if month_idx < len(row) else None)
+                if unidades <= 0:
+                    continue
+                parsed_rows.append(
+                    ClientesWorkbookParsedLine(
+                        source_row=source_row,
+                        anio=row_year,
+                        mes=month_number,
+                        mes_nombre=month_name,
+                        cliente_id=cliente_id,
+                        cliente_codigo=cliente_codigo,
+                        cliente_codigo_distribuidor=cliente_codigo_distribuidor,
+                        cliente_nombre=cliente_nombre,
+                        articulo_id=articulo_id,
+                        articulo_codigo_excel=articulo_codigo_excel,
+                        articulo_descripcion=articulo_descripcion,
+                        unidades=unidades,
+                    )
+                )
+        return parsed_rows, parsed_rows[0].anio if parsed_rows else detected_year
 
     def _resolve_tarifa_precio_kg(
         self,
@@ -1635,7 +1700,15 @@ class SalesReconciliationService:
                 lookup[candidate] = articulo_id
         return lookup
 
-    def _resolve_clientes_product_id(self, articulo_code: object, lookup: dict[str, str]) -> str:
+    def _resolve_clientes_product_id(
+        self,
+        articulo_code: object,
+        lookup: dict[str, str],
+        products: dict[str, IngredienteIreks] | None = None,
+    ) -> str:
+        direct_id = str(articulo_code or "").strip()
+        if direct_id and products is not None and direct_id in products:
+            return direct_id
         for candidate in self._code_candidates(articulo_code):
             product_id = lookup.get(candidate, "")
             if product_id:

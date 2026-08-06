@@ -1566,6 +1566,12 @@ def _migrate_sales_tables() -> None:
             if not expected.issubset(columns) or columns.intersection(legacy):
                 conn.exec_driver_sql("DROP TABLE ventas_mensuales_raw")
 
+        if "ventas_clientes_raw" in tables:
+            columns = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(ventas_clientes_raw)").fetchall()}
+            if "mes" not in columns:
+                conn.exec_driver_sql("ALTER TABLE ventas_clientes_raw ADD COLUMN mes INTEGER NOT NULL DEFAULT 12")
+            conn.exec_driver_sql("UPDATE ventas_clientes_raw SET mes = 12 WHERE mes IS NULL OR mes <= 0")
+
 
 def _ensure_pedidos_items_sync() -> None:
     with engine.begin() as conn:

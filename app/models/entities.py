@@ -275,6 +275,7 @@ class VentaClientesRaw(SQLModel, table=True):
     lote_id: str = Field(default="", nullable=False, max_length=36, index=True)
     cliente_id: str = Field(default="", nullable=False, max_length=36, index=True)
     anio: int = Field(default=0, nullable=False, index=True)
+    mes: int = Field(default=12, nullable=False, index=True)
     articulo_codigo_origen: str = Field(default="", max_length=120, index=True)
     articulo_id: str = Field(default="", max_length=36, index=True)
     articulo_descripcion_origen: str = Field(default="", max_length=255)

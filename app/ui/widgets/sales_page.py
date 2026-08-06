@@ -1758,7 +1758,7 @@ class SalesToolsDialog(QDialog):
         summary.setStyleSheet("color: #4B5F7A;")
         root.addWidget(summary)
 
-        correction_note = QLabel("La corrección reemplaza filas existentes con la misma combinación de cliente, año y artículo.")
+        correction_note = QLabel("La corrección reemplaza filas existentes con la misma combinación de cliente, año, mes y artículo.")
         correction_note.setWordWrap(True)
         correction_note.setStyleSheet("color: #8A5A00; font-size: 12px;")
         root.addWidget(correction_note)
@@ -1786,10 +1786,11 @@ class SalesToolsDialog(QDialog):
             root.addWidget(issues)
 
         preview_rows = list(getattr(preview, "preview_rows", []) or [])
-        table = QTableWidget(0, 4)
+        table = QTableWidget(0, 5)
         table.setHorizontalHeaderLabels(
             [
                 "Fila",
+                "Año/Mes",
                 "Cliente",
                 "Cod. Dist.",
                 "Producto IREKS",
@@ -1804,11 +1805,13 @@ class SalesToolsDialog(QDialog):
         header = table.horizontalHeader()
         header.setStretchLastSection(False)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         table.setColumnWidth(0, 74)
-        table.setColumnWidth(2, 128)
+        table.setColumnWidth(1, 98)
+        table.setColumnWidth(3, 128)
         table.verticalHeader().setDefaultSectionSize(34)
 
         for row_idx, row in enumerate(preview_rows):
@@ -1825,6 +1828,13 @@ class SalesToolsDialog(QDialog):
             fila_item.setBackground(QColor(bg_color))
             fila_item.setToolTip(str(row.get("issue_text") or ""))
             fila_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            periodo_item = QTableWidgetItem(f"{row.get('anio') or ''}/{int(row.get('mes') or 0):02d}")
+            periodo_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            periodo_item.setForeground(QBrush(QColor("#14213D")))
+            periodo_item.setBackground(QColor(bg_color))
+            periodo_item.setToolTip(str(row.get("issue_text") or ""))
+            periodo_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
             cliente_item = QTableWidgetItem(str(row.get("cliente_nombre") or ""))
             cliente_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
@@ -1845,9 +1855,10 @@ class SalesToolsDialog(QDialog):
             producto_item.setToolTip(str(row.get("issue_text") or ""))
 
             table.setItem(row_idx, 0, fila_item)
-            table.setItem(row_idx, 1, cliente_item)
-            table.setItem(row_idx, 2, codigo_item)
-            table.setItem(row_idx, 3, producto_item)
+            table.setItem(row_idx, 1, periodo_item)
+            table.setItem(row_idx, 2, cliente_item)
+            table.setItem(row_idx, 3, codigo_item)
+            table.setItem(row_idx, 4, producto_item)
         root.addWidget(table, 1)
 
         def queue_import(*, replace_existing: bool = False) -> None:

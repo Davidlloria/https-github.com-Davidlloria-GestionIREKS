@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+from openpyxl import Workbook
+
 from app.services.sales_reconciliation_service import ClientesImportPreview, SalesReconciliationService
 
 
@@ -176,6 +178,57 @@ def test_pdf_wrappers_delegate_to_flow_service() -> None:
     assert callable(fake.calls[1][2]["sync_warehouse_callback"])
 
 
+def test_parse_clientes_workbook_expands_ventas_bruto_month_columns(tmp_path) -> None:
+    path = tmp_path / "clientes.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Ventas_Bruto"
+    sheet.append(
+        [
+            "UUID Cliente",
+            "Codigo IREKS",
+            "Codigo IGSA",
+            "Cliente",
+            "Marca",
+            "UUID Producto",
+            "Codigo Producto",
+            "Nombre Porducto",
+            "Año",
+            "ENERO",
+            "FEBRERO",
+            "MARZO",
+            "TOTAL",
+        ]
+    )
+    sheet.append(
+        [
+            "cliente-1",
+            502,
+            "1000 301",
+            "Cliente Uno",
+            "IREKS",
+            "producto-1",
+            "3874",
+            "Producto Excel",
+            2026,
+            2,
+            None,
+            3,
+            5,
+        ]
+    )
+    workbook.save(path)
+
+    rows, year = SalesReconciliationService()._parse_clientes_workbook(path)
+
+    assert year == 2026
+    assert [(row.anio, row.mes, row.unidades) for row in rows] == [(2026, 1, 2.0), (2026, 3, 3.0)]
+    assert rows[0].cliente_codigo_distribuidor == "1000 301"
+    assert rows[0].articulo_id == "producto-1"
+    assert rows[0].articulo_codigo_excel == "3874"
+    assert rows[0].articulo_descripcion == "Producto Excel"
+
+
 def test_import_clientes_from_preview_uses_only_importable_rows(tmp_path, monkeypatch) -> None:
     path = tmp_path / "clientes.xlsx"
     path.write_bytes(b"preview-test")
@@ -184,12 +237,17 @@ def test_import_clientes_from_preview_uses_only_importable_rows(tmp_path, monkey
         {
             "source_row": 2,
             "anio": 2026,
+            "mes": 3,
+            "mes_nombre": "MARZO",
             "cliente_id": "cliente-1",
             "cliente_codigo": "C001",
+            "cliente_codigo_distribuidor": "1000 301",
             "cliente_nombre": "Cliente Uno",
             "articulo_codigo": "DIST-01",
             "articulo_id": "prod-1",
             "articulo_codigo_corto": "IREKS-01",
+            "articulo_codigo_excel": "DIST-01",
+            "articulo_descripcion_excel": "Producto Uno Excel",
             "articulo_descripcion": "Producto Uno",
             "articulo_label": "IREKS-01 - Producto Uno",
             "envase": 12.5,
@@ -247,6 +305,7 @@ def test_import_clientes_from_preview_uses_only_importable_rows(tmp_path, monkey
     assert len(inserted_rows) == 1
     assert inserted_rows[0].cliente_id == "cliente-1"
     assert inserted_rows[0].articulo_id == "prod-1"
+    assert inserted_rows[0].mes == 3
     assert inserted_rows[0].precio_kg == 0.0
     assert any("Cliente no valido" in line for line in result.warnings)
 
