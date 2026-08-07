@@ -45,6 +45,9 @@ def test_customer_queries_dialog_exposes_named_controls() -> None:
     assert '#16A34A' in dialog.excel_button.styleSheet()
     assert '#DC2626' in dialog.pdf_button.styleSheet()
     assert '#F59E0B' in dialog.clear_button.styleSheet()
+    assert '#F3F4F6' in dialog.excel_button.styleSheet()
+    assert '#374151' in dialog.pdf_button.styleSheet()
+    assert '#9CA3AF' in dialog.clear_button.styleSheet()
     image = dialog.run_button.icon().pixmap(16, 16).toImage()
     colors = {
         image.pixelColor(x, y).name()

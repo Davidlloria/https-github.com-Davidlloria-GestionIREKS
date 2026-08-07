@@ -137,7 +137,8 @@ class CustomerQueriesDialog(QDialog):
             'background: #16A34A; color: #FFFFFF; border: 1px solid #15803D; '
             'border-radius: 6px; padding: 5px 12px; font-weight: 600; }'
             'QPushButton#customerQueryExcelButton:hover { background: #15803D; }'
-            'QPushButton#customerQueryExcelButton:disabled { background: #BBF7D0; border-color: #86EFAC; }'
+            'QPushButton#customerQueryExcelButton:disabled {'
+            'background: #F3F4F6; color: #374151; border-color: #9CA3AF; }'
         )
         self.excel_button.clicked.connect(self._export_excel)
         action_row.addWidget(self.excel_button)
@@ -155,7 +156,8 @@ class CustomerQueriesDialog(QDialog):
             'background: #DC2626; color: #FFFFFF; border: 1px solid #B91C1C; '
             'border-radius: 6px; padding: 5px 12px; font-weight: 600; }'
             'QPushButton#customerQueryPdfButton:hover { background: #B91C1C; }'
-            'QPushButton#customerQueryPdfButton:disabled { background: #FECACA; border-color: #FCA5A5; }'
+            'QPushButton#customerQueryPdfButton:disabled {'
+            'background: #F3F4F6; color: #374151; border-color: #9CA3AF; }'
         )
         self.pdf_button.clicked.connect(self._export_pdf)
         action_row.addWidget(self.pdf_button)
@@ -169,7 +171,8 @@ class CustomerQueriesDialog(QDialog):
             'background: #F59E0B; color: #FFFFFF; border: 1px solid #D97706; '
             'border-radius: 6px; padding: 5px 12px; font-weight: 600; }'
             'QPushButton#customerQueryClearButton:hover { background: #D97706; }'
-            'QPushButton#customerQueryClearButton:disabled { background: #FDE68A; border-color: #FCD34D; }'
+            'QPushButton#customerQueryClearButton:disabled {'
+            'background: #F3F4F6; color: #374151; border-color: #9CA3AF; }'
         )
         self.clear_button.clicked.connect(self._clear_query)
         action_row.addWidget(self.clear_button)
