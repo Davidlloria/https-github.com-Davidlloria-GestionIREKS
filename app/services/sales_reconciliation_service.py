@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 import hashlib
 import json
 import math
@@ -100,6 +100,18 @@ class IgsaWorkbookParsedLine:
     lote: str
     es_sc: bool
     suma_cantidad_lotes: float
+
+
+@dataclass
+class IgsaConsolidadoPreview:
+    file_path: Path
+    total_rows: int
+    valid_rows: int
+    invalid_rows: int
+    periodos: list[str]
+    preview_rows: list[dict[str, object]]
+    issues: list[str]
+    import_rows: list[dict[str, object]] = field(default_factory=list)
 
 
 @dataclass
@@ -281,11 +293,11 @@ class SalesReconciliationService:
 
     def import_igsa_excel(self, file_path: Path) -> SalesOpResult:
         try:
-            data = self._read_igsa_consolidado_rows(file_path)
+            preview = self.preview_igsa_excel(file_path)
         except ValueError as exc:
             return SalesOpResult(False, str(exc))
-        if not data:
-            return SalesOpResult(False, "El Excel IGSA no contiene filas válidas en hoja 'consolidado'.")
+        if not preview.import_rows:
+            return SalesOpResult(False, "El Excel IGSA no contiene filas válidas en hoja 'consolidado'.", incidencias=preview.invalid_rows)
 
         file_hash = self._file_hash(file_path)
         with Session(engine) as session:
@@ -298,62 +310,30 @@ class SalesReconciliationService:
             was_reimport = existing is not None
 
             rows: list[VentaMensualRaw] = []
-            skipped = 0
             first_period = ""
             first_cliente_id = ""
-            client_rows = list(
-                session.exec(
-                    select(Cliente.cliente_id, Cliente.cliente_nombre_comercial, Cliente.cliente_nombre_fiscal, Cliente.cliente_tipo)
-                )
-            )
-            allowed_by_id: dict[str, str] = {}
-            allowed_by_name: dict[str, str] = {}
-            for cid, ncom, nfis, ctype in client_rows:
-                tipo = str(ctype or "").strip().lower()
-                if tipo not in SALES_CLIENT_TYPES:
-                    continue
-                cliente_id_val = str(cid or "").strip()
-                if not cliente_id_val:
-                    continue
-                allowed_by_id[cliente_id_val] = cliente_id_val
-                for raw_name in (ncom, nfis):
-                    norm_name = self._normalize_search_text(raw_name)
-                    if norm_name:
-                        allowed_by_name[norm_name] = cliente_id_val
-            for item in data:
+            for item in preview.import_rows:
                 year = self._to_int(item.get("anio"))
                 month = self._to_int(item.get("mes_numero"))
-                if year <= 0 or month < 1 or month > 12:
-                    skipped += 1
-                    continue
                 periodo = f"{year:04d}-{month:02d}"
                 if not first_period:
                     first_period = periodo
-                cliente_id = self._resolve_igsa_cliente_id(
-                    item.get("distribuidor_uuid"),
-                    item.get("distribuidor_nombre"),
-                    allowed_by_id,
-                    allowed_by_name,
-                )
+                cliente_id = str(item.get("empresa_id") or "").strip()
                 if cliente_id and not first_cliente_id:
                     first_cliente_id = cliente_id
 
-                code = self._normalize_code(item.get("articulo_referencia"))
+                code = self._normalize_code(item.get("articulo_referencia") or item.get("ref_corta"))
                 articulo_id = str(item.get("articulo_id") or "").strip()
-                if self._is_total_row(code) or (not code and not articulo_id):
-                    skipped += 1
-                    continue
 
                 tipo = self._normalize_igsa_tipo(item.get("tipo"))
                 kilos = self._to_float(item.get("kilos"))
                 if tipo == "venta":
                     venta_kilos = kilos
                     venta_kilos_sc = 0.0
-                elif tipo in {"s/c", "muestras"}:
+                elif self._is_sc_tipo(tipo):
                     venta_kilos = 0.0
                     venta_kilos_sc = kilos
                 else:
-                    skipped += 1
                     continue
 
                 rows.append(
@@ -374,7 +354,7 @@ class SalesReconciliationService:
                 )
 
             if not rows:
-                return SalesOpResult(False, "No se pudo importar ninguna fila válida.", imported=0, incidencias=skipped)
+                return SalesOpResult(False, "No se pudo importar ninguna fila válida.", imported=0, incidencias=preview.invalid_rows)
 
             # Reemplaza periodos ya importados de IGSA para evitar duplicados
             # cuando se vuelven a importar meses/años (mismo cliente y periodo).
@@ -421,7 +401,136 @@ class SalesReconciliationService:
         msg = "Importación IGSA completada."
         if was_reimport:
             msg = "Reimportación IGSA completada (periodos reemplazados)."
-        return SalesOpResult(True, msg, imported=len(rows), incidencias=skipped)
+        return SalesOpResult(True, msg, imported=len(rows), incidencias=preview.invalid_rows, warnings=list(preview.issues))
+
+    def preview_igsa_excel(self, file_path: Path) -> IgsaConsolidadoPreview:
+        data = self._read_igsa_consolidado_rows(file_path)
+        if not data:
+            return IgsaConsolidadoPreview(
+                file_path=Path(file_path),
+                total_rows=0,
+                valid_rows=0,
+                invalid_rows=0,
+                periodos=[],
+                preview_rows=[],
+                issues=[],
+                import_rows=[],
+            )
+
+        article_ids = sorted(
+            {
+                str(item.get("articulo_id") or "").strip()
+                for item in data
+                if str(item.get("articulo_id") or "").strip()
+            }
+        )
+        with Session(engine) as session:
+            products = (
+                list(session.exec(select(IngredienteIreks).where(col(IngredienteIreks.articulo_id).in_(article_ids))))
+                if article_ids
+                else []
+            )
+        product_by_id = {str(getattr(product, "articulo_id", "") or "").strip(): product for product in products}
+
+        import_rows: list[dict[str, object]] = []
+        preview_rows: list[dict[str, object]] = []
+        issues: list[str] = []
+        for item in data:
+            source_row = self._to_int(item.get("source_row"))
+            empresa_id = str(item.get("empresa_id") or "").strip()
+            year = self._to_int(item.get("anio"))
+            month = self._to_int(item.get("mes_numero"))
+            tipo = self._normalize_igsa_tipo(item.get("tipo"))
+            articulo_id = str(item.get("articulo_id") or "").strip()
+            cantidad = self._to_float(item.get("cantidad"))
+            lote = str(item.get("lote") or "").strip()
+
+            row_errors: list[str] = []
+            if not empresa_id:
+                row_errors.append("Empresa ID vacío.")
+            if year <= 0 or month < 1 or month > 12:
+                row_errors.append("Año/mes inválido.")
+            if tipo not in {"venta", "s/c", "muestras", "promociones"}:
+                row_errors.append(f"Tipo salida no reconocido: {item.get('tipo')!r}.")
+            if not articulo_id:
+                row_errors.append("UUID de producto vacío.")
+            product = product_by_id.get(articulo_id)
+            if articulo_id and product is None:
+                row_errors.append(f"Producto no existe en productos_ireks: {articulo_id}.")
+            if cantidad <= 0:
+                row_errors.append("Cantidad vacía, cero o negativa.")
+            if not lote:
+                row_errors.append("Lote vacío.")
+
+            peso_envase = 0.0
+            descripcion = str(item.get("articulo_descripcion") or "").strip()
+            ref_corta = self._normalize_code(item.get("ref_corta"))
+            if product is not None:
+                peso_envase = float(getattr(product, "articulo_envase_peso_total", 0.0) or 0.0)
+                if peso_envase <= 0:
+                    peso_envase = float(getattr(product, "articulo_envase_peso", 0.0) or 0.0)
+                descripcion = str(getattr(product, "articulo_descripcion", "") or "").strip() or descripcion
+                ref_corta = self._normalize_code(
+                    str(getattr(product, "articulo_referencia_corta", "") or "").strip()
+                    or str(getattr(product, "articulo_referencia", "") or "").strip()
+                    or ref_corta
+                )
+                if peso_envase <= 0:
+                    row_errors.append(f"Producto sin peso en ficha: {articulo_id}.")
+
+            kilos = cantidad * peso_envase
+            periodo = f"{year:04d}-{month:02d}" if year > 0 and 1 <= month <= 12 else ""
+            destino = "S/C" if self._is_sc_tipo(tipo) else "Venta"
+            if row_errors:
+                for error in row_errors:
+                    issues.append(f"Fila {source_row}: {error}")
+                continue
+
+            clean_item = dict(item)
+            clean_item.update(
+                {
+                    "periodo": periodo,
+                    "empresa_id": empresa_id,
+                    "tipo": tipo,
+                    "articulo_id": articulo_id,
+                    "articulo_referencia": ref_corta,
+                    "articulo_descripcion": descripcion,
+                    "cantidad": cantidad,
+                    "cantidad_documento": cantidad,
+                    "envase_peso": peso_envase,
+                    "envase_peso_documento": peso_envase,
+                    "kilos": kilos,
+                    "lote": lote,
+                }
+            )
+            import_rows.append(clean_item)
+            preview_rows.append(
+                {
+                    "source_row": source_row,
+                    "periodo": periodo,
+                    "tipo": str(item.get("tipo") or "").strip(),
+                    "destino": destino,
+                    "ref_corta": ref_corta,
+                    "descripcion": descripcion,
+                    "cantidad": cantidad,
+                    "peso_envase": peso_envase,
+                    "kilos": kilos,
+                    "lote": lote,
+                    "articulo_id": articulo_id,
+                }
+            )
+
+        periodos = sorted({str(row.get("periodo") or "").strip() for row in import_rows if str(row.get("periodo") or "").strip()})
+        return IgsaConsolidadoPreview(
+            file_path=Path(file_path),
+            total_rows=len(data),
+            valid_rows=len(import_rows),
+            invalid_rows=len(issues),
+            periodos=periodos,
+            preview_rows=preview_rows,
+            issues=issues,
+            import_rows=import_rows,
+        )
 
     def parse_igsa_workbook_by_sheets(self, file_path: Path) -> tuple[list[IgsaWorkbookParsedLine], list[str]]:
         return self._igsa_workbook_flow_service.parse_igsa_workbook_by_sheets(file_path)
@@ -2028,7 +2137,9 @@ class SalesReconciliationService:
             tipo = self._normalize_igsa_tipo(payload.get("tipo"))
             lote = str(payload.get("lote") or "").strip()
             lote_key = lote.strip().upper()
-            caducidad = expiry_by_key.get((almacen_id, articulo_id, lote_key)) if lote_key else None
+            caducidad = self._parse_date_value(payload.get("caducidad"))
+            if caducidad is None:
+                caducidad = expiry_by_key.get((almacen_id, articulo_id, lote_key)) if lote_key else None
             mes = self._to_int(periodo.split("-")[1] if "-" in periodo else 0)
             anio = self._to_int(periodo.split("-")[0] if "-" in periodo else 0)
             fecha = date(anio if anio > 0 else date.today().year, mes if 1 <= mes <= 12 else 1, 1)
@@ -2059,6 +2170,23 @@ class SalesReconciliationService:
         except Exception:
             return {}
 
+    def _parse_date_value(self, value) -> date | None:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        text = str(value or "").strip()
+        if not text:
+            return None
+        for pattern in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+            try:
+                return datetime.strptime(text, pattern).date()
+            except ValueError:
+                continue
+        return None
+
     def _igsa_file_path(self) -> Path:
         return BASE_DIR.parent / "Recursos" / "Ventas" / "IGSA - Ventas 01 Enero - 2026.xlsx"
 
@@ -2080,16 +2208,43 @@ class SalesReconciliationService:
             return []
         header_cells = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
         headers = [str(cell).strip() if cell is not None else "" for cell in header_cells]
+        normalized_headers = [self._normalize_key(header) for header in headers]
         rows: list[dict[str, object]] = []
-        for row in ws.iter_rows(min_row=2, values_only=True):
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             if not any(cell not in (None, "") for cell in row):
                 continue
-            item = {headers[idx]: value for idx, value in enumerate(row) if idx < len(headers) and headers[idx]}
-            cantidad = self._to_float(item.get("cantidad"))
-            envase_peso = self._to_float(item.get("envase_peso"))
-            item["kilos"] = cantidad * envase_peso
-            item["anio"] = self._to_int(item.get("anio"))
-            item["mes_numero"] = self._to_int(item.get("mes_numero"))
+            raw_item = {headers[idx]: value for idx, value in enumerate(row) if idx < len(headers) and headers[idx]}
+            normalized_item = {
+                normalized_headers[idx]: value
+                for idx, value in enumerate(row)
+                if idx < len(normalized_headers) and normalized_headers[idx]
+            }
+            item: dict[str, object] = dict(raw_item)
+            empresa_id = self._get_any(normalized_item, "empresaid")
+            year = self._to_int(self._get_any(normalized_item, "anio", "ano"))
+            month = self._to_int(self._get_any(normalized_item, "nmes", "nomes", "mesnumero", "numeromes"))
+            if month < 1:
+                month = self._parse_month(self._get_any(normalized_item, "mes"))
+            cantidad = self._to_float(self._get_any(normalized_item, "cantidad"))
+            item.update(
+                {
+                    "source_row": row_idx,
+                    "empresa": self._get_any(normalized_item, "empresa"),
+                    "empresa_id": str(empresa_id or "").strip(),
+                    "anio": year,
+                    "mes": str(self._get_any(normalized_item, "mes") or "").strip(),
+                    "mes_numero": month,
+                    "tipo": self._get_any(normalized_item, "tiposalida"),
+                    "ref_distribuidor": self._normalize_code(self._get_any(normalized_item, "refdistribuidor")),
+                    "ref_corta": self._normalize_code(self._get_any(normalized_item, "refcorta")),
+                    "articulo_id": str(self._get_any(normalized_item, "id") or "").strip(),
+                    "articulo_descripcion": str(self._get_any(normalized_item, "descripcion") or "").strip(),
+                    "cantidad": cantidad,
+                    "lote": self._normalize_code(self._get_any(normalized_item, "lote")),
+                    "caducidad": self._get_any(normalized_item, "caducidad"),
+                    "observaciones": self._get_any(normalized_item, "observaciones"),
+                }
+            )
             rows.append(item)
         return rows
 

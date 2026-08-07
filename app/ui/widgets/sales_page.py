@@ -1037,7 +1037,7 @@ class SalesToolsDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self._mode = mode if mode in {"ireks", "clientes"} else "ireks"
+        self._mode = mode if mode in {"ireks", "igsa", "clientes"} else "ireks"
         self.setWindowTitle(self._dialog_title())
         self.setModal(True)
         self.resize(980, 620)
@@ -1053,31 +1053,43 @@ class SalesToolsDialog(QDialog):
         self._refresh_history()
 
     def _dialog_title(self) -> str:
+        if self._mode == "igsa":
+            return "Herramienta de ventas - IGSA"
         if self._mode == "clientes":
             return "Herramienta de ventas - clientes"
         return "Herramientas de ventas - IREKS"
 
     def _subtitle_text(self) -> str:
+        if self._mode == "igsa":
+            return "Importación con previsualización de ventas IGSA y salidas de almacén."
         if self._mode == "clientes":
             return "Acceso rápido a importación e histórico de ventas clientes."
         return "Acceso rápido a exportación, importación e histórico de IREKS."
 
     def _export_card_title(self) -> str:
+        if self._mode == "igsa":
+            return "Ventas IGSA"
         if self._mode == "clientes":
             return "Ventas clientes"
         return "Ventas IREKS"
 
     def _export_card_description(self) -> str:
+        if self._mode == "igsa":
+            return "Importa la hoja consolidado y registra las salidas de almacén."
         if self._mode == "clientes":
             return "Gestión de ventas clientes."
         return "Gestiona exportación e importación de ventas IREKS."
 
     def _history_title(self) -> str:
+        if self._mode == "igsa":
+            return "Histórico IGSA"
         if self._mode == "clientes":
             return "Histórico clientes"
         return "Histórico IREKS"
 
     def _history_description(self) -> str:
+        if self._mode == "igsa":
+            return "Últimas operaciones de importación de ventas IGSA."
         if self._mode == "clientes":
             return "Últimas operaciones de importación de ventas clientes."
         return "Últimas operaciones de exportación e importación."
@@ -1621,6 +1633,9 @@ class SalesToolsDialog(QDialog):
         )
 
     def _import_ireks_sales(self) -> None:
+        if self._mode == "igsa":
+            self._import_igsa_sales()
+            return
         if self._mode == "clientes":
             self._import_clientes_sales()
             return
@@ -1659,6 +1674,142 @@ class SalesToolsDialog(QDialog):
             QMessageBox.information(self, outcome.title, outcome.message)
         else:
             QMessageBox.warning(self, outcome.title, outcome.message)
+
+    def _import_igsa_sales(self) -> None:
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Seleccionar Excel ventas IGSA",
+            "",
+            "Excel (*.xlsx *.xlsm)",
+        )
+        if not file_path:
+            return
+        source = Path(file_path)
+        try:
+            preview = self._sales_reconciliation_service.preview_igsa_excel(source)
+        except Exception as exc:  # noqa: BLE001
+            self._record_history(
+                action="import",
+                detail=source.name,
+                status="error",
+                message=str(exc),
+            )
+            self._refresh_history()
+            QMessageBox.warning(self, "Previsualización IGSA", f"No se pudo previsualizar el Excel IGSA:\n{exc}")
+            return
+        self._show_igsa_sales_preview_dialog(source, preview)
+
+    def _execute_igsa_sales_import(self, source: Path, close_dialog: QDialog | None = None) -> None:
+        try:
+            outcome = self._import_service.import_igsa_excel(source)
+        except Exception as exc:  # noqa: BLE001
+            self._record_history(
+                action="import",
+                detail=source.name,
+                status="error",
+                message=str(exc),
+            )
+            self._refresh_history()
+            QMessageBox.warning(self, "Importación IGSA", f"No se pudo importar el Excel IGSA:\n{exc}")
+            return
+
+        status = "warning" if int(outcome.incidencias or 0) > 0 else "ok"
+        if not outcome.ok:
+            status = "error"
+        self._record_history(
+            action="import",
+            detail=f"{source.name} | Excel IGSA consolidado",
+            status=status,
+            message=outcome.message.replace("\n", " | "),
+        )
+        self._refresh_history()
+        if outcome.ok and self._on_import_completed is not None:
+            self._on_import_completed()
+        if close_dialog is not None and outcome.ok:
+            close_dialog.accept()
+
+        if outcome.ok and status == "ok":
+            QMessageBox.information(self, outcome.title, outcome.message)
+        else:
+            QMessageBox.warning(self, outcome.title, outcome.message)
+
+    def _show_igsa_sales_preview_dialog(self, source: Path, preview) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Previsualización IGSA")
+        dialog.setModal(True)
+        dialog.resize(1180, 720)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        title = QLabel("Previsualización de ventas IGSA")
+        title.setStyleSheet("font-size: 20px; font-weight: 700; color: #14213D;")
+        layout.addWidget(title)
+
+        venta_kg = sum(float(row.get("kilos", 0.0) or 0.0) for row in preview.preview_rows if row.get("destino") == "Venta")
+        sc_kg = sum(float(row.get("kilos", 0.0) or 0.0) for row in preview.preview_rows if row.get("destino") == "S/C")
+        summary = QLabel(
+            "Archivo: {file}\nPeriodo(s): {periodos}\nFilas leídas: {total} · válidas: {valid} · errores: {errors}\n"
+            "Kg venta: {venta:,.2f} · Kg S/C: {sc:,.2f} · salidas almacén previstas: {valid}".format(
+                file=source.name,
+                periodos=", ".join(preview.periodos) if preview.periodos else "No detectado",
+                total=int(preview.total_rows or 0),
+                valid=int(preview.valid_rows or 0),
+                errors=int(preview.invalid_rows or 0),
+                venta=venta_kg,
+                sc=sc_kg,
+            )
+        )
+        summary.setStyleSheet("color: #4B5F7A; font-size: 12px;")
+        layout.addWidget(summary)
+
+        table = QTableWidget(0, 10)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setHorizontalHeaderLabels(["Fila", "Periodo", "Tipo", "Destino", "Ref", "Producto", "Cant.", "Peso", "Kg", "Lote"])
+        table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+        for col in (0, 1, 2, 3, 4, 6, 7, 8, 9):
+            table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        preview_sample = list(preview.preview_rows[:300])
+        table.setRowCount(len(preview_sample))
+        for row_idx, row in enumerate(preview_sample):
+            values = [
+                row.get("source_row", ""),
+                row.get("periodo", ""),
+                row.get("tipo", ""),
+                row.get("destino", ""),
+                row.get("ref_corta", ""),
+                row.get("descripcion", ""),
+                f"{float(row.get('cantidad', 0.0) or 0.0):,.2f}",
+                f"{float(row.get('peso_envase', 0.0) or 0.0):,.2f}",
+                f"{float(row.get('kilos', 0.0) or 0.0):,.2f}",
+                row.get("lote", ""),
+            ]
+            for col_idx, value in enumerate(values):
+                item = QTableWidgetItem(str(value))
+                if col_idx in {6, 7, 8}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                table.setItem(row_idx, col_idx, item)
+        layout.addWidget(table, 1)
+
+        issues_label = QLabel("Errores / avisos")
+        issues_label.setStyleSheet("font-weight: 700; color: #14213D;")
+        layout.addWidget(issues_label)
+        issues = QPlainTextEdit()
+        issues.setReadOnly(True)
+        issues.setMaximumHeight(140)
+        issues.setPlainText("\n".join(preview.issues) if preview.issues else "Sin errores.")
+        layout.addWidget(issues)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
+        import_btn = buttons.addButton("Importar definitivamente", QDialogButtonBox.ButtonRole.AcceptRole)
+        import_btn.setEnabled(bool(preview.import_rows))
+        import_btn.setStyleSheet("QPushButton { background-color: #1D7D4D; color: white; font-weight: 700; padding: 8px 14px; }")
+        buttons.rejected.connect(dialog.reject)
+        import_btn.clicked.connect(lambda: self._execute_igsa_sales_import(source, dialog))
+        layout.addWidget(buttons)
+        dialog.exec()
 
     def _import_clientes_sales(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(
@@ -2372,7 +2523,7 @@ class SalesPage(QWidget):
             hover_background="#E3D2F7",
             pressed_background="#CBB2ED",
         )
-        self.sales_tools_btn_igsa.clicked.connect(lambda: self._show_igsa_placeholder_action("Tools"))
+        self.sales_tools_btn_igsa.clicked.connect(self._open_igsa_sales_tools_dialog)
 
         igsa_chart_actions_widget = QWidget()
         igsa_chart_band = QHBoxLayout(igsa_chart_actions_widget)
@@ -3517,6 +3668,10 @@ class SalesPage(QWidget):
 
     def _open_sales_tools_dialog(self) -> None:
         dialog = SalesToolsDialog(on_import_completed=self.reload, parent=self)
+        dialog.exec()
+
+    def _open_igsa_sales_tools_dialog(self) -> None:
+        dialog = SalesToolsDialog(mode="igsa", on_import_completed=self.reload_igsa, parent=self)
         dialog.exec()
 
     def _open_clientes_sales_tools_dialog(self) -> None:

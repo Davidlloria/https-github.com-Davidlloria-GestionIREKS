@@ -2,7 +2,11 @@ import json
 from pathlib import Path
 
 from openpyxl import Workbook
+import pytest
+from sqlmodel import SQLModel, Session, create_engine, select
 
+import app.services.sales_reconciliation_service as sales_reconciliation_service_module
+from app.models import AlmacenMovimiento, Distribuidor, IngredienteIreks, VentaMensualRaw
 from app.services.sales_reconciliation_service import ClientesImportPreview, SalesReconciliationService
 
 
@@ -56,6 +60,63 @@ class _FakeSessionFactory:
         return self.last_session
 
 
+@pytest.fixture()
+def isolated_sales_engine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'sales-reconciliation.db'}",
+        connect_args={"check_same_thread": False},
+    )
+    SQLModel.metadata.create_all(engine)
+    monkeypatch.setattr(sales_reconciliation_service_module, "engine", engine)
+    return engine
+
+
+def _build_igsa_consolidado_workbook(path: Path, *, include_invalid: bool = False) -> None:
+    workbook = Workbook()
+    ws = workbook.active
+    ws.title = "consolidado"
+    ws.append(
+        [
+            "Empresa",
+            "Empresa ID",
+            "Año",
+            "Mes",
+            "Nº mes",
+            "Tipo salida",
+            "Ref distribuidor",
+            "Ref corta",
+            "ID",
+            "Descripción",
+            "Cantidad",
+            "Lote",
+            "Caducidad",
+            "Observaciones",
+        ]
+    )
+    ws.append(["IGSA", "dist-igsa", 2026, "JULIO", 7, "Venta", 36, "D123", "art-1", "Producto Excel", 4, "L001", None, None])
+    ws.append(["IGSA", "dist-igsa", 2026, "JULIO", 7, "Muestra", 36, "D123", "art-1", "Producto Excel", 2, "L002", None, None])
+    if include_invalid:
+        ws.append(["IGSA", "dist-igsa", 2026, "JULIO", 7, "Venta", 99, "D999", "missing-art", "Producto sin ficha", 1, "L003", None, None])
+    workbook.save(path)
+
+
+def _seed_igsa_product(session: Session) -> None:
+    session.add(Distribuidor(distribuidor_id="dist-igsa", distribuidor_codigo=2, distribuidor_nombre_comercial="IGSA"))
+    session.add(
+        IngredienteIreks(
+            articulo_id="art-1",
+            almacen_id="alm-central",
+            distribuidor_id="dist-igsa",
+            articulo_referencia="D123",
+            articulo_referencia_corta="D123",
+            articulo_descripcion="Producto ficha",
+            articulo_envase_peso_total=2.5,
+            articulo_envase_peso=2.5,
+        )
+    )
+    session.commit()
+
+
 def test_read_ireks_json_accepts_utf16_bom(tmp_path) -> None:
     path = tmp_path / "ireks.json"
     rows = [{"venta_Anio": 2025, "venta_Mes": "Enero", "Codigo": "123"}]
@@ -74,6 +135,61 @@ def test_import_ireks_json_returns_result_for_invalid_json(tmp_path) -> None:
 
     assert not result.ok
     assert "JSON valido" in result.message
+
+
+def test_preview_igsa_excel_reads_consolidado_and_classifies_sc(isolated_sales_engine, tmp_path: Path) -> None:
+    workbook_path = tmp_path / "igsa-julio.xlsx"
+    _build_igsa_consolidado_workbook(workbook_path, include_invalid=True)
+    with Session(isolated_sales_engine) as session:
+        _seed_igsa_product(session)
+
+    preview = SalesReconciliationService().preview_igsa_excel(workbook_path)
+
+    assert preview.total_rows == 3
+    assert preview.valid_rows == 2
+    assert preview.invalid_rows == 1
+    assert preview.periodos == ["2026-07"]
+    assert preview.preview_rows[0]["destino"] == "Venta"
+    assert preview.preview_rows[0]["kilos"] == 10.0
+    assert preview.preview_rows[1]["destino"] == "S/C"
+    assert preview.preview_rows[1]["kilos"] == 5.0
+    assert any("missing-art" in issue for issue in preview.issues)
+
+
+def test_import_igsa_excel_persists_sales_and_warehouse_outputs(isolated_sales_engine, tmp_path: Path) -> None:
+    workbook_path = tmp_path / "igsa-julio.xlsx"
+    _build_igsa_consolidado_workbook(workbook_path)
+    with Session(isolated_sales_engine) as session:
+        _seed_igsa_product(session)
+
+    result = SalesReconciliationService().import_igsa_excel(workbook_path)
+
+    assert result.ok is True
+    assert result.imported == 2
+    assert result.incidencias == 0
+    with Session(isolated_sales_engine) as session:
+        rows = list(session.exec(select(VentaMensualRaw).order_by(VentaMensualRaw.venta_kilos.desc())))
+        assert len(rows) == 2
+        assert rows[0].fuente == "igsa"
+        assert rows[0].cliente_id == "dist-igsa"
+        assert rows[0].periodo == "2026-07"
+        assert rows[0].venta_kilos == 10.0
+        assert rows[0].venta_kilos_sc == 0.0
+        assert rows[1].venta_kilos == 0.0
+        assert rows[1].venta_kilos_sc == 5.0
+        movements = list(session.exec(select(AlmacenMovimiento).order_by(AlmacenMovimiento.articulo_lote)))
+        assert len(movements) == 2
+        assert {movement.almacen_id for movement in movements} == {"dist-igsa"}
+        assert [movement.cantidad for movement in movements] == [-4.0, -2.0]
+        assert {movement.pedido_numero for movement in movements} == {"IGSA-2026-07"}
+
+    second = SalesReconciliationService().import_igsa_excel(workbook_path)
+
+    assert second.ok is True
+    assert second.imported == 2
+    with Session(isolated_sales_engine) as session:
+        assert len(list(session.exec(select(VentaMensualRaw)))) == 2
+        assert len(list(session.exec(select(AlmacenMovimiento)))) == 2
 
 
 def test_import_ireks_json_accepts_structured_payload(tmp_path, monkeypatch) -> None:
