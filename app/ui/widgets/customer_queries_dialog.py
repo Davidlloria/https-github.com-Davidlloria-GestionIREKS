@@ -8,9 +8,11 @@ from PySide6.QtGui import QColor, QIcon, QPainter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
+    QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QTableWidget,
@@ -19,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.customer_query_service import CustomerQueryResult, CustomerQueryService
+from app.services.report_export_service import ReportExportService
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 
@@ -63,6 +66,7 @@ class CustomerQueriesDialog(QDialog):
     def __init__(
         self,
         service: CustomerQueryService | None = None,
+        report_export_service: ReportExportService | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -72,7 +76,9 @@ class CustomerQueriesDialog(QDialog):
         self.resize(1040, 680)
         self.setMinimumSize(820, 540)
         self._service = service or CustomerQueryService()
+        self._report_export_service = report_export_service or ReportExportService()
         self._worker: CustomerQueryWorker | None = None
+        self._last_result: CustomerQueryResult | None = None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -117,9 +123,54 @@ class CustomerQueriesDialog(QDialog):
             'QPushButton#customerQueryRunButton:disabled { background: #BFDBFE; }'
         )
         action_row.addWidget(self.run_button)
+
+        self.excel_button = QPushButton('Excel')
+        self.excel_button.setObjectName('customerQueryExcelButton')
+        self.excel_button.setProperty('btnRole', 'success')
+        self.excel_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.excel_button.setEnabled(False)
+        self.excel_button.setIcon(
+            _tinted_icon(BASE_DIR / 'assets' / 'icons' / 'sheet.svg', QColor('#FFFFFF'), 16)
+        )
+        self.excel_button.setStyleSheet(
+            'QPushButton#customerQueryExcelButton {'
+            'background: #16A34A; color: #FFFFFF; border: 1px solid #15803D; '
+            'border-radius: 6px; padding: 5px 12px; font-weight: 600; }'
+            'QPushButton#customerQueryExcelButton:hover { background: #15803D; }'
+            'QPushButton#customerQueryExcelButton:disabled { background: #BBF7D0; border-color: #86EFAC; }'
+        )
+        self.excel_button.clicked.connect(self._export_excel)
+        action_row.addWidget(self.excel_button)
+
+        self.pdf_button = QPushButton('Pdf')
+        self.pdf_button.setObjectName('customerQueryPdfButton')
+        self.pdf_button.setProperty('btnRole', 'danger')
+        self.pdf_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.pdf_button.setEnabled(False)
+        self.pdf_button.setIcon(
+            _tinted_icon(BASE_DIR / 'assets' / 'icons' / 'file-text.svg', QColor('#FFFFFF'), 16)
+        )
+        self.pdf_button.setStyleSheet(
+            'QPushButton#customerQueryPdfButton {'
+            'background: #DC2626; color: #FFFFFF; border: 1px solid #B91C1C; '
+            'border-radius: 6px; padding: 5px 12px; font-weight: 600; }'
+            'QPushButton#customerQueryPdfButton:hover { background: #B91C1C; }'
+            'QPushButton#customerQueryPdfButton:disabled { background: #FECACA; border-color: #FCA5A5; }'
+        )
+        self.pdf_button.clicked.connect(self._export_pdf)
+        action_row.addWidget(self.pdf_button)
+
         self.clear_button = QPushButton('Limpiar')
         self.clear_button.setObjectName('customerQueryClearButton')
-        self.clear_button.setProperty('btnRole', 'secondary')
+        self.clear_button.setProperty('btnRole', 'warning')
+        self.clear_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.clear_button.setStyleSheet(
+            'QPushButton#customerQueryClearButton {'
+            'background: #F59E0B; color: #FFFFFF; border: 1px solid #D97706; '
+            'border-radius: 6px; padding: 5px 12px; font-weight: 600; }'
+            'QPushButton#customerQueryClearButton:hover { background: #D97706; }'
+            'QPushButton#customerQueryClearButton:disabled { background: #FDE68A; border-color: #FCD34D; }'
+        )
         self.clear_button.clicked.connect(self._clear_query)
         action_row.addWidget(self.clear_button)
         action_row.addStretch(1)
@@ -167,6 +218,8 @@ class CustomerQueriesDialog(QDialog):
         self.results_table.clear()
         self.results_table.setRowCount(0)
         self.results_table.setColumnCount(0)
+        self._last_result = None
+        self._set_export_buttons_enabled(False)
         self.interpretation_label.setText('La interpretación de la consulta aparecerá aquí.')
         self.status_label.setText('Sin consulta ejecutada.')
         self.prompt.setFocus()
@@ -190,10 +243,12 @@ class CustomerQueriesDialog(QDialog):
         self._worker.start()
 
     def _show_result(self, result: CustomerQueryResult) -> None:
+        self._last_result = result if result.status == "ready" else None
         self.interpretation_label.setText(
             result.interpretation or "No se pudo determinar una interpretación detallada."
         )
         self._render_rows(result.headers, result.rows)
+        self._set_export_buttons_enabled(result.status == "ready" and bool(result.rows))
         if result.status == "ready":
             source = f" · {result.source}" if result.source else ""
             self.status_label.setText(f"{result.title} · {len(result.rows)} fila(s){source}")
@@ -201,6 +256,8 @@ class CustomerQueriesDialog(QDialog):
             self.status_label.setText(result.message or "No se encontraron resultados.")
 
     def _show_error(self, message: str) -> None:
+        self._last_result = None
+        self._set_export_buttons_enabled(False)
         self.interpretation_label.setText("La consulta no pudo interpretarse o ejecutarse.")
         self.status_label.setText(message)
 
@@ -248,8 +305,73 @@ class CustomerQueriesDialog(QDialog):
     def _set_busy(self, busy: bool) -> None:
         self.run_button.setEnabled(not busy)
         self.clear_button.setEnabled(not busy)
+        self._set_export_buttons_enabled(not busy and self._has_exportable_rows())
         self.close_button.setEnabled(not busy)
         self.prompt.setReadOnly(busy)
+
+    def _has_exportable_rows(self) -> bool:
+        return bool(
+            self._last_result
+            and self.results_table.rowCount() > 0
+            and self.results_table.columnCount() > 0
+        )
+
+    def _set_export_buttons_enabled(self, enabled: bool) -> None:
+        if hasattr(self, 'excel_button'):
+            self.excel_button.setEnabled(enabled)
+        if hasattr(self, 'pdf_button'):
+            self.pdf_button.setEnabled(enabled)
+
+    def _visible_table_data(self) -> tuple[list[str], list[list[Any]]]:
+        headers = [
+            str(self.results_table.horizontalHeaderItem(column).text() or '')
+            if self.results_table.horizontalHeaderItem(column) is not None
+            else ''
+            for column in range(self.results_table.columnCount())
+        ]
+        rows: list[list[Any]] = []
+        for row_index in range(self.results_table.rowCount()):
+            row: list[Any] = []
+            for column_index in range(self.results_table.columnCount()):
+                item = self.results_table.item(row_index, column_index)
+                if item is None:
+                    row.append('')
+                    continue
+                value = item.data(Qt.ItemDataRole.UserRole)
+                row.append(value if value is not None else item.text())
+            rows.append(row)
+        return headers, rows
+
+    def _export_title(self) -> str:
+        if self._last_result is not None and self._last_result.title:
+            return self._last_result.title
+        return 'Consulta de clientes'
+
+    def _export_excel(self) -> None:
+        if not self._has_exportable_rows():
+            QMessageBox.warning(self, 'Consultas de clientes', 'No hay resultados para exportar.')
+            return
+        headers, rows = self._visible_table_data()
+        title = self._export_title()
+        default = str(self._report_export_service.default_path(title, 'xlsx', folder='consultas_clientes'))
+        path, _ = QFileDialog.getSaveFileName(self, 'Exportar consulta a Excel', default, 'Excel (*.xlsx)')
+        if not path:
+            return
+        out = self._report_export_service.export_excel(path, title, headers, rows, sheet_title='Consulta clientes')
+        QMessageBox.information(self, 'Consultas de clientes', f'Excel exportado:\n{out}')
+
+    def _export_pdf(self) -> None:
+        if not self._has_exportable_rows():
+            QMessageBox.warning(self, 'Consultas de clientes', 'No hay resultados para exportar.')
+            return
+        headers, rows = self._visible_table_data()
+        title = self._export_title()
+        default = str(self._report_export_service.default_path(title, 'pdf', folder='consultas_clientes'))
+        path, _ = QFileDialog.getSaveFileName(self, 'Exportar consulta a PDF', default, 'PDF (*.pdf)')
+        if not path:
+            return
+        out = self._report_export_service.export_pdf(path, title, headers, rows)
+        QMessageBox.information(self, 'Consultas de clientes', f'PDF exportado:\n{out}')
 
     def reject(self) -> None:
         if self._worker is not None and self._worker.isRunning():

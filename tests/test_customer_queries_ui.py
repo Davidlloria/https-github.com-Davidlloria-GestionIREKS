@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -9,6 +10,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QDateEdit, QPushButton
 
 from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
+from app.services.customer_query_service import CustomerQueryResult
 from app.ui.widgets.customers_page import AgendaCalendarDelegate, CustomersPage
 
 _APP: QApplication | None = None
@@ -28,10 +30,21 @@ def test_customer_queries_dialog_exposes_named_controls() -> None:
     assert dialog.prompt.objectName() == "customerQueryPrompt"
     assert dialog.results_table.objectName() == "customerQueryResultsTable"
     assert dialog.run_button.objectName() == "customerQueryRunButton"
+    assert dialog.excel_button.objectName() == "customerQueryExcelButton"
+    assert dialog.excel_button.text() == "Excel"
+    assert not dialog.excel_button.icon().isNull()
+    assert not dialog.excel_button.isEnabled()
+    assert dialog.pdf_button.objectName() == "customerQueryPdfButton"
+    assert dialog.pdf_button.text() == "Pdf"
+    assert not dialog.pdf_button.icon().isNull()
+    assert not dialog.pdf_button.isEnabled()
     assert dialog.close_button.objectName() == "customerQueriesCloseButton"
     assert dialog.clear_button.objectName() == 'customerQueryClearButton'
     assert dialog.findChildren(QPushButton, 'customerQueryExampleButton') == []
     assert '#60A5FA' in dialog.run_button.styleSheet()
+    assert '#16A34A' in dialog.excel_button.styleSheet()
+    assert '#DC2626' in dialog.pdf_button.styleSheet()
+    assert '#F59E0B' in dialog.clear_button.styleSheet()
     image = dialog.run_button.icon().pixmap(16, 16).toImage()
     colors = {
         image.pixelColor(x, y).name()
@@ -59,6 +72,8 @@ def test_customer_query_clear_button_resets_the_dialog() -> None:
     assert dialog.results_table.rowCount() == 0
     assert dialog.results_table.columnCount() == 0
     assert dialog.status_label.text() == 'Sin consulta ejecutada.'
+    assert not dialog.excel_button.isEnabled()
+    assert not dialog.pdf_button.isEnabled()
     dialog.close()
     dialog.deleteLater()
     QApplication.processEvents()
@@ -70,6 +85,79 @@ def test_customer_code_is_not_formatted_as_decimal() -> None:
 
     assert dialog._table_item('Cod.', 35).text() == '35'
     assert dialog._table_item('Kg', 35).text() == '35,00'
+    dialog.close()
+    dialog.deleteLater()
+    QApplication.processEvents()
+
+
+class _StubReportExportService:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def default_path(self, title: str, suffix: str, folder: str = "listados_clientes") -> Path:
+        return Path(f"export.{suffix}")
+
+    def export_excel(self, path: str, title: str, headers: list[str], rows: list[list[str]], sheet_title: str = "Listado clientes") -> Path:
+        self.calls.append(("excel", path, title, headers, rows, sheet_title))
+        return Path(path)
+
+    def export_pdf(self, path: str, title: str, headers: list[str], rows: list[list[str]]) -> Path:
+        self.calls.append(("pdf", path, title, headers, rows))
+        return Path(path)
+
+
+def test_customer_query_exports_visible_results(monkeypatch, tmp_path) -> None:
+    _application()
+    export_service = _StubReportExportService()
+    dialog = CustomerQueriesDialog(report_export_service=export_service)
+    messages = []
+    monkeypatch.setattr(
+        "app.ui.widgets.customer_queries_dialog.QFileDialog.getSaveFileName",
+        lambda *args, **kwargs: (str(tmp_path / "consulta.xlsx"), ""),
+    )
+    monkeypatch.setattr(
+        "app.ui.widgets.customer_queries_dialog.QMessageBox.information",
+        lambda *args, **kwargs: messages.append(args),
+    )
+    dialog._show_result(
+        CustomerQueryResult(
+            status="ready",
+            title="Consulta ventas",
+            headers=["Nombre comercial", "Kg"],
+            rows=[["Cliente Uno", 12.5]],
+            source="cálculo local",
+        )
+    )
+
+    assert dialog.excel_button.isEnabled()
+    assert dialog.pdf_button.isEnabled()
+
+    dialog._export_excel()
+
+    monkeypatch.setattr(
+        "app.ui.widgets.customer_queries_dialog.QFileDialog.getSaveFileName",
+        lambda *args, **kwargs: (str(tmp_path / "consulta.pdf"), ""),
+    )
+    dialog._export_pdf()
+
+    assert export_service.calls == [
+        (
+            "excel",
+            str(tmp_path / "consulta.xlsx"),
+            "Consulta ventas",
+            ["Nombre comercial", "Kg"],
+            [["Cliente Uno", 12.5]],
+            "Consulta clientes",
+        ),
+        (
+            "pdf",
+            str(tmp_path / "consulta.pdf"),
+            "Consulta ventas",
+            ["Nombre comercial", "Kg"],
+            [["Cliente Uno", 12.5]],
+        ),
+    ]
+    assert messages
     dialog.close()
     dialog.deleteLater()
     QApplication.processEvents()
