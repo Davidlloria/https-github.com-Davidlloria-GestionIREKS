@@ -182,7 +182,7 @@ class SalesAnnualComparisonService:
             {
                 int(year or 0)
                 for year in years
-                if int(year or 0) > 0
+                if 1900 <= int(year or 0) <= 2100
             },
             reverse=True,
         )

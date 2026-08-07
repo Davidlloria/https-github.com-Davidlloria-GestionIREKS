@@ -1353,6 +1353,8 @@ class CustomersPage(QWidget):
 
     def _handle_customer_tab_changed(self, index: int) -> None:
         if index == getattr(self, "_customer_sales_tab_index", -1):
+            self._reload_related_sales_years()
+            self._refresh_related_sales()
             QTimer.singleShot(0, self._sync_related_sales_totals)
 
     def _sync_related_sales_totals(self, *args) -> None:
@@ -2747,6 +2749,7 @@ class CustomersPage(QWidget):
             ]
         self._update_search_counter(len(self.rows), len(all_rows))
         self._render_table()
+        self._reload_related_sales_years()
         if not self._restore_customer_selection(preferred_customer_id):
             self._restore_customer_selection(self._last_selected_customer_id)
         if self.table.rowCount() > 0 and not self.table.selectionModel().selectedRows():
