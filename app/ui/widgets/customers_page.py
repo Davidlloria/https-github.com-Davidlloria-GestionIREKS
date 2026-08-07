@@ -1196,8 +1196,11 @@ class CustomersPage(QWidget):
         self._populate_month_filter(self._related_sales_month_to_filter, 12)
         self._related_sales_month_to_filter.currentIndexChanged.connect(self._refresh_related_sales)
 
-        self._related_sales_compare_btn = QPushButton("Comp.")
+        self._related_sales_compare_btn = QPushButton("Comparar")
         self._related_sales_compare_btn.setObjectName("customerSalesCompareButton")
+        self._related_sales_compare_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "scale.svg")))
+        self._related_sales_compare_btn.setIconSize(QSize(16, 16))
+        self._related_sales_compare_btn.setProperty("btnRole", "info")
         self._related_sales_compare_btn.setEnabled(False)
         self._related_sales_compare_btn.clicked.connect(self._open_related_sales_comparison)
 
