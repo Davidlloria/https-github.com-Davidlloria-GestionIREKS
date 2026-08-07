@@ -131,6 +131,21 @@ def test_sales_customer_top_query_orders_descending_and_respects_fields() -> Non
     assert intent.sort_by_island is False
 
 
+def test_sales_customer_comparison_query_uses_two_years_and_requested_fields() -> None:
+    intent = CustomerQueryService().interpret(
+        'listado 5 clientes top ventas en 2025 versus 2024, '
+        'campos: nombre, kg 2025, kg 2024, diferencia kg'
+    )
+
+    assert intent.query_type == 'sales_customer_year_comparison'
+    assert intent.year == 2025
+    assert intent.compare_year == 2024
+    assert intent.limit == 5
+    assert intent.direction == 'desc'
+    assert intent.sort_metric == 'kg_curr'
+    assert intent.columns == ['nombre', 'kg_curr', 'kg_prev', 'delta_kg']
+
+
 def test_zero_consumption_is_not_interpreted_as_a_one_row_limit() -> None:
     intent = CustomerQueryService().interpret(
         'dame el listado de los clientes de gran canaria con consumo 0 en el 2025, '
@@ -235,6 +250,51 @@ def test_sales_customer_top_query_returns_global_top_and_requested_columns(tmp_p
         ['Cliente Bajo', 1.0],
     ]
     assert 'orden: kg de mayor a menor' in result.interpretation
+
+
+def test_sales_customer_comparison_query_returns_top_year_with_requested_columns(tmp_path) -> None:
+    db_engine = _sales_engine(tmp_path)
+    with Session(db_engine) as session:
+        session.add_all([
+            Cliente(cliente_id='c1', cliente_codigo=101, cliente_nombre_comercial='Cliente Bajo'),
+            Cliente(cliente_id='c2', cliente_codigo=102, cliente_nombre_comercial='Cliente Medio'),
+            Cliente(cliente_id='c3', cliente_codigo=103, cliente_nombre_comercial='Cliente Alto'),
+            Cliente(cliente_id='c4', cliente_codigo=104, cliente_nombre_comercial='Cliente Maximo'),
+            Cliente(cliente_id='c5', cliente_codigo=105, cliente_nombre_comercial='Cliente Cero'),
+            Cliente(cliente_id='c6', cliente_codigo=106, cliente_nombre_comercial='Cliente Extra'),
+        ])
+        _add_sale(session, 'cmp-1-current', 'c1', 2025, 1.0)
+        _add_sale(session, 'cmp-1-prev', 'c1', 2024, 10.0)
+        _add_sale(session, 'cmp-2-current', 'c2', 2025, 20.0)
+        _add_sale(session, 'cmp-2-prev', 'c2', 2024, 5.0)
+        _add_sale(session, 'cmp-3-current', 'c3', 2025, 100.0)
+        _add_sale(session, 'cmp-3-prev', 'c3', 2024, 90.0)
+        _add_sale(session, 'cmp-4-current', 'c4', 2025, 200.0)
+        _add_sale(session, 'cmp-4-prev', 'c4', 2024, 150.0)
+        _add_sale(session, 'cmp-5-current', 'c5', 2025, 0.5)
+        _add_sale(session, 'cmp-5-prev', 'c5', 2024, 1.0)
+        _add_sale(session, 'cmp-6-current', 'c6', 2025, 50.0)
+        _add_sale(session, 'cmp-6-prev', 'c6', 2024, 80.0)
+        session.commit()
+
+    result = CustomerQueryService(
+        sales_service=SalesAnnualComparisonService(db_engine=db_engine)
+    ).run(
+        'listado 5 clientes top ventas en 2025 versus 2024, '
+        'campos: nombre, kg 2025, kg 2024, diferencia kg'
+    )
+
+    assert result.title == 'Comparativa ventas 2025 vs 2024'
+    assert result.headers == ['Nombre comercial', 'Kg 2025', 'Kg 2024', 'Dif. Kg']
+    assert result.rows == [
+        ['Cliente Maximo', 200.0, 150.0, 50.0],
+        ['Cliente Alto', 100.0, 90.0, 10.0],
+        ['Cliente Extra', 50.0, 80.0, -30.0],
+        ['Cliente Medio', 20.0, 5.0, 15.0],
+        ['Cliente Bajo', 1.0, 10.0, -9.0],
+    ]
+    assert 'Comparativa 2025 vs 2024' in result.interpretation
+    assert 'orden: kg 2025 de mayor a menor' in result.interpretation
 
 
 def test_zero_consumption_includes_customers_without_sales_and_excludes_positive_sales(tmp_path) -> None:

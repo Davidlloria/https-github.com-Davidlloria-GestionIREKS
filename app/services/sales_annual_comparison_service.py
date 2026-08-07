@@ -743,6 +743,44 @@ class SalesAnnualComparisonService:
             raw_rows, party_by_id, current_year, safe_limit, direction
         )
 
+    def listar_comparativa_anual_clientes(
+        self,
+        year: int,
+        compare_year: int,
+        limit: int = 10,
+        direction: str = 'desc',
+        sort_metric: str = 'kg_curr',
+        cliente_tipo: str = '',
+        isla: str = '',
+    ) -> list[SalesCustomerAnnualComparisonRow]:
+        current_year = int(year or 0)
+        previous_year = int(compare_year or 0)
+        if current_year <= 0 or previous_year <= 0 or current_year == previous_year:
+            return []
+        safe_limit = min(max(int(limit or 10), 1), 500)
+        with Session(self._engine) as session:
+            raw_rows = list(
+                session.exec(
+                    select(VentaClientesRaw).where(
+                        col(VentaClientesRaw.anio).in_([previous_year, current_year])
+                    )
+                )
+            )
+            clients = list(session.exec(select(Cliente)))
+            islands = list(session.exec(select(Isla)))
+        return self._build_customer_year_comparison(
+            raw_rows,
+            clients,
+            islands,
+            current_year,
+            previous_year,
+            safe_limit,
+            direction,
+            sort_metric,
+            cliente_tipo,
+            isla,
+        )
+
     def _build_annual_customer_sales(
         self,
         raw_rows,
@@ -850,6 +888,89 @@ class SalesAnnualComparisonService:
         reverse = str(direction or 'asc').strip().lower() == 'desc'
         result.sort(
             key=lambda row: (row.delta_kg, row.cliente_nombre.lower(), row.cliente_codigo.lower()),
+            reverse=reverse,
+        )
+        return result[:safe_limit]
+
+    def _build_customer_year_comparison(
+        self,
+        raw_rows,
+        clients,
+        islands,
+        current_year: int,
+        previous_year: int,
+        safe_limit: int,
+        direction: str,
+        sort_metric: str,
+        cliente_tipo: str,
+        isla: str,
+    ) -> list[SalesCustomerAnnualComparisonRow]:
+        island_by_id = {str(row.isla_id or '').strip(): str(row.isla_nombre or '') for row in islands}
+        clean_type = str(cliente_tipo or '').strip().lower()
+        clean_island = self._normalize_search_text(isla)
+        eligible_clients = {}
+        for client in clients:
+            cliente_id = str(getattr(client, 'cliente_id', '') or '').strip()
+            if not cliente_id:
+                continue
+            row_type = str(getattr(client, 'cliente_tipo', '') or '').strip().lower()
+            if clean_type and row_type != clean_type:
+                continue
+            island_id = str(getattr(client, 'cliente_direccion_isla_id', '') or '').strip()
+            island_name = island_by_id.get(island_id, '')
+            if clean_island and self._normalize_search_text(island_name) != clean_island:
+                continue
+            eligible_clients[cliente_id] = client
+
+        totals = defaultdict(lambda: {'kg_prev': 0.0, 'kg_curr': 0.0})
+        for raw_row in raw_rows:
+            cliente_id = str(getattr(raw_row, 'cliente_id', '') or '').strip()
+            if cliente_id not in eligible_clients:
+                continue
+            row_year = int(getattr(raw_row, 'anio', 0) or 0)
+            if row_year == current_year:
+                totals[cliente_id]['kg_curr'] += float(getattr(raw_row, 'kg', 0.0) or 0.0)
+            elif row_year == previous_year:
+                totals[cliente_id]['kg_prev'] += float(getattr(raw_row, 'kg', 0.0) or 0.0)
+
+        result = []
+        for cliente_id, values in totals.items():
+            client = eligible_clients.get(cliente_id)
+            if client is None:
+                continue
+            kg_prev = float(values['kg_prev'] or 0.0)
+            kg_curr = float(values['kg_curr'] or 0.0)
+            delta_kg = kg_curr - kg_prev
+            result.append(
+                SalesCustomerAnnualComparisonRow(
+                    cliente_id=cliente_id,
+                    cliente_codigo=str(getattr(client, 'cliente_codigo', '') or ''),
+                    cliente_nombre=str(
+                        getattr(client, 'cliente_nombre_comercial', '')
+                        or getattr(client, 'cliente_nombre_fiscal', '')
+                        or cliente_id
+                    ),
+                    kg_prev=kg_prev,
+                    kg_curr=kg_curr,
+                    delta_kg=delta_kg,
+                    delta_kg_pct=self._pct(delta_kg, kg_prev),
+                )
+            )
+
+        clean_sort = str(sort_metric or 'kg_curr').strip().lower()
+        reverse = str(direction or 'desc').strip().lower() == 'desc'
+        if clean_sort == 'delta_kg':
+            sort_value = lambda row: row.delta_kg
+        elif clean_sort == 'kg_prev':
+            sort_value = lambda row: row.kg_prev
+        else:
+            sort_value = lambda row: row.kg_curr
+        result.sort(
+            key=lambda row: (
+                sort_value(row),
+                row.cliente_nombre.lower(),
+                row.cliente_codigo.lower(),
+            ),
             reverse=reverse,
         )
         return result[:safe_limit]

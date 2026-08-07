@@ -14,6 +14,7 @@ from app.services.sales_annual_comparison_service import SalesAnnualComparisonSe
 class CustomerQueryIntent:
     query_type: str = "customer_filter"
     year: int = 0
+    compare_year: int = 0
     limit: int = 500
     customer_type: str = ''
     island: str = ''
@@ -22,6 +23,7 @@ class CustomerQueryIntent:
     zero_consumption: bool = False
     columns: list[str] = field(default_factory=list)
     sort_by_island: bool = True
+    sort_metric: str = "kg"
 
 
 @dataclass
@@ -68,6 +70,8 @@ class CustomerQueryService:
             return CustomerQueryResult(status="empty", message="Escribe una consulta sobre los clientes.")
 
         intent = self.interpret(text)
+        if intent.query_type == 'sales_customer_year_comparison':
+            return self._run_sales_customer_year_comparison(intent)
         if intent.query_type == 'sales_customer_list':
             return self._run_sales_customer_list(intent)
         if intent.query_type in {"sales_drop_ranking", "sales_growth_ranking"}:
@@ -76,8 +80,9 @@ class CustomerQueryService:
 
     def interpret(self, prompt: str) -> CustomerQueryIntent:
         normalized = self._normalize(prompt)
-        year_match = re.search(r"\b(20\d{2})\b", normalized)
-        year = int(year_match.group(1)) if year_match else date.today().year
+        years = [int(item) for item in re.findall(r"\b(20\d{2})\b", normalized)]
+        year = years[0] if years else date.today().year
+        compare_year = years[1] if len(years) > 1 else 0
         limit = self._extract_limit(normalized)
 
         sales_terms = ("compra", "venta", "kg", "kilo", "consumo")
@@ -88,7 +93,22 @@ class CustomerQueryService:
         wants_drop = any(term in normalized for term in drop_terms)
         wants_growth = any(term in normalized for term in growth_terms)
         wants_ranking = any(term in normalized for term in ranking_terms) or limit != 500
-        sales_columns = self._extract_sales_columns(normalized)
+        wants_year_comparison = bool(
+            compare_year
+            and any(
+                term in normalized
+                for term in (
+                    ' versus ',
+                    ' vs ',
+                    ' contra ',
+                    ' comparado con ',
+                    ' comparativa con ',
+                    ' comparativa entre ',
+                    ' comparar con ',
+                )
+            )
+        )
+        sales_columns = self._extract_sales_columns(normalized, year=year, compare_year=compare_year)
         customer_type = ''
         if 'indirect' in normalized:
             customer_type = 'indirecto'
@@ -152,6 +172,19 @@ class CustomerQueryService:
             list_direction = 'desc'
         if explicit_ascending or negative_ranking:
             list_direction = 'asc'
+        sort_metric = 'kg'
+        if wants_year_comparison:
+            sort_metric = (
+                'delta_kg'
+                if wants_drop
+                or wants_growth
+                or any(term in normalized for term in ('ordenar por diferencia', 'ordenado por diferencia', 'por diferencia'))
+                else 'kg_curr'
+            )
+            if wants_drop or negative_ranking:
+                list_direction = 'asc'
+            elif wants_growth or positive_ranking:
+                list_direction = 'desc'
         sort_by_island = any(
             term in normalized
             for term in (
@@ -170,6 +203,21 @@ class CustomerQueryService:
                 for term in ('sin consumo', 'no han consumido', 'no ha consumido')
             )
         )
+
+        if is_sales and wants_year_comparison:
+            return CustomerQueryIntent(
+                query_type='sales_customer_year_comparison',
+                year=year,
+                compare_year=compare_year,
+                limit=min(max(limit if limit != 500 else 10, 1), 500),
+                direction=list_direction,
+                metric='kg',
+                customer_type=customer_type,
+                island=island,
+                columns=sales_columns,
+                sort_by_island=sort_by_island,
+                sort_metric=sort_metric,
+            )
 
         if is_sales and not (wants_ranking and (wants_drop or wants_growth)):
             return CustomerQueryIntent(
@@ -258,6 +306,52 @@ class CustomerQueryService:
             intent=intent,
         )
 
+    def _run_sales_customer_year_comparison(self, intent: CustomerQueryIntent) -> CustomerQueryResult:
+        rows = self.sales_service.listar_comparativa_anual_clientes(
+            year=intent.year,
+            compare_year=intent.compare_year,
+            limit=intent.limit,
+            direction=intent.direction,
+            sort_metric=intent.sort_metric,
+            cliente_tipo=intent.customer_type,
+            isla=intent.island,
+        )
+        column_map = {
+            'codigo': ('Cod.', lambda row: row.cliente_codigo),
+            'nombre': ('Nombre comercial', lambda row: row.cliente_nombre),
+            'kg_curr': (f'Kg {intent.year}', lambda row: row.kg_curr),
+            'kg_prev': (f'Kg {intent.compare_year}', lambda row: row.kg_prev),
+            'delta_kg': ('Dif. Kg', lambda row: row.delta_kg),
+            'delta_kg_pct': ('Dif. Kg %', lambda row: row.delta_kg_pct),
+        }
+        selected_columns = [key for key in intent.columns if key in column_map] or [
+            'codigo',
+            'nombre',
+            'kg_curr',
+            'kg_prev',
+            'delta_kg',
+            'delta_kg_pct',
+        ]
+        headers = [column_map[key][0] for key in selected_columns]
+        data = [[column_map[key][1](row) for key in selected_columns] for row in rows]
+        customer_type = f' de clientes {intent.customer_type}s' if intent.customer_type else ''
+        location = f' de {intent.island}' if intent.island else ''
+        order_label = 'mayor a menor' if intent.direction == 'desc' else 'menor a mayor'
+        metric_label = 'diferencia kg' if intent.sort_metric == 'delta_kg' else f'kg {intent.year}'
+        return CustomerQueryResult(
+            status='ready' if data else 'empty',
+            title=f'Comparativa ventas {intent.year} vs {intent.compare_year}{customer_type}{location}',
+            headers=headers,
+            rows=data,
+            message='' if data else 'No se encontraron ventas para los años indicados.',
+            source='cálculo local',
+            interpretation=(
+                f'Comparativa {intent.year} vs {intent.compare_year}{customer_type}{location} · '
+                f'métrica Kg · orden: {metric_label} de {order_label}'
+            ),
+            intent=intent,
+        )
+
     def _run_sales_ranking(self, intent: CustomerQueryIntent) -> CustomerQueryResult:
         rows = self.sales_service.listar_ranking_anual_clientes(
             year=intent.year,
@@ -305,7 +399,7 @@ class CustomerQueryService:
                 return value
         return 500
 
-    def _extract_sales_columns(self, normalized: str) -> list[str]:
+    def _extract_sales_columns(self, normalized: str, *, year: int = 0, compare_year: int = 0) -> list[str]:
         if not any(marker in normalized for marker in ('campos', 'columnas', 'solo los campos', 'solo campos')):
             return []
         tail = re.split(r'\b(?:campos|columnas|solo los campos|solo campos)\b\s*:?', normalized, maxsplit=1)
@@ -323,6 +417,28 @@ class CustomerQueryService:
                 key = 'codigo'
             elif token in {'nombre', 'cliente', 'nombre comercial'}:
                 key = 'nombre'
+            elif compare_year and (
+                token in {f'kg {year}', f'kilos {year}', f'kilogramos {year}', f'ventas {year}'}
+                or (str(year) in token and any(term in token for term in ('kg', 'kilo', 'venta')))
+            ):
+                key = 'kg_curr'
+            elif compare_year and (
+                token in {f'kg {compare_year}', f'kilos {compare_year}', f'kilogramos {compare_year}', f'ventas {compare_year}'}
+                or (str(compare_year) in token and any(term in token for term in ('kg', 'kilo', 'venta')))
+            ):
+                key = 'kg_prev'
+            elif compare_year and (
+                token in {'diferencia kg %', 'dif kg %', 'delta kg %', 'variacion kg %', 'porcentaje'}
+                or '%' in token
+            ):
+                key = 'delta_kg_pct'
+            elif compare_year and (
+                token in {'diferencia kg', 'dif kg', 'delta kg', 'variacion kg', 'variacion'}
+                or 'diferencia' in token
+                or 'delta' in token
+                or 'variacion' in token
+            ):
+                key = 'delta_kg'
             elif token in {'kg', 'kilos', 'kilogramos'}:
                 key = 'kg'
             if key and key not in columns:
