@@ -563,11 +563,17 @@ class SalesAnnualComparisonService:
         fabricante_id: str = "",
         familia_id: str = "",
         subfamilia_id: str = "",
+        month_from: int = 1,
+        month_to: int = 12,
     ) -> list[SalesClientsComparisonRow]:
         current_year = int(year or 0)
         if current_year <= 0:
             return []
         previous_year = current_year - 1
+        clean_month_from = max(1, min(int(month_from or 1), 12))
+        clean_month_to = max(1, min(int(month_to or 12), 12))
+        if clean_month_from > clean_month_to:
+            clean_month_from, clean_month_to = clean_month_to, clean_month_from
         clean_cliente_id = str(cliente_id or "").strip()
         clean_producto_texto = self._normalize_search_text(producto_texto)
         clean_fabricante_id = str(fabricante_id or "").strip()
@@ -576,6 +582,7 @@ class SalesAnnualComparisonService:
 
         with Session(self._engine) as session:
             stmt = select(VentaClientesRaw).where(col(VentaClientesRaw.anio).in_([previous_year, current_year]))
+            stmt = stmt.where(col(VentaClientesRaw.mes) >= clean_month_from, col(VentaClientesRaw.mes) <= clean_month_to)
             if clean_cliente_id:
                 resolved_cliente_ids = self._resolve_sales_party_ids(session, clean_cliente_id)
                 stmt = stmt.where(col(VentaClientesRaw.cliente_id).in_(sorted(resolved_cliente_ids)))

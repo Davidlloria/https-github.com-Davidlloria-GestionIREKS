@@ -796,6 +796,8 @@ class CustomersPage(QWidget):
         self._agenda_filter_to: QDateEdit | None = None
         self._agenda_filter_refresh_btn: QPushButton | None = None
         self._related_sales_year_filter: QComboBox | None = None
+        self._related_sales_month_from_filter: QComboBox | None = None
+        self._related_sales_month_to_filter: QComboBox | None = None
         self._related_sales_compare_btn: QPushButton | None = None
         self._related_sales_rows: list = []
         self._search_timer = QTimer(self)
@@ -1182,12 +1184,26 @@ class CustomersPage(QWidget):
         self._related_sales_year_filter.setFixedWidth(110)
         self._related_sales_year_filter.currentIndexChanged.connect(self._refresh_related_sales)
 
+        self._related_sales_month_from_filter = QComboBox()
+        self._related_sales_month_from_filter.setObjectName("customerSalesMonthFromFilter")
+        self._related_sales_month_from_filter.setFixedWidth(125)
+        self._populate_month_filter(self._related_sales_month_from_filter, 1)
+        self._related_sales_month_from_filter.currentIndexChanged.connect(self._refresh_related_sales)
+
+        self._related_sales_month_to_filter = QComboBox()
+        self._related_sales_month_to_filter.setObjectName("customerSalesMonthToFilter")
+        self._related_sales_month_to_filter.setFixedWidth(125)
+        self._populate_month_filter(self._related_sales_month_to_filter, 12)
+        self._related_sales_month_to_filter.currentIndexChanged.connect(self._refresh_related_sales)
+
         self._related_sales_compare_btn = QPushButton("Comp.")
         self._related_sales_compare_btn.setObjectName("customerSalesCompareButton")
         self._related_sales_compare_btn.setEnabled(False)
         self._related_sales_compare_btn.clicked.connect(self._open_related_sales_comparison)
 
         actions.addWidget(self._related_sales_year_filter)
+        actions.addWidget(self._related_sales_month_from_filter)
+        actions.addWidget(self._related_sales_month_to_filter)
         actions.addWidget(self._related_sales_compare_btn)
         actions.addStretch(1)
         layout.addLayout(actions)
@@ -1273,6 +1289,42 @@ class CustomersPage(QWidget):
             combo.setCurrentIndex(preferred_index)
         combo.blockSignals(False)
 
+    def _populate_month_filter(self, combo: QComboBox, selected_month: int) -> None:
+        months = [
+            (1, "Enero"),
+            (2, "Febrero"),
+            (3, "Marzo"),
+            (4, "Abril"),
+            (5, "Mayo"),
+            (6, "Junio"),
+            (7, "Julio"),
+            (8, "Agosto"),
+            (9, "Septiembre"),
+            (10, "Octubre"),
+            (11, "Noviembre"),
+            (12, "Diciembre"),
+        ]
+        combo.blockSignals(True)
+        combo.clear()
+        for value, label in months:
+            combo.addItem(label, value)
+        idx = combo.findData(int(selected_month or 0))
+        combo.setCurrentIndex(idx if idx >= 0 else 0)
+        combo.blockSignals(False)
+
+    def _related_sales_month_range(self) -> tuple[int, int]:
+        month_from = 1
+        month_to = 12
+        if self._related_sales_month_from_filter is not None:
+            month_from = int(self._related_sales_month_from_filter.currentData() or 1)
+        if self._related_sales_month_to_filter is not None:
+            month_to = int(self._related_sales_month_to_filter.currentData() or 12)
+        month_from = max(1, min(month_from, 12))
+        month_to = max(1, min(month_to, 12))
+        if month_from > month_to:
+            month_from, month_to = month_to, month_from
+        return month_from, month_to
+
     def _refresh_related_sales(self) -> None:
         selected = self._selected_row()
         self._render_related_sales(str(getattr(selected, "cliente_id", "") or "") if selected else "")
@@ -1285,7 +1337,13 @@ class CustomersPage(QWidget):
         if not str(cliente_id or "").strip() or year <= 0:
             rows = []
         else:
-            rows = self.customer_service.related_sales(str(cliente_id or "").strip(), year)
+            month_from, month_to = self._related_sales_month_range()
+            rows = self.customer_service.related_sales(
+                str(cliente_id or "").strip(),
+                year,
+                month_from=month_from,
+                month_to=month_to,
+            )
 
         self._related_sales_rows = list(rows or [])
         self._loading_related_sales = True
@@ -1381,7 +1439,8 @@ class CustomersPage(QWidget):
         customer_name = str(getattr(selected, "cliente_nombre_comercial", "") or "").strip() if selected else ""
         if not cliente_id or year <= 0:
             return
-        rows = self.customer_service.related_sales(cliente_id, year)
+        month_from, month_to = self._related_sales_month_range()
+        rows = self.customer_service.related_sales(cliente_id, year, month_from=month_from, month_to=month_to)
         dialog = self._build_related_sales_comparison_dialog(rows=rows, year=year, customer_name=customer_name)
         self._related_sales_comparison_dialog = dialog
         dialog.exec()

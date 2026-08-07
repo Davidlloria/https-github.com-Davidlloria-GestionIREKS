@@ -362,7 +362,7 @@ class CustomerService:
     def related_sales_years(self) -> list[int]:
         return self.sales_summary_service.list_years_clientes()
 
-    def related_sales(self, cliente_id: str, year: int) -> list[Any]:
+    def related_sales(self, cliente_id: str, year: int, *, month_from: int = 1, month_to: int = 12) -> list[Any]:
         clean_id = str(cliente_id or "").strip()
         clean_year = int(year or 0)
         if not clean_id or clean_year <= 0:
@@ -370,6 +370,8 @@ class CustomerService:
         return self.sales_summary_service.listar_resumen_anual_clientes(
             year=clean_year,
             cliente_id=clean_id,
+            month_from=month_from,
+            month_to=month_to,
         )
 
     def related_agenda(self, cliente_id: str) -> list[ClienteAgenda]:

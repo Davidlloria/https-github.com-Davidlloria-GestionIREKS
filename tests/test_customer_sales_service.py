@@ -12,13 +12,13 @@ class _SalesRow:
 
 class _FakeSalesSummaryService:
     def __init__(self) -> None:
-        self.calls: list[tuple[int, str]] = []
+        self.calls: list[tuple[int, str, int, int]] = []
 
     def list_years_clientes(self) -> list[int]:
         return [2026, 2025]
 
-    def listar_resumen_anual_clientes(self, *, year: int, cliente_id: str):
-        self.calls.append((year, cliente_id))
+    def listar_resumen_anual_clientes(self, *, year: int, cliente_id: str, month_from: int = 1, month_to: int = 12):
+        self.calls.append((year, cliente_id, month_from, month_to))
         return [_SalesRow()]
 
 
@@ -38,10 +38,10 @@ def test_related_sales_years_delegates_to_sales_summary() -> None:
 def test_related_sales_filters_by_selected_customer_and_year() -> None:
     service, fake = _service_with_fake_sales()
 
-    rows = service.related_sales(" cliente-1 ", 2026)
+    rows = service.related_sales(" cliente-1 ", 2026, month_from=2, month_to=8)
 
     assert [row.codigo for row in rows] == ["D123"]
-    assert fake.calls == [(2026, "cliente-1")]
+    assert fake.calls == [(2026, "cliente-1", 2, 8)]
 
 
 def test_related_sales_rejects_empty_customer_or_invalid_year() -> None:
