@@ -705,6 +705,7 @@ class SalesAnnualComparisonService:
         isla: str = '',
         direction: str = 'asc',
         zero_consumption: bool = False,
+        sort_by_island: bool = True,
     ):
         current_year = int(year or 0)
         if current_year <= 0:
@@ -718,7 +719,7 @@ class SalesAnnualComparisonService:
             clients = list(session.exec(select(Cliente)))
             islands = list(session.exec(select(Isla)))
         return self._build_annual_customer_sales(
-            raw_rows, clients, islands, cliente_tipo, isla, direction, zero_consumption
+            raw_rows, clients, islands, cliente_tipo, isla, direction, zero_consumption, sort_by_island
         )
 
     def listar_ranking_anual_clientes(self, year: int, limit: int = 10, direction: str = 'asc'):
@@ -751,6 +752,7 @@ class SalesAnnualComparisonService:
         isla: str,
         direction: str,
         zero_consumption: bool = False,
+        sort_by_island: bool = True,
     ):
         client_by_id = {str(row.cliente_id or '').strip(): row for row in clients}
         island_by_id = {str(row.isla_id or '').strip(): str(row.isla_nombre or '') for row in islands}
@@ -799,14 +801,23 @@ class SalesAnnualComparisonService:
                 )
             )
         kg_factor = -1.0 if str(direction or 'asc').strip().lower() == 'desc' else 1.0
-        result.sort(
-            key=lambda row: (
-                not bool(row.isla.strip()),
-                row.isla.lower(),
-                kg_factor * row.kg,
-                row.cliente_nombre.lower(),
+        if sort_by_island:
+            result.sort(
+                key=lambda row: (
+                    not bool(row.isla.strip()),
+                    row.isla.lower(),
+                    kg_factor * row.kg,
+                    row.cliente_nombre.lower(),
+                )
             )
-        )
+        else:
+            result.sort(
+                key=lambda row: (
+                    kg_factor * row.kg,
+                    row.cliente_nombre.lower(),
+                    row.cliente_codigo.lower(),
+                )
+            )
         return result
 
     def _build_annual_customer_ranking(

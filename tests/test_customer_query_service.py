@@ -118,6 +118,19 @@ def test_sales_customer_list_query_filters_gran_canaria_and_orders_descending() 
     assert intent.direction == 'desc'
 
 
+def test_sales_customer_top_query_orders_descending_and_respects_fields() -> None:
+    intent = CustomerQueryService().interpret(
+        'listado 5 clientes top ventas en 2025, campos: nombre, kg'
+    )
+
+    assert intent.query_type == 'sales_customer_list'
+    assert intent.year == 2025
+    assert intent.limit == 5
+    assert intent.direction == 'desc'
+    assert intent.columns == ['nombre', 'kg']
+    assert intent.sort_by_island is False
+
+
 def test_zero_consumption_is_not_interpreted_as_a_one_row_limit() -> None:
     intent = CustomerQueryService().interpret(
         'dame el listado de los clientes de gran canaria con consumo 0 en el 2025, '
@@ -186,6 +199,42 @@ def test_sales_customer_list_applies_island_filter_and_descending_kg(tmp_path) -
     assert [row[0] for row in result.rows] == ['Gran Canaria', 'Gran Canaria']
     assert [row[1] for row in result.rows] == ['102', '101']
     assert [row[3] for row in result.rows] == [20.0, 5.0]
+
+
+def test_sales_customer_top_query_returns_global_top_and_requested_columns(tmp_path) -> None:
+    db_engine = _sales_engine(tmp_path)
+    with Session(db_engine) as session:
+        session.add_all([
+            Isla(isla_id='gc', provincia_id='p1', isla_nombre='Gran Canaria', isla_codigo='GC-TOP'),
+            Isla(isla_id='fue', provincia_id='p1', isla_nombre='Fuerteventura', isla_codigo='FUE-TOP'),
+            Cliente(cliente_id='c1', cliente_codigo=101, cliente_nombre_comercial='Cliente Bajo', cliente_direccion_isla_id='gc'),
+            Cliente(cliente_id='c2', cliente_codigo=102, cliente_nombre_comercial='Cliente Medio', cliente_direccion_isla_id='fue'),
+            Cliente(cliente_id='c3', cliente_codigo=103, cliente_nombre_comercial='Cliente Alto', cliente_direccion_isla_id='gc'),
+            Cliente(cliente_id='c4', cliente_codigo=104, cliente_nombre_comercial='Cliente Maximo', cliente_direccion_isla_id='fue'),
+            Cliente(cliente_id='c5', cliente_codigo=105, cliente_nombre_comercial='Cliente Cero', cliente_direccion_isla_id='gc'),
+            Cliente(cliente_id='c6', cliente_codigo=106, cliente_nombre_comercial='Cliente Extra', cliente_direccion_isla_id='fue'),
+        ])
+        _add_sale(session, 'top-1', 'c1', 2025, 1.0)
+        _add_sale(session, 'top-2', 'c2', 2025, 20.0)
+        _add_sale(session, 'top-3', 'c3', 2025, 100.0)
+        _add_sale(session, 'top-4', 'c4', 2025, 200.0)
+        _add_sale(session, 'top-5', 'c5', 2025, 0.5)
+        _add_sale(session, 'top-6', 'c6', 2025, 50.0)
+        session.commit()
+
+    result = CustomerQueryService(
+        sales_service=SalesAnnualComparisonService(db_engine=db_engine)
+    ).run('listado 5 clientes top ventas en 2025, campos: nombre, kg')
+
+    assert result.headers == ['Nombre comercial', 'Kg']
+    assert result.rows == [
+        ['Cliente Maximo', 200.0],
+        ['Cliente Alto', 100.0],
+        ['Cliente Extra', 50.0],
+        ['Cliente Medio', 20.0],
+        ['Cliente Bajo', 1.0],
+    ]
+    assert 'orden: kg de mayor a menor' in result.interpretation
 
 
 def test_zero_consumption_includes_customers_without_sales_and_excludes_positive_sales(tmp_path) -> None:

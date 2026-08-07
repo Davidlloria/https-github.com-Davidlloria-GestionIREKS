@@ -20,6 +20,8 @@ class CustomerQueryIntent:
     direction: str = "asc"
     metric: str = "kg"
     zero_consumption: bool = False
+    columns: list[str] = field(default_factory=list)
+    sort_by_island: bool = True
 
 
 @dataclass
@@ -86,6 +88,7 @@ class CustomerQueryService:
         wants_drop = any(term in normalized for term in drop_terms)
         wants_growth = any(term in normalized for term in growth_terms)
         wants_ranking = any(term in normalized for term in ranking_terms) or limit != 500
+        sales_columns = self._extract_sales_columns(normalized)
         customer_type = ''
         if 'indirect' in normalized:
             customer_type = 'indirecto'
@@ -108,11 +111,58 @@ class CustomerQueryService:
             if island_term in normalized:
                 island = island_name
                 break
-        descending = any(
+        explicit_descending = any(
             term in normalized
             for term in ('mayor a menor', 'descendente', 'decreciente')
         )
-        list_direction = 'desc' if descending else 'asc'
+        explicit_ascending = any(
+            term in normalized
+            for term in ('menor a mayor', 'ascendente', 'creciente')
+        )
+        positive_ranking = any(
+            term in normalized
+            for term in (
+                'top',
+                'ranking',
+                'mayores ventas',
+                'mayor venta',
+                'mas ventas',
+                'mas venta',
+                'mas kg',
+                'mayores kg',
+                'mejores clientes',
+                'primeros',
+            )
+        )
+        negative_ranking = any(
+            term in normalized
+            for term in (
+                'menores ventas',
+                'menor venta',
+                'menos ventas',
+                'menos venta',
+                'menos kg',
+                'menores kg',
+                'peores clientes',
+                'bottom',
+            )
+        )
+        list_direction = 'asc'
+        if explicit_descending or (positive_ranking and not negative_ranking):
+            list_direction = 'desc'
+        if explicit_ascending or negative_ranking:
+            list_direction = 'asc'
+        sort_by_island = any(
+            term in normalized
+            for term in (
+                'por isla',
+                'por islas',
+                'ordenada por isla',
+                'ordenadas por isla',
+                'ordenado por isla',
+                'ordenados por isla',
+            )
+        )
         zero_consumption = bool(
             re.search(r'\bconsumo\s*(?:=|igual\s+a)?\s*0(?:[,.]0+)?\b', normalized)
             or any(
@@ -131,6 +181,8 @@ class CustomerQueryService:
                 customer_type=customer_type,
                 island=island,
                 zero_consumption=zero_consumption,
+                columns=sales_columns,
+                sort_by_island=sort_by_island,
             )
 
         if is_sales and wants_ranking and (wants_drop or wants_growth):
@@ -175,10 +227,19 @@ class CustomerQueryService:
             isla=intent.island,
             direction=intent.direction,
             zero_consumption=intent.zero_consumption,
+            sort_by_island=intent.sort_by_island,
         )
         safe_limit = min(max(int(intent.limit or 500), 1), 5000)
         rows = rows[:safe_limit]
-        data = [[row.isla, row.cliente_codigo, row.cliente_nombre, row.kg] for row in rows]
+        column_map = {
+            'isla': ('Isla', lambda row: row.isla),
+            'codigo': ('Cod.', lambda row: row.cliente_codigo),
+            'nombre': ('Nombre comercial', lambda row: row.cliente_nombre),
+            'kg': ('Kg', lambda row: row.kg),
+        }
+        selected_columns = [key for key in intent.columns if key in column_map] or ['isla', 'codigo', 'nombre', 'kg']
+        headers = [column_map[key][0] for key in selected_columns]
+        data = [[column_map[key][1](row) for key in selected_columns] for row in rows]
         customer_type = f' de clientes {intent.customer_type}s' if intent.customer_type else ''
         location = f' de {intent.island}' if intent.island else ''
         consumption = ' con consumo 0 kg' if intent.zero_consumption else ''
@@ -186,7 +247,7 @@ class CustomerQueryService:
         return CustomerQueryResult(
             status='ready' if data else 'empty',
             title=f'Listado de ventas {intent.year}{customer_type}{location}{consumption}',
-            headers=['Isla', 'Cod.', 'Nombre comercial', 'Kg'],
+            headers=headers,
             rows=data,
             message='' if data else 'No se encontraron clientes para los filtros indicados.',
             source='cálculo local',
@@ -243,6 +304,30 @@ class CustomerQueryService:
             if re.search(rf"\b{word}\b", normalized):
                 return value
         return 500
+
+    def _extract_sales_columns(self, normalized: str) -> list[str]:
+        if not any(marker in normalized for marker in ('campos', 'columnas', 'solo los campos', 'solo campos')):
+            return []
+        tail = re.split(r'\b(?:campos|columnas|solo los campos|solo campos)\b\s*:?', normalized, maxsplit=1)
+        if len(tail) < 2:
+            return []
+        raw = re.split(r'\b(?:ordenad[oa]s?|ordenar|de mayor|de menor|mayor a menor|menor a mayor)\b', tail[1], maxsplit=1)[0]
+        parts = [part.strip(" .;:") for part in re.split(r',|\by\b', raw) if part.strip(" .;:")]
+        columns: list[str] = []
+        for part in parts:
+            token = part.strip()
+            key = ''
+            if token in {'isla', 'islas'}:
+                key = 'isla'
+            elif token in {'cod', 'cod.', 'codigo', 'codigo cliente', 'codigo interno'}:
+                key = 'codigo'
+            elif token in {'nombre', 'cliente', 'nombre comercial'}:
+                key = 'nombre'
+            elif token in {'kg', 'kilos', 'kilogramos'}:
+                key = 'kg'
+            if key and key not in columns:
+                columns.append(key)
+        return columns
 
     @staticmethod
     def _normalize(value: str) -> str:
