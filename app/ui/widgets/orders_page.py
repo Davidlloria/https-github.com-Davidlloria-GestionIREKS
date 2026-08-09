@@ -1311,10 +1311,10 @@ class OrdersPage(QWidget):
         splitter.addWidget(left_panel)
 
         right_panel = QWidget()
-        right_panel.setObjectName("customersRightPanel")
+        right_panel.setObjectName("ordersRightPanel")
         right_panel.setStyleSheet(
             """
-            QWidget#customersRightPanel {
+            QWidget#ordersRightPanel {
                 background: transparent;
                 border: none;
             }
@@ -1373,7 +1373,7 @@ class OrdersPage(QWidget):
         self.edit_order_btn.clicked.connect(self._edit_order)
 
         right_splitter = QSplitter(Qt.Orientation.Vertical)
-        right_splitter.setObjectName("customersDetailSplitter")
+        right_splitter.setObjectName("ordersDetailSplitter")
         right_layout.addWidget(right_splitter, 1)
 
         detail_panel = QWidget()
@@ -1421,7 +1421,7 @@ class OrdersPage(QWidget):
         tabs_layout.setContentsMargins(12, 12, 12, 12)
         tabs_layout.setSpacing(8)
         tabs = QTabWidget()
-        tabs.setObjectName("customerTabs")
+        tabs.setObjectName("ordersTabs")
 
         pedido_tab = QWidget()
         pedido_tab_layout = QVBoxLayout(pedido_tab)

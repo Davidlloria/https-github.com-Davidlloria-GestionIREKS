@@ -58,9 +58,9 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
         │       │   ├── Total Kg (100 px)
         │       │   └── Estado (55 px, cabecera centrada)
         │       └── table_totals (QTableWidget, 1 fila fija de totales, 6 columnas sincronizadas, alto 30 px)
-        └── customersRightPanel (QWidget, objectName `customersRightPanel`, fondo transparente, sin borde)
+        └── ordersRightPanel (QWidget, objectName `ordersRightPanel`, fondo transparente, sin borde)
             └── right_layout (QVBoxLayout, márgenes 0 px, separación 10 px)
-                └── customersDetailSplitter (QSplitter vertical, objectName `customersDetailSplitter`, fondo global #F4F6F9, sin borde propio, tirador oculto)
+                └── ordersDetailSplitter (QSplitter vertical, objectName `ordersDetailSplitter`, fondo global #F4F6F9, sin borde propio, tirador oculto)
                     ├── detailPanel (QWidget, objectName `detailPanel`, fondo #FCFDFF, borde #E2E8F1, radio 8 px, alto máximo 170 px)
                     │   └── detail_layout (QVBoxLayout, márgenes 14 px, separación 8 px)
                     │       ├── detail_title (QLabel "Detalle del pedido", role="sectionTitle")
@@ -74,7 +74,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
                     │           └── espacio flexible
                     └── crmCard (QWidget, objectName `crmCard`, fondo global #F4F6F9 salvo override externo, sin borde propio, contenedor de pestañas)
                         └── tabs_layout (QVBoxLayout, márgenes 12 px, separación 8 px)
-                            └── customerTabs (QTabWidget, objectName `customerTabs`; pane fondo #FFFFFF, borde #D7DEE8, radio 8 px)
+                            └── ordersTabs (QTabWidget, objectName `ordersTabs`; pane fondo #FFFFFF, borde #D7DEE8, radio 8 px)
                                 ├── Pedido
                                 │   ├── pedido_actions_ribbon (QFrame, objectName `topRibbon`, fondo #FFFFFF, borde inferior #D7DEE8; sin pageType)
                                 │   │   ├── add_line_btn (QPushButton "Añadir", btnRole="success", alto 26 px)
@@ -166,7 +166,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
   - ocupa el resto del ancho disponible;
   - layout sin márgenes;
   - separación vertical de 10 px.
-- `customersDetailSplitter` es vertical:
+- `ordersDetailSplitter` es vertical:
   - `detailPanel` arriba;
   - `crmCard` debajo;
   - el panel de pestañas tiene factor de estiramiento superior al detalle (`0 / 10`).
@@ -187,11 +187,11 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
 - `layout principal`: sin fondo ni borde propios.
 - `splitter principal` / `ordersMainSplitter`: fondo transparente, sin borde; hereda visualmente el fondo de `OrdersPageRoot`.
 - `sidePanel`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
-- `customersRightPanel`: fondo transparente, sin borde.
-- `customersDetailSplitter`: sin borde propio; hereda fondo global `#F4F6F9`.
+- `ordersRightPanel`: fondo transparente, sin borde.
+- `ordersDetailSplitter`: sin borde propio; hereda fondo global `#F4F6F9`.
 - `detailPanel`: fondo `#FCFDFF`, borde `#E2E8F1`, radio 8 px.
 - `crmCard`: sin borde propio en `orders_page.py`; hereda fondo global `#F4F6F9` si no recibe otro override.
-- `customerTabs::pane`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
+- `ordersTabs::pane`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
 - `QTabBar::tab`: fondo `#F7FAFD`, borde `#DDE5F0`, borde inferior `#DDE5F0`, radio superior 8 px.
 - `QTabBar::tab:selected`: fondo `#FFFFFF`, borde `#DDE5F0`, borde inferior `#2563EB`.
 - `topRibbon` global: fondo `#FFFFFF`, borde inferior `#D7DEE8`, sin radio.
@@ -252,7 +252,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
 - El ribbon principal cuelga del layout principal y no del panel izquierdo.
 - El ribbon principal usa el estándar común `app/ui/widgets/action_ribbon.py`: botones con ancho fijo 110 px, alto 30 px, iconos de 20 px y colores por acción.
 - La tabla principal mantiene columnas fijas para `Almacen`, `Nº`, `Fecha`, `Semana`, `Total Kg` y `Estado`.
-- La parte derecha conserva el patrón visual heredado de clientes (`customersRightPanel`, `customersDetailSplitter`, `crmCard`, `customerTabs`).
+- La parte derecha usa nombres propios de pedidos (`ordersRightPanel`, `ordersDetailSplitter`, `ordersTabs`) y conserva el contenedor visual `crmCard`.
 - Las tablas de Pedido, Albarán y Factura tienen filas de totales fijas fuera del scroll.
 - La pestaña Factura usa splitter horizontal interno para separar listado de facturas y detalle de líneas.
 
