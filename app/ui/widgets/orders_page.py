@@ -65,6 +65,7 @@ from app.services.orders_documents_import_ui_service import (
 from app.services.order_query_service import OrderQueryService
 from app.services.order_service import OrderLineInput, OrderService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
+from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 
@@ -1224,51 +1225,17 @@ class OrdersPage(QWidget):
         almacen_row.addWidget(self.almacen_filter, 1)
         left_layout.addLayout(almacen_row)
 
-        self.new_btn = QPushButton("Nuevo")
-        self.new_btn.setProperty("btnRole", "success")
-        self.new_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "plus.svg")))
-        self.edit_btn = QPushButton("Editar")
-        self.edit_btn.setProperty("btnRole", "warning")
-        self.edit_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-pen.svg")))
-        self.del_btn = QPushButton("Eliminar")
-        self.del_btn.setProperty("btnRole", "danger")
-        self.del_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
-        self.export_btn = QPushButton("Exportar")
-        self.export_btn.setProperty("btnRole", "secondary")
-        self.export_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "sheet.svg")))
-        self.send_mail_btn = QPushButton("Enviar")
-        self.send_mail_btn.setProperty("btnRole", "secondary")
-        self.send_mail_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "mail.svg")))
-        self.print_btn = QPushButton("Imprimir")
-        self.print_btn.setProperty("btnRole", "secondary")
-        self.print_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "printer.svg")))
-        self.help_btn = QPushButton("Ayuda")
-        self.help_btn.setProperty("btnRole", "secondary")
-        self.help_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "circle-question-mark.svg")))
-        for button in (
-            self.new_btn,
-            self.edit_btn,
-            self.del_btn,
-            self.export_btn,
-            self.send_mail_btn,
-            self.print_btn,
-            self.help_btn,
-        ):
-            button.setFixedHeight(26)
-            button.setIconSize(QSize(16, 16))
-
-        ribbon_buttons = (
-            self.new_btn,
-            self.edit_btn,
-            self.del_btn,
-            self.export_btn,
-            self.send_mail_btn,
-            self.print_btn,
-            self.help_btn,
+        self.new_btn = create_standard_ribbon_button("Nuevo", role="success", icon_name="plus.svg")
+        self.edit_btn = create_standard_ribbon_button("Editar", role="warning", icon_name="file-pen.svg")
+        self.del_btn = create_standard_ribbon_button("Eliminar", role="danger", icon_name="trash.svg")
+        self.export_btn = create_standard_ribbon_button("Exportar", role="secondary", icon_name="sheet.svg")
+        self.send_mail_btn = create_standard_ribbon_button("Enviar", role="secondary", icon_name="mail.svg")
+        self.print_btn = create_standard_ribbon_button("Imprimir", role="secondary", icon_name="printer.svg")
+        self.help_btn = create_standard_ribbon_button(
+            "Ayuda",
+            role="secondary",
+            icon_name="circle-question-mark.svg",
         )
-        ribbon_button_width = 154
-        for button in ribbon_buttons:
-            button.setFixedWidth(ribbon_button_width)
 
         self.new_btn.clicked.connect(self._new_order)
         self.edit_btn.clicked.connect(self._edit_order)
@@ -1278,13 +1245,7 @@ class OrdersPage(QWidget):
         self.print_btn.clicked.connect(self._print_selected_order)
         self.help_btn.clicked.connect(self._show_orders_help)
 
-        left_ribbon = QFrame()
-        left_ribbon.setObjectName("topRibbon")
-        left_ribbon.setProperty("pageType", "contacts")
-        left_ribbon.setFrameShape(QFrame.Shape.StyledPanel)
-        left_ribbon_layout = QHBoxLayout(left_ribbon)
-        left_ribbon_layout.setContentsMargins(8, 6, 8, 6)
-        left_ribbon_layout.setSpacing(6)
+        left_ribbon, left_ribbon_layout = create_standard_top_ribbon()
         left_ribbon_layout.addWidget(self.new_btn)
         left_ribbon_layout.addWidget(self.edit_btn)
         left_ribbon_layout.addWidget(self.del_btn)

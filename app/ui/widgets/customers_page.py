@@ -53,6 +53,7 @@ from app.services.customer_service import CustomerService
 from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
 from app.services.customer_report_service import CustomerReportIntentService, CustomerReportResult, CustomerReportService
 from app.services.report_export_service import ReportExportService
+from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
 from app.ui.widgets.entity_dialog import EntityDialog
 
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -828,71 +829,26 @@ class CustomersPage(QWidget):
         layout.addWidget(header)
         header.hide()
 
-        ribbon = QFrame()
-        ribbon.setObjectName("topRibbon")
-        ribbon.setProperty("pageType", "contacts")
-        ribbon.setFrameShape(QFrame.Shape.StyledPanel)
-        ribbon_layout = QHBoxLayout(ribbon)
-        ribbon_layout.setContentsMargins(8, 6, 8, 6)
-        ribbon_layout.setSpacing(6)
+        ribbon, ribbon_layout = create_standard_top_ribbon()
 
-        self.new_btn = QPushButton("Nuevo")
-        self.new_btn.setProperty("btnRole", "success")
-        self.new_btn.setFixedHeight(26)
-        self.new_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "user-round-plus.svg")))
-        self.new_btn.setIconSize(QSize(16, 16))
-
-        self.edit_btn = QPushButton("Editar")
-        self.edit_btn.setProperty("btnRole", "warning")
-        self.edit_btn.setFixedHeight(26)
-        self.edit_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-pen.svg")))
-        self.edit_btn.setIconSize(QSize(16, 16))
-
-        self.del_btn = QPushButton("Eliminar")
-        self.del_btn.setProperty("btnRole", "danger")
-        self.del_btn.setFixedHeight(26)
-        self.del_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
-        self.del_btn.setIconSize(QSize(16, 16))
-
-        self.print_btn = QPushButton("Listados")
-        self.print_btn.setProperty("btnRole", "secondary")
-        self.print_btn.setFixedHeight(26)
-        self.print_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "list.svg")))
-        self.print_btn.setIconSize(QSize(16, 16))
-
-        self.queries_btn = QPushButton("Consultas")
-        self.queries_btn.setObjectName("customerQueriesButton")
-        self.queries_btn.setProperty("btnRole", "primary")
-        self.queries_btn.setFixedHeight(26)
-        self.queries_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "brain.svg")))
-        self.queries_btn.setIconSize(QSize(16, 16))
-        self.queries_btn.setToolTip("Abrir consultas de clientes")
-
-        self.help_btn = QPushButton("Ayuda")
-        self.help_btn.setProperty("btnRole", "secondary")
-        self.help_btn.setFixedHeight(26)
-        self.help_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "circle-question-mark.svg")))
-        self.help_btn.setIconSize(QSize(16, 16))
-        self.help_btn.clicked.connect(self._show_customer_help)
-
-        self.refresh_btn = QPushButton("Actualizar")
-        self.refresh_btn.setProperty("btnRole", "info")
-        self.refresh_btn.setFixedHeight(26)
-        self.refresh_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "refresh-cw.svg")))
-        self.refresh_btn.setIconSize(QSize(16, 16))
-
-        ribbon_buttons = (
-            self.new_btn,
-            self.edit_btn,
-            self.del_btn,
-            self.print_btn,
-            self.refresh_btn,
-            self.queries_btn,
-            self.help_btn,
+        self.new_btn = create_standard_ribbon_button("Nuevo", role="success", icon_name="user-round-plus.svg")
+        self.edit_btn = create_standard_ribbon_button("Editar", role="warning", icon_name="file-pen.svg")
+        self.del_btn = create_standard_ribbon_button("Eliminar", role="danger", icon_name="trash.svg")
+        self.print_btn = create_standard_ribbon_button("Listados", role="secondary", icon_name="list.svg")
+        self.refresh_btn = create_standard_ribbon_button("Actualizar", role="info", icon_name="refresh-cw.svg")
+        self.queries_btn = create_standard_ribbon_button(
+            "Consultas",
+            role="primary",
+            icon_name="brain.svg",
+            object_name="customerQueriesButton",
+            tooltip="Abrir consultas de clientes",
         )
-        ribbon_button_width = max(button.sizeHint().width() for button in ribbon_buttons)
-        for button in ribbon_buttons:
-            button.setFixedWidth(ribbon_button_width)
+        self.help_btn = create_standard_ribbon_button(
+            "Ayuda",
+            role="secondary",
+            icon_name="circle-question-mark.svg",
+        )
+        self.help_btn.clicked.connect(self._show_customer_help)
 
         self.new_btn.clicked.connect(self._new_entity)
         self.edit_btn.clicked.connect(self._edit_entity)

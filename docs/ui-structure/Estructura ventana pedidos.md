@@ -191,8 +191,8 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
 - `QTabBar::tab`: fondo `#F7FAFD`, borde `#DDE5F0`, borde inferior `#DDE5F0`, radio superior 8 px.
 - `QTabBar::tab:selected`: fondo `#FFFFFF`, borde `#DDE5F0`, borde inferior `#2563EB`.
 - `topRibbon` global: fondo `#FFFFFF`, borde inferior `#D7DEE8`, sin radio.
-- `topRibbon` principal con `pageType="contacts"`: fondo `#FFFFFF`, borde `#E2E8F1`, radio 8 px; está en el layout principal, por encima del splitter.
-- Botones del ribbon principal: ancho fijo 154 px, alto 26 px, iconos 16 px y colores por `btnRole`, siguiendo el estándar de la ventana Clientes.
+- `topRibbon` principal con `pageType="contacts"`: fondo `#FFFFFF`, borde `#E2E8F1`, radio 8 px; está en el layout principal, por encima del splitter, creado con `app/ui/widgets/action_ribbon.py`.
+- Botones del ribbon principal: ancho fijo 154 px, alto 26 px, iconos 16 px y colores por `btnRole`, creados con el estándar común `create_standard_ribbon_button()`.
 - `pedido_actions_ribbon`, `albaran_actions_ribbon` y `factura_actions_ribbon`: usan `#topRibbon` sin `pageType`; fondo `#FFFFFF`, borde inferior `#D7DEE8`, sin radio.
 - `QTableWidget`: fondo `#FFFFFF`, fondo alterno `#F7F9FC`, borde `#D8E0EA`, radio 8 px, gridline `#E6EBF2`.
 - `QHeaderView::section`: fondo `#EEF2F7`, borde derecho `#E0E7F0`, borde inferior `#D8E0EA`.
@@ -246,7 +246,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
 
 - El filtro `almacen_filter` es editable con búsqueda por ocurrencia para manejar listas largas.
 - El ribbon principal cuelga del layout principal y no del panel izquierdo.
-- El ribbon principal usa el estándar de Clientes: botones con ancho fijo 154 px, iconos de 16 px y colores por acción.
+- El ribbon principal usa el estándar común `app/ui/widgets/action_ribbon.py`: botones con ancho fijo 154 px, alto 26 px, iconos de 16 px y colores por acción.
 - La tabla principal mantiene columnas fijas para `Almacen`, `Nº`, `Fecha`, `Semana`, `Total Kg` y `Estado`.
 - La parte derecha conserva el patrón visual heredado de clientes (`customersRightPanel`, `customersDetailSplitter`, `crmCard`, `customerTabs`).
 - Las tablas de Pedido, Albarán y Factura tienen filas de totales fijas fuera del scroll.
