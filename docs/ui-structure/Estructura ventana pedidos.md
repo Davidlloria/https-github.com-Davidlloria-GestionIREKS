@@ -37,7 +37,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
     │   ├── print_btn (QPushButton "Imprimir", btnRole="secondary", icono `assets/icons/printer.svg`, alto 30 px, icono 20 px, ancho fijo 110 px)
     │   ├── espacio flexible
     │   └── help_btn (QPushButton "Ayuda", btnRole="secondary", icono `assets/icons/circle-question-mark.svg`, alto 30 px, icono 20 px, ancho fijo 110 px)
-    └── splitter principal (QSplitter horizontal, tirador oculto, childrenCollapsible=False)
+    └── splitter principal (QSplitter horizontal, objectName `ordersMainSplitter`, fondo transparente, sin borde, tirador oculto, childrenCollapsible=False)
         ├── sidePanel (QWidget, objectName `sidePanel`, fondo #FFFFFF, borde #D7DEE8, radio 8 px, ancho 560-620 px)
         │   └── left_layout (QVBoxLayout)
         │       ├── fila de filtros de periodo (QHBoxLayout)
@@ -185,7 +185,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
 
 - `OrdersPageRoot`: fondo `#EEF3F8`, sin borde.
 - `layout principal`: sin fondo ni borde propios.
-- `splitter principal`: sin fondo ni borde propios; hereda visualmente el fondo de `OrdersPageRoot`.
+- `splitter principal` / `ordersMainSplitter`: fondo transparente, sin borde; hereda visualmente el fondo de `OrdersPageRoot`.
 - `sidePanel`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
 - `customersRightPanel`: sin borde propio; hereda fondo global `#F4F6F9` si no recibe otro override.
 - `customersDetailSplitter`: sin borde propio; hereda fondo global `#F4F6F9`.

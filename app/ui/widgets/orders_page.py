@@ -1181,6 +1181,15 @@ class OrdersPage(QWidget):
         layout.setSpacing(10)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setObjectName("ordersMainSplitter")
+        splitter.setStyleSheet(
+            """
+            QSplitter#ordersMainSplitter {
+                background: transparent;
+                border: none;
+            }
+            """
+        )
 
         left_panel = QWidget()
         left_panel.setObjectName("sidePanel")
