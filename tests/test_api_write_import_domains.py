@@ -17,6 +17,7 @@ import app.services.warehouse_inventory_service as warehouse_inventory_service_m
 import app.services.warehouse_movement_service as warehouse_movement_service_module
 from app.api.main import create_app
 from app.models import (
+    Albaran,
     AlbaranItem,
     AlmacenMovimiento,
     Cliente,
@@ -620,6 +621,126 @@ def test_order_albaran_pdf_import_missing_order_returns_not_found(api_client: Te
     )
     assert imported.status_code == 404
     assert "no existe" in imported.json()["detail"].lower()
+
+
+def test_delete_albaran_item_removes_warehouse_movement(api_client: TestClient) -> None:
+    with Session(order_document_import_service_module.engine) as session:
+        session.add(
+            Pedido(
+                pedido_id="order-delete-line",
+                almacen_id="alm-1",
+                pedido_fecha=date(2026, 5, 4),
+                pedido_albaran_numero="ALB-1",
+            )
+        )
+        session.add(
+            Albaran(
+                albaran_id="albaran-delete-line",
+                almacen_id="alm-1",
+                pedido_id="order-delete-line",
+                albaran_numero="ALB-1",
+                albaran_fecha=date(2026, 5, 5),
+            )
+        )
+        session.add(
+            AlbaranItem(
+                item_id="albaran-item-delete-line",
+                pedido_id="order-delete-line",
+                albaran_id="albaran-delete-line",
+                albaran_numero="ALB-1",
+                albaran_fecha=date(2026, 5, 5),
+                articulo_codigo="ART-1",
+                articulo_id="article-delete-line",
+                articulo_cantidad=12.0,
+            )
+        )
+        session.add(
+            AlmacenMovimiento(
+                almacen_id="alm-1",
+                articulo_id="article-delete-line",
+                pedido_numero="",
+                pedido_albaran_numero="ALB-1",
+                cantidad=12.0,
+                fecha_pedido=date(2026, 5, 5),
+                albaran_item_id="albaran-item-delete-line",
+            )
+        )
+        session.commit()
+
+    order_document_import_service_module.OrderDocumentImportService().delete_albaran_item("albaran-item-delete-line")
+
+    with Session(order_document_import_service_module.engine) as session:
+        assert list(session.exec(select(AlbaranItem))) == []
+        assert list(session.exec(select(AlmacenMovimiento))) == []
+        assert list(session.exec(select(Albaran))) == []
+        pedido = session.get(Pedido, "order-delete-line")
+    assert pedido is not None
+    assert pedido.pedido_albaran_numero == ""
+
+
+def test_delete_albaran_removes_lines_movements_and_keeps_remaining_header(api_client: TestClient) -> None:
+    with Session(order_document_import_service_module.engine) as session:
+        session.add(
+            Pedido(
+                pedido_id="order-delete-albaran",
+                almacen_id="alm-1",
+                pedido_fecha=date(2026, 5, 4),
+                pedido_albaran_numero="ALB-2",
+            )
+        )
+        for albaran_id, numero, item_id, articulo_id, qty in [
+            ("albaran-delete-target", "ALB-2", "item-delete-target", "article-target", 7.0),
+            ("albaran-keep", "ALB-1", "item-keep", "article-keep", 5.0),
+        ]:
+            session.add(
+                Albaran(
+                    albaran_id=albaran_id,
+                    almacen_id="alm-1",
+                    pedido_id="order-delete-albaran",
+                    albaran_numero=numero,
+                    albaran_fecha=date(2026, 5, 5),
+                )
+            )
+            session.add(
+                AlbaranItem(
+                    item_id=item_id,
+                    pedido_id="order-delete-albaran",
+                    albaran_id=albaran_id,
+                    albaran_numero=numero,
+                    albaran_fecha=date(2026, 5, 5),
+                    articulo_codigo=articulo_id,
+                    articulo_id=articulo_id,
+                    articulo_cantidad=qty,
+                )
+            )
+            session.add(
+                AlmacenMovimiento(
+                    almacen_id="alm-1",
+                    articulo_id=articulo_id,
+                    pedido_numero="",
+                    pedido_albaran_numero=numero,
+                    cantidad=qty,
+                    fecha_pedido=date(2026, 5, 5),
+                    albaran_item_id=item_id,
+                )
+            )
+        session.commit()
+
+    order_document_import_service_module.OrderDocumentImportService().delete_albaran(
+        "order-delete-albaran",
+        "albaran-delete-target",
+    )
+
+    with Session(order_document_import_service_module.engine) as session:
+        assert session.get(Albaran, "albaran-delete-target") is None
+        assert session.get(AlbaranItem, "item-delete-target") is None
+        remaining_items = list(session.exec(select(AlbaranItem)))
+        remaining_movements = list(session.exec(select(AlmacenMovimiento)))
+        pedido = session.get(Pedido, "order-delete-albaran")
+    assert [row.item_id for row in remaining_items] == ["item-keep"]
+    assert [row.albaran_item_id for row in remaining_movements] == ["item-keep"]
+    assert pedido is not None
+    assert pedido.pedido_albaran_numero == "ALB-1"
 
 
 def test_order_factura_pdf_import_endpoint(api_client: TestClient, tmp_path: Path) -> None:

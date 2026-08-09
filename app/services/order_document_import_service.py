@@ -147,6 +147,60 @@ class OrderDocumentImportService:
                 session.add(pedido)
             session.commit()
 
+    def delete_albaran(self, pedido_id: str, albaran_id: str) -> None:
+        clean_pedido_id = str(pedido_id or "").strip()
+        clean_albaran_id = str(albaran_id or "").strip()
+        if not clean_pedido_id or not clean_albaran_id:
+            raise ValueError("Albaran no valido.")
+        with Session(engine) as session:
+            albaran = session.get(Albaran, clean_albaran_id)
+            if albaran is None or str(getattr(albaran, "pedido_id", "") or "").strip() != clean_pedido_id:
+                raise ValueError("Albaran no encontrado.")
+            pedido = session.get(Pedido, clean_pedido_id)
+            if pedido is None:
+                raise ValueError("Pedido no encontrado.")
+
+            items = list(session.exec(select(AlbaranItem).where(AlbaranItem.albaran_id == clean_albaran_id)))
+            for item in items:
+                self._delete_albaran_item_movements(session, item)
+                session.delete(item)
+            if not items:
+                self._delete_legacy_albaran_movements(session, pedido, albaran)
+            albaran_numero = str(getattr(albaran, "albaran_numero", "") or "").strip()
+            session.delete(albaran)
+            session.flush()
+            self._sync_pedido_albaran_numero_after_delete(session, pedido, albaran_numero)
+            session.flush()
+            self.rebuild_order_pendientes(session, clean_pedido_id, clean_albaran_id)
+
+    def delete_albaran_item(self, albaran_item_id: str) -> None:
+        clean_item_id = str(albaran_item_id or "").strip()
+        if not clean_item_id:
+            raise ValueError("Linea de albaran no valida.")
+        with Session(engine) as session:
+            item = session.get(AlbaranItem, clean_item_id)
+            if item is None:
+                raise ValueError("Linea de albaran no encontrada.")
+            pedido_id = str(getattr(item, "pedido_id", "") or "").strip()
+            albaran_id = str(getattr(item, "albaran_id", "") or "").strip()
+            if not pedido_id or not albaran_id:
+                raise ValueError("Linea de albaran sin pedido/albaran relacionado.")
+            albaran = session.get(Albaran, albaran_id)
+            pedido = session.get(Pedido, pedido_id)
+            self._delete_albaran_item_movements(session, item)
+            session.delete(item)
+            session.flush()
+
+            remaining = session.exec(select(AlbaranItem).where(AlbaranItem.albaran_id == albaran_id)).first()
+            if remaining is None and albaran is not None:
+                albaran_numero = str(getattr(albaran, "albaran_numero", "") or "").strip()
+                session.delete(albaran)
+                session.flush()
+                if pedido is not None:
+                    self._sync_pedido_albaran_numero_after_delete(session, pedido, albaran_numero)
+                    session.flush()
+            self.rebuild_order_pendientes(session, pedido_id, albaran_id)
+
     def repair_albaran_item_mappings_for_order(self, pedido_id: str, albaran_id: str = "") -> None:
         with Session(engine) as session:
             self.repair_albaran_item_mappings(session, pedido_id, albaran_id)
@@ -807,6 +861,77 @@ class OrderDocumentImportService:
     @staticmethod
     def parse_float(value: object, default: float = 0.0) -> float:
         return OrderDocumentParser.parse_decimal_es(value, default)
+
+    def _delete_albaran_item_movements(self, session: Session, item: AlbaranItem) -> None:
+        item_id = str(getattr(item, "item_id", "") or "").strip()
+        seen_ids: set[int] = set()
+        if item_id:
+            movements = list(session.exec(select(AlmacenMovimiento).where(AlmacenMovimiento.albaran_item_id == item_id)))
+            for mov in movements:
+                mov_id = int(getattr(mov, "id", 0) or 0)
+                if mov_id > 0:
+                    seen_ids.add(mov_id)
+                session.delete(mov)
+
+        albaran_numero = str(getattr(item, "albaran_numero", "") or "").strip()
+        articulo_id = str(getattr(item, "articulo_id", "") or "").strip()
+        if not albaran_numero or not articulo_id:
+            return
+        candidates = list(
+            session.exec(
+                select(AlmacenMovimiento).where(
+                    AlmacenMovimiento.pedido_albaran_numero == albaran_numero,
+                    AlmacenMovimiento.articulo_id == articulo_id,
+                )
+            )
+        )
+        cantidad = float(getattr(item, "articulo_cantidad", 0.0) or 0.0)
+        lote = str(getattr(item, "articulo_lote", "") or "").strip()
+        caducidad = getattr(item, "articulo_caducidad", None)
+        for mov in candidates:
+            mov_id = int(getattr(mov, "id", 0) or 0)
+            if mov_id > 0 and mov_id in seen_ids:
+                continue
+            if str(getattr(mov, "albaran_item_id", "") or "").strip():
+                continue
+            if abs(float(getattr(mov, "cantidad", 0.0) or 0.0) - cantidad) > 1e-9:
+                continue
+            if str(getattr(mov, "articulo_lote", "") or "").strip() != lote:
+                continue
+            if getattr(mov, "articulo_caducidad", None) != caducidad:
+                continue
+            session.delete(mov)
+
+    def _delete_legacy_albaran_movements(self, session: Session, pedido: Pedido, albaran: Albaran) -> None:
+        almacen_id = str(getattr(pedido, "almacen_id", "") or "").strip()
+        albaran_numero = str(getattr(albaran, "albaran_numero", "") or "").strip()
+        if not almacen_id or not albaran_numero:
+            return
+        movements = list(
+            session.exec(
+                select(AlmacenMovimiento).where(
+                    AlmacenMovimiento.almacen_id == almacen_id,
+                    AlmacenMovimiento.pedido_albaran_numero == albaran_numero,
+                )
+            )
+        )
+        for mov in movements:
+            if str(getattr(mov, "albaran_item_id", "") or "").strip():
+                continue
+            session.delete(mov)
+
+    def _sync_pedido_albaran_numero_after_delete(self, session: Session, pedido: Pedido, deleted_albaran_numero: str) -> None:
+        current = str(getattr(pedido, "pedido_albaran_numero", "") or "").strip()
+        if current != str(deleted_albaran_numero or "").strip():
+            return
+        pedido_id = str(getattr(pedido, "pedido_id", "") or "").strip()
+        remaining = session.exec(
+            select(Albaran)
+            .where(Albaran.pedido_id == pedido_id)
+            .order_by(Albaran.albaran_fecha.desc(), Albaran.albaran_numero.desc())
+        ).first()
+        pedido.pedido_albaran_numero = str(getattr(remaining, "albaran_numero", "") or "").strip() if remaining else ""
+        session.add(pedido)
 
     @staticmethod
     def try_parse_date(value: object) -> date | None:

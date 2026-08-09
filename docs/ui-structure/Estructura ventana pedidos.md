@@ -93,7 +93,8 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
                                 │   └── pedido_items_totals_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 1 fila fija de totales, 7 columnas sincronizadas, alto 30 px)
                                 ├── Albarán
                                 │   ├── albaran_actions_ribbon (QFrame, objectName `topRibbon`, fondo #FFFFFF, borde inferior #D7DEE8; sin pageType)
-                                │   │   ├── import_albaran_btn (QPushButton "Imp. Albarán", btnRole="warning", alto 26 px, deshabilitado sin pedido)
+                                │   │   ├── import_albaran_btn (QPushButton "Albarán", btnRole="warning", icono `assets/icons/import.svg`, alto 26 px, deshabilitado sin pedido)
+                                │   │   ├── delete_albaran_btn (QPushButton "Eliminar", btnRole="danger", icono `assets/icons/trash.svg`, alto 26 px, deshabilitado sin albaranes; si hay varios abre selector)
                                 │   │   └── espacio flexible
                                 │   ├── albaran_filter_row (QHBoxLayout)
                                 │   │   ├── QLabel "Albaran"
@@ -146,7 +147,8 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
 - `detail_fecha` y `detail_pedido_numero` programan autosave con `_schedule_autosave()`.
 - `pedido_items_table` permite edición directa por doble clic, tecla de edición o clic sobre celda seleccionada; los cambios se procesan en `_on_pedido_item_cell_changed()`.
 - `pedido_items_table` tiene menú contextual mediante `_show_pedido_items_context_menu()` con opciones `Añadir`, `Editar` y `Eliminar`; al hacer click derecho sobre una línea, la selecciona antes de ejecutar la acción.
-- `albaran_items_table` tiene menú contextual propio mediante `_show_albaran_items_context_menu()`.
+- `delete_albaran_btn` elimina el albarán seleccionado; si el pedido tiene más de un albarán muestra una lista para elegir. El borrado elimina líneas de albarán, entradas vinculadas en almacén y recalcula pendientes.
+- `albaran_items_table` tiene menú contextual propio mediante `_show_albaran_items_context_menu()` con opción `Eliminar`; el borrado elimina la línea, su entrada vinculada en almacén y recalcula pendientes.
 - `pendientes_table` tiene menú contextual mediante `_show_pendientes_context_menu()` con opciones `Editar` y `Eliminar`; actúa sobre la fila agregada visible ajustando la cantidad pedida del artículo para modificar o cancelar el pendiente.
 - `factura_items_table` habilita `edit_factura_line_btn` si hay línea seleccionada y abre edición con doble clic.
 - Las tablas principales y de detalle tienen ordenación activada desde cabecera.

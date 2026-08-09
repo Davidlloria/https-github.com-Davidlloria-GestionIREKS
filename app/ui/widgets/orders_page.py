@@ -1307,11 +1307,20 @@ class OrdersPage(QWidget):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
 
-        self.import_albaran_btn = QPushButton("Imp. Albarán")
+        self.import_albaran_btn = QPushButton("Albarán")
         self.import_albaran_btn.setProperty("btnRole", "warning")
+        self.import_albaran_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "import.svg")))
+        self.import_albaran_btn.setIconSize(QSize(14, 14))
         self.import_albaran_btn.setFixedHeight(26)
         self.import_albaran_btn.setEnabled(False)
         self.import_albaran_btn.clicked.connect(self._import_albaran_for_selected_order)
+        self.delete_albaran_btn = QPushButton("Eliminar")
+        self.delete_albaran_btn.setProperty("btnRole", "danger")
+        self.delete_albaran_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
+        self.delete_albaran_btn.setIconSize(QSize(14, 14))
+        self.delete_albaran_btn.setFixedHeight(26)
+        self.delete_albaran_btn.setEnabled(False)
+        self.delete_albaran_btn.clicked.connect(self._delete_selected_albaran)
         self.import_factura_btn = QPushButton("Imp. Factura")
         self.import_factura_btn.setProperty("btnRole", "warning")
         self.import_factura_btn.setFixedHeight(26)
@@ -1478,6 +1487,7 @@ class OrdersPage(QWidget):
         albaran_actions_layout.setContentsMargins(8, 6, 8, 6)
         albaran_actions_layout.setSpacing(6)
         albaran_actions_layout.addWidget(self.import_albaran_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        albaran_actions_layout.addWidget(self.delete_albaran_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         albaran_actions_layout.addStretch(1)
         albaran_tab_layout.addWidget(albaran_actions_ribbon)
         albaran_filter_row = QHBoxLayout()
@@ -2036,6 +2046,8 @@ class OrdersPage(QWidget):
                 self.albaran_selector.addItem(label, albaran_id)
         self.albaran_selector.setCurrentIndex(0)
         self.albaran_selector.blockSignals(False)
+        if hasattr(self, "delete_albaran_btn"):
+            self.delete_albaran_btn.setEnabled(self.albaran_selector.count() > 1)
 
     def _reload_albaran_items_table(self, pedido_id: str | None, albaran_id: str | None = None) -> None:
         header = self.albaran_items_table.horizontalHeader()
@@ -2291,13 +2303,15 @@ class OrdersPage(QWidget):
         albaran_item_id = str(id_cell.data(Qt.ItemDataRole.UserRole) or "").strip() if id_cell else ""
         if not albaran_item_id:
             return
-        if not self.order_document_import_service.is_albaran_item_pending(albaran_item_id):
-            return
         menu = QMenu(self)
         refresh_action = menu.addAction("Refrescar")
+        refresh_action.setEnabled(self.order_document_import_service.is_albaran_item_pending(albaran_item_id))
+        delete_action = menu.addAction("Eliminar")
         chosen = menu.exec(self.albaran_items_table.viewport().mapToGlobal(pos))
         if chosen == refresh_action:
             self._refresh_albaran_item_mapping(albaran_item_id)
+        elif chosen == delete_action:
+            self._delete_albaran_line(albaran_item_id)
 
     def _refresh_albaran_item_mapping(self, albaran_item_id: str) -> None:
         try:
@@ -2408,6 +2422,69 @@ class OrdersPage(QWidget):
         )
         self.reload()
         self._select_by_id(selected_order.pedido_id)
+        self._show_selected_details()
+
+    def _delete_albaran_line(self, albaran_item_id: str) -> None:
+        answer = QMessageBox.question(
+            self,
+            "Eliminar linea de albaran",
+            "Eliminar la linea seleccionada del albaran y su entrada de almacen?",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.order_document_import_service.delete_albaran_item(albaran_item_id)
+        except Exception as exc:
+            QMessageBox.warning(self, "Albaran", str(exc))
+            return
+        self.reload()
+
+    def _delete_selected_albaran(self) -> None:
+        selected = self._selected_row()
+        if selected is None:
+            QMessageBox.warning(self, "Albaran", "Selecciona un pedido.")
+            return
+        rows = self.order_query_service.list_albaranes(selected.pedido_id)
+        if not rows:
+            QMessageBox.warning(self, "Albaran", "El pedido no tiene albaranes.")
+            return
+        target = rows[0]
+        if len(rows) > 1:
+            labels: list[str] = []
+            by_label: dict[str, Albaran] = {}
+            for idx, row in enumerate(rows, start=1):
+                numero = str(getattr(row, "albaran_numero", "") or "").strip()
+                fecha = self._parse_date(getattr(row, "albaran_fecha", None))
+                label = f"{idx}. {numero or 'Sin numero'} ({fecha.strftime('%d/%m/%Y')})"
+                labels.append(label)
+                by_label[label] = row
+            chosen, ok = QInputDialog.getItem(
+                self,
+                "Eliminar albaran",
+                "Selecciona el albaran a eliminar:",
+                labels,
+                0,
+                False,
+            )
+            if not ok or not chosen:
+                return
+            target = by_label[chosen]
+        albaran_id = str(getattr(target, "albaran_id", "") or "").strip()
+        numero = str(getattr(target, "albaran_numero", "") or "").strip()
+        answer = QMessageBox.question(
+            self,
+            "Eliminar albaran",
+            f"Eliminar el albaran {numero or albaran_id} y todas sus lineas y entradas de almacen?",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.order_document_import_service.delete_albaran(selected.pedido_id, albaran_id)
+        except Exception as exc:
+            QMessageBox.warning(self, "Albaran", str(exc))
+            return
+        self.reload()
+        self._select_by_id(selected.pedido_id)
         self._show_selected_details()
 
     def _delete_pending_row(self) -> None:
@@ -2655,6 +2732,7 @@ class OrdersPage(QWidget):
         self._reload_factura_items_table(row.pedido_id, self._selected_factura_id())
         self._reload_pendientes_table(row.pedido_id)
         self.import_albaran_btn.setEnabled(True)
+        self.delete_albaran_btn.setEnabled(self.albaran_selector.count() > 1)
         self.import_factura_btn.setEnabled(True)
         self.delete_factura_btn.setEnabled(bool(self._selected_factura_id()))
         self.edit_factura_line_btn.setEnabled(bool(self._selected_factura_item_id()))
@@ -2672,6 +2750,7 @@ class OrdersPage(QWidget):
         self._reload_factura_items_table(None)
         self._reload_pendientes_table(None)
         self.import_albaran_btn.setEnabled(False)
+        self.delete_albaran_btn.setEnabled(False)
         self.import_factura_btn.setEnabled(False)
         self.delete_factura_btn.setEnabled(False)
         self.edit_factura_line_btn.setEnabled(False)
