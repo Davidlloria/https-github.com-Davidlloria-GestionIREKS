@@ -27,7 +27,16 @@ Implementación principal:
 
 ```text
 OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_StyledBackground=True)
-└── layout principal (QVBoxLayout)
+└── layout principal (QVBoxLayout, márgenes 14 px, separación 10 px)
+    ├── topRibbon (QFrame, objectName `topRibbon`, pageType="contacts", fondo #FFFFFF, borde #E2E8F1, radio 8 px)
+    │   ├── new_btn (QPushButton "Nuevo", btnRole="success", icono `assets/icons/plus.svg`, alto 26 px, icono 16 px, ancho fijo común del ribbon)
+    │   ├── edit_btn (QPushButton "Editar", btnRole="warning", icono `assets/icons/file-pen.svg`, alto 26 px, icono 16 px, ancho fijo común del ribbon)
+    │   ├── del_btn (QPushButton "Eliminar", btnRole="danger", icono `assets/icons/trash.svg`, alto 26 px, icono 16 px, ancho fijo común del ribbon)
+    │   ├── export_btn (QPushButton "Exportar", btnRole="secondary", icono `assets/icons/sheet.svg`, alto 26 px, icono 16 px, ancho fijo común del ribbon)
+    │   ├── send_mail_btn (QPushButton "Enviar Outlook", btnRole="secondary", icono `assets/icons/mail.svg`, alto 26 px, icono 16 px, ancho fijo común del ribbon)
+    │   ├── print_btn (QPushButton "Imprimir", btnRole="secondary", icono `assets/icons/printer.svg`, alto 26 px, icono 16 px, ancho fijo común del ribbon)
+    │   ├── espacio flexible
+    │   └── help_btn (QPushButton "Ayuda", btnRole="secondary", icono `assets/icons/circle-question-mark.svg`, alto 26 px, icono 16 px, ancho fijo común del ribbon)
     └── splitter principal (QSplitter horizontal, tirador oculto, childrenCollapsible=False)
         ├── sidePanel (QWidget, objectName `sidePanel`, fondo #FFFFFF, borde #D7DEE8, radio 8 px, ancho 560-620 px)
         │   └── left_layout (QVBoxLayout)
@@ -41,15 +50,6 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
         │       ├── fila de almacén / cliente-distribuidor (QHBoxLayout)
         │       │   ├── QLabel "Cliente/Distribuidor"
         │       │   └── almacen_filter (QComboBox editable, ancho mínimo 210 px, sin inserción manual, completer por ocurrencia)
-        │       ├── topRibbon (QFrame, objectName `topRibbon`, pageType="contacts")
-        │       │   ├── new_btn (QPushButton "Nuevo", btnRole="success", alto 26 px, icono 14 px)
-        │       │   ├── edit_btn (QPushButton "Editar", btnRole="warning", alto 26 px, icono 14 px)
-        │       │   ├── del_btn (QPushButton "Eliminar", btnRole="danger", alto 26 px, icono 14 px)
-        │       │   ├── export_btn (QPushButton "Exportar", btnRole="secondary", alto 26 px, icono 14 px)
-        │       │   ├── send_mail_btn (QPushButton "Enviar Outlook", btnRole="secondary", alto 26 px, icono 14 px)
-        │       │   ├── print_btn (QPushButton "Imprimir", btnRole="secondary", alto 26 px, icono 14 px)
-        │       │   ├── espacio flexible
-        │       │   └── help_btn (QPushButton "Ayuda", btnRole="secondary", alto 26 px, icono 14 px)
         │       ├── table (QTableWidget, listado principal de pedidos, 6 columnas, ordenable, selección de fila completa)
         │       │   ├── Almacen (180 px)
         │       │   ├── Nº (60 px)
@@ -191,7 +191,8 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
 - `QTabBar::tab`: fondo `#F7FAFD`, borde `#DDE5F0`, borde inferior `#DDE5F0`, radio superior 8 px.
 - `QTabBar::tab:selected`: fondo `#FFFFFF`, borde `#DDE5F0`, borde inferior `#2563EB`.
 - `topRibbon` global: fondo `#FFFFFF`, borde inferior `#D7DEE8`, sin radio.
-- `topRibbon` principal con `pageType="contacts"`: fondo `#FFFFFF`, borde `#E2E8F1`, radio 8 px.
+- `topRibbon` principal con `pageType="contacts"`: fondo `#FFFFFF`, borde `#E2E8F1`, radio 8 px; está en el layout principal, por encima del splitter.
+- Botones del ribbon principal: ancho fijo común calculado desde `sizeHint()`, alto 26 px, iconos 16 px y colores por `btnRole`, siguiendo el estándar de la ventana Clientes.
 - `pedido_actions_ribbon`, `albaran_actions_ribbon` y `factura_actions_ribbon`: usan `#topRibbon` sin `pageType`; fondo `#FFFFFF`, borde inferior `#D7DEE8`, sin radio.
 - `QTableWidget`: fondo `#FFFFFF`, fondo alterno `#F7F9FC`, borde `#D8E0EA`, radio 8 px, gridline `#E6EBF2`.
 - `QHeaderView::section`: fondo `#EEF2F7`, borde derecho `#E0E7F0`, borde inferior `#D8E0EA`.
@@ -244,6 +245,8 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
 ## Últimos ajustes relevantes documentados
 
 - El filtro `almacen_filter` es editable con búsqueda por ocurrencia para manejar listas largas.
+- El ribbon principal cuelga del layout principal y no del panel izquierdo.
+- El ribbon principal usa el estándar de Clientes: botones con ancho común, iconos de 16 px y colores por acción.
 - La tabla principal mantiene columnas fijas para `Almacen`, `Nº`, `Fecha`, `Semana`, `Total Kg` y `Estado`.
 - La parte derecha conserva el patrón visual heredado de clientes (`customersRightPanel`, `customersDetailSplitter`, `crmCard`, `customerTabs`).
 - Las tablas de Pedido, Albarán y Factura tienen filas de totales fijas fuera del scroll.

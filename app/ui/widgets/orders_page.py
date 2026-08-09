@@ -1175,9 +1175,10 @@ class OrdersPage(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        layout.addWidget(splitter, 1)
 
         left_panel = QWidget()
         left_panel.setObjectName("sidePanel")
@@ -1225,18 +1226,25 @@ class OrdersPage(QWidget):
 
         self.new_btn = QPushButton("Nuevo")
         self.new_btn.setProperty("btnRole", "success")
+        self.new_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "plus.svg")))
         self.edit_btn = QPushButton("Editar")
         self.edit_btn.setProperty("btnRole", "warning")
+        self.edit_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "file-pen.svg")))
         self.del_btn = QPushButton("Eliminar")
         self.del_btn.setProperty("btnRole", "danger")
+        self.del_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "trash.svg")))
         self.export_btn = QPushButton("Exportar")
         self.export_btn.setProperty("btnRole", "secondary")
+        self.export_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "sheet.svg")))
         self.send_mail_btn = QPushButton("Enviar Outlook")
         self.send_mail_btn.setProperty("btnRole", "secondary")
+        self.send_mail_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "mail.svg")))
         self.print_btn = QPushButton("Imprimir")
         self.print_btn.setProperty("btnRole", "secondary")
+        self.print_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "printer.svg")))
         self.help_btn = QPushButton("Ayuda")
         self.help_btn.setProperty("btnRole", "secondary")
+        self.help_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "circle-question-mark.svg")))
         for button in (
             self.new_btn,
             self.edit_btn,
@@ -1247,7 +1255,20 @@ class OrdersPage(QWidget):
             self.help_btn,
         ):
             button.setFixedHeight(26)
-            button.setIconSize(QSize(14, 14))
+            button.setIconSize(QSize(16, 16))
+
+        ribbon_buttons = (
+            self.new_btn,
+            self.edit_btn,
+            self.del_btn,
+            self.export_btn,
+            self.send_mail_btn,
+            self.print_btn,
+            self.help_btn,
+        )
+        ribbon_button_width = max(button.sizeHint().width() for button in ribbon_buttons)
+        for button in ribbon_buttons:
+            button.setFixedWidth(ribbon_button_width)
 
         self.new_btn.clicked.connect(self._new_order)
         self.edit_btn.clicked.connect(self._edit_order)
@@ -1272,7 +1293,8 @@ class OrdersPage(QWidget):
         left_ribbon_layout.addWidget(self.print_btn)
         left_ribbon_layout.addStretch(1)
         left_ribbon_layout.addWidget(self.help_btn)
-        left_layout.addWidget(left_ribbon)
+        layout.addWidget(left_ribbon)
+        layout.addWidget(splitter, 1)
 
         self.table = QTableWidget(0, 6)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
