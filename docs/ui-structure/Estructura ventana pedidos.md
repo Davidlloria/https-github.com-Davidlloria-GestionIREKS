@@ -124,7 +124,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
                                 │               │   └── Precio (82 px)
                                 │               └── factura_items_totals_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 1 fila fija de totales, 5 columnas sincronizadas, alto 30 px)
                                 └── Pendientes
-                                    └── pendientes_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 4 columnas, ordenable, selección de fila completa)
+                                    └── pendientes_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 4 columnas, ordenable, selección de fila completa, menú contextual)
                                         ├── Cod. (95 px)
                                         ├── Nombre (stretch)
                                         ├── Pendiente (100 px)
@@ -147,6 +147,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
 - `pedido_items_table` permite edición directa por doble clic, tecla de edición o clic sobre celda seleccionada; los cambios se procesan en `_on_pedido_item_cell_changed()`.
 - `pedido_items_table` tiene menú contextual mediante `_show_pedido_items_context_menu()` con opciones `Añadir`, `Editar` y `Eliminar`; al hacer click derecho sobre una línea, la selecciona antes de ejecutar la acción.
 - `albaran_items_table` tiene menú contextual propio mediante `_show_albaran_items_context_menu()`.
+- `pendientes_table` tiene menú contextual mediante `_show_pendientes_context_menu()` con opciones `Editar` y `Eliminar`; actúa sobre la fila agregada visible ajustando la cantidad pedida del artículo para modificar o cancelar el pendiente.
 - `factura_items_table` habilita `edit_factura_line_btn` si hay línea seleccionada y abre edición con doble clic.
 - Las tablas principales y de detalle tienen ordenación activada desde cabecera.
 - Las filas de totales se mantienen fuera del scroll de cada tabla y se sincronizan con sus columnas correspondientes.

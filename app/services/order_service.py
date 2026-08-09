@@ -222,6 +222,34 @@ class OrderService:
                 session.delete(entity)
                 session.commit()
 
+    def set_order_article_quantity(self, pedido_id: str, articulo_id: str, cantidad: float) -> None:
+        clean_pedido_id = str(pedido_id or "").strip()
+        clean_articulo_id = str(articulo_id or "").strip()
+        target_qty = max(0.0, float(cantidad or 0.0))
+        if not clean_pedido_id or not clean_articulo_id:
+            return
+        with Session(engine) as session:
+            rows = list(
+                session.exec(
+                    select(PedidoItem)
+                    .where(PedidoItem.pedido_id == clean_pedido_id, PedidoItem.articulo_id == clean_articulo_id)
+                    .order_by(PedidoItem.item_id)
+                )
+            )
+            if not rows:
+                return
+            if target_qty <= 1e-9:
+                for row in rows:
+                    session.delete(row)
+                session.commit()
+                return
+            first = rows[0]
+            first.articulo_cantidad = target_qty
+            session.add(first)
+            for row in rows[1:]:
+                session.delete(row)
+            session.commit()
+
     def delete_order_line_if_exists(self, item_id: str) -> bool:
         with Session(engine) as session:
             entity = session.get(PedidoItem, item_id)

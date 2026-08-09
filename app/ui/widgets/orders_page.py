@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHeaderView,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMenu,
@@ -1636,6 +1637,8 @@ class OrdersPage(QWidget):
         self.pendientes_table.verticalHeader().setVisible(False)
         self.pendientes_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.pendientes_table.setStyleSheet("QTableWidget::item:focus { border: none; outline: 0; }")
+        self.pendientes_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.pendientes_table.customContextMenuRequested.connect(self._show_pendientes_context_menu)
         pendientes_header = self.pendientes_table.horizontalHeader()
         pendientes_header.setSectionsClickable(True)
         pendientes_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
@@ -2323,6 +2326,15 @@ class OrdersPage(QWidget):
             cod = ref_by_article.get(articulo_id, "") or articulo_id
             nombre = name_by_article.get(articulo_id, "") or articulo_id
             pendiente = float(getattr(row, "cantidad_pendiente", 0.0) or 0.0)
+            cantidad_pedida = float(getattr(row, "cantidad_pedida", 0.0) or 0.0)
+            cantidad_recibida = float(getattr(row, "cantidad_recibida", 0.0) or 0.0)
+            row_payload = {
+                "pedido_id": str(getattr(row, "pedido_id", "") or "").strip(),
+                "articulo_id": articulo_id,
+                "cantidad_pedida": cantidad_pedida,
+                "cantidad_recibida": cantidad_recibida,
+                "cantidad_pendiente": pendiente,
+            }
             pedido_numero = str(getattr(pedido, "pedido_numero", "") or "").strip()
             values = [
                 cod,
@@ -2339,10 +2351,82 @@ class OrdersPage(QWidget):
                     cell = NumericTableWidgetItem(value, self._pedido_sort_value(pedido_numero))
                 else:
                     cell = QTableWidgetItem(value)
+                if col_idx == 0:
+                    cell.setData(Qt.ItemDataRole.UserRole, row_payload)
                 self.pendientes_table.setItem(row_idx, col_idx, cell)
         self.pendientes_table.setSortingEnabled(was_sorting)
         if was_sorting:
             self.pendientes_table.sortItems(sort_col if sort_col >= 0 else 3, sort_order if sort_col >= 0 else Qt.SortOrder.AscendingOrder)
+
+    def _selected_pending_payload(self) -> dict[str, Any] | None:
+        selected_rows = self.pendientes_table.selectionModel().selectedRows() if self.pendientes_table.selectionModel() else []
+        if not selected_rows:
+            return None
+        row_idx = selected_rows[0].row()
+        id_cell = self.pendientes_table.item(row_idx, 0)
+        payload = id_cell.data(Qt.ItemDataRole.UserRole) if id_cell else None
+        return payload if isinstance(payload, dict) else None
+
+    def _show_pendientes_context_menu(self, pos) -> None:
+        item = self.pendientes_table.itemAt(pos)
+        if item is None:
+            return
+        self.pendientes_table.selectRow(item.row())
+        menu = QMenu(self)
+        edit_action = menu.addAction("Editar")
+        delete_action = menu.addAction("Eliminar")
+        chosen = menu.exec(self.pendientes_table.viewport().mapToGlobal(pos))
+        if chosen == edit_action:
+            self._edit_pending_row()
+        elif chosen == delete_action:
+            self._delete_pending_row()
+
+    def _edit_pending_row(self) -> None:
+        payload = self._selected_pending_payload()
+        selected_order = self._selected_row()
+        if not payload or selected_order is None:
+            QMessageBox.warning(self, "Pendientes", "Selecciona una fila pendiente.")
+            return
+        current_pending = float(payload.get("cantidad_pendiente") or 0.0)
+        new_pending, accepted = QInputDialog.getDouble(
+            self,
+            "Editar pendiente",
+            "Cantidad pendiente:",
+            current_pending,
+            0.0,
+            1_000_000.0,
+            2,
+        )
+        if not accepted:
+            return
+        received = float(payload.get("cantidad_recibida") or 0.0)
+        self.order_service.set_order_article_quantity(
+            str(payload.get("pedido_id") or ""),
+            str(payload.get("articulo_id") or ""),
+            received + float(new_pending),
+        )
+        self.reload()
+        self._select_by_id(selected_order.pedido_id)
+        self._show_selected_details()
+
+    def _delete_pending_row(self) -> None:
+        payload = self._selected_pending_payload()
+        selected_order = self._selected_row()
+        if not payload or selected_order is None:
+            QMessageBox.warning(self, "Pendientes", "Selecciona una fila pendiente.")
+            return
+        answer = QMessageBox.question(self, "Confirmar", "Eliminar pendiente seleccionado?")
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        received = float(payload.get("cantidad_recibida") or 0.0)
+        self.order_service.set_order_article_quantity(
+            str(payload.get("pedido_id") or ""),
+            str(payload.get("articulo_id") or ""),
+            received,
+        )
+        self.reload()
+        self._select_by_id(selected_order.pedido_id)
+        self._show_selected_details()
 
     def reload(self) -> None:
         selected_id = self._selected_id()
