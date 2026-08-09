@@ -37,7 +37,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
     │   ├── print_btn (QPushButton "Imprimir", btnRole="secondary", icono `assets/icons/printer.svg`, alto 30 px, icono 20 px, ancho fijo 110 px)
     │   ├── espacio flexible
     │   └── help_btn (QPushButton "Ayuda", btnRole="secondary", icono `assets/icons/circle-question-mark.svg`, alto 30 px, icono 20 px, ancho fijo 110 px)
-    └── splitter principal (QSplitter horizontal, objectName `ordersMainSplitter`, fondo transparente, sin borde, tirador oculto, childrenCollapsible=False)
+    └── splitter principal (QSplitter horizontal, objectName `ordersMainSplitter`, fondo transparente, sin borde, separación transparente de 5 px entre paneles, childrenCollapsible=False)
         ├── sidePanel (QWidget, objectName `sidePanel`, fondo #FFFFFF, borde #D7DEE8, radio 8 px, ancho 560-620 px)
         │   └── left_layout (QVBoxLayout)
         │       ├── fila de filtros de periodo (QHBoxLayout)
@@ -179,7 +179,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
   - panel de líneas de factura ocupa el resto;
   - tirador oculto y deshabilitado.
 - Todas las filas de totales tienen alto fijo de 30 px.
-- El splitter principal tiene tirador de ancho 0 y `handle(1)` deshabilitado.
+- El splitter principal tiene tirador transparente de 5 px entre `sidePanel` y `ordersRightPanel`; `handle(1)` permanece deshabilitado.
 
 ## Aspecto visual actual
 

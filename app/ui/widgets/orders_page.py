@@ -1188,6 +1188,10 @@ class OrdersPage(QWidget):
                 background: transparent;
                 border: none;
             }
+            QSplitter#ordersMainSplitter::handle {
+                background: transparent;
+                border: none;
+            }
             """
         )
 
@@ -1717,7 +1721,7 @@ class OrdersPage(QWidget):
         splitter.setStretchFactor(1, 1)
         splitter.setSizes([580, 660])
         splitter.setChildrenCollapsible(False)
-        splitter.setHandleWidth(0)
+        splitter.setHandleWidth(5)
         splitter.handle(1).setEnabled(False)
 
     def _try_parse_date(self, value) -> date | None:
