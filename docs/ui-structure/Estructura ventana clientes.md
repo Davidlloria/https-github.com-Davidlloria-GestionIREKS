@@ -11,14 +11,14 @@ Implementación principal:
 CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin borde, WA_StyledBackground=True)
 └── layout principal (QVBoxLayout, márgenes 14 px, separación 10 px)
     ├── título de página "Clientes" (QLabel, actualmente oculto)
-    │   ├── Nuevo (verde claro #DCFCE7, texto #166534, icono `assets/icons/user-round-plus.svg`, ancho fijo 154 px, alto 26 px, icono 16 px)
-    │   ├── Editar (amarillo claro #FEF3C7, texto #92400E, icono `assets/icons/file-pen.svg`, ancho fijo 154 px, alto 26 px, icono 16 px)
-    │   ├── Eliminar (rojo claro #FEE2E2, texto #B91C1C, icono `assets/icons/trash.svg`, ancho fijo 154 px, alto 26 px, icono 16 px)
-    │   ├── Listados (gris azulado #E2E8F0, texto #334155, icono `assets/icons/list.svg`, ancho fijo 154 px, alto 26 px, icono 16 px)
-    │   ├── Actualizar (violeta claro #F3E8FF, texto #6B21A8, icono `assets/icons/refresh-cw.svg`, ancho fijo 154 px, alto 26 px, icono 16 px)
-    │   ├── customerQueriesButton (QPushButton, etiqueta "Consultas", icono `assets/icons/brain.svg`, ancho fijo 154 px, alto 26 px, icono 16 px)
+    │   ├── Nuevo (verde claro #DCFCE7, texto #166534, icono `assets/icons/user-round-plus.svg`, ancho fijo 116 px, alto 26 px, icono 16 px)
+    │   ├── Editar (amarillo claro #FEF3C7, texto #92400E, icono `assets/icons/file-pen.svg`, ancho fijo 116 px, alto 26 px, icono 16 px)
+    │   ├── Eliminar (rojo claro #FEE2E2, texto #B91C1C, icono `assets/icons/trash.svg`, ancho fijo 116 px, alto 26 px, icono 16 px)
+    │   ├── Listados (gris azulado #E2E8F0, texto #334155, icono `assets/icons/list.svg`, ancho fijo 116 px, alto 26 px, icono 16 px)
+    │   ├── Actualizar (violeta claro #F3E8FF, texto #6B21A8, icono `assets/icons/refresh-cw.svg`, ancho fijo 116 px, alto 26 px, icono 16 px)
+    │   ├── customerQueriesButton (QPushButton, etiqueta "Consultas", icono `assets/icons/brain.svg`, ancho fijo 116 px, alto 26 px, icono 16 px)
     │   ├── espacio flexible
-    │   └── Ayuda (gris azulado #E2E8F0, texto #334155, icono `assets/icons/circle-question-mark.svg`, ancho fijo 154 px, alto 26 px, icono 16 px)
+    │   └── Ayuda (gris azulado #E2E8F0, texto #334155, icono `assets/icons/circle-question-mark.svg`, ancho fijo 116 px, alto 26 px, icono 16 px)
     └── customersMainSplitter (QSplitter horizontal, fondo transparente, sin borde, tirador oculto)
         ├── customersLeftPanel (QWidget, fondo blanco #FFFFFF, borde #D7DEE8)
         │   └── layout vertical (QVBoxLayout, márgenes 14 px, separación 10 px)
@@ -165,7 +165,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 
 - El ribbon principal se construye con `app/ui/widgets/action_ribbon.py`.
 - `create_standard_top_ribbon()` fija `objectName="topRibbon"`, `pageType="contacts"`, márgenes `8, 6, 8, 6` y separación `6 px`.
-- `create_standard_ribbon_button()` fija ancho `154 px`, alto `26 px`, icono `16 x 16 px` y color por `btnRole`.
+- `create_standard_ribbon_button()` fija ancho `116 px`, alto `26 px`, icono `16 x 16 px` y color por `btnRole`.
 - La cinta superior usa botones compactos con colores por función e iconos.
 - Inputs y combos son blancos, con borde gris, radio de 8 px y foco azul.
 - La fila seleccionada de clientes usa fondo azul `#3A78CF` y texto blanco.
