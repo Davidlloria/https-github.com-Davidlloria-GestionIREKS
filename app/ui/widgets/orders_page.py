@@ -1419,6 +1419,8 @@ class OrdersPage(QWidget):
         self.pedido_items_table.verticalHeader().setVisible(False)
         self.pedido_items_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.pedido_items_table.setStyleSheet("QTableWidget::item:focus { border: none; outline: 0; }")
+        self.pedido_items_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.pedido_items_table.customContextMenuRequested.connect(self._show_pedido_items_context_menu)
         self.pedido_items_table.itemChanged.connect(self._on_pedido_item_cell_changed)
         items_header = self.pedido_items_table.horizontalHeader()
         items_header.setSectionsClickable(True)
@@ -1992,6 +1994,27 @@ class OrdersPage(QWidget):
         self.reload()
         self._select_by_id(selected_order.pedido_id)
         self._show_selected_details()
+
+    def _show_pedido_items_context_menu(self, pos) -> None:
+        item = self.pedido_items_table.itemAt(pos)
+        has_line = item is not None
+        if item is not None:
+            self.pedido_items_table.selectRow(item.row())
+
+        menu = QMenu(self)
+        add_action = menu.addAction("Añadir")
+        edit_action = menu.addAction("Editar")
+        delete_action = menu.addAction("Eliminar")
+        edit_action.setEnabled(has_line)
+        delete_action.setEnabled(has_line)
+
+        chosen = menu.exec(self.pedido_items_table.viewport().mapToGlobal(pos))
+        if chosen == add_action:
+            self._add_order_line()
+        elif chosen == edit_action:
+            self._edit_order_line()
+        elif chosen == delete_action:
+            self._delete_order_line()
 
     def _load_albaran_selector(self, pedido_id: str | None) -> None:
         self.albaran_selector.blockSignals(True)

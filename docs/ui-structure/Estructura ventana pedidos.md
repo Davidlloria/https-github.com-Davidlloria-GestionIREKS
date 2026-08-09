@@ -82,7 +82,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
                                 │   │   ├── del_line_btn (QPushButton "Eliminar", btnRole="danger", alto 26 px)
                                 │   │   ├── edit_order_btn (QPushButton "Editar pedido", btnRole="warning", alto 26 px)
                                 │   │   └── espacio flexible
-                                │   ├── pedido_items_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 7 columnas, ordenable, selección de fila completa, edición directa habilitada)
+                                │   ├── pedido_items_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 7 columnas, ordenable, selección de fila completa, edición directa habilitada, menú contextual)
                                 │   │   ├── Cod. (95 px)
                                 │   │   ├── Nombre (stretch)
                                 │   │   ├── Pedido (82 px)
@@ -145,6 +145,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
   - artículos pendientes.
 - `detail_fecha` y `detail_pedido_numero` programan autosave con `_schedule_autosave()`.
 - `pedido_items_table` permite edición directa por doble clic, tecla de edición o clic sobre celda seleccionada; los cambios se procesan en `_on_pedido_item_cell_changed()`.
+- `pedido_items_table` tiene menú contextual mediante `_show_pedido_items_context_menu()` con opciones `Añadir`, `Editar` y `Eliminar`; al hacer click derecho sobre una línea, la selecciona antes de ejecutar la acción.
 - `albaran_items_table` tiene menú contextual propio mediante `_show_albaran_items_context_menu()`.
 - `factura_items_table` habilita `edit_factura_line_btn` si hay línea seleccionada y abre edición con doble clic.
 - Las tablas principales y de detalle tienen ordenación activada desde cabecera.
