@@ -1447,7 +1447,7 @@ class OrdersPage(QWidget):
             """
         )
         tabs_layout = QVBoxLayout(tabs_panel)
-        tabs_layout.setContentsMargins(12, 12, 12, 12)
+        tabs_layout.setContentsMargins(0, 0, 0, 0)
         tabs_layout.setSpacing(8)
         tabs = QTabWidget()
         tabs.setObjectName("ordersTabs")

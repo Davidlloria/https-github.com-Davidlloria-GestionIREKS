@@ -73,7 +73,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
                     │           ├── detail_pedido_numero (QLineEdit, 100 px)
                     │           └── espacio flexible
                     └── crmCard (QWidget, objectName `crmCard`, fondo transparente, sin borde, contenedor de pestañas)
-                        └── tabs_layout (QVBoxLayout, márgenes 12 px, separación 8 px)
+                        └── tabs_layout (QVBoxLayout, márgenes 0 px, separación 8 px; `ordersTabs` ocupa todo el ancho de `crmCard`)
                             └── ordersTabs (QTabWidget, objectName `ordersTabs`; pane fondo #FFFFFF, borde #D7DEE8, radio 8 px)
                                 ├── Pedido
                                 │   ├── pedido_actions_ribbon (QFrame, objectName `topRibbon`, fondo #FFFFFF, borde inferior #D7DEE8; sin pageType)
