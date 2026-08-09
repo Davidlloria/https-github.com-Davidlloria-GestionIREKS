@@ -116,3 +116,8 @@ def test_import_factura_short_circuits_on_duplicate_gate(monkeypatch) -> None:
     assert fake_gate_service.factura_calls == [("p1", {"factura_numero": "F-1"})]
     assert fake_session_factory.session.exec_called is False
     assert fake_session_factory.session.commit_calls == 0
+
+
+def test_parse_float_accepts_spanish_thousands_separator() -> None:
+    assert OrderDocumentImportService.parse_float("1.008") == 1008.0
+    assert OrderDocumentImportService.parse_float("1.008,50") == 1008.5

@@ -806,13 +806,7 @@ class OrderDocumentImportService:
 
     @staticmethod
     def parse_float(value: object, default: float = 0.0) -> float:
-        text_value = str(value or "").strip()
-        if not text_value:
-            return default
-        try:
-            return float(text_value.replace(",", "."))
-        except Exception:
-            return default
+        return OrderDocumentParser.parse_decimal_es(value, default)
 
     @staticmethod
     def try_parse_date(value: object) -> date | None:
