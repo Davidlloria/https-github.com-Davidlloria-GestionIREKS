@@ -9,9 +9,9 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QPushButton, QWidget
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 
-STANDARD_RIBBON_BUTTON_WIDTH = 116
-STANDARD_RIBBON_BUTTON_HEIGHT = 26
-STANDARD_RIBBON_ICON_SIZE = QSize(16, 16)
+STANDARD_RIBBON_BUTTON_WIDTH = 110
+STANDARD_RIBBON_BUTTON_HEIGHT = 30
+STANDARD_RIBBON_ICON_SIZE = QSize(20, 20)
 STANDARD_RIBBON_MARGINS = (8, 6, 8, 6)
 STANDARD_RIBBON_SPACING = 6
 
@@ -63,8 +63,8 @@ def _standard_button_style(role: str) -> str:
     bg, fg, border, hover_bg, hover_border = _ROLE_STYLES.get(role, _ROLE_STYLES["secondary"])
     return f"""
         QPushButton {{
-            min-height: 24px;
-            max-height: 24px;
+            min-height: 28px;
+            max-height: 28px;
             padding: 0 10px;
             margin: 0;
             border-radius: 7px;
