@@ -1225,7 +1225,7 @@ class OrdersPage(QWidget):
         almacen_row.addWidget(self.almacen_filter, 1)
         left_layout.addLayout(almacen_row)
 
-        self.new_btn = create_standard_ribbon_button("Nuevo", role="success", icon_name="plus.svg")
+        self.new_btn = create_standard_ribbon_button("Nuevo", role="success", icon_name="order.svg")
         self.edit_btn = create_standard_ribbon_button("Editar", role="warning", icon_name="file-pen.svg")
         self.del_btn = create_standard_ribbon_button("Eliminar", role="danger", icon_name="trash.svg")
         self.export_btn = create_standard_ribbon_button("Exportar", role="secondary", icon_name="sheet.svg")

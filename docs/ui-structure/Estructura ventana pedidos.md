@@ -29,7 +29,7 @@ Implementación principal:
 OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_StyledBackground=True)
 └── layout principal (QVBoxLayout, márgenes 14 px, separación 10 px)
     ├── topRibbon (QFrame, objectName `topRibbon`, pageType="contacts", fondo #FFFFFF, borde #E2E8F1, radio 8 px)
-    │   ├── new_btn (QPushButton "Nuevo", btnRole="success", icono `assets/icons/plus.svg`, alto 26 px, icono 16 px, ancho fijo 116 px)
+    │   ├── new_btn (QPushButton "Nuevo", btnRole="success", icono `assets/icons/order.svg`, alto 26 px, icono 16 px, ancho fijo 116 px)
     │   ├── edit_btn (QPushButton "Editar", btnRole="warning", icono `assets/icons/file-pen.svg`, alto 26 px, icono 16 px, ancho fijo 116 px)
     │   ├── del_btn (QPushButton "Eliminar", btnRole="danger", icono `assets/icons/trash.svg`, alto 26 px, icono 16 px, ancho fijo 116 px)
     │   ├── export_btn (QPushButton "Exportar", btnRole="secondary", icono `assets/icons/sheet.svg`, alto 26 px, icono 16 px, ancho fijo 116 px)
