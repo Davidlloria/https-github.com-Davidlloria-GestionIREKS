@@ -1716,13 +1716,25 @@ class OrdersPage(QWidget):
 
     def _load_almacen_filter(self, _session: Any | None = None) -> None:
         current = str(self.almacen_filter.currentData() or "")
+        current_index_text = str(self.almacen_filter.currentText() or "").strip()
+        line_edit = self.almacen_filter.lineEdit()
+        current_text = str(line_edit.text() if line_edit is not None else current_index_text).strip()
+        if current_text and current_index_text and current_text.casefold() != current_index_text.casefold():
+            current = ""
         options = self.order_query_service.warehouse_filter_options()
         self.almacen_filter.blockSignals(True)
         self.almacen_filter.clear()
         for option in options:
             self.almacen_filter.addItem(option.label, option.value)
         idx = self.almacen_filter.findData(current)
-        self.almacen_filter.setCurrentIndex(idx if idx >= 0 else 0)
+        if idx < 0 and current_text:
+            idx = self._resolve_almacen_filter_index(current_text)
+        if idx >= 0:
+            self.almacen_filter.setCurrentIndex(idx)
+        else:
+            self.almacen_filter.setCurrentIndex(0)
+            if current_text and current_text.casefold() != "todos":
+                self.almacen_filter.setEditText(current_text)
         self.almacen_filter.blockSignals(False)
 
     def _selected_almacen_id(self) -> str:
@@ -1733,7 +1745,18 @@ class OrdersPage(QWidget):
         typed_text = str(line_edit.text() if line_edit is not None else self.almacen_filter.currentText() or "").strip()
         if not typed_text:
             return ""
-        normalized_typed = typed_text.casefold()
+        target_index = self._resolve_almacen_filter_index(typed_text)
+        if target_index < 0:
+            return ""
+        self.almacen_filter.blockSignals(True)
+        self.almacen_filter.setCurrentIndex(target_index)
+        self.almacen_filter.blockSignals(False)
+        return str(self.almacen_filter.itemData(target_index) or "").strip()
+
+    def _resolve_almacen_filter_index(self, typed_text: str) -> int:
+        normalized_typed = str(typed_text or "").strip().casefold()
+        if not normalized_typed:
+            return -1
         exact_index = -1
         partial_matches: list[int] = []
         for index in range(self.almacen_filter.count()):
@@ -1746,11 +1769,7 @@ class OrdersPage(QWidget):
                 break
             if normalized_typed in normalized_item:
                 partial_matches.append(index)
-        target_index = exact_index if exact_index >= 0 else (partial_matches[0] if len(partial_matches) == 1 else -1)
-        if target_index < 0:
-            return ""
-        self.almacen_filter.setCurrentIndex(target_index)
-        return str(self.almacen_filter.itemData(target_index) or "").strip()
+        return exact_index if exact_index >= 0 else (partial_matches[0] if len(partial_matches) == 1 else -1)
 
     def _load_period_filters(self, pedidos: list[Pedido]) -> None:
         current_year = str(self.year_filter.currentData() or "")
@@ -2305,13 +2324,14 @@ class OrdersPage(QWidget):
     def reload(self) -> None:
         selected_id = self._selected_id()
         pedidos = self.order_query_service.list_raw_orders()
+        selected_almacen_id = self._selected_almacen_id()
         self._load_almacen_filter()
         self._load_period_filters(pedidos)
 
         year_filter = str(self.year_filter.currentData() or "")
         month_from = int(self.month_from_filter.currentData() or 0)
         month_to = int(self.month_to_filter.currentData() or 0)
-        almacen_filter = self._selected_almacen_id()
+        almacen_filter = str(self.almacen_filter.currentData() or "").strip() or selected_almacen_id
         self.rows = [
                 PedidoListRow(
                     pedido_id=row.pedido_id,
@@ -2501,9 +2521,13 @@ class OrdersPage(QWidget):
     def _select_by_id(self, pedido_id: str | None) -> None:
         if not pedido_id:
             return
-        for i, row in enumerate(self.rows):
-            if row.pedido_id == pedido_id:
-                self.table.selectRow(i)
+        target_id = str(pedido_id or "").strip()
+        for row_idx in range(self.table.rowCount()):
+            id_item = self.table.item(row_idx, 0)
+            row_pedido_id = str(id_item.data(Qt.ItemDataRole.UserRole) or "").strip() if id_item else ""
+            if row_pedido_id == target_id:
+                self.table.selectRow(row_idx)
+                self.table.scrollToItem(id_item)
                 return
 
     def _show_selected_details(self) -> None:
