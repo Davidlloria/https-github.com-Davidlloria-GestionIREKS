@@ -61,7 +61,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
         └── ordersRightPanel (QWidget, objectName `ordersRightPanel`, fondo transparente, sin borde)
             └── right_layout (QVBoxLayout, márgenes 0 px, separación 10 px)
                 └── ordersDetailSplitter (QSplitter vertical, objectName `ordersDetailSplitter`, fondo transparente, sin borde, tirador oculto)
-                    ├── detailPanel (QWidget, objectName `detailPanel`, fondo #FCFDFF, borde #E2E8F1, radio 8 px, alto máximo 170 px)
+                    ├── detailPanel (QWidget, objectName `detailPanel`, fondo #FFFFFF, borde #D7DEE8, radio 8 px, alto máximo 170 px)
                     │   └── detail_layout (QVBoxLayout, márgenes 14 px, separación 8 px)
                     │       ├── detail_title (QLabel "Detalle del pedido", role="sectionTitle")
                     │       └── row_1 (QHBoxLayout)
@@ -72,7 +72,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
                     │           ├── QLabel "Numero"
                     │           ├── detail_pedido_numero (QLineEdit, 100 px)
                     │           └── espacio flexible
-                    └── crmCard (QWidget, objectName `crmCard`, fondo global #F4F6F9 salvo override externo, sin borde propio, contenedor de pestañas)
+                    └── crmCard (QWidget, objectName `crmCard`, fondo transparente, sin borde, contenedor de pestañas)
                         └── tabs_layout (QVBoxLayout, márgenes 12 px, separación 8 px)
                             └── ordersTabs (QTabWidget, objectName `ordersTabs`; pane fondo #FFFFFF, borde #D7DEE8, radio 8 px)
                                 ├── Pedido
@@ -189,8 +189,8 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
 - `sidePanel`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
 - `ordersRightPanel`: fondo transparente, sin borde.
 - `ordersDetailSplitter`: fondo transparente, sin borde.
-- `detailPanel`: fondo `#FCFDFF`, borde `#E2E8F1`, radio 8 px.
-- `crmCard`: sin borde propio en `orders_page.py`; hereda fondo global `#F4F6F9` si no recibe otro override.
+- `detailPanel`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
+- `crmCard`: fondo transparente, sin borde.
 - `ordersTabs::pane`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
 - `QTabBar::tab`: fondo `#F7FAFD`, borde `#DDE5F0`, borde inferior `#DDE5F0`, radio superior 8 px.
 - `QTabBar::tab:selected`: fondo `#FFFFFF`, borde `#DDE5F0`, borde inferior `#2563EB`.

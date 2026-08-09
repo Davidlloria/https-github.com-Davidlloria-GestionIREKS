@@ -1386,6 +1386,15 @@ class OrdersPage(QWidget):
 
         detail_panel = QWidget()
         detail_panel.setObjectName("detailPanel")
+        detail_panel.setStyleSheet(
+            """
+            QWidget#detailPanel {
+                background: #FFFFFF;
+                border: 1px solid #D7DEE8;
+                border-radius: 8px;
+            }
+            """
+        )
         detail_panel.setMaximumHeight(170)
         detail_layout = QVBoxLayout(detail_panel)
         detail_layout.setContentsMargins(14, 14, 14, 14)
@@ -1425,6 +1434,14 @@ class OrdersPage(QWidget):
 
         tabs_panel = QWidget()
         tabs_panel.setObjectName("crmCard")
+        tabs_panel.setStyleSheet(
+            """
+            QWidget#crmCard {
+                background: transparent;
+                border: none;
+            }
+            """
+        )
         tabs_layout = QVBoxLayout(tabs_panel)
         tabs_layout.setContentsMargins(12, 12, 12, 12)
         tabs_layout.setSpacing(8)
