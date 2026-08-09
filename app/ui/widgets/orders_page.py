@@ -1312,6 +1312,14 @@ class OrdersPage(QWidget):
 
         right_panel = QWidget()
         right_panel.setObjectName("customersRightPanel")
+        right_panel.setStyleSheet(
+            """
+            QWidget#customersRightPanel {
+                background: transparent;
+                border: none;
+            }
+            """
+        )
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
