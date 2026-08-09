@@ -26,10 +26,10 @@ Implementación principal:
 ## Estructura UI real
 
 ```text
-OrdersPage (QWidget, sin objectName propio; usa estilos globales de `assets/styles.qss`)
+OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_StyledBackground=True)
 └── layout principal (QVBoxLayout)
     └── splitter principal (QSplitter horizontal, tirador oculto, childrenCollapsible=False)
-        ├── sidePanel (QWidget, objectName `sidePanel`, ancho 560-620 px)
+        ├── sidePanel (QWidget, objectName `sidePanel`, fondo #FFFFFF, borde #D7DEE8, radio 8 px, ancho 560-620 px)
         │   └── left_layout (QVBoxLayout)
         │       ├── fila de filtros de periodo (QHBoxLayout)
         │       │   ├── QLabel "Año"
@@ -58,10 +58,10 @@ OrdersPage (QWidget, sin objectName propio; usa estilos globales de `assets/styl
         │       │   ├── Total Kg (100 px)
         │       │   └── Estado (55 px, cabecera centrada)
         │       └── table_totals (QTableWidget, 1 fila fija de totales, 6 columnas sincronizadas, alto 30 px)
-        └── customersRightPanel (QWidget, objectName `customersRightPanel`, fondo transparente / sin borde por estilo compartido)
+        └── customersRightPanel (QWidget, objectName `customersRightPanel`, fondo global #F4F6F9 salvo override externo, sin borde propio)
             └── right_layout (QVBoxLayout, márgenes 0 px, separación 10 px)
-                └── customersDetailSplitter (QSplitter vertical, objectName `customersDetailSplitter`, tirador oculto)
-                    ├── detailPanel (QWidget, objectName `detailPanel`, alto máximo 170 px)
+                └── customersDetailSplitter (QSplitter vertical, objectName `customersDetailSplitter`, fondo global #F4F6F9, sin borde propio, tirador oculto)
+                    ├── detailPanel (QWidget, objectName `detailPanel`, fondo #FCFDFF, borde #E2E8F1, radio 8 px, alto máximo 170 px)
                     │   └── detail_layout (QVBoxLayout, márgenes 14 px, separación 8 px)
                     │       ├── detail_title (QLabel "Detalle del pedido", role="sectionTitle")
                     │       └── row_1 (QHBoxLayout)
@@ -72,17 +72,17 @@ OrdersPage (QWidget, sin objectName propio; usa estilos globales de `assets/styl
                     │           ├── QLabel "Numero"
                     │           ├── detail_pedido_numero (QLineEdit, 100 px)
                     │           └── espacio flexible
-                    └── crmCard (QWidget, objectName `crmCard`, contenedor de pestañas)
+                    └── crmCard (QWidget, objectName `crmCard`, fondo global #F4F6F9 salvo override externo, sin borde propio, contenedor de pestañas)
                         └── tabs_layout (QVBoxLayout, márgenes 12 px, separación 8 px)
-                            └── customerTabs (QTabWidget, objectName `customerTabs`)
+                            └── customerTabs (QTabWidget, objectName `customerTabs`; pane fondo #FFFFFF, borde #D7DEE8, radio 8 px)
                                 ├── Pedido
-                                │   ├── pedido_actions_ribbon (QFrame, objectName `topRibbon`)
+                                │   ├── pedido_actions_ribbon (QFrame, objectName `topRibbon`, fondo #FFFFFF, borde inferior #D7DEE8; sin pageType)
                                 │   │   ├── add_line_btn (QPushButton "Añadir", btnRole="success", alto 26 px)
                                 │   │   ├── edit_line_btn (QPushButton "Editar", btnRole="warning", alto 26 px)
                                 │   │   ├── del_line_btn (QPushButton "Eliminar", btnRole="danger", alto 26 px)
                                 │   │   ├── edit_order_btn (QPushButton "Editar pedido", btnRole="warning", alto 26 px)
                                 │   │   └── espacio flexible
-                                │   ├── pedido_items_table (QTableWidget, 7 columnas, ordenable, selección de fila completa, edición directa habilitada)
+                                │   ├── pedido_items_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 7 columnas, ordenable, selección de fila completa, edición directa habilitada)
                                 │   │   ├── Cod. (95 px)
                                 │   │   ├── Nombre (stretch)
                                 │   │   ├── Pedido (82 px)
@@ -90,41 +90,41 @@ OrdersPage (QWidget, sin objectName propio; usa estilos globales de `assets/styl
                                 │   │   ├── Recib. (82 px)
                                 │   │   ├── Kg (96 px)
                                 │   │   └── Δ (72 px)
-                                │   └── pedido_items_totals_table (QTableWidget, 1 fila fija de totales, 7 columnas sincronizadas, alto 30 px)
+                                │   └── pedido_items_totals_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 1 fila fija de totales, 7 columnas sincronizadas, alto 30 px)
                                 ├── Albarán
-                                │   ├── albaran_actions_ribbon (QFrame, objectName `topRibbon`)
+                                │   ├── albaran_actions_ribbon (QFrame, objectName `topRibbon`, fondo #FFFFFF, borde inferior #D7DEE8; sin pageType)
                                 │   │   ├── import_albaran_btn (QPushButton "Imp. Albarán", btnRole="warning", alto 26 px, deshabilitado sin pedido)
                                 │   │   └── espacio flexible
                                 │   ├── albaran_filter_row (QHBoxLayout)
                                 │   │   ├── QLabel "Albaran"
                                 │   │   └── albaran_selector (QComboBox, cambia las líneas visibles del albarán)
-                                │   ├── albaran_items_table (QTableWidget, 5 columnas, ordenable, selección de fila completa, menú contextual)
+                                │   ├── albaran_items_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 5 columnas, ordenable, selección de fila completa, menú contextual)
                                 │   │   ├── Cod. (95 px)
                                 │   │   ├── Nº albarán (120 px)
                                 │   │   ├── Nombre (stretch)
                                 │   │   ├── Cantidad (90 px)
                                 │   │   └── Kg (100 px)
-                                │   └── albaran_items_totals_table (QTableWidget, 1 fila fija de totales, 5 columnas sincronizadas, alto 30 px)
+                                │   └── albaran_items_totals_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 1 fila fija de totales, 5 columnas sincronizadas, alto 30 px)
                                 ├── Factura
-                                │   ├── factura_actions_ribbon (QFrame, objectName `topRibbon`)
+                                │   ├── factura_actions_ribbon (QFrame, objectName `topRibbon`, fondo #FFFFFF, borde inferior #D7DEE8; sin pageType)
                                 │   │   ├── import_factura_btn (QPushButton "Imp. Factura", btnRole="warning", alto 26 px, deshabilitado sin pedido)
                                 │   │   ├── edit_factura_line_btn (QPushButton "Editar línea", btnRole="primary", alto 26 px, deshabilitado sin línea)
                                 │   │   ├── delete_factura_btn (QPushButton "Eliminar Factura", btnRole="danger", alto 26 px, deshabilitado sin factura)
                                 │   │   └── espacio flexible
-                                │   └── factura_content (QSplitter horizontal, tirador oculto, childrenCollapsible=False)
-                                │       ├── facturas_table (QTableWidget, 1 columna, ancho fijo 120 px, ordenable)
+                                │   └── factura_content (QSplitter horizontal, fondo global #F4F6F9, sin borde propio, tirador oculto, childrenCollapsible=False)
+                                │       ├── facturas_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 1 columna, ancho fijo 120 px, ordenable)
                                 │       │   └── Factura (stretch)
-                                │       └── factura_items_panel (QWidget)
+                                │       └── factura_items_panel (QWidget, fondo global #F4F6F9, sin borde propio)
                                 │           └── factura_items_layout (QVBoxLayout, márgenes 0 px, separación 0 px)
-                                │               ├── factura_items_table (QTableWidget, 5 columnas, ordenable, selección de fila completa, doble clic edita línea)
+                                │               ├── factura_items_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 5 columnas, ordenable, selección de fila completa, doble clic edita línea)
                                 │               │   ├── Cod. (86 px)
                                 │               │   ├── Nombre (stretch)
                                 │               │   ├── Uds. (60 px)
                                 │               │   ├── Kg/Lit. (78 px)
                                 │               │   └── Precio (82 px)
-                                │               └── factura_items_totals_table (QTableWidget, 1 fila fija de totales, 5 columnas sincronizadas, alto 30 px)
+                                │               └── factura_items_totals_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 1 fila fija de totales, 5 columnas sincronizadas, alto 30 px)
                                 └── Pendientes
-                                    └── pendientes_table (QTableWidget, 4 columnas, ordenable, selección de fila completa)
+                                    └── pendientes_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 4 columnas, ordenable, selección de fila completa)
                                         ├── Cod. (95 px)
                                         ├── Nombre (stretch)
                                         ├── Pendiente (100 px)
@@ -179,11 +179,25 @@ OrdersPage (QWidget, sin objectName propio; usa estilos globales de `assets/styl
 
 ## Aspecto visual actual
 
-- La ventana usa los estilos globales de `assets/styles.qss`.
-- `sidePanel` se estiliza mediante `#sidePanel`: fondo blanco, borde gris suave y radio de 8 px.
-- `detailPanel` se estiliza mediante `#detailPanel`: fondo claro `#FCFDFF`, borde `#E2E8F1`, radio 8 px.
-- `customersRightPanel`, `customersDetailSplitter`, `crmCard` y `customerTabs` reutilizan nombres de objeto heredados del patrón de clientes.
-- `topRibbon` usa variante pastel con `pageType="contacts"` en el ribbon principal.
+- `OrdersPageRoot`: fondo `#EEF3F8`, sin borde.
+- `layout principal`: sin fondo ni borde propios.
+- `splitter principal`: sin fondo ni borde propios; hereda visualmente el fondo de `OrdersPageRoot`.
+- `sidePanel`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
+- `customersRightPanel`: sin borde propio; hereda fondo global `#F4F6F9` si no recibe otro override.
+- `customersDetailSplitter`: sin borde propio; hereda fondo global `#F4F6F9`.
+- `detailPanel`: fondo `#FCFDFF`, borde `#E2E8F1`, radio 8 px.
+- `crmCard`: sin borde propio en `orders_page.py`; hereda fondo global `#F4F6F9` si no recibe otro override.
+- `customerTabs::pane`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
+- `QTabBar::tab`: fondo `#F7FAFD`, borde `#DDE5F0`, borde inferior `#DDE5F0`, radio superior 8 px.
+- `QTabBar::tab:selected`: fondo `#FFFFFF`, borde `#DDE5F0`, borde inferior `#2563EB`.
+- `topRibbon` global: fondo `#FFFFFF`, borde inferior `#D7DEE8`, sin radio.
+- `topRibbon` principal con `pageType="contacts"`: fondo `#FFFFFF`, borde `#E2E8F1`, radio 8 px.
+- `pedido_actions_ribbon`, `albaran_actions_ribbon` y `factura_actions_ribbon`: usan `#topRibbon` sin `pageType`; fondo `#FFFFFF`, borde inferior `#D7DEE8`, sin radio.
+- `QTableWidget`: fondo `#FFFFFF`, fondo alterno `#F7F9FC`, borde `#D8E0EA`, radio 8 px, gridline `#E6EBF2`.
+- `QHeaderView::section`: fondo `#EEF2F7`, borde derecho `#E0E7F0`, borde inferior `#D8E0EA`.
+- `QLineEdit`, `QComboBox`, `QDateEdit`: fondo `#FFFFFF`, borde `#C8D2DF`, radio 6 px; en foco borde `#2563EB`.
+- `QLineEdit:read-only`: fondo `#F3F6FA`, borde `#D7DEE8`.
+- `QLabel`: fondo transparente, sin borde.
 - Los botones se colorean por `btnRole`:
   - `success`: acciones de alta / añadir.
   - `warning`: edición e importaciones.

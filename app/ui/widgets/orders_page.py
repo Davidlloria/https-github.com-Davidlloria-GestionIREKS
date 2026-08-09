@@ -1134,6 +1134,16 @@ class NewPedidoDialog(QDialog):
 class OrdersPage(QWidget):
     def __init__(self) -> None:
         super().__init__()
+        self.setObjectName("OrdersPageRoot")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet(
+            """
+            QWidget#OrdersPageRoot {
+                background-color: #EEF3F8;
+                border: none;
+            }
+            """
+        )
         self.order_document_import_service = OrderDocumentImportService()
         self.order_export_service = OrderExportService()
         self.order_mail_flow_service = OrderMailFlowService(order_export_service=self.order_export_service)
