@@ -1384,6 +1384,10 @@ class OrdersPage(QWidget):
                 background: transparent;
                 border: none;
             }
+            QSplitter#ordersDetailSplitter::handle {
+                background: transparent;
+                border: none;
+            }
             """
         )
         right_layout.addWidget(right_splitter, 1)
@@ -1715,6 +1719,7 @@ class OrdersPage(QWidget):
         right_splitter.addWidget(tabs_panel)
         right_splitter.setStretchFactor(0, 0)
         right_splitter.setStretchFactor(1, 10)
+        right_splitter.setHandleWidth(5)
 
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(0, 0)

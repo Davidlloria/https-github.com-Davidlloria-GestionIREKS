@@ -60,7 +60,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
         │       └── table_totals (QTableWidget, 1 fila fija de totales, 6 columnas sincronizadas, alto 30 px)
         └── ordersRightPanel (QWidget, objectName `ordersRightPanel`, fondo transparente, sin borde)
             └── right_layout (QVBoxLayout, márgenes 0 px, separación 10 px)
-                └── ordersDetailSplitter (QSplitter vertical, objectName `ordersDetailSplitter`, fondo transparente, sin borde, tirador oculto)
+                └── ordersDetailSplitter (QSplitter vertical, objectName `ordersDetailSplitter`, fondo transparente, sin borde, separación transparente de 5 px)
                     ├── detailPanel (QWidget, objectName `detailPanel`, fondo #FFFFFF, borde #D7DEE8, radio 8 px, alto máximo 170 px)
                     │   └── detail_layout (QVBoxLayout, márgenes 14 px, separación 8 px)
                     │       ├── detail_title (QLabel "Detalle del pedido", role="sectionTitle")
@@ -169,6 +169,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
 - `ordersDetailSplitter` es vertical:
   - `detailPanel` arriba;
   - `crmCard` debajo;
+  - separación transparente de 5 px entre ambos;
   - el panel de pestañas tiene factor de estiramiento superior al detalle (`0 / 10`).
 - `detailPanel`:
   - alto máximo 170 px;
@@ -188,7 +189,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
 - `splitter principal` / `ordersMainSplitter`: fondo transparente, sin borde; hereda visualmente el fondo de `OrdersPageRoot`.
 - `sidePanel`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
 - `ordersRightPanel`: fondo transparente, sin borde.
-- `ordersDetailSplitter`: fondo transparente, sin borde.
+- `ordersDetailSplitter`: fondo transparente, sin borde; handle transparente de 5 px.
 - `detailPanel`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
 - `crmCard`: fondo transparente, sin borde.
 - `ordersTabs::pane`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
