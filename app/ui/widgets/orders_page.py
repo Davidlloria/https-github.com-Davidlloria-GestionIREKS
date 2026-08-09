@@ -1236,7 +1236,7 @@ class OrdersPage(QWidget):
         self.export_btn = QPushButton("Exportar")
         self.export_btn.setProperty("btnRole", "secondary")
         self.export_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "sheet.svg")))
-        self.send_mail_btn = QPushButton("Enviar Outlook")
+        self.send_mail_btn = QPushButton("Enviar")
         self.send_mail_btn.setProperty("btnRole", "secondary")
         self.send_mail_btn.setIcon(QIcon(str(BASE_DIR / "assets" / "icons" / "mail.svg")))
         self.print_btn = QPushButton("Imprimir")
@@ -1266,7 +1266,7 @@ class OrdersPage(QWidget):
             self.print_btn,
             self.help_btn,
         )
-        ribbon_button_width = max(button.sizeHint().width() for button in ribbon_buttons)
+        ribbon_button_width = 154
         for button in ribbon_buttons:
             button.setFixedWidth(ribbon_button_width)
 
