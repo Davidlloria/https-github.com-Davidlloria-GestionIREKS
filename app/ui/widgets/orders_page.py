@@ -1652,6 +1652,7 @@ class OrdersPage(QWidget):
         self.pendientes_table.setColumnWidth(2, 100)
         self.pendientes_table.setColumnWidth(3, 100)
         self.pendientes_table.setSortingEnabled(True)
+        pendientes_header.setSortIndicator(3, Qt.SortOrder.DescendingOrder)
         pendientes_tab_layout.addWidget(self.pendientes_table, 1)
         tabs.addTab(pendientes_tab, "Pendientes")
         tabs_layout.addWidget(tabs)
