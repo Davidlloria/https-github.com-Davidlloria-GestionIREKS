@@ -241,6 +241,57 @@ def test_parse_albaran_pdf_keeps_alphanumeric_codes_and_ignores_transport(tmp_pa
     assert rows[0]["articulo_caducidad"] == "29/07/28"
 
 
+def test_parse_albaran_pdf_accepts_thousands_separator_in_envases(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "albaran_envases_miles.pdf"
+    _write_pdf(
+        pdf_path,
+        [
+            "PACKING LIST",
+            "Numero:",
+            "2026090108",
+            "Fecha:",
+            "03/08/26",
+            "Fecha pedido:",
+            "03/08/26",
+            "N Pedido:",
+            "2199",
+            "Cod.Art.",
+            "Descripcion",
+            "Kilos",
+            "Envases",
+            "Fecha entrega:",
+            "06/08/26",
+            "44700",
+            "SEPA-WAX 500",
+            "1.008,00",
+            "1.008",
+            "Lote:",
+            "25035007",
+            "Cons.Pref:",
+            "10/01/28",
+            "Carga:",
+            "Datos transporte",
+        ],
+    )
+
+    header, rows = OrderDocumentParser.parse_albaran_pdf(pdf_path)
+
+    assert header["albaran_numero"] == "2026090108"
+    assert rows == [
+        {
+            "albaran_numero": "2026090108",
+            "albaran_fecha": "03/08/26",
+            "pedido_numero": "",
+            "articulo_codigo": "44700",
+            "articulo_descripcion": "SEPA-WAX 500",
+            "articulo_kilos": "1.008,00",
+            "articulo_cantidad": "1.008",
+            "articulo_lote": "25035007",
+            "articulo_caducidad": "10/01/28",
+        }
+    ]
+
+
 def test_article_code_candidates_include_unpadded_numeric_reference() -> None:
     assert OrderDocumentParser.article_code_candidates("08107") == ["08107", "8107", "008107"]
 

@@ -171,7 +171,7 @@ class OrderDocumentParser:
         idx = 0
         code_rx = re.compile(r"^(?:\d{3,8}|[A-Z]{1,2}\d{4,8})$")
         kilos_rx = re.compile(r"^\d{1,3}(?:\.\d{3})*,\d{2}$")
-        envases_rx = re.compile(r"^\d+(?:,\d+)?$")
+        envases_rx = re.compile(r"^\d{1,3}(?:\.\d{3})*(?:,\d+)?$|^\d+(?:,\d+)?$")
 
         def looks_like_item_start(pos: int) -> bool:
             if pos + 3 >= len(item_source_lines):
