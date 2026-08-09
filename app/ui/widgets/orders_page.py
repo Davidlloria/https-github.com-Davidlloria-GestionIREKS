@@ -1374,6 +1374,14 @@ class OrdersPage(QWidget):
 
         right_splitter = QSplitter(Qt.Orientation.Vertical)
         right_splitter.setObjectName("ordersDetailSplitter")
+        right_splitter.setStyleSheet(
+            """
+            QSplitter#ordersDetailSplitter {
+                background: transparent;
+                border: none;
+            }
+            """
+        )
         right_layout.addWidget(right_splitter, 1)
 
         detail_panel = QWidget()

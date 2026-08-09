@@ -60,7 +60,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
         │       └── table_totals (QTableWidget, 1 fila fija de totales, 6 columnas sincronizadas, alto 30 px)
         └── ordersRightPanel (QWidget, objectName `ordersRightPanel`, fondo transparente, sin borde)
             └── right_layout (QVBoxLayout, márgenes 0 px, separación 10 px)
-                └── ordersDetailSplitter (QSplitter vertical, objectName `ordersDetailSplitter`, fondo global #F4F6F9, sin borde propio, tirador oculto)
+                └── ordersDetailSplitter (QSplitter vertical, objectName `ordersDetailSplitter`, fondo transparente, sin borde, tirador oculto)
                     ├── detailPanel (QWidget, objectName `detailPanel`, fondo #FCFDFF, borde #E2E8F1, radio 8 px, alto máximo 170 px)
                     │   └── detail_layout (QVBoxLayout, márgenes 14 px, separación 8 px)
                     │       ├── detail_title (QLabel "Detalle del pedido", role="sectionTitle")
@@ -188,7 +188,7 @@ OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_S
 - `splitter principal` / `ordersMainSplitter`: fondo transparente, sin borde; hereda visualmente el fondo de `OrdersPageRoot`.
 - `sidePanel`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
 - `ordersRightPanel`: fondo transparente, sin borde.
-- `ordersDetailSplitter`: sin borde propio; hereda fondo global `#F4F6F9`.
+- `ordersDetailSplitter`: fondo transparente, sin borde.
 - `detailPanel`: fondo `#FCFDFF`, borde `#E2E8F1`, radio 8 px.
 - `crmCard`: sin borde propio en `orders_page.py`; hereda fondo global `#F4F6F9` si no recibe otro override.
 - `ordersTabs::pane`: fondo `#FFFFFF`, borde `#D7DEE8`, radio 8 px.
