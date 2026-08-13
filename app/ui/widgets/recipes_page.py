@@ -1678,13 +1678,26 @@ class RecipesPage(QWidget):
 
         customer_tab = QWidget()
         customer_layout = QVBoxLayout(customer_tab)
+        customer_filter_row = QHBoxLayout()
+        customer_filter_row.setContentsMargins(0, 0, 0, 0)
+        customer_filter_row.setSpacing(6)
         self.customer_filter_input = QLineEdit()
         self.customer_filter_input.setObjectName("customerRecipeFilterInput")
         self.customer_filter_input.setPlaceholderText("Filtrar clientes...")
-        self.customer_filter_input.setClearButtonEnabled(True)
         self.customer_filter_input.textChanged.connect(self._on_customer_filter_text_changed)
         self.customer_filter_input.returnPressed.connect(self._select_first_customer_filter_result)
-        customer_layout.addWidget(self.customer_filter_input)
+        customer_filter_row.addWidget(self.customer_filter_input, 1)
+        self.customer_filter_clear_btn = QPushButton()
+        self.customer_filter_clear_btn.setObjectName("customerRecipeFilterClearButton")
+        self.customer_filter_clear_btn.setProperty("btnRole", "danger")
+        self.customer_filter_clear_btn.setIcon(QIcon(str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "close-white.svg")))
+        self.customer_filter_clear_btn.setIconSize(QSize(14, 14))
+        self.customer_filter_clear_btn.setFixedSize(32, 32)
+        self.customer_filter_clear_btn.setToolTip("Limpiar filtro de clientes")
+        self.customer_filter_clear_btn.setEnabled(False)
+        self.customer_filter_clear_btn.clicked.connect(self._clear_customer_filter)
+        customer_filter_row.addWidget(self.customer_filter_clear_btn)
+        customer_layout.addLayout(customer_filter_row)
 
         self.customer_filter_results = QTableWidget(0, 2)
         self.customer_filter_results.setObjectName("customerRecipeFilterResults")
@@ -2584,6 +2597,7 @@ class RecipesPage(QWidget):
         if self._is_loading_recipe:
             return
         term = str(text or "").strip()
+        self.customer_filter_clear_btn.setEnabled(bool(term))
         if not term:
             if self.customer_filter_selected_id:
                 self.customer_filter_selected_id = ""
@@ -2602,6 +2616,9 @@ class RecipesPage(QWidget):
             self.customer_filter_results.setItem(row, 0, code_item)
             self.customer_filter_results.setItem(row, 1, QTableWidgetItem(self._customer_filter_label(customer)))
         self.customer_filter_results.setVisible(bool(customers))
+
+    def _clear_customer_filter(self) -> None:
+        self.customer_filter_input.clear()
 
     def _select_first_customer_filter_result(self) -> None:
         if self.customer_filter_results.rowCount() > 0:
@@ -3553,6 +3570,7 @@ class RecipesPage(QWidget):
         self.customer_filter_input.blockSignals(True)
         self.customer_filter_input.setText(label)
         self.customer_filter_input.blockSignals(False)
+        self.customer_filter_clear_btn.setEnabled(bool(str(label or "").strip()))
         self.customer_filter_results.setRowCount(0)
         self.customer_filter_results.setVisible(False)
 
