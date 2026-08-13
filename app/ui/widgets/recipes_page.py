@@ -1670,6 +1670,7 @@ class RecipesPage(QWidget):
     ESC_COL_PCT = 2
     ESC_COL_EUR_KG = 3
     ESC_COL_EUR_LINEA = 4
+    ESC_TOTALS_OFFSET = 1
     MIN_LINE_ROWS = 10
     PROCESO_RICH_HTML_KEY = "__proceso_rich_html"
     IMAGES_GALLERY_KEY = "__images_gallery_json"
@@ -2207,7 +2208,17 @@ class RecipesPage(QWidget):
         escandallo_layout = QVBoxLayout(escandallo_tab)
         escandallo_layout.setContentsMargins(0, 0, 0, 0)
         escandallo_layout.setSpacing(6)
-        escandallo_group = QGroupBox("Escandallo")
+        escandallo_ribbon, escandallo_ribbon_layout = create_standard_top_ribbon()
+        self.escandallo_excel_btn = create_standard_ribbon_button("Excel", role="secondary", icon_name="sheet.svg")
+        self.escandallo_pdf_btn = create_standard_ribbon_button("Pdf", role="secondary", icon_name="file-text.svg")
+        self.escandallo_excel_btn.clicked.connect(self._export_excel)
+        self.escandallo_pdf_btn.clicked.connect(self._export_pdf)
+        escandallo_ribbon_layout.addWidget(self.escandallo_excel_btn)
+        escandallo_ribbon_layout.addWidget(self.escandallo_pdf_btn)
+        escandallo_ribbon_layout.addStretch(1)
+        escandallo_layout.addWidget(escandallo_ribbon)
+
+        escandallo_group = QGroupBox()
         escandallo_group_layout = QVBoxLayout(escandallo_group)
         escandallo_group_layout.setContentsMargins(8, 8, 8, 8)
         escandallo_group_layout.setSpacing(6)
@@ -2223,7 +2234,7 @@ class RecipesPage(QWidget):
         self.escandallo_table.itemChanged.connect(self._on_escandallo_item_changed)
         escandallo_header.sectionResized.connect(lambda *_args: self._refresh_escandallo_table())
         escandallo_group_layout.addWidget(self.escandallo_table, 1)
-        self.escandallo_totals_table = QTableWidget(1, 5)
+        self.escandallo_totals_table = QTableWidget(1, 6)
         self.escandallo_totals_table.horizontalHeader().setVisible(False)
         self.escandallo_totals_table.verticalHeader().setVisible(False)
         self.escandallo_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -2233,7 +2244,7 @@ class RecipesPage(QWidget):
         self.escandallo_totals_table.setShowGrid(False)
         self.escandallo_totals_table.setFrameShape(QFrame.Shape.NoFrame)
         self.escandallo_totals_table.setStyleSheet(
-            "QTableWidget { background-color: #2F80ED; border: none; border-radius: 0; }"
+            "QTableWidget { background-color: #2F80ED; border: none; border-radius: 8px; }"
             "QTableWidget::item { background-color: #2F80ED; color: #FFFFFF; border: none; padding: 0 8px; }"
         )
         escandallo_group_layout.addWidget(self.escandallo_totals_table)
@@ -2248,11 +2259,12 @@ class RecipesPage(QWidget):
         escandallo_content_row.addWidget(self.total_panel)
         escandallo_layout.addLayout(escandallo_content_row, 1)
 
-        self.escandallo_summary_group = QGroupBox("Resumen")
+        self.escandallo_summary_group = QGroupBox()
         self.escandallo_summary_group.setObjectName("escandalloSummaryGroup")
         escandallo_summary_layout = QHBoxLayout(self.escandallo_summary_group)
         escandallo_summary_layout.setContentsMargins(8, 8, 8, 8)
         escandallo_summary_layout.setSpacing(8)
+        escandallo_summary_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         self.escandallo_total_masa_lbl = QLabel("0,00 g")
         self.escandallo_peso_pieza_lbl = QLabel("0,00 g")
         self.escandallo_total_piezas_lbl = QLabel("0")
@@ -2272,7 +2284,7 @@ class RecipesPage(QWidget):
                 "border: none; border-radius: 14px;"
                 "}"
                 "QLabel { background: transparent; border: none; }"
-                "QLabel[pillLabel='true'] { color: #51627A; font-size: 11px; }"
+                "QLabel[pillLabel='true'] { color: #51627A; font-size: 13px; }"
                 "QLabel[pillValue='true'] { color: #16325C; font-size: 12px; font-weight: 800; }"
             )
             pill.setFixedSize(150, 48)
@@ -2292,7 +2304,11 @@ class RecipesPage(QWidget):
             ("Total piezas", self.escandallo_total_piezas_lbl, "#FEF3C7"),
             ("Coste unitario", self.escandallo_coste_unitario_lbl, "#F3E8FF"),
         ):
-            escandallo_summary_layout.addWidget(escandallo_pill(label_text, value_label, background))
+            escandallo_summary_layout.addWidget(
+                escandallo_pill(label_text, value_label, background),
+                0,
+                Qt.AlignmentFlag.AlignVCenter,
+            )
         escandallo_summary_layout.addStretch(1)
         escandallo_layout.addWidget(self.escandallo_summary_group)
         editor_tabs.addTab(escandallo_tab, "Escandallo")
@@ -3541,15 +3557,25 @@ class RecipesPage(QWidget):
     def _refresh_escandallo_totals(self, total_qty_g: float, total_pct: float, total_cost: float) -> None:
         if not hasattr(self, "escandallo_totals_table"):
             return
-        values = ["", f"{self._format_number(total_qty_g, 2)} g", f"{self._format_number(total_pct, 2)} %", "", f"{self._format_number(total_cost, 2)} €"]
+        values = [
+            "",
+            "",
+            f"{self._format_number(total_qty_g, 2)} g",
+            f"{self._format_number(total_pct, 2)} %",
+            "",
+            f"{self._format_number(total_cost, 2)} €",
+        ]
         for column, value in enumerate(values):
             item = QTableWidgetItem(value)
             item.setFlags(Qt.ItemFlag.ItemIsEnabled)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.escandallo_totals_table.setItem(0, column, item)
-        self.escandallo_totals_table.setColumnWidth(self.ESC_COL_INGREDIENTE, self.escandallo_table.columnWidth(self.ESC_COL_INGREDIENTE))
-        for column in range(self.ESC_COL_CANTIDAD, self.ESC_COL_EUR_LINEA + 1):
-            self.escandallo_totals_table.setColumnWidth(column, self.escandallo_table.columnWidth(column))
+        self.escandallo_totals_table.setColumnWidth(0, self.escandallo_table.verticalHeader().width())
+        for column in range(self.ESC_COL_INGREDIENTE, self.ESC_COL_EUR_LINEA + 1):
+            self.escandallo_totals_table.setColumnWidth(
+                column + self.ESC_TOTALS_OFFSET,
+                self.escandallo_table.columnWidth(column),
+            )
         if hasattr(self, "escandallo_summary_group"):
             peso_pieza = float(self.peso_spin.value() or 0.0)
             total_piezas = int(self.piezas_spin.value() or 0)
