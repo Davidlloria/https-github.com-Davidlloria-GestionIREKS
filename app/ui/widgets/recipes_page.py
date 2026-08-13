@@ -6,7 +6,7 @@ import traceback
 from typing import Any, cast
 
 from PySide6.QtCore import QEvent, QSize, QTimer, Qt
-from PySide6.QtGui import QAction, QBrush, QColor, QFont, QIcon, QKeySequence, QPixmap, QShortcut, QTextCharFormat
+from PySide6.QtGui import QAction, QBrush, QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut, QTextCharFormat
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -52,6 +52,18 @@ from app.viewmodels import IngredientChoice
 def _normalize_process_name(value: str | None) -> str:
     text = str(value or "").strip()
     return text if text else "Masa final"
+
+
+def _white_icon_from_svg(svg_path: Path) -> QIcon:
+    source = QPixmap(str(svg_path))
+    white = QPixmap(source.size())
+    white.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(white)
+    painter.drawPixmap(0, 0, source)
+    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    painter.fillRect(white.rect(), QColor("#FFFFFF"))
+    painter.end()
+    return QIcon(white)
 
 
 def _unique_process_names(values: list[str]) -> list[str]:
@@ -1692,7 +1704,9 @@ class RecipesPage(QWidget):
         self.customer_filter_clear_btn = QPushButton()
         self.customer_filter_clear_btn.setObjectName("customerRecipeFilterClearButton")
         self.customer_filter_clear_btn.setProperty("btnRole", "danger")
-        self.customer_filter_clear_btn.setIcon(QIcon(str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "eraser.svg")))
+        self.customer_filter_clear_btn.setIcon(
+            _white_icon_from_svg(Path(__file__).resolve().parents[3] / "assets" / "icons" / "eraser.svg")
+        )
         self.customer_filter_clear_btn.setIconSize(QSize(18, 18))
         self.customer_filter_clear_btn.setFixedSize(34, 34)
         self.customer_filter_clear_btn.setToolTip("Limpiar filtro de clientes")
