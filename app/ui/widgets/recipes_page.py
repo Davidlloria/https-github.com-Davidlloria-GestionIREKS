@@ -1931,23 +1931,26 @@ class RecipesPage(QWidget):
         self.active_process_combo.setMinimumWidth(130)
         self.active_process_combo.setMaximumWidth(170)
         self.active_process_combo.setFixedHeight(30)
+        self.active_process_combo.setStyleSheet(
+            "QComboBox { min-height: 0px; max-height: 30px; padding: 0 8px; }"
+        )
         self.active_process_combo.currentTextChanged.connect(self._on_active_process_changed)
         recipe_process_layout.addWidget(self.active_process_combo)
         add_process_btn = QPushButton("+")
-        add_process_btn.setFixedSize(34, self.active_process_combo.height())
-        add_process_btn.setMinimumWidth(34)
+        add_process_btn.setObjectName("addRecipeProcessButton")
+        add_process_btn.setFixedSize(34, 30)
         add_process_btn.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
         add_process_btn.setStyleSheet(
-            "QPushButton { background-color: #DCFCE7; color: #166534; border: 1px solid #86EFAC; border-radius: 7px; }"
+            "QPushButton { min-height: 0px; max-height: 30px; padding: 0px; background-color: #DCFCE7; color: #166534; border: 1px solid #86EFAC; border-radius: 7px; }"
             "QPushButton:hover { background-color: #BBF7D0; border-color: #4ADE80; }"
         )
         add_process_btn.clicked.connect(self._add_process)
         del_process_btn = QPushButton("-")
-        del_process_btn.setFixedSize(34, self.active_process_combo.height())
-        del_process_btn.setMinimumWidth(34)
+        del_process_btn.setObjectName("removeRecipeProcessButton")
+        del_process_btn.setFixedSize(34, 30)
         del_process_btn.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
         del_process_btn.setStyleSheet(
-            "QPushButton { background-color: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; border-radius: 7px; }"
+            "QPushButton { min-height: 0px; max-height: 30px; padding: 0px; background-color: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; border-radius: 7px; }"
             "QPushButton:hover { background-color: #FECACA; border-color: #F87171; }"
         )
         del_process_btn.clicked.connect(self._remove_process)
