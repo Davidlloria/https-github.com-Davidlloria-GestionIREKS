@@ -1,4 +1,4 @@
-from sqlalchemy import String, cast
+from sqlalchemy import String, cast, func
 from sqlmodel import Session, col, or_, select
 
 from app.models import Cliente
@@ -12,22 +12,22 @@ class CustomerRepository(BaseRepository[Cliente]):
     def search(self, session: Session, term: str) -> list[Cliente]:
         if not term.strip():
             return self.list_all(session)
-        like_term = f"%{term.strip()}%"
+        like_term = f"%{term.strip().casefold()}%"
         stmt = (
             select(Cliente)
             .where(
                 or_(
-                    cast(col(Cliente.cliente_codigo), String).like(like_term),
-                    col(Cliente.cliente_id).like(like_term),
-                    col(Cliente.cliente_nombre_fiscal).like(like_term),
-                    col(Cliente.cliente_nombre_comercial).like(like_term),
-                    col(Cliente.cliente_nombre_interno).like(like_term),
-                    col(Cliente.cliente_cif).like(like_term),
-                    col(Cliente.cliente_telefono).like(like_term),
-                    col(Cliente.cliente_email).like(like_term),
-                    col(Cliente.cliente_direccion).like(like_term),
-                    col(Cliente.cliente_tipo).like(like_term),
-                    col(Cliente.cliente_actividad).like(like_term),
+                    func.lower(cast(col(Cliente.cliente_codigo), String)).like(like_term),
+                    func.lower(col(Cliente.cliente_id)).like(like_term),
+                    func.lower(col(Cliente.cliente_nombre_fiscal)).like(like_term),
+                    func.lower(col(Cliente.cliente_nombre_comercial)).like(like_term),
+                    func.lower(col(Cliente.cliente_nombre_interno)).like(like_term),
+                    func.lower(col(Cliente.cliente_cif)).like(like_term),
+                    func.lower(col(Cliente.cliente_telefono)).like(like_term),
+                    func.lower(col(Cliente.cliente_email)).like(like_term),
+                    func.lower(col(Cliente.cliente_direccion)).like(like_term),
+                    func.lower(col(Cliente.cliente_tipo)).like(like_term),
+                    func.lower(col(Cliente.cliente_actividad)).like(like_term),
                 )
             )
             .order_by(col(Cliente.cliente_nombre_comercial))

@@ -48,7 +48,10 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
         │       │       └── Nombre receta (stretch; item transparente, sin borde; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
         │       └── pestaña Clientes (tab no seleccionado fondo #F7FAFD, borde #DDE5F0; seleccionado fondo #FFFFFF, borde inferior #2563EB)
         │           ├── customer_tab (QWidget, fondo transparente, sin borde)
-        │           ├── customer_filter_btn (QPushButton "Todos los clientes", fondo #F3F6FA, borde #D7DEE8, radio 6 px)
+        │           ├── customer_filter_input (QLineEdit, objectName `customerRecipeFilterInput`, fondo #FFFFFF, borde #C8D2DF, radio 6 px, campo de filtro con botón de limpiar)
+        │           ├── customer_filter_results (QTableWidget, objectName `customerRecipeFilterResults`, fondo #FFFFFF, borde #D8E0EA, radio 8 px, oculto hasta escribir, alto máximo 180 px)
+        │           │   ├── Código (cabecera fondo #EEF2F7, borde inferior #D8E0EA)
+        │           │   └── Cliente (cabecera fondo #EEF2F7, borde inferior #D8E0EA)
         │           ├── load_base_btn (QPushButton "Cargar receta base", fondo #5BBE6A, borde #5BBE6A, radio 6 px)
         │           └── customer_recipe_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 2 columnas, ordenable)
         │               ├── Nº (52 px; item transparente, sin borde; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
@@ -102,7 +105,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 - Al abrirse, carga clientes, el listado de recetas de la pestaña activa y una receta nueva en memoria.
 - La pestaña `IREKS` lista recetas base; su buscador filtra por ocurrencia. La pestaña `Clientes` lista recetas del cliente seleccionado o de todos los clientes.
 - Cambiar de pestaña fuerza el autosave pendiente, prepara una receta nueva y recarga el listado aplicable.
-- `customer_filter_btn` abre un selector de cliente. Al elegir uno, actualiza el listado y el campo de cliente visible de la receta.
+- `customer_filter_input` sustituye al selector modal: al escribir consulta clientes y despliega `customer_filter_results`; al hacer clic en una fila (o pulsar Intro) fija el cliente, actualiza el listado y el campo visible de la receta. Limpiar el campo vuelve a mostrar recetas de todos los clientes.
 - `load_base_btn` permite cargar una receta base en una receta de cliente, clonando líneas, proceso, observaciones y parámetros; no guarda hasta la acción de guardado/autosave.
 - Las tablas de recetas son de solo lectura, ordenables y cargan la receta al seleccionar una fila.
 - El encabezado real conserva más datos que los visibles en esta composición: cliente, código, versión, estado, masa deseada, peso de pieza, número de piezas y merma se mantienen en el modelo y se usan en los flujos de cálculo y guardado.
@@ -145,7 +148,6 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 
 - `IngredientSearchDialog`: busca ingredientes por código, nombre o familia; también permite insertar la salida de otro proceso.
 - `BaseRecipeSearchDialog`: filtra y selecciona una receta base IREKS para convertirla en punto de partida de una receta de cliente.
-- `CustomerSearchDialog`: filtra clientes y permite volver a “Todos los clientes”.
 - `RecipeScaleDialog`: escala la receta por harina, masa total o piezas, según el modo elegido.
 - `ProcessSourceDialog`: está definido para seleccionar un proceso fuente, pero `RecipesPage` no lo invoca actualmente; la inserción desde otro proceso se resuelve en `IngredientSearchDialog`.
 - `RecipeTechnicalDialog`: concentra escandallo, parámetros de elaboración, costes, edición por proceso y exportación PDF simple/extendida.
@@ -175,7 +177,6 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 
 - Modal `Buscar ingrediente`: `IngredientSearchDialog`.
 - Modal `Cargar receta base`: `BaseRecipeSearchDialog`.
-- Modal `Seleccionar cliente`: `CustomerSearchDialog`.
 - Modal `Escalar receta`: `RecipeScaleDialog`.
 - Modal `Ficha técnica`: `RecipeTechnicalDialog`.
 - Modal `Editor de proceso`: diálogo de edición enriquecida del proceso.

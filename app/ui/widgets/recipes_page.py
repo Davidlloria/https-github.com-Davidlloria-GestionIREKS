@@ -302,90 +302,6 @@ class BaseRecipeSearchDialog(QDialog):
         self.accept()
 
 
-class CustomerSearchDialog(QDialog):
-    def __init__(self, service: RecipeService, selected_id: str = "", parent=None) -> None:
-        super().__init__(parent)
-        self.service = service
-        self.selected_id = selected_id
-        self.selected_customer_id: str | None = None
-        self.selected_customer_label: str = "Todos los clientes"
-        self.setWindowTitle("Seleccionar cliente")
-        self.resize(820, 480)
-        self._build_ui()
-        self._search()
-
-    def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Filtrar por ocurrencia...")
-        self.search_input.textChanged.connect(self._search)
-        layout.addWidget(self.search_input)
-
-        self.table = QTableWidget(0, 3)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.setHorizontalHeaderLabels(["Codigo", "Cliente", "ID"])
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        self.table.doubleClicked.connect(self._accept_selected)
-        layout.addWidget(self.table, 1)
-
-        actions = QHBoxLayout()
-        all_btn = QPushButton("Todos los clientes")
-        all_btn.setProperty("btnRole", "secondary")
-        all_btn.clicked.connect(self._accept_all)
-        actions.addWidget(all_btn)
-        actions.addStretch()
-        use_btn = QPushButton("Seleccionar")
-        use_btn.setProperty("btnRole", "primary")
-        cancel_btn = QPushButton("Cancelar")
-        cancel_btn.setProperty("btnRole", "secondary")
-        use_btn.clicked.connect(self._accept_selected)
-        cancel_btn.clicked.connect(self.reject)
-        actions.addWidget(use_btn)
-        actions.addWidget(cancel_btn)
-        layout.addLayout(actions)
-
-    def _search(self) -> None:
-        term = self.search_input.text().strip()
-        customers = self.service.search_customers(term)
-        self.table.setRowCount(len(customers))
-        for row, customer in enumerate(customers):
-            code = str(customer.cliente_codigo or "")
-            label = customer.cliente_nombre_comercial or customer.cliente_nombre_fiscal or str(customer.cliente_id)
-            customer_id = str(customer.cliente_id or "")
-            values = [code, label, customer_id]
-            for col, value in enumerate(values):
-                cell = QTableWidgetItem(value)
-                if col == 2:
-                    cell.setData(Qt.ItemDataRole.UserRole, customer_id)
-                self.table.setItem(row, col, cell)
-            if customer_id == self.selected_id:
-                self.table.selectRow(row)
-
-    def _accept_all(self) -> None:
-        self.selected_customer_id = ""
-        self.selected_customer_label = "Todos los clientes"
-        self.accept()
-
-    def _accept_selected(self) -> None:
-        selected = self.table.selectionModel().selectedRows()
-        if not selected:
-            QMessageBox.warning(self, "Clientes", "Selecciona un cliente.")
-            return
-        row = selected[0].row()
-        id_item = self.table.item(row, 2)
-        label_item = self.table.item(row, 1)
-        if not id_item or not label_item:
-            return
-        self.selected_customer_id = str(id_item.data(Qt.ItemDataRole.UserRole) or "").strip()
-        self.selected_customer_label = label_item.text().strip()
-        self.accept()
-
-
 class RecipeScaleDialog(QDialog):
     def __init__(self, current_flour_g: float, current_total_g: float, current_pieces: float, parent=None) -> None:
         super().__init__(parent)
@@ -1762,10 +1678,29 @@ class RecipesPage(QWidget):
 
         customer_tab = QWidget()
         customer_layout = QVBoxLayout(customer_tab)
-        self.customer_filter_btn = QPushButton("Todos los clientes")
-        self.customer_filter_btn.setProperty("btnRole", "secondary")
-        self.customer_filter_btn.clicked.connect(self._pick_customer_filter)
-        customer_layout.addWidget(self.customer_filter_btn)
+        self.customer_filter_input = QLineEdit()
+        self.customer_filter_input.setObjectName("customerRecipeFilterInput")
+        self.customer_filter_input.setPlaceholderText("Filtrar clientes...")
+        self.customer_filter_input.setClearButtonEnabled(True)
+        self.customer_filter_input.textChanged.connect(self._on_customer_filter_text_changed)
+        self.customer_filter_input.returnPressed.connect(self._select_first_customer_filter_result)
+        customer_layout.addWidget(self.customer_filter_input)
+
+        self.customer_filter_results = QTableWidget(0, 2)
+        self.customer_filter_results.setObjectName("customerRecipeFilterResults")
+        self.customer_filter_results.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.customer_filter_results.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.customer_filter_results.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.customer_filter_results.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.customer_filter_results.setHorizontalHeaderLabels(["Código", "Cliente"])
+        results_header = self.customer_filter_results.horizontalHeader()
+        results_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        results_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.customer_filter_results.verticalHeader().setVisible(False)
+        self.customer_filter_results.setMaximumHeight(180)
+        self.customer_filter_results.setVisible(False)
+        self.customer_filter_results.cellClicked.connect(self._select_customer_filter_result)
+        customer_layout.addWidget(self.customer_filter_results)
         self.load_base_btn = QPushButton("Cargar receta base")
         self.load_base_btn.setProperty("btnRole", "success")
         self.load_base_btn.clicked.connect(self._load_base_recipe_template)
@@ -2622,7 +2557,7 @@ class RecipesPage(QWidget):
         self._reload_customer_filter(customers)
 
     def _reload_customer_filter(self, customers: list[Any] | None = None) -> None:
-        if not hasattr(self, "customer_filter_btn"):
+        if not hasattr(self, "customer_filter_input"):
             return
         if customers is None:
             customers = self.recipe_service.list_customers()
@@ -2633,7 +2568,57 @@ class RecipesPage(QWidget):
         valid_ids = {item[0] for item in self._customer_filter_items}
         if self.customer_filter_selected_id not in valid_ids:
             self.customer_filter_selected_id = ""
-        self._refresh_customer_filter_button()
+        self._refresh_customer_filter_input()
+        self._reload_recipe_list()
+
+    @staticmethod
+    def _customer_filter_label(customer: Any) -> str:
+        return str(
+            getattr(customer, "cliente_nombre_comercial", "")
+            or getattr(customer, "cliente_nombre_fiscal", "")
+            or getattr(customer, "cliente_id", "")
+            or ""
+        ).strip()
+
+    def _on_customer_filter_text_changed(self, text: str) -> None:
+        if self._is_loading_recipe:
+            return
+        term = str(text or "").strip()
+        if not term:
+            if self.customer_filter_selected_id:
+                self.customer_filter_selected_id = ""
+                self._reload_recipe_list()
+            self.customer_filter_results.setRowCount(0)
+            self.customer_filter_results.setVisible(False)
+            return
+
+        customers = self.recipe_service.search_customers(term)
+        self.customer_filter_results.setRowCount(len(customers))
+        for row, customer in enumerate(customers):
+            customer_id = str(getattr(customer, "cliente_id", "") or "").strip()
+            code = str(getattr(customer, "cliente_codigo", "") or "")
+            code_item = QTableWidgetItem(code)
+            code_item.setData(Qt.ItemDataRole.UserRole, customer_id)
+            self.customer_filter_results.setItem(row, 0, code_item)
+            self.customer_filter_results.setItem(row, 1, QTableWidgetItem(self._customer_filter_label(customer)))
+        self.customer_filter_results.setVisible(bool(customers))
+
+    def _select_first_customer_filter_result(self) -> None:
+        if self.customer_filter_results.rowCount() > 0:
+            self._select_customer_filter_result(0, 0)
+
+    def _select_customer_filter_result(self, row: int, _column: int) -> None:
+        code_item = self.customer_filter_results.item(row, 0)
+        label_item = self.customer_filter_results.item(row, 1)
+        if code_item is None or label_item is None:
+            return
+        customer_id = str(code_item.data(Qt.ItemDataRole.UserRole) or "").strip()
+        if not customer_id:
+            return
+        self.customer_filter_selected_id = customer_id
+        self._set_combo_by_data(self.cliente_combo, customer_id)
+        self._refresh_customer_filter_input(label_item.text())
+        self.customer_filter_results.setVisible(False)
         self._reload_recipe_list()
 
     def _reload_recipe_list(self) -> None:
@@ -3556,26 +3541,23 @@ class RecipesPage(QWidget):
     def _export_excel(self) -> None:
         QMessageBox.information(self, "Recetas", "Exportacion Excel se implementa en Fase 3.")
 
-    def _refresh_customer_filter_button(self) -> None:
-        if not hasattr(self, "customer_filter_btn"):
+    def _refresh_customer_filter_input(self, label: str | None = None) -> None:
+        if not hasattr(self, "customer_filter_input"):
             return
-        label = "Todos los clientes"
-        for customer_id, customer_label in getattr(self, "_customer_filter_items", []):
-            if customer_id == self.customer_filter_selected_id:
-                label = customer_label
-                break
-        self.customer_filter_btn.setText(label)
+        if label is None:
+            label = ""
+            for customer_id, customer_label in getattr(self, "_customer_filter_items", []):
+                if customer_id == self.customer_filter_selected_id:
+                    label = customer_label
+                    break
+        self.customer_filter_input.blockSignals(True)
+        self.customer_filter_input.setText(label)
+        self.customer_filter_input.blockSignals(False)
+        self.customer_filter_results.setRowCount(0)
+        self.customer_filter_results.setVisible(False)
 
-    def _pick_customer_filter(self) -> None:
-        dialog = CustomerSearchDialog(self.recipe_service, self.customer_filter_selected_id, self)
-        if not dialog.exec() or dialog.selected_customer_id is None:
-            return
-        self.customer_filter_selected_id = dialog.selected_customer_id
-        self._refresh_customer_filter_button()
-        if self.customer_filter_selected_id:
-            self._set_combo_by_data(self.cliente_combo, self.customer_filter_selected_id)
-        self._update_inline_customer_name()
-        self._reload_recipe_list()
+    def _refresh_customer_filter_button(self) -> None:
+        self._refresh_customer_filter_input()
 
     def _load_base_recipe_template(self) -> None:
         if self.recipe_tabs.currentIndex() != 1:
