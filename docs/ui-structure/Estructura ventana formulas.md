@@ -107,7 +107,8 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 - Al abrirse, carga clientes, el listado de recetas de la pestaña activa y una receta nueva en memoria.
 - La pestaña `IREKS` lista recetas base; su buscador filtra por ocurrencia. La pestaña `Clientes` lista recetas del cliente seleccionado o de todos los clientes.
 - Cambiar de pestaña fuerza el autosave pendiente, prepara una receta nueva y recarga el listado aplicable.
-- `customer_filter_input` sustituye al selector modal: al escribir consulta clientes y despliega `customer_filter_results`; al hacer clic en una fila (o pulsar Intro) fija el cliente, actualiza el listado y el campo visible de la receta. Limpiar el campo vuelve a mostrar recetas de todos los clientes.
+- `customer_filter_input` sustituye al selector modal: al escribir consulta clientes y despliega `customer_filter_results`; al hacer clic en una fila (o pulsar Intro) filtra el listado. Limpiar el campo vuelve a mostrar recetas de todos los clientes. El campo visible de la receta permanece vacío hasta seleccionar una receta.
+- `Nueva` limpia todos los campos en IREKS. En Clientes abre `CustomerRecipeSelectionDialog`, que filtra clientes y exige seleccionar uno antes de preparar la receta nueva.
 - `load_base_btn` permite cargar una receta base en una receta de cliente, clonando líneas, proceso, observaciones y parámetros; no guarda hasta la acción de guardado/autosave.
 - Las tablas de recetas son de solo lectura, ordenables y cargan la receta al seleccionar una fila.
 - El encabezado real conserva más datos que los visibles en esta composición: cliente, código, versión, estado, masa deseada, peso de pieza, número de piezas y merma se mantienen en el modelo y se usan en los flujos de cálculo y guardado.
@@ -150,6 +151,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 
 - `IngredientSearchDialog`: busca ingredientes por código, nombre o familia; también permite insertar la salida de otro proceso.
 - `BaseRecipeSearchDialog`: filtra y selecciona una receta base IREKS para convertirla en punto de partida de una receta de cliente.
+- `CustomerRecipeSelectionDialog`: filtra y selecciona el cliente obligatorio al crear una nueva receta desde la pestaña Clientes.
 - `RecipeScaleDialog`: escala la receta por harina, masa total o piezas, según el modo elegido.
 - `ProcessSourceDialog`: está definido para seleccionar un proceso fuente, pero `RecipesPage` no lo invoca actualmente; la inserción desde otro proceso se resuelve en `IngredientSearchDialog`.
 - `RecipeTechnicalDialog`: concentra escandallo, parámetros de elaboración, costes, edición por proceso y exportación PDF simple/extendida.
@@ -179,6 +181,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 
 - Modal `Buscar ingrediente`: `IngredientSearchDialog`.
 - Modal `Cargar receta base`: `BaseRecipeSearchDialog`.
+- Modal `Nueva receta de cliente`: `CustomerRecipeSelectionDialog`.
 - Modal `Escalar receta`: `RecipeScaleDialog`.
 - Modal `Ficha técnica`: `RecipeTechnicalDialog`.
 - Modal `Editor de proceso`: diálogo de edición enriquecida del proceso.

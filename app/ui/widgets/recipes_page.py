@@ -314,6 +314,75 @@ class BaseRecipeSearchDialog(QDialog):
         self.accept()
 
 
+class CustomerRecipeSelectionDialog(QDialog):
+    def __init__(self, service: RecipeService, parent=None) -> None:
+        super().__init__(parent)
+        self.service = service
+        self.selected_customer_id = ""
+        self.setWindowTitle("Nueva receta de cliente")
+        self.resize(620, 420)
+        self._build_ui()
+        self._search()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Filtrar clientes...")
+        self.search_input.textChanged.connect(self._search)
+        layout.addWidget(self.search_input)
+
+        self.table = QTableWidget(0, 2)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setHorizontalHeaderLabels(["Código", "Cliente"])
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table.verticalHeader().setVisible(False)
+        self.table.doubleClicked.connect(self._accept_selected)
+        layout.addWidget(self.table, 1)
+
+        actions = QHBoxLayout()
+        actions.addStretch()
+        select_btn = QPushButton("Seleccionar")
+        select_btn.setProperty("btnRole", "primary")
+        cancel_btn = QPushButton("Cancelar")
+        cancel_btn.setProperty("btnRole", "secondary")
+        select_btn.clicked.connect(self._accept_selected)
+        cancel_btn.clicked.connect(self.reject)
+        actions.addWidget(select_btn)
+        actions.addWidget(cancel_btn)
+        layout.addLayout(actions)
+
+    def _search(self) -> None:
+        customers = self.service.search_customers(self.search_input.text().strip())
+        self.table.setRowCount(len(customers))
+        for row, customer in enumerate(customers):
+            customer_id = str(getattr(customer, "cliente_id", "") or "").strip()
+            code_item = QTableWidgetItem(str(getattr(customer, "cliente_codigo", "") or ""))
+            code_item.setData(Qt.ItemDataRole.UserRole, customer_id)
+            self.table.setItem(row, 0, code_item)
+            label = str(
+                getattr(customer, "cliente_nombre_comercial", "")
+                or getattr(customer, "cliente_nombre_fiscal", "")
+                or customer_id
+            ).strip()
+            self.table.setItem(row, 1, QTableWidgetItem(label))
+
+    def _accept_selected(self) -> None:
+        selected = self.table.selectionModel().selectedRows()
+        if not selected:
+            QMessageBox.warning(self, "Recetas", "Selecciona un cliente.")
+            return
+        item = self.table.item(selected[0].row(), 0)
+        customer_id = str(item.data(Qt.ItemDataRole.UserRole) or "").strip() if item else ""
+        if not customer_id:
+            return
+        self.selected_customer_id = customer_id
+        self.accept()
+
+
 class RecipeScaleDialog(QDialog):
     def __init__(self, current_flour_g: float, current_total_g: float, current_pieces: float, parent=None) -> None:
         super().__init__(parent)
@@ -1640,7 +1709,7 @@ class RecipesPage(QWidget):
         self.export_pdf_btn = create_standard_ribbon_button("PDF", role="secondary", icon_name="file-text.svg")
         self.export_excel_btn = create_standard_ribbon_button("Excel", role="secondary", icon_name="sheet.svg")
 
-        self.new_recipe_btn.clicked.connect(self._new_recipe)
+        self.new_recipe_btn.clicked.connect(self._start_new_recipe)
         self.save_recipe_btn.clicked.connect(self._save_recipe)
         self.save_version_btn.clicked.connect(self._save_version)
         self.duplicate_recipe_btn.clicked.connect(self._duplicate_recipe)
@@ -2589,6 +2658,7 @@ class RecipesPage(QWidget):
         self.cliente_combo.clear()
         for customer in customers:
             self.cliente_combo.addItem(f"{customer.cliente_nombre_comercial}", customer.cliente_id)
+        self.cliente_combo.setCurrentIndex(-1)
         self._update_inline_customer_name()
         self._reload_customer_filter(customers)
 
@@ -2656,7 +2726,6 @@ class RecipesPage(QWidget):
         if not customer_id:
             return
         self.customer_filter_selected_id = customer_id
-        self._set_combo_by_data(self.cliente_combo, customer_id)
         self._refresh_customer_filter_input(label_item.text())
         self.customer_filter_results.setVisible(False)
         self._reload_recipe_list()
@@ -2789,13 +2858,25 @@ class RecipesPage(QWidget):
         self._refresh_process_controls(self.recipe_process_names, preserve_active=False)
         self._on_lines_changed()
 
-    def _new_recipe(self) -> None:
+    def _start_new_recipe(self) -> None:
+        if self.recipe_tabs.currentIndex() == 0:
+            self._new_recipe()
+            return
+        dialog = CustomerRecipeSelectionDialog(self.recipe_service, self)
+        if not dialog.exec() or not dialog.selected_customer_id:
+            return
+        self._new_recipe(cliente_id=dialog.selected_customer_id)
+
+    def _new_recipe(self, cliente_id: str = "") -> None:
         self._autosave_timer.stop()
         self._is_loading_recipe = True
         try:
             self.current_recipe_id = None
             self.current_base_recipe_id = None
             self.current_recipe_is_ireks = self.recipe_tabs.currentIndex() == 0 if hasattr(self, "recipe_tabs") else False
+            self._set_combo_by_data(self.cliente_combo, cliente_id)
+            if not cliente_id:
+                self.cliente_combo.setCurrentIndex(-1)
             self.nombre_input.clear()
             self.codigo_input.clear()
             self.version_input.setText("1.0")
