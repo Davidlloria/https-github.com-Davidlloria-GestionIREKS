@@ -1779,6 +1779,8 @@ class RecipesPage(QWidget):
         right_panel = QWidget()
         right_panel.setObjectName("recipesContentPanel")
         right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(10)
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(1, 1)
         splitter.setChildrenCollapsible(False)

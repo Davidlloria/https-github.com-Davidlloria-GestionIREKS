@@ -53,7 +53,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
         │           └── customer_recipe_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 2 columnas, ordenable)
         │               ├── Nº (52 px; item transparente, sin borde; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
         │               └── Nombre receta (stretch; item transparente, sin borde; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
-        └── panel derecho (QWidget, objectName `recipesContentPanel`, fondo transparente, sin borde, ocupa el espacio restante)
+        └── panel derecho (QWidget, objectName `recipesContentPanel`, fondo transparente, sin borde, ocupa el espacio restante; layout sin márgenes y separación 10 px)
             ├── header_row (QWidget, objectName `recipesHeaderRow`, fondo #FFFFFF, borde #D7DEE8, radio 8 px, alto fijo 64 px)
             │   ├── recipe_header_box (QGroupBox "Receta", fondo #FFFFFF, borde #D8E0EA, radio 8 px, 460 x 64 px)
             │   │   └── nombre_input (QLineEdit, fondo #FFFFFF, borde #C8D2DF, radio 6 px, posición absoluta, ancho 440 px)
@@ -121,6 +121,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 
 - El splitter principal es horizontal, sin tirador visible (`handleWidth(0)`).
 - El panel izquierdo mide exactamente 332 px; el derecho recibe el factor de estiramiento disponible.
+- El layout del panel derecho no tiene márgenes: `header_row` queda alineado con su borde superior; mantiene 10 px de separación respecto al editor de pestañas.
 - El tamaño inicial del splitter es aproximadamente 332 px / 930 px.
 - `header_row`, `recipe_header_box` y `customer_header_box` tienen alto fijo de 64 px.
 - Los grupos de cabecera se posicionan de forma absoluta: receta en `0,0` y cliente en `468,0`; ambos con ancho 460 px.
