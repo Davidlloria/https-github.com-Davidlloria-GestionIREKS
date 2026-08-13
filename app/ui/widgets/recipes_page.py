@@ -1671,6 +1671,8 @@ class RecipesPage(QWidget):
 
     def __init__(self) -> None:
         super().__init__()
+        self.setObjectName("RecipesPageRoot")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.recipe_service = RecipeService()
         self.recipe_active_flow_service = RecipeActiveFlowService(recipe_service=self.recipe_service)
         self.pdf_service = PdfService()
@@ -1697,9 +1699,11 @@ class RecipesPage(QWidget):
         root = QVBoxLayout(self)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setObjectName("recipesMainSplitter")
         root.addWidget(splitter, 1)
 
         left_panel = QWidget()
+        left_panel.setObjectName("recipesSidePanel")
         left_panel.setFixedWidth(332)
         left_layout = QVBoxLayout(left_panel)
         left_layout.addWidget(QLabel("Recetas"))
@@ -1735,6 +1739,7 @@ class RecipesPage(QWidget):
         splitter.addWidget(left_panel)
 
         right_panel = QWidget()
+        right_panel.setObjectName("recipesContentPanel")
         right_layout = QVBoxLayout(right_panel)
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(1, 1)
@@ -1771,6 +1776,7 @@ class RecipesPage(QWidget):
         right_layout.addLayout(actions)
 
         self.header_row = QWidget()
+        self.header_row.setObjectName("recipesHeaderRow")
         self.header_row.setFixedHeight(64)
 
         self.recipe_header_box = QGroupBox("Receta")
@@ -2132,6 +2138,7 @@ class RecipesPage(QWidget):
 
         imagenes_tab = QWidget()
         self.images_ribbon = QWidget(imagenes_tab)
+        self.images_ribbon.setObjectName("recipesImagesRibbon")
         self.images_ribbon.setGeometry(0, 0, 928, 56)
         self.images_list = QListWidget()
         self.images_list.setParent(imagenes_tab)
