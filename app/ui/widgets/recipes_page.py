@@ -2867,15 +2867,15 @@ class RecipesPage(QWidget):
     def _layout_header_boxes_abs(self) -> None:
         if not hasattr(self, "header_row") or not hasattr(self, "recipe_header_box") or not hasattr(self, "customer_header_box"):
             return
-        self.recipe_header_box.setGeometry(0, 0, 460, 62)
-        self.customer_header_box.setGeometry(468, 0, 500, 64)
+        self.recipe_header_box.setGeometry(0, 4, 460, 58)
+        self.customer_header_box.setGeometry(468, 4, 500, 58)
         self.header_separator.setGeometry(464, 8, 1, 48)
 
     def _layout_header_fields_abs(self) -> None:
         if not hasattr(self, "recipe_header_box") or not hasattr(self, "customer_header_box"):
             return
-        self.nombre_input.setGeometry(10, 25, 440, 24)
-        self.customer_name_value.setGeometry(10, 25, 480, 34)
+        self.nombre_input.setGeometry(10, 21, 440, 24)
+        self.customer_name_value.setGeometry(10, 21, 480, 34)
 
     def _add_ingredient(self) -> None:
         target_process = self._current_active_process()
