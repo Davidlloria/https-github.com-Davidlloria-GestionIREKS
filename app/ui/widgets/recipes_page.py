@@ -1408,8 +1408,25 @@ class CompactQuantityDelegate(QStyledItemDelegate):
     def updateEditorGeometry(self, editor, option, index) -> None:  # type: ignore[override]
         editor.setGeometry(option.rect)
 
+    def setEditorData(self, editor, index) -> None:  # type: ignore[override]
+        if isinstance(editor, QLineEdit):
+            editor.setText(str(index.data(Qt.ItemDataRole.DisplayRole) or "").replace("g", "").strip())
+            editor.selectAll()
+            return
+        super().setEditorData(editor, index)
+
     def setModelData(self, editor, model, index) -> None:  # type: ignore[override]
-        super().setModelData(editor, model, index)
+        if isinstance(editor, QLineEdit):
+            raw_value = editor.text().replace("g", "").strip()
+            normalized = raw_value.replace(".", "").replace(",", ".")
+            try:
+                value = float(normalized) if normalized else 0.0
+            except ValueError:
+                value = 0.0
+            text = f"{value:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+            model.setData(index, f"{text} g" if raw_value else "", Qt.ItemDataRole.EditRole)
+        else:
+            super().setModelData(editor, model, index)
         if callable(self.on_commit):
             self.on_commit()
 
@@ -1663,7 +1680,7 @@ class RecipesPage(QWidget):
     COL_INGREDIENTE = 0
     COL_NOTA = 1
     COL_CANTIDAD = 2
-    COL_UNIDAD = 3
+    COL_PCT = 3
     COL_PROCESO = 4
     ESC_COL_INGREDIENTE = 0
     ESC_COL_CANTIDAD = 1
@@ -1917,16 +1934,22 @@ class RecipesPage(QWidget):
         self.active_process_combo.currentTextChanged.connect(self._on_active_process_changed)
         recipe_process_layout.addWidget(self.active_process_combo)
         add_process_btn = QPushButton("+")
-        add_process_btn.setProperty("btnRole", "success")
-        add_process_btn.setFixedHeight(self.active_process_combo.height())
+        add_process_btn.setFixedSize(34, self.active_process_combo.height())
         add_process_btn.setMinimumWidth(34)
         add_process_btn.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
+        add_process_btn.setStyleSheet(
+            "QPushButton { background-color: #DCFCE7; color: #166534; border: 1px solid #86EFAC; border-radius: 7px; }"
+            "QPushButton:hover { background-color: #BBF7D0; border-color: #4ADE80; }"
+        )
         add_process_btn.clicked.connect(self._add_process)
         del_process_btn = QPushButton("-")
-        del_process_btn.setProperty("btnRole", "danger")
-        del_process_btn.setFixedHeight(self.active_process_combo.height())
+        del_process_btn.setFixedSize(34, self.active_process_combo.height())
         del_process_btn.setMinimumWidth(34)
         del_process_btn.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
+        del_process_btn.setStyleSheet(
+            "QPushButton { background-color: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; border-radius: 7px; }"
+            "QPushButton:hover { background-color: #FECACA; border-color: #F87171; }"
+        )
         del_process_btn.clicked.connect(self._remove_process)
         recipe_process_layout.addWidget(add_process_btn)
         recipe_process_layout.addWidget(del_process_btn)
@@ -1947,17 +1970,17 @@ class RecipesPage(QWidget):
         self.lines_table.setEditTriggers(
             QAbstractItemView.EditTrigger.DoubleClicked | QAbstractItemView.EditTrigger.EditKeyPressed
         )
-        self.lines_table.setHorizontalHeaderLabels(["Ingrediente", "", "Cantidad", "Und", "Proceso"])
+        self.lines_table.setHorizontalHeaderLabels(["Ingrediente", "", "Cantidad", "%", "Proceso"])
         lines_header = self.lines_table.horizontalHeader()
         lines_header.setSectionResizeMode(self.COL_INGREDIENTE, QHeaderView.ResizeMode.Stretch)
         lines_header.setSectionResizeMode(self.COL_NOTA, QHeaderView.ResizeMode.Fixed)
         lines_header.setSectionResizeMode(self.COL_CANTIDAD, QHeaderView.ResizeMode.Fixed)
-        lines_header.setSectionResizeMode(self.COL_UNIDAD, QHeaderView.ResizeMode.Fixed)
+        lines_header.setSectionResizeMode(self.COL_PCT, QHeaderView.ResizeMode.Fixed)
         lines_header.setSectionResizeMode(self.COL_PROCESO, QHeaderView.ResizeMode.Fixed)
         lines_header.setFixedHeight(26)
         self.lines_table.setColumnWidth(self.COL_NOTA, 108)
         self.lines_table.setColumnWidth(self.COL_CANTIDAD, 86)
-        self.lines_table.setColumnWidth(self.COL_UNIDAD, 52)
+        self.lines_table.setColumnWidth(self.COL_PCT, 72)
         self.lines_table.setColumnWidth(self.COL_PROCESO, 94)
         self.lines_table.setItemDelegateForColumn(
             self.COL_NOTA,
@@ -1966,10 +1989,6 @@ class RecipesPage(QWidget):
         self.lines_table.setItemDelegateForColumn(
             self.COL_CANTIDAD,
             CompactQuantityDelegate(self._on_lines_changed, self.lines_table),
-        )
-        self.lines_table.setItemDelegateForColumn(
-            self.COL_UNIDAD,
-            UnitComboDelegate(self._on_lines_changed, self.lines_table),
         )
         self.lines_table.setItemDelegateForColumn(
             self.COL_PROCESO,
@@ -3284,8 +3303,7 @@ class RecipesPage(QWidget):
             if not (line.nombre_mostrado or line.notas or line.cantidad_base_g):
                 continue
             cantidad_text = self._cell_text(row, self.COL_CANTIDAD)
-            unidad_text = self._cell_text(row, self.COL_UNIDAD) or "g"
-            rows_data.append((line, cantidad_text, unidad_text))
+            rows_data.append((line, cantidad_text, "g"))
             source_rows.append(row)
 
         if not rows_data:
@@ -3435,14 +3453,12 @@ class RecipesPage(QWidget):
     def _set_line_row(self, row: int, linea: RecetaLinea) -> None:
         has_ingredient = bool((linea.nombre_mostrado or "").strip())
         has_content = has_ingredient or bool((linea.notas or "").strip()) or float(linea.cantidad_base_g or 0.0) > 0
-        prev_unit = self._cell_text(row, self.COL_UNIDAD).lower() if row < self.lines_table.rowCount() else ""
-        unit_text = prev_unit if prev_unit in {"g", "kg", "l", "ml"} else "g"
         process_text = _normalize_process_name(getattr(linea, "proceso_nombre", "") or self._current_active_process())
         values = [
             linea.nombre_mostrado or "",
             linea.notas or "",
-            self._format_number(linea.cantidad_base_g) if has_content else "",
-            unit_text if has_content else "",
+            f"{self._format_number(linea.cantidad_base_g)} g" if has_content else "",
+            f"{self._format_number(linea.porcentaje_panadero, 2)} %" if has_content else "",
             process_text if has_content else "",
         ]
         for col, value in enumerate(values):
@@ -3453,10 +3469,9 @@ class RecipesPage(QWidget):
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             if col == self.COL_CANTIDAD:
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            if col == self.COL_UNIDAD:
+            if col == self.COL_PCT:
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                if not has_content:
-                    cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
             if col == self.COL_PROCESO and not has_content:
                 cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.lines_table.setItem(row, col, cell)
@@ -3497,7 +3512,7 @@ class RecipesPage(QWidget):
         return item.text().strip() if item else ""
 
     def _cell_float(self, row: int, col: int) -> float:
-        text = self._cell_text(row, col).replace(".", "").replace(",", ".")
+        text = self._cell_text(row, col).replace("g", "").replace(".", "").replace(",", ".")
         try:
             return float(text) if text else 0.0
         except ValueError:
@@ -3507,16 +3522,8 @@ class RecipesPage(QWidget):
         text = f"{float(value or 0):,.{decimals}f}"
         return text.replace(",", "_").replace(".", ",").replace("_", ".")
 
-    def _unit_for_row(self, row: int) -> str:
-        text = self._cell_text(row, self.COL_UNIDAD).lower()
-        return text if text in {"g", "kg", "l", "ml"} else "g"
-
     def _quantity_as_grams(self, row: int) -> float:
-        quantity = self._cell_float(row, self.COL_CANTIDAD)
-        unit = self._unit_for_row(row)
-        if unit in {"kg", "l"}:
-            return quantity * 1000
-        return quantity
+        return self._cell_float(row, self.COL_CANTIDAD)
 
     def _build_recipe_payload(self) -> RecipeActivePayload:
         elaboracion_payload = dict(self.recipe_elaboracion_data)
@@ -3576,16 +3583,16 @@ class RecipesPage(QWidget):
         price_by_code = self.recipe_service.std_prices_by_code()
         table = self.escandallo_table
         table.blockSignals(True)
-        rows: list[tuple[int, RecetaLinea, str, str]] = []
+        rows: list[tuple[int, RecetaLinea]] = []
         for source_row in range(self.lines_table.rowCount()):
             line = self._line_from_row(source_row)
             if line.nombre_mostrado or line.notas or line.cantidad_base_g:
-                rows.append((source_row, line, self._cell_text(source_row, self.COL_CANTIDAD), self._cell_text(source_row, self.COL_UNIDAD)))
+                rows.append((source_row, line))
         table.setRowCount(len(rows))
         total_qty_g = 0.0
         total_pct = 0.0
         total_cost = 0.0
-        for row, (source_row, line, cantidad_text, unidad_text) in enumerate(rows):
+        for row, (source_row, line) in enumerate(rows):
             eur_kg = float(line.precio_kg_snapshot or 0.0)
             if eur_kg <= 0 and (line.tipo_origen or "").strip().lower() == "std":
                 eur_kg = float(price_by_code.get((line.codigo_ingrediente or "").strip().lower()) or 0.0)
@@ -3595,7 +3602,7 @@ class RecipesPage(QWidget):
                 ingredient = f"{ingredient} ({line.notas})"
             values = [
                 ingredient,
-                f"{(cantidad_text or self._format_number(line.cantidad_base_g)).strip()} {(unidad_text or 'g').strip()}".strip(),
+                f"{self._format_number(line.cantidad_base_g)} g",
                 f"{self._format_number(line.porcentaje_panadero, 2)} %",
                 f"{self._format_number(eur_kg, 2)} €" if eur_kg > 0 else "",
                 f"{self._format_number(cost, 2)} €" if eur_kg > 0 else "",
@@ -3706,7 +3713,7 @@ class RecipesPage(QWidget):
     def _on_line_item_changed(self, item: QTableWidgetItem) -> None:
         if self._is_loading_recipe:
             return
-        if item.column() not in {self.COL_INGREDIENTE, self.COL_NOTA, self.COL_CANTIDAD, self.COL_UNIDAD, self.COL_PROCESO}:
+        if item.column() not in {self.COL_INGREDIENTE, self.COL_NOTA, self.COL_CANTIDAD, self.COL_PROCESO}:
             return
         self._on_lines_changed()
 
@@ -3714,8 +3721,25 @@ class RecipesPage(QWidget):
         receta = self._build_recipe_model()
         lineas = self._build_lines()
         result = self.recipe_service.calculate(receta, lineas, sync_categories=True)
+        self._refresh_line_baker_percentages(result.lineas)
         self._update_summary(result.receta, result.lineas)
         self.current_issues = [f"[{i.level.upper()}] {i.message}" for i in result.issues]
+
+    def _refresh_line_baker_percentages(self, lineas: list[RecetaLinea]) -> None:
+        self.lines_table.blockSignals(True)
+        try:
+            for linea in lineas:
+                row = int(linea.orden or 0) - 1
+                if row < 0 or row >= self.lines_table.rowCount():
+                    continue
+                pct_item = self.lines_table.item(row, self.COL_PCT)
+                if pct_item is not None:
+                    pct_item.setText(f"{self._format_number(linea.porcentaje_panadero, 2)} %")
+                ingredient_item = self.lines_table.item(row, self.COL_INGREDIENTE)
+                if ingredient_item is not None:
+                    ingredient_item.setData(Qt.ItemDataRole.UserRole, linea.model_dump())
+        finally:
+            self.lines_table.blockSignals(False)
 
     def _schedule_autosave(self) -> None:
         if self._is_loading_recipe:
