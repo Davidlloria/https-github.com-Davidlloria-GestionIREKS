@@ -18,10 +18,15 @@ QWidget#RecipesPageRoot {
     border: none;
 }
 
-QTabWidget#recipeEditorTabs,
-QTabWidget#recipeEditorTabs::pane {
+QTabWidget#recipeEditorTabs {
     background-color: transparent;
     border: none;
+}
+
+QTabWidget#recipeEditorTabs::pane {
+    background-color: #FFFFFF;
+    border: 1px solid #D7DEE8;
+    border-radius: 8px;
 }
 
 QSplitter#recipesMainSplitter,
