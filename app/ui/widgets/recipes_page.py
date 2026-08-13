@@ -2183,6 +2183,7 @@ class RecipesPage(QWidget):
         self.expand_process_shortcut.activated.connect(self._open_process_editor_dialog)
         notes_layout.addWidget(self.observaciones_input, 1)
         editor_tabs = QTabWidget()
+        editor_tabs.setObjectName("recipeEditorTabs")
         receta_tab = QWidget()
         receta_tab_layout = QHBoxLayout(receta_tab)
         receta_tab_layout.setContentsMargins(0, 0, 0, 0)
