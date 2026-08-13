@@ -1,14 +1,19 @@
 ﻿from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import tempfile
 import traceback
 from typing import Any, cast
 
 from PySide6.QtCore import QEvent, QSize, QTimer, Qt
 from PySide6.QtGui import QAction, QBrush, QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut, QTextCharFormat
+from PySide6.QtPdf import QPdfDocument
+from PySide6.QtPdfWidgets import QPdfView
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QButtonGroup,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -29,6 +34,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QPushButton,
     QPlainTextEdit,
+    QRadioButton,
     QTextEdit,
     QSpinBox,
     QSizePolicy,
@@ -518,6 +524,78 @@ class ProcessSourceDialog(QDialog):
 
     def selected(self) -> tuple[str, float]:
         return self._selected_process, self._selected_qty
+
+
+class MinimalRecipePdfDialog(QDialog):
+    def __init__(self, pdf_service: PdfService, recipe_id: int, parent=None) -> None:
+        super().__init__(parent)
+        self.pdf_service = pdf_service
+        self.recipe_id = recipe_id
+        self._preview_path: Path | None = None
+        self.setWindowTitle("PDF mínimo - Vista previa")
+        self.resize(920, 720)
+
+        layout = QVBoxLayout(self)
+        options = QHBoxLayout()
+        options.addWidget(QLabel("Incluir escandallo:"))
+        self.escandallo_si = QRadioButton("Sí")
+        self.escandallo_no = QRadioButton("No")
+        self.escandallo_no.setChecked(True)
+        self.escandallo_group = QButtonGroup(self)
+        self.escandallo_group.addButton(self.escandallo_si)
+        self.escandallo_group.addButton(self.escandallo_no)
+        options.addWidget(self.escandallo_si)
+        options.addWidget(self.escandallo_no)
+        options.addStretch()
+        layout.addLayout(options)
+
+        self.pdf_view = QPdfView(self)
+        self.pdf_document = QPdfDocument(self.pdf_view)
+        self.pdf_view.setDocument(self.pdf_document)
+        self.pdf_view.setPageMode(QPdfView.PageMode.MultiPage)
+        self.pdf_view.setZoomMode(QPdfView.ZoomMode.FitToWidth)
+        layout.addWidget(self.pdf_view, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        buttons.button(QDialogButtonBox.StandardButton.Save).setText("Guardar PDF")
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        self.escandallo_group.buttonToggled.connect(lambda *_args: self._refresh_preview())
+        self._refresh_preview()
+
+    def include_escandallo(self) -> bool:
+        return self.escandallo_si.isChecked()
+
+    def _refresh_preview(self) -> None:
+        if self._preview_path is not None:
+            try:
+                os.unlink(self._preview_path)
+            except FileNotFoundError:
+                pass
+        handle = tempfile.NamedTemporaryFile(prefix="gestionireks_minimo_", suffix=".pdf", delete=False)
+        handle.close()
+        self._preview_path = Path(handle.name)
+        try:
+            self.pdf_service.export_recipe_to_pdf(
+                self.recipe_id,
+                self._preview_path,
+                layout_mode="minimal",
+                include_escandallo=self.include_escandallo(),
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Vista previa PDF", f"No se pudo generar la vista previa:\n{exc}")
+            return
+        self.pdf_document.load(str(self._preview_path))
+
+    def cleanup_preview(self) -> None:
+        self.pdf_document.close()
+        if self._preview_path is not None:
+            try:
+                os.unlink(self._preview_path)
+            except FileNotFoundError:
+                pass
+            self._preview_path = None
 
 
 class RecipeTechnicalDialog(QDialog):
@@ -4044,6 +4122,7 @@ class RecipesPage(QWidget):
         selector.setText("Selecciona el tipo de documento:")
         btn_simple = selector.addButton("Simple", QMessageBox.ButtonRole.AcceptRole)
         btn_ext = selector.addButton("Extendido", QMessageBox.ButtonRole.AcceptRole)
+        btn_minimal = selector.addButton("Mínimo", QMessageBox.ButtonRole.AcceptRole)
         btn_cancel = selector.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
         selector.setDefaultButton(btn_ext)
         selector.exec()
@@ -4051,7 +4130,18 @@ class RecipesPage(QWidget):
         clicked = selector.clickedButton()
         if clicked == btn_cancel or clicked is None:
             return
-        layout_mode = "simple" if clicked == btn_simple else "extended"
+        include_escandallo = False
+        if clicked == btn_minimal:
+            minimal_dialog = MinimalRecipePdfDialog(self.pdf_service, self.current_recipe_id, self)
+            try:
+                if not minimal_dialog.exec():
+                    return
+                include_escandallo = minimal_dialog.include_escandallo()
+            finally:
+                minimal_dialog.cleanup_preview()
+            layout_mode = "minimal"
+        else:
+            layout_mode = "simple" if clicked == btn_simple else "extended"
 
         default_name = (self.nombre_input.text().strip() or f"receta_{self.current_recipe_id}").replace("/", "-")
         output_path, _ = QFileDialog.getSaveFileName(
@@ -4064,7 +4154,12 @@ class RecipesPage(QWidget):
             return
 
         try:
-            self.pdf_service.export_recipe_to_pdf(self.current_recipe_id, Path(output_path), layout_mode=layout_mode)
+            self.pdf_service.export_recipe_to_pdf(
+                self.current_recipe_id,
+                Path(output_path),
+                layout_mode=layout_mode,
+                include_escandallo=include_escandallo,
+            )
         except Exception as exc:
             QMessageBox.critical(self, "Recetas", f"No se pudo exportar el PDF:\n{exc}")
             return

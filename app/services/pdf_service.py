@@ -312,7 +312,13 @@ class PdfService:
                     result[name]["fermentacion_temp"] = v
         return result
 
-    def export_recipe_to_pdf(self, recipe_id: int, output_path: Path, layout_mode: str = "extended") -> None:
+    def export_recipe_to_pdf(
+        self,
+        recipe_id: int,
+        output_path: Path,
+        layout_mode: str = "extended",
+        include_escandallo: bool = False,
+    ) -> None:
         receta, cliente, lineas = self._load_recipe_data(recipe_id)
         if not receta:
             raise ValueError("Receta no encontrada.")
@@ -333,6 +339,10 @@ class PdfService:
 
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if str(layout_mode or "").strip().lower() == "minimal":
+            self._export_minimal_recipe_to_pdf(receta, lineas, output_path, include_escandallo=include_escandallo)
+            return
 
         story: list = []
         story.extend(self._build_header(receta, cliente, header_kind="elaboracion"))
@@ -557,6 +567,144 @@ class PdfService:
             author="Gestion IREKS",
         )
         doc.build(story, onFirstPage=self._draw_page_bg, onLaterPages=self._draw_page_bg)
+
+    def _export_minimal_recipe_to_pdf(
+        self,
+        receta: Receta,
+        lineas: list[RecetaLinea],
+        output_path: Path,
+        *,
+        include_escandallo: bool,
+    ) -> None:
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "minimal_recipe_title",
+            parent=styles["Heading1"],
+            fontName="Helvetica-Bold",
+            fontSize=19,
+            leading=23,
+            textColor=colors.HexColor("#16325C"),
+            spaceAfter=5 * mm,
+        )
+        section_style = ParagraphStyle(
+            "minimal_recipe_section",
+            parent=styles["Heading2"],
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            leading=13,
+            textColor=colors.HexColor("#334155"),
+            spaceBefore=4 * mm,
+            spaceAfter=2 * mm,
+        )
+        body_style = ParagraphStyle("minimal_recipe_body", parent=styles["BodyText"], fontName="Helvetica", fontSize=8, leading=10)
+        body_right = ParagraphStyle("minimal_recipe_body_right", parent=body_style, alignment=2)
+        header_style = ParagraphStyle(
+            "minimal_recipe_header",
+            parent=body_style,
+            fontName="Helvetica-Bold",
+            fontSize=7.5,
+            leading=9,
+            textColor=colors.white,
+        )
+        story: list = [Paragraph(escape((receta.nombre or "Sin nombre").strip()), title_style)]
+        story.append(Paragraph("RECETA", section_style))
+        story.append(self._build_minimal_recipe_table(lineas, body_style, body_right, header_style))
+        if include_escandallo:
+            story.append(Paragraph("ESCANDALLO", section_style))
+            story.append(self._build_minimal_escandallo_table(lineas, body_style, body_right, header_style))
+
+        doc = SimpleDocTemplate(
+            str(output_path),
+            pagesize=A4,
+            leftMargin=12 * mm,
+            rightMargin=12 * mm,
+            topMargin=14 * mm,
+            bottomMargin=14 * mm,
+            title=(receta.nombre or "Sin nombre").strip(),
+            author="Gestion IREKS",
+        )
+        doc.build(story)
+
+    def _build_minimal_recipe_table(
+        self,
+        lineas: list[RecetaLinea],
+        body_style: ParagraphStyle,
+        body_right: ParagraphStyle,
+        header_style: ParagraphStyle,
+    ) -> Table:
+        data = [[
+            Paragraph("INGREDIENTE", header_style),
+            Paragraph("NOTA", header_style),
+            Paragraph("CANTIDAD", header_style),
+            Paragraph("%", header_style),
+            Paragraph("PROCESO", header_style),
+        ]]
+        for line in lineas:
+            if not (line.nombre_mostrado or line.notas or line.cantidad_base_g):
+                continue
+            data.append([
+                Paragraph(escape((line.nombre_mostrado or "").strip()), body_style),
+                Paragraph(escape((line.notas or "").strip()), body_style),
+                Paragraph(f"{self._fmt(line.cantidad_base_g, 2)} g", body_right),
+                Paragraph(f"{self._fmt(line.porcentaje_panadero, 2)} %", body_right),
+                Paragraph(escape((line.proceso_nombre or "Masa final").strip()), body_style),
+            ])
+        return self._minimal_table(data, [60 * mm, 34 * mm, 27 * mm, 18 * mm, 37 * mm])
+
+    def _build_minimal_escandallo_table(
+        self,
+        lineas: list[RecetaLinea],
+        body_style: ParagraphStyle,
+        body_right: ParagraphStyle,
+        header_style: ParagraphStyle,
+    ) -> Table:
+        data = [[
+            Paragraph("INGREDIENTE", header_style),
+            Paragraph("CANTIDAD", header_style),
+            Paragraph("% PANADERO", header_style),
+            Paragraph("€/kg", header_style),
+            Paragraph("€/INGREDIENTE", header_style),
+        ]]
+        total_cost = 0.0
+        for line in lineas:
+            if not (line.nombre_mostrado or line.notas or line.cantidad_base_g):
+                continue
+            eur_kg = float(line.precio_kg_snapshot or 0.0)
+            cost = (float(line.cantidad_base_g or 0.0) / 1000.0) * eur_kg
+            total_cost += cost
+            data.append([
+                Paragraph(escape((line.nombre_mostrado or "").strip()), body_style),
+                Paragraph(f"{self._fmt(line.cantidad_base_g, 2)} g", body_right),
+                Paragraph(f"{self._fmt(line.porcentaje_panadero, 2)} %", body_right),
+                Paragraph(f"{self._fmt(eur_kg, 2)} €", body_right),
+                Paragraph(f"{self._fmt(cost, 2)} €", body_right),
+            ])
+        data.append([
+            Paragraph("<b>TOTAL</b>", body_style),
+            Paragraph("", body_right),
+            Paragraph("", body_right),
+            Paragraph("", body_right),
+            Paragraph(f"<b>{self._fmt(total_cost, 2)} €</b>", body_right),
+        ])
+        return self._minimal_table(data, [65 * mm, 29 * mm, 25 * mm, 20 * mm, 37 * mm], total_row=True)
+
+    @staticmethod
+    def _minimal_table(data: list[list[Paragraph]], col_widths: list[float], *, total_row: bool = False) -> Table:
+        table = Table(data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
+        style = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2563EB")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D8E0EA")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]
+        if total_row:
+            style.append(("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#EFF6FF")))
+        table.setStyle(TableStyle(style))
+        return table
 
     def _two_col_style(self) -> TableStyle:
         return TableStyle(
