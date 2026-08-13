@@ -1730,10 +1730,6 @@ class RecipesPage(QWidget):
         self.customer_filter_results.setVisible(False)
         self.customer_filter_results.cellClicked.connect(self._select_customer_filter_result)
         customer_layout.addWidget(self.customer_filter_results)
-        self.load_base_btn = QPushButton("Cargar receta base")
-        self.load_base_btn.setProperty("btnRole", "success")
-        self.load_base_btn.clicked.connect(self._load_base_recipe_template)
-        customer_layout.addWidget(self.load_base_btn)
         self.customer_recipe_table = self._create_recipe_table()
         customer_layout.addWidget(self.customer_recipe_table, 1)
         self.recipe_tabs.addTab(customer_tab, "Clientes")
@@ -1810,12 +1806,15 @@ class RecipesPage(QWidget):
         scale_btn.setProperty("btnRole", "primary")
         tech_recipe_btn = QPushButton("Técnica")
         tech_recipe_btn.setProperty("btnRole", "secondary")
+        self.load_base_btn = QPushButton("Cargar")
+        self.load_base_btn.setProperty("btnRole", "success")
         line_button_style = "min-height: 26px; max-height: 26px; padding: 0 8px;"
         for btn, min_width in (
             (add_line_btn, 74),
             (del_line_btn, 78),
             (scale_btn, 74),
             (tech_recipe_btn, 74),
+            (self.load_base_btn, 74),
         ):
             btn.setFixedHeight(26)
             btn.setMinimumWidth(min_width)
@@ -1824,10 +1823,13 @@ class RecipesPage(QWidget):
         del_line_btn.clicked.connect(self._remove_line)
         scale_btn.clicked.connect(self._scale_recipe)
         tech_recipe_btn.clicked.connect(self._open_recipe_technical)
+        self.load_base_btn.clicked.connect(self._load_base_recipe_template)
         line_actions.addWidget(add_line_btn)
         line_actions.addWidget(del_line_btn)
         line_actions.addWidget(scale_btn)
         line_actions.addWidget(tech_recipe_btn)
+        line_actions.addWidget(self.load_base_btn)
+        self.load_base_btn.setVisible(False)
         line_actions.addStretch()
         line_actions.addSpacing(10)
         line_actions.addWidget(QLabel("Proceso"))
@@ -2699,6 +2701,7 @@ class RecipesPage(QWidget):
     def _on_recipe_tab_changed(self) -> None:
         if not hasattr(self, "nombre_input"):
             return
+        self.load_base_btn.setVisible(self.recipe_tabs.currentIndex() == 1)
         self._flush_autosave()
         self.current_recipe_is_ireks = self.recipe_tabs.currentIndex() == 0
         self._new_recipe()
