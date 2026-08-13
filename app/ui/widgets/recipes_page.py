@@ -3130,7 +3130,6 @@ class RecipesPage(QWidget):
             self.version_input.setText(receta.version)
             self.estado_input.setText(receta.estado)
             self.masa_spin.setValue(receta.masa_final_deseada_g)
-            self.peso_spin.setValue(receta.peso_pieza_g)
             self.piezas_spin.setValue(receta.numero_piezas)
             self.merma_spin.setValue(receta.merma_pct)
             self.observaciones_input.setPlainText(receta.observaciones)
@@ -3141,6 +3140,7 @@ class RecipesPage(QWidget):
             self._proceso_rich_html = str(self.recipe_elaboracion_data.get(self.PROCESO_RICH_HTML_KEY, "") or "").strip()
             line_processes = [_normalize_process_name(getattr(line, "proceso_nombre", "") or "Masa final") for line in aggregate.lineas]
             self._refresh_process_controls(line_processes or ["Masa final"], preserve_active=False)
+            self.peso_spin.setValue(self._technical_peso_pieza(float(receta.peso_pieza_g or 0.0)))
             self._render_lines(aggregate.lineas)
             self._update_summary(receta, aggregate.lineas)
             self._set_issues_text("")
@@ -3670,11 +3670,20 @@ class RecipesPage(QWidget):
 
     @staticmethod
     def _parse_decimal(value: str) -> float:
-        normalized = str(value or "").replace("€", "").replace(".", "").replace(",", ".").strip()
+        normalized = str(value or "")
+        for suffix in ("€", "%", "g", "G", "uds", "Uds"):
+            normalized = normalized.replace(suffix, "")
+        normalized = normalized.replace(".", "").replace(",", ".").strip()
         try:
             return float(normalized) if normalized else 0.0
         except ValueError:
             return 0.0
+
+    def _technical_peso_pieza(self, fallback: float = 0.0) -> float:
+        process_key = f"proceso::{self._current_active_process()}::peso_pieza"
+        value = self.recipe_escandallo_data.get(process_key) or self.recipe_escandallo_data.get("peso_pieza", "")
+        peso_pieza = self._parse_decimal(value)
+        return peso_pieza if peso_pieza > 0 else fallback
 
     def _on_line_item_changed(self, item: QTableWidgetItem) -> None:
         if self._is_loading_recipe:
