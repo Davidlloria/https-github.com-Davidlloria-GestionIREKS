@@ -285,6 +285,14 @@ QComboBox:disabled {
     border-color: #E1E7EF;
 }
 
+QPushButton#customerRecipeFilterClearButton {
+    min-width: 34px;
+    max-width: 34px;
+    min-height: 34px;
+    max-height: 34px;
+    padding: 0;
+}
+
 QTableView,
 QListView,
 QTreeView,
