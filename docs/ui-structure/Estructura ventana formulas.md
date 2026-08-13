@@ -68,18 +68,19 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
             └── editor_tabs (QTabWidget, objectName `recipeEditorTabs`, contenedor y paneles de pestaña fondo transparente, sin borde)
                 ├── pestaña Receta (tab no seleccionado fondo #F7FAFD, borde #DDE5F0; seleccionado fondo #FFFFFF, borde inferior #2563EB)
                 │   ├── receta_tab / receta_left_panel (QWidget, fondo transparente, sin borde)
+                │   │   ├── recipe_ribbon (QFrame, objectName `recipeRibbon`, fondo transparente, sin borde)
+                │   │   │   ├── Escalar (QPushButton, icono `scale.svg`, estilo estándar primary)
+                │   │   │   ├── Técnica (QPushButton, icono `cooking-pot.svg`, estilo estándar secondary)
+                │   │   │   ├── Cargar (QPushButton, icono `download.svg`, estilo estándar success; visible solo en la pestaña Clientes)
+                │   │   │   ├── Pdf (QPushButton, icono `file-text.svg`, estilo estándar secondary)
+                │   │   │   └── Excel (QPushButton, icono `sheet.svg`, estilo estándar secondary)
+                │   │   ├── recipe_process_row (QWidget, transparente, sin borde; situado bajo `recipeRibbon`)
+                │   │   │   ├── QLabel "Proceso" (fondo transparente, sin borde)
+                │   │   │   ├── active_process_combo (QComboBox editable, fondo #FFFFFF, borde #C8D2DF, radio 6 px, alto 30 px)
+                │   │   │   ├── + (QPushButton, fondo #5BBE6A, borde #5BBE6A, radio 6 px, alto 30 px)
+                │   │   │   └── - (QPushButton, fondo #D96464, borde #D96464, radio 6 px, alto 30 px)
                 │   │   ├── lines_group (QGroupBox "Líneas de receta", fondo #FFFFFF, borde #D8E0EA, radio 8 px)
-                │   │   │   ├── acciones de línea (QHBoxLayout, transparente, sin borde)
-                │   │   │   │   ├── Añadir (QPushButton, fondo #5BBE6A, borde #5BBE6A, radio 6 px)
-                │   │   │   │   ├── Eliminar (QPushButton, fondo #D96464, borde #D96464, radio 6 px)
-                │   │   │   │   ├── Escalar (QPushButton, fondo #2563EB, borde #2563EB, radio 6 px)
-                │   │   │   │   ├── Técnica (QPushButton, fondo #F3F6FA, borde #D7DEE8, radio 6 px)
-                │   │   │   │   ├── Cargar (QPushButton, fondo #5BBE6A, borde #5BBE6A, radio 6 px; visible solo en la pestaña Clientes)
-                │   │   │   │   ├── QLabel "Proceso" (fondo transparente, sin borde)
-                │   │   │   │   ├── active_process_combo (QComboBox editable, fondo #FFFFFF, borde #C8D2DF, radio 6 px)
-                │   │   │   │   ├── + (QPushButton, fondo #5BBE6A, borde #5BBE6A, radio 6 px)
-                │   │   │   │   └── - (QPushButton, fondo #D96464, borde #D96464, radio 6 px)
-                │   │   │   └── lines_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, alto fijo para 10 filas mínimas)
+                │   │   │   └── lines_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, alto fijo para 10 filas mínimas; menú contextual: Añadir fila y Eliminar fila)
                 │   │   │       ├── Ingrediente (stretch; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
                 │   │   │       ├── Nota (108 px; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
                 │   │   │       ├── Cantidad (86 px; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
@@ -97,7 +98,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
                 │   │   ├── escandallo_table (QTableWidget, columnas Ingrediente, Cantidad, % panadero, €/kg y €/ingrediente; €/kg editable)
                 │   │   └── escandallo_totals_frame (QFrame azul #2F80ED, radio 8 px) → escandallo_totals_table (QTableWidget transparente, totales sin barras de desplazamiento y columnas sincronizadas con la tabla)
                 │   └── total_panel (QFrame, objectName `totalPanel`, fondo #FFFFFF, borde #D8E0EA, radio 8 px, ancho 300 px; a la derecha y con la misma altura que escandallo_group)
-                │       └── píldoras superiores, texto ampliado: Total masa (valor técnico), Peso por pieza (QLineEdit editable y sincronizado bidireccionalmente con la ficha técnica) y Total piezas (Total masa / Peso por pieza, mismo rendimiento técnico)
+                │       └── píldoras superiores, texto ampliado: Total masa (valor técnico), Peso por pieza (QLineEdit editable y sincronizado bidireccionalmente con la ficha técnica), Total piezas (Total masa / Peso por pieza, mismo rendimiento técnico) y Coste unitario (mismo cálculo de la ficha técnica)
                 │   └── escandallo_summary_group (QGroupBox sin etiqueta, fondo #FFFFFF, borde #D8E0EA, radio 8 px)
                 │       └── píldoras centradas verticalmente y sin borde interno: texto 13 px; Total masa #DBEAFE, Peso por pieza #DCFCE7, Total piezas #FEF3C7 y Coste unitario #F3E8FF
                 ├── pestaña Proceso (tab no seleccionado fondo #F7FAFD, borde #DDE5F0; seleccionado fondo #FFFFFF, borde inferior #2563EB)
@@ -126,12 +127,13 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 - Las tablas de recetas son de solo lectura, ordenables y cargan la receta al seleccionar una fila.
 - El encabezado real conserva más datos que los visibles en esta composición: cliente, código, versión, estado, masa deseada, peso de pieza, número de piezas y merma se mantienen en el modelo y se usan en los flujos de cálculo y guardado.
 - `lines_table` tiene al menos 10 filas, permite editar cantidad, unidad, nota y proceso. Un doble clic sobre ingrediente abre la búsqueda de ingrediente o de proceso origen.
+- El menú contextual de `lines_table` ofrece `Añadir fila` y `Eliminar fila`. `Añadir fila` ejecuta el mismo flujo que la acción de añadir anterior: abre `IngredientSearchDialog`; `Eliminar fila` elimina la fila pulsada y mantiene el mínimo de 10 filas.
 - El selector de procesos filtra las líneas visibles. `Masa final` siempre existe y no se puede eliminar; eliminar otro proceso solicita el proceso de sustitución para sus líneas.
-- Añadir una línea abre `IngredientSearchDialog`; puede insertar un ingrediente o reutilizar la cantidad de un proceso anterior como subproceso.
+- La incorporación de una línea desde el menú contextual abre `IngredientSearchDialog`; puede insertar un ingrediente o reutilizar la cantidad de un proceso anterior como subproceso.
 - Cada modificación de línea recalcula el resumen y programa autosave. El autosave usa un temporizador de 450 ms y también se vacía al ocultar/cerrar la página o cambiar de receta/pestaña.
 - `Recalcular` sincroniza categorías, calcula la receta, actualiza las líneas y el resumen, y conserva incidencias en memoria.
 - El resumen se calcula sobre el proceso principal (`Masa final` si existe): masa total, harinas, líquidos e hidratación. La tabla nutricional se recalcula por 100 g cuando hay información nutricional disponible.
-- `Técnica` abre la ficha técnica de la receta, donde se editan escandallo y elaboración y se exportan PDFs simple o extendido; al aceptar, la ficha persiste inmediatamente los cambios.
+- `Técnica` abre la ficha técnica de la receta, donde se editan escandallo y elaboración y se exportan PDFs simple o extendido; al aceptar, la ficha persiste inmediatamente los cambios. Peso por pieza y coste unitario se reflejan en las píldoras de `total_panel`.
 - La pestaña `Proceso` abre un editor ampliado con doble clic o `Ctrl+Shift+P`; incluye la opción de generar texto con ChatGPT mediante `OpenAIProcessService`.
 - La pestaña `Imagenes` permite añadir, quitar, marcar imagen principal, previsualizar con doble clic y reordenar imágenes mediante arrastre; el orden se guarda con la receta.
 - `Guardar` valida nombre y, para recetas de cliente, cliente seleccionado. `Guardar como versión` pide un comentario. `Duplicar` clona la receta actual y `Eliminar` solicita confirmación.
@@ -145,6 +147,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 - El tamaño inicial del splitter es aproximadamente 332 px / 930 px.
 - `header_row`, `recipe_header_box` y `customer_header_box` tienen alto fijo de 64 px.
 - Los grupos de cabecera se posicionan de forma absoluta: receta en `0,0` y cliente en `468,0`; ambos con ancho 460 px.
+- `recipeRibbon` se sitúa antes de `lines_group`; la fila de controles de proceso se sitúa inmediatamente debajo. El selector y los botones de proceso tienen alto fijo de 30 px.
 - `lines_table` tiene una altura fija equivalente a cabecera más 10 filas de 30 px, para mantener un editor de líneas compacto y estable.
 - `nutrition_panel` tiene ancho mínimo y máximo de 272 px; sus columnas miden 146 px y 88 px.
 - Las píldoras del resumen técnico miden 150 x 48 px.
