@@ -45,6 +45,7 @@ from app.services.openai_process_service import OpenAIProcessService
 from app.services import PdfService
 from app.services.recipe_active_flow_service import RecipeActiveFlowService, RecipeActivePayload
 from app.services.recipe_service import RecipeService
+from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
 from app.viewmodels import IngredientChoice
 
 
@@ -1697,6 +1698,44 @@ class RecipesPage(QWidget):
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
+        root.setContentsMargins(14, 14, 14, 14)
+        root.setSpacing(10)
+
+        ribbon, ribbon_layout = create_standard_top_ribbon()
+        self.new_recipe_btn = create_standard_ribbon_button("Nueva", role="success", icon_name="plus.svg")
+        self.save_recipe_btn = create_standard_ribbon_button("Guardar", role="primary", icon_name="save.svg")
+        self.save_version_btn = create_standard_ribbon_button("Versión", role="warning", icon_name="history.svg")
+        self.duplicate_recipe_btn = create_standard_ribbon_button("Duplicar", role="secondary", icon_name="file-text.svg")
+        self.delete_recipe_btn = create_standard_ribbon_button("Eliminar", role="danger", icon_name="trash.svg")
+        self.recalculate_recipe_btn = create_standard_ribbon_button("Recalcular", role="info", icon_name="refresh-cw.svg")
+        self.print_recipe_btn = create_standard_ribbon_button("Imprimir", role="secondary", icon_name="printer.svg")
+        self.export_pdf_btn = create_standard_ribbon_button("PDF", role="secondary", icon_name="file-text.svg")
+        self.export_excel_btn = create_standard_ribbon_button("Excel", role="secondary", icon_name="sheet.svg")
+
+        self.new_recipe_btn.clicked.connect(self._new_recipe)
+        self.save_recipe_btn.clicked.connect(self._save_recipe)
+        self.save_version_btn.clicked.connect(self._save_version)
+        self.duplicate_recipe_btn.clicked.connect(self._duplicate_recipe)
+        self.delete_recipe_btn.clicked.connect(self._delete_recipe)
+        self.recalculate_recipe_btn.clicked.connect(self._recalculate)
+        self.print_recipe_btn.clicked.connect(self._print_recipe)
+        self.export_pdf_btn.clicked.connect(self._export_pdf)
+        self.export_excel_btn.clicked.connect(self._export_excel)
+
+        for button in (
+            self.new_recipe_btn,
+            self.save_recipe_btn,
+            self.save_version_btn,
+            self.duplicate_recipe_btn,
+            self.delete_recipe_btn,
+            self.recalculate_recipe_btn,
+            self.print_recipe_btn,
+            self.export_pdf_btn,
+            self.export_excel_btn,
+        ):
+            ribbon_layout.addWidget(button)
+        ribbon_layout.addStretch(1)
+        root.addWidget(ribbon)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setObjectName("recipesMainSplitter")
@@ -1745,34 +1784,6 @@ class RecipesPage(QWidget):
         splitter.setChildrenCollapsible(False)
         splitter.setHandleWidth(0)
         splitter.setSizes([332, 930])
-
-        actions = QHBoxLayout()
-        for label, handler in [
-            ("Nueva", self._new_recipe),
-            ("Guardar", self._save_recipe),
-            ("Guardar como version", self._save_version),
-            ("Duplicar", self._duplicate_recipe),
-            ("Eliminar", self._delete_recipe),
-            ("Recalcular", self._recalculate),
-            ("Imprimir", self._print_recipe),
-            ("Exportar PDF", self._export_pdf),
-            ("Exportar Excel", self._export_excel),
-        ]:
-            btn = QPushButton(label)
-            if label == "Nueva":
-                btn.setProperty("btnRole", "success")
-            elif label in {"Guardar", "Recalcular"}:
-                btn.setProperty("btnRole", "primary")
-            elif label == "Guardar como version":
-                btn.setProperty("btnRole", "warning")
-            elif label == "Eliminar":
-                btn.setProperty("btnRole", "danger")
-            else:
-                btn.setProperty("btnRole", "secondary")
-            btn.clicked.connect(handler)
-            actions.addWidget(btn)
-        actions.addStretch()
-        right_layout.addLayout(actions)
 
         self.header_row = QWidget()
         self.header_row.setObjectName("recipesHeaderRow")
