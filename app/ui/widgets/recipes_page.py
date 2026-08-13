@@ -2280,27 +2280,26 @@ class RecipesPage(QWidget):
                 "QLabel { background: transparent; border: none; color: #16325C; }"
                 "QLineEdit { background: transparent; border: none; color: #16325C; font-weight: 800; }"
             )
-            pill.setFixedHeight(62)
+            pill.setFixedHeight(72)
             pill_layout = QVBoxLayout(pill)
             pill_layout.setContentsMargins(12, 7, 12, 7)
             pill_layout.setSpacing(0)
             label = QLabel(label_text)
-            label.setStyleSheet("font-size: 13px; color: #51627A;")
+            label.setStyleSheet("font-size: 16px; color: #51627A;")
             pill_layout.addWidget(label)
             pill_layout.addWidget(value_widget)
             return pill
 
         self.total_panel_total_masa_lbl = QLabel("0,00 g")
         self.total_panel_total_masa_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.total_panel_total_masa_lbl.setStyleSheet("font-size: 15px; font-weight: 800;")
+        self.total_panel_total_masa_lbl.setStyleSheet("font-size: 18px; font-weight: 800;")
         self.total_panel_peso_pieza_input = QLineEdit()
         self.total_panel_peso_pieza_input.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.total_panel_peso_pieza_input.setStyleSheet("font-size: 15px; font-weight: 800;")
+        self.total_panel_peso_pieza_input.setStyleSheet("font-size: 18px; font-weight: 800;")
         self.total_panel_peso_pieza_input.editingFinished.connect(self._on_total_panel_peso_pieza_changed)
         self.total_panel_total_piezas_lbl = QLabel("0 Uds")
         self.total_panel_total_piezas_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.total_panel_total_piezas_lbl.setStyleSheet("font-size: 15px; font-weight: 800;")
-        total_panel_layout.addStretch(1)
+        self.total_panel_total_piezas_lbl.setStyleSheet("font-size: 18px; font-weight: 800;")
         total_panel_layout.addWidget(total_panel_pill("Total masa", self.total_panel_total_masa_lbl, "#DBEAFE"))
         total_panel_layout.addWidget(total_panel_pill("Peso por pieza", self.total_panel_peso_pieza_input, "#DCFCE7"))
         total_panel_layout.addWidget(total_panel_pill("Total piezas", self.total_panel_total_piezas_lbl, "#FEF3C7"))
@@ -3319,6 +3318,7 @@ class RecipesPage(QWidget):
         updated_lines, escandallo_payload, elaboracion_payload = dialog.get_payload()
         self.recipe_escandallo_data = escandallo_payload
         self.recipe_elaboracion_data = elaboracion_payload
+        self.peso_spin.setValue(float(dialog.peso_pieza_g or 0.0))
 
         for idx, row in enumerate(source_rows):
             if idx >= len(updated_lines):
@@ -3332,6 +3332,7 @@ class RecipesPage(QWidget):
         # Persist immediately after closing technical sheet so values survive app close/reopen.
         self._autosave_timer.stop()
         self._auto_recalculate_summary()
+        self._refresh_escandallo_table()
         self._perform_autosave()
 
     def _scale_recipe(self) -> None:
@@ -3645,6 +3646,9 @@ class RecipesPage(QWidget):
     def _on_total_panel_peso_pieza_changed(self) -> None:
         peso_pieza = self._parse_decimal(self.total_panel_peso_pieza_input.text())
         self.peso_spin.setValue(peso_pieza)
+        peso_pieza_text = self._format_number(peso_pieza, 2) if peso_pieza > 0 else ""
+        self.recipe_escandallo_data["peso_pieza"] = peso_pieza_text
+        self.recipe_escandallo_data[f"proceso::{self._current_active_process()}::peso_pieza"] = peso_pieza_text
         self._refresh_escandallo_table()
         self._schedule_autosave()
 
