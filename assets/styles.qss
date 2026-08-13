@@ -28,6 +28,12 @@ QTabWidget#recipeEditorTabs::pane {
     border: none;
 }
 
+QTabWidget#recipeEditorTabs QStackedWidget,
+QWidget#recipeEditorTabPage {
+    background-color: transparent;
+    border: none;
+}
+
 QSplitter#recipesMainSplitter,
 QWidget#recipesContentPanel,
 QWidget#recipesImagesRibbon {

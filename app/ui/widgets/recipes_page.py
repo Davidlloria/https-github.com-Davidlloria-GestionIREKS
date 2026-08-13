@@ -2185,6 +2185,8 @@ class RecipesPage(QWidget):
         editor_tabs = QTabWidget()
         editor_tabs.setObjectName("recipeEditorTabs")
         receta_tab = QWidget()
+        receta_tab.setObjectName("recipeEditorTabPage")
+        receta_tab.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         receta_tab_layout = QHBoxLayout(receta_tab)
         receta_tab_layout.setContentsMargins(0, 0, 0, 0)
         receta_tab_layout.setSpacing(8)
@@ -2200,6 +2202,8 @@ class RecipesPage(QWidget):
         editor_tabs.addTab(receta_tab, "Receta")
 
         escandallo_tab = QWidget()
+        escandallo_tab.setObjectName("recipeEditorTabPage")
+        escandallo_tab.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         escandallo_layout = QVBoxLayout(escandallo_tab)
         escandallo_layout.setContentsMargins(0, 0, 0, 0)
         escandallo_layout.setSpacing(6)
@@ -2294,6 +2298,8 @@ class RecipesPage(QWidget):
         editor_tabs.addTab(escandallo_tab, "Escandallo")
 
         proceso_tab = QWidget()
+        proceso_tab.setObjectName("recipeEditorTabPage")
+        proceso_tab.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         proceso_tab_layout = QVBoxLayout(proceso_tab)
         proceso_tab_layout.setContentsMargins(0, 0, 0, 0)
         proceso_tab_layout.setSpacing(0)
@@ -2301,6 +2307,8 @@ class RecipesPage(QWidget):
         editor_tabs.addTab(proceso_tab, "Proceso")
 
         observaciones_tab = QWidget()
+        observaciones_tab.setObjectName("recipeEditorTabPage")
+        observaciones_tab.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         observaciones_tab_layout = QVBoxLayout(observaciones_tab)
         observaciones_tab_layout.setContentsMargins(0, 0, 0, 0)
         observaciones_tab_layout.setSpacing(0)
@@ -2308,6 +2316,8 @@ class RecipesPage(QWidget):
         editor_tabs.addTab(observaciones_tab, "Observaciones")
 
         imagenes_tab = QWidget()
+        imagenes_tab.setObjectName("recipeEditorTabPage")
+        imagenes_tab.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.images_ribbon = QWidget(imagenes_tab)
         self.images_ribbon.setObjectName("recipesImagesRibbon")
         self.images_ribbon.setGeometry(0, 0, 928, 56)
