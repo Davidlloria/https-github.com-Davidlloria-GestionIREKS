@@ -291,6 +291,22 @@ QPushButton#customerRecipeFilterClearButton {
     min-height: 34px;
     max-height: 34px;
     padding: 0;
+    background-color: #D96464;
+    color: #FFFFFF;
+    border: 1px solid #FFFFFF;
+    border-radius: 6px;
+}
+
+QPushButton#customerRecipeFilterClearButton:hover {
+    background-color: #C64F4F;
+    color: #FFFFFF;
+    border-color: #FFFFFF;
+}
+
+QPushButton#customerRecipeFilterClearButton:disabled {
+    background-color: #F7CACA;
+    color: #FFFFFF;
+    border-color: #FFFFFF;
 }
 
 QTableView,

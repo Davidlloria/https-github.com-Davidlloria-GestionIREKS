@@ -1685,6 +1685,7 @@ class RecipesPage(QWidget):
         self.customer_filter_input.setObjectName("customerRecipeFilterInput")
         self.customer_filter_input.setPlaceholderText("Filtrar clientes...")
         self.customer_filter_input.setFixedHeight(34)
+        self.customer_filter_input.installEventFilter(self)
         self.customer_filter_input.textChanged.connect(self._on_customer_filter_text_changed)
         self.customer_filter_input.returnPressed.connect(self._select_first_customer_filter_result)
         customer_filter_row.addWidget(self.customer_filter_input, 1)
@@ -2561,6 +2562,11 @@ class RecipesPage(QWidget):
         spin.setRange(min_value, max_value)
         spin.setDecimals(decimals)
         return spin
+
+    def eventFilter(self, watched, event) -> bool:  # type: ignore[override]
+        if watched is self.customer_filter_input and event.type() == QEvent.Type.FocusIn:
+            QTimer.singleShot(0, self.customer_filter_input.selectAll)
+        return super().eventFilter(watched, event)
 
     def _load_customers(self) -> None:
         customers = self.recipe_service.list_customers()
