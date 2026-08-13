@@ -2200,6 +2200,10 @@ class RecipesPage(QWidget):
         escandallo_layout = QVBoxLayout(escandallo_tab)
         escandallo_layout.setContentsMargins(0, 0, 0, 0)
         escandallo_layout.setSpacing(6)
+        escandallo_group = QGroupBox("Escandallo")
+        escandallo_group_layout = QVBoxLayout(escandallo_group)
+        escandallo_group_layout.setContentsMargins(8, 8, 8, 8)
+        escandallo_group_layout.setSpacing(6)
         self.escandallo_table = QTableWidget(0, 5)
         self.escandallo_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.escandallo_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -2211,7 +2215,7 @@ class RecipesPage(QWidget):
             self.escandallo_table.setColumnWidth(column, width)
         self.escandallo_table.itemChanged.connect(self._on_escandallo_item_changed)
         escandallo_header.sectionResized.connect(lambda *_args: self._refresh_escandallo_table())
-        escandallo_layout.addWidget(self.escandallo_table, 1)
+        escandallo_group_layout.addWidget(self.escandallo_table, 1)
         self.escandallo_totals_table = QTableWidget(1, 5)
         self.escandallo_totals_table.horizontalHeader().setVisible(False)
         self.escandallo_totals_table.verticalHeader().setVisible(False)
@@ -2225,7 +2229,8 @@ class RecipesPage(QWidget):
             "QTableWidget { background-color: #2F80ED; border: none; border-radius: 0; }"
             "QTableWidget::item { background-color: #2F80ED; color: #FFFFFF; border: none; padding: 0 8px; }"
         )
-        escandallo_layout.addWidget(self.escandallo_totals_table)
+        escandallo_group_layout.addWidget(self.escandallo_totals_table)
+        escandallo_layout.addWidget(escandallo_group, 1)
         editor_tabs.addTab(escandallo_tab, "Escandallo")
 
         proceso_tab = QWidget()
