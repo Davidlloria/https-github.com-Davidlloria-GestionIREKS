@@ -90,11 +90,12 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
                 │   └── nutrition_panel (QGroupBox "Valores nutricionales", fondo #FFFFFF, borde #D8E0EA, radio 8 px, ancho 272 px)
                 │       └── nutrition_table (QTableWidget, fondo transparente, sin borde, 8 filas, valores por 100 g; cabecera fondo #E6EAF0, sin borde)
                 ├── pestaña Escandallo (QWidget, fondo transparente, sin borde)
-                │   └── escandallo_group (QGroupBox "Escandallo", fondo #FFFFFF, borde #D8E0EA, radio 8 px)
-                │       ├── escandallo_table (QTableWidget, columnas Ingrediente, Cantidad, % panadero, €/kg y €/ingrediente; €/kg editable)
-                │       └── escandallo_totals_table (QTableWidget, fila de totales azul #2F80ED)
+                │   ├── escandallo_group (QGroupBox "Escandallo", fondo #FFFFFF, borde #D8E0EA, radio 8 px; ocupa el lado izquierdo)
+                │   │   ├── escandallo_table (QTableWidget, columnas Ingrediente, Cantidad, % panadero, €/kg y €/ingrediente; €/kg editable)
+                │   │   └── escandallo_totals_table (QTableWidget, fila de totales azul #2F80ED)
+                │   └── total_panel (QFrame, objectName `totalPanel`, fondo #FFFFFF, borde #D8E0EA, radio 8 px, ancho 300 px; a la derecha y con la misma altura que escandallo_group)
                 │   └── escandallo_summary_group (QGroupBox "Resumen", fondo #FFFFFF, borde #D8E0EA, radio 8 px)
-                │       └── píldoras: Total masa, Peso por pieza, Total piezas y Coste unitario
+                │       └── píldoras sin borde interno: Total masa #DBEAFE, Peso por pieza #DCFCE7, Total piezas #FEF3C7 y Coste unitario #F3E8FF
                 ├── pestaña Proceso (tab no seleccionado fondo #F7FAFD, borde #DDE5F0; seleccionado fondo #FFFFFF, borde inferior #2563EB)
                 │   └── process_group (QGroupBox "Proceso", fondo #FFFFFF, borde #D8E0EA, radio 8 px)
                 │       └── proceso_input (ExpandablePlainTextEdit, fondo #F8FAFD, borde #CAD3DF, radio 6 px)

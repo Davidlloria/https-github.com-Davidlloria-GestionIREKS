@@ -2232,7 +2232,16 @@ class RecipesPage(QWidget):
             "QTableWidget::item { background-color: #2F80ED; color: #FFFFFF; border: none; padding: 0 8px; }"
         )
         escandallo_group_layout.addWidget(self.escandallo_totals_table)
-        escandallo_layout.addWidget(escandallo_group, 1)
+        escandallo_content_row = QHBoxLayout()
+        escandallo_content_row.setContentsMargins(0, 0, 0, 0)
+        escandallo_content_row.setSpacing(8)
+        escandallo_content_row.addWidget(escandallo_group, 1)
+        self.total_panel = QFrame()
+        self.total_panel.setObjectName("totalPanel")
+        self.total_panel.setFixedWidth(300)
+        self.total_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+        escandallo_content_row.addWidget(self.total_panel)
+        escandallo_layout.addLayout(escandallo_content_row, 1)
 
         self.escandallo_summary_group = QGroupBox("Resumen")
         self.escandallo_summary_group.setObjectName("escandalloSummaryGroup")
@@ -2250,15 +2259,17 @@ class RecipesPage(QWidget):
             self.escandallo_coste_unitario_lbl,
         ):
             label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        pill_style = (
-            "QFrame { background-color: #F8FAFD; border: 1px solid #CAD3DF; border-radius: 14px; }"
-            "QLabel[pillLabel='true'] { color: #51627A; font-size: 11px; }"
-            "QLabel[pillValue='true'] { color: #16325C; font-size: 12px; font-weight: 800; }"
-        )
-
-        def escandallo_pill(label_text: str, value_label: QLabel) -> QFrame:
+        def escandallo_pill(label_text: str, value_label: QLabel, background: str) -> QFrame:
             pill = QFrame()
-            pill.setStyleSheet(pill_style)
+            pill.setStyleSheet(
+                "QFrame {"
+                f"background-color: {background};"
+                "border: none; border-radius: 14px;"
+                "}"
+                "QLabel { background: transparent; border: none; }"
+                "QLabel[pillLabel='true'] { color: #51627A; font-size: 11px; }"
+                "QLabel[pillValue='true'] { color: #16325C; font-size: 12px; font-weight: 800; }"
+            )
             pill.setFixedSize(150, 48)
             pill_layout = QVBoxLayout(pill)
             pill_layout.setContentsMargins(10, 5, 10, 5)
@@ -2270,13 +2281,13 @@ class RecipesPage(QWidget):
             pill_layout.addWidget(value_label)
             return pill
 
-        for label_text, value_label in (
-            ("Total masa", self.escandallo_total_masa_lbl),
-            ("Peso por pieza", self.escandallo_peso_pieza_lbl),
-            ("Total piezas", self.escandallo_total_piezas_lbl),
-            ("Coste unitario", self.escandallo_coste_unitario_lbl),
+        for label_text, value_label, background in (
+            ("Total masa", self.escandallo_total_masa_lbl, "#DBEAFE"),
+            ("Peso por pieza", self.escandallo_peso_pieza_lbl, "#DCFCE7"),
+            ("Total piezas", self.escandallo_total_piezas_lbl, "#FEF3C7"),
+            ("Coste unitario", self.escandallo_coste_unitario_lbl, "#F3E8FF"),
         ):
-            escandallo_summary_layout.addWidget(escandallo_pill(label_text, value_label))
+            escandallo_summary_layout.addWidget(escandallo_pill(label_text, value_label, background))
         escandallo_summary_layout.addStretch(1)
         escandallo_layout.addWidget(self.escandallo_summary_group)
         editor_tabs.addTab(escandallo_tab, "Escandallo")

@@ -71,6 +71,12 @@ QPushButton#changeRecipeCustomerButton {
     padding: 0;
 }
 
+QFrame#totalPanel {
+    background-color: #FFFFFF;
+    border: 1px solid #D8E0EA;
+    border-radius: 8px;
+}
+
 QDialog,
 QMessageBox {
     background-color: #F4F6F9;
