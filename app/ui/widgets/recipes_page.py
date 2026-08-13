@@ -2300,9 +2300,13 @@ class RecipesPage(QWidget):
         self.total_panel_total_piezas_lbl = QLabel("0 Uds")
         self.total_panel_total_piezas_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.total_panel_total_piezas_lbl.setStyleSheet("font-size: 18px; font-weight: 800;")
+        self.total_panel_coste_unitario_lbl = QLabel("0,00 €")
+        self.total_panel_coste_unitario_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.total_panel_coste_unitario_lbl.setStyleSheet("font-size: 18px; font-weight: 800;")
         total_panel_layout.addWidget(total_panel_pill("Total masa", self.total_panel_total_masa_lbl, "#DBEAFE"))
         total_panel_layout.addWidget(total_panel_pill("Peso por pieza", self.total_panel_peso_pieza_input, "#DCFCE7"))
         total_panel_layout.addWidget(total_panel_pill("Total piezas", self.total_panel_total_piezas_lbl, "#FEF3C7"))
+        total_panel_layout.addWidget(total_panel_pill("Coste unitario", self.total_panel_coste_unitario_lbl, "#F3E8FF"))
         total_panel_layout.addStretch(1)
         escandallo_content_row.addWidget(self.total_panel)
         escandallo_layout.addLayout(escandallo_content_row, 1)
@@ -3637,11 +3641,17 @@ class RecipesPage(QWidget):
         if hasattr(self, "total_panel"):
             peso_pieza = float(self.peso_spin.value() or 0.0)
             total_piezas = total_qty_g / peso_pieza if peso_pieza > 0 else 0.0
+            costes_adicionales = sum(
+                self._parse_decimal(self._technical_escandallo_value(key))
+                for key in ("costes_fijos", "costes_variables", "otros_costes")
+            )
+            coste_unitario = (total_cost + costes_adicionales) / total_piezas if total_piezas > 0 else 0.0
             self.total_panel_total_masa_lbl.setText(f"{self._format_number(total_qty_g)} g")
             self.total_panel_peso_pieza_input.blockSignals(True)
             self.total_panel_peso_pieza_input.setText(f"{self._format_number(peso_pieza)} g" if peso_pieza > 0 else "")
             self.total_panel_peso_pieza_input.blockSignals(False)
             self.total_panel_total_piezas_lbl.setText(f"{self._format_number(total_piezas, 0)} Uds")
+            self.total_panel_coste_unitario_lbl.setText(f"{self._format_number(coste_unitario, 2)} €")
 
     def _on_total_panel_peso_pieza_changed(self) -> None:
         peso_pieza = self._parse_decimal(self.total_panel_peso_pieza_input.text())
@@ -3680,10 +3690,12 @@ class RecipesPage(QWidget):
             return 0.0
 
     def _technical_peso_pieza(self, fallback: float = 0.0) -> float:
-        process_key = f"proceso::{self._current_active_process()}::peso_pieza"
-        value = self.recipe_escandallo_data.get(process_key) or self.recipe_escandallo_data.get("peso_pieza", "")
-        peso_pieza = self._parse_decimal(value)
+        peso_pieza = self._parse_decimal(self._technical_escandallo_value("peso_pieza"))
         return peso_pieza if peso_pieza > 0 else fallback
+
+    def _technical_escandallo_value(self, key: str) -> str:
+        process_key = f"proceso::{self._current_active_process()}::{key}"
+        return self.recipe_escandallo_data.get(process_key) or self.recipe_escandallo_data.get(key, "")
 
     def _on_line_item_changed(self, item: QTableWidgetItem) -> None:
         if self._is_loading_recipe:

@@ -18,3 +18,13 @@ def test_json_to_string_dict_stringifies_keys_and_values() -> None:
 def test_parse_decimal_accepts_the_unit_suffixes_shown_in_recipe_totals() -> None:
     assert RecipesPage._parse_decimal("260,00 g") == 260.0
     assert RecipesPage._parse_decimal("12 Uds") == 12.0
+
+
+def test_technical_escandallo_value_prefers_the_active_process_value() -> None:
+    page = RecipesPage.__new__(RecipesPage)
+    page.recipe_escandallo_data = {
+        "costes_fijos": "2,00",
+        "proceso::Masa final::costes_fijos": "3,50",
+    }
+
+    assert page._technical_escandallo_value("costes_fijos") == "3,50"
