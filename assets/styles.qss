@@ -93,6 +93,23 @@ QFrame#totalPanel {
     border-radius: 8px;
 }
 
+QFrame#escandalloRibbon {
+    background-color: transparent;
+    border: none;
+}
+
+QGroupBox#escandalloGroup,
+QGroupBox#escandalloSummaryGroup {
+    margin-top: 0;
+    padding-top: 0;
+}
+
+QGroupBox#escandalloGroup::title,
+QGroupBox#escandalloSummaryGroup::title {
+    height: 0;
+    padding: 0;
+}
+
 QDialog,
 QMessageBox {
     background-color: #F4F6F9;
