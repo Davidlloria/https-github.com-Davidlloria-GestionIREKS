@@ -568,6 +568,9 @@ class MinimalRecipePdfDialog(QDialog):
         return self.escandallo_si.isChecked()
 
     def _refresh_preview(self) -> None:
+        # QPdfView conserva el documento ya cargado; ciérralo antes de reemplazar
+        # el PDF temporal para que la selección Sí/No se vea inmediatamente.
+        self.pdf_document.close()
         if self._preview_path is not None:
             try:
                 os.unlink(self._preview_path)
@@ -586,7 +589,9 @@ class MinimalRecipePdfDialog(QDialog):
         except Exception as exc:
             QMessageBox.critical(self, "Vista previa PDF", f"No se pudo generar la vista previa:\n{exc}")
             return
-        self.pdf_document.load(str(self._preview_path))
+        load_error = self.pdf_document.load(str(self._preview_path))
+        if load_error != QPdfDocument.Error.None_:
+            QMessageBox.critical(self, "Vista previa PDF", "No se pudo cargar la vista previa generada.")
 
     def cleanup_preview(self) -> None:
         self.pdf_document.close()
