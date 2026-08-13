@@ -89,6 +89,9 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
                 │   │       └── píldoras (QFrame, fondo #F8FAFD, borde #CAD3DF, radio 14 px): Masa total, Total harinas, Total líquidos e Hidratación
                 │   └── nutrition_panel (QGroupBox "Valores nutricionales", fondo #FFFFFF, borde #D8E0EA, radio 8 px, ancho 272 px)
                 │       └── nutrition_table (QTableWidget, fondo transparente, sin borde, 8 filas, valores por 100 g; cabecera fondo #E6EAF0, sin borde)
+                ├── pestaña Escandallo (QWidget, fondo transparente, sin borde)
+                │   ├── escandallo_table (QTableWidget, mismas columnas que la tabla de Receta técnica: Ingrediente, Cantidad, % panadero, €/kg y €/ingrediente; €/kg editable)
+                │   └── escandallo_totals_table (QTableWidget, fila de totales azul #2F80ED)
                 ├── pestaña Proceso (tab no seleccionado fondo #F7FAFD, borde #DDE5F0; seleccionado fondo #FFFFFF, borde inferior #2563EB)
                 │   └── process_group (QGroupBox "Proceso", fondo #FFFFFF, borde #D8E0EA, radio 8 px)
                 │       └── proceso_input (ExpandablePlainTextEdit, fondo #F8FAFD, borde #CAD3DF, radio 6 px)
@@ -110,6 +113,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 - Cambiar de pestaña fuerza el autosave pendiente, prepara una receta nueva y recarga el listado aplicable.
 - `customer_filter_input` sustituye al selector modal: al escribir consulta clientes y despliega `customer_filter_results`; al hacer clic en una fila (o pulsar Intro) filtra el listado. Limpiar el campo vuelve a mostrar recetas de todos los clientes. El campo visible de la receta permanece vacío hasta seleccionar una receta.
 - `Nueva` limpia todos los campos en IREKS. En Clientes abre `CustomerRecipeSelectionDialog`, que filtra clientes y exige seleccionar uno antes de preparar la receta nueva.
+- La pestaña `Escandallo` muestra la tabla de costes de la ficha técnica; permite ajustar el precio por kg de cada línea y actualiza sus totales.
 - `change_customer_btn` abre el selector de clientes, solicita confirmación y reasigna únicamente el cliente de una receta de cliente guardada; después actualiza el encabezado y el listado.
 - `load_base_btn` permite cargar una receta base en una receta de cliente, clonando líneas, proceso, observaciones y parámetros; no guarda hasta la acción de guardado/autosave.
 - Las tablas de recetas son de solo lectura, ordenables y cargan la receta al seleccionar una fila.

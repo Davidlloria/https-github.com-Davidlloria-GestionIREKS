@@ -1665,6 +1665,11 @@ class RecipesPage(QWidget):
     COL_CANTIDAD = 2
     COL_UNIDAD = 3
     COL_PROCESO = 4
+    ESC_COL_INGREDIENTE = 0
+    ESC_COL_CANTIDAD = 1
+    ESC_COL_PCT = 2
+    ESC_COL_EUR_KG = 3
+    ESC_COL_EUR_LINEA = 4
     MIN_LINE_ROWS = 10
     PROCESO_RICH_HTML_KEY = "__proceso_rich_html"
     IMAGES_GALLERY_KEY = "__images_gallery_json"
@@ -2190,6 +2195,38 @@ class RecipesPage(QWidget):
         receta_tab_layout.addWidget(receta_left_panel, 1)
         receta_tab_layout.addWidget(nutrition_panel)
         editor_tabs.addTab(receta_tab, "Receta")
+
+        escandallo_tab = QWidget()
+        escandallo_layout = QVBoxLayout(escandallo_tab)
+        escandallo_layout.setContentsMargins(0, 0, 0, 0)
+        escandallo_layout.setSpacing(6)
+        self.escandallo_table = QTableWidget(0, 5)
+        self.escandallo_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.escandallo_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.escandallo_table.setHorizontalHeaderLabels(["Ingrediente", "Cantidad", "% panadero", "€/kg", "€/ingrediente"])
+        escandallo_header = self.escandallo_table.horizontalHeader()
+        escandallo_header.setSectionResizeMode(self.ESC_COL_INGREDIENTE, QHeaderView.ResizeMode.Stretch)
+        for column, width in ((self.ESC_COL_CANTIDAD, 96), (self.ESC_COL_PCT, 92), (self.ESC_COL_EUR_KG, 72), (self.ESC_COL_EUR_LINEA, 108)):
+            escandallo_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+            self.escandallo_table.setColumnWidth(column, width)
+        self.escandallo_table.itemChanged.connect(self._on_escandallo_item_changed)
+        escandallo_header.sectionResized.connect(lambda *_args: self._refresh_escandallo_table())
+        escandallo_layout.addWidget(self.escandallo_table, 1)
+        self.escandallo_totals_table = QTableWidget(1, 5)
+        self.escandallo_totals_table.horizontalHeader().setVisible(False)
+        self.escandallo_totals_table.verticalHeader().setVisible(False)
+        self.escandallo_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.escandallo_totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.escandallo_totals_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.escandallo_totals_table.setFixedHeight(34)
+        self.escandallo_totals_table.setShowGrid(False)
+        self.escandallo_totals_table.setFrameShape(QFrame.Shape.NoFrame)
+        self.escandallo_totals_table.setStyleSheet(
+            "QTableWidget { background-color: #2F80ED; border: none; border-radius: 0; }"
+            "QTableWidget::item { background-color: #2F80ED; color: #FFFFFF; border: none; padding: 0 8px; }"
+        )
+        escandallo_layout.addWidget(self.escandallo_totals_table)
+        editor_tabs.addTab(escandallo_tab, "Escandallo")
 
         proceso_tab = QWidget()
         proceso_tab_layout = QVBoxLayout(proceso_tab)
@@ -3379,7 +3416,89 @@ class RecipesPage(QWidget):
 
     def _on_lines_changed(self) -> None:
         self._auto_recalculate_summary()
+        self._refresh_escandallo_table()
         self._schedule_autosave()
+
+    def _refresh_escandallo_table(self) -> None:
+        if not hasattr(self, "escandallo_table"):
+            return
+        price_by_code = self.recipe_service.std_prices_by_code()
+        table = self.escandallo_table
+        table.blockSignals(True)
+        rows: list[tuple[int, RecetaLinea, str, str]] = []
+        for source_row in range(self.lines_table.rowCount()):
+            line = self._line_from_row(source_row)
+            if line.nombre_mostrado or line.notas or line.cantidad_base_g:
+                rows.append((source_row, line, self._cell_text(source_row, self.COL_CANTIDAD), self._cell_text(source_row, self.COL_UNIDAD)))
+        table.setRowCount(len(rows))
+        total_qty_g = 0.0
+        total_pct = 0.0
+        total_cost = 0.0
+        for row, (source_row, line, cantidad_text, unidad_text) in enumerate(rows):
+            eur_kg = float(line.precio_kg_snapshot or 0.0)
+            if eur_kg <= 0 and (line.tipo_origen or "").strip().lower() == "std":
+                eur_kg = float(price_by_code.get((line.codigo_ingrediente or "").strip().lower()) or 0.0)
+            cost = (float(line.cantidad_base_g or 0.0) / 1000.0) * eur_kg
+            ingredient = (line.nombre_mostrado or "").strip()
+            if line.notas:
+                ingredient = f"{ingredient} ({line.notas})"
+            values = [
+                ingredient,
+                f"{(cantidad_text or self._format_number(line.cantidad_base_g)).strip()} {(unidad_text or 'g').strip()}".strip(),
+                f"{self._format_number(line.porcentaje_panadero, 2)} %",
+                f"{self._format_number(eur_kg, 2)} €" if eur_kg > 0 else "",
+                f"{self._format_number(cost, 2)} €" if eur_kg > 0 else "",
+            ]
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                item.setData(Qt.ItemDataRole.UserRole, source_row)
+                if column in {self.ESC_COL_INGREDIENTE, self.ESC_COL_CANTIDAD, self.ESC_COL_PCT, self.ESC_COL_EUR_LINEA}:
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                if column in {self.ESC_COL_CANTIDAD, self.ESC_COL_PCT, self.ESC_COL_EUR_KG, self.ESC_COL_EUR_LINEA}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                table.setItem(row, column, item)
+            total_qty_g += float(line.cantidad_base_g or 0.0)
+            total_pct += float(line.porcentaje_panadero or 0.0)
+            total_cost += cost
+        table.blockSignals(False)
+        self._refresh_escandallo_totals(total_qty_g, total_pct, total_cost)
+
+    def _refresh_escandallo_totals(self, total_qty_g: float, total_pct: float, total_cost: float) -> None:
+        if not hasattr(self, "escandallo_totals_table"):
+            return
+        values = ["", f"{self._format_number(total_qty_g, 2)} g", f"{self._format_number(total_pct, 2)} %", "", f"{self._format_number(total_cost, 2)} €"]
+        for column, value in enumerate(values):
+            item = QTableWidgetItem(value)
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.escandallo_totals_table.setItem(0, column, item)
+        self.escandallo_totals_table.setColumnWidth(self.ESC_COL_INGREDIENTE, self.escandallo_table.columnWidth(self.ESC_COL_INGREDIENTE))
+        for column in range(self.ESC_COL_CANTIDAD, self.ESC_COL_EUR_LINEA + 1):
+            self.escandallo_totals_table.setColumnWidth(column, self.escandallo_table.columnWidth(column))
+
+    def _on_escandallo_item_changed(self, item: QTableWidgetItem) -> None:
+        if item.column() != self.ESC_COL_EUR_KG or self._is_loading_recipe:
+            return
+        source_row = int(item.data(Qt.ItemDataRole.UserRole) or -1)
+        if source_row < 0:
+            return
+        line = self._line_from_row(source_row)
+        price = self._parse_decimal(item.text())
+        line.precio_kg_snapshot = price
+        line.coste_linea = (float(line.cantidad_base_g or 0.0) / 1000.0) * price
+        ingredient_item = self.lines_table.item(source_row, self.COL_INGREDIENTE)
+        if ingredient_item is not None:
+            ingredient_item.setData(Qt.ItemDataRole.UserRole, line.model_dump())
+        self._refresh_escandallo_table()
+        self._schedule_autosave()
+
+    @staticmethod
+    def _parse_decimal(value: str) -> float:
+        normalized = str(value or "").replace("€", "").replace(".", "").replace(",", ".").strip()
+        try:
+            return float(normalized) if normalized else 0.0
+        except ValueError:
+            return 0.0
 
     def _on_line_item_changed(self, item: QTableWidgetItem) -> None:
         if self._is_loading_recipe:
@@ -3446,6 +3565,7 @@ class RecipesPage(QWidget):
             self._set_line_row(idx, linea)
         self._ensure_min_line_rows()
         self._apply_process_filter()
+        self._refresh_escandallo_table()
 
     def _ensure_min_line_rows(self) -> None:
         while self.lines_table.rowCount() < self.MIN_LINE_ROWS:
