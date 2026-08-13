@@ -1793,7 +1793,7 @@ class RecipesPage(QWidget):
 
         self.recipe_header_box = QGroupBox("Receta")
         self.recipe_header_box.setObjectName("recipeHeaderBox")
-        self.recipe_header_box.setFixedHeight(64)
+        self.recipe_header_box.setFixedHeight(62)
         self.cliente_combo = QComboBox()
         self.cliente_combo.currentIndexChanged.connect(self._update_inline_customer_name)
         self.nombre_input = QLineEdit()
@@ -2861,7 +2861,7 @@ class RecipesPage(QWidget):
     def _layout_header_boxes_abs(self) -> None:
         if not hasattr(self, "header_row") or not hasattr(self, "recipe_header_box") or not hasattr(self, "customer_header_box"):
             return
-        self.recipe_header_box.setGeometry(0, 0, 460, 64)
+        self.recipe_header_box.setGeometry(0, 0, 460, 62)
         self.customer_header_box.setGeometry(468, 0, 460, 64)
 
     def _layout_header_fields_abs(self) -> None:
