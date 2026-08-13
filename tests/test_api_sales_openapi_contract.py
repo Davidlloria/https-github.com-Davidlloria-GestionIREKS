@@ -16,6 +16,9 @@ EXPECTED_SALES_PATHS = {
     "/sales/annual-summary/igsa/filters/families",
     "/sales/annual-summary/filters/subfamilies",
     "/sales/annual-summary/igsa/filters/subfamilies",
+    "/sales/annual-summary/clientes",
+    "/sales/annual-summary/clientes/years",
+    "/sales/annual-summary/clientes/filters/clients",
 }
 
 
@@ -36,6 +39,7 @@ def test_sales_openapi_contract_freezes_sales_paths_and_models() -> None:
 
     summary = _get_operation(spec, "/sales/annual-summary")
     igsa_summary = _get_operation(spec, "/sales/annual-summary/igsa")
+    clientes_summary = _get_operation(spec, "/sales/annual-summary/clientes")
 
     expected_summary_params = [
         "year",
@@ -67,6 +71,17 @@ def test_sales_openapi_contract_freezes_sales_paths_and_models() -> None:
     assert igsa_summary["responses"]["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/SalesAnnualSummaryResponse"
     }
+    assert _get_param_names(clientes_summary) == [
+        "year",
+        "cliente_id",
+        "producto_texto",
+        "fabricante_id",
+        "familia_id",
+        "subfamilia_id",
+    ]
+    assert clientes_summary["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/SalesClientsAnnualSummaryResponse"
+    }
 
     years = _get_operation(spec, "/sales/annual-summary/years")
     igsa_years = _get_operation(spec, "/sales/annual-summary/igsa/years")
@@ -76,6 +91,11 @@ def test_sales_openapi_contract_freezes_sales_paths_and_models() -> None:
         "$ref": "#/components/schemas/SalesYearOptionsResponse"
     }
     assert igsa_years["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/SalesYearOptionsResponse"
+    }
+    clientes_years = _get_operation(spec, "/sales/annual-summary/clientes/years")
+    assert _get_param_names(clientes_years) == []
+    assert clientes_years["responses"]["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/SalesYearOptionsResponse"
     }
 
@@ -88,6 +108,7 @@ def test_sales_openapi_contract_freezes_sales_paths_and_models() -> None:
         "/sales/annual-summary/igsa/filters/families": ["fabricante_id"],
         "/sales/annual-summary/filters/subfamilies": ["familia_id"],
         "/sales/annual-summary/igsa/filters/subfamilies": ["familia_id"],
+        "/sales/annual-summary/clientes/filters/clients": [],
     }
     for path, expected_params in filter_paths.items():
         operation = _get_operation(spec, path)
@@ -97,6 +118,5 @@ def test_sales_openapi_contract_freezes_sales_paths_and_models() -> None:
         }
 
     summary_schema = spec["components"]["schemas"]["SalesAnnualSummaryResponse"]
-    assert summary_schema["properties"]["source"]["enum"] == ["ireks", "igsa"]
+    assert summary_schema["properties"]["source"]["enum"] == ["ireks", "igsa", "clientes"]
     assert summary_schema["properties"]["source"]["default"] == "ireks"
-

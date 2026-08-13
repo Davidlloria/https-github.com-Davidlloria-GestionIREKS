@@ -1556,6 +1556,7 @@ class CustomersPage(QWidget):
                 QTableWidgetItem(str(getattr(item, "nombre", "") or "")),
             ]
             for col_idx, base_item in enumerate(base_items):
+                base_item.setData(Qt.ItemDataRole.UserRole, row_idx)
                 table.setItem(row_idx, col_idx, base_item)
             for offset, value in enumerate(values, start=2):
                 suffix = " kg" if offset in (3, 6, 9) else " €" if offset in (4, 7, 10) else ""
@@ -1620,6 +1621,21 @@ class CustomersPage(QWidget):
         dialog = CustomerSalesComparisonChartDialog(rows=rows, year=year, customer_name=customer_name, parent=parent or self)
         dialog.exec()
 
+    @staticmethod
+    def _sales_comparison_pdf_filename(year: int, customer_name: str) -> str:
+        safe_customer_name = str(customer_name or "").strip() or "Cliente"
+        return f"Comparativa - {int(year) - 1} vs {int(year)} - {safe_customer_name}.pdf"
+
+    @staticmethod
+    def _sales_comparison_rows_in_table_order(table: QTableWidget, rows: list) -> list:
+        ordered_rows: list = []
+        for table_row in range(table.rowCount()):
+            item = table.item(table_row, 0)
+            source_row = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+            if isinstance(source_row, int) and 0 <= source_row < len(rows):
+                ordered_rows.append(rows[source_row])
+        return ordered_rows or list(rows)
+
     def _export_related_sales_comparison_excel(self, *, rows: list, year: int, customer_name: str, parent: QWidget | None = None) -> None:
         if not rows:
             return
@@ -1661,8 +1677,8 @@ class CustomersPage(QWidget):
         if not rows:
             return
         safe_customer_name = customer_name.strip() or "Cliente"
-        default_name = f"Comparativa - {year - 1} vs {year} - {safe_customer_name}"
-        default = str(self.report_export_service.default_path(default_name, "pdf"))
+        filename = self._sales_comparison_pdf_filename(year, safe_customer_name)
+        default = str(self.report_export_service.default_path(Path(filename).stem, "pdf"))
         path, _ = QFileDialog.getSaveFileName(parent or self, "Guardar comparativa PDF", default, "PDF (*.pdf)")
         if not path:
             return
