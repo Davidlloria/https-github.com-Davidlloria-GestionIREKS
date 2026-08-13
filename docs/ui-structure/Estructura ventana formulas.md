@@ -63,7 +63,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
             │   │   └── nombre_input (QLineEdit, fondo #FFFFFF, borde #C8D2DF, radio 6 px, posición y=21 px, ancho 440 px)
             │   ├── header_separator (QFrame, objectName `recipesHeaderSeparator`, fondo #D7DEE8, sin borde, 1 x 48 px)
             │   └── customer_header_box (QGroupBox, objectName `customerHeaderBox`, fondo transparente, sin borde, posición y=4 px, 500 x 58 px)
-            │       ├── customer_name_value (QLabel, objectName `customerNameValue`, fondo #FFFFFF, borde #D7DEE8, radio 6 px, posición y=21 px, 440 x 34 px, visible en la pestaña Clientes)
+            │       ├── customer_name_value (QLabel, objectName `customerNameValue`, fondo #FFFFFF, borde #D7DEE8, radio 6 px, posición y=21 px, alto 34 px y ancho disponible hasta el botón, visible en la pestaña Clientes)
             │       └── change_customer_btn (QPushButton, objectName `changeRecipeCustomerButton`, icono blanco `user-round-pen.svg`, fondo azul #2563EB, borde #2563EB, 34 x 34 px; a la derecha del cliente y habilitado solo para recetas de cliente guardadas)
             └── editor_tabs (QTabWidget, pane fondo #FFFFFF, borde #D7DEE8, radio 8 px)
                 ├── pestaña Receta (tab no seleccionado fondo #F7FAFD, borde #DDE5F0; seleccionado fondo #FFFFFF, borde inferior #2563EB)

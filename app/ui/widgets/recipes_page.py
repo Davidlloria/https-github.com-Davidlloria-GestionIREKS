@@ -2990,15 +2990,17 @@ class RecipesPage(QWidget):
         if not hasattr(self, "header_row") or not hasattr(self, "recipe_header_box") or not hasattr(self, "customer_header_box"):
             return
         self.recipe_header_box.setGeometry(0, 4, 460, 58)
-        self.customer_header_box.setGeometry(468, 4, 500, 58)
+        customer_width = max(500, self.header_row.width() - 468)
+        self.customer_header_box.setGeometry(468, 4, customer_width, 58)
         self.header_separator.setGeometry(464, 8, 1, 48)
 
     def _layout_header_fields_abs(self) -> None:
         if not hasattr(self, "recipe_header_box") or not hasattr(self, "customer_header_box"):
             return
         self.nombre_input.setGeometry(10, 21, 440, 24)
-        self.customer_name_value.setGeometry(10, 21, 440, 34)
-        self.change_customer_btn.setGeometry(456, 21, 34, 34)
+        customer_field_width = max(0, self.customer_header_box.width() - 60)
+        self.customer_name_value.setGeometry(10, 21, customer_field_width, 34)
+        self.change_customer_btn.setGeometry(16 + customer_field_width, 21, 34, 34)
 
     def _change_recipe_customer(self) -> None:
         if self.recipe_tabs.currentIndex() != 1 or not self.current_recipe_id or self.current_recipe_is_ireks:

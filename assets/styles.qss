@@ -63,6 +63,14 @@ QLabel#customerNameValue {
     border-radius: 6px;
 }
 
+QPushButton#changeRecipeCustomerButton {
+    min-width: 34px;
+    max-width: 34px;
+    min-height: 34px;
+    max-height: 34px;
+    padding: 0;
+}
+
 QDialog,
 QMessageBox {
     background-color: #F4F6F9;
