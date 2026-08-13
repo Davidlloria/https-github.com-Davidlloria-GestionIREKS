@@ -93,6 +93,12 @@ QFrame#totalPanel {
     border-radius: 8px;
 }
 
+QFrame#escandalloTotalsFrame {
+    background-color: #2F80ED;
+    border: none;
+    border-radius: 8px;
+}
+
 QFrame#escandalloRibbon {
     background-color: transparent;
     border: none;

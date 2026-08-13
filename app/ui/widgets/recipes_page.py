@@ -2237,6 +2237,10 @@ class RecipesPage(QWidget):
         escandallo_header.sectionResized.connect(lambda *_args: self._refresh_escandallo_table())
         escandallo_header.geometriesChanged.connect(self._refresh_escandallo_table)
         escandallo_group_layout.addWidget(self.escandallo_table, 1)
+        self.escandallo_totals_frame = QFrame()
+        self.escandallo_totals_frame.setObjectName("escandalloTotalsFrame")
+        escandallo_totals_layout = QVBoxLayout(self.escandallo_totals_frame)
+        escandallo_totals_layout.setContentsMargins(0, 0, 0, 0)
         self.escandallo_totals_table = QTableWidget(1, 6)
         self.escandallo_totals_table.horizontalHeader().setVisible(False)
         self.escandallo_totals_table.verticalHeader().setVisible(False)
@@ -2249,10 +2253,11 @@ class RecipesPage(QWidget):
         self.escandallo_totals_table.setShowGrid(False)
         self.escandallo_totals_table.setFrameShape(QFrame.Shape.NoFrame)
         self.escandallo_totals_table.setStyleSheet(
-            "QTableWidget { background-color: #2F80ED; border: none; border-radius: 8px; }"
-            "QTableWidget::item { background-color: #2F80ED; color: #FFFFFF; border: none; padding: 0 8px; }"
+            "QTableWidget { background-color: transparent; border: none; }"
+            "QTableWidget::item { background-color: transparent; color: #FFFFFF; border: none; padding: 0 8px; }"
         )
-        escandallo_group_layout.addWidget(self.escandallo_totals_table)
+        escandallo_totals_layout.addWidget(self.escandallo_totals_table)
+        escandallo_group_layout.addWidget(self.escandallo_totals_frame)
         escandallo_content_row = QHBoxLayout()
         escandallo_content_row.setContentsMargins(0, 0, 0, 0)
         escandallo_content_row.setSpacing(8)
@@ -2261,6 +2266,45 @@ class RecipesPage(QWidget):
         self.total_panel.setObjectName("totalPanel")
         self.total_panel.setFixedWidth(300)
         self.total_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+        total_panel_layout = QVBoxLayout(self.total_panel)
+        total_panel_layout.setContentsMargins(12, 12, 12, 12)
+        total_panel_layout.setSpacing(10)
+
+        def total_panel_pill(label_text: str, value_widget: QWidget, background: str) -> QFrame:
+            pill = QFrame()
+            pill.setStyleSheet(
+                "QFrame {"
+                f"background-color: {background};"
+                "border: none; border-radius: 12px;"
+                "}"
+                "QLabel { background: transparent; border: none; color: #16325C; }"
+                "QLineEdit { background: transparent; border: none; color: #16325C; font-weight: 800; }"
+            )
+            pill.setFixedHeight(62)
+            pill_layout = QVBoxLayout(pill)
+            pill_layout.setContentsMargins(12, 7, 12, 7)
+            pill_layout.setSpacing(0)
+            label = QLabel(label_text)
+            label.setStyleSheet("font-size: 13px; color: #51627A;")
+            pill_layout.addWidget(label)
+            pill_layout.addWidget(value_widget)
+            return pill
+
+        self.total_panel_total_masa_lbl = QLabel("0,00 g")
+        self.total_panel_total_masa_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.total_panel_total_masa_lbl.setStyleSheet("font-size: 15px; font-weight: 800;")
+        self.total_panel_peso_pieza_input = QLineEdit()
+        self.total_panel_peso_pieza_input.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.total_panel_peso_pieza_input.setStyleSheet("font-size: 15px; font-weight: 800;")
+        self.total_panel_peso_pieza_input.editingFinished.connect(self._on_total_panel_peso_pieza_changed)
+        self.total_panel_total_piezas_lbl = QLabel("0 Uds")
+        self.total_panel_total_piezas_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.total_panel_total_piezas_lbl.setStyleSheet("font-size: 15px; font-weight: 800;")
+        total_panel_layout.addStretch(1)
+        total_panel_layout.addWidget(total_panel_pill("Total masa", self.total_panel_total_masa_lbl, "#DBEAFE"))
+        total_panel_layout.addWidget(total_panel_pill("Peso por pieza", self.total_panel_peso_pieza_input, "#DCFCE7"))
+        total_panel_layout.addWidget(total_panel_pill("Total piezas", self.total_panel_total_piezas_lbl, "#FEF3C7"))
+        total_panel_layout.addStretch(1)
         escandallo_content_row.addWidget(self.total_panel)
         escandallo_layout.addLayout(escandallo_content_row, 1)
 
@@ -3589,6 +3633,20 @@ class RecipesPage(QWidget):
             self.escandallo_peso_pieza_lbl.setText(f"{self._format_number(peso_pieza)} g")
             self.escandallo_total_piezas_lbl.setText(str(total_piezas))
             self.escandallo_coste_unitario_lbl.setText(f"{self._format_number(coste_unitario, 2)} €")
+        if hasattr(self, "total_panel"):
+            peso_pieza = float(self.peso_spin.value() or 0.0)
+            total_piezas = total_qty_g / peso_pieza if peso_pieza > 0 else 0.0
+            self.total_panel_total_masa_lbl.setText(f"{self._format_number(total_qty_g)} g")
+            self.total_panel_peso_pieza_input.blockSignals(True)
+            self.total_panel_peso_pieza_input.setText(f"{self._format_number(peso_pieza)} g" if peso_pieza > 0 else "")
+            self.total_panel_peso_pieza_input.blockSignals(False)
+            self.total_panel_total_piezas_lbl.setText(f"{self._format_number(total_piezas, 0)} Uds")
+
+    def _on_total_panel_peso_pieza_changed(self) -> None:
+        peso_pieza = self._parse_decimal(self.total_panel_peso_pieza_input.text())
+        self.peso_spin.setValue(peso_pieza)
+        self._refresh_escandallo_table()
+        self._schedule_autosave()
 
     def _on_escandallo_item_changed(self, item: QTableWidgetItem) -> None:
         if item.column() != self.ESC_COL_EUR_KG or self._is_loading_recipe:
