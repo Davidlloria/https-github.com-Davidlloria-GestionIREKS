@@ -1817,7 +1817,7 @@ class RecipesPage(QWidget):
         self.customer_name_value = QLabel("")
         self.customer_name_value.setObjectName("customerNameValue")
         self.customer_name_value.setParent(self.customer_header_box)
-        self.customer_name_value.setFixedHeight(24)
+        self.customer_name_value.setFixedHeight(34)
         self.customer_name_value.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.customer_name_value.setStyleSheet("color: #16325C;")
 
@@ -2869,7 +2869,7 @@ class RecipesPage(QWidget):
         if not hasattr(self, "recipe_header_box") or not hasattr(self, "customer_header_box"):
             return
         self.nombre_input.setGeometry(10, 25, 440, 24)
-        self.customer_name_value.setGeometry(10, 25, 440, 24)
+        self.customer_name_value.setGeometry(10, 25, 440, 34)
 
     def _add_ingredient(self) -> None:
         target_process = self._current_active_process()
