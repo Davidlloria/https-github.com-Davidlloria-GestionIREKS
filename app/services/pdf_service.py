@@ -611,9 +611,9 @@ class PdfService:
         story.append(self._build_minimal_recipe_table(lineas, body_style, body_right, header_style))
         if include_escandallo:
             story.append(Paragraph("ESCANDALLO", section_style))
-            story.append(self._build_minimal_escandallo_pills(receta, lineas, body_style, body_right))
-            story.append(Spacer(1, 3 * mm))
             story.append(self._build_minimal_escandallo_table(lineas, body_style, body_right, header_style))
+            story.append(Spacer(1, 3 * mm))
+            story.append(self._build_minimal_escandallo_pills(receta, lineas, body_style, body_right))
 
         doc = SimpleDocTemplate(
             str(output_path),
