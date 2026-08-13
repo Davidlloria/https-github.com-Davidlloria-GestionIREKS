@@ -47,6 +47,12 @@ QGroupBox#recipeHeaderBox {
     border: none;
 }
 
+QLabel#customerNameValue {
+    background-color: #FFFFFF;
+    border: 1px solid #D7DEE8;
+    border-radius: 6px;
+}
+
 QDialog,
 QMessageBox {
     background-color: #F4F6F9;

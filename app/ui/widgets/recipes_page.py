@@ -1815,10 +1815,11 @@ class RecipesPage(QWidget):
         self.customer_header_box = QGroupBox("Cliente")
         self.customer_header_box.setFixedHeight(64)
         self.customer_name_value = QLabel("")
+        self.customer_name_value.setObjectName("customerNameValue")
         self.customer_name_value.setParent(self.customer_header_box)
         self.customer_name_value.setFixedHeight(24)
         self.customer_name_value.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self.customer_name_value.setStyleSheet("background: transparent; border: none; color: #16325C;")
+        self.customer_name_value.setStyleSheet("color: #16325C;")
 
         self.recipe_header_box.setParent(self.header_row)
         self.customer_header_box.setParent(self.header_row)
