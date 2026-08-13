@@ -24,9 +24,8 @@ QTabWidget#recipeEditorTabs {
 }
 
 QTabWidget#recipeEditorTabs::pane {
-    background-color: #FFFFFF;
-    border: 1px solid #D7DEE8;
-    border-radius: 8px;
+    background-color: transparent;
+    border: none;
 }
 
 QSplitter#recipesMainSplitter,
