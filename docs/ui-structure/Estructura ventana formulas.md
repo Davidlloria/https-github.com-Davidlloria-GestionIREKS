@@ -137,7 +137,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 - La pestaña `Proceso` abre un editor ampliado con doble clic o `Ctrl+Shift+P`; incluye la opción de generar texto con ChatGPT mediante `OpenAIProcessService`.
 - La pestaña `Imagenes` permite añadir, quitar, marcar imagen principal, previsualizar con doble clic y reordenar imágenes mediante arrastre; el orden se guarda con la receta.
 - `Guardar` valida nombre y, para recetas de cliente, cliente seleccionado. `Guardar como versión` pide un comentario. `Duplicar` clona la receta actual y `Eliminar` solicita confirmación.
-- `Exportar PDF` exige una receta guardada y permite elegir diseño simple, extendido o mínimo. En el formato `Mínimo` primero se selecciona mediante radios excluyentes si se incluye el escandallo y después se genera una única vista previa; muestra una copia de la tabla Receta y, opcionalmente, de la tabla Escandallo. El título es el nombre de la receta. `Imprimir` y `Exportar Excel` muestran actualmente un aviso de fase futura.
+- `Exportar PDF` exige una receta guardada y permite elegir diseño simple, extendido o mínimo. En el formato `Mínimo` primero se selecciona mediante radios excluyentes si se incluye el escandallo y después se genera una única vista previa; muestra una copia de la tabla Receta y, opcionalmente, las píldoras de Total masa, Peso por pieza, Total piezas y Coste unitario junto con la tabla Escandallo. El título es el nombre de la receta. `Imprimir` y `Exportar Excel` muestran actualmente un aviso de fase futura.
 
 ## Geometría actual
 

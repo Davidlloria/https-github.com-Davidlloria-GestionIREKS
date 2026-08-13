@@ -611,6 +611,8 @@ class PdfService:
         story.append(self._build_minimal_recipe_table(lineas, body_style, body_right, header_style))
         if include_escandallo:
             story.append(Paragraph("ESCANDALLO", section_style))
+            story.append(self._build_minimal_escandallo_pills(receta, lineas, body_style, body_right))
+            story.append(Spacer(1, 3 * mm))
             story.append(self._build_minimal_escandallo_table(lineas, body_style, body_right, header_style))
 
         doc = SimpleDocTemplate(
@@ -687,6 +689,64 @@ class PdfService:
             Paragraph(f"<b>{self._fmt(total_cost, 2)} €</b>", body_right),
         ])
         return self._minimal_table(data, [65 * mm, 29 * mm, 25 * mm, 20 * mm, 37 * mm], total_row=True)
+
+    def _build_minimal_escandallo_pills(
+        self,
+        receta: Receta,
+        lineas: list[RecetaLinea],
+        body_style: ParagraphStyle,
+        body_right: ParagraphStyle,
+    ) -> Table:
+        esc = self._json_to_dict(receta.escandallo_detalle_json)
+        total_masa = float(receta.masa_total_g or sum(float(line.cantidad_base_g or 0.0) for line in lineas))
+        peso_pieza = self._to_float(esc.get("peso_pieza")) or float(receta.peso_pieza_g or 0.0)
+        total_piezas = (total_masa / peso_pieza) if peso_pieza > 0 else float(receta.numero_piezas or 0.0)
+        coste_ingredientes = sum(
+            (float(line.cantidad_base_g or 0.0) / 1000.0) * float(line.precio_kg_snapshot or 0.0)
+            for line in lineas
+        )
+        costes_adicionales = sum(
+            self._to_float(esc.get(key)) for key in ("costes_fijos", "costes_variables", "otros_costes")
+        )
+        coste_unitario = ((coste_ingredientes + costes_adicionales) / total_piezas) if total_piezas > 0 else 0.0
+        pill_data = [
+            ("TOTAL MASA", f"{self._fmt(total_masa, 2)} g", "#DBEAFE"),
+            ("PESO POR PIEZA", f"{self._fmt(peso_pieza, 2)} g", "#DCFCE7"),
+            ("TOTAL PIEZAS", f"{self._fmt(total_piezas, 0)} Uds", "#FEF3C7"),
+            ("COSTE UNITARIO", f"{self._fmt(coste_unitario, 2)} €", "#F3E8FF"),
+        ]
+        cells: list[Table] = []
+        for label, value, background in pill_data:
+            cell = Table(
+                [[Paragraph(label, body_style)], [Paragraph(f"<b>{value}</b>", body_right)]],
+                colWidths=[44 * mm],
+            )
+            cell.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(background)),
+                        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D8E0EA")),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                        ("TOPPADDING", (0, 0), (-1, -1), 4),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ]
+                )
+            )
+            cells.append(cell)
+        pills = Table([cells], colWidths=[44 * mm] * 4, hAlign="LEFT")
+        pills.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 2 * mm),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]
+            )
+        )
+        return pills
 
     @staticmethod
     def _minimal_table(data: list[list[Paragraph]], col_widths: list[float], *, total_row: bool = False) -> Table:

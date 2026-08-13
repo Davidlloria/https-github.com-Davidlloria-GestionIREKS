@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from pypdf import PdfReader
 
 from app.models import Receta, RecetaLinea
@@ -7,7 +9,13 @@ from app.services.pdf_service import PdfService
 
 
 def test_minimal_recipe_pdf_includes_recipe_and_optional_escandallo(tmp_path) -> None:
-    recipe = Receta(cliente_id="cliente-1", nombre="Pan mínimo", codigo_receta="PAN-1")
+    recipe = Receta(
+        cliente_id="cliente-1",
+        nombre="Pan mínimo",
+        codigo_receta="PAN-1",
+        peso_pieza_g=250,
+        escandallo_detalle_json=json.dumps({"costes_fijos": "1,20"}),
+    )
     lines = [
         RecetaLinea(
             receta_id=1,
@@ -29,3 +37,7 @@ def test_minimal_recipe_pdf_includes_recipe_and_optional_escandallo(tmp_path) ->
     assert "RECETA" in text
     assert "ESCANDALLO" in text
     assert "Harina" in text
+    assert "TOTAL MASA" in text
+    assert "PESO POR PIEZA" in text
+    assert "TOTAL PIEZAS" in text
+    assert "COSTE UNITARIO" in text
