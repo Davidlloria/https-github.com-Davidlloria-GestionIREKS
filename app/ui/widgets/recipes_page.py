@@ -1706,7 +1706,6 @@ class RecipesPage(QWidget):
         left_panel.setObjectName("recipesSidePanel")
         left_panel.setFixedWidth(332)
         left_layout = QVBoxLayout(left_panel)
-        left_layout.addWidget(QLabel("Recetas"))
 
         self.recipe_tabs = QTabWidget()
         self.recipe_tabs.currentChanged.connect(self._on_recipe_tab_changed)
