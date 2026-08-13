@@ -1998,6 +1998,8 @@ class RecipesPage(QWidget):
         self.lines_table.setFixedHeight(lines_table_height)
         self.lines_table.itemDoubleClicked.connect(self._on_line_double_click)
         self.lines_table.itemChanged.connect(self._on_line_item_changed)
+        self.lines_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.lines_table.customContextMenuRequested.connect(self._show_lines_context_menu)
         lines_layout.addWidget(self.lines_table)
         self._refresh_process_controls(["Masa final"], preserve_active=False)
 
@@ -3269,6 +3271,35 @@ class RecipesPage(QWidget):
         self.lines_table.removeRow(selected[0].row())
         self._ensure_min_line_rows()
         self._on_lines_changed()
+
+    def _show_lines_context_menu(self, position) -> None:
+        index = self.lines_table.indexAt(position)
+        if index.isValid():
+            self.lines_table.selectRow(index.row())
+
+        menu = QMenu(self.lines_table)
+        add_action = menu.addAction("Añadir fila")
+        remove_action = menu.addAction("Eliminar fila")
+        remove_action.setEnabled(index.isValid())
+        action = menu.exec(self.lines_table.viewport().mapToGlobal(position))
+        if action is add_action:
+            self._insert_empty_line(index.row() + 1 if index.isValid() else self.lines_table.rowCount())
+        elif action is remove_action:
+            self._remove_line()
+
+    def _insert_empty_line(self, row: int) -> None:
+        row = max(0, min(row, self.lines_table.rowCount()))
+        self.lines_table.insertRow(row)
+        self._set_line_row(
+            row,
+            RecetaLinea(
+                receta_id=self.current_recipe_id or 0,
+                orden=row + 1,
+                proceso_nombre=self._current_active_process(),
+            ),
+        )
+        self._on_lines_changed()
+        self._apply_process_filter()
 
     def _open_recipe_technical(self) -> None:
         rows_data: list[tuple[RecetaLinea, str, str]] = []
