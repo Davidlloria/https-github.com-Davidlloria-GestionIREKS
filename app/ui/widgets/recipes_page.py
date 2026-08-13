@@ -2925,14 +2925,17 @@ class RecipesPage(QWidget):
         return str(value).strip() if value is not None else ""
 
     def _on_recipe_selected(self, row: int, _col: int) -> None:
-        self._flush_autosave()
         table = self.sender() if isinstance(self.sender(), QTableWidget) else self._active_recipe_table()
         if not isinstance(table, QTableWidget):
             return
         item = table.item(row, 0)
         if not item:
             return
-        recipe_id = int(item.data(Qt.ItemDataRole.UserRole))
+        recipe_id = int(item.data(Qt.ItemDataRole.UserRole) or 0)
+        if not recipe_id:
+            return
+        self._flush_autosave()
+        self._select_recipe_in_active_table(recipe_id)
         self._load_recipe(recipe_id)
 
     def _load_recipe(self, recipe_id: int) -> None:
