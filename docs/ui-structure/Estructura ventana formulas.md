@@ -54,7 +54,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
         │               ├── Nº (52 px; item transparente, sin borde; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
         │               └── Nombre receta (stretch; item transparente, sin borde; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
         └── panel derecho (QWidget, objectName `recipesContentPanel`, fondo transparente, sin borde, ocupa el espacio restante)
-            ├── header_row (QWidget, objectName `recipesHeaderRow`, fondo transparente, sin borde, alto fijo 64 px)
+            ├── header_row (QWidget, objectName `recipesHeaderRow`, fondo #FFFFFF, borde #D7DEE8, radio 8 px, alto fijo 64 px)
             │   ├── recipe_header_box (QGroupBox "Receta", fondo #FFFFFF, borde #D8E0EA, radio 8 px, 460 x 64 px)
             │   │   └── nombre_input (QLineEdit, fondo #FFFFFF, borde #C8D2DF, radio 6 px, posición absoluta, ancho 440 px)
             │   └── customer_header_box (QGroupBox "Cliente", fondo #FFFFFF, borde #D8E0EA, radio 8 px, 460 x 64 px)

@@ -20,13 +20,18 @@ QWidget#RecipesPageRoot {
 
 QSplitter#recipesMainSplitter,
 QWidget#recipesContentPanel,
-QWidget#recipesHeaderRow,
 QWidget#recipesImagesRibbon {
     background-color: transparent;
     border: none;
 }
 
 QWidget#recipesSidePanel {
+    background-color: #FFFFFF;
+    border: 1px solid #D7DEE8;
+    border-radius: 8px;
+}
+
+QWidget#recipesHeaderRow {
     background-color: #FFFFFF;
     border: 1px solid #D7DEE8;
     border-radius: 8px;
