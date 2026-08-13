@@ -38,7 +38,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
     │   ├── Excel (QPushButton, icono `sheet.svg`, fondo #E2E8F0, borde #CBD5E1, radio 7 px, 110 x 30 px)
     │   └── espacio flexible (transparente, sin borde)
     └── splitter horizontal (objectName `recipesMainSplitter`, fondo transparente, sin borde, sin tirador visible, childrenCollapsible=False, tamaños iniciales 332 / 930)
-        ├── panel izquierdo (QWidget, objectName `recipesSidePanel`, fondo transparente, sin borde, ancho fijo 332 px)
+        ├── panel izquierdo (QWidget, objectName `recipesSidePanel`, fondo #FFFFFF, borde #D7DEE8, radio 8 px, ancho fijo 332 px)
         │   └── recipe_tabs (QTabWidget, pane fondo #FFFFFF, borde #D7DEE8, radio 8 px)
         │       ├── pestaña IREKS (tab no seleccionado fondo #F7FAFD, borde #DDE5F0; seleccionado fondo #FFFFFF, borde inferior #2563EB)
         │       │   ├── ireks_tab (QWidget, fondo transparente, sin borde)
