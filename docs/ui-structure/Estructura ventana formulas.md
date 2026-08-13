@@ -93,6 +93,8 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
                 │   └── escandallo_group (QGroupBox "Escandallo", fondo #FFFFFF, borde #D8E0EA, radio 8 px)
                 │       ├── escandallo_table (QTableWidget, columnas Ingrediente, Cantidad, % panadero, €/kg y €/ingrediente; €/kg editable)
                 │       └── escandallo_totals_table (QTableWidget, fila de totales azul #2F80ED)
+                │   └── escandallo_summary_group (QGroupBox "Resumen", fondo #FFFFFF, borde #D8E0EA, radio 8 px)
+                │       └── píldoras: Total masa, Peso por pieza, Total piezas y Coste unitario
                 ├── pestaña Proceso (tab no seleccionado fondo #F7FAFD, borde #DDE5F0; seleccionado fondo #FFFFFF, borde inferior #2563EB)
                 │   └── process_group (QGroupBox "Proceso", fondo #FFFFFF, borde #D8E0EA, radio 8 px)
                 │       └── proceso_input (ExpandablePlainTextEdit, fondo #F8FAFD, borde #CAD3DF, radio 6 px)

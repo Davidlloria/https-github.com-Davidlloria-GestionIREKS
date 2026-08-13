@@ -1846,6 +1846,8 @@ class RecipesPage(QWidget):
         self.piezas_spin = QSpinBox()
         self.piezas_spin.setRange(0, 1_000_000)
         self.piezas_spin.setValue(1)
+        self.peso_spin.valueChanged.connect(self._refresh_escandallo_table)
+        self.piezas_spin.valueChanged.connect(self._refresh_escandallo_table)
         self.merma_spin = self._double_spin(0, 100, 2)
 
         self.customer_header_box = QGroupBox("Cliente")
@@ -2231,6 +2233,52 @@ class RecipesPage(QWidget):
         )
         escandallo_group_layout.addWidget(self.escandallo_totals_table)
         escandallo_layout.addWidget(escandallo_group, 1)
+
+        self.escandallo_summary_group = QGroupBox("Resumen")
+        self.escandallo_summary_group.setObjectName("escandalloSummaryGroup")
+        escandallo_summary_layout = QHBoxLayout(self.escandallo_summary_group)
+        escandallo_summary_layout.setContentsMargins(8, 8, 8, 8)
+        escandallo_summary_layout.setSpacing(8)
+        self.escandallo_total_masa_lbl = QLabel("0,00 g")
+        self.escandallo_peso_pieza_lbl = QLabel("0,00 g")
+        self.escandallo_total_piezas_lbl = QLabel("0")
+        self.escandallo_coste_unitario_lbl = QLabel("0,00 €")
+        for label in (
+            self.escandallo_total_masa_lbl,
+            self.escandallo_peso_pieza_lbl,
+            self.escandallo_total_piezas_lbl,
+            self.escandallo_coste_unitario_lbl,
+        ):
+            label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        pill_style = (
+            "QFrame { background-color: #F8FAFD; border: 1px solid #CAD3DF; border-radius: 14px; }"
+            "QLabel[pillLabel='true'] { color: #51627A; font-size: 11px; }"
+            "QLabel[pillValue='true'] { color: #16325C; font-size: 12px; font-weight: 800; }"
+        )
+
+        def escandallo_pill(label_text: str, value_label: QLabel) -> QFrame:
+            pill = QFrame()
+            pill.setStyleSheet(pill_style)
+            pill.setFixedSize(150, 48)
+            pill_layout = QVBoxLayout(pill)
+            pill_layout.setContentsMargins(10, 5, 10, 5)
+            pill_layout.setSpacing(0)
+            label = QLabel(label_text)
+            label.setProperty("pillLabel", True)
+            value_label.setProperty("pillValue", True)
+            pill_layout.addWidget(label)
+            pill_layout.addWidget(value_label)
+            return pill
+
+        for label_text, value_label in (
+            ("Total masa", self.escandallo_total_masa_lbl),
+            ("Peso por pieza", self.escandallo_peso_pieza_lbl),
+            ("Total piezas", self.escandallo_total_piezas_lbl),
+            ("Coste unitario", self.escandallo_coste_unitario_lbl),
+        ):
+            escandallo_summary_layout.addWidget(escandallo_pill(label_text, value_label))
+        escandallo_summary_layout.addStretch(1)
+        escandallo_layout.addWidget(self.escandallo_summary_group)
         editor_tabs.addTab(escandallo_tab, "Escandallo")
 
         proceso_tab = QWidget()
@@ -3480,6 +3528,14 @@ class RecipesPage(QWidget):
         self.escandallo_totals_table.setColumnWidth(self.ESC_COL_INGREDIENTE, self.escandallo_table.columnWidth(self.ESC_COL_INGREDIENTE))
         for column in range(self.ESC_COL_CANTIDAD, self.ESC_COL_EUR_LINEA + 1):
             self.escandallo_totals_table.setColumnWidth(column, self.escandallo_table.columnWidth(column))
+        if hasattr(self, "escandallo_summary_group"):
+            peso_pieza = float(self.peso_spin.value() or 0.0)
+            total_piezas = int(self.piezas_spin.value() or 0)
+            coste_unitario = total_cost / total_piezas if total_piezas > 0 else 0.0
+            self.escandallo_total_masa_lbl.setText(f"{self._format_number(total_qty_g)} g")
+            self.escandallo_peso_pieza_lbl.setText(f"{self._format_number(peso_pieza)} g")
+            self.escandallo_total_piezas_lbl.setText(str(total_piezas))
+            self.escandallo_coste_unitario_lbl.setText(f"{self._format_number(coste_unitario, 2)} €")
 
     def _on_escandallo_item_changed(self, item: QTableWidgetItem) -> None:
         if item.column() != self.ESC_COL_EUR_KG or self._is_loading_recipe:
