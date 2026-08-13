@@ -3004,7 +3004,7 @@ class RecipesPage(QWidget):
         if not hasattr(self, "recipe_header_box") or not hasattr(self, "customer_header_box"):
             return
         self.nombre_input.setGeometry(10, 21, 440, 24)
-        customer_field_width = max(0, self.customer_header_box.width() - 55)
+        customer_field_width = max(0, self.customer_header_box.width() - 60)
         self.customer_name_value.setGeometry(10, 21, customer_field_width, 34)
         self.change_customer_btn.setGeometry(16 + customer_field_width, 21, 34, 34)
 
