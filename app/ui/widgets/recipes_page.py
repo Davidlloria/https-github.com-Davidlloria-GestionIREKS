@@ -1691,7 +1691,7 @@ class RecipesPage(QWidget):
         self.customer_filter_clear_btn = QPushButton()
         self.customer_filter_clear_btn.setObjectName("customerRecipeFilterClearButton")
         self.customer_filter_clear_btn.setProperty("btnRole", "danger")
-        self.customer_filter_clear_btn.setIcon(QIcon(str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "broom.svg")))
+        self.customer_filter_clear_btn.setIcon(QIcon(str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "eraser.svg")))
         self.customer_filter_clear_btn.setIconSize(QSize(18, 18))
         self.customer_filter_clear_btn.setFixedSize(34, 34)
         self.customer_filter_clear_btn.setToolTip("Limpiar filtro de clientes")
