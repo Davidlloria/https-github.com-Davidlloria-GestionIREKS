@@ -1871,6 +1871,7 @@ class RecipesPage(QWidget):
         self.header_separator.setObjectName("recipesHeaderSeparator")
         self.header_separator.setFrameShape(QFrame.Shape.VLine)
         self.header_separator.setFrameShadow(QFrame.Shadow.Plain)
+        self.header_row.installEventFilter(self)
         right_layout.addWidget(self.header_row)
         self._layout_header_boxes_abs()
         self._layout_header_fields_abs()
@@ -2665,6 +2666,9 @@ class RecipesPage(QWidget):
     def eventFilter(self, watched, event) -> bool:  # type: ignore[override]
         if watched is self.customer_filter_input and event.type() == QEvent.Type.FocusIn:
             QTimer.singleShot(0, self.customer_filter_input.selectAll)
+        if watched is self.header_row and event.type() == QEvent.Type.Resize:
+            self._layout_header_boxes_abs()
+            self._layout_header_fields_abs()
         return super().eventFilter(watched, event)
 
     def _load_customers(self) -> None:
@@ -2998,7 +3002,7 @@ class RecipesPage(QWidget):
         if not hasattr(self, "recipe_header_box") or not hasattr(self, "customer_header_box"):
             return
         self.nombre_input.setGeometry(10, 21, 440, 24)
-        customer_field_width = max(0, self.customer_header_box.width() - 60)
+        customer_field_width = max(0, self.customer_header_box.width() - 50)
         self.customer_name_value.setGeometry(10, 21, customer_field_width, 34)
         self.change_customer_btn.setGeometry(16 + customer_field_width, 21, 34, 34)
 
