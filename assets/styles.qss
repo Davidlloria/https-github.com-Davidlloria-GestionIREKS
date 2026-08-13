@@ -47,6 +47,16 @@ QGroupBox#recipeHeaderBox {
     border: none;
 }
 
+QGroupBox#customerHeaderBox {
+    background-color: transparent;
+    border: none;
+}
+
+QFrame#recipesHeaderSeparator {
+    background-color: #D7DEE8;
+    border: none;
+}
+
 QLabel#customerNameValue {
     background-color: #FFFFFF;
     border: 1px solid #D7DEE8;

@@ -1813,6 +1813,7 @@ class RecipesPage(QWidget):
         self.merma_spin = self._double_spin(0, 100, 2)
 
         self.customer_header_box = QGroupBox("Cliente")
+        self.customer_header_box.setObjectName("customerHeaderBox")
         self.customer_header_box.setFixedHeight(64)
         self.customer_name_value = QLabel("")
         self.customer_name_value.setObjectName("customerNameValue")
@@ -1823,6 +1824,10 @@ class RecipesPage(QWidget):
 
         self.recipe_header_box.setParent(self.header_row)
         self.customer_header_box.setParent(self.header_row)
+        self.header_separator = QFrame(self.header_row)
+        self.header_separator.setObjectName("recipesHeaderSeparator")
+        self.header_separator.setFrameShape(QFrame.Shape.VLine)
+        self.header_separator.setFrameShadow(QFrame.Shadow.Plain)
         right_layout.addWidget(self.header_row)
         self._layout_header_boxes_abs()
         self._layout_header_fields_abs()
@@ -2864,6 +2869,7 @@ class RecipesPage(QWidget):
             return
         self.recipe_header_box.setGeometry(0, 0, 460, 62)
         self.customer_header_box.setGeometry(468, 0, 460, 64)
+        self.header_separator.setGeometry(464, 8, 1, 48)
 
     def _layout_header_fields_abs(self) -> None:
         if not hasattr(self, "recipe_header_box") or not hasattr(self, "customer_header_box"):
