@@ -1884,70 +1884,50 @@ class RecipesPage(QWidget):
         self._layout_header_boxes_abs()
         self._layout_header_fields_abs()
 
-        lines_group = QGroupBox("Lineas de receta")
-        lines_layout = QVBoxLayout(lines_group)
-        lines_layout.setSpacing(6)
-        line_actions = QHBoxLayout()
-        line_actions.setContentsMargins(0, 0, 0, 0)
-        line_actions.setSpacing(6)
-        add_line_btn = QPushButton("Añadir")
-        add_line_btn.setProperty("btnRole", "success")
-        del_line_btn = QPushButton("Eliminar")
-        del_line_btn.setProperty("btnRole", "danger")
-        scale_btn = QPushButton("Escalar")
-        scale_btn.setProperty("btnRole", "primary")
-        tech_recipe_btn = QPushButton("Técnica")
-        tech_recipe_btn.setProperty("btnRole", "secondary")
-        self.load_base_btn = QPushButton("Cargar")
-        self.load_base_btn.setProperty("btnRole", "success")
-        line_button_style = "min-height: 26px; max-height: 26px; padding: 0 8px;"
-        for btn, min_width in (
-            (add_line_btn, 74),
-            (del_line_btn, 78),
-            (scale_btn, 74),
-            (tech_recipe_btn, 74),
-            (self.load_base_btn, 74),
-        ):
-            btn.setFixedHeight(26)
-            btn.setMinimumWidth(min_width)
-            btn.setStyleSheet(line_button_style)
+        recipe_ribbon, recipe_ribbon_layout = create_standard_top_ribbon()
+        recipe_ribbon.setObjectName("recipeRibbon")
+        add_line_btn = create_standard_ribbon_button("Añadir", role="success", icon_name="plus.svg")
+        del_line_btn = create_standard_ribbon_button("Eliminar", role="danger", icon_name="trash.svg")
+        scale_btn = create_standard_ribbon_button("Escalar", role="primary", icon_name="scale.svg")
+        tech_recipe_btn = create_standard_ribbon_button("Técnica", role="secondary", icon_name="cooking-pot.svg")
+        self.load_base_btn = create_standard_ribbon_button("Cargar", role="success", icon_name="download.svg")
         add_line_btn.clicked.connect(self._add_ingredient)
         del_line_btn.clicked.connect(self._remove_line)
         scale_btn.clicked.connect(self._scale_recipe)
         tech_recipe_btn.clicked.connect(self._open_recipe_technical)
         self.load_base_btn.clicked.connect(self._load_base_recipe_template)
-        line_actions.addWidget(add_line_btn)
-        line_actions.addWidget(del_line_btn)
-        line_actions.addWidget(scale_btn)
-        line_actions.addWidget(tech_recipe_btn)
-        line_actions.addWidget(self.load_base_btn)
+        recipe_ribbon_layout.addWidget(add_line_btn)
+        recipe_ribbon_layout.addWidget(del_line_btn)
+        recipe_ribbon_layout.addWidget(scale_btn)
+        recipe_ribbon_layout.addWidget(tech_recipe_btn)
+        recipe_ribbon_layout.addWidget(self.load_base_btn)
         self.load_base_btn.setVisible(False)
-        line_actions.addStretch()
-        line_actions.addSpacing(10)
-        line_actions.addWidget(QLabel("Proceso"))
+        recipe_ribbon_layout.addStretch()
+        recipe_ribbon_layout.addWidget(QLabel("Proceso"))
         self.active_process_combo = QComboBox()
         self.active_process_combo.setEditable(True)
         self.active_process_combo.setMinimumWidth(130)
         self.active_process_combo.setMaximumWidth(170)
         self.active_process_combo.currentTextChanged.connect(self._on_active_process_changed)
-        line_actions.addWidget(self.active_process_combo)
+        recipe_ribbon_layout.addWidget(self.active_process_combo)
         add_process_btn = QPushButton("+")
         add_process_btn.setProperty("btnRole", "success")
-        add_process_btn.setFixedHeight(26)
+        add_process_btn.setFixedHeight(30)
         add_process_btn.setMinimumWidth(34)
-        add_process_btn.setStyleSheet(line_button_style)
         add_process_btn.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
         add_process_btn.clicked.connect(self._add_process)
         del_process_btn = QPushButton("-")
         del_process_btn.setProperty("btnRole", "danger")
-        del_process_btn.setFixedHeight(26)
+        del_process_btn.setFixedHeight(30)
         del_process_btn.setMinimumWidth(34)
-        del_process_btn.setStyleSheet(line_button_style)
         del_process_btn.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
         del_process_btn.clicked.connect(self._remove_process)
-        line_actions.addWidget(add_process_btn)
-        line_actions.addWidget(del_process_btn)
-        lines_layout.addLayout(line_actions)
+        recipe_ribbon_layout.addWidget(add_process_btn)
+        recipe_ribbon_layout.addWidget(del_process_btn)
+
+        lines_group = QGroupBox("Lineas de receta")
+        lines_layout = QVBoxLayout(lines_group)
+        lines_layout.setSpacing(6)
 
         self.lines_table = QTableWidget(0, 5)
         self.lines_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -2197,6 +2177,7 @@ class RecipesPage(QWidget):
         receta_left_layout = QVBoxLayout(receta_left_panel)
         receta_left_layout.setContentsMargins(0, 0, 0, 0)
         receta_left_layout.setSpacing(8)
+        receta_left_layout.addWidget(recipe_ribbon)
         receta_left_layout.addWidget(lines_group)
         receta_left_layout.addWidget(summary_group)
         receta_left_layout.addStretch(1)
@@ -3283,23 +3264,9 @@ class RecipesPage(QWidget):
         remove_action.setEnabled(index.isValid())
         action = menu.exec(self.lines_table.viewport().mapToGlobal(position))
         if action is add_action:
-            self._insert_empty_line(index.row() + 1 if index.isValid() else self.lines_table.rowCount())
+            self._add_ingredient()
         elif action is remove_action:
             self._remove_line()
-
-    def _insert_empty_line(self, row: int) -> None:
-        row = max(0, min(row, self.lines_table.rowCount()))
-        self.lines_table.insertRow(row)
-        self._set_line_row(
-            row,
-            RecetaLinea(
-                receta_id=self.current_recipe_id or 0,
-                orden=row + 1,
-                proceso_nombre=self._current_active_process(),
-            ),
-        )
-        self._on_lines_changed()
-        self._apply_process_filter()
 
     def _open_recipe_technical(self) -> None:
         rows_data: list[tuple[RecetaLinea, str, str]] = []

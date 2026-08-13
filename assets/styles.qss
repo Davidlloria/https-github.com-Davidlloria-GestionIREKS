@@ -104,6 +104,11 @@ QFrame#escandalloRibbon {
     border: none;
 }
 
+QFrame#recipeRibbon {
+    background-color: transparent;
+    border: none;
+}
+
 QGroupBox#escandalloGroup,
 QGroupBox#escandalloSummaryGroup {
     margin-top: 0;
