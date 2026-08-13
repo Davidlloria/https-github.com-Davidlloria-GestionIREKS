@@ -104,6 +104,16 @@ class RecipeRepository:
         session.commit()
         return True
 
+    def update_customer(self, session: Session, receta_id: int, cliente_id: str) -> bool:
+        receta = session.get(Receta, receta_id)
+        if receta is None:
+            return False
+        receta.cliente_id = cliente_id
+        receta.updated_at = datetime.now(UTC)
+        session.add(receta)
+        session.commit()
+        return True
+
     def save_version(
         self,
         session: Session,

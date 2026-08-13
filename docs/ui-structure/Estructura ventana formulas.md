@@ -63,7 +63,8 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
             │   │   └── nombre_input (QLineEdit, fondo #FFFFFF, borde #C8D2DF, radio 6 px, posición y=21 px, ancho 440 px)
             │   ├── header_separator (QFrame, objectName `recipesHeaderSeparator`, fondo #D7DEE8, sin borde, 1 x 48 px)
             │   └── customer_header_box (QGroupBox, objectName `customerHeaderBox`, fondo transparente, sin borde, posición y=4 px, 500 x 58 px)
-            │       └── customer_name_value (QLabel, objectName `customerNameValue`, fondo #FFFFFF, borde #D7DEE8, radio 6 px, posición y=21 px, 480 x 34 px, visible en la pestaña Clientes)
+            │       ├── customer_name_value (QLabel, objectName `customerNameValue`, fondo #FFFFFF, borde #D7DEE8, radio 6 px, posición y=21 px, 440 x 34 px, visible en la pestaña Clientes)
+            │       └── change_customer_btn (QPushButton, objectName `changeRecipeCustomerButton`, icono blanco `user-round-pen.svg`, fondo azul #2563EB, borde #2563EB, 34 x 34 px; a la derecha del cliente y habilitado solo para recetas de cliente guardadas)
             └── editor_tabs (QTabWidget, pane fondo #FFFFFF, borde #D7DEE8, radio 8 px)
                 ├── pestaña Receta (tab no seleccionado fondo #F7FAFD, borde #DDE5F0; seleccionado fondo #FFFFFF, borde inferior #2563EB)
                 │   ├── receta_tab / receta_left_panel (QWidget, fondo transparente, sin borde)
@@ -109,6 +110,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 - Cambiar de pestaña fuerza el autosave pendiente, prepara una receta nueva y recarga el listado aplicable.
 - `customer_filter_input` sustituye al selector modal: al escribir consulta clientes y despliega `customer_filter_results`; al hacer clic en una fila (o pulsar Intro) filtra el listado. Limpiar el campo vuelve a mostrar recetas de todos los clientes. El campo visible de la receta permanece vacío hasta seleccionar una receta.
 - `Nueva` limpia todos los campos en IREKS. En Clientes abre `CustomerRecipeSelectionDialog`, que filtra clientes y exige seleccionar uno antes de preparar la receta nueva.
+- `change_customer_btn` abre el selector de clientes, solicita confirmación y reasigna únicamente el cliente de una receta de cliente guardada; después actualiza el encabezado y el listado.
 - `load_base_btn` permite cargar una receta base en una receta de cliente, clonando líneas, proceso, observaciones y parámetros; no guarda hasta la acción de guardado/autosave.
 - Las tablas de recetas son de solo lectura, ordenables y cargan la receta al seleccionar una fila.
 - El encabezado real conserva más datos que los visibles en esta composición: cliente, código, versión, estado, masa deseada, peso de pieza, número de piezas y merma se mantienen en el modelo y se usan en los flujos de cálculo y guardado.

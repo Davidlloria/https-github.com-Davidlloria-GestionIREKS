@@ -234,6 +234,9 @@ class RecipeViewModel:
     def delete_recipe(self, session: Session, recipe_id: int) -> bool:
         return self.recipe_repo.delete(session, recipe_id)
 
+    def update_recipe_customer(self, session: Session, recipe_id: int, customer_id: str) -> bool:
+        return self.recipe_repo.update_customer(session, recipe_id, customer_id)
+
     def duplicate_recipe(self, session: Session, recipe_id: int, target_cliente_id: str | None = None) -> RecipeAggregate:
         aggregate = self.recipe_repo.get(session, recipe_id)
         if not aggregate:

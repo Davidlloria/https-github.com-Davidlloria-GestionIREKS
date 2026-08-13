@@ -319,6 +319,7 @@ class CustomerRecipeSelectionDialog(QDialog):
         super().__init__(parent)
         self.service = service
         self.selected_customer_id = ""
+        self.selected_customer_label = ""
         self.setWindowTitle("Nueva receta de cliente")
         self.resize(620, 420)
         self._build_ui()
@@ -380,6 +381,7 @@ class CustomerRecipeSelectionDialog(QDialog):
         if not customer_id:
             return
         self.selected_customer_id = customer_id
+        self.selected_customer_label = (self.table.item(selected[0].row(), 1).text() if self.table.item(selected[0].row(), 1) else "")
         self.accept()
 
 
@@ -1850,6 +1852,18 @@ class RecipesPage(QWidget):
         self.customer_name_value.setFixedHeight(34)
         self.customer_name_value.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.customer_name_value.setStyleSheet("color: #16325C;")
+        self.change_customer_btn = QPushButton()
+        self.change_customer_btn.setObjectName("changeRecipeCustomerButton")
+        self.change_customer_btn.setProperty("btnRole", "primary")
+        self.change_customer_btn.setIcon(
+            _white_icon_from_svg(Path(__file__).resolve().parents[3] / "assets" / "icons" / "user-round-pen.svg")
+        )
+        self.change_customer_btn.setIconSize(QSize(18, 18))
+        self.change_customer_btn.setFixedSize(34, 34)
+        self.change_customer_btn.setToolTip("Cambiar cliente de la receta")
+        self.change_customer_btn.setEnabled(False)
+        self.change_customer_btn.clicked.connect(self._change_recipe_customer)
+        self.change_customer_btn.setParent(self.customer_header_box)
 
         self.recipe_header_box.setParent(self.header_row)
         self.customer_header_box.setParent(self.header_row)
@@ -2960,6 +2974,7 @@ class RecipesPage(QWidget):
             return
         is_customer_tab = self.recipe_tabs.currentIndex() == 1
         self.customer_header_box.setVisible(is_customer_tab)
+        self.change_customer_btn.setEnabled(is_customer_tab and bool(self.current_recipe_id) and not self.current_recipe_is_ireks)
         if not is_customer_tab:
             self.customer_name_value.clear()
             return
@@ -2982,7 +2997,41 @@ class RecipesPage(QWidget):
         if not hasattr(self, "recipe_header_box") or not hasattr(self, "customer_header_box"):
             return
         self.nombre_input.setGeometry(10, 21, 440, 24)
-        self.customer_name_value.setGeometry(10, 21, 480, 34)
+        self.customer_name_value.setGeometry(10, 21, 440, 34)
+        self.change_customer_btn.setGeometry(456, 21, 34, 34)
+
+    def _change_recipe_customer(self) -> None:
+        if self.recipe_tabs.currentIndex() != 1 or not self.current_recipe_id or self.current_recipe_is_ireks:
+            return
+        dialog = CustomerRecipeSelectionDialog(self.recipe_service, self)
+        if not dialog.exec() or not dialog.selected_customer_id:
+            return
+        if dialog.selected_customer_id == self._selected_cliente_id():
+            return
+        answer = QMessageBox.question(
+            self,
+            "Cambiar cliente",
+            f"¿Asignar esta receta a '{dialog.selected_customer_label}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self._autosave_timer.stop()
+        try:
+            updated = self.recipe_service.update_recipe_customer(self.current_recipe_id, dialog.selected_customer_id)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Recetas", f"No se pudo cambiar el cliente.\n{exc}")
+            return
+        if not updated:
+            QMessageBox.warning(self, "Recetas", "No se encontró la receta para cambiar el cliente.")
+            return
+        self._set_combo_by_data(self.cliente_combo, dialog.selected_customer_id)
+        self.customer_filter_selected_id = dialog.selected_customer_id
+        self._refresh_customer_filter_input(dialog.selected_customer_label)
+        self._reload_recipe_list()
+        self._select_recipe_in_active_table(self.current_recipe_id)
+        QMessageBox.information(self, "Recetas", "Cliente de la receta actualizado.")
 
     def _add_ingredient(self) -> None:
         target_process = self._current_active_process()

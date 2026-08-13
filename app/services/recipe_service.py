@@ -81,6 +81,10 @@ class RecipeService:
         with Session(engine) as session:
             return self.vm.delete_recipe(session, recipe_id)
 
+    def update_recipe_customer(self, recipe_id: int, customer_id: str) -> bool:
+        with Session(engine) as session:
+            return self.vm.update_recipe_customer(session, recipe_id, customer_id)
+
     def std_prices_by_code(self) -> dict[str, float]:
         with Session(engine) as session:
             std_items = list(session.exec(select(IngredienteStd)))
