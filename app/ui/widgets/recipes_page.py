@@ -2664,9 +2664,11 @@ class RecipesPage(QWidget):
         return spin
 
     def eventFilter(self, watched, event) -> bool:  # type: ignore[override]
-        if watched is self.customer_filter_input and event.type() == QEvent.Type.FocusIn:
-            QTimer.singleShot(0, self.customer_filter_input.selectAll)
-        if watched is self.header_row and event.type() == QEvent.Type.Resize:
+        customer_filter_input = getattr(self, "customer_filter_input", None)
+        header_row = getattr(self, "header_row", None)
+        if watched is customer_filter_input and event.type() == QEvent.Type.FocusIn:
+            QTimer.singleShot(0, customer_filter_input.selectAll)
+        if watched is header_row and event.type() == QEvent.Type.Resize:
             self._layout_header_boxes_abs()
             self._layout_header_fields_abs()
         return super().eventFilter(watched, event)
