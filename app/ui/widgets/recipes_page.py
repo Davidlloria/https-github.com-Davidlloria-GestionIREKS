@@ -1784,7 +1784,7 @@ class RecipesPage(QWidget):
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(1, 1)
         splitter.setChildrenCollapsible(False)
-        splitter.setHandleWidth(0)
+        splitter.setHandleWidth(5)
         splitter.setSizes([332, 930])
 
         self.header_row = QWidget()

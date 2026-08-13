@@ -25,6 +25,11 @@ QWidget#recipesImagesRibbon {
     border: none;
 }
 
+QSplitter#recipesMainSplitter::handle {
+    background-color: transparent;
+    border: none;
+}
+
 QWidget#recipesSidePanel {
     background-color: #FFFFFF;
     border: 1px solid #D7DEE8;

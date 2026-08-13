@@ -37,7 +37,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
     │   ├── PDF (QPushButton, icono `file-text.svg`, fondo #E2E8F0, borde #CBD5E1, radio 7 px, 110 x 30 px)
     │   ├── Excel (QPushButton, icono `sheet.svg`, fondo #E2E8F0, borde #CBD5E1, radio 7 px, 110 x 30 px)
     │   └── espacio flexible (transparente, sin borde)
-    └── splitter horizontal (objectName `recipesMainSplitter`, fondo transparente, sin borde, sin tirador visible, childrenCollapsible=False, tamaños iniciales 332 / 930)
+    └── splitter horizontal (objectName `recipesMainSplitter`, fondo transparente, sin borde, handle transparente de 5 px, childrenCollapsible=False, tamaños iniciales 332 / 930)
         ├── panel izquierdo (QWidget, objectName `recipesSidePanel`, fondo #FFFFFF, borde #D7DEE8, radio 8 px, ancho fijo 332 px)
         │   └── recipe_tabs (QTabWidget, pane fondo #FFFFFF, borde #D7DEE8, radio 8 px)
         │       ├── pestaña IREKS (tab no seleccionado fondo #F7FAFD, borde #DDE5F0; seleccionado fondo #FFFFFF, borde inferior #2563EB)
@@ -119,7 +119,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 
 ## Geometría actual
 
-- El splitter principal es horizontal, sin tirador visible (`handleWidth(0)`).
+- El splitter principal es horizontal y deja un espacio transparente de 5 px entre panel izquierdo y derecho (`handleWidth(5)`).
 - El panel izquierdo mide exactamente 332 px; el derecho recibe el factor de estiramiento disponible.
 - El layout del panel derecho no tiene márgenes: `header_row` queda alineado con su borde superior; mantiene 10 px de separación respecto al editor de pestañas.
 - El tamaño inicial del splitter es aproximadamente 332 px / 930 px.
