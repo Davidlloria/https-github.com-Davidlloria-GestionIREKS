@@ -526,14 +526,11 @@ class ProcessSourceDialog(QDialog):
         return self._selected_process, self._selected_qty
 
 
-class MinimalRecipePdfDialog(QDialog):
-    def __init__(self, pdf_service: PdfService, recipe_id: int, parent=None) -> None:
+class MinimalRecipePdfOptionsDialog(QDialog):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.pdf_service = pdf_service
-        self.recipe_id = recipe_id
-        self._preview_path: Path | None = None
-        self.setWindowTitle("PDF mínimo - Vista previa")
-        self.resize(920, 720)
+        self.setWindowTitle("PDF mínimo")
+        self.setFixedSize(360, 130)
 
         layout = QVBoxLayout(self)
         options = QHBoxLayout()
@@ -549,6 +546,25 @@ class MinimalRecipePdfDialog(QDialog):
         options.addStretch()
         layout.addLayout(options)
 
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Mostrar previsualización")
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def include_escandallo(self) -> bool:
+        return self.escandallo_si.isChecked()
+
+
+class MinimalRecipePdfPreviewDialog(QDialog):
+    def __init__(self, pdf_service: PdfService, recipe_id: int, include_escandallo: bool, parent=None) -> None:
+        super().__init__(parent)
+        self._preview_path: Path | None = None
+        self.setWindowTitle("PDF mínimo - Vista previa")
+        self.resize(920, 720)
+
+        layout = QVBoxLayout(self)
+
         self.pdf_view = QPdfView(self)
         self.pdf_document = QPdfDocument(self.pdf_view)
         self.pdf_view.setDocument(self.pdf_document)
@@ -561,30 +577,15 @@ class MinimalRecipePdfDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
-        self.escandallo_group.buttonToggled.connect(lambda *_args: self._refresh_preview())
-        self._refresh_preview()
-
-    def include_escandallo(self) -> bool:
-        return self.escandallo_si.isChecked()
-
-    def _refresh_preview(self) -> None:
-        # QPdfView conserva el documento ya cargado; ciérralo antes de reemplazar
-        # el PDF temporal para que la selección Sí/No se vea inmediatamente.
-        self.pdf_document.close()
-        if self._preview_path is not None:
-            try:
-                os.unlink(self._preview_path)
-            except FileNotFoundError:
-                pass
         handle = tempfile.NamedTemporaryFile(prefix="gestionireks_minimo_", suffix=".pdf", delete=False)
         handle.close()
         self._preview_path = Path(handle.name)
         try:
-            self.pdf_service.export_recipe_to_pdf(
-                self.recipe_id,
+            pdf_service.export_recipe_to_pdf(
+                recipe_id,
                 self._preview_path,
                 layout_mode="minimal",
-                include_escandallo=self.include_escandallo(),
+                include_escandallo=include_escandallo,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Vista previa PDF", f"No se pudo generar la vista previa:\n{exc}")
@@ -4137,13 +4138,21 @@ class RecipesPage(QWidget):
             return
         include_escandallo = False
         if clicked == btn_minimal:
-            minimal_dialog = MinimalRecipePdfDialog(self.pdf_service, self.current_recipe_id, self)
+            options_dialog = MinimalRecipePdfOptionsDialog(self)
+            if not options_dialog.exec():
+                return
+            include_escandallo = options_dialog.include_escandallo()
+            preview_dialog = MinimalRecipePdfPreviewDialog(
+                self.pdf_service,
+                self.current_recipe_id,
+                include_escandallo,
+                self,
+            )
             try:
-                if not minimal_dialog.exec():
+                if not preview_dialog.exec():
                     return
-                include_escandallo = minimal_dialog.include_escandallo()
             finally:
-                minimal_dialog.cleanup_preview()
+                preview_dialog.cleanup_preview()
             layout_mode = "minimal"
         else:
             layout_mode = "simple" if clicked == btn_simple else "extended"
