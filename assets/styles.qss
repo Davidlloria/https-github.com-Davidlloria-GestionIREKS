@@ -42,6 +42,11 @@ QWidget#recipesHeaderRow {
     border-radius: 8px;
 }
 
+QGroupBox#recipeHeaderBox {
+    background-color: transparent;
+    border: none;
+}
+
 QDialog,
 QMessageBox {
     background-color: #F4F6F9;

@@ -1792,6 +1792,7 @@ class RecipesPage(QWidget):
         self.header_row.setFixedHeight(64)
 
         self.recipe_header_box = QGroupBox("Receta")
+        self.recipe_header_box.setObjectName("recipeHeaderBox")
         self.recipe_header_box.setFixedHeight(64)
         self.cliente_combo = QComboBox()
         self.cliente_combo.currentIndexChanged.connect(self._update_inline_customer_name)
