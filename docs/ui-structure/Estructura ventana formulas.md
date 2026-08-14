@@ -138,6 +138,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 - La pestaña `Imagenes` permite añadir, quitar, marcar imagen principal, previsualizar con doble clic y reordenar imágenes mediante arrastre; el orden se guarda con la receta.
 - `Guardar` valida nombre y, para recetas de cliente, cliente seleccionado. `Guardar como versión` pide un comentario. `Duplicar` clona la receta actual y `Eliminar` solicita confirmación.
 - `Exportar PDF` exige una receta guardada y permite elegir diseño simple, extendido o mínimo. En el formato `Mínimo` primero se selecciona mediante radios excluyentes si se incluye el escandallo y después se genera una única vista previa; la tabla Receta incorpora una fila de totales. Opcionalmente incluye las píldoras de Total masa, Peso por pieza, Total piezas y Coste unitario junto con la tabla Escandallo. El título muestra el nombre de la receta y, a la derecha entre corchetes, el cliente. `Imprimir` y `Exportar Excel` muestran actualmente un aviso de fase futura.
+- Al guardar cualquier formato PDF se muestra un selector de ubicación; el nombre propuesto es `nombre-receta-nombre-cliente[AAAA-MM-DD].pdf`.
 
 ## Geometría actual
 

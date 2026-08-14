@@ -1,8 +1,10 @@
 ﻿from __future__ import annotations
 
+from datetime import datetime
 import json
 import os
 from pathlib import Path
+import re
 import tempfile
 import traceback
 from typing import Any, cast
@@ -58,6 +60,15 @@ from app.viewmodels import IngredientChoice
 def _normalize_process_name(value: str | None) -> str:
     text = str(value or "").strip()
     return text if text else "Masa final"
+
+
+def _default_recipe_pdf_filename(recipe_name: str, customer_name: str, saved_at: datetime | None = None) -> str:
+    timestamp = saved_at or datetime.now()
+    recipe_label = str(recipe_name or "").strip() or "receta"
+    customer_label = str(customer_name or "").strip() or "sin cliente"
+    base_name = f"{recipe_label}-{customer_label}[{timestamp:%Y-%m-%d}]"
+    safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "-", base_name).strip(". ")
+    return f"{safe_name or 'receta'}.pdf"
 
 
 def _white_icon_from_svg(svg_path: Path) -> QIcon:
@@ -4157,11 +4168,14 @@ class RecipesPage(QWidget):
         else:
             layout_mode = "simple" if clicked == btn_simple else "extended"
 
-        default_name = (self.nombre_input.text().strip() or f"receta_{self.current_recipe_id}").replace("/", "-")
+        default_name = _default_recipe_pdf_filename(
+            self.nombre_input.text().strip() or f"receta_{self.current_recipe_id}",
+            self.cliente_combo.currentText().strip(),
+        )
         output_path, _ = QFileDialog.getSaveFileName(
             self,
             "Exportar receta a PDF",
-            f"{default_name}.pdf",
+            default_name,
             "PDF (*.pdf)",
         )
         if not output_path:

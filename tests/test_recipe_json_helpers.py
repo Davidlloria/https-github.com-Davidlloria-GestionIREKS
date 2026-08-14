@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from app.ui.widgets.recipes_page import RecipesPage, _json_to_string_dict
+from datetime import datetime
+
+from app.ui.widgets.recipes_page import RecipesPage, _default_recipe_pdf_filename, _json_to_string_dict
 
 
 def test_json_to_string_dict_returns_empty_for_blank_and_invalid_payloads() -> None:
@@ -28,3 +30,9 @@ def test_technical_escandallo_value_prefers_the_active_process_value() -> None:
     }
 
     assert page._technical_escandallo_value("costes_fijos") == "3,50"
+
+
+def test_default_recipe_pdf_filename_uses_recipe_customer_and_save_date() -> None:
+    filename = _default_recipe_pdf_filename("Pan/Integral", "Cliente: Norte", datetime(2026, 8, 14))
+
+    assert filename == "Pan-Integral-Cliente- Norte[2026-08-14].pdf"
