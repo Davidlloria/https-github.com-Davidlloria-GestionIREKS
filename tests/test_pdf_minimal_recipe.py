@@ -14,6 +14,7 @@ def test_minimal_recipe_pdf_includes_recipe_and_optional_escandallo(tmp_path) ->
         nombre="Pan mínimo",
         codigo_receta="PAN-1",
         peso_pieza_g=250,
+        proceso="Amasar durante 10 minutos.\nFermentar 30 minutos.",
         escandallo_detalle_json=json.dumps({"costes_fijos": "1,20"}),
     )
     lines = [
@@ -37,6 +38,8 @@ def test_minimal_recipe_pdf_includes_recipe_and_optional_escandallo(tmp_path) ->
     assert "Pan mínimo" in text
     assert "Panadería Norte" in text
     assert "RECETA" in text
+    assert "PROCESO" in text
+    assert "Amasar durante 10 minutos." in text
     assert "ESCANDALLO" in text
     assert "Harina" in text
     assert "TOTAL MASA" in text

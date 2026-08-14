@@ -652,6 +652,10 @@ class PdfService:
         story: list = [title_row]
         story.append(Paragraph("RECETA", section_style))
         story.append(self._build_minimal_recipe_table(lineas, body_style, body_right, header_style))
+        process_text = (receta.proceso or "").strip()
+        if process_text:
+            story.append(Paragraph("PROCESO", section_style))
+            story.append(Paragraph(escape(process_text).replace("\n", "<br/>"), body_style))
         if include_escandallo:
             story.append(Paragraph("ESCANDALLO", section_style))
             story.append(self._build_minimal_escandallo_table(lineas, body_style, body_right, header_style))
