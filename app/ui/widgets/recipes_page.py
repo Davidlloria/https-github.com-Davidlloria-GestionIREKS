@@ -2413,13 +2413,14 @@ class RecipesPage(QWidget):
         self.total_panel_merma_input.setFixedWidth(76)
         self.total_panel_merma_input.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.total_panel_merma_input.setStyleSheet(
-            "font-size: 14px; font-weight: 700; background-color: transparent; border: none; border-radius: 0;"
+            "font-size: 14px; font-weight: 700; background-color: #FFFFFF; border: 1px solid #FDA4AF; border-radius: 6px;"
         )
         self.total_panel_merma_input.editingFinished.connect(self._on_total_panel_merma_changed)
         self.total_panel_peso_terminado_lbl = QLabel("0,00 g")
         self.total_panel_peso_terminado_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.total_panel_peso_terminado_lbl.setStyleSheet("font-size: 18px; font-weight: 800;")
         peso_terminado_values = QWidget()
+        peso_terminado_values.setStyleSheet("background: transparent; border: none;")
         peso_terminado_layout = QHBoxLayout(peso_terminado_values)
         peso_terminado_layout.setContentsMargins(0, 0, 0, 0)
         peso_terminado_layout.setSpacing(6)
