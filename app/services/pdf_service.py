@@ -794,7 +794,7 @@ class PdfService:
                 )
             )
             cells.append(cell)
-        pills = Table([cells], colWidths=[44 * mm] * 4, hAlign="LEFT")
+        pills = Table([cells], colWidths=[44 * mm] * 4, hAlign="CENTER")
         pills.setStyle(
             TableStyle(
                 [
@@ -810,7 +810,7 @@ class PdfService:
 
     @staticmethod
     def _minimal_table(data: list[list[Paragraph]], col_widths: list[float], *, total_row: bool = False) -> Table:
-        table = Table(data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
+        table = Table(data, colWidths=col_widths, repeatRows=1, hAlign="CENTER")
         style = [
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2563EB")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
