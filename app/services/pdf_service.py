@@ -341,7 +341,7 @@ class PdfService:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         if str(layout_mode or "").strip().lower() == "minimal":
-            self._export_minimal_recipe_to_pdf(receta, lineas, output_path, include_escandallo=include_escandallo)
+            self._export_minimal_recipe_to_pdf(receta, cliente, lineas, output_path, include_escandallo=include_escandallo)
             return
 
         story: list = []
@@ -571,6 +571,7 @@ class PdfService:
     def _export_minimal_recipe_to_pdf(
         self,
         receta: Receta,
+        cliente: Cliente | None,
         lineas: list[RecetaLinea],
         output_path: Path,
         *,
@@ -585,6 +586,15 @@ class PdfService:
             leading=23,
             textColor=colors.HexColor("#16325C"),
             spaceAfter=5 * mm,
+        )
+        client_title_style = ParagraphStyle(
+            "minimal_recipe_client",
+            parent=styles["BodyText"],
+            fontName="Helvetica",
+            fontSize=9,
+            leading=12,
+            alignment=2,
+            textColor=colors.HexColor("#51627A"),
         )
         section_style = ParagraphStyle(
             "minimal_recipe_section",
@@ -606,7 +616,33 @@ class PdfService:
             leading=9,
             textColor=colors.white,
         )
-        story: list = [Paragraph(escape((receta.nombre or "Sin nombre").strip()), title_style)]
+        client_name = ""
+        if cliente is not None:
+            client_name = (
+                cliente.cliente_nombre_comercial
+                or cliente.cliente_nombre_fiscal
+                or cliente.cliente_nombre_interno
+            ).strip()
+        title_row = Table(
+            [[
+                Paragraph(escape((receta.nombre or "Sin nombre").strip()), title_style),
+                Paragraph(f"[{escape(client_name)}]" if client_name else "", client_title_style),
+            ]],
+            colWidths=[130 * mm, 56 * mm],
+            hAlign="LEFT",
+        )
+        title_row.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]
+            )
+        )
+        story: list = [title_row]
         story.append(Paragraph("RECETA", section_style))
         story.append(self._build_minimal_recipe_table(lineas, body_style, body_right, header_style))
         if include_escandallo:
@@ -641,9 +677,13 @@ class PdfService:
             Paragraph("%", header_style),
             Paragraph("PROCESO", header_style),
         ]]
+        total_qty = 0.0
+        total_pct = 0.0
         for line in lineas:
             if not (line.nombre_mostrado or line.notas or line.cantidad_base_g):
                 continue
+            total_qty += float(line.cantidad_base_g or 0.0)
+            total_pct += float(line.porcentaje_panadero or 0.0)
             data.append([
                 Paragraph(escape((line.nombre_mostrado or "").strip()), body_style),
                 Paragraph(escape((line.notas or "").strip()), body_style),
@@ -651,7 +691,14 @@ class PdfService:
                 Paragraph(f"{self._fmt(line.porcentaje_panadero, 2)} %", body_right),
                 Paragraph(escape((line.proceso_nombre or "Masa final").strip()), body_style),
             ])
-        return self._minimal_table(data, [60 * mm, 34 * mm, 27 * mm, 18 * mm, 37 * mm])
+        data.append([
+            Paragraph("<b>TOTAL</b>", body_style),
+            Paragraph("", body_style),
+            Paragraph(f"<b>{self._fmt(total_qty, 2)} g</b>", body_right),
+            Paragraph(f"<b>{self._fmt(total_pct, 2)} %</b>", body_right),
+            Paragraph("", body_style),
+        ])
+        return self._minimal_table(data, [60 * mm, 34 * mm, 27 * mm, 18 * mm, 37 * mm], total_row=True)
 
     def _build_minimal_escandallo_table(
         self,
