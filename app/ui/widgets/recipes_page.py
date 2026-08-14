@@ -2407,7 +2407,9 @@ class RecipesPage(QWidget):
         self.total_panel_total_masa_lbl.setStyleSheet("font-size: 18px; font-weight: 800;")
         self.total_panel_peso_pieza_input = QLineEdit()
         self.total_panel_peso_pieza_input.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.total_panel_peso_pieza_input.setStyleSheet("font-size: 18px; font-weight: 800;")
+        self.total_panel_peso_pieza_input.setStyleSheet(
+            "font-size: 18px; font-weight: 800; background-color: #FFFFFF; border: 1px solid #86EFAC; border-radius: 6px;"
+        )
         self.total_panel_peso_pieza_input.editingFinished.connect(self._on_total_panel_peso_pieza_changed)
         self.total_panel_merma_input = QLineEdit()
         self.total_panel_merma_input.setFixedWidth(76)
