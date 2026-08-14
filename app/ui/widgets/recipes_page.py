@@ -1965,6 +1965,7 @@ class RecipesPage(QWidget):
         self.peso_spin.valueChanged.connect(self._refresh_escandallo_table)
         self.piezas_spin.valueChanged.connect(self._refresh_escandallo_table)
         self.merma_spin = self._double_spin(0, 100, 2)
+        self.merma_spin.valueChanged.connect(self._refresh_escandallo_table)
 
         self.customer_header_box = QGroupBox("Cliente")
         self.customer_header_box.setObjectName("customerHeaderBox")
@@ -2381,7 +2382,7 @@ class RecipesPage(QWidget):
         total_panel_layout.setContentsMargins(12, 12, 12, 12)
         total_panel_layout.setSpacing(10)
 
-        def total_panel_pill(label_text: str, value_widget: QWidget, background: str) -> QFrame:
+        def total_panel_pill(label_text: str, value_widget: QWidget, background: str, height: int = 72) -> QFrame:
             pill = QFrame()
             pill.setStyleSheet(
                 "QFrame {"
@@ -2391,7 +2392,7 @@ class RecipesPage(QWidget):
                 "QLabel { background: transparent; border: none; color: #16325C; }"
                 "QLineEdit { background: transparent; border: none; color: #16325C; font-weight: 800; }"
             )
-            pill.setFixedHeight(72)
+            pill.setFixedHeight(height)
             pill_layout = QVBoxLayout(pill)
             pill_layout.setContentsMargins(12, 7, 12, 7)
             pill_layout.setSpacing(0)
@@ -2408,6 +2409,21 @@ class RecipesPage(QWidget):
         self.total_panel_peso_pieza_input.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.total_panel_peso_pieza_input.setStyleSheet("font-size: 18px; font-weight: 800;")
         self.total_panel_peso_pieza_input.editingFinished.connect(self._on_total_panel_peso_pieza_changed)
+        self.total_panel_merma_input = QLineEdit()
+        self.total_panel_merma_input.setFixedWidth(76)
+        self.total_panel_merma_input.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.total_panel_merma_input.setStyleSheet("font-size: 14px; font-weight: 700;")
+        self.total_panel_merma_input.editingFinished.connect(self._on_total_panel_merma_changed)
+        self.total_panel_peso_terminado_lbl = QLabel("0,00 g")
+        self.total_panel_peso_terminado_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.total_panel_peso_terminado_lbl.setStyleSheet("font-size: 18px; font-weight: 800;")
+        peso_terminado_values = QWidget()
+        peso_terminado_layout = QHBoxLayout(peso_terminado_values)
+        peso_terminado_layout.setContentsMargins(0, 0, 0, 0)
+        peso_terminado_layout.setSpacing(6)
+        peso_terminado_layout.addWidget(QLabel("Merma"))
+        peso_terminado_layout.addWidget(self.total_panel_merma_input)
+        peso_terminado_layout.addWidget(self.total_panel_peso_terminado_lbl, 1)
         self.total_panel_total_piezas_lbl = QLabel("0 Uds")
         self.total_panel_total_piezas_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.total_panel_total_piezas_lbl.setStyleSheet("font-size: 18px; font-weight: 800;")
@@ -2415,7 +2431,8 @@ class RecipesPage(QWidget):
         self.total_panel_coste_unitario_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.total_panel_coste_unitario_lbl.setStyleSheet("font-size: 18px; font-weight: 800;")
         total_panel_layout.addWidget(total_panel_pill("Total masa", self.total_panel_total_masa_lbl, "#DBEAFE"))
-        total_panel_layout.addWidget(total_panel_pill("Peso por pieza", self.total_panel_peso_pieza_input, "#DCFCE7"))
+        total_panel_layout.addWidget(total_panel_pill("Peso por pieza en masa", self.total_panel_peso_pieza_input, "#DCFCE7"))
+        total_panel_layout.addWidget(total_panel_pill("Peso por pieza terminada", peso_terminado_values, "#FFE4E6", height=82))
         total_panel_layout.addWidget(total_panel_pill("Total piezas", self.total_panel_total_piezas_lbl, "#FEF3C7"))
         total_panel_layout.addWidget(total_panel_pill("Coste unitario", self.total_panel_coste_unitario_lbl, "#F3E8FF"))
         total_panel_layout.addStretch(1)
@@ -3754,7 +3771,9 @@ class RecipesPage(QWidget):
             self.escandallo_coste_unitario_lbl.setText(f"{self._format_number(coste_unitario, 2)} €")
         if hasattr(self, "total_panel"):
             peso_pieza = float(self.peso_spin.value() or 0.0)
+            merma_pct = float(self.merma_spin.value() or 0.0)
             total_piezas = total_qty_g / peso_pieza if peso_pieza > 0 else 0.0
+            peso_terminado = peso_pieza * (1 - (merma_pct / 100.0))
             costes_adicionales = sum(
                 self._parse_decimal(self._technical_escandallo_value(key))
                 for key in ("costes_fijos", "costes_variables", "otros_costes")
@@ -3764,6 +3783,10 @@ class RecipesPage(QWidget):
             self.total_panel_peso_pieza_input.blockSignals(True)
             self.total_panel_peso_pieza_input.setText(f"{self._format_number(peso_pieza)} g" if peso_pieza > 0 else "")
             self.total_panel_peso_pieza_input.blockSignals(False)
+            self.total_panel_merma_input.blockSignals(True)
+            self.total_panel_merma_input.setText(f"{self._format_number(merma_pct, 2)} %")
+            self.total_panel_merma_input.blockSignals(False)
+            self.total_panel_peso_terminado_lbl.setText(f"{self._format_number(peso_terminado)} g")
             self.total_panel_total_piezas_lbl.setText(f"{self._format_number(total_piezas, 0)} Uds")
             self.total_panel_coste_unitario_lbl.setText(f"{self._format_number(coste_unitario, 2)} €")
 
@@ -3773,6 +3796,12 @@ class RecipesPage(QWidget):
         peso_pieza_text = self._format_number(peso_pieza, 2) if peso_pieza > 0 else ""
         self.recipe_escandallo_data["peso_pieza"] = peso_pieza_text
         self.recipe_escandallo_data[f"proceso::{self._current_active_process()}::peso_pieza"] = peso_pieza_text
+        self._refresh_escandallo_table()
+        self._schedule_autosave()
+
+    def _on_total_panel_merma_changed(self) -> None:
+        merma_pct = max(0.0, min(100.0, self._parse_decimal(self.total_panel_merma_input.text())))
+        self.merma_spin.setValue(merma_pct)
         self._refresh_escandallo_table()
         self._schedule_autosave()
 
