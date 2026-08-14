@@ -12,7 +12,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.graphics.shapes import Circle, Drawing, String
 from reportlab.platypus import Image as RLImage
-from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepInFrame, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import func
 from sqlmodel import Session, col, select
 
@@ -591,8 +591,8 @@ class PdfService:
             "minimal_recipe_client",
             parent=styles["BodyText"],
             fontName="Helvetica",
-            fontSize=9,
-            leading=12,
+            fontSize=8,
+            leading=10,
             alignment=2,
             textColor=colors.HexColor("#51627A"),
         )
@@ -626,7 +626,14 @@ class PdfService:
         title_row = Table(
             [[
                 Paragraph(escape((receta.nombre or "Sin nombre").strip()), title_style),
-                Paragraph(f"[{escape(client_name)}]" if client_name else "", client_title_style),
+                KeepInFrame(
+                    56 * mm,
+                    10 * mm,
+                    [Paragraph(f"[{escape(client_name).replace(' ', '&nbsp;')}]" if client_name else "", client_title_style)],
+                    mode="shrink",
+                    hAlign="RIGHT",
+                    vAlign="MIDDLE",
+                ),
             ]],
             colWidths=[130 * mm, 56 * mm],
             hAlign="LEFT",
@@ -763,9 +770,15 @@ class PdfService:
             ("COSTE UNITARIO", f"{self._fmt(coste_unitario, 2)} €", "#F3E8FF"),
         ]
         cells: list[Table] = []
+        pill_value_style = ParagraphStyle(
+            "minimal_recipe_pill_value",
+            parent=body_right,
+            fontSize=11,
+            leading=13,
+        )
         for label, value, background in pill_data:
             cell = Table(
-                [[Paragraph(label, body_style)], [Paragraph(f"<b>{value}</b>", body_right)]],
+                [[Paragraph(label, body_style)], [Paragraph(f"<b>{value}</b>", pill_value_style)]],
                 colWidths=[44 * mm],
             )
             cell.setStyle(
