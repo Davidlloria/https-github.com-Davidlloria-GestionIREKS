@@ -98,7 +98,12 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
                 │   │   ├── escandallo_table (QTableWidget, columnas Ingrediente, Cantidad, % panadero, €/kg y €/ingrediente; €/kg editable)
                 │   │   └── escandallo_totals_frame (QFrame azul #2F80ED, radio 8 px) → escandallo_totals_table (QTableWidget transparente, totales sin barras de desplazamiento y columnas sincronizadas con la tabla)
                 │   └── total_panel (QFrame, objectName `totalPanel`, fondo #FFFFFF, borde #D8E0EA, radio 8 px, ancho 300 px; a la derecha y con la misma altura que escandallo_group)
-                │       └── píldoras superiores, texto ampliado: Total masa (valor técnico), Peso por pieza en masa (QLineEdit editable y sincronizado bidireccionalmente con la ficha técnica), Peso por pieza terminada (merma editable y peso resultante), Total piezas (Total masa / Peso por pieza, mismo rendimiento técnico) y Coste unitario (mismo cálculo de la ficha técnica)
+                │       └── píldoras superiores de `total_panel` (QFrame, radio 12 px; etiquetas 16 px y valores 18 px, sin borde interno)
+                │           ├── Total masa (fondo azul pastel #DBEAFE; QLabel no editable con el total técnico en g)
+                │           ├── Peso por pieza en masa (fondo verde pastel #DCFCE7; QLineEdit editable, sincronizado bidireccionalmente con la ficha técnica, en g)
+                │           ├── Peso por pieza terminada (fondo rosa pastel #FFE4E6, alto 82 px; texto Merma y resultado transparentes, campo Merma editable transparente con %; resultado = peso en masa menos merma, en g)
+                │           ├── Total piezas (fondo amarillo pastel #FEF3C7; QLabel no editable con Total masa / Peso por pieza en masa, en Uds)
+                │           └── Coste unitario (fondo lila pastel #F3E8FF; QLabel no editable con el mismo cálculo de la ficha técnica, en €)
                 │   └── escandallo_summary_group (QGroupBox sin etiqueta, fondo #FFFFFF, borde #D8E0EA, radio 8 px)
                 │       └── píldoras centradas verticalmente y sin borde interno: texto 13 px; Total masa #DBEAFE, Peso por pieza #DCFCE7, Total piezas #FEF3C7 y Coste unitario #F3E8FF
                 ├── pestaña Proceso (tab no seleccionado fondo #F7FAFD, borde #DDE5F0; seleccionado fondo #FFFFFF, borde inferior #2563EB)

@@ -2413,7 +2413,7 @@ class RecipesPage(QWidget):
         self.total_panel_merma_input.setFixedWidth(76)
         self.total_panel_merma_input.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.total_panel_merma_input.setStyleSheet(
-            "font-size: 14px; font-weight: 700; background-color: #FFE4E6; border: 1px solid #FDA4AF; border-radius: 6px;"
+            "font-size: 14px; font-weight: 700; background-color: transparent; border: none; border-radius: 0;"
         )
         self.total_panel_merma_input.editingFinished.connect(self._on_total_panel_merma_changed)
         self.total_panel_peso_terminado_lbl = QLabel("0,00 g")
@@ -2434,7 +2434,7 @@ class RecipesPage(QWidget):
         self.total_panel_coste_unitario_lbl.setStyleSheet("font-size: 18px; font-weight: 800;")
         total_panel_layout.addWidget(total_panel_pill("Total masa", self.total_panel_total_masa_lbl, "#DBEAFE"))
         total_panel_layout.addWidget(total_panel_pill("Peso por pieza en masa", self.total_panel_peso_pieza_input, "#DCFCE7"))
-        total_panel_layout.addWidget(total_panel_pill("Peso por pieza terminada", peso_terminado_values, "transparent", height=82))
+        total_panel_layout.addWidget(total_panel_pill("Peso por pieza terminada", peso_terminado_values, "#FFE4E6", height=82))
         total_panel_layout.addWidget(total_panel_pill("Total piezas", self.total_panel_total_piezas_lbl, "#FEF3C7"))
         total_panel_layout.addWidget(total_panel_pill("Coste unitario", self.total_panel_coste_unitario_lbl, "#F3E8FF"))
         total_panel_layout.addStretch(1)
