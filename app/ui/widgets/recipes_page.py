@@ -606,11 +606,14 @@ class MinimalRecipePdfPreviewDialog(QDialog):
             QMessageBox.critical(self, "Vista previa PDF", "No se pudo cargar la vista previa generada.")
 
     def cleanup_preview(self) -> None:
+        self.pdf_view.setDocument(None)
         self.pdf_document.close()
         if self._preview_path is not None:
             try:
                 os.unlink(self._preview_path)
-            except FileNotFoundError:
+            except (FileNotFoundError, PermissionError):
+                # En Windows QPdfDocument puede liberar el descriptor después de
+                # cerrar el diálogo. No bloqueamos el guardado por un temporal.
                 pass
             self._preview_path = None
 
