@@ -204,8 +204,8 @@ _CARD_STYLESHEET: Final = """
 QFrame#nutritionCard { background: #FFFFFF; border: none; border-radius: 14px; }
 QWidget#nutritionHeader { background: #DCEFE4; border-top-left-radius: 14px; border-top-right-radius: 14px; border-bottom: 1px solid #CDE3D6; }
 QFrame#nutritionHeaderIcon { background: #FFFFFF; border: 1px solid #D9E9E1; border-radius: 10px; }
-QLabel#nutritionTitle { color: #20312B; font-size: 14px; font-weight: 700; }
-QLabel#nutritionSubtitle, QLabel#nutritionSecondaryLabel { color: #6D7D76; font-size: 10px; }
+QLabel#nutritionTitle { background: transparent; color: #20312B; font-size: 14px; font-weight: 700; }
+QLabel#nutritionSubtitle, QLabel#nutritionSecondaryLabel { background: transparent; color: #6D7D76; font-size: 10px; }
 QLabel#nutritionServing { color: #39735B; background: #FFFFFF; border: 1px solid #D9E9E1; border-radius: 9px; padding: 4px 7px; font-size: 10px; font-weight: 700; }
 QWidget#nutritionColumns { background: #FBFDFC; border-bottom: 1px solid #E4ECE8; }
 QLabel#nutritionColumnLabel { color: #718079; font-size: 9px; font-weight: 700; }
