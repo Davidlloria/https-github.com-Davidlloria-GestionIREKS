@@ -83,11 +83,6 @@ QFrame#escandalloTotalsFrame {
     border-radius: 8px;
 }
 
-QFrame#escandalloRibbon {
-    background-color: transparent;
-    border: none;
-}
-
 QFrame#recipeRibbon {
     background-color: transparent;
     border: none;
