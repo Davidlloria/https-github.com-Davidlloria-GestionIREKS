@@ -538,38 +538,82 @@ class ProcessSourceDialog(QDialog):
         return self._selected_process, self._selected_qty
 
 
-class MinimalRecipePdfOptionsDialog(QDialog):
+class RecipePdfExportDialog(QDialog):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("PDF mínimo")
-        self.setFixedSize(360, 130)
+        self.setWindowTitle("Exportar receta a PDF")
+        self.setMinimumWidth(390)
 
         layout = QVBoxLayout(self)
-        options = QHBoxLayout()
-        options.addWidget(QLabel("Incluir escandallo:"))
+        layout.setSpacing(10)
+
+        format_group = QGroupBox("Tipo de impresión", self)
+        format_layout = QVBoxLayout(format_group)
+        self.simple_radio = QRadioButton("Simple", format_group)
+        self.extended_radio = QRadioButton("Extendido", format_group)
+        self.minimal_radio = QRadioButton("Mínimo", format_group)
+        self.extended_radio.setChecked(True)
+        self.format_buttons = QButtonGroup(self)
+        for button in (self.simple_radio, self.extended_radio, self.minimal_radio):
+            self.format_buttons.addButton(button)
+            format_layout.addWidget(button)
+        layout.addWidget(format_group)
+
+        self.minimal_options_group = QGroupBox("Opciones del formato mínimo", self)
+        options_layout = QGridLayout(self.minimal_options_group)
+        options_layout.addWidget(QLabel("Incluir escandallo:"), 0, 0)
         self.escandallo_si = QRadioButton("Sí")
         self.escandallo_no = QRadioButton("No")
         self.escandallo_no.setChecked(True)
         self.escandallo_group = QButtonGroup(self)
         self.escandallo_group.addButton(self.escandallo_si)
         self.escandallo_group.addButton(self.escandallo_no)
-        options.addWidget(self.escandallo_si)
-        options.addWidget(self.escandallo_no)
-        options.addStretch()
-        layout.addLayout(options)
+        options_layout.addWidget(self.escandallo_si, 0, 1)
+        options_layout.addWidget(self.escandallo_no, 0, 2)
+        options_layout.addWidget(QLabel("Incluir valores nutricionales:"), 1, 0)
+        self.nutrition_si = QRadioButton("Sí")
+        self.nutrition_no = QRadioButton("No")
+        self.nutrition_no.setChecked(True)
+        self.nutrition_group = QButtonGroup(self)
+        self.nutrition_group.addButton(self.nutrition_si)
+        self.nutrition_group.addButton(self.nutrition_no)
+        options_layout.addWidget(self.nutrition_si, 1, 1)
+        options_layout.addWidget(self.nutrition_no, 1, 2)
+        layout.addWidget(self.minimal_options_group)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Mostrar previsualización")
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Exportar")
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+        self.minimal_radio.toggled.connect(self.minimal_options_group.setVisible)
+        self.minimal_options_group.setVisible(False)
+
+    def layout_mode(self) -> str:
+        if self.simple_radio.isChecked():
+            return "simple"
+        if self.minimal_radio.isChecked():
+            return "minimal"
+        return "extended"
+
     def include_escandallo(self) -> bool:
         return self.escandallo_si.isChecked()
 
+    def include_nutrition(self) -> bool:
+        return self.nutrition_si.isChecked()
+
 
 class MinimalRecipePdfPreviewDialog(QDialog):
-    def __init__(self, pdf_service: PdfService, recipe_id: int, include_escandallo: bool, parent=None) -> None:
+    def __init__(
+        self,
+        pdf_service: PdfService,
+        recipe_id: int,
+        include_escandallo: bool,
+        include_nutrition: bool,
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self._preview_path: Path | None = None
         self.setWindowTitle("PDF mínimo - Vista previa")
@@ -598,6 +642,7 @@ class MinimalRecipePdfPreviewDialog(QDialog):
                 self._preview_path,
                 layout_mode="minimal",
                 include_escandallo=include_escandallo,
+                include_nutrition=include_nutrition,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Vista previa PDF", f"No se pudo generar la vista previa:\n{exc}")
@@ -4244,30 +4289,18 @@ class RecipesPage(QWidget):
             QMessageBox.warning(self, "Recetas", "Selecciona y guarda una receta antes de exportar.")
             return
 
-        selector = QMessageBox(self)
-        selector.setIcon(QMessageBox.Icon.Question)
-        selector.setWindowTitle("Exportar receta a PDF")
-        selector.setText("Selecciona el tipo de documento:")
-        btn_simple = selector.addButton("Simple", QMessageBox.ButtonRole.AcceptRole)
-        btn_ext = selector.addButton("Extendido", QMessageBox.ButtonRole.AcceptRole)
-        btn_minimal = selector.addButton("Mínimo", QMessageBox.ButtonRole.AcceptRole)
-        btn_cancel = selector.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
-        selector.setDefaultButton(btn_ext)
-        selector.exec()
-
-        clicked = selector.clickedButton()
-        if clicked == btn_cancel or clicked is None:
+        export_dialog = RecipePdfExportDialog(self)
+        if not export_dialog.exec():
             return
-        include_escandallo = False
-        if clicked == btn_minimal:
-            options_dialog = MinimalRecipePdfOptionsDialog(self)
-            if not options_dialog.exec():
-                return
-            include_escandallo = options_dialog.include_escandallo()
+        layout_mode = export_dialog.layout_mode()
+        include_escandallo = layout_mode == "minimal" and export_dialog.include_escandallo()
+        include_nutrition = layout_mode == "minimal" and export_dialog.include_nutrition()
+        if layout_mode == "minimal":
             preview_dialog = MinimalRecipePdfPreviewDialog(
                 self.pdf_service,
                 self.current_recipe_id,
                 include_escandallo,
+                include_nutrition,
                 self,
             )
             try:
@@ -4275,9 +4308,6 @@ class RecipesPage(QWidget):
                     return
             finally:
                 preview_dialog.cleanup_preview()
-            layout_mode = "minimal"
-        else:
-            layout_mode = "simple" if clicked == btn_simple else "extended"
 
         default_name = _default_recipe_pdf_filename(
             self.nombre_input.text().strip() or f"receta_{self.current_recipe_id}",
@@ -4298,6 +4328,7 @@ class RecipesPage(QWidget):
                 Path(output_path),
                 layout_mode=layout_mode,
                 include_escandallo=include_escandallo,
+                include_nutrition=include_nutrition,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Recetas", f"No se pudo exportar el PDF:\n{exc}")

@@ -318,6 +318,7 @@ class PdfService:
         output_path: Path,
         layout_mode: str = "extended",
         include_escandallo: bool = False,
+        include_nutrition: bool = False,
     ) -> None:
         receta, cliente, lineas = self._load_recipe_data(recipe_id)
         if not receta:
@@ -341,7 +342,14 @@ class PdfService:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         if str(layout_mode or "").strip().lower() == "minimal":
-            self._export_minimal_recipe_to_pdf(receta, cliente, lineas, output_path, include_escandallo=include_escandallo)
+            self._export_minimal_recipe_to_pdf(
+                receta,
+                cliente,
+                lineas,
+                output_path,
+                include_escandallo=include_escandallo,
+                include_nutrition=include_nutrition,
+            )
             return
 
         story: list = []
@@ -576,6 +584,7 @@ class PdfService:
         output_path: Path,
         *,
         include_escandallo: bool,
+        include_nutrition: bool = False,
     ) -> None:
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
@@ -661,6 +670,9 @@ class PdfService:
             story.append(self._build_minimal_escandallo_table(lineas, body_style, body_right, header_style))
             story.append(Spacer(1, 3 * mm))
             story.append(self._build_minimal_escandallo_pills(receta, lineas, body_style, body_right))
+        if include_nutrition:
+            story.append(Paragraph("VALORES NUTRICIONALES", section_style))
+            story.append(self._build_minimal_nutrition_table(receta, lineas, body_style, body_right, header_style))
 
         doc = SimpleDocTemplate(
             str(output_path),
@@ -673,6 +685,45 @@ class PdfService:
             author="Gestion IREKS",
         )
         doc.build(story)
+
+    def _build_minimal_nutrition_table(
+        self,
+        receta: Receta,
+        lineas: list[RecetaLinea],
+        body_style: ParagraphStyle,
+        body_right: ParagraphStyle,
+        header_style: ParagraphStyle,
+    ) -> Table:
+        values = self._compute_recipe_nutrition_per_100(receta, lineas)
+        rows = [
+            ("Energía (kJ/kcal)", f"{self._fmt(values['energia_kj'], 2)} kJ / {self._fmt(values['energia_kcal'], 2)} kcal"),
+            ("Grasas", f"{self._fmt(values['grasas_g'], 2)} g"),
+            ("de las cuales saturadas", f"{self._fmt(values['saturadas_g'], 2)} g"),
+            ("Hidratos de carbono", f"{self._fmt(values['hidratos_g'], 2)} g"),
+            ("de los cuales azúcares", f"{self._fmt(values['azucares_g'], 2)} g"),
+            ("Fibra", f"{self._fmt(values['fibra_g'], 2)} g"),
+            ("Proteínas", f"{self._fmt(values['proteinas_g'], 2)} g"),
+            ("Sal", f"{self._fmt(values['sal_g'], 2)} g"),
+        ]
+        data = [[Paragraph("INFORMACIÓN NUTRICIONAL", header_style), Paragraph("POR 100 G", header_style)]]
+        data.extend([[Paragraph(label, body_style), Paragraph(value, body_right)] for label, value in rows])
+        table = Table(data, colWidths=[112 * mm, 74 * mm], hAlign="CENTER")
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#39735B")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                    ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D9E9E1")),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ]
+            )
+        )
+        return table
 
     def _build_minimal_recipe_table(
         self,

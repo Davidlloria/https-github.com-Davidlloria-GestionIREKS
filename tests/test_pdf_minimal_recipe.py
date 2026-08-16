@@ -31,7 +31,14 @@ def test_minimal_recipe_pdf_includes_recipe_and_optional_escandallo(tmp_path) ->
     output_path = tmp_path / "minimo.pdf"
     customer = Cliente(cliente_id="cliente-1", cliente_nombre_comercial="Panadería Norte")
 
-    PdfService()._export_minimal_recipe_to_pdf(recipe, customer, lines, output_path, include_escandallo=True)
+    PdfService()._export_minimal_recipe_to_pdf(
+        recipe,
+        customer,
+        lines,
+        output_path,
+        include_escandallo=True,
+        include_nutrition=True,
+    )
 
     text = "\n".join(page.extract_text() or "" for page in PdfReader(str(output_path)).pages)
     assert output_path.read_bytes().startswith(b"%PDF")
@@ -47,3 +54,5 @@ def test_minimal_recipe_pdf_includes_recipe_and_optional_escandallo(tmp_path) ->
     assert "TOTAL PIEZAS" in text
     assert "COSTE UNITARIO" in text
     assert "TOTAL" in text
+    assert "VALORES NUTRICIONALES" in text
+    assert "INFORMACIÓN NUTRICIONAL" in text
