@@ -1867,10 +1867,13 @@ class RecipesPage(QWidget):
         left_layout = QVBoxLayout(left_panel)
 
         self.recipe_tabs = QTabWidget()
+        self.recipe_tabs.setObjectName("recipeTabs")
         self.recipe_tabs.currentChanged.connect(self._on_recipe_tab_changed)
         left_layout.addWidget(self.recipe_tabs, 1)
 
         ireks_tab = QWidget()
+        ireks_tab.setObjectName("recipeTabPage")
+        ireks_tab.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         ireks_layout = QVBoxLayout(ireks_tab)
         self.ireks_recipe_search = QLineEdit()
         self.ireks_recipe_search.setPlaceholderText("Buscar por ocurrencia, receta, producto IREKS...")
@@ -1881,6 +1884,8 @@ class RecipesPage(QWidget):
         self.recipe_tabs.addTab(ireks_tab, "IREKS")
 
         customer_tab = QWidget()
+        customer_tab.setObjectName("recipeTabPage")
+        customer_tab.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         customer_layout = QVBoxLayout(customer_tab)
         customer_filter_row = QHBoxLayout()
         customer_filter_row.setContentsMargins(0, 0, 0, 0)

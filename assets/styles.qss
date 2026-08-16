@@ -52,6 +52,18 @@ QWidget#recipesSidePanel {
     border-radius: 8px;
 }
 
+QTabWidget#recipeTabs,
+QTabWidget#recipeTabs::pane,
+QTabWidget#recipeTabs QStackedWidget {
+    background-color: #EF4444;
+    border: none;
+}
+
+QWidget#recipeTabPage {
+    background-color: transparent;
+    border: none;
+}
+
 QWidget#recipesHeaderRow {
     background-color: #FFFFFF;
     border: 1px solid #D7DEE8;
