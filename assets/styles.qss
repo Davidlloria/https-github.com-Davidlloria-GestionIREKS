@@ -65,8 +65,9 @@ QTabWidget#recipeTabs QTabBar::tab {
     background-color: #F7FAFD;
     color: #6A7890;
     border: 1px solid #DDE5F0;
-    border-bottom: 1px solid #DDE5F0;
-    border-radius: 0;
+    border-bottom: 2px solid #DDE5F0;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
 }
 
 QTabWidget#recipeTabs QTabBar::tab:selected {
@@ -74,7 +75,8 @@ QTabWidget#recipeTabs QTabBar::tab:selected {
     color: #1D4ED8;
     border: 1px solid #DDE5F0;
     border-bottom: 2px solid #2563EB;
-    border-radius: 0;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
 }
 
 QTabWidget#recipeTabs QTabBar::tab:hover:!selected {
