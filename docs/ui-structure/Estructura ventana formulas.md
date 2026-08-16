@@ -57,8 +57,8 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
         │           └── customer_recipe_table (QTableWidget, fondo #FFFFFF, borde #D8E0EA, radio 8 px, 2 columnas, ordenable)
         │               ├── Nº (52 px; item transparente, sin borde; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
         │               └── Nombre receta (stretch; item transparente, sin borde; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
-        └── panel derecho (QWidget, objectName `recipesContentPanel`, fondo transparente, sin borde, ocupa el espacio restante; layout sin márgenes y separación 10 px)
-            ├── header_row (QWidget, objectName `recipesHeaderRow`, fondo #FFFFFF, borde #D7DEE8, radio 8 px, alto fijo 64 px)
+        └── panel derecho (QWidget, objectName `recipesContentPanel`, fondo transparente, sin borde, ocupa el espacio restante; layout sin márgenes y separación 4 px)
+            ├── header_row (QWidget, objectName `recipesHeaderRow`, fondo #FFFFFF, borde #D7DEE8, radio 8 px, alto fijo 68 px)
             │   ├── recipe_header_box (QGroupBox, objectName `recipeHeaderBox`, fondo transparente, sin borde, posición y=4 px, 460 x 58 px)
             │   │   └── nombre_input (QLineEdit, fondo #FFFFFF, borde #C8D2DF, radio 6 px, posición y=21 px, ancho 440 px)
             │   ├── header_separator (QFrame, objectName `recipesHeaderSeparator`, fondo #D7DEE8, sin borde, 1 x 48 px)
@@ -144,9 +144,9 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 
 - El splitter principal es horizontal y deja un espacio transparente de 5 px entre panel izquierdo y derecho (`handleWidth(5)`).
 - El panel izquierdo mide exactamente 332 px; el derecho recibe el factor de estiramiento disponible.
-- El layout del panel derecho no tiene márgenes: `header_row` queda alineado con su borde superior; mantiene 10 px de separación respecto al editor de pestañas.
+- El layout del panel derecho no tiene márgenes: `header_row` queda alineado con su borde superior; mantiene 4 px de separación respecto a `recipe_editor_container`.
 - El tamaño inicial del splitter es aproximadamente 332 px / 930 px.
-- `header_row`, `recipe_header_box` y `customer_header_box` tienen alto fijo de 64 px.
+- `header_row` tiene alto fijo de 68 px; `recipe_header_box` mide 62 px y `customer_header_box` 64 px de alto.
 - Los grupos de cabecera se posicionan de forma absoluta: receta en `0,0` y cliente en `468,0`; ambos con ancho 460 px.
 - `recipeRibbon` se sitúa antes de `lines_group`; la fila de controles de proceso se sitúa inmediatamente debajo. El selector y los botones de proceso tienen alto fijo de 30 px.
 - `lines_table` tiene una altura fija equivalente a cabecera más 10 filas de 30 px, para mantener un editor de líneas compacto y estable.

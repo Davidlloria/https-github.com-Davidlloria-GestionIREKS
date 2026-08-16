@@ -1938,7 +1938,7 @@ class RecipesPage(QWidget):
         right_panel.setObjectName("recipesContentPanel")
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(10)
+        right_layout.setSpacing(4)
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(1, 1)
         splitter.setChildrenCollapsible(False)
@@ -1947,7 +1947,7 @@ class RecipesPage(QWidget):
 
         self.header_row = QWidget()
         self.header_row.setObjectName("recipesHeaderRow")
-        self.header_row.setFixedHeight(64)
+        self.header_row.setFixedHeight(68)
 
         self.recipe_header_box = QGroupBox("Receta")
         self.recipe_header_box.setObjectName("recipeHeaderBox")
