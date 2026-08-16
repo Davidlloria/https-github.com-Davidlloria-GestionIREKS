@@ -89,9 +89,10 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
                 │   │   │       └── Proceso (94 px; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
                 │   │   └── summary_group (QGroupBox "Resumen técnico", fondo #FFFFFF, borde #D8E0EA, radio 8 px)
                 │   │       └── píldoras (QFrame, fondo #F8FAFD, borde #CAD3DF, radio 14 px): Masa total, Total harinas, Total líquidos e Hidratación
-                │   └── nutrition_panel (QGroupBox, objectName `nutritionPanel`, fondo #FFFFFF, borde #D8E0EA, radio 8 px, ancho 272 px, sin reserva de título nativo)
-                │       ├── QLabel "Valores nutricionales" (dentro del panel, fondo transparente, sin borde, margen superior interno de 2 px)
-                │       └── nutrition_table (QTableWidget, ajustada a la parte superior 5 px bajo la etiqueta, fondo transparente, sin borde, 8 filas, valores por 100 g; cabecera fondo #E6EAF0, sin borde)
+                │   └── nutrition_column (QWidget, objectName `nutritionColumn`, fondo transparente, sin borde; separador superior calculado para alinear el panel con lines_group)
+                │       └── nutrition_panel (QGroupBox, objectName `nutritionPanel`, fondo #FFFFFF, borde #D8E0EA, radio 8 px, ancho 272 px, sin reserva de título nativo)
+                │           ├── QLabel "Valores nutricionales" (dentro del panel, fondo transparente, sin borde, margen superior interno de 2 px)
+                │           └── nutrition_table (QTableWidget, ajustada a la parte superior 5 px bajo la etiqueta, fondo transparente, sin borde, 8 filas, valores por 100 g; cabecera fondo #E6EAF0, sin borde)
                 ├── pestaña Escandallo (QWidget, fondo transparente, sin borde)
                 │   ├── escandallo_ribbon (QFrame, objectName `escandalloRibbon`, fondo transparente, sin borde; separación de 5 px con escandallo_group)
                 │   │   ├── Excel (QPushButton, icono `sheet.svg`, estilo estándar secondary)
@@ -157,7 +158,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 - Los grupos de cabecera se posicionan de forma absoluta: receta en `0,0` y cliente en `468,0`; ambos con ancho 460 px.
 - `recipeRibbon` se sitúa antes de `lines_group`; la fila de controles de proceso se sitúa inmediatamente debajo. El selector y los botones de proceso tienen alto fijo de 30 px.
 - `lines_table` tiene una altura fija equivalente a cabecera más 10 filas de 30 px, para mantener un editor de líneas compacto y estable.
-- `nutrition_panel` tiene ancho mínimo y máximo de 272 px; sus columnas miden 146 px y 88 px.
+- `nutrition_panel` tiene ancho mínimo y máximo de 272 px; sus columnas miden 146 px y 88 px. Su columna contenedora calcula un espaciador superior a partir del ribbon y de la fila de proceso para alinear su borde superior con `lines_group`.
 - Las píldoras del resumen técnico miden 150 x 48 px.
 - La pestaña de imágenes usa una cinta superior de 56 px y una lista de iconos con cuadrícula de 154 x 140 px e iconos de 132 x 98 px.
 

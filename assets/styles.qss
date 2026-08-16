@@ -434,7 +434,8 @@ QTabWidget QTabBar {
 }
 
 QWidget#recipeEditorTabPage,
-QWidget#recipeTabPage {
+QWidget#recipeTabPage,
+QWidget#nutritionColumn {
     background-color: transparent;
     border: none;
 }

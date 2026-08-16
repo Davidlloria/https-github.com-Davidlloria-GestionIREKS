@@ -2329,7 +2329,21 @@ class RecipesPage(QWidget):
         receta_left_layout.addWidget(summary_group)
         receta_left_layout.addStretch(1)
         receta_tab_layout.addWidget(receta_left_panel, 1)
-        receta_tab_layout.addWidget(nutrition_panel)
+        nutrition_column = QWidget()
+        nutrition_column.setObjectName("nutritionColumn")
+        nutrition_column.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        nutrition_column_layout = QVBoxLayout(nutrition_column)
+        nutrition_column_layout.setContentsMargins(0, 0, 0, 0)
+        nutrition_column_layout.setSpacing(0)
+        nutrition_top_offset = (
+            recipe_ribbon.sizeHint().height()
+            + recipe_process_row.sizeHint().height()
+            + receta_left_layout.spacing() * 2
+        )
+        nutrition_column_layout.addSpacing(nutrition_top_offset)
+        nutrition_column_layout.addWidget(nutrition_panel, 0, Qt.AlignmentFlag.AlignTop)
+        nutrition_column_layout.addStretch(1)
+        receta_tab_layout.addWidget(nutrition_column)
         editor_tabs.addTab(receta_tab, "Receta")
 
         escandallo_tab = QWidget()
