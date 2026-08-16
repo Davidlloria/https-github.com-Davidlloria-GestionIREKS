@@ -54,7 +54,16 @@ QWidget#recipesSidePanel {
 
 QTabWidget#recipeTabs,
 QTabWidget#recipeTabs::pane,
-QTabWidget#recipeTabs QStackedWidget {
+QTabWidget#recipeTabs QStackedWidget,
+QTabWidget#recipeTabs QTabBar {
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+QTabWidget#recipeTabs QTabBar::tab,
+QTabWidget#recipeTabs QTabBar::tab:selected,
+QTabWidget#recipeTabs QTabBar::tab:hover:!selected {
     background-color: transparent;
     border: none;
     border-radius: 0;
