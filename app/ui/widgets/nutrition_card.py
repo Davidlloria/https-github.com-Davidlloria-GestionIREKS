@@ -132,6 +132,7 @@ class NutritionCard(QFrame):
         icon_layout.addWidget(SvgIcon("energy", color="#39735B", size=20, parent=icon_box))
         layout.addWidget(icon_box)
         heading = QWidget(header)
+        heading.setObjectName("nutritionHeading")
         heading_layout = QVBoxLayout(heading)
         heading_layout.setContentsMargins(0, 0, 0, 0)
         heading_layout.setSpacing(0)
@@ -203,6 +204,7 @@ def _normalise_key(value: str) -> str:
 _CARD_STYLESHEET: Final = """
 QFrame#nutritionCard { background: #FFFFFF; border: none; border-radius: 14px; }
 QWidget#nutritionHeader { background: #DCEFE4; border-top-left-radius: 14px; border-top-right-radius: 14px; border-bottom: 1px solid #CDE3D6; }
+QWidget#nutritionHeading { background: transparent; border: none; }
 QFrame#nutritionHeaderIcon { background: #FFFFFF; border: 1px solid #D9E9E1; border-radius: 10px; }
 QLabel#nutritionTitle { background: transparent; color: #20312B; font-size: 14px; font-weight: 700; }
 QLabel#nutritionSubtitle, QLabel#nutritionSecondaryLabel { background: transparent; color: #6D7D76; font-size: 10px; }
