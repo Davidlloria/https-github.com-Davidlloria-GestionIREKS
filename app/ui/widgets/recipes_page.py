@@ -2315,8 +2315,8 @@ class RecipesPage(QWidget):
         receta_tab.setObjectName("recipeEditorTabPage")
         receta_tab.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         receta_tab_layout = QVBoxLayout(receta_tab)
-        receta_tab_layout.setContentsMargins(0, 0, 0, 0)
-        receta_tab_layout.setSpacing(8)
+        receta_tab_layout.setContentsMargins(0, 4, 0, 0)
+        receta_tab_layout.setSpacing(4)
 
         recipe_process_row.setObjectName("recipeProcessRow")
         recipe_top_row = QWidget()
@@ -2342,11 +2342,11 @@ class RecipesPage(QWidget):
         receta_left_layout.setContentsMargins(0, 0, 0, 0)
         receta_left_layout.setSpacing(8)
         receta_left_layout.addWidget(lines_group)
-        receta_left_layout.addWidget(summary_group)
         receta_left_layout.addStretch(1)
         recipe_content_layout.addWidget(receta_left_panel, 1)
         recipe_content_layout.addWidget(nutrition_panel)
         receta_tab_layout.addWidget(recipe_content_row, 1)
+        receta_tab_layout.addWidget(summary_group)
         editor_tabs.addTab(receta_tab, "Receta")
 
         escandallo_tab = QWidget()
