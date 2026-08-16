@@ -2008,26 +2008,26 @@ class RecipesPage(QWidget):
 
         recipe_ribbon, recipe_ribbon_layout = create_standard_top_ribbon()
         recipe_ribbon.setObjectName("recipeRibbon")
-        scale_btn = create_standard_ribbon_button("Escalar", role="primary", icon_name="scale.svg")
-        tech_recipe_btn = create_standard_ribbon_button("Técnica", role="info", icon_name="cooking-pot.svg")
+        self.scale_btn = create_standard_ribbon_button("Escalar", role="primary", icon_name="scale.svg")
+        self.tech_recipe_btn = create_standard_ribbon_button("Técnica", role="info", icon_name="cooking-pot.svg")
         self.load_base_btn = create_standard_ribbon_button("Cargar", role="success", icon_name="download.svg")
         self.recipe_pdf_btn = create_standard_ribbon_button("Pdf", role="danger", icon_name="file-text.svg")
         self.recipe_excel_btn = create_standard_ribbon_button("Excel", role="success", icon_name="sheet.svg")
-        scale_btn.clicked.connect(self._scale_recipe)
-        tech_recipe_btn.clicked.connect(self._open_recipe_technical)
+        self.scale_btn.clicked.connect(self._scale_recipe)
+        self.tech_recipe_btn.clicked.connect(self._open_recipe_technical)
         self.load_base_btn.clicked.connect(self._load_base_recipe_template)
         self.recipe_pdf_btn.clicked.connect(self._export_pdf)
         self.recipe_excel_btn.clicked.connect(self._export_excel)
-        recipe_ribbon_layout.addWidget(scale_btn)
-        recipe_ribbon_layout.addWidget(tech_recipe_btn)
+        recipe_ribbon_layout.addWidget(self.scale_btn)
+        recipe_ribbon_layout.addWidget(self.tech_recipe_btn)
         recipe_ribbon_layout.addWidget(self.load_base_btn)
         recipe_ribbon_layout.addWidget(self.recipe_pdf_btn)
         recipe_ribbon_layout.addWidget(self.recipe_excel_btn)
         self.load_base_btn.setVisible(False)
         recipe_ribbon_layout.addStretch()
 
-        recipe_process_row = QWidget()
-        recipe_process_layout = QHBoxLayout(recipe_process_row)
+        self.recipe_process_row = QWidget()
+        recipe_process_layout = QHBoxLayout(self.recipe_process_row)
         recipe_process_layout.setContentsMargins(8, 0, 8, 0)
         recipe_process_layout.setSpacing(6)
         recipe_process_layout.addWidget(QLabel("Proceso"))
@@ -2041,26 +2041,26 @@ class RecipesPage(QWidget):
         )
         self.active_process_combo.currentTextChanged.connect(self._on_active_process_changed)
         recipe_process_layout.addWidget(self.active_process_combo)
-        add_process_btn = QPushButton("+")
-        add_process_btn.setObjectName("addRecipeProcessButton")
-        add_process_btn.setFixedSize(34, 30)
-        add_process_btn.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
-        add_process_btn.setStyleSheet(
+        self.add_process_btn = QPushButton("+")
+        self.add_process_btn.setObjectName("addRecipeProcessButton")
+        self.add_process_btn.setFixedSize(34, 30)
+        self.add_process_btn.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
+        self.add_process_btn.setStyleSheet(
             "QPushButton { min-height: 0px; max-height: 30px; padding: 0px; background-color: #DCFCE7; color: #166534; border: 1px solid #86EFAC; border-radius: 7px; }"
             "QPushButton:hover { background-color: #BBF7D0; border-color: #4ADE80; }"
         )
-        add_process_btn.clicked.connect(self._add_process)
-        del_process_btn = QPushButton("-")
-        del_process_btn.setObjectName("removeRecipeProcessButton")
-        del_process_btn.setFixedSize(34, 30)
-        del_process_btn.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
-        del_process_btn.setStyleSheet(
+        self.add_process_btn.clicked.connect(self._add_process)
+        self.del_process_btn = QPushButton("-")
+        self.del_process_btn.setObjectName("removeRecipeProcessButton")
+        self.del_process_btn.setFixedSize(34, 30)
+        self.del_process_btn.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
+        self.del_process_btn.setStyleSheet(
             "QPushButton { min-height: 0px; max-height: 30px; padding: 0px; background-color: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; border-radius: 7px; }"
             "QPushButton:hover { background-color: #FECACA; border-color: #F87171; }"
         )
-        del_process_btn.clicked.connect(self._remove_process)
-        recipe_process_layout.addWidget(add_process_btn)
-        recipe_process_layout.addWidget(del_process_btn)
+        self.del_process_btn.clicked.connect(self._remove_process)
+        recipe_process_layout.addWidget(self.add_process_btn)
+        recipe_process_layout.addWidget(self.del_process_btn)
         recipe_process_layout.addStretch()
 
         lines_group = QGroupBox()
@@ -2332,26 +2332,24 @@ class RecipesPage(QWidget):
         self.expand_process_shortcut = QShortcut(QKeySequence("Ctrl+Shift+P"), self)
         self.expand_process_shortcut.activated.connect(self._open_process_editor_dialog)
         notes_layout.addWidget(self.observaciones_input, 1)
-        editor_tabs = QTabWidget()
-        editor_tabs.setObjectName("recipeEditorTabs")
+        self.editor_tabs = QTabWidget()
+        self.editor_tabs.setObjectName("recipeEditorTabs")
         receta_tab = QWidget()
         receta_tab.setObjectName("recipeEditorTabPage")
         receta_tab.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         receta_tab_layout = QVBoxLayout(receta_tab)
-        receta_tab_layout.setContentsMargins(0, 4, 0, 0)
+        receta_tab_layout.setContentsMargins(0, 0, 0, 0)
         receta_tab_layout.setSpacing(4)
 
-        recipe_process_row.setObjectName("recipeProcessRow")
+        self.recipe_process_row.setObjectName("recipeProcessRow")
         recipe_top_row = QWidget()
         recipe_top_row.setObjectName("recipeTopRow")
         recipe_top_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         recipe_top_layout = QHBoxLayout(recipe_top_row)
         recipe_top_layout.setContentsMargins(0, 0, 0, 0)
         recipe_top_layout.setSpacing(8)
-        recipe_top_layout.addWidget(recipe_process_row)
+        recipe_top_layout.addWidget(self.recipe_process_row)
         recipe_top_layout.addWidget(recipe_ribbon, 1)
-        receta_tab_layout.addWidget(recipe_top_row)
-
         recipe_content_row = QWidget()
         recipe_content_row.setObjectName("recipeContentRow")
         recipe_content_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -2371,31 +2369,14 @@ class RecipesPage(QWidget):
         recipe_content_layout.addWidget(nutrition_panel)
         receta_tab_layout.addWidget(recipe_content_row, 1)
         receta_tab_layout.addWidget(summary_group)
-        editor_tabs.addTab(receta_tab, "Receta")
+        self.editor_tabs.addTab(receta_tab, "Receta")
 
         escandallo_tab = QWidget()
         escandallo_tab.setObjectName("recipeEditorTabPage")
         escandallo_tab.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         escandallo_layout = QVBoxLayout(escandallo_tab)
-        escandallo_layout.setContentsMargins(0, 4, 0, 0)
+        escandallo_layout.setContentsMargins(0, 0, 0, 0)
         escandallo_layout.setSpacing(4)
-        escandallo_top_row = QWidget()
-        escandallo_top_row.setObjectName("recipeTopRow")
-        escandallo_top_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        escandallo_top_layout = QHBoxLayout(escandallo_top_row)
-        escandallo_top_layout.setContentsMargins(0, 0, 0, 0)
-        escandallo_top_layout.setSpacing(8)
-        escandallo_ribbon, escandallo_ribbon_layout = create_standard_top_ribbon()
-        escandallo_ribbon.setObjectName("recipeRibbon")
-        self.escandallo_excel_btn = create_standard_ribbon_button("Excel", role="secondary", icon_name="sheet.svg")
-        self.escandallo_pdf_btn = create_standard_ribbon_button("Pdf", role="secondary", icon_name="file-text.svg")
-        self.escandallo_excel_btn.clicked.connect(self._export_excel)
-        self.escandallo_pdf_btn.clicked.connect(self._export_pdf)
-        escandallo_ribbon_layout.addWidget(self.escandallo_excel_btn)
-        escandallo_ribbon_layout.addWidget(self.escandallo_pdf_btn)
-        escandallo_ribbon_layout.addStretch(1)
-        escandallo_top_layout.addWidget(escandallo_ribbon, 1)
-        escandallo_layout.addWidget(escandallo_top_row)
 
         escandallo_group = QGroupBox()
         escandallo_group.setObjectName("escandalloGroup")
@@ -2562,7 +2543,7 @@ class RecipesPage(QWidget):
             )
         escandallo_summary_layout.addStretch(1)
         escandallo_layout.addWidget(self.escandallo_summary_group)
-        editor_tabs.addTab(escandallo_tab, "Escandallo")
+        self.editor_tabs.addTab(escandallo_tab, "Escandallo")
 
         proceso_tab = QWidget()
         proceso_tab.setObjectName("recipeEditorTabPage")
@@ -2571,7 +2552,7 @@ class RecipesPage(QWidget):
         proceso_tab_layout.setContentsMargins(0, 0, 0, 0)
         proceso_tab_layout.setSpacing(0)
         proceso_tab_layout.addWidget(process_group, 1)
-        editor_tabs.addTab(proceso_tab, "Proceso")
+        self.editor_tabs.addTab(proceso_tab, "Proceso")
 
         observaciones_tab = QWidget()
         observaciones_tab.setObjectName("recipeEditorTabPage")
@@ -2580,7 +2561,7 @@ class RecipesPage(QWidget):
         observaciones_tab_layout.setContentsMargins(0, 0, 0, 0)
         observaciones_tab_layout.setSpacing(0)
         observaciones_tab_layout.addWidget(notes_group, 1)
-        editor_tabs.addTab(observaciones_tab, "Observaciones")
+        self.editor_tabs.addTab(observaciones_tab, "Observaciones")
 
         imagenes_tab = QWidget()
         imagenes_tab.setObjectName("recipeEditorTabPage")
@@ -2658,11 +2639,19 @@ class RecipesPage(QWidget):
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setFrameShadow(QFrame.Shadow.Plain)
         separator.setStyleSheet("color: #D7DEE8;")
-        editor_tabs.addTab(imagenes_tab, "Imagenes")
+        self.editor_tabs.addTab(imagenes_tab, "Imagenes")
+        self.editor_tabs.currentChanged.connect(self._on_editor_tab_changed)
 
-        body_layout = QHBoxLayout()
-        body_layout.addWidget(editor_tabs, 1)
-        right_layout.addLayout(body_layout, 1)
+        editor_container = QWidget()
+        editor_container.setObjectName("recipeEditorContainer")
+        editor_container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        editor_container_layout = QVBoxLayout(editor_container)
+        editor_container_layout.setContentsMargins(0, 4, 0, 0)
+        editor_container_layout.setSpacing(4)
+        editor_container_layout.addWidget(recipe_top_row)
+        editor_container_layout.addWidget(self.editor_tabs, 1)
+        right_layout.addWidget(editor_container, 1)
+        self._on_editor_tab_changed(self.editor_tabs.currentIndex())
 
         self.issues_label = None
 
@@ -3169,12 +3158,29 @@ class RecipesPage(QWidget):
     def _on_recipe_tab_changed(self) -> None:
         if not hasattr(self, "nombre_input"):
             return
-        self.load_base_btn.setVisible(self.recipe_tabs.currentIndex() == 1)
+        if hasattr(self, "editor_tabs"):
+            self._on_editor_tab_changed(self.editor_tabs.currentIndex())
         self._flush_autosave()
         self.current_recipe_is_ireks = self.recipe_tabs.currentIndex() == 0
         self._new_recipe()
         self._reload_recipe_list()
         self._update_inline_customer_name()
+
+    def _on_editor_tab_changed(self, index: int) -> None:
+        if not hasattr(self, "recipe_process_row"):
+            return
+        is_recipe_or_escandallo = index in (0, 1)
+        process_enabled = index in (0, 1, 2)
+        exports_enabled = index in (0, 1, 4)
+        customer_tab_active = hasattr(self, "recipe_tabs") and self.recipe_tabs.currentIndex() == 1
+
+        self.recipe_process_row.setEnabled(process_enabled)
+        self.scale_btn.setEnabled(is_recipe_or_escandallo)
+        self.tech_recipe_btn.setEnabled(index in (0, 1, 2))
+        self.recipe_pdf_btn.setEnabled(exports_enabled)
+        self.recipe_excel_btn.setEnabled(exports_enabled)
+        self.load_base_btn.setVisible(customer_tab_active)
+        self.load_base_btn.setEnabled(customer_tab_active and is_recipe_or_escandallo)
 
     def _available_process_names(self) -> list[str]:
         return _unique_process_names(self.recipe_process_names)

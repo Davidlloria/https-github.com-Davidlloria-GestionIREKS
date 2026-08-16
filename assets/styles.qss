@@ -431,6 +431,7 @@ QTabWidget QTabBar {
 
 QWidget#recipeEditorTabPage,
 QWidget#recipeTabPage,
+QWidget#recipeEditorContainer,
 QWidget#recipeTopRow,
 QWidget#recipeContentRow,
 QWidget#recipeProcessRow {

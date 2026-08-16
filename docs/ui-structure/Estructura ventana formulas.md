@@ -65,21 +65,13 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
             │   └── customer_header_box (QGroupBox, objectName `customerHeaderBox`, fondo transparente, sin borde, posición y=4 px, 500 x 58 px)
             │       ├── customer_name_value (QLabel, objectName `customerNameValue`, fondo #FFFFFF, borde #D7DEE8, radio 6 px, posición y=21 px, alto 34 px y ancho disponible hasta el botón, visible en la pestaña Clientes)
             │       └── change_customer_btn (QPushButton, objectName `changeRecipeCustomerButton`, icono blanco `user-round-pen.svg`, fondo azul #2563EB, borde #2563EB, 34 x 34 px; a la derecha del cliente y habilitado solo para recetas de cliente guardadas)
-            └── editor_tabs (QTabWidget, objectName `recipeEditorTabs`, contenedor y paneles de pestaña fondo transparente, sin borde)
+            └── recipe_editor_container (QWidget, objectName `recipeEditorContainer`, fondo transparente, sin borde)
+                ├── recipe_top_row (QWidget, objectName `recipeTopRow`, fondo transparente, sin borde; fila compartida con margen superior de 4 px)
+                │   ├── recipe_process_row (QWidget, objectName `recipeProcessRow`, transparente, sin borde)
+                │   └── recipe_ribbon (QFrame, objectName `recipeRibbon`, fondo transparente, sin borde; Escalar, Técnica, Cargar, Pdf y Excel)
+                └── editor_tabs (QTabWidget, objectName `recipeEditorTabs`, contenedor y paneles de pestaña fondo transparente, sin borde; separación de 4 px con la fila compartida)
                 ├── pestaña Receta (tab no seleccionado fondo #F7FAFD, borde #DDE5F0; seleccionado fondo #FFFFFF, borde inferior #2563EB)
                 │   ├── receta_tab (QWidget, fondo transparente, sin borde)
-                │   │   ├── recipe_top_row (QWidget, objectName `recipeTopRow`, fondo transparente, sin borde; ancho completo y margen superior de 4 px)
-                │   │   │   ├── recipe_process_row (QWidget, objectName `recipeProcessRow`, transparente, sin borde; antes del ribbon)
-                │   │   │   │   ├── QLabel "Proceso" (fondo transparente, sin borde)
-                │   │   │   │   ├── active_process_combo (QComboBox editable, fondo #FFFFFF, borde #C8D2DF, radio 6 px, alto 30 px)
-                │   │   │   │   ├── + (QPushButton, fondo #5BBE6A, borde #5BBE6A, radio 6 px, alto 30 px)
-                │   │   │   │   └── - (QPushButton, fondo #D96464, borde #D96464, radio 6 px, alto 30 px)
-                │   │   │   └── recipe_ribbon (QFrame, objectName `recipeRibbon`, fondo transparente, sin borde)
-                │   │   │       ├── Escalar (QPushButton, icono `scale.svg`, estilo estándar primary)
-                │   │   │       ├── Técnica (QPushButton, icono `cooking-pot.svg`, estilo estándar info)
-                │   │   │       ├── Cargar (QPushButton, icono `download.svg`, estilo estándar success; visible solo en la pestaña Clientes)
-                │   │   │       ├── Pdf (QPushButton, icono `file-text.svg`, estilo estándar danger)
-                │   │   │       └── Excel (QPushButton, icono `sheet.svg`, estilo estándar success)
                 │   │   ├── recipe_content_row (QWidget, objectName `recipeContentRow`, fondo transparente, sin borde; ancho completo y separación de 4 px respecto a la fila superior)
                 │   │       ├── receta_left_panel (QWidget, fondo transparente, sin borde; expansión vertical para ocupar todo el alto de recipe_content_row)
                 │   │       │   ├── lines_group (QGroupBox, objectName `recipeLinesGroup`, fondo #FFFFFF, borde #D8E0EA, radio 8 px, sin reserva de título nativo)
@@ -97,11 +89,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
                 │   │   └── summary_group (QGroupBox "Resumen técnico", fondo #FFFFFF, borde #D8E0EA, radio 8 px; ancho completo de receta_tab)
                 │   │       └── píldoras (QFrame, fondo #F8FAFD, borde #CAD3DF, radio 14 px): Masa total, Total harinas, Total líquidos e Hidratación
                 ├── pestaña Escandallo (QWidget, fondo transparente, sin borde)
-                │   ├── recipe_top_row (QWidget, objectName `recipeTopRow`, fondo transparente, sin borde; margen superior de 4 px y separación de 4 px con escandallo_group)
-                │   │   └── recipe_ribbon (QFrame, objectName `recipeRibbon`, fondo transparente, sin borde)
-                │   │       ├── Excel (QPushButton, icono `sheet.svg`, estilo estándar secondary)
-                │   │       └── Pdf (QPushButton, icono `file-text.svg`, estilo estándar secondary)
-                │   ├── escandallo_group (QGroupBox sin etiqueta, fondo #FFFFFF, borde #D8E0EA, radio 8 px; ocupa el lado izquierdo)
+                │   ├── escandallo_group (QGroupBox sin etiqueta, fondo #FFFFFF, borde #D8E0EA, radio 8 px; ocupa el lado izquierdo y queda 4 px bajo la fila compartida)
                 │   │   ├── escandallo_table (QTableWidget, columnas Ingrediente, Cantidad, % panadero, €/kg y €/ingrediente; €/kg editable)
                 │   │   └── escandallo_totals_frame (QFrame azul #2F80ED, radio 8 px) → escandallo_totals_table (QTableWidget transparente, totales sin barras de desplazamiento y columnas sincronizadas con la tabla)
                 │   └── total_panel (QFrame, objectName `totalPanel`, fondo #FFFFFF, borde #D8E0EA, radio 8 px, ancho 300 px; a la derecha y con la misma altura que escandallo_group)
@@ -162,7 +150,8 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 - Los grupos de cabecera se posicionan de forma absoluta: receta en `0,0` y cliente en `468,0`; ambos con ancho 460 px.
 - `recipeRibbon` se sitúa antes de `lines_group`; la fila de controles de proceso se sitúa inmediatamente debajo. El selector y los botones de proceso tienen alto fijo de 30 px.
 - `lines_table` tiene una altura fija equivalente a cabecera más 10 filas de 30 px, para mantener un editor de líneas compacto y estable.
-- `recipe_top_row` ocupa el ancho completo de la pestaña Receta y contiene `recipe_process_row` antes de `recipeRibbon`. `recipe_content_row` agrupa en paralelo `receta_left_panel` y `nutrition_panel`.
+- `recipe_top_row` ocupa el ancho completo del contenedor compartido y contiene `recipe_process_row` antes de `recipeRibbon`. `recipe_content_row` agrupa en paralelo `receta_left_panel` y `nutrition_panel`.
+- `recipe_top_row` está fuera de `editor_tabs` y se comparte entre todas sus pestañas: en Receta y Escandallo se habilitan todos los controles; en Proceso solo el selector, +/− y Técnica; en Observaciones todos quedan apagados; y en Imágenes se habilitan PDF y Excel.
 - `nutrition_panel` tiene ancho mínimo y máximo de 272 px; sus columnas miden 146 px y 88 px.
 - Las píldoras del resumen técnico miden 150 x 48 px.
 - La pestaña de imágenes usa una cinta superior de 56 px y una lista de iconos con cuadrícula de 154 x 140 px e iconos de 132 x 98 px.
