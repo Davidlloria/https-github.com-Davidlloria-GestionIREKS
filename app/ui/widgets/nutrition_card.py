@@ -202,7 +202,7 @@ def _normalise_key(value: str) -> str:
 
 _CARD_STYLESHEET: Final = """
 QFrame#nutritionCard { background: #FFFFFF; border: 1px solid #DFE9E4; border-radius: 14px; }
-QWidget#nutritionHeader { background: #EEF7F2; border-top-left-radius: 14px; border-top-right-radius: 14px; border-bottom: 1px solid #E1EBE6; }
+QWidget#nutritionHeader { background: #DCEFE4; border-top-left-radius: 14px; border-top-right-radius: 14px; border-bottom: 1px solid #CDE3D6; }
 QFrame#nutritionHeaderIcon { background: #FFFFFF; border: 1px solid #D9E9E1; border-radius: 10px; }
 QLabel#nutritionTitle { color: #20312B; font-size: 14px; font-weight: 700; }
 QLabel#nutritionSubtitle, QLabel#nutritionSecondaryLabel { color: #6D7D76; font-size: 10px; }
