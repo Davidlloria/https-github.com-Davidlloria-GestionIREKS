@@ -2207,7 +2207,7 @@ class RecipesPage(QWidget):
         nutrition_panel.setMaximumWidth(272)
         nutrition_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         nutrition_layout = QVBoxLayout(nutrition_panel)
-        nutrition_layout.setContentsMargins(6, 6, 6, 6)
+        nutrition_layout.setContentsMargins(6, 2, 6, 6)
         nutrition_layout.setSpacing(4)
         nutrition_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         nutrition_title = QLabel("Valores nutricionales")

@@ -89,7 +89,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
                 │   │   └── summary_group (QGroupBox "Resumen técnico", fondo #FFFFFF, borde #D8E0EA, radio 8 px)
                 │   │       └── píldoras (QFrame, fondo #F8FAFD, borde #CAD3DF, radio 14 px): Masa total, Total harinas, Total líquidos e Hidratación
                 │   └── nutrition_panel (QGroupBox, fondo #FFFFFF, borde #D8E0EA, radio 8 px, ancho 272 px)
-                │       ├── QLabel "Valores nutricionales" (dentro del panel, fondo transparente, sin borde)
+                │       ├── QLabel "Valores nutricionales" (dentro del panel, fondo transparente, sin borde, margen superior interno de 2 px)
                 │       └── nutrition_table (QTableWidget, ajustada a la parte superior bajo la etiqueta, fondo transparente, sin borde, 8 filas, valores por 100 g; cabecera fondo #E6EAF0, sin borde)
                 ├── pestaña Escandallo (QWidget, fondo transparente, sin borde)
                 │   ├── escandallo_ribbon (QFrame, objectName `escandalloRibbon`, fondo transparente, sin borde; separación de 5 px con escandallo_group)
