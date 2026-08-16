@@ -1786,6 +1786,7 @@ class RecipesPage(QWidget):
     ESC_COL_EUR_KG = 3
     ESC_COL_EUR_LINEA = 4
     ESC_TOTALS_OFFSET = 1
+    LINES_TOTALS_OFFSET = 1
     MIN_LINE_ROWS = 10
     PROCESO_RICH_HTML_KEY = "__proceso_rich_html"
     IMAGES_GALLERY_KEY = "__images_gallery_json"
@@ -2067,7 +2068,6 @@ class RecipesPage(QWidget):
         lines_layout = QVBoxLayout(lines_group)
         lines_layout.setContentsMargins(6, 2, 6, 6)
         lines_layout.setSpacing(5)
-        lines_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         lines_title = QLabel("Líneas de receta")
         lines_title.setStyleSheet("background: transparent; border: none;")
         lines_layout.addWidget(lines_title)
@@ -2114,12 +2114,35 @@ class RecipesPage(QWidget):
             + self.lines_table.verticalHeader().defaultSectionSize() * self.MIN_LINE_ROWS
             + 8
         )
-        self.lines_table.setFixedHeight(lines_table_height)
+        self.lines_table.setMinimumHeight(lines_table_height)
         self.lines_table.itemDoubleClicked.connect(self._on_line_double_click)
         self.lines_table.itemChanged.connect(self._on_line_item_changed)
         self.lines_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.lines_table.customContextMenuRequested.connect(self._show_lines_context_menu)
-        lines_layout.addWidget(self.lines_table, 0, Qt.AlignmentFlag.AlignTop)
+        lines_layout.addWidget(self.lines_table, 1)
+        self.lines_totals_frame = QFrame()
+        self.lines_totals_frame.setObjectName("recipeLinesTotalsFrame")
+        lines_totals_layout = QVBoxLayout(self.lines_totals_frame)
+        lines_totals_layout.setContentsMargins(0, 0, 0, 0)
+        self.lines_totals_table = QTableWidget(1, 6)
+        self.lines_totals_table.horizontalHeader().setVisible(False)
+        self.lines_totals_table.verticalHeader().setVisible(False)
+        self.lines_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.lines_totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.lines_totals_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.lines_totals_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.lines_totals_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.lines_totals_table.setFixedHeight(34)
+        self.lines_totals_table.setShowGrid(False)
+        self.lines_totals_table.setFrameShape(QFrame.Shape.NoFrame)
+        self.lines_totals_table.setStyleSheet(
+            "QTableWidget { background-color: transparent; border: none; }"
+            "QTableWidget::item { background-color: transparent; color: #FFFFFF; border: none; padding: 0 8px; }"
+        )
+        lines_totals_layout.addWidget(self.lines_totals_table)
+        lines_layout.addWidget(self.lines_totals_frame)
+        lines_header.sectionResized.connect(lambda *_args: self._refresh_recipe_lines_totals())
+        lines_header.geometriesChanged.connect(self._refresh_recipe_lines_totals)
         self._refresh_process_controls(["Masa final"], preserve_active=False)
 
         summary_group = QGroupBox("Resumen tecnico")
@@ -2343,8 +2366,7 @@ class RecipesPage(QWidget):
         receta_left_layout = QVBoxLayout(receta_left_panel)
         receta_left_layout.setContentsMargins(0, 0, 0, 0)
         receta_left_layout.setSpacing(8)
-        receta_left_layout.addWidget(lines_group)
-        receta_left_layout.addStretch(1)
+        receta_left_layout.addWidget(lines_group, 1)
         recipe_content_layout.addWidget(receta_left_panel, 1)
         recipe_content_layout.addWidget(nutrition_panel)
         receta_tab_layout.addWidget(recipe_content_row, 1)
@@ -2357,15 +2379,22 @@ class RecipesPage(QWidget):
         escandallo_layout = QVBoxLayout(escandallo_tab)
         escandallo_layout.setContentsMargins(0, 4, 0, 0)
         escandallo_layout.setSpacing(4)
-        escandallo_top_row, escandallo_top_layout = create_standard_top_ribbon()
+        escandallo_top_row = QWidget()
         escandallo_top_row.setObjectName("recipeTopRow")
+        escandallo_top_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        escandallo_top_layout = QHBoxLayout(escandallo_top_row)
+        escandallo_top_layout.setContentsMargins(0, 0, 0, 0)
+        escandallo_top_layout.setSpacing(8)
+        escandallo_ribbon, escandallo_ribbon_layout = create_standard_top_ribbon()
+        escandallo_ribbon.setObjectName("recipeRibbon")
         self.escandallo_excel_btn = create_standard_ribbon_button("Excel", role="secondary", icon_name="sheet.svg")
         self.escandallo_pdf_btn = create_standard_ribbon_button("Pdf", role="secondary", icon_name="file-text.svg")
         self.escandallo_excel_btn.clicked.connect(self._export_excel)
         self.escandallo_pdf_btn.clicked.connect(self._export_pdf)
-        escandallo_top_layout.addWidget(self.escandallo_excel_btn)
-        escandallo_top_layout.addWidget(self.escandallo_pdf_btn)
-        escandallo_top_layout.addStretch(1)
+        escandallo_ribbon_layout.addWidget(self.escandallo_excel_btn)
+        escandallo_ribbon_layout.addWidget(self.escandallo_pdf_btn)
+        escandallo_ribbon_layout.addStretch(1)
+        escandallo_top_layout.addWidget(escandallo_ribbon, 1)
         escandallo_layout.addWidget(escandallo_top_row)
 
         escandallo_group = QGroupBox()
@@ -3737,6 +3766,42 @@ class RecipesPage(QWidget):
         self._refresh_escandallo_table()
         self._schedule_autosave()
 
+    def _refresh_recipe_lines_totals(
+        self,
+        total_qty_g: float | None = None,
+        total_pct: float | None = None,
+    ) -> None:
+        if not hasattr(self, "lines_totals_table"):
+            return
+        if total_qty_g is None or total_pct is None:
+            total_qty_g = 0.0
+            total_pct = 0.0
+            for row in range(self.lines_table.rowCount()):
+                line = self._line_from_row(row)
+                if not (line.nombre_mostrado or line.notas or line.cantidad_base_g):
+                    continue
+                total_qty_g += float(line.cantidad_base_g or 0.0)
+                total_pct += float(line.porcentaje_panadero or 0.0)
+        values = [
+            "",
+            "",
+            "",
+            f"{self._format_number(total_qty_g, 2)} g",
+            f"{self._format_number(total_pct, 2)} %",
+            "",
+        ]
+        for column, value in enumerate(values):
+            item = QTableWidgetItem(value)
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.lines_totals_table.setItem(0, column, item)
+        self.lines_totals_table.setColumnWidth(0, self.lines_table.verticalHeader().width())
+        for column in range(self.COL_INGREDIENTE, self.COL_PROCESO + 1):
+            self.lines_totals_table.setColumnWidth(
+                column + self.LINES_TOTALS_OFFSET,
+                self.lines_table.columnWidth(column),
+            )
+
     def _refresh_escandallo_table(self) -> None:
         if not hasattr(self, "escandallo_table"):
             return
@@ -3779,6 +3844,7 @@ class RecipesPage(QWidget):
             total_pct += float(line.porcentaje_panadero or 0.0)
             total_cost += cost
         table.blockSignals(False)
+        self._refresh_recipe_lines_totals(total_qty_g, total_pct)
         self._refresh_escandallo_totals(total_qty_g, total_pct, total_cost)
 
     def _refresh_escandallo_totals(self, total_qty_g: float, total_pct: float, total_cost: float) -> None:

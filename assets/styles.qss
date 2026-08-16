@@ -77,7 +77,8 @@ QFrame#totalPanel {
     border-radius: 8px;
 }
 
-QFrame#escandalloTotalsFrame {
+QFrame#escandalloTotalsFrame,
+QFrame#recipeLinesTotalsFrame {
     background-color: #2F80ED;
     border: none;
     border-radius: 8px;
