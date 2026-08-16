@@ -3445,38 +3445,6 @@ class CustomersPage(QWidget):
             QPushButton:hover {
                 opacity: 0.95;
             }
-            QTabWidget#customerTabs::pane {
-                border: 0;
-                background: transparente;
-                margin-top: 0px;
-            }
-            QTabWidget#customerTabs QTabBar {
-                background: transparent;
-            }
-            QTabWidget#customerTabs::tab-bar {
-                background: transparent;
-                left: 0px;
-            }
-            QTabWidget#customerTabs QTabBar::tab {
-                background: #FFFFFF;
-                color: #64748B;
-                padding: 8px 14px;
-                border: 1px solid #E2E8F0;
-                border-bottom: 2px solid transparent;
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                margin-right: 6px;
-                margin-bottom: 0px;
-                font-weight: 600;
-            }
-            QTabWidget#customerTabs QTabBar::tab:selected {
-                color: #3B82F6;
-                background: #FFFFFF;
-                border-bottom: 2px solid #3B82F6;
-            }
-            QTabWidget#customerTabs QTabBar::tab:!selected {
-                background: #F8FAFC;
-            }
             QTableWidget {
                 border: 1px solid #E2E8F0;
                 border-radius: 8px;

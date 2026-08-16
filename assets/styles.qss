@@ -18,22 +18,6 @@ QWidget#RecipesPageRoot {
     border: none;
 }
 
-QTabWidget#recipeEditorTabs {
-    background-color: transparent;
-    border: none;
-}
-
-QTabWidget#recipeEditorTabs::pane {
-    background-color: transparent;
-    border: none;
-}
-
-QTabWidget#recipeEditorTabs QStackedWidget,
-QWidget#recipeEditorTabPage {
-    background-color: transparent;
-    border: none;
-}
-
 QSplitter#recipesMainSplitter,
 QWidget#recipesContentPanel,
 QWidget#recipesImagesRibbon {
@@ -50,43 +34,6 @@ QWidget#recipesSidePanel {
     background-color: #FFFFFF;
     border: 1px solid #D7DEE8;
     border-radius: 8px;
-}
-
-QTabWidget#recipeTabs,
-QTabWidget#recipeTabs::pane,
-QTabWidget#recipeTabs QStackedWidget,
-QTabWidget#recipeTabs QTabBar {
-    background-color: transparent;
-    border: none;
-    border-radius: 0;
-}
-
-QTabWidget#recipeTabs QTabBar::tab {
-    background-color: #F7FAFD;
-    color: #6A7890;
-    border: 1px solid #DDE5F0;
-    border-bottom: 2px solid #DDE5F0;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-}
-
-QTabWidget#recipeTabs QTabBar::tab:selected {
-    background-color: #FFFFFF;
-    color: #1D4ED8;
-    border: 1px solid #DDE5F0;
-    border-bottom: 2px solid #2563EB;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-}
-
-QTabWidget#recipeTabs QTabBar::tab:hover:!selected {
-    background-color: #EAF2FF;
-    color: #24324A;
-}
-
-QWidget#recipeTabPage {
-    background-color: transparent;
-    border: none;
 }
 
 QWidget#recipesHeaderRow {
@@ -473,11 +420,19 @@ QHeaderView::section:horizontal:last {
     border-right: none;
 }
 
-QTabWidget::pane {
-    border: 1px solid #D7DEE8;
-    background-color: #FFFFFF;
-    border-radius: 8px;
-    top: -1px;
+QTabWidget,
+QTabWidget::pane,
+QTabWidget QStackedWidget,
+QTabWidget QTabBar {
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+QWidget#recipeEditorTabPage,
+QWidget#recipeTabPage {
+    background-color: transparent;
+    border: none;
 }
 
 QTabBar::tab {
@@ -495,13 +450,17 @@ QTabBar::tab {
 QTabBar::tab:selected {
     background-color: #FFFFFF;
     color: #1D4ED8;
-    border-color: #DDE5F0;
+    border: 1px solid #DDE5F0;
     border-bottom: 2px solid #2563EB;
 }
 
 QTabBar::tab:hover:!selected {
     background-color: #EAF2FF;
     color: #24324A;
+}
+
+QTabBar::tab:!enabled {
+    color: #A7B3C5;
 }
 
 QCheckBox,

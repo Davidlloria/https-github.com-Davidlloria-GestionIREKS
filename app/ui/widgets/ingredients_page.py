@@ -911,12 +911,6 @@ class IngredientsIreksPage(QWidget):
         self.detail_tabs = tabs
         tabs.setDocumentMode(False)
         tabs.tabBar().setDrawBase(False)
-        tabs.setStyleSheet(
-            "QTabWidget { background: #FFFFFF; }"
-            "QTabWidget::pane { border: 0; margin-top: 1px; background: #FFFFFF; }"
-            "QTabBar { background: #FFFFFF; }"
-            "QTabBar::tab { margin-bottom: 0px; }"
-        )
 
         datos_tab = self._build_ireks_data_tab()
         tabs.addTab(datos_tab, "Datos")

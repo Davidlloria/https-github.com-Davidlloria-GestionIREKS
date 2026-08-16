@@ -2660,7 +2660,6 @@ class WarehousePage(QWidget):
         self.main_tabs.addTab(self._build_familias_tab(), "Familias")
         self.main_tabs.addTab(self._build_subfamilias_tab(), "Subfamilias")
         self.main_tabs.addTab(self._build_envases_tab(), "Envases")
-        self._style_main_tabs()
         if self.entradas_tab is not None:
             self.entradas_tab.table.itemDoubleClicked.connect(self._open_article_from_entradas_row)
             self.entradas_tab.table.cellDoubleClicked.connect(self._open_article_from_entradas_cell)
@@ -2668,20 +2667,6 @@ class WarehousePage(QWidget):
             self.salidas_tab.table.itemDoubleClicked.connect(self._open_article_from_salidas_row)
             self.salidas_tab.table.cellDoubleClicked.connect(self._open_article_from_salidas_cell)
         layout.addWidget(self.main_tabs, 1)
-
-    def _style_main_tabs(self) -> None:
-        bar = self.main_tabs.tabBar()
-        self.main_tabs.setStyleSheet(
-            "QTabBar::tab { padding: 8px 14px; }"
-            "QTabBar::tab:!enabled { color: #A7B3C5; }"
-        )
-        for idx in range(self.main_tabs.count()):
-            if idx in (0, 1, 2, 3, 4):
-                bar.setTabTextColor(idx, QColor("#1E4FA1"))
-            elif idx == 5:
-                bar.setTabTextColor(idx, QColor("#A7B3C5"))
-            else:
-                bar.setTabTextColor(idx, QColor("#5E6C84"))
 
     def _build_placeholder_tab(self, name: str) -> QWidget:
         tab = QWidget()
