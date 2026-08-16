@@ -2202,13 +2202,17 @@ class RecipesPage(QWidget):
             summary_top_layout.addWidget(summary_pill(icon_path, label, value))
         summary_top_layout.addStretch(1)
 
-        nutrition_panel = QGroupBox("Valores nutricionales")
+        nutrition_panel = QGroupBox()
         nutrition_panel.setMinimumWidth(272)
         nutrition_panel.setMaximumWidth(272)
         nutrition_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         nutrition_layout = QVBoxLayout(nutrition_panel)
         nutrition_layout.setContentsMargins(6, 6, 6, 6)
         nutrition_layout.setSpacing(4)
+        nutrition_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        nutrition_title = QLabel("Valores nutricionales")
+        nutrition_title.setStyleSheet("background: transparent; border: none;")
+        nutrition_layout.addWidget(nutrition_title)
         self.nutrition_table = QTableWidget(8, 2)
         self.nutrition_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.nutrition_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -2260,7 +2264,7 @@ class RecipesPage(QWidget):
             self.nutrition_table.rowHeight(i) for i in range(self.nutrition_table.rowCount())
         ) + 2
         self.nutrition_table.setFixedHeight(nutrition_table_height)
-        nutrition_layout.addWidget(self.nutrition_table)
+        nutrition_layout.addWidget(self.nutrition_table, 0, Qt.AlignmentFlag.AlignTop)
 
         summary_root_layout.addLayout(summary_top_layout)
 
