@@ -61,12 +61,25 @@ QTabWidget#recipeTabs QTabBar {
     border-radius: 0;
 }
 
-QTabWidget#recipeTabs QTabBar::tab,
-QTabWidget#recipeTabs QTabBar::tab:selected,
-QTabWidget#recipeTabs QTabBar::tab:hover:!selected {
-    background-color: transparent;
-    border: none;
+QTabWidget#recipeTabs QTabBar::tab {
+    background-color: #F7FAFD;
+    color: #6A7890;
+    border: 1px solid #DDE5F0;
+    border-bottom: 1px solid #DDE5F0;
     border-radius: 0;
+}
+
+QTabWidget#recipeTabs QTabBar::tab:selected {
+    background-color: #FFFFFF;
+    color: #1D4ED8;
+    border: 1px solid #DDE5F0;
+    border-bottom: 2px solid #2563EB;
+    border-radius: 0;
+}
+
+QTabWidget#recipeTabs QTabBar::tab:hover:!selected {
+    background-color: #EAF2FF;
+    color: #24324A;
 }
 
 QWidget#recipeTabPage {
