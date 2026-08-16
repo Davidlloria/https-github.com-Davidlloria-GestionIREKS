@@ -94,13 +94,15 @@ QFrame#recipeRibbon {
 }
 
 QGroupBox#escandalloGroup,
-QGroupBox#escandalloSummaryGroup {
+QGroupBox#escandalloSummaryGroup,
+QGroupBox#nutritionPanel {
     margin-top: 0;
     padding-top: 0;
 }
 
 QGroupBox#escandalloGroup::title,
-QGroupBox#escandalloSummaryGroup::title {
+QGroupBox#escandalloSummaryGroup::title,
+QGroupBox#nutritionPanel::title {
     height: 0;
     padding: 0;
 }
