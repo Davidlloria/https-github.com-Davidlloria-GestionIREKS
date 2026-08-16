@@ -39,7 +39,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
     │   └── espacio flexible (transparente, sin borde)
     └── splitter horizontal (objectName `recipesMainSplitter`, fondo transparente, sin borde, handle transparente de 5 px, childrenCollapsible=False, tamaños iniciales 332 / 930)
         ├── panel izquierdo (QWidget, objectName `recipesSidePanel`, fondo #FFFFFF, borde #D7DEE8, radio 8 px, ancho fijo 332 px)
-        │   └── recipe_tabs (QTabWidget, objectName `recipeTabs`, fondo #EF4444, sin borde)
+        │   └── recipe_tabs (QTabWidget, objectName `recipeTabs`, fondo transparente, sin borde, esquinas rectas)
         │       ├── pestaña IREKS (tab no seleccionado fondo #F7FAFD, borde #DDE5F0; seleccionado fondo #FFFFFF, borde inferior #2563EB)
         │       │   ├── ireks_tab (QWidget, fondo transparente, sin borde)
         │       │   ├── ireks_recipe_search (QLineEdit, fondo #FFFFFF, borde #C8D2DF, radio 6 px)
