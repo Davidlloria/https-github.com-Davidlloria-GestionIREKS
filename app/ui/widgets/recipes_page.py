@@ -2307,6 +2307,8 @@ class RecipesPage(QWidget):
         receta_tab_layout.setContentsMargins(0, 0, 0, 0)
         receta_tab_layout.setSpacing(8)
         receta_left_panel = QWidget()
+        receta_left_panel.setObjectName("recipeEditorTabPage")
+        receta_left_panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         receta_left_layout = QVBoxLayout(receta_left_panel)
         receta_left_layout.setContentsMargins(0, 0, 0, 0)
         receta_left_layout.setSpacing(8)
