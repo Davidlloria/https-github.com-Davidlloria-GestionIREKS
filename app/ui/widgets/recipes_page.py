@@ -549,12 +549,12 @@ class RecipePdfExportDialog(QDialog):
 
         format_group = QGroupBox("Tipo de impresión", self)
         format_layout = QVBoxLayout(format_group)
+        self.minimal_radio = QRadioButton("Mínimo", format_group)
         self.simple_radio = QRadioButton("Simple", format_group)
         self.extended_radio = QRadioButton("Extendido", format_group)
-        self.minimal_radio = QRadioButton("Mínimo", format_group)
-        self.extended_radio.setChecked(True)
+        self.minimal_radio.setChecked(True)
         self.format_buttons = QButtonGroup(self)
-        for button in (self.simple_radio, self.extended_radio, self.minimal_radio):
+        for button in (self.minimal_radio, self.simple_radio, self.extended_radio):
             self.format_buttons.addButton(button)
             format_layout.addWidget(button)
         layout.addWidget(format_group)
@@ -589,7 +589,7 @@ class RecipePdfExportDialog(QDialog):
         layout.addWidget(buttons)
 
         self.minimal_radio.toggled.connect(self.minimal_options_group.setVisible)
-        self.minimal_options_group.setVisible(False)
+        self.minimal_options_group.setVisible(True)
 
     def layout_mode(self) -> str:
         if self.simple_radio.isChecked():

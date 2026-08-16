@@ -18,7 +18,12 @@ def test_minimal_export_options_are_exclusive_and_only_visible_for_minimal() -> 
     _application()
     dialog = RecipePdfExportDialog()
 
-    assert dialog.layout_mode() == "extended"
+    assert dialog.layout_mode() == "minimal"
+    assert not dialog.minimal_options_group.isHidden()
+
+    dialog.simple_radio.setChecked(True)
+
+    assert dialog.layout_mode() == "simple"
     assert dialog.minimal_options_group.isHidden()
 
     dialog.minimal_radio.setChecked(True)
