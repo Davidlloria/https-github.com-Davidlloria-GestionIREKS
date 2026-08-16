@@ -83,9 +83,10 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
                 │   │       │   │       ├── Und (52 px; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
                 │   │       │   │       └── Proceso (94 px; cabecera fondo #EEF2F7, borde inferior #D8E0EA)
                 │   │       │   └── lines_totals_frame (QFrame azul #2F80ED, radio 8 px) → lines_totals_table (QTableWidget transparente; total de cantidad y % panadero, sincronizado con las columnas de líneas)
-                │   │       └── nutrition_panel (QGroupBox, objectName `nutritionPanel`, fondo #FFFFFF, borde #D8E0EA, radio 8 px, ancho 272 px, sin reserva de título nativo)
-                │   │           ├── QLabel "Valores nutricionales" (dentro del panel, fondo transparente, sin borde, margen superior interno de 2 px)
-                │   │           └── nutrition_table (QTableWidget, ajustada a la parte superior 5 px bajo la etiqueta, fondo transparente, sin borde, 8 filas, valores por 100 g; cabecera fondo #E6EAF0, sin borde)
+                │   │       └── nutrition_panel (QWidget, objectName `nutritionPanel`, fondo transparente, sin borde, ancho 272 px)
+                │   │           └── nutrition_card (NutritionCard, fondo #FFFFFF, borde verde suave #DFE9E4, radio 14 px, ajustada a la parte superior)
+                │   │               ├── cabecera verde suave con icono, título "Valores nutricionales", subtítulo "Información media" y etiqueta "Por 100 g"
+                │   │               └── 8 filas de solo lectura con icono, etiqueta y valor: energía, grasas, saturadas, hidratos, azúcares, fibra, proteínas y sal
                 │   │   └── summary_group (QGroupBox "Resumen técnico", fondo #FFFFFF, borde #D8E0EA, radio 8 px; ancho completo de receta_tab)
                 │   │       └── píldoras (QFrame, fondo #F8FAFD, borde #CAD3DF, radio 14 px): Masa total, Total harinas, Total líquidos e Hidratación
                 ├── pestaña Escandallo (QWidget, fondo transparente, sin borde)
@@ -152,7 +153,7 @@ RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA
 - `lines_table` tiene una altura fija equivalente a cabecera más 10 filas de 30 px, para mantener un editor de líneas compacto y estable.
 - `recipe_top_row` ocupa el ancho completo del contenedor compartido y contiene `recipe_process_row` antes de `recipeRibbon`. `recipe_content_row` agrupa en paralelo `receta_left_panel` y `nutrition_panel`.
 - `recipe_top_row` está fuera de `editor_tabs` y se comparte entre todas sus pestañas: en Receta y Escandallo se habilitan todos los controles; en Proceso solo el selector, +/− y Técnica; en Observaciones todos quedan apagados; y en Imágenes se habilitan PDF y Excel.
-- `nutrition_panel` tiene ancho mínimo y máximo de 272 px; sus columnas miden 146 px y 88 px.
+- `nutrition_panel` tiene ancho mínimo y máximo de 272 px. `NutritionCard` conserva los valores calculados y formateados por la receta; no introduce porcentajes de ingesta de referencia ni modifica servicios o persistencia.
 - Las píldoras del resumen técnico miden 150 x 48 px.
 - La pestaña de imágenes usa una cinta superior de 56 px y una lista de iconos con cuadrícula de 154 x 140 px e iconos de 132 x 98 px.
 

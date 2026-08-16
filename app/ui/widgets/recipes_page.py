@@ -54,6 +54,7 @@ from app.services import PdfService
 from app.services.recipe_active_flow_service import RecipeActiveFlowService, RecipeActivePayload
 from app.services.recipe_service import RecipeService
 from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
+from app.ui.widgets.nutrition_card import NutritionCard, NutritionRowData
 from app.viewmodels import IngredientChoice
 
 
@@ -2231,70 +2232,16 @@ class RecipesPage(QWidget):
             summary_top_layout.addWidget(summary_pill(icon_path, label, value))
         summary_top_layout.addStretch(1)
 
-        nutrition_panel = QGroupBox()
+        nutrition_panel = QWidget()
         nutrition_panel.setObjectName("nutritionPanel")
         nutrition_panel.setMinimumWidth(272)
         nutrition_panel.setMaximumWidth(272)
         nutrition_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         nutrition_layout = QVBoxLayout(nutrition_panel)
-        nutrition_layout.setContentsMargins(6, 2, 6, 6)
-        nutrition_layout.setSpacing(5)
-        nutrition_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        nutrition_title = QLabel("Valores nutricionales")
-        nutrition_title.setStyleSheet("background: transparent; border: none;")
-        nutrition_layout.addWidget(nutrition_title)
-        self.nutrition_table = QTableWidget(8, 2)
-        self.nutrition_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.nutrition_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.nutrition_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        self.nutrition_table.setHorizontalHeaderLabels(["Información nutricional", "Por 100 g"])
-        self.nutrition_table.setStyleSheet(
-            "QTableWidget { font-size: 11px; border: none; background: transparent; }"
-            "QHeaderView { background: #E6EAF0; }"
-            "QHeaderView::section {"
-            "font-size: 10px; padding: 1px 4px; background: #E6EAF0;"
-            "border: none; border-radius: 0px; margin: 0px;"
-            "}"
-            "QTableCornerButton::section { background: #E6EAF0; border: none; border-radius: 0px; }"
-            "QTableWidget::item { padding: 1px 4px; border: none; }"
-        )
-        nutrition_header = self.nutrition_table.horizontalHeader()
-        nutrition_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        nutrition_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        nutrition_header.setFixedHeight(22)
-        self.nutrition_table.verticalHeader().setDefaultSectionSize(24)
-        self.nutrition_table.verticalHeader().setMinimumSectionSize(22)
-        self.nutrition_table.verticalHeader().setVisible(False)
-        self.nutrition_table.setShowGrid(False)
-        self.nutrition_table.setAlternatingRowColors(False)
-        self.nutrition_table.setWordWrap(True)
-        self.nutrition_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.nutrition_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        nutrition_rows = [
-            ("Energía (kJ/kcal)", "1200 / 285"),
-            ("Grasas", "12 g"),
-            ("- de las cuales saturadas", "4 g"),
-            ("Hidratos de carbono", "35 g"),
-            ("- de los cuales azúcares", "8 g"),
-            ("Fibra", "3 g"),
-            ("Proteínas", "6 g"),
-            ("Sal", "1,2 g"),
-        ]
-        for row, (name, per_100) in enumerate(nutrition_rows):
-            name_item = QTableWidgetItem(name)
-            per_100_item = QTableWidgetItem(per_100)
-            per_100_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            self.nutrition_table.setItem(row, 0, name_item)
-            self.nutrition_table.setItem(row, 1, per_100_item)
-        self.nutrition_table.setColumnWidth(0, 146)
-        self.nutrition_table.setColumnWidth(1, 88)
-        self.nutrition_table.setRowHeight(0, 34)
-        self.nutrition_table.resizeRowsToContents()
-        nutrition_table_height = self.nutrition_table.horizontalHeader().height() + sum(
-            self.nutrition_table.rowHeight(i) for i in range(self.nutrition_table.rowCount())
-        ) + 2
-        self.nutrition_table.setFixedHeight(nutrition_table_height)
-        nutrition_layout.addWidget(self.nutrition_table, 0, Qt.AlignmentFlag.AlignTop)
+        nutrition_layout.setContentsMargins(0, 0, 0, 0)
+        nutrition_layout.setSpacing(0)
+        self.nutrition_card = NutritionCard(parent=nutrition_panel)
+        nutrition_layout.addWidget(self.nutrition_card, 0, Qt.AlignmentFlag.AlignTop)
 
         summary_root_layout.addLayout(summary_top_layout)
 
@@ -4176,24 +4123,42 @@ class RecipesPage(QWidget):
         proteinas = float(values_per_100.get("proteinas_g", 0.0) or 0.0)
         sal = float(values_per_100.get("sal_g", 0.0) or 0.0)
 
-        rendered = [
-            f"{self._format_number(energia_kj)} kJ\n{self._format_number(energia_kcal)} kcal",
-            f"{self._format_number(grasas)} g",
-            f"{self._format_number(saturadas)} g",
-            f"{self._format_number(hidratos)} g",
-            f"{self._format_number(azucares)} g",
-            f"{self._format_number(fibra)} g",
-            f"{self._format_number(proteinas)} g",
-            f"{self._format_number(sal)} g",
-        ]
-        for row_idx, text in enumerate(rendered):
-            item = self.nutrition_table.item(row_idx, 1)
-            if item is None:
-                item = QTableWidgetItem()
-                item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                self.nutrition_table.setItem(row_idx, 1, item)
-            item.setText(text)
-        self.nutrition_table.resizeRowsToContents()
+        if not hasattr(self, "nutrition_card"):
+            return
+        self.nutrition_card.set_rows(
+            [
+                NutritionRowData(
+                    key="energia",
+                    label="Energía (kJ/kcal)",
+                    value=f"{self._format_number(energia_kj)} kJ\n{self._format_number(energia_kcal)} kcal",
+                    icon="energy",
+                ),
+                NutritionRowData("grasas", "Grasas", f"{self._format_number(grasas)} g", icon="fat"),
+                NutritionRowData(
+                    "saturadas",
+                    "de las cuales saturadas",
+                    f"{self._format_number(saturadas)} g",
+                    icon="fat",
+                    secondary=True,
+                ),
+                NutritionRowData(
+                    "hidratos",
+                    "Hidratos de carbono",
+                    f"{self._format_number(hidratos)} g",
+                    icon="carbohydrate",
+                ),
+                NutritionRowData(
+                    "azucares",
+                    "de los cuales azúcares",
+                    f"{self._format_number(azucares)} g",
+                    icon="sugar",
+                    secondary=True,
+                ),
+                NutritionRowData("fibra", "Fibra", f"{self._format_number(fibra)} g", icon="fiber"),
+                NutritionRowData("proteinas", "Proteínas", f"{self._format_number(proteinas)} g", icon="protein"),
+                NutritionRowData("sal", "Sal", f"{self._format_number(sal)} g", icon="salt"),
+            ]
+        )
 
     def _set_issues_text(self, text: str) -> None:
         self.current_issues = text.splitlines() if text else []

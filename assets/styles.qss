@@ -91,7 +91,6 @@ QFrame#recipeRibbon {
 
 QGroupBox#escandalloGroup,
 QGroupBox#escandalloSummaryGroup,
-QGroupBox#nutritionPanel,
 QGroupBox#recipeLinesGroup {
     margin-top: 0;
     padding-top: 0;
@@ -99,10 +98,14 @@ QGroupBox#recipeLinesGroup {
 
 QGroupBox#escandalloGroup::title,
 QGroupBox#escandalloSummaryGroup::title,
-QGroupBox#nutritionPanel::title,
 QGroupBox#recipeLinesGroup::title {
     height: 0;
     padding: 0;
+}
+
+QWidget#nutritionPanel {
+    background-color: transparent;
+    border: none;
 }
 
 QDialog,
