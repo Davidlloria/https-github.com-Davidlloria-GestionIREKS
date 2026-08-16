@@ -2062,9 +2062,15 @@ class RecipesPage(QWidget):
         recipe_process_layout.addWidget(del_process_btn)
         recipe_process_layout.addStretch()
 
-        lines_group = QGroupBox("Lineas de receta")
+        lines_group = QGroupBox()
+        lines_group.setObjectName("recipeLinesGroup")
         lines_layout = QVBoxLayout(lines_group)
-        lines_layout.setSpacing(6)
+        lines_layout.setContentsMargins(6, 2, 6, 6)
+        lines_layout.setSpacing(5)
+        lines_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        lines_title = QLabel("Líneas de receta")
+        lines_title.setStyleSheet("background: transparent; border: none;")
+        lines_layout.addWidget(lines_title)
 
         self.lines_table = QTableWidget(0, 5)
         self.lines_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -2113,7 +2119,7 @@ class RecipesPage(QWidget):
         self.lines_table.itemChanged.connect(self._on_line_item_changed)
         self.lines_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.lines_table.customContextMenuRequested.connect(self._show_lines_context_menu)
-        lines_layout.addWidget(self.lines_table)
+        lines_layout.addWidget(self.lines_table, 0, Qt.AlignmentFlag.AlignTop)
         self._refresh_process_controls(["Masa final"], preserve_active=False)
 
         summary_group = QGroupBox("Resumen tecnico")
