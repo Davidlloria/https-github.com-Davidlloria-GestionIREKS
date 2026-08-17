@@ -1,0 +1,171 @@
+# VENTANA PRODUCTOS IREKS — PYSIDE6 / BACKEND
+
+Implementación principal:
+
+- UI: `app/ui/widgets/ingredients_page.py` (`IngredientsIreksPage`)
+- Estilos compartidos: `assets/styles.qss`
+- Servicios principales:
+  - `app/services/ingredient_ireks_service.py`
+  - `app/services/ingredient_ireks_autosave_flow_service.py`
+  - `app/services/sales_annual_comparison_service.py`
+  - `app/services/monthly_orders_service.py`
+  - `app/services/product_report_flow_service.py`
+- Modelos relevantes:
+  - `IngredienteIreks`
+  - `Fabricante`, `Familia`, `Subfamilia`, `Envase`
+  - `ReferenciaDistribuidor`
+  - `TarifaPrecioIreks`
+  - `MateriaPrimaValorNutricional`
+  - `AlmacenMovimiento`, `PedidoItem`
+
+La sección se registra como `Productos IREKS` en `app/ui/main_window.py` y usa el widget `IngredientsIreksPage`.
+
+## Estructura UI real
+
+```text
+IngredientsIreksPage (QWidget)
+└── layout principal (QVBoxLayout)
+    ├── título “Productos IREKS” (QLabel, role="pageTitle"; visible salvo modo embebido)
+    └── splitter horizontal (QSplitter, childrenCollapsible=False, handleWidth=0)
+        ├── panel izquierdo (QWidget, objectName `sidePanel`, ancho fijo 420 px)
+        │   └── layout vertical
+        │       ├── fila de filtros de fabricante y actividad
+        │       │   ├── fabricante_filter (QComboBox, ancho 280 px)
+        │       │   └── activity_filter (QComboBox, ancho 120 px: Todos, Activos, Inactivos)
+        │       ├── fila de taxonomía
+        │       │   ├── familia_filter (QComboBox)
+        │       │   └── subfamilia_filter (QComboBox)
+        │       ├── search_input (QLineEdit, placeholder “Buscar productos...”, ancho 405 px)
+        │       └── table (QTableWidget, selección de fila única, solo lectura, cabeceras ordenables)
+        │           ├── Ref (90 px)
+        │           ├── Nombre (stretch)
+        │           └── Sel. (55 px; selector de inclusión para listados)
+        └── panel derecho (QWidget)
+            └── layout vertical sin márgenes
+                ├── topRibbon (QFrame; se oculta en modo sin acciones)
+                │   ├── Nuevo (btnRole `success`)
+                │   ├── Eliminar (btnRole `danger`)
+                │   ├── ID (btnRole `secondary`)
+                │   ├── Importar Excel/CSV (btnRole `secondary`)
+                │   ├── Listados (btnRole `primary`)
+                │   └── Refrescar (btnRole `secondary`)
+                └── splitter vertical derecho (QSplitter)
+                    ├── detailPanel (QWidget, alto fijo 168 px; 82 px en modo compacto)
+                    │   ├── título “Detalle del producto”
+                    │   ├── Ref. / detail_referencia (QLineEdit)
+                    │   ├── Ref. corta / detail_ref_corta (QLineEdit)
+                    │   ├── Descripción / detail_descripcion (QLineEdit)
+                    │   ├── distribuidor, referencia y descripción de distribuidor
+                    │   ├── estado Activo (radio Sí/No)
+                    │   ├── estado En lista (radio Sí/No)
+                    │   └── categoría (radio Harina/Líquido)
+                    └── tabs_host
+                        └── detail_tabs (QTabWidget)
+                            ├── Datos
+                            │   └── ireksDataTab (QWidget, fondo blanco)
+                            │       ├── taxonomía: fabricante, familia y subfamilia
+                            │       ├── presentación: envase, contenido, unidad de contenido,
+                            │       │   peso por unidad, unidad de peso y total de presentación
+                            │       └── transporte: pallet, presentaciones/capa, capas,
+                            │           presentaciones/pallet, uds/pallet, total pallet y observaciones
+                            ├── Tarifa
+                            │   ├── filtro de año
+                            │   ├── Añadir tarifa / Editar / Eliminar
+                            │   ├── tarifa_header_table (cabecera agrupada IREKS / DISTRIBUIDOR)
+                            │   └── tarifa_table (10 columnas: año, precio IREKS, descuento y coste/margen de distribuidor)
+                            ├── Entradas
+                            │   ├── filtro Desde / Hasta / Todo
+                            │   ├── entradas_table (Fecha, Pedido Nº, Albarán, Uds, Kg, Lote, Caduca)
+                            │   └── entradas_totals_table (fila fija sincronizada)
+                            ├── Salidas
+                            │   ├── filtro Desde / Hasta / Todo
+                            │   ├── salidas_table (Fecha, Pedido Nº, Albarán, Uds, Kg, Lote, Caduca)
+                            │   └── salidas_totals_table (fila fija sincronizada)
+                            ├── Stock
+                            │   ├── filtro Desde / Hasta / Todo
+                            │   ├── stock_table (Fecha, Tipo, Pedido Nº, Albarán, Uds, Kg, Lote, Caduca)
+                            │   └── stock_totals_table (fila fija sincronizada)
+                            ├── Mensual
+                            │   ├── filtro Desde / Hasta / Limpiar
+                            │   └── monthly_orders_table (Mes, Pedidos, Cantidad, Kg, Media, Últ. fecha, Últ. pedido)
+                            ├── Pedidos
+                            │   ├── filtro Desde / Hasta / Limpiar
+                            │   └── pedidos_table (Fecha, Pedido Nº, Albarán, Cantidad, Lote, Caducidad)
+                            ├── Nutición
+                            │   └── nutricion_table (Nutriente / Por 100 g; 9 filas editables)
+                            └── Clientes
+                                ├── selector de año
+                                ├── ireksCustomerConsumptionEmpty (estado vacío)
+                                └── ireksCustomerConsumptionTable (Cliente, Último período, Kg, Unidades, €; ordenable)
+```
+
+## Comportamiento actual
+
+- Al abrir la pantalla se cargan el catálogo de productos y sus filtros. Si hay productos, se selecciona el primero y se completa su ficha.
+- La búsqueda espera 200 ms antes de recargar, y filtra junto con fabricante, familia, subfamilia, estado y distribuidor externo cuando se ha recibido ese filtro.
+- La lista izquierda conserva la ordenación elegida de Ref. o Nombre. La columna `Sel.` permite marcar productos para los listados.
+- Seleccionar un producto actualiza la ficha, la presentación, la taxonomía, la referencia de distribuidor y las pestañas relacionadas.
+- Los cambios de ficha se guardan mediante autosave diferido de 350 ms. Durante la carga de datos, el autosave queda bloqueado.
+- El total de presentación se calcula a partir de contenido y peso. Los campos de transporte derivados (presentaciones/pallet, uds/pallet y total pallet) son de solo lectura y se recalculan desde los datos de pallet.
+- Cambiar fabricante restringe las familias disponibles; cambiar familia restringe las subfamilias.
+- Las pestañas Entradas, Salidas y Stock se actualizan con el producto activo y respetan sus filtros de fechas. Sus filas de total no se desplazan y se alinean con las tablas.
+- Mensual resume los pedidos por período; Pedidos muestra los artículos de pedido del producto filtrados por fechas.
+- Tarifa permite crear, editar y eliminar tarifas del producto. La cabecera agrupa visualmente los datos IREKS y los del distribuidor.
+- Nutición guarda valores por 100 g del producto seleccionado. La pestaña usa valores de energía, grasas, saturadas, hidratos, azúcares, fibra, proteínas y sal.
+- La pestaña Clientes carga los consumidores del producto seleccionado. Filtra por año y, para un año concreto, muestra solo clientes con kg o euros actuales positivos. Sus magnitudes se ordenan numéricamente.
+- `Nuevo` abre una ficha de creación; `Eliminar` requiere producto seleccionado y confirmación; `Importar Excel/CSV` abre el flujo de importación; `ID` muestra el identificador técnico del producto.
+- `Listados` abre una ventana no modal para generar un listado desde una petición en lenguaje natural, previsualizarlo y exportarlo a Excel, PDF o impresora.
+
+## Geometría actual
+
+- El panel de lista tiene ancho fijo de 420 px; el panel de detalle comparte el resto del ancho con factor de estiramiento equivalente.
+- El separador principal no es visible ni arrastrable (`handleWidth(0)`).
+- El ribbon se sitúa sobre el detalle y tiene márgenes internos de 8 x 6 px y separación de 6 px entre acciones.
+- `detailPanel` tiene alto fijo de 168 px; el modo compacto lo reduce a 82 px.
+- El splitter vertical derecho da prioridad a las pestañas (factor 9) sobre la ficha superior (factor 1).
+- Las pestañas de movimientos usan tablas de siete u ocho columnas; fecha, pedido, albarán, unidades, kg y caducidad mantienen anchuras fijas y Lote absorbe el ancho restante.
+- La tabla de tarifas fija diez columnas entre 58 y 92 px y elimina el desplazamiento horizontal; su cabecera de dos filas mide 62 px.
+
+## Aspecto visual actual
+
+- La página usa el estilo global de controles y tablas de `assets/styles.qss`.
+- Las listas son de solo lectura, con selección de fila, cabeceras clicables y sin borde de foco en los ítems.
+- `ireksDataTab` usa fondo blanco; sus etiquetas son azul grisáceo `#486081` y los campos tienen altura mínima de 28 px.
+- Entradas se presenta en una tarjeta blanca con borde `#E5EAF1`, radio 10 px, tabla blanca y cabecera `#F7F9FC`; las filas alternas y el hover aportan contraste suave.
+- Las tablas de totales de movimientos no muestran scroll, usan fondo `#F7F9FC` y quedan unidas visualmente a su tabla.
+- Los botones de tarifa tienen colores propios: añadir verde, editar azul y eliminar rojo.
+- Los botones del ribbon siguen los roles estándar: verde para altas, rojo para eliminación, azul para listados y gris para acciones auxiliares.
+
+## Diálogos y flujos relacionados
+
+- `IngredientIreksCreateDialog`: alta de un producto IREKS con catálogos disponibles.
+- `AddTarifaIreksDialog`: alta o edición de una tarifa, calculando los valores por envase y por kg.
+- Diálogo de ID: muestra el identificador técnico del producto seleccionado.
+- Flujo de importación: selecciona archivo Excel/CSV, analiza y confirma la importación de productos.
+- Diálogo `Listados de productos IREKS`: permite generar, exportar a Excel/PDF e imprimir el resultado del listado.
+- Confirmación de eliminación: evita borrar un producto sin confirmación explícita.
+
+## Relación con backend / datos
+
+- `IngredientsIreksPage` es UI PySide6 y consulta servicios locales; no utiliza el frontend React.
+- `IngredientIreksService` centraliza la consulta de catálogo, alta, actualización, eliminación, tarifas, nutrición, referencias de distribuidor y movimientos/pedidos.
+- `IngredientIreksAutosaveFlowService` valida y ejecuta la actualización diferida de la ficha seleccionada.
+- `SalesAnnualComparisonService` proporciona los años y clientes consumidores de la pestaña Clientes.
+- `MonthlyOrdersService` construye el resumen de pedidos mensuales.
+- `ProductReportFlowService` interpreta la petición de listado y prepara las filas exportables; `ReportExportService` resuelve los destinos de exportación.
+
+## Ajustes y limitaciones relevantes documentados
+
+- La ficha es editable y su autosave persiste cambios reales; no existe un botón general Guardar para deshacerlos.
+- La eliminación de producto y las operaciones de tarifa son mutaciones reales sobre datos locales.
+- Las pestañas de movimientos, pedidos, tarifas, nutrición y clientes dependen del producto seleccionado; sin selección muestran tabla vacía o estado vacío.
+- La pestaña Clientes es de consulta: no permite cambiar la relación entre cliente y producto desde esta pantalla.
+- El diálogo de listados se abre como no modal y las exportaciones solo se habilitan después de generar un resultado válido.
+
+## Modales principales
+
+- Modal `Nuevo producto IREKS`: `IngredientIreksCreateDialog`.
+- Modal `Añadir/Editar tarifa`: `AddTarifaIreksDialog`.
+- Modal `ID de producto`: muestra el ID del producto seleccionado.
+- Modal `Importar productos`: flujo Excel/CSV de productos IREKS.
+- Ventana `Listados de productos IREKS`: generación, previsualización y exportación de listados.
