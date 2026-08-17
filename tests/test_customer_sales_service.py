@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 from app.services.customer_service import CustomerService
+from app.ui.widgets.customers_page import _has_current_sales_activity
 
 
 @dataclass
@@ -50,3 +52,11 @@ def test_related_sales_rejects_empty_customer_or_invalid_year() -> None:
     assert service.related_sales("", 2026) == []
     assert service.related_sales("cliente-1", 0) == []
     assert fake.calls == []
+
+
+def test_current_sales_activity_excludes_previous_period_only_articles() -> None:
+    previous_period_only = SimpleNamespace(unidades_curr=0, kg_curr=0, euros_curr=0, unidades_prev=4)
+    current_amount_without_units = SimpleNamespace(unidades_curr=0, kg_curr=3.5, euros_curr=12.0)
+
+    assert not _has_current_sales_activity(previous_period_only)
+    assert _has_current_sales_activity(current_amount_without_units)

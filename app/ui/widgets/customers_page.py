@@ -59,6 +59,14 @@ from app.ui.widgets.entity_dialog import EntityDialog
 BASE_DIR = Path(__file__).resolve().parents[3]
 
 
+def _has_current_sales_activity(item: object) -> bool:
+    """Return whether a comparison row has activity in the selected period."""
+    return any(
+        abs(float(getattr(item, field, 0.0) or 0.0)) > 1e-9
+        for field in ("unidades_curr", "kg_curr", "euros_curr")
+    )
+
+
 class CustomerSalesComparisonChartDialog(QDialog):
     def __init__(self, *, rows: list, year: int, customer_name: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -1304,7 +1312,10 @@ class CustomersPage(QWidget):
                 month_to=month_to,
             )
 
-        self._related_sales_rows = list(rows or [])
+        # The summary service also returns previous-period-only articles for the
+        # comparison dialog. Keep those records in the service result, but do
+        # not show them as current sales in this main table.
+        self._related_sales_rows = [item for item in (rows or []) if _has_current_sales_activity(item)]
         self._loading_related_sales = True
         self.related_sales_table.setSortingEnabled(False)
         try:
