@@ -59,6 +59,7 @@ from app.services.product_report_flow_service import ProductReportFlowService
 from app.services.product_report_service import ProductReportResult
 from app.services.report_export_service import ReportExportService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
+from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
 from app.ui.widgets.entity_page import EntityPage
 from app.ui.widgets.ingredient_distributors_tab import IngredientDistributorsTab
 from app.viewmodels import IngredientIreksViewModel, IngredientStdViewModel
@@ -637,6 +638,26 @@ class IngredientsIreksPage(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
+        if self.show_actions_ribbon:
+            ribbon, ribbon_layout = create_standard_top_ribbon()
+            self.new_product_btn = create_standard_ribbon_button("Nuevo", role="success", icon_name="plus.svg")
+            self.delete_product_btn = create_standard_ribbon_button("Eliminar", role="danger", icon_name="trash.svg")
+            self.product_id_btn = create_standard_ribbon_button("ID", role="secondary", icon_name="package.svg")
+            self.product_reports_btn = create_standard_ribbon_button("Listados", role="primary", icon_name="list.svg")
+            self.new_product_btn.clicked.connect(self._new_product)
+            self.delete_product_btn.clicked.connect(self._delete_product)
+            self.product_id_btn.clicked.connect(self._show_product_id_dialog)
+            self.product_reports_btn.clicked.connect(self._open_product_reports_dialog)
+            for button in (
+                self.new_product_btn,
+                self.delete_product_btn,
+                self.product_id_btn,
+                self.product_reports_btn,
+            ):
+                ribbon_layout.addWidget(button)
+            ribbon_layout.addStretch(1)
+            layout.addWidget(ribbon)
+
         splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(splitter, 1)
 
@@ -711,28 +732,6 @@ class IngredientsIreksPage(QWidget):
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(6)
-
-        if self.show_actions_ribbon:
-            ribbon = QFrame()
-            ribbon.setObjectName("topRibbon")
-            ribbon.setFrameShape(QFrame.Shape.StyledPanel)
-            ribbon_layout = QHBoxLayout(ribbon)
-            ribbon_layout.setContentsMargins(8, 6, 8, 6)
-            ribbon_layout.setSpacing(6)
-            for text, role, handler in [
-                ("Nuevo", "success", self._new_product),
-                ("Eliminar", "danger", self._delete_product),
-                ("ID", "secondary", self._show_product_id_dialog),
-                ("Importar Excel/CSV", "secondary", self._import_products),
-                ("Listados", "primary", self._open_product_reports_dialog),
-                ("Refrescar", "secondary", self.reload),
-            ]:
-                btn = QPushButton(text)
-                btn.setProperty("btnRole", role)
-                btn.clicked.connect(handler)
-                ribbon_layout.addWidget(btn)
-            ribbon_layout.addStretch(1)
-            right_layout.addWidget(ribbon)
 
         right_splitter = QSplitter(Qt.Orientation.Vertical)
         right_layout.addWidget(right_splitter, 1)

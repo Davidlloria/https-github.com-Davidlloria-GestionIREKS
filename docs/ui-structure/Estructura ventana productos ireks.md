@@ -25,6 +25,12 @@ La sección se registra como `Productos IREKS` en `app/ui/main_window.py` y usa 
 ```text
 IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF3F8, sin borde, WA_StyledBackground=True)
 └── layout principal (QVBoxLayout)
+    ├── topRibbon (QFrame, objectName `topRibbon`, pageType="contacts", fondo #FFFFFF, borde #E2E8F1, radio 8 px)
+    │   ├── Nuevo (QPushButton, icono `plus.svg`, rol `success`, 110 x 30 px)
+    │   ├── Eliminar (QPushButton, icono `trash.svg`, rol `danger`, 110 x 30 px)
+    │   ├── ID (QPushButton, icono `package.svg`, rol `secondary`, 110 x 30 px)
+    │   ├── Listados (QPushButton, icono `list.svg`, rol `primary`, 110 x 30 px)
+    │   └── espacio flexible
     └── splitter horizontal (QSplitter, childrenCollapsible=False, handleWidth=0)
         ├── panel izquierdo (QWidget, objectName `sidePanel`, ancho fijo 420 px)
         │   └── layout vertical
@@ -41,13 +47,6 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
         │           └── Sel. (55 px; selector de inclusión para listados)
         └── panel derecho (QWidget)
             └── layout vertical sin márgenes
-                ├── topRibbon (QFrame; se oculta en modo sin acciones)
-                │   ├── Nuevo (btnRole `success`)
-                │   ├── Eliminar (btnRole `danger`)
-                │   ├── ID (btnRole `secondary`)
-                │   ├── Importar Excel/CSV (btnRole `secondary`)
-                │   ├── Listados (btnRole `primary`)
-                │   └── Refrescar (btnRole `secondary`)
                 └── splitter vertical derecho (QSplitter)
                     ├── detailPanel (QWidget, alto fijo 168 px; 82 px en modo compacto)
                     │   ├── título “Detalle del producto”
@@ -112,14 +111,14 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
 - Tarifa permite crear, editar y eliminar tarifas del producto. La cabecera agrupa visualmente los datos IREKS y los del distribuidor.
 - Nutición guarda valores por 100 g del producto seleccionado. La pestaña usa valores de energía, grasas, saturadas, hidratos, azúcares, fibra, proteínas y sal.
 - La pestaña Clientes carga los consumidores del producto seleccionado. Filtra por año y, para un año concreto, muestra solo clientes con kg o euros actuales positivos. Sus magnitudes se ordenan numéricamente.
-- `Nuevo` abre una ficha de creación; `Eliminar` requiere producto seleccionado y confirmación; `Importar Excel/CSV` abre el flujo de importación; `ID` muestra el identificador técnico del producto.
+- `Nuevo` abre una ficha de creación; `Eliminar` requiere producto seleccionado y confirmación; `ID` muestra el identificador técnico del producto.
 - `Listados` abre una ventana no modal para generar un listado desde una petición en lenguaje natural, previsualizarlo y exportarlo a Excel, PDF o impresora.
 
 ## Geometría actual
 
 - El panel de lista tiene ancho fijo de 420 px; el panel de detalle comparte el resto del ancho con factor de estiramiento equivalente.
 - El separador principal no es visible ni arrastrable (`handleWidth(0)`).
-- El ribbon se sitúa sobre el detalle y tiene márgenes internos de 8 x 6 px y separación de 6 px entre acciones.
+- El ribbon se sitúa antes del splitter horizontal y tiene márgenes internos de 8 x 6 px y separación de 6 px entre acciones.
 - `detailPanel` tiene alto fijo de 168 px; el modo compacto lo reduce a 82 px.
 - El splitter vertical derecho da prioridad a las pestañas (factor 9) sobre la ficha superior (factor 1).
 - Las pestañas de movimientos usan tablas de siete u ocho columnas; fecha, pedido, albarán, unidades, kg y caducidad mantienen anchuras fijas y Lote absorbe el ancho restante.
@@ -140,7 +139,6 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
 - `IngredientIreksCreateDialog`: alta de un producto IREKS con catálogos disponibles.
 - `AddTarifaIreksDialog`: alta o edición de una tarifa, calculando los valores por envase y por kg.
 - Diálogo de ID: muestra el identificador técnico del producto seleccionado.
-- Flujo de importación: selecciona archivo Excel/CSV, analiza y confirma la importación de productos.
 - Diálogo `Listados de productos IREKS`: permite generar, exportar a Excel/PDF e imprimir el resultado del listado.
 - Confirmación de eliminación: evita borrar un producto sin confirmación explícita.
 
@@ -166,5 +164,4 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
 - Modal `Nuevo producto IREKS`: `IngredientIreksCreateDialog`.
 - Modal `Añadir/Editar tarifa`: `AddTarifaIreksDialog`.
 - Modal `ID de producto`: muestra el ID del producto seleccionado.
-- Modal `Importar productos`: flujo Excel/CSV de productos IREKS.
 - Ventana `Listados de productos IREKS`: generación, previsualización y exportación de listados.
