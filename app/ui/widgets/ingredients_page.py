@@ -1561,7 +1561,7 @@ class IngredientsIreksPage(QWidget):
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 1)
         splitter.setChildrenCollapsible(False)
-        splitter.setHandleWidth(0)
+        splitter.setHandleWidth(5)
         splitter.handle(1).setEnabled(False)
 
     def _build_product_reports_panel(self) -> QWidget:

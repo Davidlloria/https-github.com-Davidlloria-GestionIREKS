@@ -31,7 +31,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
     │   ├── ID (QPushButton, icono `package.svg`, rol `secondary`, 110 x 30 px)
     │   ├── Listados (QPushButton, icono `list.svg`, rol `primary`, 110 x 30 px)
     │   └── espacio flexible
-    └── splitter horizontal (QSplitter, objectName `ireksMainSplitter`, fondo transparente, sin borde, childrenCollapsible=False, handleWidth=0)
+    └── splitter horizontal (QSplitter, objectName `ireksMainSplitter`, fondo transparente, sin borde, childrenCollapsible=False, handleWidth=5 px)
         ├── panel izquierdo (QWidget, objectName `sidePanel`, ancho fijo 420 px)
         │   └── layout vertical
         │       ├── fila de filtros de fabricante y actividad
@@ -117,7 +117,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
 ## Geometría actual
 
 - El panel de lista tiene ancho fijo de 420 px; el panel de detalle comparte el resto del ancho con factor de estiramiento equivalente.
-- El separador principal no es visible ni arrastrable (`handleWidth(0)`).
+- El separador principal deja un espacio transparente de 5 px entre los paneles y no es arrastrable (`handleWidth(5)`).
 - El ribbon se sitúa antes del splitter horizontal y tiene márgenes internos de 8 x 6 px y separación de 6 px entre acciones.
 - `detailPanel` tiene alto fijo de 168 px; el modo compacto lo reduce a 82 px.
 - El splitter vertical derecho da prioridad a las pestañas (factor 9) sobre la ficha superior (factor 1).
