@@ -586,6 +586,8 @@ class IngredientsIreksPage(QWidget):
         vm: Any | None = None,
     ) -> None:
         QWidget.__init__(self)
+        self.setObjectName("IngredientsIreksPageRoot")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.show_header = show_header
         self.show_actions_ribbon = show_actions_ribbon
         self.compact_mode = compact_mode
@@ -634,10 +636,6 @@ class IngredientsIreksPage(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
-        if self.show_header:
-            header = QLabel("Productos IREKS")
-            header.setProperty("role", "pageTitle")
-            layout.addWidget(header)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(splitter, 1)

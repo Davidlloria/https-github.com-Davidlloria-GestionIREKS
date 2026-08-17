@@ -23,9 +23,8 @@ La sección se registra como `Productos IREKS` en `app/ui/main_window.py` y usa 
 ## Estructura UI real
 
 ```text
-IngredientsIreksPage (QWidget)
+IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF3F8, sin borde, WA_StyledBackground=True)
 └── layout principal (QVBoxLayout)
-    ├── título “Productos IREKS” (QLabel, role="pageTitle"; visible salvo modo embebido)
     └── splitter horizontal (QSplitter, childrenCollapsible=False, handleWidth=0)
         ├── panel izquierdo (QWidget, objectName `sidePanel`, ancho fijo 420 px)
         │   └── layout vertical

@@ -18,6 +18,11 @@ QWidget#RecipesPageRoot {
     border: none;
 }
 
+QWidget#IngredientsIreksPageRoot {
+    background-color: #EEF3F8;
+    border: none;
+}
+
 QSplitter#recipesMainSplitter,
 QWidget#recipesContentPanel,
 QWidget#recipesImagesRibbon {
