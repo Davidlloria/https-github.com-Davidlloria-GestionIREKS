@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 
 from PySide6.QtCore import QDate, QTimer, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QTextDocument
+from PySide6.QtGui import QBrush, QColor, QFont, QIcon, QPainter, QPen, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -741,33 +741,246 @@ class IngredientsIreksPage(QWidget):
 
         detail_panel = QWidget()
         detail_panel.setObjectName("detailPanel")
-        if self.compact_mode:
-            detail_panel.setFixedHeight(82)
-        else:
-            detail_panel.setFixedHeight(168)
+        detail_panel.setFixedHeight(232)
+        icon_dir = Path(__file__).resolve().parents[3] / "assets" / "icons"
+        detail_panel.setStyleSheet(
+            f"""
+            QWidget#detailPanel {{
+                background-color: #F8FAFC;
+                border: 1px solid #CBD5E1;
+                border-radius: 9px;
+            }}
+            QFrame#productDetailHeader {{
+                background-color: #06213D;
+                border: none;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+            }}
+            QLabel#productDetailTitle {{
+                color: #FFFFFF;
+                font-size: 16px;
+                font-weight: 700;
+            }}
+            QFrame#productDetailBody {{
+                background-color: #F8FAFC;
+                border: none;
+            }}
+            QLabel[detailGroup="true"] {{
+                color: #315176;
+                font-size: 10px;
+                font-weight: 700;
+            }}
+            QLabel[detailField="true"] {{
+                color: #37516F;
+                font-size: 11px;
+                font-weight: 600;
+            }}
+            QWidget[detailFieldBox="true"] {{
+                background: transparent;
+                border: none;
+            }}
+            QWidget#detailPanel QLineEdit,
+            QWidget#detailPanel QComboBox {{
+                min-height: 28px;
+                max-height: 28px;
+                padding: 0 9px;
+                color: #102A48;
+                background-color: #FFFFFF;
+                border: 1px solid #C5D0DE;
+                border-radius: 6px;
+            }}
+            QWidget#detailPanel QLineEdit:focus,
+            QWidget#detailPanel QComboBox:focus {{
+                border-color: #087E9C;
+            }}
+            QWidget#detailPanel QComboBox::drop-down {{
+                width: 26px;
+                border: none;
+            }}
+            QWidget#detailPanel QComboBox::down-arrow {{
+                image: url({(icon_dir / "chevron-down-navy.svg").as_posix()});
+                width: 13px;
+                height: 13px;
+            }}
+            QFrame#productDetailDivider {{
+                background-color: #D9E2EC;
+                border: none;
+                max-height: 1px;
+            }}
+            QFrame#productDetailStatusRail {{
+                background-color: #F1F5F9;
+                border: 1px solid #D6E0EA;
+                border-radius: 7px;
+            }}
+            QLabel[detailStatusLabel="true"] {{
+                color: #315176;
+                font-size: 11px;
+                font-weight: 600;
+            }}
+            QRadioButton[detailSegment="true"] {{
+                min-height: 26px;
+                padding: 0 12px;
+                spacing: 0;
+                color: #17324F;
+                background-color: #FFFFFF;
+                border: 1px solid #C7D2DF;
+                border-radius: 5px;
+                font-weight: 600;
+            }}
+            QRadioButton[detailSegment="true"]::indicator {{
+                width: 0;
+                height: 0;
+            }}
+            QRadioButton[detailSegment="true"]:hover {{
+                background-color: #E6F2F6;
+                border-color: #77AFC0;
+            }}
+            QRadioButton[detailSegment="true"]:checked {{
+                color: #FFFFFF;
+                background-color: #087E9C;
+                border-color: #087E9C;
+            }}
+            QFrame[detailStatusDivider="true"] {{
+                background-color: #CBD5E1;
+                border: none;
+                min-width: 1px;
+                max-width: 1px;
+            }}
+            """
+        )
 
-        # Malla fija (coordenadas absolutas) para el bloque de detalle.
-        detail_title = QLabel("Detalle del producto", detail_panel)
-        detail_title.setProperty("role", "sectionTitle")
-        detail_title.setGeometry(14, 8, 260, 24)
+        detail_layout = QVBoxLayout(detail_panel)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
+        detail_layout.setSpacing(0)
 
-        QLabel("Ref.", detail_panel).setGeometry(14, 50, 30, 24)
-        self.detail_referencia = QLineEdit()
-        self.detail_referencia.setParent(detail_panel)
-        self.detail_referencia.setGeometry(45, 46, 92 if self.compact_mode else 100, 24)
-        QLabel("Ref. corta", detail_panel).setGeometry(150, 50, 82, 24)
-        self.detail_ref_corta = QLineEdit()
-        self.detail_ref_corta.setParent(detail_panel)
-        self.detail_ref_corta.setGeometry(210, 46, 95 if self.compact_mode else 100, 24)
-        QLabel("Descripcion", detail_panel).setGeometry(333 if self.compact_mode else 350, 50, 82, 24)
-        self.detail_descripcion = QLineEdit()
-        self.detail_descripcion.setParent(detail_panel)
-        self.detail_descripcion.setGeometry(415 if self.compact_mode else 432, 46, 385, 24)
+        detail_header = QFrame(detail_panel)
+        detail_header.setObjectName("productDetailHeader")
+        detail_header.setFixedHeight(38)
+        detail_header_layout = QHBoxLayout(detail_header)
+        detail_header_layout.setContentsMargins(14, 0, 14, 0)
+        detail_header_layout.setSpacing(9)
+        detail_icon = QLabel(detail_header)
+        detail_icon.setPixmap(QIcon(str(icon_dir / "product-detail.svg")).pixmap(21, 21))
+        detail_icon.setFixedSize(22, 22)
+        detail_header_layout.addWidget(detail_icon)
+        detail_title = QLabel("Detalle del producto", detail_header)
+        detail_title.setObjectName("productDetailTitle")
+        detail_header_layout.addWidget(detail_title)
+        detail_header_layout.addStretch(1)
+        detail_layout.addWidget(detail_header)
 
+        detail_body = QFrame(detail_panel)
+        detail_body.setObjectName("productDetailBody")
+        detail_body_layout = QVBoxLayout(detail_body)
+        detail_body_layout.setContentsMargins(12, 7, 12, 7)
+        detail_body_layout.setSpacing(3)
+
+        def add_detail_field(row: QHBoxLayout, label_text: str, field: QWidget, stretch: int) -> None:
+            field_box = QWidget(detail_body)
+            field_box.setProperty("detailFieldBox", True)
+            field_layout = QVBoxLayout(field_box)
+            field_layout.setContentsMargins(0, 0, 0, 0)
+            field_layout.setSpacing(1)
+            label = QLabel(label_text, field_box)
+            label.setProperty("detailField", True)
+            field_layout.addWidget(label)
+            field_layout.addWidget(field)
+            row.addWidget(field_box, stretch)
+
+        product_group_label = QLabel("PRODUCTO", detail_body)
+        product_group_label.setProperty("detailGroup", True)
+        detail_body_layout.addWidget(product_group_label)
+
+        self.detail_referencia = QLineEdit(detail_body)
+        self.detail_ref_corta = QLineEdit(detail_body)
+        self.detail_descripcion = QLineEdit(detail_body)
+        product_row = QHBoxLayout()
+        product_row.setContentsMargins(0, 0, 0, 0)
+        product_row.setSpacing(8)
+        add_detail_field(product_row, "Ref.", self.detail_referencia, 2)
+        add_detail_field(product_row, "Ref. corta", self.detail_ref_corta, 2)
+        add_detail_field(product_row, "Descripción", self.detail_descripcion, 5)
+        detail_body_layout.addLayout(product_row)
+
+        product_divider = QFrame(detail_body)
+        product_divider.setObjectName("productDetailDivider")
+        product_divider.setFixedHeight(1)
+        detail_body_layout.addWidget(product_divider)
+
+        distributor_group_label = QLabel("DISTRIBUIDOR", detail_body)
+        distributor_group_label.setProperty("detailGroup", True)
+        detail_body_layout.addWidget(distributor_group_label)
+
+        self.detail_distribuidor_id = QComboBox(detail_body)
+        self.detail_distribuidor_id.addItem("", "")
+        self.detail_referencia_distribuidor = QLineEdit(detail_body)
+        self.detail_descripcion_distribuidor = QLineEdit(detail_body)
+        distributor_row = QHBoxLayout()
+        distributor_row.setContentsMargins(0, 0, 0, 0)
+        distributor_row.setSpacing(8)
+        add_detail_field(distributor_row, "Distribuidor", self.detail_distribuidor_id, 3)
+        add_detail_field(distributor_row, "Referencia", self.detail_referencia_distribuidor, 2)
+        add_detail_field(distributor_row, "Descripción", self.detail_descripcion_distribuidor, 5)
+        detail_body_layout.addLayout(distributor_row)
+
+        status_rail = QFrame(detail_body)
+        status_rail.setObjectName("productDetailStatusRail")
+        status_rail_layout = QHBoxLayout(status_rail)
+        status_rail_layout.setContentsMargins(9, 4, 9, 4)
+        status_rail_layout.setSpacing(7)
+
+        def add_status_label(text: str) -> None:
+            label = QLabel(text, status_rail)
+            label.setProperty("detailStatusLabel", True)
+            status_rail_layout.addWidget(label)
+
+        def add_status_button(text: str) -> QRadioButton:
+            button = QRadioButton(text, status_rail)
+            button.setProperty("detailSegment", True)
+            status_rail_layout.addWidget(button)
+            return button
+
+        def add_status_divider() -> None:
+            divider = QFrame(status_rail)
+            divider.setProperty("detailStatusDivider", True)
+            divider.setFixedHeight(24)
+            status_rail_layout.addWidget(divider)
+
+        add_status_label("Status activo")
+        self.detail_status_activo_si = add_status_button("Sí")
+        self.detail_status_activo_no = add_status_button("No")
+        self.detail_status_activo_group = QButtonGroup(detail_panel)
+        self.detail_status_activo_group.setExclusive(True)
+        self.detail_status_activo_group.addButton(self.detail_status_activo_si)
+        self.detail_status_activo_group.addButton(self.detail_status_activo_no)
+        self.detail_status_activo_si.setChecked(True)
+
+        add_status_divider()
+        add_status_label("Status en lista")
+        self.detail_status_en_lista_si = add_status_button("Sí")
+        self.detail_status_en_lista_no = add_status_button("No")
+        self.detail_status_en_lista_group = QButtonGroup(detail_panel)
+        self.detail_status_en_lista_group.setExclusive(True)
+        self.detail_status_en_lista_group.addButton(self.detail_status_en_lista_si)
+        self.detail_status_en_lista_group.addButton(self.detail_status_en_lista_no)
+        self.detail_status_en_lista_no.setChecked(True)
+
+        add_status_divider()
+        add_status_label("Categoría")
+        self.detail_categoria_harina = add_status_button("Harina")
+        self.detail_categoria_liquido = add_status_button("Líquido")
+        self.detail_categoria_group = QButtonGroup(detail_panel)
+        self.detail_categoria_group.setExclusive(True)
+        self.detail_categoria_group.addButton(self.detail_categoria_harina)
+        self.detail_categoria_group.addButton(self.detail_categoria_liquido)
+        self._set_ireks_category("")
+        status_rail_layout.addStretch(1)
+        detail_body_layout.addWidget(status_rail)
+        detail_layout.addWidget(detail_body, 1)
+
+        # Estos campos se reutilizan en la pestaña Datos mediante reparentado.
         self.detail_data_top_separator = QFrame(detail_panel)
-        self.detail_data_top_separator.setFrameShape(QFrame.Shape.HLine)
-        self.detail_data_top_separator.setFrameShadow(QFrame.Shadow.Sunken)
-        self.detail_data_top_separator.setGeometry(14, 82, 810 if self.compact_mode else 850, 2)
+        self.detail_data_top_separator.hide()
 
         self.lbl_detail_envase = QLabel("Envase", detail_panel)
         self.lbl_detail_envase.setGeometry(14, 92, 45, 24)
@@ -818,75 +1031,7 @@ class IngredientsIreksPage(QWidget):
         self.detail_subfamilia_id.addItem("", "")
 
         self.detail_data_row_separator = QFrame(detail_panel)
-        self.detail_data_row_separator.setFrameShape(QFrame.Shape.HLine)
-        self.detail_data_row_separator.setFrameShadow(QFrame.Shadow.Sunken)
-        self.detail_data_row_separator.setGeometry(14, 128, 810 if self.compact_mode else 850, 2)
-
-        QLabel("Distribuidor", detail_panel).setGeometry(14, 94, 70, 24)
-        self.detail_distribuidor_id = QComboBox(detail_panel)
-        self.detail_distribuidor_id.setGeometry(86, 90, 180 if self.compact_mode else 210, 24)
-        self.detail_distribuidor_id.addItem("", "")
-
-        QLabel("Referencia", detail_panel).setGeometry(280 if self.compact_mode else 305, 94, 64, 24)
-        self.detail_referencia_distribuidor = QLineEdit(detail_panel)
-        self.detail_referencia_distribuidor.setGeometry(
-            345 if self.compact_mode else 375,
-            90,
-            60 if self.compact_mode else 95,
-            24,
-        )
-
-        QLabel("Descripcion", detail_panel).setGeometry(480 if self.compact_mode else 485, 94, 68, 24)
-        self.detail_descripcion_distribuidor = QLineEdit(detail_panel)
-        self.detail_descripcion_distribuidor.setGeometry(
-            550 if self.compact_mode else 555,
-            90,
-            260 if self.compact_mode else 270,
-            24,
-        )
-
-        row_separator_3 = QFrame(detail_panel)
-        row_separator_3.setFrameShape(QFrame.Shape.HLine)
-        row_separator_3.setFrameShadow(QFrame.Shadow.Sunken)
-        row_separator_3.setGeometry(14, 82, 810 if self.compact_mode else 850, 2)
-
-        row_separator_4 = QFrame(detail_panel)
-        row_separator_4.setFrameShape(QFrame.Shape.HLine)
-        row_separator_4.setFrameShadow(QFrame.Shadow.Sunken)
-        row_separator_4.setGeometry(14, 124, 810 if self.compact_mode else 850, 2)
-
-        QLabel("Status activo", detail_panel).setGeometry(14, 132, 88, 24)
-        self.detail_status_activo_si = QRadioButton("Si", detail_panel)
-        self.detail_status_activo_si.setGeometry(106, 132, 50, 24)
-        self.detail_status_activo_no = QRadioButton("No", detail_panel)
-        self.detail_status_activo_no.setGeometry(160, 132, 50, 24)
-        self.detail_status_activo_group = QButtonGroup(detail_panel)
-        self.detail_status_activo_group.setExclusive(True)
-        self.detail_status_activo_group.addButton(self.detail_status_activo_si)
-        self.detail_status_activo_group.addButton(self.detail_status_activo_no)
-        self.detail_status_activo_si.setChecked(True)
-
-        QLabel("Status en lista", detail_panel).setGeometry(220, 132, 92, 24)
-        self.detail_status_en_lista_si = QRadioButton("Si", detail_panel)
-        self.detail_status_en_lista_si.setGeometry(316, 132, 50, 24)
-        self.detail_status_en_lista_no = QRadioButton("No", detail_panel)
-        self.detail_status_en_lista_no.setGeometry(370, 132, 50, 24)
-        self.detail_status_en_lista_group = QButtonGroup(detail_panel)
-        self.detail_status_en_lista_group.setExclusive(True)
-        self.detail_status_en_lista_group.addButton(self.detail_status_en_lista_si)
-        self.detail_status_en_lista_group.addButton(self.detail_status_en_lista_no)
-        self.detail_status_en_lista_no.setChecked(True)
-
-        QLabel("Categoria", detail_panel).setGeometry(440, 132, 70, 24)
-        self.detail_categoria_harina = QRadioButton("Harina", detail_panel)
-        self.detail_categoria_harina.setGeometry(512, 132, 70, 24)
-        self.detail_categoria_liquido = QRadioButton("Líquido", detail_panel)
-        self.detail_categoria_liquido.setGeometry(590, 132, 80, 24)
-        self.detail_categoria_group = QButtonGroup(detail_panel)
-        self.detail_categoria_group.setExclusive(True)
-        self.detail_categoria_group.addButton(self.detail_categoria_harina)
-        self.detail_categoria_group.addButton(self.detail_categoria_liquido)
-        self._set_ireks_category("")
+        self.detail_data_row_separator.hide()
 
         for field in (
             self.detail_ref_corta,
