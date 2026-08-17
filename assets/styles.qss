@@ -23,6 +23,11 @@ QWidget#IngredientsIreksPageRoot {
     border: none;
 }
 
+QWidget#ireksContentPanel {
+    background-color: transparent;
+    border: none;
+}
+
 QSplitter#recipesMainSplitter,
 QWidget#recipesContentPanel,
 QWidget#recipesImagesRibbon {
