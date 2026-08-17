@@ -64,6 +64,17 @@ from app.ui.widgets.ingredient_distributors_tab import IngredientDistributorsTab
 from app.viewmodels import IngredientIreksViewModel, IngredientStdViewModel
 
 
+class _SortableNumberItem(QTableWidgetItem):
+    def __init__(self, text: str, value: float) -> None:
+        super().__init__(text)
+        self._value = float(value or 0.0)
+
+    def __lt__(self, other) -> bool:
+        if isinstance(other, _SortableNumberItem):
+            return self._value < other._value
+        return super().__lt__(other)
+
+
 class TarifaDistribuidorChart(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -1531,9 +1542,11 @@ class IngredientsIreksPage(QWidget):
         self.customer_consumption_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.customer_consumption_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.customer_consumption_table.setAlternatingRowColors(True)
+        self.customer_consumption_table.setSortingEnabled(True)
         self.customer_consumption_table.verticalHeader().setVisible(False)
         self.customer_consumption_table.setHorizontalHeaderLabels(["Cliente", "Último período", "Kg", "Unidades", "€"])
         customer_header = self.customer_consumption_table.horizontalHeader()
+        customer_header.setSectionsClickable(True)
         customer_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         for column in range(1, 5):
             customer_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
@@ -1875,6 +1888,7 @@ class IngredientsIreksPage(QWidget):
             ]
         self.customer_consumption_empty.setText("No hay clientes con consumo registrado para este producto.")
         self.customer_consumption_empty.setVisible(not rows)
+        self.customer_consumption_table.setSortingEnabled(False)
         self.customer_consumption_table.setRowCount(len(rows))
         for row_index, row in enumerate(rows):
             code = str(getattr(row, "cliente_codigo", "") or "").strip()
@@ -1882,9 +1896,12 @@ class IngredientsIreksPage(QWidget):
             customer_item = QTableWidgetItem(f"{code} · {name}" if code else name)
             customer_item.setData(Qt.ItemDataRole.UserRole, str(getattr(row, "cliente_id", "") or ""))
             period_item = QTableWidgetItem(str(getattr(row, "ultimo_periodo", "") or ""))
-            kg_item = QTableWidgetItem(f"{float(getattr(row, 'kg_curr', 0.0) or 0.0):.2f}")
-            units_item = QTableWidgetItem(f"{float(getattr(row, 'unidades_curr', 0.0) or 0.0):.2f}")
-            euros_item = QTableWidgetItem(f"{float(getattr(row, 'euros_curr', 0.0) or 0.0):.2f} €")
+            kg_value = float(getattr(row, "kg_curr", 0.0) or 0.0)
+            units_value = float(getattr(row, "unidades_curr", 0.0) or 0.0)
+            euros_value = float(getattr(row, "euros_curr", 0.0) or 0.0)
+            kg_item = _SortableNumberItem(f"{kg_value:.2f}", kg_value)
+            units_item = _SortableNumberItem(f"{units_value:.2f}", units_value)
+            euros_item = _SortableNumberItem(f"{euros_value:.2f} €", euros_value)
             for item in (period_item, kg_item, units_item, euros_item):
                 item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.customer_consumption_table.setItem(row_index, 0, customer_item)
@@ -1892,6 +1909,7 @@ class IngredientsIreksPage(QWidget):
             self.customer_consumption_table.setItem(row_index, 2, kg_item)
             self.customer_consumption_table.setItem(row_index, 3, units_item)
             self.customer_consumption_table.setItem(row_index, 4, euros_item)
+        self.customer_consumption_table.setSortingEnabled(True)
 
     def _reload_customer_consumption_years(self) -> None:
         if not hasattr(self, "customer_consumption_year"):
