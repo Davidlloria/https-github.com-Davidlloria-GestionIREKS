@@ -72,6 +72,16 @@ def _default_recipe_pdf_filename(recipe_name: str, customer_name: str, saved_at:
     return f"{safe_name or 'receta'}.pdf"
 
 
+def _customer_display_name(customer: Any) -> str:
+    return str(
+        getattr(customer, "cliente_nombre_comercial", "")
+        or getattr(customer, "cliente_nombre_fiscal", "")
+        or getattr(customer, "cliente_nombre_interno", "")
+        or getattr(customer, "cliente_id", "")
+        or ""
+    ).strip()
+
+
 def _white_icon_from_svg(svg_path: Path) -> QIcon:
     source = QPixmap(str(svg_path))
     white = QPixmap(source.size())
@@ -382,11 +392,7 @@ class CustomerRecipeSelectionDialog(QDialog):
             code_item = QTableWidgetItem(str(getattr(customer, "cliente_codigo", "") or ""))
             code_item.setData(Qt.ItemDataRole.UserRole, customer_id)
             self.table.setItem(row, 0, code_item)
-            label = str(
-                getattr(customer, "cliente_nombre_comercial", "")
-                or getattr(customer, "cliente_nombre_fiscal", "")
-                or customer_id
-            ).strip()
+            label = _customer_display_name(customer) or customer_id
             self.table.setItem(row, 1, QTableWidgetItem(label))
 
     def _accept_selected(self) -> None:
@@ -3037,7 +3043,7 @@ class RecipesPage(QWidget):
         customers = self.recipe_service.list_customers()
         self.cliente_combo.clear()
         for customer in customers:
-            self.cliente_combo.addItem(f"{customer.cliente_nombre_comercial}", customer.cliente_id)
+            self.cliente_combo.addItem(_customer_display_name(customer), str(customer.cliente_id))
         self.cliente_combo.setCurrentIndex(-1)
         self._update_inline_customer_name()
         self._reload_customer_filter(customers)
@@ -3049,8 +3055,7 @@ class RecipesPage(QWidget):
             customers = self.recipe_service.list_customers()
         self._customer_filter_items: list[tuple[str, str]] = [("", "Todos los clientes")]
         for customer in customers:
-            label = customer.cliente_nombre_comercial or customer.cliente_nombre_fiscal or customer.cliente_id
-            self._customer_filter_items.append((str(customer.cliente_id), str(label)))
+            self._customer_filter_items.append((str(customer.cliente_id), _customer_display_name(customer)))
         valid_ids = {item[0] for item in self._customer_filter_items}
         if self.customer_filter_selected_id not in valid_ids:
             self.customer_filter_selected_id = ""
@@ -3059,12 +3064,7 @@ class RecipesPage(QWidget):
 
     @staticmethod
     def _customer_filter_label(customer: Any) -> str:
-        return str(
-            getattr(customer, "cliente_nombre_comercial", "")
-            or getattr(customer, "cliente_nombre_fiscal", "")
-            or getattr(customer, "cliente_id", "")
-            or ""
-        ).strip()
+        return _customer_display_name(customer)
 
     def _on_customer_filter_text_changed(self, text: str) -> None:
         if self._is_loading_recipe:
@@ -3349,11 +3349,11 @@ class RecipesPage(QWidget):
         finally:
             self._is_loading_recipe = False
 
-    def _set_combo_by_data(self, combo: QComboBox, value: str) -> None:
-        idx = combo.findData(value)
-        if idx >= 0:
-            combo.setCurrentIndex(idx)
+    def _set_combo_by_data(self, combo: QComboBox, value: str) -> bool:
+        idx = combo.findData(str(value or ""))
+        combo.setCurrentIndex(idx)
         self._update_inline_customer_name()
+        return idx >= 0
 
     def _update_inline_customer_name(self) -> None:
         if not hasattr(self, "customer_header_box") or not hasattr(self, "recipe_tabs"):
