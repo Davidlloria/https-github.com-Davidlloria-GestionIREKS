@@ -736,6 +736,7 @@ class IngredientsIreksPage(QWidget):
         right_layout.setSpacing(6)
 
         right_splitter = QSplitter(Qt.Orientation.Vertical)
+        right_splitter.setObjectName("ireksDetailSplitter")
         right_layout.addWidget(right_splitter, 1)
 
         detail_panel = QWidget()

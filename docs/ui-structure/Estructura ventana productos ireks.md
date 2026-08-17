@@ -47,7 +47,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
         │           └── Sel. (55 px; selector de inclusión para listados)
         └── panel derecho (QWidget, objectName `ireksContentPanel`, fondo transparente, sin borde)
             └── layout vertical sin márgenes
-                └── splitter vertical derecho (QSplitter)
+                └── splitter vertical derecho (QSplitter, objectName `ireksDetailSplitter`, fondo transparente, sin borde)
                     ├── detailPanel (QWidget, alto fijo 168 px; 82 px en modo compacto)
                     │   ├── título “Detalle del producto”
                     │   ├── Ref. / detail_referencia (QLineEdit)
