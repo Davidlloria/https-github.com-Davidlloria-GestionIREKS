@@ -1472,7 +1472,8 @@ class CustomersPage(QWidget):
         dialog = QDialog(self)
         dialog.setObjectName("customerSalesMonthlyDetailDialog")
         dialog.setWindowTitle(f"Detalle mensual · {product_name or articulo_codigo}")
-        dialog.resize(640, 580)
+        dialog.setFixedWidth(680)
+        dialog.resize(680, 580)
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
@@ -1489,6 +1490,7 @@ class CustomersPage(QWidget):
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         table.setAlternatingRowColors(True)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         table.verticalHeader().setVisible(False)
         table.setHorizontalHeaderLabels(["Mes", "Unid.", "Kg", "€"])
         header = table.horizontalHeader()
@@ -1526,14 +1528,30 @@ class CustomersPage(QWidget):
         totals.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         totals.verticalHeader().setVisible(False)
         totals.horizontalHeader().setVisible(False)
+        totals.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        totals.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         totals.setFixedHeight(34)
-        totals.setItem(0, 0, QTableWidgetItem("TOTALES"))
+        totals_header = totals.horizontalHeader()
+        for column in range(4):
+            totals_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+        total_label = QTableWidgetItem("TOTALES")
+        total_label.setForeground(QColor("#FFFFFF"))
+        total_label.setBackground(QColor("#2F80ED"))
+        totals.setItem(0, 0, total_label)
         for column, value, suffix in ((1, total_units, ""), (2, total_kg, " kg"), (3, total_euros, " €")):
             cell = QTableWidgetItem(self._format_sales_number(value, suffix=suffix))
             cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            cell.setForeground(QColor("#FFFFFF"))
+            cell.setBackground(QColor("#2F80ED"))
             totals.setItem(0, column, cell)
-            totals.setColumnWidth(column, table.columnWidth(column))
-        totals.setColumnWidth(0, table.columnWidth(0))
+        totals.setStyleSheet("QTableWidget { background: #2F80ED; border: 0; gridline-color: #2F80ED; }")
+
+        def sync_totals() -> None:
+            for column in range(table.columnCount()):
+                totals.setColumnWidth(column, table.columnWidth(column))
+
+        header.sectionResized.connect(lambda *_: sync_totals())
+        QTimer.singleShot(0, sync_totals)
         layout.addWidget(totals)
 
         footer = QHBoxLayout()
