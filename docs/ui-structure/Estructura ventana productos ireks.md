@@ -31,7 +31,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
     │   ├── ID (QPushButton, icono `package.svg`, rol `secondary`, 110 x 30 px)
     │   ├── Listados (QPushButton, icono `list.svg`, rol `primary`, 110 x 30 px)
     │   └── espacio flexible
-    └── splitter horizontal (QSplitter, childrenCollapsible=False, handleWidth=0)
+    └── splitter horizontal (QSplitter, objectName `ireksMainSplitter`, fondo transparente, sin borde, childrenCollapsible=False, handleWidth=0)
         ├── panel izquierdo (QWidget, objectName `sidePanel`, ancho fijo 420 px)
         │   └── layout vertical
         │       ├── fila de filtros de fabricante y actividad

@@ -659,6 +659,7 @@ class IngredientsIreksPage(QWidget):
             layout.addWidget(ribbon)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setObjectName("ireksMainSplitter")
         layout.addWidget(splitter, 1)
 
         left_panel = QWidget()

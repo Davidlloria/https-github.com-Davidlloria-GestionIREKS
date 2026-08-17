@@ -28,6 +28,12 @@ QWidget#ireksContentPanel {
     border: none;
 }
 
+QSplitter#ireksMainSplitter,
+QSplitter#ireksMainSplitter::handle {
+    background-color: transparent;
+    border: none;
+}
+
 QSplitter#recipesMainSplitter,
 QWidget#recipesContentPanel,
 QWidget#recipesImagesRibbon {
