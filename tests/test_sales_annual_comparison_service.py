@@ -430,3 +430,45 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
     assert all_year_rows[0].ultimo_periodo == "2026-12"
     assert len(rows_by_code_only) == 2
     assert len(rows_by_name_only) == 2
+
+
+def test_listar_ventas_mensuales_cliente_producto_groups_selected_year_by_month(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        cliente_id, _fabricante_id, _familia_id, _subfamilia_id = _seed_products(session)
+        session.add_all(
+            [
+                VentaClientesRaw(
+                    raw_id="monthly-1", lote_id="monthly-lote", cliente_id=cliente_id, anio=2026, mes=1,
+                    articulo_codigo_origen="D123", articulo_id="art-1", unidades=2, kg=5, euros=15,
+                ),
+                VentaClientesRaw(
+                    raw_id="monthly-2", lote_id="monthly-lote", cliente_id=cliente_id, anio=2026, mes=1,
+                    articulo_codigo_origen="D123", articulo_id="art-1", unidades=1, kg=2.5, euros=8,
+                ),
+                VentaClientesRaw(
+                    raw_id="monthly-3", lote_id="monthly-lote", cliente_id=cliente_id, anio=2026, mes=3,
+                    articulo_codigo_origen="D123", articulo_id="art-1", unidades=4, kg=10, euros=30,
+                ),
+                VentaClientesRaw(
+                    raw_id="monthly-4", lote_id="monthly-lote", cliente_id=cliente_id, anio=2026, mes=3,
+                    articulo_codigo_origen="OTHER", articulo_id="other-art", unidades=9, kg=99, euros=99,
+                ),
+            ]
+        )
+        session.commit()
+
+    rows = SalesAnnualComparisonService().listar_ventas_mensuales_cliente_producto(
+        year=2026,
+        cliente_id=cliente_id,
+        articulo_id="art-1",
+        articulo_codigo="D123",
+    )
+
+    assert len(rows) == 12
+    assert rows[0].unidades == pytest.approx(3.0)
+    assert rows[0].kg == pytest.approx(7.5)
+    assert rows[0].euros == pytest.approx(23.0)
+    assert rows[2].unidades == pytest.approx(4.0)
+    assert rows[2].kg == pytest.approx(10.0)
+    assert rows[2].euros == pytest.approx(30.0)
+    assert rows[1].kg == pytest.approx(0.0)

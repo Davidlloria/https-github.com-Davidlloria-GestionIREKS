@@ -98,6 +98,14 @@ class SalesClientsComparisonRow:
 
 
 @dataclass
+class SalesClientProductMonthlyRow:
+    month: int
+    unidades: float
+    kg: float
+    euros: float
+
+
+@dataclass
 class SalesClientProductConsumerRow:
     cliente_id: str
     cliente_codigo: str
@@ -699,6 +707,79 @@ class SalesAnnualComparisonService:
             bucket[f"euros_{suffix}"] = float(bucket[f"euros_{suffix}"] or 0.0) + float(getattr(row, "euros", 0.0) or 0.0)
 
         return self._build_client_rows(totals)
+
+    def listar_ventas_mensuales_cliente_producto(
+        self,
+        *,
+        year: int,
+        cliente_id: str,
+        articulo_id: str = "",
+        articulo_codigo: str = "",
+    ) -> list[SalesClientProductMonthlyRow]:
+        current_year = int(year or 0)
+        clean_cliente_id = str(cliente_id or "").strip()
+        clean_articulo_id = str(articulo_id or "").strip()
+        clean_articulo_codigo = self._normalize_code(articulo_codigo)
+        empty_rows = [SalesClientProductMonthlyRow(month=month, unidades=0.0, kg=0.0, euros=0.0) for month in range(1, 13)]
+        if current_year <= 0 or not clean_cliente_id or (not clean_articulo_id and not clean_articulo_codigo):
+            return empty_rows
+
+        with Session(self._engine) as session:
+            resolved_cliente_ids = self._resolve_sales_party_ids(session, clean_cliente_id)
+            stmt = select(VentaClientesRaw).where(
+                col(VentaClientesRaw.anio) == current_year,
+                col(VentaClientesRaw.cliente_id).in_(sorted(resolved_cliente_ids)),
+            )
+            raw_rows = list(session.exec(stmt))
+            product_rows = list(session.exec(select(IngredienteIreks)))
+            reference_lookup = self._build_clientes_product_reference_lookup(session)
+
+        product_code_lookup: dict[str, str] = {}
+        for product in product_rows:
+            product_id = str(getattr(product, "articulo_id", "") or "").strip()
+            if not product_id:
+                continue
+            for code in (
+                getattr(product, "articulo_referencia_corta", ""),
+                getattr(product, "articulo_referencia", ""),
+            ):
+                for candidate in self._code_candidates(code):
+                    product_code_lookup[candidate] = product_id
+
+        totals = {month: {"unidades": 0.0, "kg": 0.0, "euros": 0.0} for month in range(1, 13)}
+        for row in raw_rows:
+            row_articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
+            row_code_candidates = self._code_candidates(getattr(row, "articulo_codigo_origen", ""))
+            if not row_articulo_id:
+                row_articulo_id = next(
+                    (
+                        reference_lookup.get(candidate) or product_code_lookup.get(candidate)
+                        for candidate in row_code_candidates
+                        if reference_lookup.get(candidate) or product_code_lookup.get(candidate)
+                    ),
+                    "",
+                )
+            if clean_articulo_id:
+                if row_articulo_id != clean_articulo_id:
+                    continue
+            elif clean_articulo_codigo not in row_code_candidates:
+                continue
+            month = int(getattr(row, "mes", 0) or 0)
+            if month not in totals:
+                continue
+            totals[month]["unidades"] += float(getattr(row, "unidades", 0.0) or 0.0)
+            totals[month]["kg"] += float(getattr(row, "kg", 0.0) or 0.0)
+            totals[month]["euros"] += float(getattr(row, "euros", 0.0) or 0.0)
+
+        return [
+            SalesClientProductMonthlyRow(
+                month=month,
+                unidades=totals[month]["unidades"],
+                kg=totals[month]["kg"],
+                euros=totals[month]["euros"],
+            )
+            for month in range(1, 13)
+        ]
 
     def listar_ventas_anuales_clientes(
         self,

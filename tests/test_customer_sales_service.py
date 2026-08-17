@@ -23,6 +23,10 @@ class _FakeSalesSummaryService:
         self.calls.append((year, cliente_id, month_from, month_to))
         return [_SalesRow()]
 
+    def listar_ventas_mensuales_cliente_producto(self, **kwargs):
+        self.monthly_call = kwargs
+        return ["monthly-row"]
+
 
 def _service_with_fake_sales() -> tuple[CustomerService, _FakeSalesSummaryService]:
     service = CustomerService.__new__(CustomerService)
@@ -60,3 +64,17 @@ def test_current_sales_activity_excludes_previous_period_only_articles() -> None
 
     assert not _has_current_sales_activity(previous_period_only)
     assert _has_current_sales_activity(current_amount_without_units)
+
+
+def test_related_sales_monthly_product_delegates_with_customer_and_product_ids() -> None:
+    service, fake = _service_with_fake_sales()
+
+    rows = service.related_sales_monthly_product(" cliente-1 ", 2026, articulo_id="art-1", articulo_codigo="D123")
+
+    assert rows == ["monthly-row"]
+    assert fake.monthly_call == {
+        "year": 2026,
+        "cliente_id": "cliente-1",
+        "articulo_id": "art-1",
+        "articulo_codigo": "D123",
+    }

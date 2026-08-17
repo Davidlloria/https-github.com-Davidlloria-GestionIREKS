@@ -374,6 +374,25 @@ class CustomerService:
             month_to=month_to,
         )
 
+    def related_sales_monthly_product(
+        self,
+        cliente_id: str,
+        year: int,
+        *,
+        articulo_id: str = "",
+        articulo_codigo: str = "",
+    ) -> list[Any]:
+        clean_id = str(cliente_id or "").strip()
+        clean_year = int(year or 0)
+        if not clean_id or clean_year <= 0:
+            return []
+        return self.sales_summary_service.listar_ventas_mensuales_cliente_producto(
+            year=clean_year,
+            cliente_id=clean_id,
+            articulo_id=articulo_id,
+            articulo_codigo=articulo_codigo,
+        )
+
     def related_agenda(self, cliente_id: str) -> list[ClienteAgenda]:
         return self.agenda_service.related_agenda(cliente_id)
 

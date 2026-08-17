@@ -1183,6 +1183,8 @@ class CustomersPage(QWidget):
         self.related_sales_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.related_sales_table.setAlternatingRowColors(True)
         self.related_sales_table.setSortingEnabled(True)
+        self.related_sales_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.related_sales_table.customContextMenuRequested.connect(self._show_related_sales_context_menu)
         self.related_sales_table.verticalHeader().setVisible(False)
         self.related_sales_table.setHorizontalHeaderLabels(["Referencia", "Descripción", "Unid.", "Kg", "€"])
         sales_header = self.related_sales_table.horizontalHeader()
@@ -1414,6 +1416,134 @@ class CustomersPage(QWidget):
         dialog = self._build_related_sales_comparison_dialog(rows=rows, year=year, customer_name=customer_name)
         self._related_sales_comparison_dialog = dialog
         dialog.exec()
+
+    def _show_related_sales_context_menu(self, pos) -> None:
+        index = self.related_sales_table.indexAt(pos)
+        if not index.isValid():
+            return
+        self.related_sales_table.selectRow(index.row())
+        code_item = self.related_sales_table.item(index.row(), 0)
+        if code_item is None:
+            return
+        menu = QMenu(self)
+        detail_action = menu.addAction("Ver detalle mensual")
+        detail_action.setEnabled(bool(str(code_item.text() or "").strip()))
+        if menu.exec(self.related_sales_table.viewport().mapToGlobal(pos)) == detail_action:
+            self._open_related_sales_monthly_detail(index.row())
+
+    def _open_related_sales_monthly_detail(self, row_idx: int) -> None:
+        selected = self._selected_row()
+        year_filter = self._related_sales_year_filter
+        year = int(year_filter.currentData() or 0) if year_filter is not None else 0
+        if selected is None or year <= 0:
+            return
+        code_item = self.related_sales_table.item(row_idx, 0)
+        name_item = self.related_sales_table.item(row_idx, 1)
+        if code_item is None:
+            return
+        cliente_id = str(getattr(selected, "cliente_id", "") or "").strip()
+        articulo_id = str(code_item.data(Qt.ItemDataRole.UserRole) or "").strip()
+        articulo_codigo = str(code_item.text() or "").strip()
+        if not cliente_id or not articulo_codigo:
+            return
+        rows = self.customer_service.related_sales_monthly_product(
+            cliente_id,
+            year,
+            articulo_id=articulo_id,
+            articulo_codigo=articulo_codigo,
+        )
+        product_name = str(name_item.text() or "").strip() if name_item is not None else ""
+        dialog = self._build_related_sales_monthly_detail_dialog(
+            rows=rows,
+            year=year,
+            articulo_codigo=articulo_codigo,
+            product_name=product_name,
+        )
+        dialog.exec()
+
+    def _build_related_sales_monthly_detail_dialog(
+        self,
+        *,
+        rows: list,
+        year: int,
+        articulo_codigo: str,
+        product_name: str,
+    ) -> QDialog:
+        dialog = QDialog(self)
+        dialog.setObjectName("customerSalesMonthlyDetailDialog")
+        dialog.setWindowTitle(f"Detalle mensual · {product_name or articulo_codigo}")
+        dialog.resize(640, 580)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+        title = QLabel(f"{articulo_codigo} · {product_name}".strip(" ·"))
+        title.setProperty("role", "sectionTitle")
+        layout.addWidget(title)
+        subtitle = QLabel(f"Detalle mensual · {year}")
+        subtitle.setProperty("role", "muted")
+        layout.addWidget(subtitle)
+
+        table = QTableWidget(0, 4)
+        table.setObjectName("customerSalesMonthlyDetailTable")
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        table.setAlternatingRowColors(True)
+        table.verticalHeader().setVisible(False)
+        table.setHorizontalHeaderLabels(["Mes", "Unid.", "Kg", "€"])
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for column in range(1, 4):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+        table.setColumnWidth(1, 125)
+        table.setColumnWidth(2, 140)
+        table.setColumnWidth(3, 140)
+        month_names = (
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+        )
+        table.setRowCount(len(month_names))
+        total_units = total_kg = total_euros = 0.0
+        for index, month_name in enumerate(month_names):
+            item = rows[index] if index < len(rows) else None
+            units = float(getattr(item, "unidades", 0.0) or 0.0)
+            kg = float(getattr(item, "kg", 0.0) or 0.0)
+            euros = float(getattr(item, "euros", 0.0) or 0.0)
+            total_units += units
+            total_kg += kg
+            total_euros += euros
+            table.setItem(index, 0, QTableWidgetItem(month_name))
+            for column, value, suffix in ((1, units, ""), (2, kg, " kg"), (3, euros, " €")):
+                cell = QTableWidgetItem(self._format_sales_number(value, suffix=suffix))
+                cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                table.setItem(index, column, cell)
+        layout.addWidget(table, 1)
+
+        totals = QTableWidget(1, 4)
+        totals.setObjectName("customerSalesMonthlyDetailTotals")
+        totals.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        totals.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        totals.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        totals.verticalHeader().setVisible(False)
+        totals.horizontalHeader().setVisible(False)
+        totals.setFixedHeight(34)
+        totals.setItem(0, 0, QTableWidgetItem("TOTALES"))
+        for column, value, suffix in ((1, total_units, ""), (2, total_kg, " kg"), (3, total_euros, " €")):
+            cell = QTableWidgetItem(self._format_sales_number(value, suffix=suffix))
+            cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            totals.setItem(0, column, cell)
+            totals.setColumnWidth(column, table.columnWidth(column))
+        totals.setColumnWidth(0, table.columnWidth(0))
+        layout.addWidget(totals)
+
+        footer = QHBoxLayout()
+        footer.addStretch(1)
+        close_button = QPushButton("Cerrar")
+        close_button.setProperty("btnRole", "danger")
+        close_button.clicked.connect(dialog.accept)
+        footer.addWidget(close_button)
+        layout.addLayout(footer)
+        return dialog
 
     def _build_related_sales_comparison_dialog(self, *, rows: list, year: int, customer_name: str) -> QDialog:
         dialog = QDialog(self)
