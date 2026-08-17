@@ -402,6 +402,7 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
 
     service = SalesAnnualComparisonService()
     rows = service.listar_clientes_consumidores_producto(2026, "art-1", "DX-001")
+    all_year_rows = service.listar_clientes_consumidores_producto(0, "art-1", "DX-001")
     rows_by_code_only = service.listar_clientes_consumidores_producto(2026, "wrong-id", "DX-001")
     rows_by_name_only = service.listar_clientes_consumidores_producto(2026, "wrong-id", "wrong-code", "Producto IREKS")
 
@@ -414,6 +415,8 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
     assert rows[0].euros_curr == pytest.approx(42.0)
     assert rows[0].delta_kg == pytest.approx(8.5)
     assert rows[0].delta_euros == pytest.approx(32.0)
+    assert rows[0].unidades_curr == pytest.approx(5.0)
+    assert rows[0].ultimo_periodo == "2026-12"
     assert rows[1].cliente_codigo == "2"
     assert rows[1].cliente_nombre == "Cliente Dos"
     assert rows[1].kg_prev == pytest.approx(1.0)
@@ -422,5 +425,8 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
     assert rows[1].euros_curr == pytest.approx(16.8)
     assert rows[1].delta_kg == pytest.approx(4.0)
     assert rows[1].delta_euros == pytest.approx(13.8)
+    assert all_year_rows[0].kg_curr == pytest.approx(16.5)
+    assert all_year_rows[0].unidades_curr == pytest.approx(7.0)
+    assert all_year_rows[0].ultimo_periodo == "2026-12"
     assert len(rows_by_code_only) == 2
     assert len(rows_by_name_only) == 2

@@ -108,6 +108,8 @@ class SalesClientProductConsumerRow:
     euros_curr: float
     delta_kg: float
     delta_euros: float
+    unidades_curr: float = 0.0
+    ultimo_periodo: str = ""
 
 
 @dataclass
@@ -1402,14 +1404,17 @@ class SalesAnnualComparisonService:
         clean_articulo_codigo = self._normalize_code(articulo_codigo)
         clean_articulo_nombre = self._normalize_search_text(articulo_nombre)
         clean_cliente_text = self._normalize_search_text(cliente_texto)
-        if current_year <= 0 or (not clean_articulo_id and not clean_articulo_codigo and not clean_articulo_nombre):
+        if not clean_articulo_id and not clean_articulo_codigo and not clean_articulo_nombre:
             return []
-        years = {current_year}
+        all_years = current_year <= 0
+        years = {current_year} if not all_years else set()
         if current_year > 1:
             years.add(current_year - 1)
 
         with Session(self._engine) as session:
-            stmt = select(VentaClientesRaw).where(col(VentaClientesRaw.anio).in_(years))
+            stmt = select(VentaClientesRaw)
+            if years:
+                stmt = stmt.where(col(VentaClientesRaw.anio).in_(years))
             raw_rows = list(session.exec(stmt))
             clients = list(session.exec(select(Cliente)))
             distributors = list(session.exec(select(Distribuidor)))
@@ -1476,11 +1481,13 @@ class SalesAnnualComparisonService:
                 "euros_prev": 0.0,
                 "kg_curr": 0.0,
                 "euros_curr": 0.0,
+                "unidades_curr": 0.0,
+                "ultimo_periodo": "",
             }
         )
         for row in raw_rows:
             row_year = int(getattr(row, "anio", 0) or 0)
-            if row_year not in years:
+            if years and row_year not in years:
                 continue
             cliente_id_raw = str(getattr(row, "cliente_id", "") or "").strip()
             client_info = client_by_id.get(cliente_id_raw)
@@ -1515,12 +1522,17 @@ class SalesAnnualComparisonService:
                 bucket["cliente_codigo"] = cliente_codigo
             if not str(bucket["cliente_nombre"]):
                 bucket["cliente_nombre"] = cliente_nombre
-            if row_year == current_year - 1:
+            if not all_years and row_year == current_year - 1:
                 bucket["kg_prev"] = float(bucket["kg_prev"] or 0.0) + float(getattr(row, "kg", 0.0) or 0.0)
                 bucket["euros_prev"] = float(bucket["euros_prev"] or 0.0) + float(getattr(row, "euros", 0.0) or 0.0)
-            elif row_year == current_year:
+            elif all_years or row_year == current_year:
                 bucket["kg_curr"] = float(bucket["kg_curr"] or 0.0) + float(getattr(row, "kg", 0.0) or 0.0)
                 bucket["euros_curr"] = float(bucket["euros_curr"] or 0.0) + float(getattr(row, "euros", 0.0) or 0.0)
+                bucket["unidades_curr"] = float(bucket["unidades_curr"] or 0.0) + float(getattr(row, "unidades", 0.0) or 0.0)
+            row_month = int(getattr(row, "mes", 0) or 0)
+            period = f"{row_year:04d}-{row_month:02d}" if row_year > 0 and 1 <= row_month <= 12 else str(row_year or "")
+            if period > str(bucket["ultimo_periodo"] or ""):
+                bucket["ultimo_periodo"] = period
 
         result = [
             SalesClientProductConsumerRow(
@@ -1533,6 +1545,8 @@ class SalesAnnualComparisonService:
                 euros_curr=float(values["euros_curr"] or 0.0),
                 delta_kg=float(values["kg_curr"] or 0.0) - float(values["kg_prev"] or 0.0),
                 delta_euros=float(values["euros_curr"] or 0.0) - float(values["euros_prev"] or 0.0),
+                unidades_curr=float(values["unidades_curr"] or 0.0),
+                ultimo_periodo=str(values["ultimo_periodo"] or ""),
             )
             for values in totals.values()
             if float(values["kg_prev"] or 0.0) > 0

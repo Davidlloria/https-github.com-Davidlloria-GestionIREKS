@@ -58,6 +58,7 @@ from app.services.product_report_document_helper import build_product_report_htm
 from app.services.product_report_flow_service import ProductReportFlowService
 from app.services.product_report_service import ProductReportResult
 from app.services.report_export_service import ReportExportService
+from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
 from app.ui.widgets.entity_page import EntityPage
 from app.ui.widgets.ingredient_distributors_tab import IngredientDistributorsTab
 from app.viewmodels import IngredientIreksViewModel, IngredientStdViewModel
@@ -579,6 +580,7 @@ class IngredientsIreksPage(QWidget):
         self.compact_mode = compact_mode
         self.vm = vm or IngredientIreksViewModel()
         self.ireks_service = IngredientIreksService(self.vm)
+        self.sales_summary_service = SalesAnnualComparisonService()
         self.monthly_orders_service = MonthlyOrdersService()
         self.product_report_flow_service = ProductReportFlowService()
         self.report_export_service = ReportExportService()
@@ -1508,10 +1510,36 @@ class IngredientsIreksPage(QWidget):
 
         clientes_tab = QWidget()
         clientes_layout = QVBoxLayout(clientes_tab)
-        clientes_info = QLabel("Pestaña Clientes pendiente de implementar.")
-        clientes_info.setWordWrap(True)
-        clientes_layout.addWidget(clientes_info, 1)
-        tabs.addTab(clientes_tab, "Clientes")
+        clientes_layout.setContentsMargins(8, 8, 8, 8)
+        clientes_layout.setSpacing(6)
+        clientes_filter_row = QHBoxLayout()
+        clientes_filter_row.addWidget(QLabel("Año"))
+        self.customer_consumption_year = QComboBox(clientes_tab)
+        self.customer_consumption_year.currentIndexChanged.connect(self._reload_customer_consumption_table)
+        clientes_filter_row.addWidget(self.customer_consumption_year)
+        clientes_filter_row.addStretch(1)
+        clientes_layout.addLayout(clientes_filter_row)
+        self.customer_consumption_empty = QLabel("Selecciona un producto para ver sus clientes consumidores.", clientes_tab)
+        self.customer_consumption_empty.setObjectName("ireksCustomerConsumptionEmpty")
+        self.customer_consumption_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.customer_consumption_empty.setWordWrap(True)
+        clientes_layout.addWidget(self.customer_consumption_empty)
+        self.customer_consumption_table = QTableWidget(0, 5, clientes_tab)
+        self.customer_consumption_table.setObjectName("ireksCustomerConsumptionTable")
+        self.customer_consumption_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.customer_consumption_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.customer_consumption_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.customer_consumption_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.customer_consumption_table.setAlternatingRowColors(True)
+        self.customer_consumption_table.verticalHeader().setVisible(False)
+        self.customer_consumption_table.setHorizontalHeaderLabels(["Cliente", "Último período", "Kg", "Unidades", "€"])
+        customer_header = self.customer_consumption_table.horizontalHeader()
+        customer_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for column in range(1, 5):
+            customer_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+        clientes_layout.addWidget(self.customer_consumption_table, 1)
+        self._clientes_tab_index = tabs.addTab(clientes_tab, "Clientes")
+        tabs.currentChanged.connect(self._on_detail_tab_changed)
         tabs_layout.addWidget(tabs)
         right_splitter.addWidget(tabs_host)
         right_splitter.setStretchFactor(0, 1)
@@ -1814,6 +1842,71 @@ class IngredientsIreksPage(QWidget):
         if combo is None:
             return ""
         return str(combo.currentData() or "")
+
+    def _on_detail_tab_changed(self, index: int) -> None:
+        if int(index) == getattr(self, "_clientes_tab_index", -1):
+            self._reload_customer_consumption_table(refresh_years=True)
+
+    def _reload_customer_consumption_table(self, *_args, refresh_years: bool = False) -> None:
+        if not hasattr(self, "customer_consumption_table"):
+            return
+        product = self._selected_row()
+        articulo_id = str(getattr(product, "articulo_id", "") or "").strip() if product else ""
+        if refresh_years:
+            self._reload_customer_consumption_years()
+        self.customer_consumption_table.setRowCount(0)
+        if not articulo_id:
+            self.customer_consumption_empty.setText("Selecciona un producto para ver sus clientes consumidores.")
+            self.customer_consumption_empty.setVisible(True)
+            return
+        year = int(self.customer_consumption_year.currentData() or 0)
+        rows = self.sales_summary_service.listar_clientes_consumidores_producto(
+            year,
+            articulo_id,
+            str(getattr(product, "articulo_referencia_corta", "") or getattr(product, "articulo_referencia", "") or ""),
+            str(getattr(product, "articulo_descripcion", "") or ""),
+        )
+        if year > 0:
+            rows = [
+                row
+                for row in rows
+                if float(getattr(row, "kg_curr", 0.0) or 0.0) > 0
+                or float(getattr(row, "euros_curr", 0.0) or 0.0) > 0
+            ]
+        self.customer_consumption_empty.setText("No hay clientes con consumo registrado para este producto.")
+        self.customer_consumption_empty.setVisible(not rows)
+        self.customer_consumption_table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            code = str(getattr(row, "cliente_codigo", "") or "").strip()
+            name = str(getattr(row, "cliente_nombre", "") or "").strip()
+            customer_item = QTableWidgetItem(f"{code} · {name}" if code else name)
+            customer_item.setData(Qt.ItemDataRole.UserRole, str(getattr(row, "cliente_id", "") or ""))
+            period_item = QTableWidgetItem(str(getattr(row, "ultimo_periodo", "") or ""))
+            kg_item = QTableWidgetItem(f"{float(getattr(row, 'kg_curr', 0.0) or 0.0):.2f}")
+            units_item = QTableWidgetItem(f"{float(getattr(row, 'unidades_curr', 0.0) or 0.0):.2f}")
+            euros_item = QTableWidgetItem(f"{float(getattr(row, 'euros_curr', 0.0) or 0.0):.2f} €")
+            for item in (period_item, kg_item, units_item, euros_item):
+                item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.customer_consumption_table.setItem(row_index, 0, customer_item)
+            self.customer_consumption_table.setItem(row_index, 1, period_item)
+            self.customer_consumption_table.setItem(row_index, 2, kg_item)
+            self.customer_consumption_table.setItem(row_index, 3, units_item)
+            self.customer_consumption_table.setItem(row_index, 4, euros_item)
+
+    def _reload_customer_consumption_years(self) -> None:
+        if not hasattr(self, "customer_consumption_year"):
+            return
+        current_year = self.customer_consumption_year.currentData()
+        was_blocked = self.customer_consumption_year.blockSignals(True)
+        try:
+            self.customer_consumption_year.clear()
+            self.customer_consumption_year.addItem("Todos los años", 0)
+            for year in self.sales_summary_service.list_years_clientes():
+                self.customer_consumption_year.addItem(str(year), int(year))
+            index = self.customer_consumption_year.findData(current_year)
+            self.customer_consumption_year.setCurrentIndex(index if index >= 0 else 0)
+        finally:
+            self.customer_consumption_year.blockSignals(was_blocked)
 
     def set_external_distributor_filter(self, distribuidor_id: str) -> None:
         self.external_distributor_filter_id = str(distribuidor_id or "").strip()
@@ -2324,6 +2417,8 @@ class IngredientsIreksPage(QWidget):
         self._reload_pedidos_table(selected_articulo_id)
         self._reload_tarifas_table(selected_articulo_id)
         self._reload_nutricion_table(selected_articulo_id)
+        if self.detail_tabs.currentIndex() == getattr(self, "_clientes_tab_index", -1):
+            self._reload_customer_consumption_table(refresh_years=True)
         self._update_envase_total_preview()
         self._update_transport_label_texts()
         self._update_transport_total_preview()
