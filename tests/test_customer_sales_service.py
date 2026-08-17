@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 
 from app.services.customer_service import CustomerService
-from app.ui.widgets.customers_page import _has_current_sales_activity
+from app.ui.widgets.customers_page import _NumericTableWidgetItem, _has_current_sales_activity
 
 
 @dataclass
@@ -78,3 +78,11 @@ def test_related_sales_monthly_product_delegates_with_customer_and_product_ids()
         "articulo_id": "art-1",
         "articulo_codigo": "D123",
     }
+
+
+def test_numeric_table_items_sort_by_their_numeric_value() -> None:
+    twelve = _NumericTableWidgetItem("12,00 kg", 12.0)
+    three = _NumericTableWidgetItem("3,00 kg", 3.0)
+
+    assert not (twelve < three)
+    assert three < twelve

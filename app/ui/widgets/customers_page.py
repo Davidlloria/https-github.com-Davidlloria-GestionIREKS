@@ -67,6 +67,21 @@ def _has_current_sales_activity(item: object) -> bool:
     )
 
 
+class _NumericTableWidgetItem(QTableWidgetItem):
+    """Table item that displays formatted text while sorting by its numeric value."""
+
+    _SORT_ROLE = Qt.ItemDataRole.UserRole + 10
+
+    def __init__(self, text: str, value: float) -> None:
+        super().__init__(text)
+        self.setData(self._SORT_ROLE, float(value))
+
+    def __lt__(self, other: QTableWidgetItem) -> bool:
+        if isinstance(other, _NumericTableWidgetItem):
+            return float(self.data(self._SORT_ROLE) or 0.0) < float(other.data(self._SORT_ROLE) or 0.0)
+        return super().__lt__(other)
+
+
 class CustomerSalesComparisonChartDialog(QDialog):
     def __init__(self, *, rows: list, year: int, customer_name: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -1335,9 +1350,9 @@ class CustomersPage(QWidget):
 
                 code_item = QTableWidgetItem(str(getattr(item, "codigo", "") or ""))
                 name_item = QTableWidgetItem(str(getattr(item, "nombre", "") or ""))
-                units_item = QTableWidgetItem(self._format_sales_number(units))
-                kg_item = QTableWidgetItem(self._format_sales_number(kg, suffix=" kg"))
-                euros_item = QTableWidgetItem(self._format_sales_number(euros, suffix=" €"))
+                units_item = _NumericTableWidgetItem(self._format_sales_number(units), units)
+                kg_item = _NumericTableWidgetItem(self._format_sales_number(kg, suffix=" kg"), kg)
+                euros_item = _NumericTableWidgetItem(self._format_sales_number(euros, suffix=" €"), euros)
 
                 code_item.setData(Qt.ItemDataRole.UserRole, str(getattr(item, "articulo_id", "") or ""))
                 units_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
