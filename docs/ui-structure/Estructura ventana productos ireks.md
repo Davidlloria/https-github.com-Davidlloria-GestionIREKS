@@ -48,15 +48,24 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
         └── panel derecho (QWidget, objectName `ireksContentPanel`, fondo transparente, sin borde)
             └── layout vertical sin márgenes
                 └── splitter vertical derecho (QSplitter, objectName `ireksDetailSplitter`, fondo transparente, sin borde)
-                    ├── detailPanel (QWidget, alto fijo 168 px; 82 px en modo compacto)
-                    │   ├── título “Detalle del producto”
-                    │   ├── Ref. / detail_referencia (QLineEdit)
-                    │   ├── Ref. corta / detail_ref_corta (QLineEdit)
-                    │   ├── Descripción / detail_descripcion (QLineEdit)
-                    │   ├── distribuidor, referencia y descripción de distribuidor
-                    │   ├── estado Activo (radio Sí/No)
-                    │   ├── estado En lista (radio Sí/No)
-                    │   └── categoría (radio Harina/Líquido)
+                    ├── detailPanel (QWidget, alto fijo 232 px, fondo #F8FAFC, borde #CBD5E1, radio 9 px)
+                    │   ├── productDetailHeader (QFrame, alto 38 px, fondo azul marino #06213D)
+                    │   │   ├── icono `assets/icons/product-detail.svg` (blanco, 21 px)
+                    │   │   └── título “Detalle del producto” (blanco, 16 px, negrita)
+                    │   └── productDetailBody (QFrame, fondo #F8FAFC)
+                    │       ├── grupo PRODUCTO (etiqueta azul grisácea, 10 px)
+                    │       │   ├── Ref. / detail_referencia (QLineEdit; factor 2)
+                    │       │   ├── Ref. corta / detail_ref_corta (QLineEdit; factor 2)
+                    │       │   └── Descripción / detail_descripcion (QLineEdit; factor 5)
+                    │       ├── divisor horizontal #D9E2EC
+                    │       ├── grupo DISTRIBUIDOR (etiqueta azul grisácea, 10 px)
+                    │       │   ├── Distribuidor / detail_distribuidor_id (QComboBox; factor 3)
+                    │       │   ├── Referencia / detail_referencia_distribuidor (QLineEdit; factor 2)
+                    │       │   └── Descripción / detail_descripcion_distribuidor (QLineEdit; factor 5)
+                    │       └── productDetailStatusRail (QFrame #F1F5F9, borde #D6E0EA, radio 7 px)
+                    │           ├── Status activo: botones segmentados Sí / No
+                    │           ├── Status en lista: botones segmentados Sí / No
+                    │           └── Categoría: botones segmentados Harina / Líquido
                     └── tabs_host
                         └── detail_tabs (QTabWidget)
                             ├── Datos
@@ -119,7 +128,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
 - El panel de lista tiene ancho fijo de 420 px; el panel de detalle comparte el resto del ancho con factor de estiramiento equivalente.
 - El separador principal deja un espacio transparente de 5 px entre los paneles y no es arrastrable (`handleWidth(5)`).
 - El ribbon se sitúa antes del splitter horizontal y tiene márgenes internos de 8 x 6 px y separación de 6 px entre acciones.
-- `detailPanel` tiene alto fijo de 168 px; el modo compacto lo reduce a 82 px.
+- `detailPanel` tiene alto fijo de 232 px. La cabecera mide 38 px; el cuerpo usa márgenes 12 × 7 px, filas de campos responsivas con separación de 8 px y rail de estado con márgenes 9 × 4 px.
 - El splitter vertical derecho da prioridad a las pestañas (factor 9) sobre la ficha superior (factor 1).
 - Las pestañas de movimientos usan tablas de siete u ocho columnas; fecha, pedido, albarán, unidades, kg y caducidad mantienen anchuras fijas y Lote absorbe el ancho restante.
 - La tabla de tarifas fija diez columnas entre 58 y 92 px y elimina el desplazamiento horizontal; su cabecera de dos filas mide 62 px.
@@ -128,6 +137,9 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
 
 - La página usa el estilo global de controles y tablas de `assets/styles.qss`.
 - Las listas son de solo lectura, con selección de fila, cabeceras clicables y sin borde de foco en los ítems.
+- `detailPanel` usa el diseño enterprise compacto: cabecera azul marino, icono de producto blanco y cuerpo gris muy claro. Sus grupos PRODUCTO y DISTRIBUIDOR ordenan los campos en proporciones responsivas 2/2/5 y 3/2/5 respectivamente.
+- Los campos de detalle tienen fondo blanco, borde #C5D0DE, radio 6 px, alto 28 px y foco turquesa #087E9C. El desplegable usa `assets/icons/chevron-down-navy.svg`.
+- Los radios de estado se muestran como controles segmentados: blanco con borde gris en reposo y turquesa #087E9C con texto blanco al seleccionarse; los indicadores circulares nativos quedan ocultos.
 - `ireksDataTab` usa fondo blanco; sus etiquetas son azul grisáceo `#486081` y los campos tienen altura mínima de 28 px.
 - Entradas se presenta en una tarjeta blanca con borde `#E5EAF1`, radio 10 px, tabla blanca y cabecera `#F7F9FC`; las filas alternas y el hover aportan contraste suave.
 - Las tablas de totales de movimientos no muestran scroll, usan fondo `#F7F9FC` y quedan unidas visualmente a su tabla.
@@ -154,6 +166,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
 ## Ajustes y limitaciones relevantes documentados
 
 - La ficha es editable y su autosave persiste cambios reales; no existe un botón general Guardar para deshacerlos.
+- El rediseño solo reorganiza visualmente los mismos campos, grupos y señales de autoguardado; no modifica la persistencia ni los contratos de datos.
 - La eliminación de producto y las operaciones de tarifa son mutaciones reales sobre datos locales.
 - Las pestañas de movimientos, pedidos, tarifas, nutrición y clientes dependen del producto seleccionado; sin selección muestran tabla vacía o estado vacío.
 - La pestaña Clientes es de consulta: no permite cambiar la relación entre cliente y producto desde esta pantalla.
