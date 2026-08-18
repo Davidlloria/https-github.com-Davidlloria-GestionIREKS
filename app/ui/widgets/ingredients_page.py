@@ -757,6 +757,8 @@ class IngredientsIreksPage(QWidget):
                 border: none;
                 border-top-left-radius: 8px;
                 border-top-right-radius: 8px;
+                border-bottom-left-radius: 0px;
+                border-bottom-right-radius: 0px;
             }}
             QLabel#productDetailTitle {{
                 color: #FFFFFF;
@@ -764,8 +766,9 @@ class IngredientsIreksPage(QWidget):
                 font-weight: 700;
             }}
             QFrame#productDetailBody {{
-                background-color: #F8FAFC;
-                border: none;
+                background-color: #FFFFFF;
+                border: 1px solid #CBD5E1;
+                border-top: none;
             }}
             QLabel[detailGroup="true"] {{
                 color: #315176;

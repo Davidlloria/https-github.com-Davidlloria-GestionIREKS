@@ -49,10 +49,10 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
             └── layout vertical sin márgenes
                 └── splitter vertical derecho (QSplitter, objectName `ireksDetailSplitter`, fondo transparente, sin borde)
                     ├── detailPanel (QWidget, alto fijo 232 px, fondo #F8FAFC, borde #CBD5E1, radio 9 px)
-                    │   ├── productDetailHeader (QFrame, alto 38 px, fondo azul marino #06213D)
+                    │   ├── productDetailHeader (QFrame, alto 38 px, fondo azul marino #06213D, esquinas inferiores rectas)
                     │   │   ├── icono `assets/icons/product-detail.svg` (blanco, 21 px)
                     │   │   └── título “Detalle del producto” (blanco, 16 px, negrita)
-                    │   └── productDetailBody (QFrame, fondo #F8FAFC)
+                    │   └── productDetailBody (QFrame, fondo #FFFFFF, borde gris #CBD5E1)
                     │       ├── grupo PRODUCTO (etiqueta azul grisácea, 10 px)
                     │       │   ├── Ref. / detail_referencia (QLineEdit; factor 2)
                     │       │   ├── Ref. corta / detail_ref_corta (QLineEdit; factor 2)
