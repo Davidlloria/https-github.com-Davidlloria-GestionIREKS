@@ -69,12 +69,19 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
                     └── tabs_host
                         └── detail_tabs (QTabWidget)
                             ├── Datos
-                            │   └── ireksDataTab (QWidget, fondo blanco)
-                            │       ├── taxonomía: fabricante, familia y subfamilia
-                            │       ├── presentación: envase, contenido, unidad de contenido,
-                            │       │   peso por unidad, unidad de peso y total de presentación
-                            │       └── transporte: pallet, presentaciones/capa, capas,
-                            │           presentaciones/pallet, uds/pallet, total pallet y observaciones
+                            │   └── ireksDataTab (QWidget, fondo #EEF3F8)
+                            │       ├── tarjeta CLASIFICACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #D6E0EA, radio 8 px)
+                            │       │   ├── cabecera `ireksTabHeader` (fondo #0B2F5B, icono blanco `product-tag.svg`, título blanco 15 px)
+                            │       │   └── Fabricante / detail_fabricante_id · Familia / detail_familia_id · Subfamilia / detail_subfamilia_id
+                            │       ├── tarjeta PRESENTACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #D6E0EA, radio 8 px)
+                            │       │   ├── cabecera `ireksTabHeader` (icono blanco `presentation-container.svg`)
+                            │       │   └── cuadrícula 3 columnas: Presentación / detail_envase_id · Contenido / detail_envase_cantidad · Unidad contenido / detail_contenido_unidad
+                            │       │       Peso unidad / detail_envase_peso · Unidad peso / detail_envase_unidad · Total presentación / detail_envase_total (solo lectura, #F4F7FB)
+                            │       └── tarjeta PALETIZACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #D6E0EA, radio 8 px)
+                            │           ├── cabecera `ireksTabHeader` (icono blanco `pallet.svg`)
+                            │           └── cuadrícula 3 columnas: Pallet / transporte_pallet_tipo · Presentaciones/capa / transporte_cajas_por_capa · Capas / transporte_capas_por_pallet
+                            │               Presentaciones/pallet / transporte_cajas_por_pallet · Uds/pallet / transporte_unidades_por_pallet · Total pallet / transporte_kg_por_pallet (los tres derivados, solo lectura, #F4F7FB)
+                            │               Obs. / transporte_observaciones (ancho completo)
                             ├── Tarifa
                             │   ├── filtro de año
                             │   ├── Añadir tarifa / Editar / Eliminar
