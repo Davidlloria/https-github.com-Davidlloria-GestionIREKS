@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 
 from PySide6.QtCore import QDate, QTimer, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QIcon, QPainter, QPen, QTextDocument
+from PySide6.QtGui import QBrush, QColor, QFont, QIcon, QPainter, QPen, QPixmap, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -1073,13 +1073,14 @@ class IngredientsIreksPage(QWidget):
         tabs = QTabWidget()
         self.detail_tabs = tabs
         tabs.setObjectName("ireksDetailTabs")
+        tabs.tabBar().setExpanding(True)
         tabs.setStyleSheet(
             """
             QTabWidget#ireksDetailTabs::pane { border: 0; background: transparent; }
             QTabWidget#ireksDetailTabs QTabBar::tab {
                 background: #F4F7FB; color: #5E6C84; border: 1px solid #DCE5F1;
                 border-bottom-color: #DCE5F1; border-top-left-radius: 8px;
-                border-top-right-radius: 8px; min-width: 104px; padding: 9px 16px;
+                border-top-right-radius: 8px; min-width: 0; padding: 8px 6px;
                 margin-right: 2px;
             }
             QTabWidget#ireksDetailTabs QTabBar::tab:selected {
@@ -1869,7 +1870,14 @@ class IngredientsIreksPage(QWidget):
         icon = QLabel(header)
         icon.setObjectName("ireksTabHeaderIcon")
         icon_path = Path(__file__).resolve().parents[3] / "assets" / "icons" / icon_name
-        icon.setPixmap(QIcon(str(icon_path)).pixmap(24, 24))
+        pixmap = QIcon(str(icon_path)).pixmap(24, 24)
+        image = pixmap.toImage()
+        for x in range(image.width()):
+            for y in range(image.height()):
+                color = image.pixelColor(x, y)
+                if color.alpha():
+                    image.setPixelColor(x, y, QColor(255, 255, 255, color.alpha()))
+        icon.setPixmap(QPixmap.fromImage(image))
         layout.addWidget(icon)
         title_box = QVBoxLayout()
         title_box.setContentsMargins(0, 0, 0, 0)
@@ -1884,7 +1892,7 @@ class IngredientsIreksPage(QWidget):
         layout.addLayout(title_box)
         layout.addStretch(1)
         header.setStyleSheet(
-            "QFrame#ireksTabHeader { background: #0B2F5B; border: 0; border-left: 3px solid #16B8A6; border-radius: 8px; }"
+            "QFrame#ireksTabHeader { background: #0B2F5B; border: none; border-radius: 8px; }"
             "QLabel#ireksTabHeaderTitle { color: #FFFFFF; background: transparent; font-size: 15px; font-weight: 700; }"
             "QLabel#ireksTabHeaderSubtitle { color: #CDECE8; background: transparent; }"
             "QLabel#ireksTabHeaderIcon { background: transparent; }"
