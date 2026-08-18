@@ -32,16 +32,22 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
     │   ├── Listados (QPushButton, icono `list.svg`, rol `primary`, 110 x 30 px)
     │   └── espacio flexible
     └── splitter horizontal (QSplitter, objectName `ireksMainSplitter`, fondo transparente, sin borde, childrenCollapsible=False, handleWidth=5 px)
-        ├── panel izquierdo (QWidget, objectName `sidePanel`, ancho fijo 420 px)
-        │   └── layout vertical
-        │       ├── fila de filtros de fabricante y actividad
-        │       │   ├── fabricante_filter (QComboBox, ancho 280 px)
-        │       │   └── activity_filter (QComboBox, ancho 120 px: Todos, Activos, Inactivos)
-        │       ├── fila de taxonomía
-        │       │   ├── familia_filter (QComboBox)
-        │       │   └── subfamilia_filter (QComboBox)
-        │       ├── search_input (QLineEdit, placeholder “Buscar productos...”, ancho 405 px)
-        │       └── table (QTableWidget, selección de fila única, solo lectura, cabeceras ordenables)
+        ├── panel izquierdo (QWidget, objectName `sidePanel`, ancho fijo 420 px, fondo #FFFFFF, borde gris #D7DEE8)
+        │   └── catálogo lateral (layout vertical sin márgenes ni separación, fondo #FFFFFF, borde #D7DEE8, radio 10 px)
+        │       ├── catalogHeader (QFrame, alto fijo 54 px, ancho total, ajustado al borde superior, fondo #0B2F5B, radio superior 9 px y esquinas inferiores rectas)
+        │       │   ├── icono `product-tag.svg` (blanco, 20 px)
+        │       │   ├── título “CATÁLOGO DE PRODUCTOS” (blanco, 14 px, negrita)
+        │       │   └── subtítulo “Filtra y selecciona productos” (#CDECE8, 10 px)
+        │       └── catalogBody (QWidget, márgenes 10 px, separación 8 px, fondo #FFFFFF, sin borde, radio inferior 9 px)
+        │           ├── cuadrícula 2 × 2 de filtros
+        │       │   ├── Fabricante / fabricante_filter (QComboBox; valor inicial “Todos”)
+        │       │   ├── Estado / activity_filter (QComboBox; Todos, Activos, Inactivos)
+        │       │   ├── Familia / familia_filter (QComboBox; valor inicial “Todas”)
+        │       │   └── Subfamilia / subfamilia_filter (QComboBox; valor inicial “Todas”)
+        │           ├── fila de búsqueda
+        │       │   ├── search_input (QLineEdit, placeholder “Buscar por referencia o nombre”, alto 36 px)
+        │       │   └── catalog_result_count (QLabel, contador real, fondo #DDF3F0, borde #9DDCD4)
+        │           └── table / catalogProductTable (QTableWidget, selección de fila única, solo lectura, cabeceras ordenables)
         │           ├── Ref (90 px)
         │           ├── Nombre (stretch)
         │           └── Sel. (55 px; selector de inclusión para listados)
@@ -49,7 +55,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
             └── layout vertical sin márgenes
                 └── splitter vertical derecho (QSplitter, objectName `ireksDetailSplitter`, fondo transparente, sin borde)
                     ├── detailPanel (QWidget, alto fijo 232 px, fondo #F8FAFC, borde #CBD5E1, radio 9 px)
-                    │   ├── productDetailHeader (QFrame, alto 38 px, fondo azul marino #06213D, esquinas inferiores rectas)
+                    │   ├── productDetailHeader (QFrame, alto 38 px, fondo azul marino #0B2F5B, esquinas inferiores rectas)
                     │   │   ├── icono `assets/icons/product-detail.svg` (blanco, 21 px)
                     │   │   └── título “Detalle del producto” (blanco, 16 px, negrita)
                     │   └── productDetailBody (QFrame, fondo #FFFFFF, borde gris #CBD5E1)
@@ -71,7 +77,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
                             ├── Datos
                             │   └── ireksDataTab (QWidget, fondo #EEF3F8)
                             │       ├── tarjeta CLASIFICACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #D6E0EA, radio 8 px)
-                            │       │   ├── cabecera estándar `uiRole="detailHeader"` (alto fijo 38 px, fondo #06213D, icono blanco `product-tag.svg` 21 px, título blanco 16 px)
+                            │       │   ├── cabecera estándar `uiRole="detailHeader"` (alto fijo 38 px, fondo #0B2F5B, icono blanco `product-tag.svg` 21 px, título blanco 16 px)
                             │       │   └── Fabricante / detail_fabricante_id · Familia / detail_familia_id · Subfamilia / detail_subfamilia_id
                             │       ├── tarjeta PRESENTACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #D6E0EA, radio 8 px)
                             │       │   ├── cabecera `ireksTabHeader` (icono blanco `presentation-container.svg`)
@@ -112,6 +118,8 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
                                 ├── ireksCustomerConsumptionEmpty (estado vacío)
                                 └── ireksCustomerConsumptionTable (Cliente, Último período, Kg, Unidades, €; ordenable)
 ```
+
+Las pestañas Tarifa, Entradas, Salidas, Stock, Mensual, Pedidos, Nutrición y Clientes usan la propia pestaña como tarjeta blanca con borde `#D6E0EA` y radio de 8 px. Su cabecera estándar `ireksTabHeader` ocupa todo el ancho y queda ajustada al borde superior; el contenido restante se aloja en un cuerpo interno con márgenes de 10 px. La tabla de Tarifa ocupa todo el ancho disponible de ese cuerpo y estira su última columna para mantener sincronizadas las dos filas de cabecera.
 
 ## Estructura de la pestaña Datos
 
@@ -157,9 +165,9 @@ ireksDataTab (QWidget, fondo #EEF3F8)
 
 | Tarjeta | Cabecera | Componentes y disposición | Campos calculados / aspecto |
 | --- | --- | --- | --- |
-| **CLASIFICACIÓN** | Cabecera estándar `uiRole="detailHeader"`: alto fijo 38 px, fondo azul marino `#06213D`, radio solo en esquinas superiores de 8 px, icono blanco de 21 px y título blanco de 16 px. | Cuadrícula de tres columnas con etiqueta encima del control: **Fabricante** / `detail_fabricante_id`, **Familia** / `detail_familia_id` y **Subfamilia** / `detail_subfamilia_id`. `ireksClassificationCard` tiene alto fijo 146 px. | No incorpora cálculo. Etiquetas `#5E6C84`, peso 500. Combos blancos, texto `#0B2F5B`, borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco turquesa `#087E9C`. |
-| **PRESENTACIÓN** | Cabecera estándar `uiRole="detailHeader"`: alto fijo 38 px, fondo `#06213D`, radio superior de 8 px, icono blanco de 21 px y título blanco de 16 px. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Presentación** / `detail_envase_id`, **Contenido** / `detail_envase_cantidad`, **Unidad contenido** / `detail_contenido_unidad`; fila 2: **Peso unidad** / `detail_envase_peso`, **Unidad peso** / `detail_envase_unidad`, **Total presentación** / `detail_envase_total`. `ireksPresentationCard` tiene alto fijo 204 px. | `detail_envase_total` es solo lectura, fondo `#F4F7FB` y texto `#0B2F5B`; los otros controles son blancos con borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco `#087E9C`. |
-| **PALETIZACIÓN** | Cabecera estándar `uiRole="detailHeader"`: alto fijo 38 px, fondo `#06213D`, radio superior de 8 px, icono blanco de 21 px y título blanco de 16 px. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Pallet** / `transporte_pallet_tipo`, **Presentaciones/capa** / `transporte_cajas_por_capa`, **Capas** / `transporte_capas_por_pallet`; fila 2: **Presentaciones/pallet** / `transporte_cajas_por_pallet`, **Uds/pallet** / `transporte_unidades_por_pallet`, **Total pallet** / `transporte_kg_por_pallet`. `ireksPalletCard` tiene alto fijo 204 px. | `transporte_cajas_por_pallet`, `transporte_unidades_por_pallet` y `transporte_kg_por_pallet` son solo lectura, fondo `#F4F7FB`; los campos fuente son editables. Todos usan texto marino `#0B2F5B`, etiquetas `#5E6C84`, borde `#C9D7E8`, radio 6 px y foco turquesa `#087E9C`. |
+| **CLASIFICACIÓN** | Cabecera estándar `uiRole="detailHeader"`: alto fijo 38 px, ancho completo, ajustada al borde superior de la tarjeta, fondo azul marino `#0B2F5B`, radio solo en esquinas superiores de 8 px, icono blanco de 21 px y título blanco de 16 px. | Cuadrícula de tres columnas con etiqueta encima del control: **Fabricante** / `detail_fabricante_id`, **Familia** / `detail_familia_id` y **Subfamilia** / `detail_subfamilia_id`. `ireksClassificationCard` tiene alto fijo 146 px. | No incorpora cálculo. Etiquetas `#5E6C84`, peso 500. Combos blancos, texto `#0B2F5B`, borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco turquesa `#087E9C`. |
+| **PRESENTACIÓN** | Cabecera estándar `uiRole="detailHeader"`: alto fijo 38 px, fondo `#0B2F5B`, radio superior de 8 px, icono blanco de 21 px y título blanco de 16 px. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Presentación** / `detail_envase_id`, **Contenido** / `detail_envase_cantidad`, **Unidad contenido** / `detail_contenido_unidad`; fila 2: **Peso unidad** / `detail_envase_peso`, **Unidad peso** / `detail_envase_unidad`, **Total presentación** / `detail_envase_total`. `ireksPresentationCard` tiene alto fijo 204 px. | `detail_envase_total` es solo lectura, fondo `#F4F7FB` y texto `#0B2F5B`; los otros controles son blancos con borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco `#087E9C`. |
+| **PALETIZACIÓN** | Cabecera estándar `uiRole="detailHeader"`: alto fijo 38 px, fondo `#0B2F5B`, radio superior de 8 px, icono blanco de 21 px y título blanco de 16 px. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Pallet** / `transporte_pallet_tipo`, **Presentaciones/capa** / `transporte_cajas_por_capa`, **Capas** / `transporte_capas_por_pallet`; fila 2: **Presentaciones/pallet** / `transporte_cajas_por_pallet`, **Uds/pallet** / `transporte_unidades_por_pallet`, **Total pallet** / `transporte_kg_por_pallet`. `ireksPalletCard` tiene alto fijo 204 px. | `transporte_cajas_por_pallet`, `transporte_unidades_por_pallet` y `transporte_kg_por_pallet` son solo lectura, fondo `#F4F7FB`; los campos fuente son editables. Todos usan texto marino `#0B2F5B`, etiquetas `#5E6C84`, borde `#C9D7E8`, radio 6 px y foco turquesa `#087E9C`. |
 | **OBSERVACIONES** | No utiliza cabecera; es una tarjeta compacta `ireksObservationsCard` de fondo blanco, borde `#D6E0EA`, radio 8 px y alto fijo 46 px. | Una sola fila: etiqueta **Obs.** a la izquierda y `transporte_observaciones` ocupando el resto del ancho. Se sitúa debajo de la fila PRESENTACIÓN / PALETIZACIÓN. | Campo editable, mismo texto, borde, radio y foco que los demás controles. |
 
 #### Contenedor común de las tres tarjetas
@@ -200,6 +208,8 @@ ireksDataTab (QWidget, fondo #EEF3F8)
 ## Aspecto visual actual
 
 - La página usa el estilo global de controles y tablas de `assets/styles.qss`.
+- El catálogo lateral usa un tratamiento local enterprise: cabecera azul marino, filtros en cuadrícula, búsqueda y contador. Sus combos y búsqueda son blancos con borde `#C9D7E8`; el foco es turquesa `#16B8A6`.
+- `catalogProductTable` alterna filas blancas y `#F8FAFD`. La selección usa fondo `#E5F7F4`, texto `#0B2F5B` y una franja vertical izquierda `#087E9C`; los checks marcados son turquesa con icono blanco y los no marcados son blancos con borde azul grisáceo. Su scrollbar vertical tiene 8 px de ancho.
 - Las listas son de solo lectura, con selección de fila, cabeceras clicables y sin borde de foco en los ítems.
 - `detailPanel` usa el diseño enterprise compacto: cabecera azul marino, icono de producto blanco y cuerpo gris muy claro. Sus grupos PRODUCTO y DISTRIBUIDOR ordenan los campos en proporciones responsivas 2/2/5 y 3/2/5 respectivamente.
 - Los campos de detalle tienen fondo blanco, borde #C5D0DE, radio 6 px, alto 28 px y foco turquesa #087E9C. El desplegable usa `assets/icons/chevron-down-navy.svg`.

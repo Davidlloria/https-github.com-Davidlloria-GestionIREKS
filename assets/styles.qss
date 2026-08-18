@@ -25,7 +25,7 @@ QWidget#IngredientsIreksPageRoot {
 
 /* Standard detail-card header: opt in with uiRole properties. */
 QFrame[uiRole="detailHeader"] {
-    background-color: #06213D;
+    background-color: #0B2F5B;
     border: none;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;

@@ -74,6 +74,42 @@ def test_ireks_tabs_use_local_enterprise_style_helpers() -> None:
         assert title in source
 
 
+def test_ireks_catalog_uses_local_filters_and_table_style() -> None:
+    source = (Path(__file__).resolve().parents[1] / "app" / "ui" / "widgets" / "ingredients_page.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "CATÁLOGO DE PRODUCTOS" in source
+    assert "catalogProductTable" in source
+    assert 'catalog_body.setObjectName("catalogBody")' in source
+    assert 'QWidget#catalogBody { background: #FFFFFF; border: none; border-bottom-left-radius: 9px; border-bottom-right-radius: 9px; }' in source
+    assert "Buscar por referencia o nombre" in source
+    assert 'self.fabricante_filter.addItem("Todos", "")' in source
+    assert 'self.familia_filter.addItem("Todas", "")' in source
+    assert 'self.subfamilia_filter.addItem("Todas", "")' in source
+    assert "_CatalogSelectionDelegate" in source
+
+
+def test_ireks_tab_headers_use_full_width_cards_with_inner_content_margins() -> None:
+    source = (Path(__file__).resolve().parents[1] / "app" / "ui" / "widgets" / "ingredients_page.py").read_text(
+        encoding="utf-8"
+    )
+
+    for body_name in (
+        "entradas_body",
+        "salidas_body",
+        "stock_body",
+        "mensual_body",
+        "pedidos_body",
+        "tarifa_body",
+        "nutricion_body",
+        "clientes_body",
+    ):
+        assert f"{body_name}_layout.setContentsMargins(10, 10, 10, 10)" in source
+    assert "tarifa_content.addWidget(tarifa_table_wrap, 1)" in source
+    assert "tarifa_header.setSectionResizeMode(9, QHeaderView.ResizeMode.Stretch)" in source
+
+
 def test_detail_header_standard_is_declared_in_the_shared_theme() -> None:
     project_root = Path(__file__).resolve().parents[1]
     source = (project_root / "app" / "ui" / "widgets" / "ingredients_page.py").read_text(encoding="utf-8")
