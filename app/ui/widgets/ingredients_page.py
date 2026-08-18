@@ -860,16 +860,19 @@ class IngredientsIreksPage(QWidget):
 
         detail_header = QFrame(detail_panel)
         detail_header.setObjectName("productDetailHeader")
+        detail_header.setProperty("uiRole", "detailHeader")
         detail_header.setFixedHeight(38)
         detail_header_layout = QHBoxLayout(detail_header)
         detail_header_layout.setContentsMargins(14, 0, 14, 0)
         detail_header_layout.setSpacing(9)
         detail_icon = QLabel(detail_header)
+        detail_icon.setProperty("uiRole", "detailHeaderIcon")
         detail_icon.setPixmap(QIcon(str(icon_dir / "product-detail.svg")).pixmap(21, 21))
         detail_icon.setFixedSize(22, 22)
         detail_header_layout.addWidget(detail_icon)
         detail_title = QLabel("Detalle del producto", detail_header)
         detail_title.setObjectName("productDetailTitle")
+        detail_title.setProperty("uiRole", "detailHeaderTitle")
         detail_header_layout.addWidget(detail_title)
         detail_header_layout.addStretch(1)
         detail_layout.addWidget(detail_header)
@@ -1867,18 +1870,20 @@ class IngredientsIreksPage(QWidget):
         icon_name: str,
         subtitle: str = "",
         *,
-        icon_size: int = 20,
-        title_size: int = 13,
-        height: int = 48,
+        icon_size: int = 21,
+        title_size: int = 16,
+        height: int = 38,
     ) -> QFrame:
         """Create the compact, local heading used by IREKS detail tabs."""
         header = QFrame(parent)
         header.setObjectName("ireksTabHeader")
+        header.setProperty("uiRole", "detailHeader")
         layout = QHBoxLayout(header)
-        layout.setContentsMargins(12, 6, 12, 6)
-        layout.setSpacing(8)
+        layout.setContentsMargins(14, 0, 14, 0)
+        layout.setSpacing(9)
         icon = QLabel(header)
         icon.setObjectName("ireksTabHeaderIcon")
+        icon.setProperty("uiRole", "detailHeaderIcon")
         icon_path = Path(__file__).resolve().parents[3] / "assets" / "icons" / icon_name
         pixmap = QIcon(str(icon_path)).pixmap(max(24, icon_size), max(24, icon_size))
         image = pixmap.toImage()
@@ -1901,6 +1906,7 @@ class IngredientsIreksPage(QWidget):
         title_box.setSpacing(1)
         title_label = QLabel(title.upper(), header)
         title_label.setObjectName("ireksTabHeaderTitle")
+        title_label.setProperty("uiRole", "detailHeaderTitle")
         title_box.addWidget(title_label)
         if subtitle:
             subtitle_label = QLabel(subtitle, header)
@@ -1911,7 +1917,7 @@ class IngredientsIreksPage(QWidget):
         header.setFixedHeight(height)
         header.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         header.setStyleSheet(
-            "QFrame#ireksTabHeader { background: #0B2F5B; border: none; border-top-left-radius: 8px; border-top-right-radius: 8px; "
+            "QFrame#ireksTabHeader { background: #06213D; border: none; border-top-left-radius: 8px; border-top-right-radius: 8px; "
             "border-bottom-left-radius: 0; border-bottom-right-radius: 0; }"
             f"QLabel#ireksTabHeaderTitle {{ color: #FFFFFF; background: transparent; font-size: {title_size}px; font-weight: 700; }}"
             "QLabel#ireksTabHeaderSubtitle { color: #CDECE8; background: transparent; }"
@@ -2089,9 +2095,9 @@ class IngredientsIreksPage(QWidget):
                 classification_card,
                 "Clasificación",
                 "product-tag.svg",
-                icon_size=26,
+                icon_size=21,
                 title_size=16,
-                height=52,
+                height=38,
             )
         )
         taxonomy_grid = QGridLayout()

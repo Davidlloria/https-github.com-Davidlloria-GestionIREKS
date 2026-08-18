@@ -74,6 +74,17 @@ def test_ireks_tabs_use_local_enterprise_style_helpers() -> None:
         assert title in source
 
 
+def test_detail_header_standard_is_declared_in_the_shared_theme() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    source = (project_root / "app" / "ui" / "widgets" / "ingredients_page.py").read_text(encoding="utf-8")
+    theme = (project_root / "assets" / "styles.qss").read_text(encoding="utf-8")
+
+    assert 'setProperty("uiRole", "detailHeader")' in source
+    assert 'QFrame[uiRole="detailHeader"]' in theme
+    assert 'QLabel[uiRole="detailHeaderTitle"]' in theme
+    assert 'QLabel[uiRole="detailHeaderIcon"]' in theme
+
+
 def test_ireks_data_cards_keep_their_controls_in_a_compact_desktop_layout(monkeypatch) -> None:
     monkeypatch.setattr(IngredientsIreksPage, "reload", lambda self: None)
     app = QApplication.instance() or QApplication([])

@@ -23,6 +23,27 @@ QWidget#IngredientsIreksPageRoot {
     border: none;
 }
 
+/* Standard detail-card header: opt in with uiRole properties. */
+QFrame[uiRole="detailHeader"] {
+    background-color: #06213D;
+    border: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+}
+
+QLabel[uiRole="detailHeaderTitle"] {
+    color: #FFFFFF;
+    background: transparent;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+QLabel[uiRole="detailHeaderIcon"] {
+    background: transparent;
+}
+
 QWidget#ireksContentPanel {
     background-color: transparent;
     border: none;
