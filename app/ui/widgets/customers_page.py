@@ -847,11 +847,6 @@ class CustomersPage(QWidget):
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
 
-        header = QLabel("Clientes")
-        header.setProperty("role", "pageTitle")
-        layout.addWidget(header)
-        header.hide()
-
         ribbon, ribbon_layout = create_standard_top_ribbon()
 
         self.new_btn = create_standard_ribbon_button("Nuevo", role="success", icon_name="user-round-plus.svg")
