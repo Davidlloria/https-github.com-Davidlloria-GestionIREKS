@@ -2060,18 +2060,37 @@ class IngredientsIreksPage(QWidget):
 
         classification_card = QFrame(tab)
         classification_card.setProperty("ireksCard", True)
+        classification_card.setMinimumHeight(128)
         classification_layout = QVBoxLayout(classification_card)
         classification_layout.setContentsMargins(0, 0, 0, 12)
         classification_layout.setSpacing(9)
         classification_layout.addWidget(self._ireks_tab_header(classification_card, "Clasificación", "product-tag.svg"))
-        row_taxonomy.setContentsMargins(12, 0, 12, 0)
-        classification_layout.addLayout(row_taxonomy)
+        taxonomy_grid = QGridLayout()
+        taxonomy_grid.setContentsMargins(12, 0, 12, 0)
+        taxonomy_grid.setHorizontalSpacing(10)
+        taxonomy_grid.setVerticalSpacing(5)
+        for column, (field_label, field) in enumerate(
+            (
+                (self.lbl_detail_fabricante, self.detail_fabricante_id),
+                (self.lbl_detail_familia, self.detail_familia_id),
+                (self.lbl_detail_subfamilia, self.detail_subfamilia_id),
+            )
+        ):
+            field.setMinimumWidth(0)
+            field.setMaximumWidth(16777215)
+            taxonomy_grid.addWidget(field_label, 0, column)
+            taxonomy_grid.addWidget(field, 1, column)
+            taxonomy_grid.setColumnStretch(column, 1)
+        taxonomy_grid.setRowMinimumHeight(0, 20)
+        taxonomy_grid.setRowMinimumHeight(1, 34)
+        classification_layout.addLayout(taxonomy_grid)
         layout.addWidget(classification_card)
 
         lower_cards = QVBoxLayout()
         lower_cards.setSpacing(10)
         presentation_card = QFrame(tab)
         presentation_card.setProperty("ireksCard", True)
+        presentation_card.setMinimumHeight(184)
         presentation_layout = QVBoxLayout(presentation_card)
         presentation_layout.setContentsMargins(0, 0, 0, 12)
         presentation_layout.setSpacing(9)
@@ -2079,7 +2098,7 @@ class IngredientsIreksPage(QWidget):
         presentation_grid = QGridLayout()
         presentation_grid.setContentsMargins(12, 0, 12, 0)
         presentation_grid.setHorizontalSpacing(10)
-        presentation_grid.setVerticalSpacing(5)
+        presentation_grid.setVerticalSpacing(8)
         presentation_fields = (
             (self.lbl_detail_envase, self.detail_envase_id),
             (self.lbl_detail_envase_cantidad, self.detail_envase_cantidad),
@@ -2096,12 +2115,17 @@ class IngredientsIreksPage(QWidget):
             presentation_grid.addWidget(field_label, grid_row, column)
             presentation_grid.addWidget(field, grid_row + 1, column)
             presentation_grid.setColumnStretch(column, 1)
+        presentation_grid.setRowMinimumHeight(0, 20)
+        presentation_grid.setRowMinimumHeight(1, 34)
+        presentation_grid.setRowMinimumHeight(2, 20)
+        presentation_grid.setRowMinimumHeight(3, 34)
         presentation_layout.addLayout(presentation_grid)
         presentation_layout.addStretch(1)
         lower_cards.addWidget(presentation_card)
 
         pallet_card = QFrame(tab)
         pallet_card.setProperty("ireksCard", True)
+        pallet_card.setMinimumHeight(246)
         pallet_layout = QVBoxLayout(pallet_card)
         pallet_layout.setContentsMargins(0, 0, 0, 12)
         pallet_layout.setSpacing(9)
@@ -2109,7 +2133,7 @@ class IngredientsIreksPage(QWidget):
         pallet_grid = QGridLayout()
         pallet_grid.setContentsMargins(12, 0, 12, 0)
         pallet_grid.setHorizontalSpacing(10)
-        pallet_grid.setVerticalSpacing(5)
+        pallet_grid.setVerticalSpacing(8)
         pallet_fields = (
             (self.lbl_transporte_pallet, self.transporte_pallet_tipo),
             (self.lbl_transporte_cajas_capa, self.transporte_cajas_por_capa),
@@ -2125,6 +2149,10 @@ class IngredientsIreksPage(QWidget):
             pallet_grid.addWidget(field_label, grid_row, column)
             pallet_grid.addWidget(field, grid_row + 1, column)
             pallet_grid.setColumnStretch(column, 1)
+        pallet_grid.setRowMinimumHeight(0, 20)
+        pallet_grid.setRowMinimumHeight(1, 34)
+        pallet_grid.setRowMinimumHeight(2, 20)
+        pallet_grid.setRowMinimumHeight(3, 34)
         pallet_layout.addLayout(pallet_grid)
         observations_wrap = QWidget(pallet_card)
         observations_layout = QVBoxLayout(observations_wrap)
@@ -2136,7 +2164,6 @@ class IngredientsIreksPage(QWidget):
         pallet_layout.addStretch(1)
         lower_cards.addWidget(pallet_card)
         layout.addLayout(lower_cards, 1)
-        layout.addStretch(1)
 
         self.transporte_pallet_tipo.currentIndexChanged.connect(self._schedule_autosave)
         self.detail_contenido_unidad.currentTextChanged.connect(self._schedule_autosave)
