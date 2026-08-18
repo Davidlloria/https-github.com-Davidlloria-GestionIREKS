@@ -24,7 +24,7 @@ La sección se registra como `Productos IREKS` en `app/ui/main_window.py` y usa 
 
 ```text
 IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF3F8, sin borde, WA_StyledBackground=True)
-└── layout principal (QVBoxLayout)
+└── layout principal (QVBoxLayout, márgenes efectivos 11 px)
     ├── topRibbon (QFrame, objectName `topRibbon`, pageType="contacts", fondo #FFFFFF, borde #E2E8F1, radio 8 px)
     │   ├── Nuevo (QPushButton, icono `plus.svg`, rol `success`, 110 x 30 px)
     │   ├── Eliminar (QPushButton, icono `trash.svg`, rol `danger`, 110 x 30 px)

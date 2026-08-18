@@ -1871,7 +1871,7 @@ class RecipesPage(QWidget):
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(14, 14, 14, 14)
+        root.setContentsMargins(14, 11, 14, 14)
         root.setSpacing(10)
 
         ribbon, ribbon_layout = create_standard_top_ribbon()

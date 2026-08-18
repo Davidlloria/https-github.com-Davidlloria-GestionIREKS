@@ -9,7 +9,7 @@ Implementación principal:
 
 ```text
 CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin borde, WA_StyledBackground=True)
-└── layout principal (QVBoxLayout, márgenes 14 px, separación 10 px)
+└── layout principal (QVBoxLayout, márgenes 14 / 11 / 14 / 14 px, separación 10 px)
     ├── topRibbon (QFrame, objectName `topRibbon`, pageType="contacts", fondo #FFFFFF, borde #E2E8F1, radio 8 px)
     │   ├── Nuevo (verde claro #DCFCE7, texto #166534, icono `assets/icons/user-round-plus.svg`, ancho fijo 110 px, alto 30 px, icono 20 px)
     │   ├── Editar (amarillo claro #FEF3C7, texto #92400E, icono `assets/icons/file-pen.svg`, ancho fijo 110 px, alto 30 px, icono 20 px)

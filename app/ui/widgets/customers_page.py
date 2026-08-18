@@ -385,7 +385,7 @@ class CustomerEditorDialog(QDialog):
             self.setStyleSheet(extra_style)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setContentsMargins(14, 11, 14, 14)
         layout.setSpacing(10)
 
         title = QLabel(self._title)
