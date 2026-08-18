@@ -637,6 +637,8 @@ class IngredientsIreksPage(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 11, 14, 14)
+        layout.setSpacing(10)
 
         if self.show_actions_ribbon:
             ribbon, ribbon_layout = create_standard_top_ribbon()
