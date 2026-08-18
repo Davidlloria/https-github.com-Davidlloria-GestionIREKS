@@ -106,6 +106,43 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
                                 └── ireksCustomerConsumptionTable (Cliente, Último período, Kg, Unidades, €; ordenable)
 ```
 
+## Estructura de la pestaña Datos
+
+`ireksDataTab` organiza los campos que antes compartían filas horizontales en tres tarjetas. Las tarjetas usan fondo blanco, borde `#D6E0EA`, radio de 8 px y se apilan verticalmente para conservar el espacio de los campos en el ancho disponible del panel derecho.
+
+```text
+ireksDataTab (QWidget, fondo #EEF3F8)
+├── tarjeta CLASIFICACIÓN (QFrame, propiedad ireksCard=True)
+│   ├── cabecera `ireksTabHeader` (azul marino #0B2F5B, icono blanco `product-tag.svg`)
+│   └── taxonomía (fila responsiva)
+│       ├── Fabricante / detail_fabricante_id (QComboBox)
+│       ├── Familia / detail_familia_id (QComboBox)
+│       └── Subfamilia / detail_subfamilia_id (QComboBox)
+├── tarjeta PRESENTACIÓN (QFrame, propiedad ireksCard=True)
+│   ├── cabecera `ireksTabHeader` (icono blanco `presentation-container.svg`)
+│   └── cuadrícula de 3 columnas y 2 grupos de campos
+│       ├── Presentación / detail_envase_id (QComboBox)
+│       ├── Contenido / detail_envase_cantidad (QLineEdit)
+│       ├── Unidad contenido / detail_contenido_unidad (QComboBox editable)
+│       ├── Peso unidad / detail_envase_peso (QLineEdit)
+│       ├── Unidad peso / detail_envase_unidad (QComboBox)
+│       └── Total presentación / detail_envase_total (QLineEdit, solo lectura)
+└── tarjeta PALETIZACIÓN (QFrame, propiedad ireksCard=True)
+    ├── cabecera `ireksTabHeader` (icono blanco `pallet.svg`)
+    ├── cuadrícula de 3 columnas y 2 grupos de campos
+    │   ├── Pallet / transporte_pallet_tipo (QComboBox)
+    │   ├── Presentaciones/capa / transporte_cajas_por_capa (QLineEdit)
+    │   ├── Capas / transporte_capas_por_pallet (QLineEdit)
+    │   ├── Presentaciones/pallet / transporte_cajas_por_pallet (QLineEdit, solo lectura)
+    │   ├── Uds/pallet / transporte_unidades_por_pallet (QLineEdit, solo lectura)
+    │   └── Total pallet / transporte_kg_por_pallet (QLineEdit, solo lectura)
+    └── Obs. / transporte_observaciones (QLineEdit, ancho completo)
+```
+
+- Las etiquetas quedan encima de los controles en Presentación y Paletización; así no se comprimen ni se solapan con sus campos.
+- Los controles derivados de cálculo son de solo lectura, con fondo `#F4F7FB`.
+- Los valores de presentación y paletización mantienen los mismos eventos de autosave y los mismos cálculos existentes: total de presentación, presentaciones por pallet, unidades por pallet y kg por pallet.
+
 ## Comportamiento actual
 
 - Al abrir la pantalla se cargan el catálogo de productos y sus filtros. Si hay productos, se selecciona el primero y se completa su ficha.
