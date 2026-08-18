@@ -1865,8 +1865,8 @@ class IngredientsIreksPage(QWidget):
         header = QFrame(parent)
         header.setObjectName("ireksTabHeader")
         layout = QHBoxLayout(header)
-        layout.setContentsMargins(12, 9, 14, 9)
-        layout.setSpacing(10)
+        layout.setContentsMargins(12, 6, 12, 6)
+        layout.setSpacing(8)
         icon = QLabel(header)
         icon.setObjectName("ireksTabHeaderIcon")
         icon_path = Path(__file__).resolve().parents[3] / "assets" / "icons" / icon_name
@@ -1877,7 +1877,7 @@ class IngredientsIreksPage(QWidget):
                 color = image.pixelColor(x, y)
                 if color.alpha():
                     image.setPixelColor(x, y, QColor(255, 255, 255, color.alpha()))
-        icon.setPixmap(QPixmap.fromImage(image))
+        icon.setPixmap(QPixmap.fromImage(image).scaled(20, 20, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         layout.addWidget(icon)
         title_box = QVBoxLayout()
         title_box.setContentsMargins(0, 0, 0, 0)
@@ -1892,8 +1892,9 @@ class IngredientsIreksPage(QWidget):
         layout.addLayout(title_box)
         layout.addStretch(1)
         header.setStyleSheet(
-            "QFrame#ireksTabHeader { background: #0B2F5B; border: none; border-radius: 8px; }"
-            "QLabel#ireksTabHeaderTitle { color: #FFFFFF; background: transparent; font-size: 15px; font-weight: 700; }"
+            "QFrame#ireksTabHeader { background: #0B2F5B; border: none; border-top-left-radius: 8px; border-top-right-radius: 8px; "
+            "border-bottom-left-radius: 0; border-bottom-right-radius: 0; }"
+            "QLabel#ireksTabHeaderTitle { color: #FFFFFF; background: transparent; font-size: 13px; font-weight: 700; }"
             "QLabel#ireksTabHeaderSubtitle { color: #CDECE8; background: transparent; }"
             "QLabel#ireksTabHeaderIcon { background: transparent; }"
         )
@@ -2060,9 +2061,10 @@ class IngredientsIreksPage(QWidget):
         classification_card = QFrame(tab)
         classification_card.setProperty("ireksCard", True)
         classification_layout = QVBoxLayout(classification_card)
-        classification_layout.setContentsMargins(12, 10, 12, 12)
+        classification_layout.setContentsMargins(0, 0, 0, 12)
         classification_layout.setSpacing(9)
         classification_layout.addWidget(self._ireks_tab_header(classification_card, "Clasificación", "product-tag.svg"))
+        row_taxonomy.setContentsMargins(12, 0, 12, 0)
         classification_layout.addLayout(row_taxonomy)
         layout.addWidget(classification_card)
 
@@ -2071,10 +2073,11 @@ class IngredientsIreksPage(QWidget):
         presentation_card = QFrame(tab)
         presentation_card.setProperty("ireksCard", True)
         presentation_layout = QVBoxLayout(presentation_card)
-        presentation_layout.setContentsMargins(12, 10, 12, 12)
+        presentation_layout.setContentsMargins(0, 0, 0, 12)
         presentation_layout.setSpacing(9)
         presentation_layout.addWidget(self._ireks_tab_header(presentation_card, "Presentación", "presentation-container.svg"))
         presentation_grid = QGridLayout()
+        presentation_grid.setContentsMargins(12, 0, 12, 0)
         presentation_grid.setHorizontalSpacing(10)
         presentation_grid.setVerticalSpacing(5)
         presentation_fields = (
@@ -2100,10 +2103,11 @@ class IngredientsIreksPage(QWidget):
         pallet_card = QFrame(tab)
         pallet_card.setProperty("ireksCard", True)
         pallet_layout = QVBoxLayout(pallet_card)
-        pallet_layout.setContentsMargins(12, 10, 12, 12)
+        pallet_layout.setContentsMargins(0, 0, 0, 12)
         pallet_layout.setSpacing(9)
         pallet_layout.addWidget(self._ireks_tab_header(pallet_card, "Paletización", "pallet.svg"))
         pallet_grid = QGridLayout()
+        pallet_grid.setContentsMargins(12, 0, 12, 0)
         pallet_grid.setHorizontalSpacing(10)
         pallet_grid.setVerticalSpacing(5)
         pallet_fields = (
@@ -2122,8 +2126,13 @@ class IngredientsIreksPage(QWidget):
             pallet_grid.addWidget(field, grid_row + 1, column)
             pallet_grid.setColumnStretch(column, 1)
         pallet_layout.addLayout(pallet_grid)
-        pallet_layout.addWidget(self.lbl_transporte_obs)
-        pallet_layout.addWidget(self.transporte_observaciones)
+        observations_wrap = QWidget(pallet_card)
+        observations_layout = QVBoxLayout(observations_wrap)
+        observations_layout.setContentsMargins(12, 0, 12, 0)
+        observations_layout.setSpacing(5)
+        observations_layout.addWidget(self.lbl_transporte_obs)
+        observations_layout.addWidget(self.transporte_observaciones)
+        pallet_layout.addWidget(observations_wrap)
         pallet_layout.addStretch(1)
         lower_cards.addWidget(pallet_card)
         layout.addLayout(lower_cards, 1)
