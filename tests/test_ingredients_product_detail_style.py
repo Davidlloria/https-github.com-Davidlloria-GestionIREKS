@@ -72,3 +72,27 @@ def test_ireks_tabs_use_local_enterprise_style_helpers() -> None:
         "Consumo por cliente",
     ):
         assert title in source
+
+
+def test_ireks_data_cards_keep_their_controls_in_a_compact_desktop_layout(monkeypatch) -> None:
+    monkeypatch.setattr(IngredientsIreksPage, "reload", lambda self: None)
+    app = QApplication.instance() or QApplication([])
+
+    page = IngredientsIreksPage()
+    page.resize(1600, 900)
+    page.show()
+    app.processEvents()
+
+    data_tab = page.detail_tabs.widget(0)
+    classification = data_tab.findChild(QWidget, "ireksClassificationCard")
+    presentation = data_tab.findChild(QWidget, "ireksPresentationCard")
+    pallet = data_tab.findChild(QWidget, "ireksPalletCard")
+
+    assert classification is not None
+    assert presentation is not None
+    assert pallet is not None
+    assert presentation.geometry().right() < pallet.geometry().left()
+    assert presentation.geometry().bottom() <= data_tab.contentsRect().bottom()
+    assert pallet.geometry().bottom() <= data_tab.contentsRect().bottom()
+
+    page.close()

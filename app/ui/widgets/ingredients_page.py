@@ -1891,6 +1891,8 @@ class IngredientsIreksPage(QWidget):
             title_box.addWidget(subtitle_label)
         layout.addLayout(title_box)
         layout.addStretch(1)
+        header.setFixedHeight(48)
+        header.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         header.setStyleSheet(
             "QFrame#ireksTabHeader { background: #0B2F5B; border: none; border-top-left-radius: 8px; border-top-right-radius: 8px; "
             "border-bottom-left-radius: 0; border-bottom-right-radius: 0; }"
@@ -2059,8 +2061,9 @@ class IngredientsIreksPage(QWidget):
         row_taxonomy.addStretch(1)
 
         classification_card = QFrame(tab)
+        classification_card.setObjectName("ireksClassificationCard")
         classification_card.setProperty("ireksCard", True)
-        classification_card.setMinimumHeight(128)
+        classification_card.setFixedHeight(142)
         classification_layout = QVBoxLayout(classification_card)
         classification_layout.setContentsMargins(0, 0, 0, 12)
         classification_layout.setSpacing(9)
@@ -2086,11 +2089,14 @@ class IngredientsIreksPage(QWidget):
         classification_layout.addLayout(taxonomy_grid)
         layout.addWidget(classification_card)
 
-        lower_cards = QVBoxLayout()
+        # Keep both dense groups at their natural height. The old stretched
+        # vertical layout could compress fields below their required space.
+        lower_cards = QHBoxLayout()
         lower_cards.setSpacing(10)
         presentation_card = QFrame(tab)
+        presentation_card.setObjectName("ireksPresentationCard")
         presentation_card.setProperty("ireksCard", True)
-        presentation_card.setMinimumHeight(184)
+        presentation_card.setFixedHeight(204)
         presentation_layout = QVBoxLayout(presentation_card)
         presentation_layout.setContentsMargins(0, 0, 0, 12)
         presentation_layout.setSpacing(9)
@@ -2120,12 +2126,12 @@ class IngredientsIreksPage(QWidget):
         presentation_grid.setRowMinimumHeight(2, 20)
         presentation_grid.setRowMinimumHeight(3, 34)
         presentation_layout.addLayout(presentation_grid)
-        presentation_layout.addStretch(1)
-        lower_cards.addWidget(presentation_card)
+        lower_cards.addWidget(presentation_card, 1)
 
         pallet_card = QFrame(tab)
+        pallet_card.setObjectName("ireksPalletCard")
         pallet_card.setProperty("ireksCard", True)
-        pallet_card.setMinimumHeight(246)
+        pallet_card.setFixedHeight(264)
         pallet_layout = QVBoxLayout(pallet_card)
         pallet_layout.setContentsMargins(0, 0, 0, 12)
         pallet_layout.setSpacing(9)
@@ -2161,9 +2167,9 @@ class IngredientsIreksPage(QWidget):
         observations_layout.addWidget(self.lbl_transporte_obs)
         observations_layout.addWidget(self.transporte_observaciones)
         pallet_layout.addWidget(observations_wrap)
-        pallet_layout.addStretch(1)
-        lower_cards.addWidget(pallet_card)
-        layout.addLayout(lower_cards, 1)
+        lower_cards.addWidget(pallet_card, 1)
+        layout.addLayout(lower_cards)
+        layout.addStretch(1)
 
         self.transporte_pallet_tipo.currentIndexChanged.connect(self._schedule_autosave)
         self.detail_contenido_unidad.currentTextChanged.connect(self._schedule_autosave)
