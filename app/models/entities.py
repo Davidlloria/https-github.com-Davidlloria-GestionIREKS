@@ -717,7 +717,7 @@ class Receta(TimeStampedModel, table=True):
     __tablename__: ClassVar[str] = "recetas"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    cliente_id: str = Field(foreign_key="clientes.cliente_id", nullable=False, index=True, max_length=36)
+    cliente_id: Optional[str] = Field(default=None, foreign_key="clientes.cliente_id", nullable=True, index=True, max_length=36)
     nombre: str = Field(max_length=255)
     codigo_receta: str = Field(index=True, max_length=100)
     version: str = Field(default="1.0", max_length=20)

@@ -5,6 +5,10 @@ from datetime import date
 from types import SimpleNamespace
 from typing import Any
 
+from sqlalchemy import text
+from sqlmodel import create_engine
+
+import app.core.database as database_module
 from app.models import RecetaLinea
 from app.services.recipe_active_flow_service import RecipeActiveFlowService, RecipeActivePayload
 
@@ -76,6 +80,59 @@ def test_build_recipe_model_merges_payload_and_defaults() -> None:
     assert receta.estado == "borrador"
     assert receta.parametros_elaboracion_json
     assert receta.escandallo_detalle_json
+
+
+def test_build_recipe_model_allows_base_recipe_without_customer() -> None:
+    service = RecipeActiveFlowService(recipe_service=_FakeRecipeService())
+
+    receta = service.build_recipe_model(_sample_payload(cliente_id=""))
+
+    assert receta.es_base is True
+    assert receta.cliente_id is None
+
+
+def test_recipe_base_customer_migration_allows_null_cliente_id(tmp_path: Any, monkeypatch: Any) -> None:
+    migration_engine = create_engine(f"sqlite:///{tmp_path / 'recipes.db'}")
+    with migration_engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE recetas (
+                    created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, id INTEGER NOT NULL,
+                    cliente_id VARCHAR(36) NOT NULL, nombre VARCHAR(255) NOT NULL,
+                    codigo_receta VARCHAR(100) NOT NULL, version VARCHAR(20) NOT NULL,
+                    es_base BOOLEAN NOT NULL, receta_base_id INTEGER, masa_final_deseada_g FLOAT NOT NULL,
+                    peso_pieza_g FLOAT NOT NULL, numero_piezas INTEGER NOT NULL,
+                    total_harinas_g FLOAT NOT NULL, total_liquidos_g FLOAT NOT NULL,
+                    hidratacion_pct FLOAT NOT NULL, total_porcentaje_panadero FLOAT NOT NULL,
+                    masa_total_g FLOAT NOT NULL, coste_total FLOAT NOT NULL, coste_kg FLOAT NOT NULL,
+                    coste_pieza FLOAT NOT NULL, merma_pct FLOAT NOT NULL, observaciones VARCHAR NOT NULL,
+                    proceso VARCHAR NOT NULL, escandallo_detalle_json TEXT NOT NULL,
+                    parametros_elaboracion_json TEXT NOT NULL, estado VARCHAR(30) NOT NULL,
+                    PRIMARY KEY (id)
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO recetas VALUES (
+                    '2026-01-01', '2026-01-01', 1, '', 'Base', 'BASE', '1.0', 1, NULL,
+                    0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', '', '{}', '{}', 'borrador'
+                )
+                """
+            )
+        )
+    monkeypatch.setattr(database_module, "engine", migration_engine)
+
+    database_module._migrate_recetas_base_cliente_nullable()
+
+    with migration_engine.connect() as connection:
+        cliente_column = next(row for row in connection.execute(text("PRAGMA table_info(recetas)")) if row[1] == "cliente_id")
+        cliente_id = connection.execute(text("SELECT cliente_id FROM recetas WHERE id = 1")).scalar_one()
+    assert cliente_column[3] == 0
+    assert cliente_id is None
 
 
 def test_save_recipe_returns_missing_name_without_calling_services() -> None:

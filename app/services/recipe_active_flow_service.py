@@ -10,7 +10,7 @@ from app.services.recipe_service import RecipeService
 @dataclass(frozen=True)
 class RecipeActivePayload:
     recipe_id: int | None
-    cliente_id: str
+    cliente_id: str | None
     nombre: str
     codigo_receta: str
     version: str
@@ -59,7 +59,7 @@ class RecipeActiveFlowService:
 
         return Receta(
             id=payload.recipe_id,
-            cliente_id=str(payload.cliente_id or "").strip(),
+            cliente_id=str(payload.cliente_id or "").strip() or None,
             nombre=str(payload.nombre or "").strip(),
             codigo_receta=str(payload.codigo_receta or "").strip() or str(payload.nombre or "").strip(),
             version=str(payload.version or "").strip() or "1.0",

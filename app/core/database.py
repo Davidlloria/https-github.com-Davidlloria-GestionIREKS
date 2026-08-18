@@ -1322,6 +1322,78 @@ def _migrate_recetas_technical_fields() -> None:
             conn.exec_driver_sql("ALTER TABLE recetas ADD COLUMN parametros_elaboracion_json TEXT NOT NULL DEFAULT ''")
 
 
+def _migrate_recetas_base_cliente_nullable() -> None:
+    """Permite recetas base IREKS sin cliente, conservando la FK cuando existe."""
+    with engine.begin() as conn:
+        tables = {row[0] for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        if "recetas" not in tables:
+            return
+        columns = conn.exec_driver_sql("PRAGMA table_info(recetas)").fetchall()
+        cliente_id_column = next((row for row in columns if row[1] == "cliente_id"), None)
+        if cliente_id_column is None or not int(cliente_id_column[3] or 0):
+            return
+
+        conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        conn.exec_driver_sql("ALTER TABLE recetas RENAME TO recetas_old_schema")
+        conn.exec_driver_sql(
+            """
+            CREATE TABLE recetas (
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                id INTEGER NOT NULL,
+                cliente_id VARCHAR(36),
+                nombre VARCHAR(255) NOT NULL,
+                codigo_receta VARCHAR(100) NOT NULL,
+                version VARCHAR(20) NOT NULL,
+                es_base BOOLEAN NOT NULL,
+                receta_base_id INTEGER,
+                masa_final_deseada_g FLOAT NOT NULL,
+                peso_pieza_g FLOAT NOT NULL,
+                numero_piezas INTEGER NOT NULL,
+                total_harinas_g FLOAT NOT NULL,
+                total_liquidos_g FLOAT NOT NULL,
+                hidratacion_pct FLOAT NOT NULL,
+                total_porcentaje_panadero FLOAT NOT NULL,
+                masa_total_g FLOAT NOT NULL,
+                coste_total FLOAT NOT NULL,
+                coste_kg FLOAT NOT NULL,
+                coste_pieza FLOAT NOT NULL,
+                merma_pct FLOAT NOT NULL,
+                observaciones VARCHAR NOT NULL,
+                proceso VARCHAR NOT NULL,
+                escandallo_detalle_json TEXT NOT NULL DEFAULT '',
+                parametros_elaboracion_json TEXT NOT NULL DEFAULT '',
+                estado VARCHAR(30) NOT NULL,
+                PRIMARY KEY (id),
+                FOREIGN KEY(cliente_id) REFERENCES clientes (cliente_id),
+                FOREIGN KEY(receta_base_id) REFERENCES recetas (id)
+            )
+            """
+        )
+        conn.exec_driver_sql(
+            """
+            INSERT INTO recetas (
+                created_at, updated_at, id, cliente_id, nombre, codigo_receta, version, es_base,
+                receta_base_id, masa_final_deseada_g, peso_pieza_g, numero_piezas,
+                total_harinas_g, total_liquidos_g, hidratacion_pct, total_porcentaje_panadero,
+                masa_total_g, coste_total, coste_kg, coste_pieza, merma_pct,
+                observaciones, proceso, escandallo_detalle_json, parametros_elaboracion_json, estado
+            )
+            SELECT
+                created_at, updated_at, id,
+                CASE WHEN TRIM(COALESCE(cliente_id, '')) = '' THEN NULL ELSE cliente_id END,
+                nombre, codigo_receta, version, es_base, receta_base_id, masa_final_deseada_g,
+                peso_pieza_g, numero_piezas, total_harinas_g, total_liquidos_g, hidratacion_pct,
+                total_porcentaje_panadero, masa_total_g, coste_total, coste_kg, coste_pieza,
+                merma_pct, observaciones, proceso, escandallo_detalle_json,
+                parametros_elaboracion_json, estado
+            FROM recetas_old_schema
+            """
+        )
+        conn.exec_driver_sql("DROP TABLE recetas_old_schema")
+        conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+
+
 def _migrate_receta_lineas_process_fields() -> None:
     with engine.begin() as conn:
         tables = {row[0] for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
@@ -2005,6 +2077,8 @@ def init_db() -> None:
     _migrate_recetas_cliente_fk()
     _migrate_receta_child_fks()
     _migrate_recetas_technical_fields()
+    _migrate_recetas_base_cliente_nullable()
+    _migrate_receta_child_fks()
     _migrate_receta_lineas_process_fields()
     _migrate_ingredientes_std_to_materias_primas()
     _migrate_nutrition_table_name()
