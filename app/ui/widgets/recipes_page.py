@@ -585,6 +585,15 @@ class RecipePdfExportDialog(QDialog):
         self.nutrition_group.addButton(self.nutrition_no)
         options_layout.addWidget(self.nutrition_si, 1, 1)
         options_layout.addWidget(self.nutrition_no, 1, 2)
+        options_layout.addWidget(QLabel("Incluir % panadero:"), 2, 0)
+        self.baker_percentage_si = QRadioButton("Sí")
+        self.baker_percentage_no = QRadioButton("No")
+        self.baker_percentage_si.setChecked(True)
+        self.baker_percentage_group = QButtonGroup(self)
+        self.baker_percentage_group.addButton(self.baker_percentage_si)
+        self.baker_percentage_group.addButton(self.baker_percentage_no)
+        options_layout.addWidget(self.baker_percentage_si, 2, 1)
+        options_layout.addWidget(self.baker_percentage_no, 2, 2)
         layout.addWidget(self.minimal_options_group)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -610,6 +619,9 @@ class RecipePdfExportDialog(QDialog):
     def include_nutrition(self) -> bool:
         return self.nutrition_si.isChecked()
 
+    def include_baker_percentage(self) -> bool:
+        return self.baker_percentage_si.isChecked()
+
 
 class MinimalRecipePdfPreviewDialog(QDialog):
     def __init__(
@@ -618,6 +630,7 @@ class MinimalRecipePdfPreviewDialog(QDialog):
         recipe_id: int,
         include_escandallo: bool,
         include_nutrition: bool,
+        include_baker_percentage: bool,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -649,6 +662,7 @@ class MinimalRecipePdfPreviewDialog(QDialog):
                 layout_mode="minimal",
                 include_escandallo=include_escandallo,
                 include_nutrition=include_nutrition,
+                include_baker_percentage=include_baker_percentage,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Vista previa PDF", f"No se pudo generar la vista previa:\n{exc}")
@@ -2143,9 +2157,9 @@ class RecipesPage(QWidget):
         lines_header.setSectionResizeMode(self.COL_PCT, QHeaderView.ResizeMode.Fixed)
         lines_header.setSectionResizeMode(self.COL_PROCESO, QHeaderView.ResizeMode.Fixed)
         lines_header.setFixedHeight(26)
-        self.lines_table.setColumnWidth(self.COL_NOTA, 108)
-        self.lines_table.setColumnWidth(self.COL_CANTIDAD, 86)
-        self.lines_table.setColumnWidth(self.COL_PCT, 72)
+        self.lines_table.setColumnWidth(self.COL_NOTA, 80)
+        self.lines_table.setColumnWidth(self.COL_CANTIDAD, 116)
+        self.lines_table.setColumnWidth(self.COL_PCT, 96)
         self.lines_table.setColumnWidth(self.COL_PROCESO, 94)
         self.lines_table.setItemDelegateForColumn(
             self.COL_NOTA,
@@ -3456,6 +3470,7 @@ class RecipesPage(QWidget):
         linea.cantidad_base_g = float(qty_g or 0.0)
         linea.notas = (linea.notas or "").strip() or "Usado desde proceso"
         self._set_line_row(row, linea)
+        self._ensure_trailing_empty_line()
         self._on_lines_changed()
         self._apply_process_filter()
 
@@ -3635,7 +3650,20 @@ class RecipesPage(QWidget):
         linea.proceso_origen_nombre = ""
         linea.cantidad_origen_g = 0.0
         self._set_line_row(row, linea)
+        self._ensure_trailing_empty_line()
         self._on_lines_changed()
+
+    def _ensure_trailing_empty_line(self) -> None:
+        """Mantiene una fila libre al final para que la tabla pueda crecer sin límite."""
+        if self.lines_table.rowCount() <= 0:
+            return
+        last_row = self.lines_table.rowCount() - 1
+        last_line = self._line_from_row(last_row)
+        if not (last_line.nombre_mostrado or last_line.notas or last_line.cantidad_base_g):
+            return
+        row = self.lines_table.rowCount()
+        self.lines_table.insertRow(row)
+        self._set_line_row(row, RecetaLinea(receta_id=0, orden=row + 1))
 
     def _set_line_row(self, row: int, linea: RecetaLinea) -> None:
         has_ingredient = bool((linea.nombre_mostrado or "").strip())
@@ -4295,12 +4323,14 @@ class RecipesPage(QWidget):
         layout_mode = export_dialog.layout_mode()
         include_escandallo = layout_mode == "minimal" and export_dialog.include_escandallo()
         include_nutrition = layout_mode == "minimal" and export_dialog.include_nutrition()
+        include_baker_percentage = layout_mode == "minimal" and export_dialog.include_baker_percentage()
         if layout_mode == "minimal":
             preview_dialog = MinimalRecipePdfPreviewDialog(
                 self.pdf_service,
                 self.current_recipe_id,
                 include_escandallo,
                 include_nutrition,
+                include_baker_percentage,
                 self,
             )
             try:
@@ -4329,6 +4359,7 @@ class RecipesPage(QWidget):
                 layout_mode=layout_mode,
                 include_escandallo=include_escandallo,
                 include_nutrition=include_nutrition,
+                include_baker_percentage=include_baker_percentage,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Recetas", f"No se pudo exportar el PDF:\n{exc}")

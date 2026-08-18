@@ -319,6 +319,7 @@ class PdfService:
         layout_mode: str = "extended",
         include_escandallo: bool = False,
         include_nutrition: bool = False,
+        include_baker_percentage: bool = True,
     ) -> None:
         receta, cliente, lineas = self._load_recipe_data(recipe_id)
         if not receta:
@@ -349,6 +350,7 @@ class PdfService:
                 output_path,
                 include_escandallo=include_escandallo,
                 include_nutrition=include_nutrition,
+                include_baker_percentage=include_baker_percentage,
             )
             return
 
@@ -585,6 +587,7 @@ class PdfService:
         *,
         include_escandallo: bool,
         include_nutrition: bool = False,
+        include_baker_percentage: bool = True,
     ) -> None:
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
@@ -660,7 +663,15 @@ class PdfService:
         )
         story: list = [title_row]
         story.append(Paragraph("RECETA", section_style))
-        story.append(self._build_minimal_recipe_table(lineas, body_style, body_right, header_style))
+        story.append(
+            self._build_minimal_recipe_table(
+                lineas,
+                body_style,
+                body_right,
+                header_style,
+                include_baker_percentage=include_baker_percentage,
+            )
+        )
         process_text = (receta.proceso or "").strip()
         if process_text:
             story.append(Paragraph("PROCESO", section_style))
@@ -731,36 +742,86 @@ class PdfService:
         body_style: ParagraphStyle,
         body_right: ParagraphStyle,
         header_style: ParagraphStyle,
+        *,
+        include_baker_percentage: bool = True,
     ) -> Table:
-        data = [[
+        headers = [
             Paragraph("INGREDIENTE", header_style),
             Paragraph("NOTA", header_style),
             Paragraph("CANTIDAD", header_style),
-            Paragraph("%", header_style),
-            Paragraph("PROCESO", header_style),
-        ]]
+        ]
+        if include_baker_percentage:
+            headers.append(Paragraph("%", header_style))
+        data: list[list[Paragraph]] = []
         total_qty = 0.0
         total_pct = 0.0
-        for line in lineas:
-            if not (line.nombre_mostrado or line.notas or line.cantidad_base_g):
+        process_rows: list[int] = []
+        header_rows: list[int] = []
+        for process_name, process_lines in self._group_lines_by_process(lineas):
+            named_lines = [line for line in process_lines if line.nombre_mostrado or line.notas or line.cantidad_base_g]
+            if not named_lines:
                 continue
-            total_qty += float(line.cantidad_base_g or 0.0)
-            total_pct += float(line.porcentaje_panadero or 0.0)
+            process_rows.append(len(data))
             data.append([
-                Paragraph(escape((line.nombre_mostrado or "").strip()), body_style),
-                Paragraph(escape((line.notas or "").strip()), body_style),
-                Paragraph(f"{self._fmt(line.cantidad_base_g, 2)} g", body_right),
-                Paragraph(f"{self._fmt(line.porcentaje_panadero, 2)} %", body_right),
-                Paragraph(escape((line.proceso_nombre or "Masa final").strip()), body_style),
+                Paragraph(f"<b>{escape(process_name.upper())}</b>", body_style),
+                *[Paragraph("", body_style) for _ in range(len(headers) - 1)],
             ])
-        data.append([
+            header_rows.append(len(data))
+            data.append(headers)
+            for line in named_lines:
+                total_qty += float(line.cantidad_base_g or 0.0)
+                total_pct += float(line.porcentaje_panadero or 0.0)
+                row = [
+                    Paragraph(escape((line.nombre_mostrado or "").strip()), body_style),
+                    Paragraph(escape((line.notas or "").strip()), body_style),
+                    Paragraph(f"{self._fmt(line.cantidad_base_g, 2)} g", body_right),
+                ]
+                if include_baker_percentage:
+                    row.append(Paragraph(f"{self._fmt(line.porcentaje_panadero, 2)} %", body_right))
+                data.append(row)
+        total_row = [
             Paragraph("<b>TOTAL</b>", body_style),
             Paragraph("", body_style),
             Paragraph(f"<b>{self._fmt(total_qty, 2)} g</b>", body_right),
-            Paragraph(f"<b>{self._fmt(total_pct, 2)} %</b>", body_right),
-            Paragraph("", body_style),
-        ])
-        return self._minimal_table(data, [60 * mm, 34 * mm, 27 * mm, 18 * mm, 37 * mm], total_row=True)
+        ]
+        if include_baker_percentage:
+            total_row.append(Paragraph(f"<b>{self._fmt(total_pct, 2)} %</b>", body_right))
+        data.append(total_row)
+        col_widths = [78 * mm, 42 * mm, 38 * mm, 28 * mm] if include_baker_percentage else [92 * mm, 50 * mm, 44 * mm]
+        table = Table(data, colWidths=col_widths, repeatRows=2 if header_rows else 0, hAlign="CENTER")
+        table.setStyle(
+            TableStyle(
+                [
+                    ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D8E0EA")),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#EFF6FF")),
+                ]
+            )
+        )
+        for row in process_rows:
+            table.setStyle(
+                TableStyle(
+                    [
+                        ("SPAN", (0, row), (-1, row)),
+                        ("BACKGROUND", (0, row), (-1, row), colors.HexColor("#F2F4F7")),
+                        ("TEXTCOLOR", (0, row), (-1, row), colors.HexColor("#334155")),
+                    ]
+                )
+            )
+        for row in header_rows:
+            table.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, row), (-1, row), colors.HexColor("#2563EB")),
+                        ("TEXTCOLOR", (0, row), (-1, row), colors.white),
+                    ]
+                )
+            )
+        return table
 
     def _build_minimal_escandallo_table(
         self,
