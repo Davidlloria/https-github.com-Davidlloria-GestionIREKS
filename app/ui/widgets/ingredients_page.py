@@ -1860,7 +1860,17 @@ class IngredientsIreksPage(QWidget):
             if button is not None:
                 button.setEnabled(enabled)
 
-    def _ireks_tab_header(self, parent: QWidget, title: str, icon_name: str, subtitle: str = "") -> QFrame:
+    def _ireks_tab_header(
+        self,
+        parent: QWidget,
+        title: str,
+        icon_name: str,
+        subtitle: str = "",
+        *,
+        icon_size: int = 20,
+        title_size: int = 13,
+        height: int = 48,
+    ) -> QFrame:
         """Create the compact, local heading used by IREKS detail tabs."""
         header = QFrame(parent)
         header.setObjectName("ireksTabHeader")
@@ -1870,14 +1880,21 @@ class IngredientsIreksPage(QWidget):
         icon = QLabel(header)
         icon.setObjectName("ireksTabHeaderIcon")
         icon_path = Path(__file__).resolve().parents[3] / "assets" / "icons" / icon_name
-        pixmap = QIcon(str(icon_path)).pixmap(24, 24)
+        pixmap = QIcon(str(icon_path)).pixmap(max(24, icon_size), max(24, icon_size))
         image = pixmap.toImage()
         for x in range(image.width()):
             for y in range(image.height()):
                 color = image.pixelColor(x, y)
                 if color.alpha():
                     image.setPixelColor(x, y, QColor(255, 255, 255, color.alpha()))
-        icon.setPixmap(QPixmap.fromImage(image).scaled(20, 20, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        icon.setPixmap(
+            QPixmap.fromImage(image).scaled(
+                icon_size,
+                icon_size,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
         layout.addWidget(icon)
         title_box = QVBoxLayout()
         title_box.setContentsMargins(0, 0, 0, 0)
@@ -1891,12 +1908,12 @@ class IngredientsIreksPage(QWidget):
             title_box.addWidget(subtitle_label)
         layout.addLayout(title_box)
         layout.addStretch(1)
-        header.setFixedHeight(48)
+        header.setFixedHeight(height)
         header.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         header.setStyleSheet(
             "QFrame#ireksTabHeader { background: #0B2F5B; border: none; border-top-left-radius: 8px; border-top-right-radius: 8px; "
             "border-bottom-left-radius: 0; border-bottom-right-radius: 0; }"
-            "QLabel#ireksTabHeaderTitle { color: #FFFFFF; background: transparent; font-size: 13px; font-weight: 700; }"
+            f"QLabel#ireksTabHeaderTitle {{ color: #FFFFFF; background: transparent; font-size: {title_size}px; font-weight: 700; }}"
             "QLabel#ireksTabHeaderSubtitle { color: #CDECE8; background: transparent; }"
             "QLabel#ireksTabHeaderIcon { background: transparent; }"
         )
@@ -2063,11 +2080,20 @@ class IngredientsIreksPage(QWidget):
         classification_card = QFrame(tab)
         classification_card.setObjectName("ireksClassificationCard")
         classification_card.setProperty("ireksCard", True)
-        classification_card.setFixedHeight(142)
+        classification_card.setFixedHeight(146)
         classification_layout = QVBoxLayout(classification_card)
         classification_layout.setContentsMargins(0, 0, 0, 12)
         classification_layout.setSpacing(9)
-        classification_layout.addWidget(self._ireks_tab_header(classification_card, "Clasificación", "product-tag.svg"))
+        classification_layout.addWidget(
+            self._ireks_tab_header(
+                classification_card,
+                "Clasificación",
+                "product-tag.svg",
+                icon_size=26,
+                title_size=16,
+                height=52,
+            )
+        )
         taxonomy_grid = QGridLayout()
         taxonomy_grid.setContentsMargins(12, 0, 12, 0)
         taxonomy_grid.setHorizontalSpacing(10)
@@ -2131,7 +2157,7 @@ class IngredientsIreksPage(QWidget):
         pallet_card = QFrame(tab)
         pallet_card.setObjectName("ireksPalletCard")
         pallet_card.setProperty("ireksCard", True)
-        pallet_card.setFixedHeight(264)
+        pallet_card.setFixedHeight(204)
         pallet_layout = QVBoxLayout(pallet_card)
         pallet_layout.setContentsMargins(0, 0, 0, 12)
         pallet_layout.setSpacing(9)
@@ -2160,15 +2186,18 @@ class IngredientsIreksPage(QWidget):
         pallet_grid.setRowMinimumHeight(2, 20)
         pallet_grid.setRowMinimumHeight(3, 34)
         pallet_layout.addLayout(pallet_grid)
-        observations_wrap = QWidget(pallet_card)
-        observations_layout = QVBoxLayout(observations_wrap)
-        observations_layout.setContentsMargins(12, 0, 12, 0)
+        lower_cards.addWidget(pallet_card, 1)
+        layout.addLayout(lower_cards)
+        observations_card = QFrame(tab)
+        observations_card.setObjectName("ireksObservationsCard")
+        observations_card.setProperty("ireksCard", True)
+        observations_card.setFixedHeight(82)
+        observations_layout = QVBoxLayout(observations_card)
+        observations_layout.setContentsMargins(12, 8, 12, 8)
         observations_layout.setSpacing(5)
         observations_layout.addWidget(self.lbl_transporte_obs)
         observations_layout.addWidget(self.transporte_observaciones)
-        pallet_layout.addWidget(observations_wrap)
-        lower_cards.addWidget(pallet_card, 1)
-        layout.addLayout(lower_cards)
+        layout.addWidget(observations_card)
         layout.addStretch(1)
 
         self.transporte_pallet_tipo.currentIndexChanged.connect(self._schedule_autosave)

@@ -87,12 +87,15 @@ def test_ireks_data_cards_keep_their_controls_in_a_compact_desktop_layout(monkey
     classification = data_tab.findChild(QWidget, "ireksClassificationCard")
     presentation = data_tab.findChild(QWidget, "ireksPresentationCard")
     pallet = data_tab.findChild(QWidget, "ireksPalletCard")
+    observations = data_tab.findChild(QWidget, "ireksObservationsCard")
 
     assert classification is not None
     assert presentation is not None
     assert pallet is not None
+    assert observations is not None
     assert presentation.geometry().right() < pallet.geometry().left()
     assert presentation.geometry().bottom() <= data_tab.contentsRect().bottom()
     assert pallet.geometry().bottom() <= data_tab.contentsRect().bottom()
+    assert observations.isAncestorOf(page.transporte_observaciones)
 
     page.close()
