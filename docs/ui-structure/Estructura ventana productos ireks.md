@@ -143,6 +143,22 @@ ireksDataTab (QWidget, fondo #EEF3F8)
 - Los controles derivados de cálculo son de solo lectura, con fondo `#F4F7FB`.
 - Los valores de presentación y paletización mantienen los mismos eventos de autosave y los mismos cálculos existentes: total de presentación, presentaciones por pallet, unidades por pallet y kg por pallet.
 
+### Especificación visual por tarjeta
+
+| Tarjeta | Cabecera | Componentes y disposición | Campos calculados / aspecto |
+| --- | --- | --- | --- |
+| **CLASIFICACIÓN** | `ireksTabHeader` (`QFrame`), fondo azul marino `#0B2F5B`, sin borde, radio 8 px. Icono lineal blanco `product-tag.svg` de 24 px y título blanco en mayúsculas, 15 px y negrita. | Una única fila responsiva con las etiquetas **Fabricante**, **Familia** y **Subfamilia** seguidas de `detail_fabricante_id`, `detail_familia_id` y `detail_subfamilia_id` (`QComboBox`). Factores de crecimiento 2 / 3 / 3. | No incorpora cálculo. Etiquetas `#5E6C84`, peso 500. Combos blancos, texto `#0B2F5B`, borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco turquesa `#087E9C`. |
+| **PRESENTACIÓN** | `ireksTabHeader`, con el mismo fondo `#0B2F5B`, radio 8 px, icono blanco `presentation-container.svg` de 24 px y título **PRESENTACIÓN** blanco. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Presentación** / `detail_envase_id`, **Contenido** / `detail_envase_cantidad`, **Unidad contenido** / `detail_contenido_unidad`; fila 2: **Peso unidad** / `detail_envase_peso`, **Unidad peso** / `detail_envase_unidad`, **Total presentación** / `detail_envase_total`. Las tres columnas comparten el ancho disponible. | `detail_envase_total` es solo lectura, fondo `#F4F7FB` y texto `#0B2F5B`; los otros controles son blancos con borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco `#087E9C`. |
+| **PALETIZACIÓN** | `ireksTabHeader`, fondo `#0B2F5B`, radio 8 px, icono blanco `pallet.svg` de 24 px y título **PALETIZACIÓN** blanco. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Pallet** / `transporte_pallet_tipo`, **Presentaciones/capa** / `transporte_cajas_por_capa`, **Capas** / `transporte_capas_por_pallet`; fila 2: **Presentaciones/pallet** / `transporte_cajas_por_pallet`, **Uds/pallet** / `transporte_unidades_por_pallet`, **Total pallet** / `transporte_kg_por_pallet`. Debajo: **Obs.** y `transporte_observaciones` a ancho completo. | `transporte_cajas_por_pallet`, `transporte_unidades_por_pallet` y `transporte_kg_por_pallet` son solo lectura, fondo `#F4F7FB`; los campos fuente y observaciones son editables. Todos usan texto marino `#0B2F5B`, etiquetas `#5E6C84`, borde `#C9D7E8`, radio 6 px y foco turquesa `#087E9C`. |
+
+#### Contenedor común de las tres tarjetas
+
+- `QFrame` con propiedad `ireksCard=True`: fondo `#FFFFFF`, borde de 1 px `#D6E0EA` y radio de 8 px.
+- Márgenes internos de tarjeta: 12 px horizontales, 10 px superiores y 12 px inferiores; separación vertical de 9 px.
+- `ireksDataTab`: fondo azul grisáceo claro `#EEF3F8`, márgenes 8 / 10 / 8 / 8 px y separación de 8 px.
+- Orden vertical: **CLASIFICACIÓN**, **PRESENTACIÓN** y **PALETIZACIÓN**. Esta disposición evita que etiquetas y controles se compriman o se solapen en el ancho efectivo del panel derecho.
+- Las cabeceras no llevan sombra ni borde/acento turquesa; los iconos se renderizan en blanco sobre el azul marino.
+
 ## Comportamiento actual
 
 - Al abrir la pantalla se cargan el catálogo de productos y sus filtros. Si hay productos, se selecciona el primero y se completa su ficha.
