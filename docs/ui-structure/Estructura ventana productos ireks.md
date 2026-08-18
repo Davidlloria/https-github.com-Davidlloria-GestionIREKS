@@ -87,36 +87,55 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
                             │           ├── cabecera `ireksTabHeader` (icono blanco `pallet.svg`)
                             │           └── cuadrícula 3 columnas: Pallet / transporte_pallet_tipo · Presentaciones/capa / transporte_cajas_por_capa · Capas / transporte_capas_por_pallet
                             │               Presentaciones/pallet / transporte_cajas_por_pallet · Uds/pallet / transporte_unidades_por_pallet · Total pallet / transporte_kg_por_pallet (los tres derivados, solo lectura, #F4F7FB)
-                            │               Obs. / transporte_observaciones (ancho completo)
-                            ├── Tarifa
-                            │   ├── filtro de año
-                            │   ├── Añadir tarifa / Editar / Eliminar
-                            │   ├── tarifa_header_table (cabecera agrupada IREKS / DISTRIBUIDOR)
-                            │   └── tarifa_table (10 columnas: año, precio IREKS, descuento y coste/margen de distribuidor)
-                            ├── Entradas
-                            │   ├── filtro Desde / Hasta / Todo
-                            │   ├── entradas_table (Fecha, Pedido Nº, Albarán, Uds, Kg, Lote, Caduca)
-                            │   └── entradas_totals_table (fila fija sincronizada)
-                            ├── Salidas
-                            │   ├── filtro Desde / Hasta / Todo
-                            │   ├── salidas_table (Fecha, Pedido Nº, Albarán, Uds, Kg, Lote, Caduca)
-                            │   └── salidas_totals_table (fila fija sincronizada)
-                            ├── Stock
-                            │   ├── filtro Desde / Hasta / Todo
-                            │   ├── stock_table (Fecha, Tipo, Pedido Nº, Albarán, Uds, Kg, Lote, Caduca)
-                            │   └── stock_totals_table (fila fija sincronizada)
-                            ├── Mensual
-                            │   ├── filtro Desde / Hasta / Limpiar
-                            │   └── monthly_orders_table (Mes, Pedidos, Cantidad, Kg, Media, Últ. fecha, Últ. pedido)
-                            ├── Pedidos
-                            │   ├── filtro Desde / Hasta / Limpiar
-                            │   └── pedidos_table (Fecha, Pedido Nº, Albarán, Cantidad, Lote, Caducidad)
-                            ├── Nutición
-                            │   └── nutricion_table (Nutriente / Por 100 g; 9 filas editables)
-                            └── Clientes
-                                ├── selector de año
-                                ├── ireksCustomerConsumptionEmpty (estado vacío)
-                                └── ireksCustomerConsumptionTable (Cliente, Último período, Kg, Unidades, €; ordenable)
+                            │       └── tarjeta OBSERVACIONES (QFrame `ireksObservationsCard`, ancho completo)
+                            │           └── Obs. / transporte_observaciones (QLineEdit editable)
+                            ├── Tarifa (QWidget `tarifaTab`, blanco, borde #D6E0EA, radio 8 px)
+                            │   ├── ireksTabHeader: product-tag.svg · “Histórico de tarifas”
+                            │   └── tarifa_body (márgenes 10 px)
+                            │       ├── Año / tarifa_year_filter · Añadir tarifa · Editar · Eliminar
+                            │       └── tarifa_table_wrap
+                            │           ├── tarifa_header_table (2 filas: Año · IREKS · Dto % · DISTRIBUIDOR)
+                            │           └── tarifa_table (10 columnas: Año · €/Env. · €/kg · Delta · Dto % · Costo · €/Env. · €/kg · Delta · Margen)
+                            ├── Entradas (QWidget `entradasTab`, tarjeta `entradasCard`)
+                            │   ├── ireksTabHeader: package.svg · “Entradas de almacén”
+                            │   └── entradas_body (márgenes 10 px)
+                            │       ├── entradasToolbar: Desde / entradasDateFrom · Hasta / entradasDateTo · Todo / entradasResetBtn
+                            │       ├── entradasTable (Fecha · Pedido Nº · Albarán · Uds · Kg · Lote · Caduca)
+                            │       └── entradasTotalsTable (fila fija: acumulados de Uds y Kg)
+                            ├── Salidas (QWidget `salidasTab`, blanco, borde #D6E0EA, radio 8 px)
+                            │   ├── ireksTabHeader: package.svg · “Salidas de almacén”
+                            │   └── salidas_body (márgenes 10 px)
+                            │       ├── Desde / salidas_date_from · Hasta / salidas_date_to · Todo
+                            │       ├── salidas_table (Fecha · Pedido Nº · Albarán · Uds · Kg · Lote · Caduca)
+                            │       ├── ireksSalesEmpty (QLabel, estado vacío centrado)
+                            │       └── salidas_totals_table (fila fija: acumulados de Uds y Kg)
+                            ├── Stock (QWidget `stockTab`, blanco, borde #D6E0EA, radio 8 px)
+                            │   ├── ireksTabHeader: pallet.svg · “Stock y movimientos”
+                            │   └── stock_body (márgenes 10 px)
+                            │       ├── Desde / stock_date_from · Hasta / stock_date_to · Todo
+                            │       ├── stock_table (Fecha · Tipo · Pedido Nº · Albarán · Uds · Kg · Lote · Caduca)
+                            │       └── stock_totals_table (fila fija: saldo neto de Uds y Kg)
+                            ├── Mensual (QWidget `mensualTab`, blanco, borde #D6E0EA, radio 8 px)
+                            │   ├── ireksTabHeader: calendar-chart.svg · “Resumen mensual”
+                            │   └── mensual_body (márgenes 10 px)
+                            │       ├── Desde / monthly_date_from · Hasta / monthly_date_to · Limpiar
+                            │       └── monthly_orders_table (Mes · Pedidos · Cantidad · Kg · Media · Ult. fecha · Ult. pedido)
+                            ├── Pedidos (QWidget `pedidosTab`, blanco, borde #D6E0EA, radio 8 px)
+                            │   ├── ireksTabHeader: list.svg · “Pedidos relacionados”
+                            │   └── pedidos_body (márgenes 10 px)
+                            │       ├── Desde / pedidos_date_from · Hasta / pedidos_date_to · Limpiar / pedidos_reset_btn
+                            │       └── pedidos_table (Fecha · Pedido Nº · Albarán · Cantidad · Lote · Caducidad)
+                            ├── Nutrición (QWidget `nutricionTab`, blanco, borde #D6E0EA, radio 8 px)
+                            │   ├── ireksTabHeader: nutrition-lab.svg · “Información nutricional”
+                            │   │   └── ireksNutritionBadge: “Valores por 100 g”
+                            │   └── nutricion_body (márgenes 10 px)
+                            │       └── nutricion_table (Nutriente / Por 100 g; 9 nutrientes, valor editable)
+                            └── Clientes (QWidget `clientesTab`, blanco, borde #D6E0EA, radio 8 px)
+                                ├── ireksTabHeader: users.svg · “Consumo por cliente”
+                                └── clientes_body (márgenes 10 px)
+                                    ├── Año / customer_consumption_year (QComboBox)
+                                    ├── ireksCustomerConsumptionEmpty (estado vacío)
+                                    └── ireksCustomerConsumptionTable (Cliente · Último período · Kg · Unidades · €; ordenable)
 ```
 
 Las pestañas Tarifa, Entradas, Salidas, Stock, Mensual, Pedidos, Nutrición y Clientes usan la propia pestaña como tarjeta blanca con borde `#D6E0EA` y radio de 8 px. Su cabecera estándar `ireksTabHeader` ocupa todo el ancho y queda ajustada al borde superior; el contenido restante se aloja en un cuerpo interno con márgenes de 10 px. La tabla de Tarifa ocupa todo el ancho disponible de ese cuerpo y estira su última columna para mantener sincronizadas las dos filas de cabecera.
