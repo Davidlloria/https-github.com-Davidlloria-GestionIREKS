@@ -107,6 +107,8 @@ def test_ireks_data_cards_keep_their_controls_in_a_compact_desktop_layout(monkey
     assert presentation.geometry().right() < pallet.geometry().left()
     assert presentation.geometry().bottom() <= data_tab.contentsRect().bottom()
     assert pallet.geometry().bottom() <= data_tab.contentsRect().bottom()
+    assert observations.geometry().top() > pallet.geometry().bottom()
+    assert observations.height() == 46
     assert observations.isAncestorOf(page.transporte_observaciones)
 
     page.close()

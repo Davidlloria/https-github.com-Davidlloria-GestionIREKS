@@ -135,7 +135,7 @@ ireksDataTab (QWidget, fondo #EEF3F8)
     │       ├── Peso unidad / detail_envase_peso (QLineEdit)
     │       ├── Unidad peso / detail_envase_unidad (QComboBox)
     │       └── Total presentación / detail_envase_total (QLineEdit, solo lectura)
-    └── tarjeta PALETIZACIÓN (QFrame `ireksPalletCard`, alto fijo 264 px)
+    └── tarjeta PALETIZACIÓN (QFrame `ireksPalletCard`, alto fijo 204 px)
         ├── cabecera `ireksTabHeader` (icono blanco `pallet.svg`)
         ├── cuadrícula de 3 columnas y 2 grupos de campos
         │   ├── Pallet / transporte_pallet_tipo (QComboBox)
@@ -144,7 +144,9 @@ ireksDataTab (QWidget, fondo #EEF3F8)
         │   ├── Presentaciones/pallet / transporte_cajas_por_pallet (QLineEdit, solo lectura)
         │   ├── Uds/pallet / transporte_unidades_por_pallet (QLineEdit, solo lectura)
         │   └── Total pallet / transporte_kg_por_pallet (QLineEdit, solo lectura)
-        └── Obs. / transporte_observaciones (QLineEdit, ancho completo)
+        └── Sin campo de observaciones
+└── tarjeta OBSERVACIONES (QFrame `ireksObservationsCard`, alto fijo 46 px, ancho completo)
+    └── Obs. / transporte_observaciones (QLabel y QLineEdit en una misma fila)
 ```
 
 - Las etiquetas quedan encima de los controles en Presentación y Paletización; así no se comprimen ni se solapan con sus campos.
@@ -155,9 +157,10 @@ ireksDataTab (QWidget, fondo #EEF3F8)
 
 | Tarjeta | Cabecera | Componentes y disposición | Campos calculados / aspecto |
 | --- | --- | --- | --- |
-| **CLASIFICACIÓN** | `ireksTabHeader` de alto fijo 48 px, fondo azul marino `#0B2F5B`, sin borde, radio solo en esquinas superiores de 8 px. Icono blanco `product-tag.svg` de 20 px y título en mayúsculas blanco, 13 px y negrita. | Cuadrícula de tres columnas con etiqueta encima del control: **Fabricante** / `detail_fabricante_id`, **Familia** / `detail_familia_id` y **Subfamilia** / `detail_subfamilia_id`. `ireksClassificationCard` tiene alto fijo 142 px. | No incorpora cálculo. Etiquetas `#5E6C84`, peso 500. Combos blancos, texto `#0B2F5B`, borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco turquesa `#087E9C`. |
-| **PRESENTACIÓN** | `ireksTabHeader` de alto fijo 48 px, fondo `#0B2F5B`, radio superior de 8 px, icono blanco `presentation-container.svg` de 20 px y título blanco de 13 px. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Presentación** / `detail_envase_id`, **Contenido** / `detail_envase_cantidad`, **Unidad contenido** / `detail_contenido_unidad`; fila 2: **Peso unidad** / `detail_envase_peso`, **Unidad peso** / `detail_envase_unidad`, **Total presentación** / `detail_envase_total`. `ireksPresentationCard` tiene alto fijo 204 px. | `detail_envase_total` es solo lectura, fondo `#F4F7FB` y texto `#0B2F5B`; los otros controles son blancos con borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco `#087E9C`. |
-| **PALETIZACIÓN** | `ireksTabHeader` de alto fijo 48 px, fondo `#0B2F5B`, radio superior de 8 px, icono blanco `pallet.svg` de 20 px y título blanco de 13 px. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Pallet** / `transporte_pallet_tipo`, **Presentaciones/capa** / `transporte_cajas_por_capa`, **Capas** / `transporte_capas_por_pallet`; fila 2: **Presentaciones/pallet** / `transporte_cajas_por_pallet`, **Uds/pallet** / `transporte_unidades_por_pallet`, **Total pallet** / `transporte_kg_por_pallet`. Debajo: **Obs.** y `transporte_observaciones` a ancho completo. `ireksPalletCard` tiene alto fijo 264 px. | `transporte_cajas_por_pallet`, `transporte_unidades_por_pallet` y `transporte_kg_por_pallet` son solo lectura, fondo `#F4F7FB`; los campos fuente y observaciones son editables. Todos usan texto marino `#0B2F5B`, etiquetas `#5E6C84`, borde `#C9D7E8`, radio 6 px y foco turquesa `#087E9C`. |
+| **CLASIFICACIÓN** | Cabecera estándar `uiRole="detailHeader"`: alto fijo 38 px, fondo azul marino `#06213D`, radio solo en esquinas superiores de 8 px, icono blanco de 21 px y título blanco de 16 px. | Cuadrícula de tres columnas con etiqueta encima del control: **Fabricante** / `detail_fabricante_id`, **Familia** / `detail_familia_id` y **Subfamilia** / `detail_subfamilia_id`. `ireksClassificationCard` tiene alto fijo 146 px. | No incorpora cálculo. Etiquetas `#5E6C84`, peso 500. Combos blancos, texto `#0B2F5B`, borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco turquesa `#087E9C`. |
+| **PRESENTACIÓN** | Cabecera estándar `uiRole="detailHeader"`: alto fijo 38 px, fondo `#06213D`, radio superior de 8 px, icono blanco de 21 px y título blanco de 16 px. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Presentación** / `detail_envase_id`, **Contenido** / `detail_envase_cantidad`, **Unidad contenido** / `detail_contenido_unidad`; fila 2: **Peso unidad** / `detail_envase_peso`, **Unidad peso** / `detail_envase_unidad`, **Total presentación** / `detail_envase_total`. `ireksPresentationCard` tiene alto fijo 204 px. | `detail_envase_total` es solo lectura, fondo `#F4F7FB` y texto `#0B2F5B`; los otros controles son blancos con borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco `#087E9C`. |
+| **PALETIZACIÓN** | Cabecera estándar `uiRole="detailHeader"`: alto fijo 38 px, fondo `#06213D`, radio superior de 8 px, icono blanco de 21 px y título blanco de 16 px. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Pallet** / `transporte_pallet_tipo`, **Presentaciones/capa** / `transporte_cajas_por_capa`, **Capas** / `transporte_capas_por_pallet`; fila 2: **Presentaciones/pallet** / `transporte_cajas_por_pallet`, **Uds/pallet** / `transporte_unidades_por_pallet`, **Total pallet** / `transporte_kg_por_pallet`. `ireksPalletCard` tiene alto fijo 204 px. | `transporte_cajas_por_pallet`, `transporte_unidades_por_pallet` y `transporte_kg_por_pallet` son solo lectura, fondo `#F4F7FB`; los campos fuente son editables. Todos usan texto marino `#0B2F5B`, etiquetas `#5E6C84`, borde `#C9D7E8`, radio 6 px y foco turquesa `#087E9C`. |
+| **OBSERVACIONES** | No utiliza cabecera; es una tarjeta compacta `ireksObservationsCard` de fondo blanco, borde `#D6E0EA`, radio 8 px y alto fijo 46 px. | Una sola fila: etiqueta **Obs.** a la izquierda y `transporte_observaciones` ocupando el resto del ancho. Se sitúa debajo de la fila PRESENTACIÓN / PALETIZACIÓN. | Campo editable, mismo texto, borde, radio y foco que los demás controles. |
 
 #### Contenedor común de las tres tarjetas
 
