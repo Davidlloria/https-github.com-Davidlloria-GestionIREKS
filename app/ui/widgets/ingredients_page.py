@@ -1907,6 +1907,8 @@ class IngredientsIreksPage(QWidget):
         clientes_body_layout.addWidget(self.customer_consumption_table, 1)
         clientes_layout.addWidget(clientes_body, 1)
         self._clientes_tab_index = tabs.addTab(clientes_tab, "Clientes")
+        for tab_index in range(tabs.count()):
+            tabs.widget(tab_index).setContentsMargins(4, 4, 4, 4)
         tabs.currentChanged.connect(self._on_detail_tab_changed)
         tabs_layout.addWidget(tabs)
         right_splitter.addWidget(tabs_host)

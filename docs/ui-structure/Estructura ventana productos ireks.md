@@ -73,7 +73,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
                     │           ├── Status en lista: botones segmentados Sí / No
                     │           └── Categoría: botones segmentados Harina / Líquido
                     └── tabs_host
-                        └── detail_tabs (QTabWidget)
+                        └── detail_tabs (QTabWidget; cada página deja un margen exterior de 4 px)
                             ├── Datos
                             │   └── ireksDataTab (QWidget, fondo #EEF3F8)
                             │       ├── tarjeta CLASIFICACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #D6E0EA, radio 8 px)
@@ -138,7 +138,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
                                     └── ireksCustomerConsumptionTable (Cliente · Último período · Kg · Unidades · €; ordenable)
 ```
 
-Las pestañas Tarifa, Entradas, Salidas, Stock, Mensual, Pedidos, Nutrición y Clientes usan la propia pestaña como tarjeta blanca con borde `#D6E0EA` y radio de 8 px. Su cabecera estándar `ireksTabHeader` ocupa todo el ancho y queda ajustada al borde superior; el contenido restante se aloja en un cuerpo interno con márgenes de 10 px. La tabla de Tarifa ocupa todo el ancho disponible de ese cuerpo y estira su última columna para mantener sincronizadas las dos filas de cabecera.
+Las páginas de `detail_tabs` dejan un margen exterior uniforme de 4 px: esta es la separación entre cada `ireksTabHeader` y el propio `QTabWidget`, sin añadir margen dentro de las tarjetas. Tarifa, Entradas, Salidas, Stock, Mensual, Pedidos, Nutrición y Clientes usan la propia pestaña como tarjeta blanca con borde `#D6E0EA` y radio de 8 px. Su cabecera estándar `ireksTabHeader` ocupa todo el ancho de su tarjeta y queda ajustada a su borde superior; el contenido restante se aloja en un cuerpo interno con márgenes de 10 px. La tabla de Tarifa ocupa todo el ancho disponible de ese cuerpo y estira su última columna para mantener sincronizadas las dos filas de cabecera.
 
 ## Estructura de la pestaña Datos
 

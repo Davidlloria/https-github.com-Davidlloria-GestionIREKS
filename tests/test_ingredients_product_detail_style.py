@@ -1,6 +1,7 @@
 from pathlib import Path
 from xml.etree import ElementTree
 
+from PySide6.QtCore import QMargins
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
 from app.ui.widgets.ingredients_page import IngredientsIreksPage
@@ -146,5 +147,17 @@ def test_ireks_data_cards_keep_their_controls_in_a_compact_desktop_layout(monkey
     assert observations.geometry().top() > pallet.geometry().bottom()
     assert observations.height() == 46
     assert observations.isAncestorOf(page.transporte_observaciones)
+
+    page.close()
+
+
+def test_ireks_detail_tabs_keep_a_four_pixel_outer_margin(monkeypatch) -> None:
+    monkeypatch.setattr(IngredientsIreksPage, "reload", lambda self: None)
+    app = QApplication.instance() or QApplication([])
+
+    page = IngredientsIreksPage()
+    assert page.detail_tabs.count() == 9
+    for tab_index in range(page.detail_tabs.count()):
+        assert page.detail_tabs.widget(tab_index).contentsMargins() == QMargins(4, 4, 4, 4)
 
     page.close()
