@@ -1,4 +1,5 @@
 from pathlib import Path
+from xml.etree import ElementTree
 
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
@@ -32,3 +33,42 @@ def test_ireks_product_detail_uses_enterprise_panel(monkeypatch) -> None:
     assert (icon_dir / "chevron-down-navy.svg").is_file()
 
     page.close()
+
+
+def test_ireks_detail_icon_assets_are_valid_svg() -> None:
+    icon_dir = Path(__file__).resolve().parents[1] / "assets" / "icons"
+    icon_names = (
+        "product-tag.svg",
+        "presentation-container.svg",
+        "pallet.svg",
+        "calendar-chart.svg",
+        "nutrition-lab.svg",
+    )
+
+    for icon_name in icon_names:
+        icon_path = icon_dir / icon_name
+        assert icon_path.is_file()
+        assert ElementTree.parse(icon_path).getroot().tag.endswith("svg")
+
+
+def test_ireks_tabs_use_local_enterprise_style_helpers() -> None:
+    source = (Path(__file__).resolve().parents[1] / "app" / "ui" / "widgets" / "ingredients_page.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "def _ireks_tab_header" in source
+    assert "def _apply_ireks_table_style" in source
+    for title in (
+        "Clasificación",
+        "Presentación",
+        "Paletización",
+        "Histórico de tarifas",
+        "Entradas de almacén",
+        "Salidas de almacén",
+        "Stock y movimientos",
+        "Resumen mensual",
+        "Pedidos relacionados",
+        "Información nutricional",
+        "Consumo por cliente",
+    ):
+        assert title in source
