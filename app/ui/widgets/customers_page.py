@@ -385,7 +385,7 @@ class CustomerEditorDialog(QDialog):
             self.setStyleSheet(extra_style)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 11, 14, 14)
+        layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
 
         title = QLabel(self._title)
@@ -844,7 +844,7 @@ class CustomersPage(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._apply_modern_styles()
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setContentsMargins(14, 11, 14, 14)
         layout.setSpacing(10)
 
         ribbon, ribbon_layout = create_standard_top_ribbon()
