@@ -71,7 +71,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
                             ├── Datos
                             │   └── ireksDataTab (QWidget, fondo #EEF3F8)
                             │       ├── tarjeta CLASIFICACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #D6E0EA, radio 8 px)
-                            │       │   ├── cabecera `ireksTabHeader` (fondo #0B2F5B, icono blanco `product-tag.svg`, título blanco 15 px)
+                            │       │   ├── cabecera `ireksTabHeader` (alto fijo 48 px, fondo #0B2F5B, icono blanco `product-tag.svg` 20 px, título blanco 13 px)
                             │       │   └── Fabricante / detail_fabricante_id · Familia / detail_familia_id · Subfamilia / detail_subfamilia_id
                             │       ├── tarjeta PRESENTACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #D6E0EA, radio 8 px)
                             │       │   ├── cabecera `ireksTabHeader` (icono blanco `presentation-container.svg`)
@@ -115,7 +115,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
 
 ## Estructura de la pestaña Datos
 
-`ireksDataTab` organiza los campos que antes compartían filas horizontales en tres tarjetas. Las tarjetas usan fondo blanco, borde `#D6E0EA`, radio de 8 px y se apilan verticalmente para conservar el espacio de los campos en el ancho disponible del panel derecho.
+`ireksDataTab` organiza los campos en tres tarjetas. CLASIFICACIÓN ocupa la primera fila; PRESENTACIÓN y PALETIZACIÓN comparten una segunda fila horizontal y reciben el mismo factor de estiramiento. Las alturas fijas de cada tarjeta evitan que las cuadrículas compriman etiquetas o controles.
 
 ```text
 ireksDataTab (QWidget, fondo #EEF3F8)
@@ -125,25 +125,26 @@ ireksDataTab (QWidget, fondo #EEF3F8)
 │       ├── Fabricante / detail_fabricante_id (QComboBox)
 │       ├── Familia / detail_familia_id (QComboBox)
 │       └── Subfamilia / detail_subfamilia_id (QComboBox)
-├── tarjeta PRESENTACIÓN (QFrame, propiedad ireksCard=True)
-│   ├── cabecera `ireksTabHeader` (icono blanco `presentation-container.svg`)
-│   └── cuadrícula de 3 columnas y 2 grupos de campos
-│       ├── Presentación / detail_envase_id (QComboBox)
-│       ├── Contenido / detail_envase_cantidad (QLineEdit)
-│       ├── Unidad contenido / detail_contenido_unidad (QComboBox editable)
-│       ├── Peso unidad / detail_envase_peso (QLineEdit)
-│       ├── Unidad peso / detail_envase_unidad (QComboBox)
-│       └── Total presentación / detail_envase_total (QLineEdit, solo lectura)
-└── tarjeta PALETIZACIÓN (QFrame, propiedad ireksCard=True)
-    ├── cabecera `ireksTabHeader` (icono blanco `pallet.svg`)
-    ├── cuadrícula de 3 columnas y 2 grupos de campos
-    │   ├── Pallet / transporte_pallet_tipo (QComboBox)
-    │   ├── Presentaciones/capa / transporte_cajas_por_capa (QLineEdit)
-    │   ├── Capas / transporte_capas_por_pallet (QLineEdit)
-    │   ├── Presentaciones/pallet / transporte_cajas_por_pallet (QLineEdit, solo lectura)
-    │   ├── Uds/pallet / transporte_unidades_por_pallet (QLineEdit, solo lectura)
-    │   └── Total pallet / transporte_kg_por_pallet (QLineEdit, solo lectura)
-    └── Obs. / transporte_observaciones (QLineEdit, ancho completo)
+└── lower_cards (QHBoxLayout, separación 10 px, factor 1 para cada tarjeta)
+    ├── tarjeta PRESENTACIÓN (QFrame `ireksPresentationCard`, alto fijo 204 px)
+    │   ├── cabecera `ireksTabHeader` (icono blanco `presentation-container.svg`)
+    │   └── cuadrícula de 3 columnas y 2 grupos de campos
+    │       ├── Presentación / detail_envase_id (QComboBox)
+    │       ├── Contenido / detail_envase_cantidad (QLineEdit)
+    │       ├── Unidad contenido / detail_contenido_unidad (QComboBox editable)
+    │       ├── Peso unidad / detail_envase_peso (QLineEdit)
+    │       ├── Unidad peso / detail_envase_unidad (QComboBox)
+    │       └── Total presentación / detail_envase_total (QLineEdit, solo lectura)
+    └── tarjeta PALETIZACIÓN (QFrame `ireksPalletCard`, alto fijo 264 px)
+        ├── cabecera `ireksTabHeader` (icono blanco `pallet.svg`)
+        ├── cuadrícula de 3 columnas y 2 grupos de campos
+        │   ├── Pallet / transporte_pallet_tipo (QComboBox)
+        │   ├── Presentaciones/capa / transporte_cajas_por_capa (QLineEdit)
+        │   ├── Capas / transporte_capas_por_pallet (QLineEdit)
+        │   ├── Presentaciones/pallet / transporte_cajas_por_pallet (QLineEdit, solo lectura)
+        │   ├── Uds/pallet / transporte_unidades_por_pallet (QLineEdit, solo lectura)
+        │   └── Total pallet / transporte_kg_por_pallet (QLineEdit, solo lectura)
+        └── Obs. / transporte_observaciones (QLineEdit, ancho completo)
 ```
 
 - Las etiquetas quedan encima de los controles en Presentación y Paletización; así no se comprimen ni se solapan con sus campos.
@@ -154,16 +155,16 @@ ireksDataTab (QWidget, fondo #EEF3F8)
 
 | Tarjeta | Cabecera | Componentes y disposición | Campos calculados / aspecto |
 | --- | --- | --- | --- |
-| **CLASIFICACIÓN** | `ireksTabHeader` (`QFrame`), fondo azul marino `#0B2F5B`, sin borde, radio 8 px. Icono lineal blanco `product-tag.svg` de 24 px y título blanco en mayúsculas, 15 px y negrita. | Una única fila responsiva con las etiquetas **Fabricante**, **Familia** y **Subfamilia** seguidas de `detail_fabricante_id`, `detail_familia_id` y `detail_subfamilia_id` (`QComboBox`). Factores de crecimiento 2 / 3 / 3. | No incorpora cálculo. Etiquetas `#5E6C84`, peso 500. Combos blancos, texto `#0B2F5B`, borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco turquesa `#087E9C`. |
-| **PRESENTACIÓN** | `ireksTabHeader`, con el mismo fondo `#0B2F5B`, radio 8 px, icono blanco `presentation-container.svg` de 24 px y título **PRESENTACIÓN** blanco. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Presentación** / `detail_envase_id`, **Contenido** / `detail_envase_cantidad`, **Unidad contenido** / `detail_contenido_unidad`; fila 2: **Peso unidad** / `detail_envase_peso`, **Unidad peso** / `detail_envase_unidad`, **Total presentación** / `detail_envase_total`. Las tres columnas comparten el ancho disponible. | `detail_envase_total` es solo lectura, fondo `#F4F7FB` y texto `#0B2F5B`; los otros controles son blancos con borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco `#087E9C`. |
-| **PALETIZACIÓN** | `ireksTabHeader`, fondo `#0B2F5B`, radio 8 px, icono blanco `pallet.svg` de 24 px y título **PALETIZACIÓN** blanco. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Pallet** / `transporte_pallet_tipo`, **Presentaciones/capa** / `transporte_cajas_por_capa`, **Capas** / `transporte_capas_por_pallet`; fila 2: **Presentaciones/pallet** / `transporte_cajas_por_pallet`, **Uds/pallet** / `transporte_unidades_por_pallet`, **Total pallet** / `transporte_kg_por_pallet`. Debajo: **Obs.** y `transporte_observaciones` a ancho completo. | `transporte_cajas_por_pallet`, `transporte_unidades_por_pallet` y `transporte_kg_por_pallet` son solo lectura, fondo `#F4F7FB`; los campos fuente y observaciones son editables. Todos usan texto marino `#0B2F5B`, etiquetas `#5E6C84`, borde `#C9D7E8`, radio 6 px y foco turquesa `#087E9C`. |
+| **CLASIFICACIÓN** | `ireksTabHeader` de alto fijo 48 px, fondo azul marino `#0B2F5B`, sin borde, radio solo en esquinas superiores de 8 px. Icono blanco `product-tag.svg` de 20 px y título en mayúsculas blanco, 13 px y negrita. | Cuadrícula de tres columnas con etiqueta encima del control: **Fabricante** / `detail_fabricante_id`, **Familia** / `detail_familia_id` y **Subfamilia** / `detail_subfamilia_id`. `ireksClassificationCard` tiene alto fijo 142 px. | No incorpora cálculo. Etiquetas `#5E6C84`, peso 500. Combos blancos, texto `#0B2F5B`, borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco turquesa `#087E9C`. |
+| **PRESENTACIÓN** | `ireksTabHeader` de alto fijo 48 px, fondo `#0B2F5B`, radio superior de 8 px, icono blanco `presentation-container.svg` de 20 px y título blanco de 13 px. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Presentación** / `detail_envase_id`, **Contenido** / `detail_envase_cantidad`, **Unidad contenido** / `detail_contenido_unidad`; fila 2: **Peso unidad** / `detail_envase_peso`, **Unidad peso** / `detail_envase_unidad`, **Total presentación** / `detail_envase_total`. `ireksPresentationCard` tiene alto fijo 204 px. | `detail_envase_total` es solo lectura, fondo `#F4F7FB` y texto `#0B2F5B`; los otros controles son blancos con borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco `#087E9C`. |
+| **PALETIZACIÓN** | `ireksTabHeader` de alto fijo 48 px, fondo `#0B2F5B`, radio superior de 8 px, icono blanco `pallet.svg` de 20 px y título blanco de 13 px. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Pallet** / `transporte_pallet_tipo`, **Presentaciones/capa** / `transporte_cajas_por_capa`, **Capas** / `transporte_capas_por_pallet`; fila 2: **Presentaciones/pallet** / `transporte_cajas_por_pallet`, **Uds/pallet** / `transporte_unidades_por_pallet`, **Total pallet** / `transporte_kg_por_pallet`. Debajo: **Obs.** y `transporte_observaciones` a ancho completo. `ireksPalletCard` tiene alto fijo 264 px. | `transporte_cajas_por_pallet`, `transporte_unidades_por_pallet` y `transporte_kg_por_pallet` son solo lectura, fondo `#F4F7FB`; los campos fuente y observaciones son editables. Todos usan texto marino `#0B2F5B`, etiquetas `#5E6C84`, borde `#C9D7E8`, radio 6 px y foco turquesa `#087E9C`. |
 
 #### Contenedor común de las tres tarjetas
 
 - `QFrame` con propiedad `ireksCard=True`: fondo `#FFFFFF`, borde de 1 px `#D6E0EA` y radio de 8 px.
-- Márgenes internos de tarjeta: 12 px horizontales, 10 px superiores y 12 px inferiores; separación vertical de 9 px.
+- La cabecera ocupa el ancho total y queda pegada al borde superior de cada tarjeta. Los campos conservan márgenes horizontales de 12 px y una separación vertical de 9 px.
 - `ireksDataTab`: fondo azul grisáceo claro `#EEF3F8`, márgenes 8 / 10 / 8 / 8 px y separación de 8 px.
-- Orden vertical: **CLASIFICACIÓN**, **PRESENTACIÓN** y **PALETIZACIÓN**. Esta disposición evita que etiquetas y controles se compriman o se solapen en el ancho efectivo del panel derecho.
+- Orden: **CLASIFICACIÓN** arriba; debajo, **PRESENTACIÓN** y **PALETIZACIÓN** en paralelo, separadas 10 px y con el mismo factor de crecimiento horizontal. Las alturas fijas y filas mínimas de 20 / 34 px evitan que etiquetas y controles se solapen.
 - Las cabeceras no llevan sombra ni borde/acento turquesa; los iconos se renderizan en blanco sobre el azul marino.
 
 ## Comportamiento actual
