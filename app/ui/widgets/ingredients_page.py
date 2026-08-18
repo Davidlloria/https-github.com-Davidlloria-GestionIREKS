@@ -867,8 +867,8 @@ class IngredientsIreksPage(QWidget):
         detail_header_layout.setSpacing(9)
         detail_icon = QLabel(detail_header)
         detail_icon.setProperty("uiRole", "detailHeaderIcon")
-        detail_icon.setPixmap(QIcon(str(icon_dir / "product-detail.svg")).pixmap(21, 21))
-        detail_icon.setFixedSize(22, 22)
+        detail_icon.setPixmap(QIcon(str(icon_dir / "product-detail.svg")).pixmap(26, 26))
+        detail_icon.setFixedSize(28, 28)
         detail_header_layout.addWidget(detail_icon)
         detail_title = QLabel("Detalle del producto", detail_header)
         detail_title.setObjectName("productDetailTitle")
@@ -1870,7 +1870,7 @@ class IngredientsIreksPage(QWidget):
         icon_name: str,
         subtitle: str = "",
         *,
-        icon_size: int = 21,
+        icon_size: int = 26,
         title_size: int = 16,
         height: int = 38,
     ) -> QFrame:
@@ -2095,7 +2095,7 @@ class IngredientsIreksPage(QWidget):
                 classification_card,
                 "Clasificación",
                 "product-tag.svg",
-                icon_size=21,
+                icon_size=26,
                 title_size=16,
                 height=38,
             )
