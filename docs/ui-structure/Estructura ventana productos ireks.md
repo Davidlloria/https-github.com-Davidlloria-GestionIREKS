@@ -178,6 +178,133 @@ ireksDataTab (QWidget, fondo #EEF3F8)
 - Orden: **CLASIFICACIÓN** arriba; debajo, **PRESENTACIÓN** y **PALETIZACIÓN** en paralelo, separadas 10 px y con el mismo factor de crecimiento horizontal. Las alturas fijas y filas mínimas de 20 / 34 px evitan que etiquetas y controles se solapen.
 - Las cabeceras no llevan sombra ni borde/acento turquesa; los iconos se renderizan en blanco sobre el azul marino.
 
+## Estructura de la pestaña Tarifa
+
+```text
+tarifaTab (QWidget, fondo blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader (QFrame, alto 38 px, ancho completo, fondo #0B2F5B)
+│   ├── product-tag.svg (blanco, 21 px)
+│   └── “Histórico de tarifas” (blanco, 16 px, negrita)
+└── tarifa_body (QWidget, márgenes 10 px, separación 8 px)
+    ├── fila de acciones
+    │   ├── Año / tarifa_year_filter (QComboBox; “Todos” y años disponibles)
+    │   ├── Añadir tarifa (QPushButton, turquesa #087E9C)
+    │   ├── Editar (QPushButton, blanco, borde y texto #0B2F5B)
+    │   └── Eliminar (QPushButton, blanco, borde y texto rojo #D92D20)
+    └── tarifa_table_wrap (ancho completo)
+        ├── tarifa_header_table (QTableWidget, dos filas de cabecera agrupada)
+        │   ├── Año
+        │   ├── IREKS: €/Env. · €/kg · Delta
+        │   ├── Dto %
+        │   └── DISTRIBUIDOR: Costo · €/Env. · €/kg · Delta · Margen
+        └── tarifa_table (QTableWidget, 10 columnas, solo lectura y selección de fila)
+```
+
+- La cabecera y la tabla comparten el mismo reparto de columnas; la última columna se estira para ocupar todo el ancho disponible sin barra horizontal.
+- Las dos tablas usan fondo blanco, bordes suaves `#D6E0EA`, filas alternas y números alineados a la derecha.
+
+## Estructura de la pestaña Entradas
+
+```text
+entradasTab (QWidget, fondo #F5F7FB)
+└── entradasCard (QFrame, blanco, borde #E5EAF1, radio 10 px)
+    ├── ireksTabHeader: package.svg · “Entradas de almacén”
+    └── entradas_body (márgenes 10 px, separación 8 px)
+        ├── entradasToolbar
+        │   ├── Desde / entradasDateFrom (QDateEdit)
+        │   ├── Hasta / entradasDateTo (QDateEdit)
+        │   └── Todo / entradasResetBtn (QPushButton)
+        ├── entradasTable (QTableWidget)
+        │   └── Fecha · Pedido Nº · Albarán · Uds · Kg · Lote · Caduca
+        └── entradasTotalsTable (QTableWidget, una fila fija sincronizada)
+```
+
+- La columna **Lote** absorbe el ancho sobrante. La fila de totales no tiene scroll, conserva las anchuras de la tabla y muestra los acumulados de Uds/Kg.
+
+## Estructura de la pestaña Salidas
+
+```text
+salidasTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader: package.svg · “Salidas de almacén”
+└── salidas_body (márgenes 10 px, separación 8 px)
+    ├── filtros: Desde / salidas_date_from · Hasta / salidas_date_to · Todo
+    ├── salidas_table (QTableWidget)
+    │   └── Fecha · Pedido Nº · Albarán · Uds · Kg · Lote · Caduca
+    ├── ireksSalesEmpty (QLabel, estado vacío centrado, borde discontinuo #D6E0EA)
+    └── salidas_totals_table (QTableWidget, una fila fija sincronizada)
+```
+
+- Cuando no existen filas en el período, se muestra `ireksSalesEmpty`; la tabla se oculta y la fila de totales se conserva sincronizada con sus columnas.
+
+## Estructura de la pestaña Stock
+
+```text
+stockTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader: pallet.svg · “Stock y movimientos”
+└── stock_body (márgenes 10 px, separación 8 px)
+    ├── filtros: Desde / stock_date_from · Hasta / stock_date_to · Todo
+    ├── stock_table (QTableWidget)
+    │   └── Fecha · Tipo · Pedido Nº · Albarán · Uds · Kg · Lote · Caduca
+    └── stock_totals_table (QTableWidget, una fila fija sincronizada)
+```
+
+- **Tipo** representa visualmente el movimiento de entrada o salida; **Lote** se estira y los totales muestran el saldo neto de Uds/Kg sin desplazamiento horizontal.
+
+## Estructura de la pestaña Mensual
+
+```text
+mensualTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader: calendar-chart.svg · “Resumen mensual”
+└── mensual_body (márgenes 10 px, separación 8 px)
+    ├── filtros: Desde / monthly_date_from · Hasta / monthly_date_to · Limpiar
+    └── monthly_orders_table (QTableWidget, solo lectura)
+        └── Mes · Pedidos · Cantidad · Kg · Media · Ult. fecha · Ult. pedido
+```
+
+- La tabla resume los pedidos del producto por mes; mantiene filas alternas, cabecera azul grisácea, y alinea las magnitudes numéricas a la derecha.
+
+## Estructura de la pestaña Pedidos
+
+```text
+pedidosTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader: list.svg · “Pedidos relacionados”
+└── pedidos_body (márgenes 10 px, separación 8 px)
+    ├── filtros: Desde / pedidos_date_from · Hasta / pedidos_date_to · Limpiar / pedidos_reset_btn
+    └── pedidos_table (QTableWidget, solo lectura y selección de fila)
+        └── Fecha · Pedido Nº · Albarán · Cantidad · Lote · Caducidad
+```
+
+- **Lote** ocupa el espacio flexible. Los filtros conservan los límites temporales y no modifican datos ni pedidos.
+
+## Estructura de la pestaña Nutrición
+
+```text
+nutricionTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader: nutrition-lab.svg · “Información nutricional”
+│   └── ireksNutritionBadge (QLabel, “Valores por 100 g”, fondo #E5F7F4, texto #087E9C)
+└── nutricion_body (márgenes 10 px, separación 8 px)
+    └── nutricion_table (QTableWidget, 9 filas)
+        ├── Nutriente (solo lectura)
+        └── Por 100 g (editable)
+            Energía kJ · Energía kcal · Grasas · Saturadas · Hidratos · Azúcares · Fibra · Proteínas · Sal
+```
+
+- La primera columna se estira y la columna **Por 100 g** mide 140 px; los valores se editan en la tabla y mantienen el autoguardado existente.
+
+## Estructura de la pestaña Clientes
+
+```text
+clientesTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader: users.svg · “Consumo por cliente”
+└── clientes_body (márgenes 10 px, separación 8 px)
+    ├── Año / customer_consumption_year (QComboBox)
+    ├── ireksCustomerConsumptionEmpty (QLabel, mensaje centrado cuando no hay producto o resultados)
+    └── ireksCustomerConsumptionTable (QTableWidget, solo lectura, ordenable)
+        └── Cliente · Último período · Kg · Unidades · €
+```
+
+- La columna **Cliente** se estira; las demás ajustan su ancho al contenido. Las cabeceras son clicables y las columnas numéricas se ordenan por sus valores reales.
+
 ## Comportamiento actual
 
 - Al abrir la pantalla se cargan el catálogo de productos y sus filtros. Si hay productos, se selecciona el primero y se completa su ficha.
