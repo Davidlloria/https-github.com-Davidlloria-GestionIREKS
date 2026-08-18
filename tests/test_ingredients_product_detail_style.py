@@ -110,6 +110,27 @@ def test_ireks_tab_headers_use_full_width_cards_with_inner_content_margins() -> 
     assert "tarifa_header.setSectionResizeMode(9, QHeaderView.ResizeMode.Stretch)" in source
 
 
+def test_ireks_tab_headers_keep_a_four_pixel_perimeter() -> None:
+    source = (Path(__file__).resolve().parents[1] / "app" / "ui" / "widgets" / "ingredients_page.py").read_text(
+        encoding="utf-8"
+    )
+
+    for layout_name in (
+        "entradas_card_layout",
+        "salidas_layout",
+        "stock_layout",
+        "mensual_layout",
+        "pedidos_layout",
+        "tarifa_layout",
+        "nutricion_layout",
+        "clientes_layout",
+    ):
+        assert f"{layout_name}.setContentsMargins(4, 4, 4, 4)" in source
+        assert f"{layout_name}.setSpacing(4)" in source
+    for layout_name in ("classification_layout", "presentation_layout", "pallet_layout"):
+        assert f"{layout_name}.setContentsMargins(4, 4, 4, 12)" in source
+
+
 def test_detail_header_standard_is_declared_in_the_shared_theme() -> None:
     project_root = Path(__file__).resolve().parents[1]
     source = (project_root / "app" / "ui" / "widgets" / "ingredients_page.py").read_text(encoding="utf-8")

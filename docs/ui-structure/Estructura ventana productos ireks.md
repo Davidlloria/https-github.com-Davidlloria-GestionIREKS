@@ -138,7 +138,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
                                     └── ireksCustomerConsumptionTable (Cliente · Último período · Kg · Unidades · €; ordenable)
 ```
 
-Las pestañas Tarifa, Entradas, Salidas, Stock, Mensual, Pedidos, Nutrición y Clientes usan la propia pestaña como tarjeta blanca con borde `#D6E0EA` y radio de 8 px. Su cabecera estándar `ireksTabHeader` ocupa todo el ancho y queda ajustada al borde superior; el contenido restante se aloja en un cuerpo interno con márgenes de 10 px. La tabla de Tarifa ocupa todo el ancho disponible de ese cuerpo y estira su última columna para mantener sincronizadas las dos filas de cabecera.
+Las pestañas Tarifa, Entradas, Salidas, Stock, Mensual, Pedidos, Nutrición y Clientes usan la propia pestaña como tarjeta blanca con borde `#D6E0EA` y radio de 8 px. Su cabecera estándar `ireksTabHeader` queda separada 4 px de su QWidget contenedor por todos los lados; el contenido restante se aloja en un cuerpo interno con márgenes de 10 px. La tabla de Tarifa ocupa todo el ancho disponible de ese cuerpo y estira su última columna para mantener sincronizadas las dos filas de cabecera.
 
 ## Estructura de la pestaña Datos
 
@@ -192,7 +192,7 @@ ireksDataTab (QWidget, fondo #EEF3F8)
 #### Contenedor común de las tres tarjetas
 
 - `QFrame` con propiedad `ireksCard=True`: fondo `#FFFFFF`, borde de 1 px `#D6E0EA` y radio de 8 px.
-- La cabecera ocupa el ancho total y queda pegada al borde superior de cada tarjeta. Los campos conservan márgenes horizontales de 12 px y una separación vertical de 9 px.
+- Cada cabecera `ireksTabHeader` mantiene una separación perimetral de 4 px respecto a la tarjeta que la contiene. Los campos conservan márgenes horizontales de 12 px y una separación vertical de 9 px.
 - `ireksDataTab`: fondo azul grisáceo claro `#EEF3F8`, márgenes 8 / 10 / 8 / 8 px y separación de 8 px.
 - Orden: **CLASIFICACIÓN** arriba; debajo, **PRESENTACIÓN** y **PALETIZACIÓN** en paralelo, separadas 10 px y con el mismo factor de crecimiento horizontal. Las alturas fijas y filas mínimas de 20 / 34 px evitan que etiquetas y controles se solapen.
 - Las cabeceras no llevan sombra ni borde/acento turquesa; los iconos se renderizan en blanco sobre el azul marino.
