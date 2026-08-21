@@ -348,6 +348,25 @@ def test_customer_list_uses_the_other_icon_for_the_other_activity(monkeypatch) -
     QApplication.processEvents()
 
 
+def test_customer_catalog_has_a_classification_filter(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+    other_customer = SimpleNamespace(cliente_actividad="OTROS")
+    bakery_customer = SimpleNamespace(cliente_actividad="PANADERIA,CAFETERIA")
+    page._populate_classification_filter()
+
+    assert page.classification_filter.itemData(0) == ""
+    assert page.classification_filter.findData("OTROS") >= 0
+    assert page._matches_customer_classification(other_customer, "OTROS")
+    assert page._matches_customer_classification(bakery_customer, "PANADERIA")
+    assert not page._matches_customer_classification(bakery_customer, "OTROS")
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
 def test_customer_merge_summary_lists_dependencies(monkeypatch) -> None:
     _application()
     monkeypatch.setattr(CustomersPage, "reload", lambda self: None)

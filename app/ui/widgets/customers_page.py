@@ -931,9 +931,19 @@ class CustomersPage(QWidget):
         customers_catalog_body_layout.setSpacing(10)
 
         self.island_filter = QComboBox()
-        self.island_filter.setFixedWidth(390)
+        self.island_filter.setObjectName("customerIslandFilter")
+        self.island_filter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.island_filter.currentIndexChanged.connect(self.reload)
-        customers_catalog_body_layout.addWidget(self.island_filter)
+        self.classification_filter = QComboBox()
+        self.classification_filter.setObjectName("customerClassificationFilter")
+        self.classification_filter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.classification_filter.currentIndexChanged.connect(self.reload)
+        filters_row = QHBoxLayout()
+        filters_row.setContentsMargins(0, 0, 0, 0)
+        filters_row.setSpacing(8)
+        filters_row.addWidget(self.island_filter, 1)
+        filters_row.addWidget(self.classification_filter, 1)
+        customers_catalog_body_layout.addLayout(filters_row)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Buscar cliente...")
@@ -3073,6 +3083,7 @@ class CustomersPage(QWidget):
         )
         self._load_address_catalogs()
         self._populate_island_filter()
+        self._populate_classification_filter()
         term = self.search_input.text().strip()
         all_rows = self._list("")
         self.rows = self._list(term) if term else list(all_rows)
@@ -3082,6 +3093,17 @@ class CustomersPage(QWidget):
                 row
                 for row in self.rows
                 if str(getattr(row, "cliente_direccion_isla_id", "") or "").strip() == selected_isla_id
+            ]
+        selected_classification = (
+            str(self.classification_filter.currentData() or "").strip()
+            if hasattr(self, "classification_filter")
+            else ""
+        )
+        if selected_classification:
+            self.rows = [
+                row
+                for row in self.rows
+                if self._matches_customer_classification(row, selected_classification)
             ]
         self._update_search_counter(len(self.rows), len(all_rows))
         self._render_table()
@@ -3108,6 +3130,32 @@ class CustomersPage(QWidget):
         idx = self.island_filter.findData(current)
         self.island_filter.setCurrentIndex(idx if idx >= 0 else 0)
         self.island_filter.blockSignals(False)
+
+    def _populate_classification_filter(self) -> None:
+        if not hasattr(self, "classification_filter"):
+            return
+        current = str(self.classification_filter.currentData() or "").strip()
+        classifications = [
+            ("Todas las clasificaciones", ""),
+            ("Panadería", "PANADERIA"),
+            ("Pastelería", "PASTELERIA"),
+            ("Heladería", "HELADERIA"),
+            ("Cafetería", "CAFETERIA"),
+            ("Restaurante", "RESTAURANTE"),
+            ("Hotel", "HOTEL"),
+            ("Otros", "OTROS"),
+        ]
+        self.classification_filter.blockSignals(True)
+        self.classification_filter.clear()
+        for label, value in classifications:
+            self.classification_filter.addItem(label, value)
+        index = self.classification_filter.findData(current)
+        self.classification_filter.setCurrentIndex(index if index >= 0 else 0)
+        self.classification_filter.blockSignals(False)
+
+    def _matches_customer_classification(self, row: Cliente, classification: str) -> bool:
+        activity = str(getattr(row, "cliente_actividad", "") or "")
+        return self._activity_matches(activity, classification)
 
     def _render_table(self) -> None:
         self.table.setSortingEnabled(False)
