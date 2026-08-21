@@ -1145,6 +1145,7 @@ class CustomersPage(QWidget):
         self._layout_detail_cards_abs()
         self._layout_left_detail_abs()
         self._layout_right_detail_abs()
+        QTimer.singleShot(0, self._layout_left_detail_abs)
 
     def _apply_fixed_split_ratio(self) -> None:
         splitter = self._main_splitter
@@ -2723,14 +2724,15 @@ class CustomersPage(QWidget):
         row_gap = 14
         col_gap = 10
         w = max(10, panel.width() - 8)
+        right_edge = max(5, panel.width() - 4)
         col1 = 120
         col2 = max(180, w - col1 - col_gap)
 
         self.lbl_cod.setGeometry(5, 2, 80, 20)
-        self.lbl_nombre_comercial.setGeometry(95, 2, 455, 20)
+        self.lbl_nombre_comercial.setGeometry(95, 2, max(0, right_edge - 95), 20)
         y += label_h + 4
         self.detail_codigo.setGeometry(5, 26, 80, 28)
-        self.detail_nombre_comercial.setGeometry(95, 26, 455, 28)
+        self.detail_nombre_comercial.setGeometry(95, 26, max(0, right_edge - 95), 28)
 
         y += field_h + row_gap
         c1 = (w - 2 * col_gap) // 3
@@ -2738,20 +2740,20 @@ class CustomersPage(QWidget):
         c3 = w - c1 - c2 - 2 * col_gap
         self.lbl_telefono.setGeometry(5, 64, 120, 20)
         self.lbl_cif.setGeometry(135, 64, 100, 20)
-        self.lbl_nombre_fiscal.setGeometry(245, 64, 305, 20)
+        self.lbl_nombre_fiscal.setGeometry(245, 64, max(0, right_edge - 245), 20)
         y += label_h + 4
         self.detail_telefono.setGeometry(5, 86, 120, 28)
         self.detail_cif.setGeometry(135, 86, 100, 28)
-        self.detail_nombre_fiscal.setGeometry(245, 86, 305, 28)
+        self.detail_nombre_fiscal.setGeometry(245, 86, max(0, right_edge - 245), 28)
 
         y += field_h + row_gap
         self.lbl_provincia.setGeometry(5, 126, 165, 20)
         self.lbl_isla.setGeometry(175, 126, 100, 20)
-        self.lbl_municipio.setGeometry(285, 126, 260, 20)
+        self.lbl_municipio.setGeometry(285, 126, max(0, right_edge - 285), 20)
         y += label_h + 4
         self.detail_provincia.setGeometry(5, 150, 165, 28)
         self.detail_isla.setGeometry(175, 150, 100, 28)
-        self.detail_municipio.setGeometry(285, 150, 260, 28)
+        self.detail_municipio.setGeometry(285, 150, max(0, right_edge - 285), 28)
 
         y += field_h + row_gap
         c1b = int(w * 0.52)
@@ -2759,11 +2761,11 @@ class CustomersPage(QWidget):
         c3b = w - c1b - c2b - 2 * col_gap
         self.lbl_calle.setGeometry(5, 190, 270, 20)
         self.lbl_cp.setGeometry(285, 190, 80, 20)
-        self.lbl_localidad.setGeometry(375, 190, 175, 20)
+        self.lbl_localidad.setGeometry(375, 190, max(0, right_edge - 375), 20)
         y += label_h + 4
         self.detail_direccion.setGeometry(5, 214, 270, 28)
         self.detail_cp.setGeometry(285, 214, 80, 28)
-        self.detail_localidad.setGeometry(375, 214, 175, 28)
+        self.detail_localidad.setGeometry(375, 214, max(0, right_edge - 375), 28)
 
     def _build_upper_right_detail_panel(self) -> QWidget:
         panel = QWidget()

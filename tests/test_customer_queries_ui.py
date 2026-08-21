@@ -257,6 +257,29 @@ def test_customer_detail_card_uses_the_standard_detail_header(monkeypatch) -> No
     QApplication.processEvents()
 
 
+def test_customer_detail_rightmost_fields_keep_a_four_pixel_margin(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+    page.resize(1360, 820)
+    page.show()
+    QApplication.processEvents()
+
+    panel = page.left_detail_panel
+    expected_right = panel.width() - 5
+    for field in (
+        page.detail_nombre_comercial,
+        page.detail_nombre_fiscal,
+        page.detail_municipio,
+        page.detail_localidad,
+    ):
+        assert field.geometry().right() == expected_right
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
 def test_customer_classification_card_uses_the_standard_detail_header(monkeypatch) -> None:
     _application()
     monkeypatch.setattr(CustomersPage, "reload", lambda self: None)

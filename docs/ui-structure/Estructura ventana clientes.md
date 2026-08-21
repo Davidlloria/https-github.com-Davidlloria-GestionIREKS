@@ -159,6 +159,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 - Las dos tarjetas usan geometría absoluta dentro de `detailTopArea`:
 - `detailLeftCard`: x=5, y=0, ancho=590, alto=300.
   - separación entre tarjetas: 5 px.
+  - Los campos de la última columna de su ficha se estiran hasta dejar un margen derecho interno de 4 px.
 - `detailRightCard`: x=600, y=0, ancho=300, alto=300.
 - El bloque inferior de pestañas tiene un mínimo de 300 px y ocupa el resto del alto.
 - Los tiradores de ambos splitters están ocultos y deshabilitados.
