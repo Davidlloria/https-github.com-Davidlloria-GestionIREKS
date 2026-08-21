@@ -3479,6 +3479,12 @@ class CustomersPage(QWidget):
                 border: 1px solid #D7DEE8;
                 border-radius: 8px;
             }
+            QWidget#customersCatalogBody {
+                background: #FFFFFF;
+                border: none;
+                border-bottom-left-radius: 7px;
+                border-bottom-right-radius: 7px;
+            }
             QWidget#customersRightPanel {
                 background: transparent;
                 border: 0;

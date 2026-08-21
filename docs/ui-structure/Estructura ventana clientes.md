@@ -25,7 +25,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
         │       ├── customersCatalogHeader (QFrame, alto fijo 38 px, ancho completo, ajustado al borde superior, estándar `uiRole="detailHeader"`, fondo azul marino #0B2F5B, radio superior 8 px y esquinas inferiores rectas)
         │       │   ├── icono `assets/icons/users.svg` (blanco, 21 px)
         │       │   └── título “CLIENTES” (blanco, 16 px, negrita)
-        │       └── customersCatalogBody (QWidget, márgenes 14 / 10 / 14 / 14 px, separación 10 px)
+        │       └── customersCatalogBody (QWidget, fondo blanco #FFFFFF, sin borde, radio inferior 7 px, márgenes 14 / 10 / 14 / 14 px, separación 10 px)
         │           ├── filtro de isla (QComboBox, blanco #FFFFFF, borde #D1D5DB, ancho 390 px)
         │           ├── fila de búsqueda
         │           │   ├── buscador "Buscar cliente..." (QLineEdit, blanco #FFFFFF, borde #D1D5DB, ancho 220 px)
@@ -161,7 +161,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 ## Aspecto visual actual
 
 - `CustomersPageRoot` tiene fondo gris `#EEF3F8`, sin borde y `WA_StyledBackground=True`; `customersMainSplitter` usa fondo transparente y sin borde; `customersDetailSplitter` usa fondo transparente y sin borde; `detailTopArea` usa fondo transparente y sin borde; `customersRightPanel` tiene fondo transparente y sin borde.
-- `customersLeftPanel` tiene fondo blanco `#FFFFFF`, borde gris `#D7DEE8` y radio de 8 px.
+- `customersLeftPanel` tiene fondo blanco `#FFFFFF`, borde gris `#D7DEE8` y radio de 8 px. `customersCatalogBody` usa el mismo fondo blanco y sin borde, para no cubrir visualmente el panel ni su perímetro.
 - `detailLeftCard` y `detailRightCard` son blancas, con borde gris y radio de 8 px.
 - `customerTabs`: x=5, y=5, ancho=crmCard-10, alto=crmCard-10, panel verde `#0BF75D` en las páginas internas (rellena `crmCard` con márgenes uniformes de 5 px).
 
