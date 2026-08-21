@@ -3509,7 +3509,7 @@ class CustomersPage(QWidget):
             }
             QWidget#customersCatalogBody {
                 background: #FFFFFF;
-                border: none;
+                border: 1px solid #D7DEE8;
                 border-bottom-left-radius: 7px;
                 border-bottom-right-radius: 7px;
             }

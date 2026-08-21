@@ -226,7 +226,7 @@ def test_customers_catalog_uses_the_standard_detail_header(monkeypatch) -> None:
     assert header.geometry().left() == panel.contentsRect().left()
     assert header.width() == panel.contentsRect().width()
     assert "QWidget#customersCatalogBody" in page.styleSheet()
-    assert "background: #FFFFFF;" in page.styleSheet()
+    assert "QWidget#customersCatalogBody {\n                background: #FFFFFF;\n                border: 1px solid #D7DEE8;" in page.styleSheet()
     page.close()
     page.deleteLater()
     QApplication.processEvents()
