@@ -2096,11 +2096,11 @@ class IngredientsIreksPage(QWidget):
             }
             QWidget#ireksDataTab QComboBox:focus, QWidget#ireksDataTab QLineEdit:focus { border-color: #087E9C; }
             QWidget#ireksDataTab QLineEdit[readOnly="true"] { background: #F4F7FB; }
-            QFrame[ireksCard="true"] { background: #FFFFFF; border: 1px solid #D6E0EA; border-radius: 8px; }
+            QFrame[ireksCard="true"] { background: #FFFFFF; border: 1px solid #EEF3F8; border-radius: 8px; }
             """
         )
         layout = QVBoxLayout(tab)
-        layout.setContentsMargins(8, 10, 8, 8)
+        layout.setContentsMargins(8, 0, 8, 8)
         layout.setSpacing(8)
 
         for widget in (self.detail_data_top_separator, self.detail_data_row_separator):

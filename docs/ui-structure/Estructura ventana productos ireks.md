@@ -76,14 +76,14 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
                         └── detail_tabs (QTabWidget; cada página deja un margen exterior de 4 px)
                             ├── Datos
                             │   └── ireksDataTab (QWidget, fondo #EEF3F8)
-                            │       ├── tarjeta CLASIFICACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #D6E0EA, radio 8 px)
+                            │       ├── tarjeta CLASIFICACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #EEF3F8, radio 8 px)
                             │       │   ├── cabecera estándar `uiRole="detailHeader"` (alto fijo 38 px, fondo #0B2F5B, icono blanco `product-tag.svg` 21 px, título blanco 16 px)
                             │       │   └── Fabricante / detail_fabricante_id · Familia / detail_familia_id · Subfamilia / detail_subfamilia_id
-                            │       ├── tarjeta PRESENTACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #D6E0EA, radio 8 px)
+                            │       ├── tarjeta PRESENTACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #EEF3F8, radio 8 px)
                             │       │   ├── cabecera `ireksTabHeader` (icono blanco `presentation-container.svg`)
                             │       │   └── cuadrícula 3 columnas: Presentación / detail_envase_id · Contenido / detail_envase_cantidad · Unidad contenido / detail_contenido_unidad
                             │       │       Peso unidad / detail_envase_peso · Unidad peso / detail_envase_unidad · Total presentación / detail_envase_total (solo lectura, #F4F7FB)
-                            │       └── tarjeta PALETIZACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #D6E0EA, radio 8 px)
+                            │       └── tarjeta PALETIZACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #EEF3F8, radio 8 px)
                             │           ├── cabecera `ireksTabHeader` (icono blanco `pallet.svg`)
                             │           └── cuadrícula 3 columnas: Pallet / transporte_pallet_tipo · Presentaciones/capa / transporte_cajas_por_capa · Capas / transporte_capas_por_pallet
                             │               Presentaciones/pallet / transporte_cajas_por_pallet · Uds/pallet / transporte_unidades_por_pallet · Total pallet / transporte_kg_por_pallet (los tres derivados, solo lectura, #F4F7FB)
@@ -191,9 +191,9 @@ ireksDataTab (QWidget, fondo #EEF3F8)
 
 #### Contenedor común de las tres tarjetas
 
-- `QFrame` con propiedad `ireksCard=True`: fondo `#FFFFFF`, borde de 1 px `#D6E0EA` y radio de 8 px.
+- `QFrame` con propiedad `ireksCard=True`: fondo `#FFFFFF`, borde de 1 px `#EEF3F8` —el mismo color que el fondo de Datos— y radio de 8 px; el borde no contrasta visualmente con la cabecera.
 - La cabecera ocupa el ancho total y queda pegada al borde superior de cada tarjeta. Los campos conservan márgenes horizontales de 12 px y una separación vertical de 9 px.
-- `ireksDataTab`: fondo azul grisáceo claro `#EEF3F8`, márgenes 8 / 10 / 8 / 8 px y separación de 8 px.
+- `ireksDataTab`: fondo azul grisáceo claro `#EEF3F8`, márgenes 8 / 0 / 8 / 8 px y separación de 8 px. El margen exterior de 4 px de `detail_tabs` es la única separación superior antes de CLASIFICACIÓN.
 - Orden: **CLASIFICACIÓN** arriba; debajo, **PRESENTACIÓN** y **PALETIZACIÓN** en paralelo, separadas 10 px y con el mismo factor de crecimiento horizontal. Las alturas fijas y filas mínimas de 20 / 34 px evitan que etiquetas y controles se solapen.
 - Las cabeceras no llevan sombra ni borde/acento turquesa; los iconos se renderizan en blanco sobre el azul marino.
 

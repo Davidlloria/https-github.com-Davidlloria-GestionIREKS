@@ -151,6 +151,15 @@ def test_ireks_data_cards_keep_their_controls_in_a_compact_desktop_layout(monkey
     page.close()
 
 
+def test_ireks_data_cards_do_not_add_a_top_header_gap() -> None:
+    source = (Path(__file__).resolve().parents[1] / "app" / "ui" / "widgets" / "ingredients_page.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'QFrame[ireksCard="true"] { background: #FFFFFF; border: 1px solid #EEF3F8; border-radius: 8px; }' in source
+    assert "layout.setContentsMargins(8, 0, 8, 8)" in source
+
+
 def test_ireks_detail_tabs_keep_a_four_pixel_outer_margin(monkeypatch) -> None:
     monkeypatch.setattr(IngredientsIreksPage, "reload", lambda self: None)
     app = QApplication.instance() or QApplication([])
