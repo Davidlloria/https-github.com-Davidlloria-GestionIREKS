@@ -53,8 +53,11 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                     │   │       ├── provincia / isla / municipio
                     │   │       └── calle / CP / localidad
                     │   └── detailRightCard (QFrame, blanco #FFFFFF, borde #D7DEE8, x=600, y=0, ancho 300 px, alto 300 px)
-                    │       ├── título "Clasificación del cliente"
-                    │       └── clasificación del cliente
+                    │       ├── customerClassificationHeader (QFrame, alto fijo 38 px, ancho completo, ajustado al borde superior, estándar `uiRole="detailHeader"`, fondo azul marino #0B2F5B, radio superior 8 px y esquinas inferiores rectas)
+                    │       │   ├── icono `assets/icons/briefcase.svg` (blanco, 21 px)
+                    │       │   └── título “CLASIFICACIÓN DEL CLIENTE” (blanco, 16 px, negrita)
+                    │       └── customerClassificationBody (QWidget, fondo blanco #FFFFFF, sin borde, márgenes 12 / 2 / 12 / 2 px)
+                    │           └── clasificación del cliente
                     │           ├── actividades / sectores seleccionables
                     │           ├── tipo de cliente
                     │           ├── abreviatura de pedido

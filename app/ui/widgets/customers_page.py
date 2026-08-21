@@ -1061,14 +1061,43 @@ class CustomersPage(QWidget):
         right_card = QFrame(detail_panel)
         right_card.setObjectName("detailRightCard")
         self.right_card = right_card
-        self.detail_tipo_header = QLabel("Clasificación del cliente", right_card)
-        self.detail_tipo_header.setProperty("role", "sectionTitle")
         right_card_layout = QVBoxLayout(right_card)
-        right_card_layout.setContentsMargins(12, 6, 12, 10)
-        right_card_layout.setSpacing(2)
-        right_card_layout.addWidget(self.detail_tipo_header, 0)
+        right_card_layout.setContentsMargins(0, 0, 0, 0)
+        right_card_layout.setSpacing(0)
+        customer_classification_header = QFrame(right_card)
+        customer_classification_header.setObjectName("customerClassificationHeader")
+        customer_classification_header.setProperty("uiRole", "detailHeader")
+        customer_classification_header.setFixedHeight(38)
+        customer_classification_header_layout = QHBoxLayout(customer_classification_header)
+        customer_classification_header_layout.setContentsMargins(14, 0, 14, 0)
+        customer_classification_header_layout.setSpacing(9)
+        customer_classification_icon = QLabel(customer_classification_header)
+        customer_classification_icon.setObjectName("customerClassificationHeaderIcon")
+        customer_classification_icon.setProperty("uiRole", "detailHeaderIcon")
+        classification_icon_pixmap = QIcon(str(BASE_DIR / "assets" / "icons" / "briefcase.svg")).pixmap(21, 21)
+        classification_icon_image = classification_icon_pixmap.toImage()
+        for x in range(classification_icon_image.width()):
+            for y in range(classification_icon_image.height()):
+                color = classification_icon_image.pixelColor(x, y)
+                if color.alpha():
+                    classification_icon_image.setPixelColor(x, y, QColor(255, 255, 255, color.alpha()))
+        customer_classification_icon.setPixmap(QPixmap.fromImage(classification_icon_image))
+        customer_classification_icon.setFixedSize(22, 22)
+        customer_classification_header_layout.addWidget(customer_classification_icon)
+        self.detail_tipo_header = QLabel("CLASIFICACIÓN DEL CLIENTE", customer_classification_header)
+        self.detail_tipo_header.setObjectName("customerClassificationHeaderTitle")
+        self.detail_tipo_header.setProperty("uiRole", "detailHeaderTitle")
+        customer_classification_header_layout.addWidget(self.detail_tipo_header)
+        customer_classification_header_layout.addStretch(1)
+        right_card_layout.addWidget(customer_classification_header)
+        customer_classification_body = QWidget(right_card)
+        customer_classification_body.setObjectName("customerClassificationBody")
+        customer_classification_body_layout = QVBoxLayout(customer_classification_body)
+        customer_classification_body_layout.setContentsMargins(12, 2, 12, 2)
+        customer_classification_body_layout.setSpacing(0)
         right_detail_panel = self._build_upper_right_detail_panel()
-        right_card_layout.addWidget(right_detail_panel, 1)
+        customer_classification_body_layout.addWidget(right_detail_panel, 1)
+        right_card_layout.addWidget(customer_classification_body, 1)
         self._layout_detail_cards_abs()
         right_splitter.addWidget(detail_panel)
 
@@ -3514,6 +3543,12 @@ class CustomersPage(QWidget):
                 border-bottom-right-radius: 7px;
             }
             QWidget#customerDetailBody {
+                background: #FFFFFF;
+                border: none;
+                border-bottom-left-radius: 7px;
+                border-bottom-right-radius: 7px;
+            }
+            QWidget#customerClassificationBody {
                 background: #FFFFFF;
                 border: none;
                 border-bottom-left-radius: 7px;

@@ -255,6 +255,29 @@ def test_customer_detail_card_uses_the_standard_detail_header(monkeypatch) -> No
     QApplication.processEvents()
 
 
+def test_customer_classification_card_uses_the_standard_detail_header(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    header = page.findChild(QFrame, "customerClassificationHeader")
+    title = page.findChild(QLabel, "customerClassificationHeaderTitle")
+    icon = page.findChild(QLabel, "customerClassificationHeaderIcon")
+    body = page.findChild(QWidget, "customerClassificationBody")
+
+    assert header is not None
+    assert header.property("uiRole") == "detailHeader"
+    assert header.height() == 38
+    assert title is not None
+    assert title.text() == "CLASIFICACIÓN DEL CLIENTE"
+    assert icon is not None
+    assert not icon.pixmap().isNull()
+    assert body is not None
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
 def test_customer_merge_summary_lists_dependencies(monkeypatch) -> None:
     _application()
     monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
