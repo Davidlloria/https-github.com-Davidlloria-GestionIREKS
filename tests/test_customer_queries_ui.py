@@ -250,6 +250,8 @@ def test_customer_detail_card_uses_the_standard_detail_header(monkeypatch) -> No
     assert icon is not None
     assert not icon.pixmap().isNull()
     assert body is not None
+    assert body.layout().contentsMargins().left() == 4
+    assert body.layout().contentsMargins().right() == 4
     page.close()
     page.deleteLater()
     QApplication.processEvents()

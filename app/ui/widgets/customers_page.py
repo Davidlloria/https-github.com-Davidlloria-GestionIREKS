@@ -1052,7 +1052,7 @@ class CustomersPage(QWidget):
         customer_detail_body = QWidget(left_card)
         customer_detail_body.setObjectName("customerDetailBody")
         customer_detail_body_layout = QVBoxLayout(customer_detail_body)
-        customer_detail_body_layout.setContentsMargins(12, 4, 12, 4)
+        customer_detail_body_layout.setContentsMargins(4, 4, 4, 4)
         customer_detail_body_layout.setSpacing(0)
         left_detail_panel = self._build_upper_left_detail_panel()
         customer_detail_body_layout.addWidget(left_detail_panel, 1)
