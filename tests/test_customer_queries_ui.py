@@ -7,7 +7,7 @@ from types import SimpleNamespace
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QDateEdit, QFrame, QLabel, QPushButton
+from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QDateEdit, QFrame, QLabel, QPushButton, QWidget
 
 from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
 from app.services.customer_query_service import CustomerQueryResult
@@ -215,6 +215,16 @@ def test_customers_catalog_uses_the_standard_detail_header(monkeypatch) -> None:
     assert title.text() == "CLIENTES"
     assert icon is not None
     assert not icon.pixmap().isNull()
+    panel = page.findChild(QWidget, "customersLeftPanel")
+    body = page.findChild(QWidget, "customersCatalogBody")
+    page.resize(1360, 820)
+    page.show()
+    QApplication.processEvents()
+    assert panel is not None
+    assert body is not None
+    assert header.geometry().top() == panel.contentsRect().top()
+    assert header.geometry().left() == panel.contentsRect().left()
+    assert header.width() == panel.contentsRect().width()
     page.close()
     page.deleteLater()
     QApplication.processEvents()

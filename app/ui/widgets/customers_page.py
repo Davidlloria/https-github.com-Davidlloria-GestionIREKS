@@ -893,8 +893,8 @@ class CustomersPage(QWidget):
         left_panel = QWidget()
         left_panel.setObjectName("customersLeftPanel")
         left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(14, 14, 14, 14)
-        left_layout.setSpacing(10)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
 
         customers_catalog_header = QFrame(left_panel)
         customers_catalog_header.setObjectName("customersCatalogHeader")
@@ -923,10 +923,16 @@ class CustomersPage(QWidget):
         customers_catalog_header_layout.addStretch(1)
         left_layout.addWidget(customers_catalog_header)
 
+        customers_catalog_body = QWidget(left_panel)
+        customers_catalog_body.setObjectName("customersCatalogBody")
+        customers_catalog_body_layout = QVBoxLayout(customers_catalog_body)
+        customers_catalog_body_layout.setContentsMargins(14, 10, 14, 14)
+        customers_catalog_body_layout.setSpacing(10)
+
         self.island_filter = QComboBox()
         self.island_filter.setFixedWidth(390)
         self.island_filter.currentIndexChanged.connect(self.reload)
-        left_layout.addWidget(self.island_filter)
+        customers_catalog_body_layout.addWidget(self.island_filter)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Buscar cliente...")
@@ -957,7 +963,7 @@ class CustomersPage(QWidget):
         search_row.addWidget(self.search_input)
         search_row.addWidget(self.clear_search_btn)
         search_row.addWidget(self.search_counter_label, 1)
-        left_layout.addLayout(search_row)
+        customers_catalog_body_layout.addLayout(search_row)
 
         self.table = QTableWidget(0, 3)
         self.table.setObjectName("customersListTable")
@@ -985,7 +991,8 @@ class CustomersPage(QWidget):
         self.table.customContextMenuRequested.connect(self._show_customers_context_menu)
         self.table.verticalHeader().setDefaultSectionSize(42)
         self.table.setAlternatingRowColors(True)
-        left_layout.addWidget(self.table, 1)
+        customers_catalog_body_layout.addWidget(self.table, 1)
+        left_layout.addWidget(customers_catalog_body, 1)
         splitter.addWidget(left_panel)
 
         right_panel = QWidget()
