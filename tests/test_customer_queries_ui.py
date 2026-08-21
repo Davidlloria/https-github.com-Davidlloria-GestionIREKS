@@ -7,7 +7,7 @@ from types import SimpleNamespace
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QDateEdit, QFrame, QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QCheckBox, QDateEdit, QFrame, QLabel, QPushButton, QWidget
 
 from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
 from app.services.customer_query_service import CustomerQueryResult
@@ -298,6 +298,27 @@ def test_customer_classification_card_uses_the_standard_detail_header(monkeypatc
     assert icon is not None
     assert not icon.pixmap().isNull()
     assert body is not None
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_classification_panel_keeps_persistence_controls_hidden(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    placeholder = page.findChild(QCheckBox, "otros_placeholder")
+
+    assert placeholder is not None
+    assert not placeholder.isEnabled()
+    assert placeholder.toolTip() == "No disponible actualmente"
+    assert page.detail_prospeccion_si.isHidden()
+    assert page.detail_prospeccion_no.isHidden()
+    assert page.lbl_prospeccion.isHidden()
+    assert page.right_detail_panel.layout() is not None
+    assert len(page.tipo_checks) == 6
+
     page.close()
     page.deleteLater()
     QApplication.processEvents()

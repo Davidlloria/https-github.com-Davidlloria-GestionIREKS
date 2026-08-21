@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QFormLayout,
+    QGridLayout,
     QHeaderView,
     QHBoxLayout,
     QLineEdit,
@@ -2775,8 +2776,7 @@ class CustomersPage(QWidget):
         self.sectors_box = QFrame(panel)
         sectors_box = self.sectors_box
         sectors_box.setObjectName("plainGroup")
-        sectors_box.setFrameShape(QFrame.Shape.Box)
-        sectors_box.setFixedHeight(128)
+        sectors_box.setFrameShape(QFrame.Shape.NoFrame)
         self.tipo_checks: dict[str, QCheckBox] = {}
         labels = [
             ("PANADERIA", "🥖"),
@@ -2797,8 +2797,22 @@ class CustomersPage(QWidget):
         for idx, (label, icon) in enumerate(labels):
             checkbox = QCheckBox(f"{icon} {label}", sectors_box)
             checkbox.setObjectName(pill_name_by_label[label])
-            checkbox.setMinimumHeight(28)
+            checkbox.setMinimumHeight(32)
             self.tipo_checks[label] = checkbox
+
+        self.otros_placeholder = QCheckBox("Otros", sectors_box)
+        self.otros_placeholder.setObjectName("otros_placeholder")
+        self.otros_placeholder.setEnabled(False)
+        self.otros_placeholder.setToolTip("No disponible actualmente")
+        self.otros_placeholder.setMinimumHeight(32)
+
+        sectors_layout = QGridLayout(sectors_box)
+        sectors_layout.setContentsMargins(0, 0, 0, 0)
+        sectors_layout.setHorizontalSpacing(8)
+        sectors_layout.setVerticalSpacing(8)
+        for idx, (label, _icon) in enumerate(labels):
+            sectors_layout.addWidget(self.tipo_checks[label], idx // 2, idx % 2)
+        sectors_layout.addWidget(self.otros_placeholder, 3, 0, 1, 2)
 
         self.section_info = QLabel("Tipo", panel)
         self.section_info.setProperty("role", "blockTitle")
@@ -2813,10 +2827,10 @@ class CustomersPage(QWidget):
         self.status_box = QFrame(panel)
         status_box = self.status_box
         status_box.setObjectName("plainGroup")
-        status_box.setFrameShape(QFrame.Shape.Box)
+        status_box.setFrameShape(QFrame.Shape.NoFrame)
         self.status_group = QButtonGroup(self)
-        self.detail_activo = QPushButton("ACTIVO", status_box)
-        self.detail_inactivo = QPushButton("INACTIVO", status_box)
+        self.detail_activo = QPushButton("Activo", status_box)
+        self.detail_inactivo = QPushButton("Inactivo", status_box)
         self.detail_activo.setCheckable(True)
         self.detail_inactivo.setCheckable(True)
         self.detail_activo.setObjectName("stateChipActive")
@@ -2830,7 +2844,33 @@ class CustomersPage(QWidget):
         self.detail_prospeccion_no.setChecked(True)
         self.prospeccion_group.addButton(self.detail_prospeccion_si)
         self.prospeccion_group.addButton(self.detail_prospeccion_no)
-        self._layout_right_detail_abs()
+        self.lbl_prospeccion.setVisible(False)
+        self.detail_prospeccion_si.setVisible(False)
+        self.detail_prospeccion_no.setVisible(False)
+
+        status_layout = QHBoxLayout(status_box)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        status_layout.setSpacing(0)
+        status_layout.addWidget(self.detail_activo)
+        status_layout.addWidget(self.detail_inactivo)
+
+        fields_layout = QGridLayout()
+        fields_layout.setContentsMargins(0, 0, 0, 0)
+        fields_layout.setHorizontalSpacing(10)
+        fields_layout.setVerticalSpacing(3)
+        fields_layout.addWidget(self.section_info, 0, 0)
+        fields_layout.addWidget(self.lbl_abrev, 0, 1)
+        fields_layout.addWidget(self.detail_tipo, 1, 0)
+        fields_layout.addWidget(self.detail_abreviatura, 1, 1)
+        fields_layout.setColumnStretch(0, 1)
+        fields_layout.setColumnStretch(1, 1)
+
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        layout.addWidget(sectors_box)
+        layout.addLayout(fields_layout)
+        layout.addWidget(status_box)
 
         for line_edit in (
             self.detail_codigo,
@@ -2852,26 +2892,9 @@ class CustomersPage(QWidget):
         return panel
 
     def _layout_right_detail_abs(self) -> None:
-        panel = getattr(self, "right_detail_panel", None)
-        if panel is None:
-            return
-        self.sectors_box.setGeometry(0, 0, 274, 128)
-        self.section_info.setGeometry(5, 119, 120, 24)
-        self.detail_tipo.setGeometry(5, 145, 120, 28)
-        self.lbl_abrev.setGeometry(145, 119, 120, 24)
-        self.detail_abreviatura.setGeometry(145, 145, 120, 28)
-        self.status_box.setGeometry(0, 182, 274, 76)
-        self.detail_activo.setGeometry(8, 10, 124, 28)
-        self.detail_inactivo.setGeometry(140, 10, 124, 28)
-        self.lbl_prospeccion.setGeometry(8, 45, 110, 24)
-        self.detail_prospeccion_si.setGeometry(130, 45, 50, 24)
-        self.detail_prospeccion_no.setGeometry(190, 45, 60, 24)
-        self.tipo_checks["PANADERIA"].setGeometry(8, 10, 125, 24)
-        self.tipo_checks["PASTELERIA"].setGeometry(141, 10, 125, 24)
-        self.tipo_checks["HELADERIA"].setGeometry(8, 48, 125, 24)
-        self.tipo_checks["CAFETERIA"].setGeometry(141, 48, 125, 24)
-        self.tipo_checks["RESTAURANTE"].setGeometry(8, 86, 125, 24)
-        self.tipo_checks["HOTEL"].setGeometry(141, 86, 125, 24)
+        # Kept as a compatibility hook for callers that also lay out the detail cards.
+        # The classification panel itself uses layouts so its controls remain responsive.
+        return
 
     def _load_address_catalogs(self) -> None:
         catalogs = self.customer_service.address_catalogs()
@@ -4099,12 +4122,14 @@ class CustomersPage(QWidget):
             QCheckBox#sectorChipPillHeladeria, QCheckBox#sectorChipPillCafeteria,
             QCheckBox#sectorChipPillRestaurante, QCheckBox#sectorChipPillHotel {
                 spacing: 6px;
-                min-height: 22px;
-                padding: 1px 9px;
+                min-height: 30px;
+                padding: 0px 10px;
                 font-size: 11px;
                 color: #0F172A;
                 font-weight: 600;
-                border-radius: 18px;
+                background: #FFFFFF;
+                border: 1px solid #D7DEE8;
+                border-radius: 10px;
             }
             QCheckBox#sectorChipPillPanaderia::indicator,
             QCheckBox#sectorChipPillPasteleria::indicator,
@@ -4112,58 +4137,79 @@ class CustomersPage(QWidget):
             QCheckBox#sectorChipPillCafeteria::indicator,
             QCheckBox#sectorChipPillRestaurante::indicator,
             QCheckBox#sectorChipPillHotel::indicator {
-                width: 11px;
-                height: 11px;
+                width: 13px;
+                height: 13px;
+                border-radius: 3px;
+                border: 1px solid #94A3B8;
+                background: #FFFFFF;
             }
-            QCheckBox#sectorChipPillPanaderia {
-                background: #FEF3C7;
-                border: 1px solid #F59E0B;
+            QCheckBox#sectorChipPillPanaderia::indicator:checked,
+            QCheckBox#sectorChipPillPasteleria::indicator:checked,
+            QCheckBox#sectorChipPillHeladeria::indicator:checked,
+            QCheckBox#sectorChipPillCafeteria::indicator:checked,
+            QCheckBox#sectorChipPillRestaurante::indicator:checked,
+            QCheckBox#sectorChipPillHotel::indicator:checked {
+                border-color: #2563EB;
+                background: #2563EB;
             }
-            QCheckBox#sectorChipPillPasteleria {
-                background: #FCE7F3;
-                border: 1px solid #EC4899;
+            QCheckBox#sectorChipPillPanaderia:checked,
+            QCheckBox#sectorChipPillPasteleria:checked,
+            QCheckBox#sectorChipPillHeladeria:checked,
+            QCheckBox#sectorChipPillCafeteria:checked,
+            QCheckBox#sectorChipPillRestaurante:checked,
+            QCheckBox#sectorChipPillHotel:checked {
+                background: #EFF6FF;
+                border: 1px solid #2563EB;
+                color: #0B2F5B;
             }
-            QCheckBox#sectorChipPillHeladeria {
-                background: #DBEAFE;
-                border: 1px solid #3B82F6;
+            QCheckBox#otros_placeholder {
+                spacing: 6px;
+                min-height: 30px;
+                padding: 0px 10px;
+                font-size: 11px;
+                font-weight: 600;
+                color: #94A3B8;
+                background: #F8FAFC;
+                border: 1px solid #D7DEE8;
+                border-radius: 10px;
             }
-            QCheckBox#sectorChipPillCafeteria {
-                background: #EDE9FE;
-                border: 1px solid #8B5CF6;
-            }
-            QCheckBox#sectorChipPillRestaurante {
-                background: #DCFCE7;
-                border: 1px solid #22C55E;
-            }
-            QCheckBox#sectorChipPillHotel {
-                background: #FFE4E6;
-                border: 1px solid #F43F5E;
+            QCheckBox#otros_placeholder::indicator {
+                width: 13px;
+                height: 13px;
+                border-radius: 3px;
+                border: 1px solid #CBD5E1;
+                background: #FFFFFF;
             }
             QPushButton#stateChipActive, QPushButton#stateChipInactive {
                 spacing: 0;
-                border-radius: 12px;
+                border-radius: 0px;
                 min-height: 26px;
                 padding: 0px;
                 font-size: 10px;
                 font-weight: 600;
                 text-align: center;
-                background: #E5E7EB;
-                border: 1px solid #9CA3AF;
-                color: #1F2937;
+                background: #FFFFFF;
+                border: 1px solid #D7DEE8;
+                color: #334155;
             }
             QPushButton#stateChipActive {
+                border-top-left-radius: 8px;
+                border-bottom-left-radius: 8px;
             }
             QPushButton#stateChipInactive {
+                border-left: 0px;
+                border-top-right-radius: 8px;
+                border-bottom-right-radius: 8px;
             }
             QPushButton#stateChipActive:checked {
-                background: #DCFCE7;
-                border: 1px solid #22C55E;
-                color: #166534;
+                background: #2563EB;
+                border: 1px solid #2563EB;
+                color: #FFFFFF;
             }
             QPushButton#stateChipInactive:checked {
-                background: #FEE2E2;
-                border: 1px solid #EF4444;
-                color: #991B1B;
+                background: #2563EB;
+                border: 1px solid #2563EB;
+                color: #FFFFFF;
             }
             """
         self.setStyleSheet(style.replace("__AGENDA_ARROW_ICON__", agenda_arrow_icon))
