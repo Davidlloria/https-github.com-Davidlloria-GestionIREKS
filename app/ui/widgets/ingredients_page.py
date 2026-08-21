@@ -812,7 +812,7 @@ class IngredientsIreksPage(QWidget):
         table_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self.table.setColumnWidth(0, 90)
         self.table.setColumnWidth(2, 55)
-        self.table.setHorizontalHeaderLabels(["REF.", "NOMBRE", "SELECCIÓN"])
+        self.table.setHorizontalHeaderLabels(["REF.", "NOMBRE", "SEL."])
         self.table.setSortingEnabled(False)
         table_header.setSortIndicatorShown(True)
         table_header.setSortIndicator(self._left_sort_col, self._left_sort_order)

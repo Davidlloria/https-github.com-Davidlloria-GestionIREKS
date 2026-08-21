@@ -50,7 +50,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
         │           └── table / catalogProductTable (QTableWidget, selección de fila única, solo lectura, cabeceras ordenables)
         │           ├── Ref (90 px)
         │           ├── Nombre (stretch)
-        │           └── Sel. (55 px; selector de inclusión para listados)
+        │           └── SEL. (55 px; selector de inclusión para listados)
         └── panel derecho (QWidget, objectName `ireksContentPanel`, fondo transparente, sin borde)
             └── layout vertical sin márgenes
                 └── splitter vertical derecho (QSplitter, objectName `ireksDetailSplitter`, fondo transparente, sin borde)
@@ -328,7 +328,7 @@ clientesTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
 
 - Al abrir la pantalla se cargan el catálogo de productos y sus filtros. Si hay productos, se selecciona el primero y se completa su ficha.
 - La búsqueda espera 200 ms antes de recargar, y filtra junto con fabricante, familia, subfamilia, estado y distribuidor externo cuando se ha recibido ese filtro.
-- La lista izquierda conserva la ordenación elegida de Ref. o Nombre. La columna `Sel.` permite marcar productos para los listados.
+- La lista izquierda conserva la ordenación elegida de Ref. o Nombre. La columna `SEL.` permite marcar productos para los listados.
 - Seleccionar un producto actualiza la ficha, la presentación, la taxonomía, la referencia de distribuidor y las pestañas relacionadas.
 - Los cambios de ficha se guardan mediante autosave diferido de 350 ms. Durante la carga de datos, el autosave queda bloqueado.
 - El total de presentación se calcula a partir de contenido y peso. Los campos de transporte derivados (presentaciones/pallet, uds/pallet y total pallet) son de solo lectura y se recalculan desde los datos de pallet.

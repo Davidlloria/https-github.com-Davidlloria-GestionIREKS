@@ -88,6 +88,7 @@ def test_ireks_catalog_uses_local_filters_and_table_style() -> None:
     assert 'self.fabricante_filter.addItem("Todos", "")' in source
     assert 'self.familia_filter.addItem("Todas", "")' in source
     assert 'self.subfamilia_filter.addItem("Todas", "")' in source
+    assert 'self.table.setHorizontalHeaderLabels(["REF.", "NOMBRE", "SEL."])' in source
     assert "_CatalogSelectionDelegate" in source
 
 
