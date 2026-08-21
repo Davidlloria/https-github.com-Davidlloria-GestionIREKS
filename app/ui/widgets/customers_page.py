@@ -3124,6 +3124,9 @@ class CustomersPage(QWidget):
             icon = self._customer_icon(item)
             label = f"{icon} {name}".strip() if icon else name
             name_item = QTableWidgetItem(label)
+            list_icon = self._customer_list_icon(item)
+            if not list_icon.isNull():
+                name_item.setIcon(list_icon)
             island_item = QTableWidgetItem(self._island_initials(item))
             island_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             code_item.setData(Qt.ItemDataRole.UserRole, getattr(item, "cliente_id", None))
@@ -3139,9 +3142,12 @@ class CustomersPage(QWidget):
         self.table.setSortingEnabled(True)
 
     def _customer_icon(self, item: Cliente) -> str:
+        activity = str(getattr(item, "cliente_actividad", "") or "")
+        if self._activity_matches(activity, "OTROS"):
+            return ""
         text = ",".join(
             [
-                str(getattr(item, "cliente_actividad", "") or ""),
+                activity,
                 str(getattr(item, "cliente_tipo", "") or ""),
                 str(getattr(item, "cliente_nombre_comercial", "") or ""),
             ]
@@ -3159,6 +3165,12 @@ class CustomersPage(QWidget):
         if self._activity_matches(text, "HOTEL"):
             return "🏨"
         return "•"
+
+    def _customer_list_icon(self, item: Cliente) -> QIcon:
+        activity = str(getattr(item, "cliente_actividad", "") or "")
+        if self._activity_matches(activity, "OTROS"):
+            return QIcon(str(BASE_DIR / "assets" / "icons" / "circle-question-mark.svg"))
+        return QIcon()
 
     def _activity_matches(self, text: str, activity: str) -> bool:
         normalized_text = unicodedata.normalize("NFD", text).encode("ascii", "ignore").decode("ascii").upper()

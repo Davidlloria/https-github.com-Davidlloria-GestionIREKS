@@ -334,6 +334,20 @@ def test_customer_classification_panel_keeps_persistence_controls_hidden(monkeyp
     QApplication.processEvents()
 
 
+def test_customer_list_uses_the_other_icon_for_the_other_activity(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+    customer = SimpleNamespace(cliente_actividad="OTROS")
+
+    assert page._customer_icon(customer) == ""
+    assert not page._customer_list_icon(customer).isNull()
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
 def test_customer_merge_summary_lists_dependencies(monkeypatch) -> None:
     _application()
     monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
