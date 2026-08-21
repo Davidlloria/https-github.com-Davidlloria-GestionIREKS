@@ -170,3 +170,16 @@ def test_ireks_detail_tabs_keep_a_four_pixel_outer_margin(monkeypatch) -> None:
         assert page.detail_tabs.widget(tab_index).contentsMargins() == QMargins(4, 4, 4, 4)
 
     page.close()
+
+
+def test_ireks_nutrition_badge_uses_a_compact_height(monkeypatch) -> None:
+    monkeypatch.setattr(IngredientsIreksPage, "reload", lambda self: None)
+    app = QApplication.instance() or QApplication([])
+
+    page = IngredientsIreksPage()
+    badge = page.findChild(QLabel, "ireksNutritionBadge")
+
+    assert badge is not None
+    assert badge.height() == 22
+
+    page.close()

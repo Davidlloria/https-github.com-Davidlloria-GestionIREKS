@@ -127,7 +127,7 @@ IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF
                             │       └── pedidos_table (Fecha · Pedido Nº · Albarán · Cantidad · Lote · Caducidad)
                             ├── Nutrición (QWidget `nutricionTab`, blanco, borde #D6E0EA, radio 8 px)
                             │   ├── ireksTabHeader: nutrition-lab.svg · “Información nutricional”
-                            │   │   └── ireksNutritionBadge: “Valores por 100 g”
+                            │   │   └── ireksNutritionBadge (QLabel, alto fijo 22 px): “Valores por 100 g”
                             │   └── nutricion_body (márgenes 10 px)
                             │       └── nutricion_table (Nutriente / Por 100 g; 9 nutrientes, valor editable)
                             └── Clientes (QWidget `clientesTab`, blanco, borde #D6E0EA, radio 8 px)
@@ -300,7 +300,7 @@ pedidosTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
 ```text
 nutricionTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
 ├── ireksTabHeader: nutrition-lab.svg · “Información nutricional”
-│   └── ireksNutritionBadge (QLabel, “Valores por 100 g”, fondo #E5F7F4, texto #087E9C)
+│   └── ireksNutritionBadge (QLabel, alto fijo 22 px, “Valores por 100 g”, fondo #E5F7F4, texto #087E9C)
 └── nutricion_body (márgenes 10 px, separación 8 px)
     └── nutricion_table (QTableWidget, 9 filas)
         ├── Nutriente (solo lectura)

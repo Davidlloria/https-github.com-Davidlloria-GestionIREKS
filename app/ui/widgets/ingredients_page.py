@@ -1818,10 +1818,11 @@ class IngredientsIreksPage(QWidget):
         nutrition_header = self._ireks_tab_header(nutricion_tab, "Información nutricional", "nutrition-lab.svg")
         nutrition_badge = QLabel("Valores por 100 g", nutrition_header)
         nutrition_badge.setObjectName("ireksNutritionBadge")
+        nutrition_badge.setFixedHeight(22)
         nutrition_header.layout().addWidget(nutrition_badge)
         nutrition_header.setStyleSheet(
             nutrition_header.styleSheet()
-            + "QLabel#ireksNutritionBadge { background: #E5F7F4; color: #087E9C; border-radius: 6px; padding: 4px 8px; font-weight: 600; }"
+            + "QLabel#ireksNutritionBadge { background: #E5F7F4; color: #087E9C; border-radius: 6px; padding: 1px 8px; font-weight: 600; }"
         )
         nutricion_layout.addWidget(nutrition_header)
         nutricion_body = QWidget(nutricion_tab)
