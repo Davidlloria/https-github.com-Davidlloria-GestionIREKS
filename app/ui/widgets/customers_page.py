@@ -896,6 +896,33 @@ class CustomersPage(QWidget):
         left_layout.setContentsMargins(14, 14, 14, 14)
         left_layout.setSpacing(10)
 
+        customers_catalog_header = QFrame(left_panel)
+        customers_catalog_header.setObjectName("customersCatalogHeader")
+        customers_catalog_header.setProperty("uiRole", "detailHeader")
+        customers_catalog_header.setFixedHeight(38)
+        customers_catalog_header_layout = QHBoxLayout(customers_catalog_header)
+        customers_catalog_header_layout.setContentsMargins(14, 0, 14, 0)
+        customers_catalog_header_layout.setSpacing(9)
+        customers_catalog_icon = QLabel(customers_catalog_header)
+        customers_catalog_icon.setObjectName("customersCatalogHeaderIcon")
+        customers_catalog_icon.setProperty("uiRole", "detailHeaderIcon")
+        catalog_icon_pixmap = QIcon(str(BASE_DIR / "assets" / "icons" / "users.svg")).pixmap(21, 21)
+        catalog_icon_image = catalog_icon_pixmap.toImage()
+        for x in range(catalog_icon_image.width()):
+            for y in range(catalog_icon_image.height()):
+                color = catalog_icon_image.pixelColor(x, y)
+                if color.alpha():
+                    catalog_icon_image.setPixelColor(x, y, QColor(255, 255, 255, color.alpha()))
+        customers_catalog_icon.setPixmap(QPixmap.fromImage(catalog_icon_image))
+        customers_catalog_icon.setFixedSize(22, 22)
+        customers_catalog_header_layout.addWidget(customers_catalog_icon)
+        customers_catalog_title = QLabel("CLIENTES", customers_catalog_header)
+        customers_catalog_title.setObjectName("customersCatalogHeaderTitle")
+        customers_catalog_title.setProperty("uiRole", "detailHeaderTitle")
+        customers_catalog_header_layout.addWidget(customers_catalog_title)
+        customers_catalog_header_layout.addStretch(1)
+        left_layout.addWidget(customers_catalog_header)
+
         self.island_filter = QComboBox()
         self.island_filter.setFixedWidth(390)
         self.island_filter.currentIndexChanged.connect(self.reload)

@@ -22,6 +22,9 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
     └── customersMainSplitter (QSplitter horizontal, fondo transparente, sin borde, tirador oculto)
         ├── customersLeftPanel (QWidget, fondo blanco #FFFFFF, borde #D7DEE8)
         │   └── layout vertical (QVBoxLayout, márgenes 14 px, separación 10 px)
+        │       ├── customersCatalogHeader (QFrame, alto fijo 38 px, estándar `uiRole="detailHeader"`, fondo azul marino #0B2F5B, radio superior 8 px y esquinas inferiores rectas)
+        │       │   ├── icono `assets/icons/users.svg` (blanco, 21 px)
+        │       │   └── título “CLIENTES” (blanco, 16 px, negrita)
         │       ├── filtro de isla (QComboBox, blanco #FFFFFF, borde #D1D5DB, ancho 390 px)
         │       ├── fila de búsqueda
         │       │   ├── buscador "Buscar cliente..." (QLineEdit, blanco #FFFFFF, borde #D1D5DB, ancho 220 px)

@@ -7,7 +7,7 @@ from types import SimpleNamespace
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QDateEdit, QPushButton
+from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QDateEdit, QFrame, QLabel, QPushButton
 
 from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
 from app.services.customer_query_service import CustomerQueryResult
@@ -194,6 +194,27 @@ def test_customers_search_row_has_counter(monkeypatch) -> None:
     page._update_search_counter(12, 720)
 
     assert page.search_counter_label.text() == "12/720"
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customers_catalog_uses_the_standard_detail_header(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    header = page.findChild(QFrame, "customersCatalogHeader")
+    title = page.findChild(QLabel, "customersCatalogHeaderTitle")
+    icon = page.findChild(QLabel, "customersCatalogHeaderIcon")
+
+    assert header is not None
+    assert header.property("uiRole") == "detailHeader"
+    assert header.height() == 38
+    assert title is not None
+    assert title.text() == "CLIENTES"
+    assert icon is not None
+    assert not icon.pixmap().isNull()
     page.close()
     page.deleteLater()
     QApplication.processEvents()
