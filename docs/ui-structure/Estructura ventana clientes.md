@@ -40,8 +40,11 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                 └── customersDetailSplitter (QSplitter vertical, fondo transparente, sin borde)
                     ├── detailTopArea (QWidget, fondo transparente, sin borde, x=0, y=0, ancho 932 px, alto 300 px)
                     │   ├── detailLeftCard (QFrame, blanco #FFFFFF, borde #D7DEE8, x=5, y=0, ancho 590 px, alto 300 px)
-                    │   │   ├── título "Detalle de cliente"
-                    │   │   └── ficha principal del cliente
+                    │   │   ├── customerDetailHeader (QFrame, alto fijo 38 px, ancho completo, ajustado al borde superior, estándar `uiRole="detailHeader"`, fondo azul marino #0B2F5B, radio superior 8 px y esquinas inferiores rectas)
+                    │   │   │   ├── icono `assets/icons/users.svg` (blanco, 21 px)
+                    │   │   │   └── título “DETALLE DEL CLIENTE” (blanco, 16 px, negrita)
+                    │   │   └── customerDetailBody (QWidget, fondo blanco #FFFFFF, sin borde, márgenes 12 / 4 / 12 / 4 px)
+                    │   │       └── ficha principal del cliente
                     │   │       ├── código
                     │   │       ├── nombre comercial
                     │   │       ├── teléfono

@@ -1020,15 +1020,43 @@ class CustomersPage(QWidget):
         left_card = QFrame(detail_panel)
         left_card.setObjectName("detailLeftCard")
         self.left_card = left_card
-        detail_title = QLabel("Detalle de cliente", left_card)
-        detail_title.setProperty("role", "sectionTitle")
-        self.detail_title = detail_title
         left_card_layout = QVBoxLayout(left_card)
-        left_card_layout.setContentsMargins(12, 10, 12, 12)
-        left_card_layout.setSpacing(8)
-        left_card_layout.addWidget(self.detail_title, 0)
+        left_card_layout.setContentsMargins(0, 0, 0, 0)
+        left_card_layout.setSpacing(0)
+        customer_detail_header = QFrame(left_card)
+        customer_detail_header.setObjectName("customerDetailHeader")
+        customer_detail_header.setProperty("uiRole", "detailHeader")
+        customer_detail_header.setFixedHeight(38)
+        customer_detail_header_layout = QHBoxLayout(customer_detail_header)
+        customer_detail_header_layout.setContentsMargins(14, 0, 14, 0)
+        customer_detail_header_layout.setSpacing(9)
+        customer_detail_icon = QLabel(customer_detail_header)
+        customer_detail_icon.setObjectName("customerDetailHeaderIcon")
+        customer_detail_icon.setProperty("uiRole", "detailHeaderIcon")
+        detail_icon_pixmap = QIcon(str(BASE_DIR / "assets" / "icons" / "users.svg")).pixmap(21, 21)
+        detail_icon_image = detail_icon_pixmap.toImage()
+        for x in range(detail_icon_image.width()):
+            for y in range(detail_icon_image.height()):
+                color = detail_icon_image.pixelColor(x, y)
+                if color.alpha():
+                    detail_icon_image.setPixelColor(x, y, QColor(255, 255, 255, color.alpha()))
+        customer_detail_icon.setPixmap(QPixmap.fromImage(detail_icon_image))
+        customer_detail_icon.setFixedSize(22, 22)
+        customer_detail_header_layout.addWidget(customer_detail_icon)
+        self.detail_title = QLabel("DETALLE DEL CLIENTE", customer_detail_header)
+        self.detail_title.setObjectName("customerDetailHeaderTitle")
+        self.detail_title.setProperty("uiRole", "detailHeaderTitle")
+        customer_detail_header_layout.addWidget(self.detail_title)
+        customer_detail_header_layout.addStretch(1)
+        left_card_layout.addWidget(customer_detail_header)
+        customer_detail_body = QWidget(left_card)
+        customer_detail_body.setObjectName("customerDetailBody")
+        customer_detail_body_layout = QVBoxLayout(customer_detail_body)
+        customer_detail_body_layout.setContentsMargins(12, 4, 12, 4)
+        customer_detail_body_layout.setSpacing(0)
         left_detail_panel = self._build_upper_left_detail_panel()
-        left_card_layout.addWidget(left_detail_panel, 1)
+        customer_detail_body_layout.addWidget(left_detail_panel, 1)
+        left_card_layout.addWidget(customer_detail_body, 1)
 
         right_card = QFrame(detail_panel)
         right_card.setObjectName("detailRightCard")
@@ -3480,6 +3508,12 @@ class CustomersPage(QWidget):
                 border-radius: 8px;
             }
             QWidget#customersCatalogBody {
+                background: #FFFFFF;
+                border: none;
+                border-bottom-left-radius: 7px;
+                border-bottom-right-radius: 7px;
+            }
+            QWidget#customerDetailBody {
                 background: #FFFFFF;
                 border: none;
                 border-bottom-left-radius: 7px;
