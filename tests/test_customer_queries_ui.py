@@ -311,13 +311,23 @@ def test_customer_classification_panel_keeps_persistence_controls_hidden(monkeyp
     placeholder = page.findChild(QCheckBox, "otros_placeholder")
 
     assert placeholder is not None
-    assert not placeholder.isEnabled()
-    assert placeholder.toolTip() == "No disponible actualmente"
+    assert placeholder.isEnabled()
     assert page.detail_prospeccion_si.isHidden()
     assert page.detail_prospeccion_no.isHidden()
     assert page.lbl_prospeccion.isHidden()
     assert page.right_detail_panel.layout() is not None
-    assert len(page.tipo_checks) == 6
+    assert len(page.tipo_checks) == 7
+
+    page.tipo_checks["PANADERIA"].setChecked(True)
+    page.tipo_checks["PASTELERIA"].setChecked(True)
+    placeholder.setChecked(True)
+    assert placeholder.isChecked()
+    assert not page.tipo_checks["PANADERIA"].isChecked()
+    assert not page.tipo_checks["PASTELERIA"].isChecked()
+
+    page.tipo_checks["HOTEL"].setChecked(True)
+    assert page.tipo_checks["HOTEL"].isChecked()
+    assert not placeholder.isChecked()
 
     page.close()
     page.deleteLater()

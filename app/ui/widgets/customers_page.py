@@ -2802,9 +2802,8 @@ class CustomersPage(QWidget):
 
         self.otros_placeholder = QCheckBox("Otros", sectors_box)
         self.otros_placeholder.setObjectName("otros_placeholder")
-        self.otros_placeholder.setEnabled(False)
-        self.otros_placeholder.setToolTip("No disponible actualmente")
         self.otros_placeholder.setMinimumHeight(32)
+        self.tipo_checks["OTROS"] = self.otros_placeholder
 
         sectors_layout = QGridLayout(sectors_box)
         sectors_layout.setContentsMargins(0, 0, 0, 0)
@@ -2881,7 +2880,10 @@ class CustomersPage(QWidget):
             self.detail_abreviatura,
         ):
             line_edit.editingFinished.connect(self._schedule_autosave)
-        for checkbox in self.tipo_checks.values():
+        for label, checkbox in self.tipo_checks.items():
+            checkbox.toggled.connect(
+                lambda checked, activity_label=label: self._enforce_activity_exclusivity(activity_label, checked)
+            )
             checkbox.toggled.connect(self._schedule_autosave)
         self.detail_tipo.currentTextChanged.connect(self._schedule_autosave)
         self.detail_activo.toggled.connect(self._schedule_autosave)
@@ -2890,6 +2892,21 @@ class CustomersPage(QWidget):
         self.detail_prospeccion_no.toggled.connect(self._schedule_autosave)
 
         return panel
+
+    def _enforce_activity_exclusivity(self, selected_label: str, checked: bool) -> None:
+        """Keep the visual 'Otros' category mutually exclusive without changing persistence."""
+        if not checked or getattr(self, "_syncing_activity_selection", False):
+            return
+        self._syncing_activity_selection = True
+        try:
+            if selected_label == "OTROS":
+                for label, checkbox in self.tipo_checks.items():
+                    if label != "OTROS":
+                        checkbox.setChecked(False)
+            elif self.otros_placeholder.isChecked():
+                self.otros_placeholder.setChecked(False)
+        finally:
+            self._syncing_activity_selection = False
 
     def _layout_right_detail_abs(self) -> None:
         # Kept as a compatibility hook for callers that also lay out the detail cards.
@@ -3539,6 +3556,7 @@ class CustomersPage(QWidget):
 
     def _apply_modern_styles(self) -> None:
         agenda_arrow_icon = (BASE_DIR / "assets" / "icons" / "arrow-down.svg").as_posix()
+        checkmark_white_icon = (BASE_DIR / "assets" / "icons" / "checkmark_white.svg").as_posix()
         style = """
             QWidget {
                 font-family: 'Segoe UI', 'Inter';
@@ -4151,6 +4169,7 @@ class CustomersPage(QWidget):
             QCheckBox#sectorChipPillHotel::indicator:checked {
                 border-color: #2563EB;
                 background: #2563EB;
+                image: url("__CHECKMARK_WHITE_ICON__");
             }
             QCheckBox#sectorChipPillPanaderia:checked,
             QCheckBox#sectorChipPillPasteleria:checked,
@@ -4179,6 +4198,16 @@ class CustomersPage(QWidget):
                 border-radius: 3px;
                 border: 1px solid #CBD5E1;
                 background: #FFFFFF;
+            }
+            QCheckBox#otros_placeholder::indicator:checked {
+                border-color: #2563EB;
+                background: #2563EB;
+                image: url("__CHECKMARK_WHITE_ICON__");
+            }
+            QCheckBox#otros_placeholder:checked {
+                background: #EFF6FF;
+                border: 1px solid #2563EB;
+                color: #0B2F5B;
             }
             QPushButton#stateChipActive, QPushButton#stateChipInactive {
                 spacing: 0;
@@ -4212,7 +4241,11 @@ class CustomersPage(QWidget):
                 color: #FFFFFF;
             }
             """
-        self.setStyleSheet(style.replace("__AGENDA_ARROW_ICON__", agenda_arrow_icon))
+        self.setStyleSheet(
+            style.replace("__AGENDA_ARROW_ICON__", agenda_arrow_icon).replace(
+                "__CHECKMARK_WHITE_ICON__", checkmark_white_icon
+            )
+        )
 
     def _show_related_contacts_context_menu(self, pos) -> None:
         source = self.sender()
