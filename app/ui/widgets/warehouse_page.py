@@ -2635,8 +2635,9 @@ class WarehousePage(QWidget):
         row.setContentsMargins(10, 6, 10, 6)
         row.setSpacing(8)
         scope_icon = QLabel(scope_bar)
-        scope_icon.setPixmap(QIcon(str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "data-scope.svg")).pixmap(18, 18))
-        scope_icon.setFixedSize(20, 20)
+        scope_icon.setObjectName("warehouseScopeIcon")
+        scope_icon.setPixmap(QIcon(str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "data-scope.svg")).pixmap(25, 25))
+        scope_icon.setFixedSize(25, 25)
         row.addWidget(scope_icon)
         scope_copy = QVBoxLayout()
         scope_copy.setContentsMargins(0, 0, 0, 0)
@@ -2655,6 +2656,11 @@ class WarehousePage(QWidget):
         layout.addWidget(scope_bar)
 
         self.main_tabs = QTabWidget()
+        self.main_tabs.setObjectName("warehouseMainTabs")
+        self.main_tabs.setStyleSheet(
+            "QTabWidget#warehouseMainTabs { background: transparent; border: 0; }"
+            "QTabWidget#warehouseMainTabs::pane { background: transparent; border: 0; }"
+        )
         self.articles_tab = IngredientsIreksPage(
             show_header=False,
             show_actions_ribbon=False,
