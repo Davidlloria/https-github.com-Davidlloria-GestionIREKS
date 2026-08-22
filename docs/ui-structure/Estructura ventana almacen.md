@@ -22,14 +22,15 @@ La sección se registra como `Almacen` en `app/ui/main_window.py` y se construye
 ```text
 WarehousePage (QWidget, objectName `warehousePage`, fondo gris #EEF3F8, sin borde, WA_StyledBackground=True)
 └── layout principal (QVBoxLayout, márgenes 10 / 8 / 10 / 10 px, separación 6 px)
-    ├── warehouseScopeBar (QFrame, fondo #F8FAFC, borde #D6E0EA, radio 10 px)
+    ├── warehouseScopeBar (QFrame, fondo blanco #FFFFFF, borde #D6E0EA, radio 10 px)
     │   ├── icono `data-scope.svg` (25 px)
     │   ├── “ÁMBITO DE DATOS” (QLabel, #64748B, 9 px, negrita)
     │   ├── “Cliente / distribuidor” (QLabel, #0B2F5B, 13 px, negrita)
     │   └── almacen_combo / warehouseScopeCombo (QComboBox expansible; “Todos” + clientes directos/distribuidores)
     └── main_tabs / warehouseMainTabs (QTabWidget, fondo transparente, sin borde)
         ├── Artículos
-        │   └── IngredientsIreksPage (sin cabecera ni ribbon propios, `compact_mode=True`)
+    │   └── IngredientsIreksPage (sin cabecera ni ribbon propios, `compact_mode=True`;
+    │       margen izquierdo local 0 px para ajustar el catálogo al borde de `main_tabs`)
         │       ├── catálogo lateral: cabecera, contador real y tabla Ref. / Nombre / selección
         │       ├── filtros: Fabricante, Estado, Familia y Subfamilia
         │       ├── búsqueda “Buscar por referencia o nombre”

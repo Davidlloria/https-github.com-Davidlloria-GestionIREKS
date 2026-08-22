@@ -2625,7 +2625,7 @@ class WarehousePage(QWidget):
         scope_bar = QFrame(self)
         scope_bar.setObjectName("warehouseScopeBar")
         scope_bar.setStyleSheet(
-            "QFrame#warehouseScopeBar { background: #F8FAFC; border: 1px solid #D6E0EA; border-radius: 10px; }"
+            "QFrame#warehouseScopeBar { background: #FFFFFF; border: 1px solid #D6E0EA; border-radius: 10px; }"
             "QLabel#warehouseScopeCaption { color: #64748B; font-size: 9px; font-weight: 700; background: transparent; }"
             "QLabel#warehouseScopeLabel { color: #0B2F5B; font-size: 13px; font-weight: 700; background: transparent; }"
             "QComboBox#warehouseScopeCombo { min-height: 30px; background: #FFFFFF; color: #0B2F5B; border: 1px solid #C9D7E8; border-radius: 7px; padding: 2px 8px; }"
@@ -2667,6 +2667,9 @@ class WarehousePage(QWidget):
             compact_mode=True,
             vm=IngredientWarehouseViewModel(),
         )
+        articles_layout = self.articles_tab.layout()
+        if articles_layout is not None:
+            articles_layout.setContentsMargins(0, 11, 14, 14)
         self.entradas_tab = MovimientosTab(mode="in")
         self.salidas_tab = MovimientosTab(mode="out")
         self.stock_tab = StockTab()
