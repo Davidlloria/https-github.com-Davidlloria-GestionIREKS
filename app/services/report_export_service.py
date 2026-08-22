@@ -76,7 +76,16 @@ class ReportExportService:
         wb.save(out)
         return out
 
-    def export_pdf(self, path: str | Path, title: str, headers: list[str], rows: list[list[Any]]) -> Path:
+    def export_pdf(
+        self,
+        path: str | Path,
+        title: str,
+        headers: list[str],
+        rows: list[list[Any]],
+        *,
+        summary: str = "",
+        format_measure_columns: bool = False,
+    ) -> Path:
         out = Path(path)
         out.parent.mkdir(parents=True, exist_ok=True)
         doc = SimpleDocTemplate(str(out), pagesize=landscape(A4), leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24)
@@ -86,8 +95,26 @@ class ReportExportService:
             parent=styles["Title"],
             alignment=0,
         )
-        story = [Paragraph(str(title or "Listado de clientes"), title_style), Spacer(1, 10)]
-        table_data = [headers] + [[str(value) for value in row] for row in rows]
+        summary_style = ParagraphStyle(
+            "ListingSummary",
+            parent=styles["Normal"],
+            fontSize=9,
+            leading=12,
+            textColor=colors.HexColor("#475569"),
+            alignment=0,
+        )
+        story = [Paragraph(xml_escape(str(title or "Listado de clientes")), title_style)]
+        if summary:
+            story.extend([Spacer(1, 3), Paragraph(xml_escape(str(summary)), summary_style)])
+        story.append(Spacer(1, 10))
+        table_data = [headers] + [
+            [
+                self._format_pdf_value(headers[index] if index < len(headers) else "", value)
+                if format_measure_columns else str(value)
+                for index, value in enumerate(row)
+            ]
+            for row in rows
+        ]
         column_count = max(1, len(headers))
         content_widths = [0] * column_count
         for row in table_data:
@@ -103,13 +130,18 @@ class ReportExportService:
             col_widths = [max(min_widths[idx], width * scale) for idx, width in enumerate(max_widths)]
         else:
             col_widths = max_widths[:]
+        if format_measure_columns:
+            self._match_pdf_measure_columns(headers, col_widths)
         width_delta = available_width - sum(col_widths)
-        if width_delta != 0 and column_count:
-            col_widths[-1] = max(min_widths[-1], col_widths[-1] + width_delta)
+        if width_delta > 0 and column_count:
+            flexible_columns = [
+                index for index, header in enumerate(headers)
+                if not self._is_pdf_numeric_header(header)
+            ] if format_measure_columns else []
+            target = flexible_columns[-1] if flexible_columns else column_count - 1
+            col_widths[target] += width_delta
         table = Table(table_data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
-        table.setStyle(
-            TableStyle(
-                [
+        table_style = [
                     ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#3A78CF")),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
@@ -121,11 +153,38 @@ class ReportExportService:
                     ("LEFTPADDING", (0, 0), (-1, -1), 4),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 4),
                 ]
-            )
-        )
+        for index, header in enumerate(headers):
+            if format_measure_columns and self._is_pdf_numeric_header(header):
+                table_style.append(("ALIGN", (index, 0), (index, -1), "RIGHT"))
+        table.setStyle(TableStyle(table_style))
         story.append(table)
         doc.build(story)
         return out
+
+    @staticmethod
+    def _format_pdf_value(header: str, value: Any) -> str:
+        normalized_header = str(header or "").strip().casefold()
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            formatted = f"{float(value):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+            if normalized_header in {"kg", "kgs", "kilogramos"}:
+                return f"{formatted} kg"
+            return formatted
+        return str(value or "")
+
+    @staticmethod
+    def _is_pdf_numeric_header(header: str) -> bool:
+        return str(header or "").strip().casefold() in {"kg", "kgs", "kilogramos", "€", "eur", "euros"}
+
+    @staticmethod
+    def _match_pdf_measure_columns(headers: list[str], widths: list[float]) -> None:
+        measure_columns = [
+            index for index, header in enumerate(headers)
+            if str(header or "").strip().casefold() in {"kg", "kgs", "kilogramos", "€", "eur", "euros"}
+        ]
+        if measure_columns:
+            shared_width = max(widths[index] for index in measure_columns)
+            for index in measure_columns:
+                widths[index] = shared_width
 
     def export_dashboard_agenda_pdf(self, path: str | Path, title: str, rows: list[list[Any]]) -> Path:
         out = Path(path)

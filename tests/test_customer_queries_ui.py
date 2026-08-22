@@ -104,8 +104,17 @@ class _StubReportExportService:
         self.calls.append(("excel", path, title, headers, rows, sheet_title))
         return Path(path)
 
-    def export_pdf(self, path: str, title: str, headers: list[str], rows: list[list[str]]) -> Path:
-        self.calls.append(("pdf", path, title, headers, rows))
+    def export_pdf(
+        self,
+        path: str,
+        title: str,
+        headers: list[str],
+        rows: list[list[str]],
+        *,
+        summary: str = "",
+        format_measure_columns: bool = False,
+    ) -> Path:
+        self.calls.append(("pdf", path, title, headers, rows, summary, format_measure_columns))
         return Path(path)
 
 
@@ -158,6 +167,8 @@ def test_customer_query_exports_visible_results(monkeypatch, tmp_path) -> None:
             "Consulta ventas",
             ["Nombre comercial", "Kg"],
             [["Cliente Uno", 12.5]],
+            "",
+            True,
         ),
     ]
     assert messages

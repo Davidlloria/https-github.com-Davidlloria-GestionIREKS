@@ -369,11 +369,22 @@ class CustomerQueriesDialog(QDialog):
             return
         headers, rows = self._visible_table_data()
         title = self._export_title()
+        summary = self._last_result.interpretation if self._last_result is not None else ''
+        if self._last_result is not None and self._last_result.intent.query_type == 'sales_customer_list':
+            title = f'Listado de ventas de clientes - {self._last_result.intent.year}'
+            summary = f'{summary} · {len(rows)} clientes incluidos.' if summary else f'{len(rows)} clientes incluidos.'
         default = str(self._report_export_service.default_path(title, 'pdf', folder='consultas_clientes'))
         path, _ = QFileDialog.getSaveFileName(self, 'Exportar consulta a PDF', default, 'PDF (*.pdf)')
         if not path:
             return
-        out = self._report_export_service.export_pdf(path, title, headers, rows)
+        out = self._report_export_service.export_pdf(
+            path,
+            title,
+            headers,
+            rows,
+            summary=summary,
+            format_measure_columns=True,
+        )
         QMessageBox.information(self, 'Consultas de clientes', f'PDF exportado:\n{out}')
 
     def reject(self) -> None:
