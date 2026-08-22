@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
@@ -127,7 +128,64 @@ class LocalAIService:
         return ""
 
     def _chat_url(self) -> str:
+        return f"{self._native_base_url()}/api/chat"
+
+    def _native_base_url(self) -> str:
         base_url = self.base_url.rstrip("/")
-        if base_url.lower().endswith("/v1"):
-            base_url = base_url[:-3].rstrip("/")
-        return f"{base_url}/api/chat"
+        return base_url[:-3].rstrip("/") if base_url.lower().endswith("/v1") else base_url
+
+
+class OllamaModelLifecycle:
+    """Keeps the configured local Ollama model warm while the desktop app is open."""
+
+    def __init__(self, service: LocalAIService | None = None, *, timeout: float = 2.0) -> None:
+        self.service = service or LocalAIService(timeout=timeout)
+        self.timeout = float(timeout)
+        self.service.timeout = min(float(self.service.timeout), self.timeout)
+        self.status = ""
+        self._closing = threading.Event()
+        self._operation_lock = threading.Lock()
+
+    def preload_async(self) -> None:
+        if not self.service.enabled or self._closing.is_set():
+            return
+        threading.Thread(target=self._preload, name="ollama-model-preload", daemon=True).start()
+
+    def _preload(self) -> None:
+        if self._closing.is_set():
+            return
+        with self._operation_lock:
+            if self._closing.is_set():
+                return
+            try:
+                self._get_json(f"{self.service._native_base_url()}/api/tags")
+                if self._closing.is_set():
+                    return
+                self.service._post_json(
+                    self.service._chat_url(),
+                    {"model": self.service.model, "messages": [], "stream": False, "think": False, "keep_alive": -1},
+                )
+                self.status = "Modelo local precargado."
+            except Exception:  # noqa: BLE001
+                self.status = "Ollama no está disponible en la URL configurada."
+
+    def unload(self) -> None:
+        self._closing.set()
+        if not self.service.enabled or self.service._validate_configuration():
+            return
+        try:
+            with self._operation_lock:
+                self.service._post_json(
+                    f"{self.service._native_base_url()}/api/generate",
+                    {"model": self.service.model, "stream": False, "keep_alive": 0},
+                )
+        except Exception:  # noqa: BLE001
+            self.status = "No se pudo descargar el modelo local."
+
+    def _get_json(self, url: str) -> dict[str, Any]:
+        request = Request(url, method="GET")
+        opener = build_opener(ProxyHandler({}))
+        with opener.open(request, timeout=self.timeout) as response:
+            body = response.read().decode("utf-8")
+        parsed = json.loads(body or "{}")
+        return parsed if isinstance(parsed, dict) else {}
