@@ -155,7 +155,8 @@ class ReportExportService:
                 ]
         for index, header in enumerate(headers):
             if format_measure_columns and self._is_pdf_numeric_header(header):
-                table_style.append(("ALIGN", (index, 0), (index, -1), "RIGHT"))
+                table_style.append(("ALIGN", (index, 0), (index, 0), "CENTER"))
+                table_style.append(("ALIGN", (index, 1), (index, -1), "RIGHT"))
         table.setStyle(TableStyle(table_style))
         story.append(table)
         doc.build(story)
@@ -168,6 +169,8 @@ class ReportExportService:
             formatted = f"{float(value):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
             if normalized_header in {"kg", "kgs", "kilogramos"}:
                 return f"{formatted} kg"
+            if normalized_header in {"€", "eur", "euros"}:
+                return f"{formatted} €"
             return formatted
         return str(value or "")
 

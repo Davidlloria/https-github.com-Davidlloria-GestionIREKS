@@ -7,7 +7,7 @@ def test_customer_query_pdf_formats_weight_and_euros_in_spanish() -> None:
     service = ReportExportService()
 
     assert service._format_pdf_value("Kg", 18456) == "18.456,00 kg"
-    assert service._format_pdf_value("€", 85585.45) == "85.585,45"
+    assert service._format_pdf_value("€", 85585.45) == "85.585,45 €"
 
 
 def test_customer_query_pdf_keeps_kg_and_euro_columns_at_the_same_width() -> None:
