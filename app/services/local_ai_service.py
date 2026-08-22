@@ -17,7 +17,7 @@ class LocalAIResult:
 
 
 class LocalAIService:
-    """Small client for a loopback OpenAI-compatible local model server."""
+    """Small client for a loopback Ollama local model server."""
 
     def __init__(
         self,
@@ -87,17 +87,19 @@ class LocalAIService:
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
-            "temperature": float(temperature),
-            "max_tokens": int(max_tokens),
             "stream": False,
+            "think": False,
+            "options": {
+                "temperature": float(temperature),
+                "num_predict": int(max_tokens),
+            },
         }
         if json_mode:
-            payload["response_format"] = {"type": "json_object"}
+            payload["format"] = "json"
 
         try:
-            parsed = self._post_json(f"{self.base_url}/chat/completions", payload)
-            choices = parsed.get("choices") or []
-            message = choices[0].get("message") if choices else {}
+            parsed = self._post_json(self._chat_url(), payload)
+            message = parsed.get("message") or {}
             text = str((message or {}).get("content") or "").strip()
             if not text:
                 return LocalAIResult(False, "", "La IA local no devolvió contenido.")
@@ -123,3 +125,9 @@ class LocalAIService:
         if not self.model:
             return "Indica el nombre del modelo de IA local."
         return ""
+
+    def _chat_url(self) -> str:
+        base_url = self.base_url.rstrip("/")
+        if base_url.lower().endswith("/v1"):
+            base_url = base_url[:-3].rstrip("/")
+        return f"{base_url}/api/chat"

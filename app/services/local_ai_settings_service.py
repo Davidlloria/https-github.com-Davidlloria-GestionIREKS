@@ -6,7 +6,7 @@ from app.services.api_settings_service import ApiSettingsService
 
 
 class LocalAISettingsService:
-    DEFAULT_BASE_URL = "http://127.0.0.1:11434/v1"
+    DEFAULT_BASE_URL = "http://127.0.0.1:11434"
     DEFAULT_MODEL = "qwen3.5:4b"
 
     def load(self) -> dict:

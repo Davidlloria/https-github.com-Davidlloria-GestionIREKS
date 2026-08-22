@@ -58,7 +58,7 @@ class SettingsProviderView:
     local_ai_title: str = "Configuracion IA local"
     local_ai_enabled_label: str = "Usar IA local en el asistente de ventas"
     local_ai_base_url_label: str = "URL local"
-    local_ai_base_url_placeholder: str = "http://127.0.0.1:11434/v1"
+    local_ai_base_url_placeholder: str = "http://127.0.0.1:11434"
     local_ai_model_label: str = "Modelo"
     local_ai_model_placeholder: str = "qwen3.5:4b"
     local_ai_info_label: str = "Solo se admiten servidores locales en 127.0.0.1, localhost o ::1."

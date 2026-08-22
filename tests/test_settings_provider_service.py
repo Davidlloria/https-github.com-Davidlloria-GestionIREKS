@@ -184,7 +184,7 @@ def test_load_operations_delegate_to_underlying_settings_services() -> None:
     assert ui_view.fatsecret_scope_label == "Scope"
     assert ui_view.openai_api_key_label == "API key"
     assert ui_view.local_ai_title == "Configuracion IA local"
-    assert ui_view.local_ai_base_url_placeholder == "http://127.0.0.1:11434/v1"
+    assert ui_view.local_ai_base_url_placeholder == "http://127.0.0.1:11434"
     assert ui_view.local_ai_model_placeholder == "qwen3.5:4b"
 
 

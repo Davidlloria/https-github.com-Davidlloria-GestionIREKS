@@ -80,7 +80,7 @@ class ApiSettingsService:
         section = self._section(root, "local_ai")
         return {
             "enabled": bool(section.get("enabled", False)),
-            "base_url": str(section.get("base_url") or "http://127.0.0.1:11434/v1").strip(),
+            "base_url": str(section.get("base_url") or "http://127.0.0.1:11434").strip(),
             "model": str(section.get("model") or "qwen3.5:4b").strip(),
         }
 
@@ -88,7 +88,7 @@ class ApiSettingsService:
         root = self.load_raw()
         root["local_ai"] = {
             "enabled": bool(enabled),
-            "base_url": str(base_url or "http://127.0.0.1:11434/v1").strip(),
+            "base_url": str(base_url or "http://127.0.0.1:11434").strip(),
             "model": str(model or "qwen3.5:4b").strip(),
         }
         return self.save_raw(root)
@@ -182,7 +182,7 @@ class ApiSettingsService:
         elif clean_provider == "local_ai":
             self.save_local_ai(
                 enabled=bool(payload.get("enabled", False)),
-                base_url=str(payload.get("base_url") or "http://127.0.0.1:11434/v1").strip(),
+                base_url=str(payload.get("base_url") or "http://127.0.0.1:11434").strip(),
                 model=str(payload.get("model") or "qwen3.5:4b").strip(),
             )
         elif clean_provider == "fatsecret":
