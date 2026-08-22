@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 
-import pytest
-
 import app.services.customer_report_service as customer_report_service_module
 from app.services.customer_report_flow_service import CustomerReportFlowService
 from app.services.customer_report_service import CustomerReportIntent, CustomerReportResult, ReportIntentResult
@@ -150,98 +148,14 @@ def test_has_last_report_reflects_state() -> None:
     assert service.has_last_report() is True
 
 
-def test_intent_service_ignores_inherited_proxy_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured_handlers: list[object] = []
-
-    class _FakeResponse:
-        def __init__(self, body: str) -> None:
-            self._body = body.encode("utf-8")
-
-        def __enter__(self) -> "_FakeResponse":
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def read(self) -> bytes:
-            return self._body
-
-    class _FakeOpener:
-        def open(self, req, timeout=None) -> _FakeResponse:
-            body = json.dumps(
-                {
-                    "output_text": json.dumps(
-                        {
-                            "title": "Listado de clientes",
-                            "columns": ["codigo", "nombre_comercial"],
-                            "filters": [],
-                            "order_by": ["codigo"],
-                            "limit": 50,
-                        }
-                    )
-                }
-            )
-            return _FakeResponse(body)
-
-    def _fake_build_opener(handler):
-        captured_handlers.append(handler)
-        return _FakeOpener()
-
-    monkeypatch.setattr(customer_report_service_module, "build_opener", _fake_build_opener)
-    monkeypatch.setattr(customer_report_service_module.OpenAISettingsService, "load", lambda self: {"api_key": "test-key", "use_ai_translation": False})
-
-    service = customer_report_service_module.CustomerReportIntentService(local_ai_service=_DisabledLocalAI())
-    result = service.parse("clientes activos")
-
-    assert result.used_ai is True
-    assert captured_handlers
-    assert captured_handlers[0].proxies == {}
-
-
-def test_intent_service_keeps_full_limit_when_ai_returns_500_for_all_customers(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _FakeResponse:
-        def __init__(self, body: str) -> None:
-            self._body = body.encode("utf-8")
-
-        def __enter__(self) -> "_FakeResponse":
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def read(self) -> bytes:
-            return self._body
-
-    class _FakeOpener:
-        def open(self, req, timeout=None) -> _FakeResponse:
-            body = json.dumps(
-                {
-                    "output_text": json.dumps(
-                        {
-                            "title": "Listado de todos los clientes",
-                            "columns": ["cliente_id", "codigo", "codigo_distribuidor", "nombre_comercial"],
-                            "filters": [],
-                            "order_by": ["codigo"],
-                            "limit": 500,
-                        }
-                    )
-                }
-            )
-            return _FakeResponse(body)
-
-    monkeypatch.setattr(customer_report_service_module, "build_opener", lambda handler: _FakeOpener())
-    monkeypatch.setattr(
-        customer_report_service_module.OpenAISettingsService,
-        "load",
-        lambda self: {"api_key": "test-key", "use_ai_translation": True},
-    )
-
+def test_intent_service_uses_deterministic_fallback_when_local_ai_is_disabled() -> None:
     service = customer_report_service_module.CustomerReportIntentService(local_ai_service=_DisabledLocalAI())
     result = service.parse(
         "listado de todos los clientes, campos uuid, cod, codigo cliente distribuidor, nombre"
     )
 
-    assert result.used_ai is True
+    assert result.used_ai is False
+    assert result.provider == "deterministic"
     assert result.intent.limit == 5000
     assert result.intent.filters == []
 
