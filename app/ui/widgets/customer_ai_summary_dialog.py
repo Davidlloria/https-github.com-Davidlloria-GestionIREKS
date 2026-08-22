@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from html import escape
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QDialog,
+    QFileDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QTextBrowser,
@@ -17,15 +20,25 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.customer_ai_summary_service import CustomerAISummaryResult, CustomerAISummarySections
+from app.services.report_export_service import ReportExportService
 
 
 class CustomerAISummaryDialog(QDialog):
     retry_requested = Signal()
 
-    def __init__(self, *, customer_name: str, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        customer_name: str,
+        report_export_service: ReportExportService | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
+        self._customer_name = str(customer_name or "Cliente").strip() or "Cliente"
+        self._report_export_service = report_export_service or ReportExportService()
+        self._result: CustomerAISummaryResult | None = None
         self.setObjectName("customerAISummaryDialog")
-        self.setWindowTitle(f"Resumen IA · {customer_name}")
+        self.setWindowTitle(f"Resumen IA · {self._customer_name}")
         self.resize(920, 720)
         self.setMinimumSize(700, 520)
 
@@ -33,7 +46,7 @@ class CustomerAISummaryDialog(QDialog):
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(14)
 
-        title = QLabel(f"Resumen comercial · {customer_name}")
+        title = QLabel(f"Resumen comercial · {self._customer_name}")
         title.setObjectName("customerAISummaryTitle")
         title.setProperty("role", "sectionTitle")
         layout.addWidget(title)
@@ -75,6 +88,11 @@ class CustomerAISummaryDialog(QDialog):
         self.source_label.setStyleSheet("color: #64748B;")
         footer.addWidget(self.source_label)
         footer.addStretch(1)
+        self.pdf_button = QPushButton("Generar PDF")
+        self.pdf_button.setObjectName("customerAISummaryPdfButton")
+        self.pdf_button.setEnabled(False)
+        self.pdf_button.clicked.connect(self._export_pdf)
+        footer.addWidget(self.pdf_button)
         self.retry_button = QPushButton("Reintentar redacción IA")
         self.retry_button.setObjectName("customerAISummaryRetryButton")
         self.retry_button.setEnabled(False)
@@ -103,12 +121,15 @@ class CustomerAISummaryDialog(QDialog):
         return value_label
 
     def set_loading(self) -> None:
+        self._result = None
         self.status_label.setText("Generando resumen con IA local…")
         self.progress.setVisible(True)
+        self.pdf_button.setEnabled(False)
         self.retry_button.setEnabled(False)
         self.summary_text.setHtml(self._loading_html())
 
     def set_result(self, result: CustomerAISummaryResult) -> None:
+        self._result = None
         self.progress.setVisible(False)
         self.retry_button.setEnabled(True)
         self.status_label.setText(result.message)
@@ -133,7 +154,34 @@ class CustomerAISummaryDialog(QDialog):
             sales="",
             conclusion="Resumen calculado con datos de GestionIREKS.",
         )
+        self._result = replace(result, sections=sections)
+        self.pdf_button.setEnabled(True)
         self.summary_text.setHtml(self._result_html(sections, result.used_ai))
+
+    def _export_pdf(self) -> None:
+        if self._result is None:
+            QMessageBox.warning(self, "Resumen IA", "Genera primero un resumen para exportarlo.")
+            return
+        default_path = str(
+            self._report_export_service.default_path(
+                f"Resumen IA {self._customer_name}",
+                "pdf",
+                folder="resumenes_ia_clientes",
+            )
+        )
+        path, _ = QFileDialog.getSaveFileName(self, "Guardar resumen IA en PDF", default_path, "PDF (*.pdf)")
+        if not path:
+            return
+        try:
+            output = self._report_export_service.export_customer_ai_summary_pdf(
+                path,
+                customer_name=self._customer_name,
+                result=self._result,
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Resumen IA", f"No se pudo generar el PDF.\n{exc}")
+            return
+        QMessageBox.information(self, "Resumen IA", f"PDF generado:\n{output}")
 
     @staticmethod
     def _loading_html() -> str:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import replace
+from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -71,11 +72,13 @@ def test_customer_ai_summary_dialog_shows_loading_and_structured_result() -> Non
     assert dialog.summary_text.isReadOnly()
     assert dialog.progress.maximum() == 0
     assert dialog.retry_button.isEnabled() is False
+    assert dialog.pdf_button.isEnabled() is False
 
     dialog.set_result(_result())
 
     assert dialog.progress.isHidden()
     assert dialog.retry_button.isEnabled() is True
+    assert dialog.pdf_button.isEnabled() is True
     assert dialog.period_label.text() == "Enero–julio 2026 frente a enero–julio 2025"
     assert dialog.kg_value.text() == "80,00 kg"
     assert dialog.variation_value.text() == "-38.5%"
@@ -85,6 +88,49 @@ def test_customer_ai_summary_dialog_shows_loading_and_structured_result() -> Non
     assert "Contactar al cliente" in plain_text
     assert "**" not in plain_text
 
+    dialog.close()
+    dialog.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_ai_summary_dialog_exports_pdf(monkeypatch, tmp_path: Path) -> None:
+    class ExportServiceDouble:
+        def __init__(self) -> None:
+            self.call = None
+
+        def default_path(self, title: str, suffix: str, *, folder: str) -> Path:
+            assert title == "Resumen IA Panadería Ejemplo"
+            assert suffix == "pdf"
+            assert folder == "resumenes_ia_clientes"
+            return tmp_path / "predeterminado.pdf"
+
+        def export_customer_ai_summary_pdf(self, path: str, *, customer_name: str, result) -> Path:
+            self.call = (path, customer_name, result)
+            return Path(path)
+
+    _application()
+    export_service = ExportServiceDouble()
+    output = tmp_path / "resumen.pdf"
+    messages = []
+    monkeypatch.setattr(
+        "app.ui.widgets.customer_ai_summary_dialog.QFileDialog.getSaveFileName",
+        lambda *_args, **_kwargs: (str(output), ""),
+    )
+    monkeypatch.setattr(
+        "app.ui.widgets.customer_ai_summary_dialog.QMessageBox.information",
+        lambda *args: messages.append(args),
+    )
+    dialog = CustomerAISummaryDialog(
+        customer_name="Panadería Ejemplo",
+        report_export_service=export_service,
+    )
+    result = _result()
+    dialog.set_result(result)
+
+    dialog.pdf_button.click()
+
+    assert export_service.call == (str(output), "Panadería Ejemplo", result)
+    assert messages
     dialog.close()
     dialog.deleteLater()
     QApplication.processEvents()

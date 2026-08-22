@@ -267,6 +267,176 @@ class ReportExportService:
         doc.build(story)
         return out
 
+    def export_customer_ai_summary_pdf(
+        self,
+        path: str | Path,
+        *,
+        customer_name: str,
+        result: Any,
+    ) -> Path:
+        snapshot = getattr(result, "snapshot", None)
+        sections = getattr(result, "sections", None)
+        if snapshot is None or sections is None:
+            raise ValueError("El resumen no contiene datos exportables.")
+
+        out = Path(path)
+        if out.suffix.lower() != ".pdf":
+            out = out.with_suffix(".pdf")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        doc = SimpleDocTemplate(
+            str(out),
+            pagesize=A4,
+            leftMargin=16 * mm,
+            rightMargin=16 * mm,
+            topMargin=17 * mm,
+            bottomMargin=17 * mm,
+            title=f"Resumen comercial - {customer_name}",
+        )
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "CustomerAISummaryTitle",
+            parent=styles["Title"],
+            fontName="Helvetica-Bold",
+            fontSize=17,
+            leading=21,
+            alignment=0,
+            textColor=colors.HexColor("#17365D"),
+            spaceAfter=5,
+        )
+        subtitle_style = ParagraphStyle(
+            "CustomerAISummarySubtitle",
+            parent=styles["Normal"],
+            fontSize=9.5,
+            leading=12,
+            textColor=colors.HexColor("#64748B"),
+            spaceAfter=11,
+        )
+        section_style = ParagraphStyle(
+            "CustomerAISummarySection",
+            parent=styles["Heading2"],
+            fontName="Helvetica-Bold",
+            fontSize=12,
+            leading=15,
+            textColor=colors.HexColor("#264A73"),
+            spaceBefore=9,
+            spaceAfter=4,
+        )
+        body_style = ParagraphStyle(
+            "CustomerAISummaryBody",
+            parent=styles["BodyText"],
+            fontSize=9.5,
+            leading=13.5,
+            textColor=colors.HexColor("#263E5C"),
+            spaceAfter=4,
+        )
+        metric_caption_style = ParagraphStyle(
+            "CustomerAISummaryMetricCaption",
+            parent=styles["Normal"],
+            fontSize=7,
+            leading=9,
+            textColor=colors.HexColor("#64748B"),
+        )
+        metric_value_style = ParagraphStyle(
+            "CustomerAISummaryMetricValue",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            leading=12,
+            textColor=colors.HexColor("#264A73"),
+        )
+
+        def clean(value: Any) -> str:
+            return (
+                str(value or "")
+                .replace("\u2013", "-")
+                .replace("\u2014", "-")
+                .replace("\u00b7", "-")
+            )
+
+        def paragraph(value: Any, style: ParagraphStyle = body_style) -> Paragraph:
+            return Paragraph(xml_escape(clean(value)).replace("\n", "<br/>"), style)
+
+        def number(value: Any) -> str:
+            return f"{float(value or 0.0):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+
+        variation = "No comparable"
+        if bool(getattr(snapshot, "comparison_available", False)):
+            delta_pct = getattr(snapshot, "delta_kg_pct", None)
+            variation = "Sin base" if delta_pct is None else f"{float(delta_pct):+.1f}%"
+        metrics = [
+            ("VOLUMEN ACTUAL", f"{number(getattr(snapshot, 'kg_current', 0.0))} kg"),
+            ("VARIACIÓN", variation),
+            ("FACTURACIÓN", f"{number(getattr(snapshot, 'euros_current', 0.0))} EUR"),
+            ("ÚLTIMA ACTIVIDAD", clean(getattr(snapshot, "latest_activity", "")) or "Sin registrar"),
+        ]
+        metric_table = Table(
+            [[
+                [Paragraph(caption, metric_caption_style), Paragraph(xml_escape(value), metric_value_style)]
+                for caption, value in metrics
+            ]],
+            colWidths=[doc.width / 4] * 4,
+        )
+        metric_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+                    ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#CBD5E1")),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#DCE3EC")),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                    ("TOPPADDING", (0, 0), (-1, -1), 7),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                ]
+            )
+        )
+
+        story: list[Any] = [
+            Paragraph(xml_escape(f"Resumen comercial - {clean(customer_name)}"), title_style),
+            Paragraph(xml_escape(clean(getattr(snapshot, "period_label", ""))), subtitle_style),
+            metric_table,
+            Spacer(1, 9),
+            paragraph(getattr(result, "message", ""), subtitle_style),
+        ]
+
+        def add_section(title: str, value: Any) -> None:
+            story.append(Paragraph(title, section_style))
+            story.append(paragraph(value))
+
+        def add_list_section(title: str, values: Any, empty_text: str) -> None:
+            story.append(Paragraph(title, section_style))
+            clean_values = tuple(values or ()) or (empty_text,)
+            story.extend(paragraph(f"- {value}") for value in clean_values)
+
+        add_section("Situación", getattr(sections, "situation", ""))
+        add_section("Ventas", getattr(sections, "sales", ""))
+        add_list_section("Productos", getattr(sections, "products", ()), "Sin observaciones de producto.")
+        add_list_section(
+            "Oportunidades",
+            getattr(sections, "opportunities", ()),
+            "Sin acciones automáticas sugeridas.",
+        )
+        add_section("Conclusión", getattr(sections, "conclusion", ""))
+        story.extend(
+            [
+                Spacer(1, 10),
+                paragraph("Datos de GestionIREKS - redacción local y privada", subtitle_style),
+            ]
+        )
+
+        def draw_footer(canvas: Any, document: Any) -> None:
+            canvas.saveState()
+            canvas.setStrokeColor(colors.HexColor("#D7DEE8"))
+            canvas.line(document.leftMargin, 11 * mm, A4[0] - document.rightMargin, 11 * mm)
+            canvas.setFont("Helvetica", 7.5)
+            canvas.setFillColor(colors.HexColor("#64748B"))
+            canvas.drawString(document.leftMargin, 7 * mm, "GestionIREKS - Resumen comercial")
+            canvas.drawRightString(A4[0] - document.rightMargin, 7 * mm, f"Página {document.page}")
+            canvas.restoreState()
+
+        doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
+        return out
+
     def export_customer_sales_comparison_pdf(
         self,
         path: str | Path,
