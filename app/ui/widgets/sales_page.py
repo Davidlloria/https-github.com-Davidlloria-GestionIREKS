@@ -647,7 +647,7 @@ class SalesAnalysisDialog(QDialog):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
 
-        title_label = QLabel("Análisis de ventas con ChatGPT")
+        title_label = QLabel("Asistente de análisis de ventas")
         title_font = QFont()
         title_font.setPointSize(12)
         title_font.setBold(True)
@@ -675,7 +675,7 @@ class SalesAnalysisDialog(QDialog):
 
         self.response_edit = QPlainTextEdit()
         self.response_edit.setReadOnly(True)
-        self.response_edit.setPlaceholderText("La respuesta de ChatGPT aparecerá aquí.")
+        self.response_edit.setPlaceholderText("La respuesta del asistente aparecerá aquí.")
         layout.addWidget(self.response_edit, 1)
 
         bottom_row = QHBoxLayout()
@@ -727,10 +727,10 @@ class SalesAnalysisDialog(QDialog):
     def _consult(self) -> None:
         question = str(self.question_edit.toPlainText() or "").strip()
         if not question:
-            QMessageBox.warning(self, "Análisis de ventas", "Escribe una consulta antes de consultar a ChatGPT.")
+            QMessageBox.warning(self, "Análisis de ventas", "Escribe una consulta antes de iniciar el análisis.")
             return
         self.consult_btn.setEnabled(False)
-        self.response_edit.setPlainText("Consultando ChatGPT...")
+        self.response_edit.setPlainText("Analizando la consulta...")
         QApplication.setOverrideCursor(QCursor(Qt.CursorShape.WaitCursor))
         try:
             # The analysis query must not inherit the visible sales-page filters.

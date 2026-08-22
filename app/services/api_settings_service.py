@@ -75,6 +75,24 @@ class ApiSettingsService:
         }
         return self.save_raw(root)
 
+    def get_local_ai(self) -> dict[str, Any]:
+        root = self.load_raw()
+        section = self._section(root, "local_ai")
+        return {
+            "enabled": bool(section.get("enabled", False)),
+            "base_url": str(section.get("base_url") or "http://127.0.0.1:11434/v1").strip(),
+            "model": str(section.get("model") or "qwen3.5:4b").strip(),
+        }
+
+    def save_local_ai(self, *, enabled: bool, base_url: str, model: str) -> Path:
+        root = self.load_raw()
+        root["local_ai"] = {
+            "enabled": bool(enabled),
+            "base_url": str(base_url or "http://127.0.0.1:11434/v1").strip(),
+            "model": str(model or "qwen3.5:4b").strip(),
+        }
+        return self.save_raw(root)
+
     def get_fatsecret(self) -> dict[str, Any]:
         root = self.load_raw()
         fat = self._section(root, "fatsecret")
@@ -138,6 +156,8 @@ class ApiSettingsService:
             return self.get_fdc()
         if clean_provider == "openai":
             return self.get_openai()
+        if clean_provider == "local_ai":
+            return self.get_local_ai()
         if clean_provider == "fatsecret":
             return self.get_fatsecret()
         if clean_provider == "orders_mail":
@@ -158,6 +178,12 @@ class ApiSettingsService:
             self.save_openai(
                 api_key=str(payload.get("api_key") or "").strip(),
                 use_ai_translation=bool(payload.get("use_ai_translation", False)),
+            )
+        elif clean_provider == "local_ai":
+            self.save_local_ai(
+                enabled=bool(payload.get("enabled", False)),
+                base_url=str(payload.get("base_url") or "http://127.0.0.1:11434/v1").strip(),
+                model=str(payload.get("model") or "qwen3.5:4b").strip(),
             )
         elif clean_provider == "fatsecret":
             self.save_fatsecret(

@@ -33,6 +33,7 @@ def test_sales_analysis_dialog_uses_sales_query_assistant(monkeypatch) -> None:
     monkeypatch.setattr(sales_page_module, "ReportExportService", _FakeExportService)
 
     dialog = SalesAnalysisDialog(title="Analisis", defaults={"year": 2026}, sales_service=object())
+    assert "ChatGPT" not in dialog.findChildren(sales_page_module.QLabel)[0].text()
     dialog.question_edit.setPlainText("dame resumen")
     dialog._consult()
 

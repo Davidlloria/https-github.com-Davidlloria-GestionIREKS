@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.request import ProxyHandler, Request, build_opener
 
+from app.services.local_ai_service import LocalAIService
 from app.services.openai_process_service import OpenAIProcessService
 from app.services.openai_settings_service import OpenAISettingsService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesDetailRow, SalesComparisonRow
@@ -54,13 +55,19 @@ class SalesQueryAssistantService:
         api_key: str | None = None,
         model: str = "gpt-4.1-mini",
         timeout: float = 30.0,
+        local_ai_service: LocalAIService | None = None,
     ) -> None:
         cfg = OpenAISettingsService().load()
         self.api_key = str(api_key or cfg.get("api_key") or "").strip()
         self.model = str(model or "gpt-4.1-mini").strip()
         self.timeout = timeout
         self.sales_service = sales_service or SalesAnnualComparisonService()
-        self.answer_service = OpenAIProcessService(api_key=self.api_key, model=self.model, timeout=self.timeout)
+        self.local_ai_service = local_ai_service or LocalAIService(timeout=max(self.timeout, 60.0))
+        self.answer_service = (
+            self.local_ai_service
+            if self.local_ai_service.enabled
+            else OpenAIProcessService(api_key=self.api_key, model=self.model, timeout=self.timeout)
+        )
 
     def answer(self, question: str, defaults: dict[str, Any] | None = None) -> SalesQueryResult:
         intent_result = self.interpret(question, defaults=defaults)
@@ -181,25 +188,42 @@ class SalesQueryAssistantService:
         fallback = self._fallback_intent(text, defaults)
         if not text:
             return SalesQueryIntentResult(False, fallback, "Escribe una consulta de ventas.")
+
+        instruction = (
+            "Convierte consultas libres sobre ventas en JSON estricto. "
+            "No generes SQL ni texto adicional. "
+            "Devuelve solo estas claves: "
+            "query_type, year, year_compare, month, acumulado, cliente_id, cliente_texto, articulo_id, "
+            "producto_texto, fabricante_id, familia_id, subfamilia_id, limit. "
+            "query_type debe ser uno de: detalle, mensual, anual, comparativa, ranking, tendencia, general. "
+            "Si la consulta menciona un producto, un cliente o un mes concreto, usa query_type detalle. "
+            "Si pide top, ranking o evolución, usa ranking, tendencia o comparativa según corresponda. "
+            "Los valores year y month deben ser enteros; acumulado debe ser booleano; limit entero. "
+            f"Consulta: {text}"
+        )
+
+        if self.local_ai_service.enabled:
+            result = self.local_ai_service.generate_json(instruction)
+            if result.ok:
+                parsed = self._parse_json(result.text)
+                intent = self._intent_from_mapping(parsed, fallback)
+                return SalesQueryIntentResult(True, intent, "Interpretado con IA local.", True)
+            return SalesQueryIntentResult(
+                True,
+                fallback,
+                f"Interpretación determinista. IA local no disponible: {result.message}",
+                False,
+            )
+
         if not self.api_key:
-            return SalesQueryIntentResult(True, fallback, "Interpretación local. Falta API key de OpenAI.", False)
+            return SalesQueryIntentResult(True, fallback, "Interpretación determinista. No hay proveedor IA activo.", False)
 
         payload: dict[str, Any] = {
             "model": self.model,
             "input": [
                 {
                     "role": "system",
-                    "content": (
-                        "Convierte consultas libres sobre ventas en JSON estricto. "
-                        "No generes SQL ni texto adicional. "
-            "Devuelve solo estas claves: "
-            "query_type, year, year_compare, month, acumulado, cliente_id, cliente_texto, articulo_id, producto_texto, "
-            "fabricante_id, familia_id, subfamilia_id, limit. "
-            "query_type debe ser uno de: detalle, mensual, anual, comparativa, ranking, tendencia, general. "
-            "Si la consulta menciona un producto, un cliente o un mes concreto, usa query_type detalle. "
-            "Si pide top, ranking o evolución, usa ranking, tendencia o comparativa según corresponda. "
-            "Los valores year y month deben ser enteros; acumulado debe ser booleano; limit entero."
-        ),
+                    "content": instruction.rsplit(" Consulta: ", 1)[0],
                 },
                 {"role": "user", "content": text},
             ],

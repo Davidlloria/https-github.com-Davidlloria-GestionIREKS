@@ -41,6 +41,26 @@ class _FakeOpenaiSettings:
         return Path("data/api_config.json")
 
 
+class _FakeLocalAISettings:
+    def __init__(self) -> None:
+        self.saved: tuple[bool, str, str] | None = None
+
+    def load(self) -> dict:
+        return {"enabled": True, "base_url": "http://127.0.0.1:11434/v1", "model": "qwen3.5:4b"}
+
+    def save(self, *, enabled: bool, base_url: str, model: str) -> Path:
+        self.saved = (enabled, base_url, model)
+        return Path("data/api_config.json")
+
+
+class _FakeLocalAI:
+    def __init__(self, **kwargs) -> None:
+        self.kwargs = kwargs
+
+    def test_connection(self):
+        return type("R", (), {"ok": True, "text": "OK", "message": "Respuesta generada con IA local."})()
+
+
 class _FakeOrdersMailSettings:
     def __init__(self) -> None:
         self.saved: tuple[str, str] | None = None
@@ -163,3 +183,24 @@ def test_load_operations_delegate_to_underlying_settings_services() -> None:
     assert ui_view.fatsecret_client_secret_label == "Client Secret"
     assert ui_view.fatsecret_scope_label == "Scope"
     assert ui_view.openai_api_key_label == "API key"
+    assert ui_view.local_ai_title == "Configuracion IA local"
+    assert ui_view.local_ai_base_url_placeholder == "http://127.0.0.1:11434/v1"
+    assert ui_view.local_ai_model_placeholder == "qwen3.5:4b"
+
+
+def test_local_ai_settings_can_be_loaded_saved_and_tested() -> None:
+    settings = _FakeLocalAISettings()
+    service = SettingsProviderService(local_ai_settings=settings, local_ai_factory=_FakeLocalAI)
+
+    loaded = service.load_local_ai()
+    saved = service.save_local_ai(
+        enabled=True,
+        base_url="http://127.0.0.1:11434/v1",
+        model="qwen3.5:4b",
+    )
+    tested = service.test_local_ai(base_url=loaded["base_url"], model=loaded["model"])
+
+    assert loaded["enabled"] is True
+    assert saved.ok is True
+    assert settings.saved == (True, "http://127.0.0.1:11434/v1", "qwen3.5:4b")
+    assert tested.ok is True

@@ -1563,6 +1563,49 @@ class SettingsPage(QWidget):
         openai_layout.addWidget(openai_info)
         layout.addWidget(openai_card)
 
+        local_ai_card = QFrame()
+        local_ai_card.setObjectName("card")
+        local_ai_layout = QVBoxLayout(local_ai_card)
+        local_ai_layout.setContentsMargins(10, 10, 10, 10)
+        local_ai_layout.setSpacing(8)
+
+        local_ai_title = QLabel(provider_view.local_ai_title)
+        local_ai_title.setProperty("role", "sectionTitle")
+        local_ai_layout.addWidget(local_ai_title)
+        local_ai_loaded = self.settings_provider_service.load_local_ai()
+
+        self.local_ai_enabled_check = QCheckBox(provider_view.local_ai_enabled_label)
+        self.local_ai_enabled_check.setChecked(bool(local_ai_loaded.get("enabled", False)))
+        local_ai_layout.addWidget(self.local_ai_enabled_check)
+
+        local_ai_form = QFormLayout()
+        self.local_ai_base_url_input = QLineEdit()
+        self.local_ai_base_url_input.setPlaceholderText(provider_view.local_ai_base_url_placeholder)
+        self.local_ai_base_url_input.setText(str(local_ai_loaded.get("base_url") or ""))
+        self.local_ai_model_input = QLineEdit()
+        self.local_ai_model_input.setPlaceholderText(provider_view.local_ai_model_placeholder)
+        self.local_ai_model_input.setText(str(local_ai_loaded.get("model") or ""))
+        local_ai_form.addRow(provider_view.local_ai_base_url_label, self.local_ai_base_url_input)
+        local_ai_form.addRow(provider_view.local_ai_model_label, self.local_ai_model_input)
+        local_ai_layout.addLayout(local_ai_form)
+
+        local_ai_actions = QHBoxLayout()
+        self.local_ai_save_btn = QPushButton(provider_view.save_button_label)
+        self.local_ai_save_btn.setProperty("btnRole", "success")
+        self.local_ai_test_btn = QPushButton(provider_view.test_button_label)
+        self.local_ai_test_btn.setProperty("btnRole", "secondary")
+        self.local_ai_save_btn.clicked.connect(self._save_local_ai_settings)
+        self.local_ai_test_btn.clicked.connect(self._test_local_ai_connection)
+        local_ai_actions.addWidget(self.local_ai_save_btn)
+        local_ai_actions.addWidget(self.local_ai_test_btn)
+        local_ai_actions.addStretch(1)
+        local_ai_layout.addLayout(local_ai_actions)
+
+        local_ai_info = QLabel(provider_view.local_ai_info_label)
+        local_ai_info.setWordWrap(True)
+        local_ai_layout.addWidget(local_ai_info)
+        layout.addWidget(local_ai_card)
+
         layout.addStretch(1)
         return panel
 
@@ -2349,6 +2392,28 @@ class SettingsPage(QWidget):
                 QMessageBox.warning(self, "OpenAI", result.message or "No se obtuvo respuesta valida.")
         except Exception as exc:
             QMessageBox.warning(self, "OpenAI", f"Error de conexion.\n{exc}")
+
+    def _save_local_ai_settings(self) -> None:
+        enabled = self.local_ai_enabled_check.isChecked() if hasattr(self, "local_ai_enabled_check") else False
+        base_url = self.local_ai_base_url_input.text().strip() if hasattr(self, "local_ai_base_url_input") else ""
+        model = self.local_ai_model_input.text().strip() if hasattr(self, "local_ai_model_input") else ""
+        try:
+            result = self.settings_provider_service.save_local_ai(enabled=enabled, base_url=base_url, model=model)
+            QMessageBox.information(self, "IA local", f"{result.message}\n{result.path}")
+        except Exception as exc:
+            QMessageBox.warning(self, "IA local", f"No se pudo guardar la configuracion.\n{exc}")
+
+    def _test_local_ai_connection(self) -> None:
+        base_url = self.local_ai_base_url_input.text().strip() if hasattr(self, "local_ai_base_url_input") else ""
+        model = self.local_ai_model_input.text().strip() if hasattr(self, "local_ai_model_input") else ""
+        try:
+            result = self.settings_provider_service.test_local_ai(base_url=base_url, model=model)
+            if result.ok:
+                QMessageBox.information(self, "IA local", result.message)
+            else:
+                QMessageBox.warning(self, "IA local", result.message or "No se obtuvo respuesta valida.")
+        except Exception as exc:
+            QMessageBox.warning(self, "IA local", f"Error de conexion.\n{exc}")
 
     def _pick_orders_historico_dir(self) -> None:
         current = self.orders_historico_dir_input.text().strip() if hasattr(self, "orders_historico_dir_input") else ""

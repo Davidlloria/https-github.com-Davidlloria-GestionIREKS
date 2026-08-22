@@ -15,6 +15,24 @@ from app.services.sales_ai_assistant_service import (
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow
 
 
+class _FakeLocalAI:
+    enabled = True
+
+    def generate_json(self, _prompt: str):
+        return type(
+            "R",
+            (),
+            {
+                "ok": True,
+                "text": '{"query_type":"detalle","year":2026,"month":7,"producto_texto":"muffin","limit":20}',
+                "message": "ok",
+            },
+        )()
+
+    def generate_process(self, _prompt: str):
+        return type("R", (), {"ok": True, "text": "Respuesta local", "message": "IA local"})()
+
+
 @pytest.fixture()
 def isolated_engine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     engine = create_engine(
@@ -278,6 +296,20 @@ def _seed_sales(session: Session) -> tuple[str, str, str, str, str]:
     )
     session.commit()
     return cliente_id, fabricante_id, familia_id, subfamilia_id, articulo_id
+
+
+def test_sales_assistant_prefers_enabled_local_ai_for_intent() -> None:
+    local_ai = _FakeLocalAI()
+    assistant = SalesQueryAssistantService(sales_service=object(), api_key="cloud-key", local_ai_service=local_ai)
+
+    result = assistant.interpret("ventas de muffin en julio de 2026")
+
+    assert assistant.answer_service is local_ai
+    assert result.used_ai is True
+    assert result.intent.query_type == "detalle"
+    assert result.intent.year == 2026
+    assert result.intent.month == 7
+    assert result.intent.producto_texto == "muffin"
 
 
 def test_listar_detalle_ventas_filters_by_client_and_product_text(isolated_engine) -> None:
