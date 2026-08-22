@@ -2674,12 +2674,11 @@ class WarehousePage(QWidget):
         if classification_card is not None and classification_card.layout() is not None:
             classification_layout = classification_card.layout()
             classification_layout.setContentsMargins(0, 0, 0, 3)
-            classification_layout.setSpacing(3)
+            classification_layout.setSpacing(2)
             taxonomy_grid = classification_layout.itemAt(1).layout()
             if taxonomy_grid is not None:
-                taxonomy_grid.setVerticalSpacing(2)
-            classification_layout.activate()
-            classification_card.setFixedHeight(classification_layout.minimumSize().height() + 2)
+                taxonomy_grid.setVerticalSpacing(1)
+            classification_card.setFixedHeight(110)
         self.entradas_tab = MovimientosTab(mode="in")
         self.salidas_tab = MovimientosTab(mode="out")
         self.stock_tab = StockTab()
