@@ -8,6 +8,7 @@ from typing import Any
 
 from app.core.database import engine
 from app.services.local_ai_service import LocalAIService
+from app.services.customer_report_schema import CUSTOMER_REPORT_RESPONSE_FORMAT
 
 
 REPORT_COLUMNS: dict[str, tuple[str, str]] = {
@@ -112,7 +113,10 @@ class CustomerReportIntentService:
             return ReportIntentResult(False, CustomerReportIntent(), "Escribe que listado necesitas.")
         fallback = self._fallback_parse(text)
         if self.local_ai_service.enabled:
-            local_result = self.local_ai_service.generate_json(self._ai_instruction(text))
+            local_result = self.local_ai_service.generate_json(
+                self._ai_instruction(text),
+                schema=CUSTOMER_REPORT_RESPONSE_FORMAT["schema"],
+            )
             if local_result.ok:
                 try:
                     parsed = self._parse_json(local_result.text)

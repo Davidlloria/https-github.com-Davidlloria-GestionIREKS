@@ -8,7 +8,7 @@ from sqlmodel import SQLModel, Session, create_engine
 
 import app.services.customer_query_service as customer_query_service_module
 from app.models import Cliente, Isla, VentaClientesRaw
-from app.services.customer_query_service import CustomerQueryService
+from app.services.customer_query_service import CUSTOMER_QUERY_INTENT_SCHEMA, CustomerQueryService
 from app.services.customer_report_schema import CUSTOMER_REPORT_RESPONSE_FORMAT
 from app.services.customer_report_service import CustomerReportIntentService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
@@ -24,9 +24,11 @@ class _FakeLocalAI:
     def __init__(self, response: dict) -> None:
         self.response = response
         self.prompts: list[str] = []
+        self.schemas: list[dict | None] = []
 
-    def generate_json(self, prompt: str):
+    def generate_json(self, prompt: str, *, schema: dict | None = None):
         self.prompts.append(prompt)
+        self.schemas.append(schema)
         return type("Result", (), {"ok": True, "text": json.dumps(self.response)})()
 
 
@@ -228,6 +230,7 @@ def test_local_ai_translates_natural_sales_query_to_a_valid_deterministic_intent
     assert intent.columns == ["codigo", "nombre", "kg", "euros"]
     assert intent.ai_interpreted is True
     assert "No generes SQL" in local_ai.prompts[0]
+    assert local_ai.schemas == [CUSTOMER_QUERY_INTENT_SCHEMA]
 
 
 def test_invalid_local_ai_intent_falls_back_to_the_deterministic_interpreter() -> None:

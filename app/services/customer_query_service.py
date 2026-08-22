@@ -13,6 +13,59 @@ from app.services.local_ai_service import LocalAIService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
 
 
+CUSTOMER_QUERY_INTENT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "query_type": {
+            "type": "string",
+            "enum": [
+                "customer_filter",
+                "duplicate_customer_names",
+                "sales_customer_year_comparison",
+                "sales_customer_list",
+                "sales_drop_ranking",
+                "sales_growth_ranking",
+            ],
+        },
+        "year": {"type": "integer"},
+        "compare_year": {"type": "integer"},
+        "limit": {"type": "integer"},
+        "customer_type": {"type": "string", "enum": ["", "directo", "indirecto", "distribuidor"]},
+        "island": {
+            "type": "string",
+            "enum": ["", "Gran Canaria", "Tenerife", "Lanzarote", "Fuerteventura", "La Palma", "La Gomera", "El Hierro"],
+        },
+        "direction": {"type": "string", "enum": ["asc", "desc"]},
+        "metric": {"type": "string", "enum": ["kg"]},
+        "zero_consumption": {"type": "boolean"},
+        "columns": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": ["isla", "codigo", "nombre", "kg", "euros", "kg_curr", "kg_prev", "delta_kg", "delta_kg_pct"],
+            },
+        },
+        "sort_by_island": {"type": "boolean"},
+        "sort_metric": {"type": "string", "enum": ["kg", "kg_curr", "delta_kg"]},
+    },
+    "required": [
+        "query_type",
+        "year",
+        "compare_year",
+        "limit",
+        "customer_type",
+        "island",
+        "direction",
+        "metric",
+        "zero_consumption",
+        "columns",
+        "sort_by_island",
+        "sort_metric",
+    ],
+    "additionalProperties": False,
+}
+
+
 @dataclass
 class CustomerQueryIntent:
     query_type: str = "customer_filter"
@@ -109,7 +162,10 @@ class CustomerQueryService:
         fallback = self._interpret_deterministic(prompt)
         if not self.local_ai_service.enabled:
             return fallback
-        result = self.local_ai_service.generate_json(self._local_ai_instruction(prompt))
+        result = self.local_ai_service.generate_json(
+            self._local_ai_instruction(prompt),
+            schema=CUSTOMER_QUERY_INTENT_SCHEMA,
+        )
         if not result.ok:
             return fallback
         try:

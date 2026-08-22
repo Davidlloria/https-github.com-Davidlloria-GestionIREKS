@@ -53,7 +53,7 @@ class LocalAIService:
             max_tokens=1200,
         )
 
-    def generate_json(self, prompt: str) -> LocalAIResult:
+    def generate_json(self, prompt: str, *, schema: dict[str, Any] | None = None) -> LocalAIResult:
         src = str(prompt or "").strip()
         if not src:
             return LocalAIResult(False, "", "Prompt vacío.")
@@ -62,6 +62,7 @@ class LocalAIService:
             temperature=0.0,
             max_tokens=400,
             json_mode=True,
+            json_schema=schema,
         )
 
     def test_connection(self) -> LocalAIResult:
@@ -78,6 +79,7 @@ class LocalAIService:
         temperature: float,
         max_tokens: int,
         json_mode: bool = False,
+        json_schema: dict[str, Any] | None = None,
     ) -> LocalAIResult:
         if not self.enabled:
             return LocalAIResult(False, "", "La IA local no está activada en Configuración > API.")
@@ -96,7 +98,7 @@ class LocalAIService:
             },
         }
         if json_mode:
-            payload["format"] = "json"
+            payload["format"] = json_schema if json_schema is not None else "json"
 
         try:
             parsed = self._post_json(self._chat_url(), payload)

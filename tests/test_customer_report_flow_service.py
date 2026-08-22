@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import json
 
 import app.services.customer_report_service as customer_report_service_module
+from app.services.customer_report_schema import CUSTOMER_REPORT_RESPONSE_FORMAT
 from app.services.customer_report_flow_service import CustomerReportFlowService
 from app.services.customer_report_service import CustomerReportIntent, CustomerReportResult, ReportIntentResult
 
@@ -35,9 +36,11 @@ class _FakeLocalAI:
 
     def __init__(self) -> None:
         self.prompts: list[str] = []
+        self.schemas: list[dict | None] = []
 
-    def generate_json(self, prompt: str):
+    def generate_json(self, prompt: str, *, schema: dict | None = None):
         self.prompts.append(prompt)
+        self.schemas.append(schema)
         return type(
             "Result",
             (),
@@ -175,6 +178,7 @@ def test_intent_service_prefers_enabled_local_ai_and_keeps_reports_read_only() -
     assert result.intent.filters[0] == customer_report_service_module.ReportFilter("activo", "=", True)
     assert local_ai.prompts
     assert "No generes SQL" in local_ai.prompts[0]
+    assert local_ai.schemas == [CUSTOMER_REPORT_RESPONSE_FORMAT["schema"]]
 
 
 def test_report_flow_labels_local_ai_as_the_active_provider() -> None:

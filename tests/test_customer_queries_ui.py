@@ -187,6 +187,11 @@ def test_customers_top_ribbon_contains_queries_button(monkeypatch) -> None:
     assert button is not None
     assert button.text() == "Consultas"
     assert not button.icon().isNull()
+    summary_button = page.findChild(QPushButton, "customerAISummaryButton")
+    assert summary_button is not None
+    assert summary_button.text() == "Resumen IA"
+    assert not summary_button.icon().isNull()
+    assert not summary_button.isEnabled()
     page.close()
     page.deleteLater()
     QApplication.processEvents()

@@ -80,6 +80,28 @@ def test_local_ai_json_mode_requests_native_ollama_json(monkeypatch) -> None:
     assert captured["options"] == {"temperature": 0.0, "num_predict": 400}
 
 
+def test_local_ai_json_mode_accepts_a_strict_schema(monkeypatch) -> None:
+    service = LocalAIService(enabled=True, base_url="http://localhost:11434", model="local-model")
+    captured: dict[str, object] = {}
+    schema = {
+        "type": "object",
+        "properties": {"query_type": {"type": "string", "enum": ["general"]}},
+        "required": ["query_type"],
+        "additionalProperties": False,
+    }
+
+    def fake_post(_url: str, payload: dict):
+        captured.update(payload)
+        return {"message": {"content": '{"query_type":"general"}'}}
+
+    monkeypatch.setattr(service, "_post_json", fake_post)
+
+    result = service.generate_json("Devuelve JSON", schema=schema)
+
+    assert result.ok is True
+    assert captured["format"] == schema
+
+
 def test_local_ai_returns_controlled_message_for_empty_ollama_content(monkeypatch) -> None:
     service = LocalAIService(enabled=True, base_url="http://localhost:11434", model="local-model")
     monkeypatch.setattr(service, "_post_json", lambda *_args: {"message": {"content": ""}})

@@ -13,6 +13,45 @@ from app.services.sales_annual_comparison_service import SalesAnnualComparisonSe
 from app.services.sales_text_normalizer import mentions_acumulado, normalize_query_text, normalize_search_text
 
 
+SALES_QUERY_INTENT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "query_type": {
+            "type": "string",
+            "enum": ["detalle", "mensual", "anual", "comparativa", "ranking", "tendencia", "general"],
+        },
+        "year": {"type": "integer"},
+        "year_compare": {"type": "integer"},
+        "month": {"type": "integer"},
+        "acumulado": {"type": "boolean"},
+        "cliente_id": {"type": "string"},
+        "cliente_texto": {"type": "string"},
+        "articulo_id": {"type": "string"},
+        "producto_texto": {"type": "string"},
+        "fabricante_id": {"type": "string"},
+        "familia_id": {"type": "string"},
+        "subfamilia_id": {"type": "string"},
+        "limit": {"type": "integer"},
+    },
+    "required": [
+        "query_type",
+        "year",
+        "year_compare",
+        "month",
+        "acumulado",
+        "cliente_id",
+        "cliente_texto",
+        "articulo_id",
+        "producto_texto",
+        "fabricante_id",
+        "familia_id",
+        "subfamilia_id",
+        "limit",
+    ],
+    "additionalProperties": False,
+}
+
+
 @dataclass
 class SalesQueryIntent:
     query_type: str = "general"
@@ -203,7 +242,7 @@ class SalesQueryAssistantService:
         )
 
         if self.local_ai_service.enabled:
-            result = self.local_ai_service.generate_json(instruction)
+            result = self.local_ai_service.generate_json(instruction, schema=SALES_QUERY_INTENT_SCHEMA)
             if result.ok:
                 parsed = self._parse_json(result.text)
                 intent = self._intent_from_mapping(parsed, fallback)

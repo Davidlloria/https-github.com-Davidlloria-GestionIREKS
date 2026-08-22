@@ -48,10 +48,12 @@ except ModuleNotFoundError:  # pragma: no cover - dependency guard
 
 from app.models import CodigoPostal, Cliente, Contacto, Isla, Localidad, Municipio, Provincia, Receta
 from app.services.customer_report_document_helper import build_customer_report_html
+from app.services.customer_ai_summary_service import CustomerAISummaryService
 from app.services.customer_report_flow_service import CustomerReportFlowResult, CustomerReportFlowService
 from app.services.customer_query_service import CustomerQueryService
 from app.services.customer_service import CustomerService
 from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
+from app.ui.widgets.customer_ai_summary_dialog import CustomerAISummaryDialog
 from app.services.customer_report_service import CustomerReportIntentService, CustomerReportResult, CustomerReportService
 from app.services.report_export_service import ReportExportService
 from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
@@ -783,6 +785,7 @@ class CustomersPage(QWidget):
         self.customer_query_service = CustomerQueryService(
             report_flow_service=self.customer_report_flow_service
         )
+        self.customer_ai_summary_service = CustomerAISummaryService(customer_service=self.customer_service)
         self.schema = [
             {"name": "cliente_nombre_comercial", "label": "Nombre comercial"},
             {"name": "cliente_nombre_fiscal", "label": "Nombre fiscal"},
@@ -871,6 +874,14 @@ class CustomersPage(QWidget):
             object_name="customerQueriesButton",
             tooltip="Abrir consultas de clientes",
         )
+        self.ai_summary_btn = create_standard_ribbon_button(
+            "Resumen IA",
+            role="primary",
+            icon_name="brain.svg",
+            object_name="customerAISummaryButton",
+            tooltip="Generar un resumen comercial del cliente seleccionado",
+        )
+        self.ai_summary_btn.setEnabled(False)
         self.help_btn = create_standard_ribbon_button(
             "Ayuda",
             role="secondary",
@@ -883,6 +894,7 @@ class CustomersPage(QWidget):
         self.del_btn.clicked.connect(self._delete_entity)
         self.print_btn.clicked.connect(self._open_customer_reports_dialog)
         self.queries_btn.clicked.connect(self._open_customer_queries_dialog)
+        self.ai_summary_btn.clicked.connect(self._open_customer_ai_summary)
         self.refresh_btn.clicked.connect(self.reload)
 
         ribbon_layout.addWidget(self.new_btn)
@@ -891,6 +903,7 @@ class CustomersPage(QWidget):
         ribbon_layout.addWidget(self.print_btn)
         ribbon_layout.addWidget(self.refresh_btn)
         ribbon_layout.addWidget(self.queries_btn)
+        ribbon_layout.addWidget(self.ai_summary_btn)
         ribbon_layout.addStretch(1)
         ribbon_layout.addWidget(self.help_btn)
         layout.addWidget(ribbon)
@@ -3263,6 +3276,8 @@ class CustomersPage(QWidget):
 
     def _show_selected_details(self) -> None:
         row = self._selected_row()
+        if hasattr(self, "ai_summary_btn"):
+            self.ai_summary_btn.setEnabled(row is not None)
         self._is_loading_details = True
         if not row:
             self._last_selected_customer_id = ""
@@ -3331,6 +3346,35 @@ class CustomersPage(QWidget):
         self._render_related_recipes(str(getattr(row, "cliente_id", "") or ""))
         self._render_customer_agenda(str(getattr(row, "cliente_id", "") or ""))
         self._is_loading_details = False
+
+    def _open_customer_ai_summary(self) -> None:
+        customer = self._selected_row()
+        if customer is None:
+            QMessageBox.information(self, "Resumen IA", "Selecciona un cliente para generar el resumen.")
+            return
+
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            result = self.customer_ai_summary_service.summarize(customer)
+        finally:
+            QApplication.restoreOverrideCursor()
+        if not result.ok:
+            QMessageBox.warning(self, "Resumen IA", result.message)
+            return
+
+        customer_name = str(
+            getattr(customer, "cliente_nombre_comercial", "")
+            or getattr(customer, "cliente_nombre_fiscal", "")
+            or "Cliente"
+        ).strip()
+        dialog = CustomerAISummaryDialog(
+            customer_name=customer_name,
+            summary=result.text,
+            status=result.message,
+            parent=self,
+        )
+        self._customer_ai_summary_dialog = dialog
+        dialog.exec()
 
     def _restore_customer_selection(self, customer_id: str) -> bool:
         clean_id = str(customer_id or "").strip()

@@ -5,9 +5,11 @@ from pathlib import Path
 import pytest
 from sqlmodel import SQLModel, Session, create_engine
 
+import app.services.sales_ai_assistant_service as sales_ai_assistant_service_module
 import app.services.sales_annual_comparison_service as sales_annual_service_module
 from app.models import Cliente, Fabricante, Familia, IngredienteIreks, Subfamilia, VentaMensualRaw
 from app.services.sales_ai_assistant_service import (
+    SALES_QUERY_INTENT_SCHEMA,
     SalesQueryAssistantService,
     SalesQueryIntent,
     SalesQueryIntentResult,
@@ -18,7 +20,8 @@ from app.services.sales_annual_comparison_service import SalesAnnualComparisonSe
 class _FakeLocalAI:
     enabled = True
 
-    def generate_json(self, _prompt: str):
+    def generate_json(self, _prompt: str, *, schema: dict | None = None):
+        self.schema = schema
         return type(
             "R",
             (),
@@ -31,6 +34,19 @@ class _FakeLocalAI:
 
     def generate_process(self, _prompt: str):
         return type("R", (), {"ok": True, "text": "Respuesta local", "message": "IA local"})()
+
+
+class _DisabledLocalAI:
+    enabled = False
+
+
+@pytest.fixture(autouse=True)
+def _disable_default_local_ai(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        sales_ai_assistant_service_module,
+        "LocalAIService",
+        lambda **_kwargs: _DisabledLocalAI(),
+    )
 
 
 @pytest.fixture()
@@ -310,6 +326,7 @@ def test_sales_assistant_prefers_enabled_local_ai_for_intent() -> None:
     assert result.intent.year == 2026
     assert result.intent.month == 7
     assert result.intent.producto_texto == "muffin"
+    assert local_ai.schema == SALES_QUERY_INTENT_SCHEMA
 
 
 def test_listar_detalle_ventas_filters_by_client_and_product_text(isolated_engine) -> None:
