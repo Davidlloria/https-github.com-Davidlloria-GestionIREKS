@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,7 @@ from app.core.config import DATA_DIR
 
 
 class ReportExportService:
+    PREFERENCES_PATH = DATA_DIR / "export_preferences.json"
     AGENDA_STATE_PALETTE = {
         'pending': ('#1D4ED8', '#DBEAFE', '#93C5FD'),
         'completed': ('#15803D', '#DCFCE7', '#86EFAC'),
@@ -48,11 +50,36 @@ class ReportExportService:
         return date_width, customer_width, state_width, card_horizontal_padding
 
     def default_path(self, title: str, suffix: str, folder: str = "listados_clientes") -> Path:
-        reports_dir = DATA_DIR / "exports" / folder
+        normalized_suffix = suffix.lstrip(".").lower()
+        reports_dir = self._remembered_directory(normalized_suffix) or (DATA_DIR / "exports" / folder)
         reports_dir.mkdir(parents=True, exist_ok=True)
         safe = "".join(ch if ch.isalnum() else "_" for ch in str(title or "listado").lower()).strip("_")
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return reports_dir / f"{safe[:40] or 'listado'}_{stamp}.{suffix.lstrip('.')}"
+        return reports_dir / f"{safe[:40] or 'listado'}_{stamp}.{normalized_suffix}"
+
+    def _remembered_directory(self, suffix: str) -> Path | None:
+        try:
+            data = json.loads(self.PREFERENCES_PATH.read_text(encoding="utf-8"))
+            value = str(data.get("last_directories", {}).get(suffix) or "").strip()
+            path = Path(value)
+            return path if value and path.is_dir() else None
+        except (OSError, ValueError, TypeError):
+            return None
+
+    def _remember_export_directory(self, path: Path) -> None:
+        suffix = path.suffix.lstrip(".").lower()
+        if suffix not in {"pdf", "xlsx"}:
+            return
+        try:
+            data = json.loads(self.PREFERENCES_PATH.read_text(encoding="utf-8")) if self.PREFERENCES_PATH.exists() else {}
+            if not isinstance(data, dict):
+                data = {}
+            directories = data.setdefault("last_directories", {})
+            directories[suffix] = str(path.parent.resolve())
+            self.PREFERENCES_PATH.parent.mkdir(parents=True, exist_ok=True)
+            self.PREFERENCES_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        except (OSError, ValueError, TypeError):
+            pass
 
     def export_excel(self, path: str | Path, title: str, headers: list[str], rows: list[list[Any]], sheet_title: str = "Listado clientes") -> Path:
         out = Path(path)
@@ -74,6 +101,7 @@ class ReportExportService:
             ws.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 45)
         ws.freeze_panes = "A3"
         wb.save(out)
+        self._remember_export_directory(out)
         return out
 
     def export_pdf(
@@ -160,6 +188,7 @@ class ReportExportService:
         table.setStyle(TableStyle(table_style))
         story.append(table)
         doc.build(story)
+        self._remember_export_directory(out)
         return out
 
     @staticmethod
@@ -265,6 +294,7 @@ class ReportExportService:
             )
             story.append(KeepTogether([card, Spacer(1, 7)]))
         doc.build(story)
+        self._remember_export_directory(out)
         return out
 
     def export_customer_ai_summary_pdf(
@@ -434,6 +464,7 @@ class ReportExportService:
             canvas.restoreState()
 
         doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
+        self._remember_export_directory(out)
         return out
 
     def export_customer_sales_comparison_pdf(
@@ -562,4 +593,5 @@ class ReportExportService:
             table,
         ]
         doc.build(story, onFirstPage=add_page_number, onLaterPages=add_page_number)
+        self._remember_export_directory(out)
         return out
