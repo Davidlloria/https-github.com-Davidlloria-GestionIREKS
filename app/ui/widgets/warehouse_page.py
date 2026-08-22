@@ -2677,10 +2677,10 @@ class WarehousePage(QWidget):
             classification_layout.setSpacing(2)
             classification_header = classification_layout.itemAt(0).widget()
             if classification_header is not None:
-                classification_header.setFixedHeight(54)
+                classification_header.setFixedHeight(53)
             taxonomy_grid = classification_layout.itemAt(1).layout()
             if taxonomy_grid is not None:
-                taxonomy_grid.setVerticalSpacing(1)
+                taxonomy_grid.setVerticalSpacing(2)
                 taxonomy_grid.setRowMinimumHeight(0, 14)
                 taxonomy_grid.setRowMinimumHeight(1, 34)
                 for label, field in (
