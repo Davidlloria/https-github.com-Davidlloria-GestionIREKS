@@ -2673,11 +2673,11 @@ class WarehousePage(QWidget):
         classification_card = self.articles_tab.findChild(QFrame, "ireksClassificationCard")
         if classification_card is not None and classification_card.layout() is not None:
             classification_layout = classification_card.layout()
-            classification_layout.setContentsMargins(0, 0, 0, 3)
+            classification_layout.setContentsMargins(0, 0, 0, 6)
             classification_layout.setSpacing(2)
             classification_header = classification_layout.itemAt(0).widget()
             if classification_header is not None:
-                classification_header.setFixedHeight(53)
+                classification_header.setFixedHeight(50)
             taxonomy_grid = classification_layout.itemAt(1).layout()
             if taxonomy_grid is not None:
                 taxonomy_grid.setVerticalSpacing(2)
