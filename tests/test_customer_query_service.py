@@ -240,6 +240,25 @@ def test_invalid_local_ai_intent_falls_back_to_the_deterministic_interpreter() -
     assert intent.ai_interpreted is False
 
 
+def test_local_ai_cannot_reroute_the_sales_zero_query_from_the_screenshot() -> None:
+    local_ai = _FakeLocalAI(
+        {
+            "query_type": "customer_filter",
+            "year": 2026,
+            "columns": ["codigo", "nombre"],
+        }
+    )
+    service = CustomerQueryService(local_ai_service=local_ai)
+
+    intent = service.interpret("lista de clientes con ventas = 0 en 2026, campos cod y nombre comercial")
+
+    assert intent.query_type == "sales_customer_list"
+    assert intent.year == 2026
+    assert intent.zero_consumption is True
+    assert intent.columns == ["codigo", "nombre"]
+    assert intent.ai_interpreted is True
+
+
 def test_sales_customer_list_returns_codes_as_text_and_orders_by_island_and_kg(tmp_path) -> None:
     db_engine = _sales_engine(tmp_path)
     with Session(db_engine) as session:

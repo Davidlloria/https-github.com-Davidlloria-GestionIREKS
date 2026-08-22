@@ -322,6 +322,8 @@ class CustomerQueryService:
         query_type = str(parsed.get("query_type") or fallback.query_type).strip()
         if query_type not in self._QUERY_TYPES:
             raise ValueError("Tipo de consulta no permitido.")
+        if fallback.query_type.startswith("sales_"):
+            query_type = fallback.query_type
         year = self._safe_year(parsed.get("year"), fallback.year)
         compare_year = self._safe_year(parsed.get("compare_year"), fallback.compare_year, allow_zero=True)
         customer_type = str(parsed.get("customer_type") or fallback.customer_type).strip().lower()
