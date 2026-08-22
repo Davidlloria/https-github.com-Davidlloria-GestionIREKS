@@ -59,6 +59,9 @@ class CustomerAISnapshot:
     euros_current: float
     delta_kg: float | None
     delta_kg_pct: float | None
+    historical_prior_year: int = 0
+    historical_prior_kg: float = 0.0
+    historical_delta_pct: float | None = None
     top_products: tuple[str, ...] = ()
     stopped_products: tuple[str, ...] = ()
     declining_products: tuple[str, ...] = ()
@@ -138,6 +141,7 @@ class CustomerAISummaryService:
                 snapshot,
                 fallback_sections,
             )
+        sections = self._enforce_comparison_rules(snapshot, sections, fallback_sections)
         return CustomerAISummaryResult(
             True,
             self._sections_text(sections),
@@ -168,6 +172,9 @@ class CustomerAISummaryService:
             or []
         )
         reference_rows = rows
+        historical_prior_year = 0
+        historical_prior_kg = 0.0
+        historical_delta_pct = None
         if previous_is_annual_total:
             reference_rows = list(
                 self.customer_service.related_sales(
@@ -178,6 +185,21 @@ class CustomerAISummaryService:
                 )
                 or []
             )
+            prior_year = year - 2
+            if self.customer_service.related_sales_months(customer_id, prior_year) == (12,):
+                prior_reference_rows = list(
+                    self.customer_service.related_sales(
+                        customer_id,
+                        year - 1,
+                        month_from=1,
+                        month_to=12,
+                    )
+                    or []
+                )
+                historical_prior_year = prior_year
+                historical_prior_kg = sum(
+                    float(getattr(row, "kg_prev", 0.0) or 0.0) for row in prior_reference_rows
+                )
         contacts = list(self.customer_service.related_contacts(customer_id) or [])
         recipes = list(self.customer_service.related_recipes(customer_id) or [])
         agenda = list(self.customer_service.related_agenda(customer_id) or [])
@@ -186,6 +208,8 @@ class CustomerAISummaryService:
         kg_previous = sum(float(getattr(row, "kg_prev", 0.0) or 0.0) for row in reference_rows)
         euros_current = sum(float(getattr(row, "euros_curr", 0.0) or 0.0) for row in rows)
         comparison_available = not previous_is_annual_total
+        if previous_is_annual_total and abs(historical_prior_kg) > 1e-9:
+            historical_delta_pct = (kg_previous - historical_prior_kg) / historical_prior_kg * 100.0
         delta_kg = kg_current - kg_previous if comparison_available else None
         delta_kg_pct = (
             delta_kg / kg_previous * 100.0
@@ -228,6 +252,9 @@ class CustomerAISummaryService:
             delta_kg_pct=delta_kg_pct,
             stopped_rows=stopped_rows,
             comparison_available=comparison_available,
+            annual_years=tuple(
+                value for value in (year - 1, historical_prior_year) if value
+            ),
             contact_count=len(contacts),
             latest_activity=latest_date,
         )
@@ -246,10 +273,16 @@ class CustomerAISummaryService:
             previous_year=year - 1,
             month_from=1,
             month_to=month_to,
-            period_label=self._period_label(year, month_to, comparison_available=comparison_available),
+            period_label=self._period_label(
+                year,
+                month_to,
+                comparison_available=comparison_available,
+                historical_prior_year=historical_prior_year,
+            ),
             comparison_available=comparison_available,
             comparison_note=(
-                f"{year - 1} solo dispone de un acumulado anual; no se calcula una variación comparable."
+                f"{year} es parcial y no se compara con los acumulados anuales de {year - 1}"
+                f"{' y ' + str(historical_prior_year) if historical_prior_year else ''}."
                 if previous_is_annual_total
                 else ""
             ),
@@ -258,6 +291,9 @@ class CustomerAISummaryService:
             euros_current=euros_current,
             delta_kg=delta_kg,
             delta_kg_pct=delta_kg_pct,
+            historical_prior_year=historical_prior_year,
+            historical_prior_kg=historical_prior_kg,
+            historical_delta_pct=historical_delta_pct,
             top_products=tuple(self._product_line(row, "kg_curr") for row in top_rows),
             stopped_products=tuple(self._product_line(row, "kg_prev") for row in stopped_rows),
             declining_products=tuple(self._declining_product_line(row) for row in declining_rows),
@@ -276,10 +312,16 @@ class CustomerAISummaryService:
         delta_kg_pct: float | None,
         stopped_rows: list[Any],
         comparison_available: bool,
+        annual_years: tuple[int, ...],
         contact_count: int,
         latest_activity: date | None,
     ) -> list[str]:
         items: list[str] = []
+        if not comparison_available:
+            years_text = " y ".join(str(value) for value in annual_years)
+            items.append(
+                f"Los datos mensuales de {years_text} no están disponibles; sus cifras se tratan como acumulados anuales."
+            )
         if comparison_available and kg_previous > 1e-9 and kg_current <= 1e-9:
             items.append("Revisar la pérdida total de consumo respecto al periodo anterior.")
         elif comparison_available and delta_kg_pct is not None and delta_kg_pct <= -20.0:
@@ -315,8 +357,7 @@ class CustomerAISummaryService:
 
     def _deterministic_summary(self, data: CustomerAISnapshot) -> str:
         variation = self._variation_text(data)
-        return "\n".join(
-            [
+        lines = [
                 f"RESUMEN COMERCIAL · {data.customer_name}",
                 "",
                 "Perfil",
@@ -325,25 +366,49 @@ class CustomerAISummaryService:
                 f"Última actividad: {data.latest_activity or 'Sin actividad registrada'}",
                 "",
                 f"Ventas {data.period_label}",
-                f"Kg actuales: {self._number(data.kg_current)} · Kg anteriores: {self._number(data.kg_previous)} · Variación: {variation}",
-                f"Facturación actual: {self._number(data.euros_current)} €",
+                self._sales_text(data),
+                f"Variación del periodo actual: {variation}",
                 data.comparison_note,
                 "",
                 "Productos principales",
                 self._bullets(data.top_products, "Sin ventas de productos en el periodo actual."),
-                "",
-                "Productos sin consumo actual",
-                self._bullets(data.stopped_products, "No se detectan productos abandonados."),
-                "",
-                "Productos en descenso",
-                self._bullets(data.declining_products, "No se detectan productos en descenso."),
+        ]
+        if data.comparison_available:
+            lines.extend(
+                [
+                    "",
+                    "Productos sin consumo actual",
+                    self._bullets(data.stopped_products, "No se detectan productos abandonados."),
+                    "",
+                    "Productos en descenso",
+                    self._bullets(data.declining_products, "No se detectan productos en descenso."),
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    "",
+                    "Comparación histórica de productos",
+                    "No evaluable: 2024 y 2025 solo contienen acumulados anuales.",
+                ]
+            )
+        lines.extend(
+            [
                 "",
                 "Oportunidades y seguimiento",
                 self._bullets(data.opportunities, "Sin recomendaciones automáticas."),
             ]
         )
+        return "\n".join(lines)
 
     def _build_prompt(self, data: CustomerAISnapshot) -> str:
+        historical_instruction = ""
+        if not data.comparison_available:
+            historical_instruction = (
+                f"Los datos de {data.historical_prior_year or data.previous_year - 1} y {data.previous_year} son "
+                f"totales anuales a diciembre: nunca los describas como el mismo periodo de {data.year}. No deduzcas "
+                "abandonos, descensos ni aumentos de producto usando esos históricos. "
+            )
         return (
             "Devuelve un JSON en español con un resumen comercial breve usando exclusivamente los datos siguientes. "
             "No inventes causas, fechas, productos ni importes. Distingue los hechos de las acciones sugeridas. "
@@ -351,12 +416,12 @@ class CustomerAISummaryService:
             "Cada texto debe tener una sola frase corta. Usa situation para el perfil, sales para las ventas, products "
             "para un máximo de tres observaciones, opportunities para un máximo de tres acciones y conclusion para una "
             "frase final. Si se indica que los periodos no son comparables, no calcules ni sugieras una variación. "
+            f"{historical_instruction}"
             "Sin Markdown ni texto fuera del JSON.\n\n"
             f"{self._deterministic_summary(data)}"
         )
 
     def _fallback_sections(self, data: CustomerAISnapshot) -> CustomerAISummarySections:
-        variation = self._variation_text(data)
         product_notes = [
             f"Productos principales: {', '.join(data.top_products)}"
             if data.top_products
@@ -382,15 +447,77 @@ class CustomerAISummaryService:
                 f"{data.recipe_count}; actividades de agenda: {data.agenda_count}. Última actividad: "
                 f"{data.latest_activity or 'sin actividad registrada'}."
             ),
-            sales=(
-                f"{data.period_label}: {self._number(data.kg_current)} kg actuales; "
-                f"referencia anterior {self._number(data.kg_previous)} kg; variación {variation}. "
-                f"Facturación actual: {self._number(data.euros_current)} €. {data.comparison_note}"
-            ),
+            sales=self._sales_text(data),
             products=tuple(product_notes),
             opportunities=data.opportunities,
-            conclusion="Resumen calculado exclusivamente con datos de GestionIREKS.",
+            conclusion=self._conclusion_text(data),
         )
+
+    def _enforce_comparison_rules(
+        self,
+        data: CustomerAISnapshot,
+        sections: CustomerAISummarySections,
+        fallback: CustomerAISummarySections,
+    ) -> CustomerAISummarySections:
+        if data.comparison_available:
+            return sections
+        unsafe_terms = (
+            "2024",
+            "2025",
+            "anterior",
+            "compar",
+            "descens",
+            "abandon",
+            "perdid",
+            "caída",
+            "inferior",
+            "superior",
+        )
+        safe_products = tuple(
+            item for item in sections.products
+            if not any(term in item.casefold() for term in unsafe_terms)
+        )[:3]
+        return CustomerAISummarySections(
+            situation=sections.situation,
+            sales=self._sales_text(data),
+            products=safe_products or fallback.products[:3],
+            opportunities=data.opportunities[:3],
+            conclusion=self._conclusion_text(data),
+        )
+
+    def _sales_text(self, data: CustomerAISnapshot) -> str:
+        current_period = self._current_period_label(data.year, data.month_to)
+        if data.comparison_available:
+            return (
+                f"{data.period_label}: {self._number(data.kg_current)} kg frente a "
+                f"{self._number(data.kg_previous)} kg; variación {self._variation_text(data)}. "
+                f"Facturación actual: {self._number(data.euros_current)} €."
+            )
+        history = f"{data.previous_year}: {self._number(data.kg_previous)} kg acumulados a diciembre"
+        if data.historical_prior_year:
+            history += f"; {data.historical_prior_year}: {self._number(data.historical_prior_kg)} kg acumulados a diciembre"
+        if data.historical_delta_pct is not None:
+            annual_variation = f"{data.historical_delta_pct:+.1f}".replace(".", ",")
+            history += (
+                f"; variación anual {data.previous_year} frente a {data.historical_prior_year}: "
+                f"{annual_variation}%"
+            )
+        return (
+            f"{current_period}: {self._number(data.kg_current)} kg y {self._number(data.euros_current)} € de facturación. "
+            f"Es un acumulado parcial y no se compara con años completos. Históricos anuales: {history}."
+        )
+
+    def _conclusion_text(self, data: CustomerAISnapshot) -> str:
+        if data.comparison_available:
+            return "Resumen calculado exclusivamente con datos de GestionIREKS."
+        if data.historical_delta_pct is not None:
+            direction = "disminuyó" if data.historical_delta_pct < 0 else "aumentó"
+            annual_variation = f"{abs(data.historical_delta_pct):.1f}".replace(".", ",")
+            return (
+                f"El consumo anual de {data.previous_year} {direction} un {annual_variation}% frente a "
+                f"{data.historical_prior_year}; el acumulado parcial de {data.year} debe analizarse por separado."
+            )
+        return f"El acumulado parcial de {data.year} debe analizarse por separado de los históricos anuales."
 
     @staticmethod
     def _parse_sections(text: str) -> CustomerAISummarySections:
@@ -431,7 +558,13 @@ class CustomerAISummaryService:
         )
 
     @staticmethod
-    def _period_label(year: int, month_to: int, *, comparison_available: bool = True) -> str:
+    def _period_label(
+        year: int,
+        month_to: int,
+        *,
+        comparison_available: bool = True,
+        historical_prior_year: int = 0,
+    ) -> str:
         month_names = (
             "enero",
             "febrero",
@@ -448,8 +581,16 @@ class CustomerAISummaryService:
         )
         end_month = month_names[max(1, min(int(month_to or 12), 12)) - 1]
         if not comparison_available:
-            return f"enero–{end_month} {year} · referencia anual {year - 1} no comparable"
+            history = f"históricos anuales {year - 1}"
+            if historical_prior_year:
+                history += f" y {historical_prior_year}"
+            return f"enero–{end_month} {year} · {history}"
         return f"enero–{end_month} {year} frente a enero–{end_month} {year - 1}"
+
+    @staticmethod
+    def _current_period_label(year: int, month_to: int) -> str:
+        label = CustomerAISummaryService._period_label(year, month_to)
+        return label.split(" frente a ", 1)[0]
 
     @staticmethod
     def _variation_text(data: CustomerAISnapshot) -> str:

@@ -75,22 +75,41 @@ class _InvalidLocalAI:
 
 class _AnnualPreviousCustomerService(_FakeCustomerService):
     def related_sales_months(self, _customer_id: str, year: int):
-        assert year == 2025
+        assert year in {2024, 2025}
         return (12,)
 
     def related_sales(self, _customer_id: str, year: int, *, month_from: int, month_to: int):
-        assert year == 2026
-        self.periods.append((month_from, month_to))
-        previous = 30307.0 if month_to == 12 else 0.0
+        assert year in {2025, 2026}
+        self.periods.append((year, month_from, month_to))
+        previous = 41029.0 if year == 2025 else 30307.0 if month_to == 12 else 0.0
+        current = 30307.0 if year == 2025 else 18456.0
         return [
             SimpleNamespace(
                 codigo="A",
                 nombre="Producto principal",
                 kg_prev=previous,
-                kg_curr=18456.0,
-                euros_curr=85585.45,
+                kg_curr=current,
+                euros_curr=85585.45 if year == 2026 else 138605.35,
             )
         ]
+
+
+class _MisleadingAnnualLocalAI(_EnabledLocalAI):
+    def generate_json(self, prompt: str, *, schema: dict, max_tokens: int):
+        self.prompt = prompt
+        self.schema = schema
+        self.max_tokens = max_tokens
+        return SimpleNamespace(
+            ok=True,
+            text=(
+                '{"situation":"Cliente activo.",'
+                '"sales":"2026 cae frente al mismo periodo de 2025.",'
+                '"products":["Producto principal mantiene el liderazgo.","Producto perdido frente a 2025."],'
+                '"opportunities":["Comparar con 2025.","Revisar productos abandonados."],'
+                '"conclusion":"El consumo es inferior al periodo anterior."}'
+            ),
+            message="IA local",
+        )
 
 
 def _customer():
@@ -150,6 +169,7 @@ def test_customer_summary_asks_ai_only_to_explain_calculated_context() -> None:
     assert "Producto perdido" in local_ai.prompt
     assert "80,00" in local_ai.prompt
     assert "enero–julio 2026" in local_ai.prompt
+    assert "totales anuales a diciembre" not in local_ai.prompt
     assert local_ai.schema == CUSTOMER_AI_SUMMARY_SCHEMA
     assert local_ai.max_tokens == 700
 
@@ -163,18 +183,44 @@ def test_customer_summary_keeps_annual_reference_without_false_variation() -> No
 
     assert result.ok is True
     assert result.snapshot is not None
-    assert customer_service.periods == [(1, 7), (1, 12)]
+    assert customer_service.periods == [(2026, 1, 7), (2026, 1, 12), (2025, 1, 12)]
     assert result.snapshot.kg_current == pytest.approx(18456.0)
     assert result.snapshot.kg_previous == pytest.approx(30307.0)
     assert result.snapshot.comparison_available is False
     assert result.snapshot.delta_kg is None
     assert result.snapshot.delta_kg_pct is None
+    assert result.snapshot.historical_prior_year == 2024
+    assert result.snapshot.historical_prior_kg == pytest.approx(41029.0)
+    assert result.snapshot.historical_delta_pct == pytest.approx(-26.132735)
     assert result.snapshot.stopped_products == ()
     assert result.snapshot.declining_products == ()
-    assert "referencia anual 2025 no comparable" in result.snapshot.period_label
+    assert "históricos anuales 2025 y 2024" in result.snapshot.period_label
     assert "30.307,00" in result.text
-    assert "no se calcula una variación comparable" in result.text
+    assert "41.029,00" in result.text
+    assert "variación anual 2025 frente a 2024: -26,1%" in result.text
+    assert "acumulado parcial y no se compara" in result.text
     assert "No se evalúan abandonos" in result.text
+    assert "No se detectan productos abandonados" not in result.text
+
+
+def test_customer_summary_overrides_misleading_ai_historical_comparisons() -> None:
+    local_ai = _MisleadingAnnualLocalAI()
+    result = CustomerAISummaryService(
+        customer_service=_AnnualPreviousCustomerService(),
+        local_ai_service=local_ai,
+    ).summarize(_customer())
+
+    assert result.ok is True
+    assert result.used_ai is True
+    assert result.sections is not None
+    assert "totales anuales a diciembre" in local_ai.prompt
+    assert "mismo periodo" not in result.sections.sales
+    assert "2025: 30.307,00 kg acumulados a diciembre" in result.sections.sales
+    assert "2024: 41.029,00 kg acumulados a diciembre" in result.sections.sales
+    assert result.sections.products == ("Producto principal mantiene el liderazgo.",)
+    assert all("comparar" not in item.casefold() for item in result.sections.opportunities)
+    assert "disminuyó un 26,1%" in result.sections.conclusion
+    assert "acumulado parcial de 2026" in result.sections.conclusion
 
 
 def test_customer_summary_falls_back_when_ai_json_is_invalid() -> None:

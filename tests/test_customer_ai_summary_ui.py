@@ -157,7 +157,7 @@ def test_customer_ai_summary_dialog_marks_annual_reference_as_not_comparable() -
     result = _result()
     snapshot = replace(
         result.snapshot,
-        period_label="enero–agosto 2026 · referencia anual 2025 no comparable",
+        period_label="enero–agosto 2026 · históricos anuales 2025 y 2024",
         comparison_available=False,
         comparison_note="2025 solo dispone de un acumulado anual.",
         kg_previous=30307.0,
@@ -168,7 +168,7 @@ def test_customer_ai_summary_dialog_marks_annual_reference_as_not_comparable() -
     dialog.set_result(replace(result, snapshot=snapshot))
 
     assert dialog.variation_value.text() == "No comparable"
-    assert "referencia anual 2025 no comparable" in dialog.period_label.text()
+    assert "históricos anuales 2025 y 2024" in dialog.period_label.text()
     dialog.close()
     dialog.deleteLater()
     QApplication.processEvents()

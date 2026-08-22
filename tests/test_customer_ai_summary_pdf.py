@@ -9,7 +9,7 @@ from app.services.report_export_service import ReportExportService
 
 def _summary_result():
     snapshot = SimpleNamespace(
-        period_label="enero-agosto 2026 - referencia anual 2025 no comparable",
+        period_label="enero-agosto 2026 - históricos anuales 2025 y 2024",
         comparison_available=False,
         delta_kg_pct=None,
         kg_current=18456.0,
@@ -18,7 +18,7 @@ def _summary_result():
     )
     sections = SimpleNamespace(
         situation="Cliente activo con cuatro contactos registrados.",
-        sales="El periodo actual suma 18.456,00 kg; 2025 solo dispone de un acumulado anual.",
+        sales="El periodo actual suma 18.456,00 kg; 2025 y 2024 son acumulados anuales.",
         products=("REX RUSTICO: 10.425,00 kg.", "MUFFIN PLUS: 6.000,00 kg."),
         opportunities=("Mantener el seguimiento comercial.",),
         conclusion="La referencia anual no permite calcular una variacion comparable.",
@@ -50,6 +50,7 @@ def test_export_customer_ai_summary_pdf_contains_metrics_and_sections(tmp_path) 
     assert "REX RUSTICO" in text
     assert "Conclusión" in text
     assert "Página 1" in text
+    assert "Resumen redactado con IA local a partir de datos calculados por GestionIREKS." not in text
 
 
 def test_export_customer_ai_summary_pdf_adds_pdf_suffix(tmp_path) -> None:

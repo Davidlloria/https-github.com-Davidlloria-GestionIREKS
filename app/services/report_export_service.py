@@ -395,8 +395,7 @@ class ReportExportService:
             Paragraph(xml_escape(f"Resumen comercial - {clean(customer_name)}"), title_style),
             Paragraph(xml_escape(clean(getattr(snapshot, "period_label", ""))), subtitle_style),
             metric_table,
-            Spacer(1, 9),
-            paragraph(getattr(result, "message", ""), subtitle_style),
+            Spacer(1, 4),
         ]
 
         def add_section(title: str, value: Any) -> None:
