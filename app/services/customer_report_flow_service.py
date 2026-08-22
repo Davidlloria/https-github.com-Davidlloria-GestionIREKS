@@ -59,7 +59,7 @@ class CustomerReportFlowService:
                 status="empty",
                 message="No se encontraron resultados.",
                 report=report,
-                source="ChatGPT" if intent_result.used_ai else "interprete local",
+                source=self._source_label(intent_result),
                 used_ai=bool(intent_result.used_ai),
             )
             self.last_result = result
@@ -68,7 +68,7 @@ class CustomerReportFlowService:
             status="ready",
             message=intent_result.message,
             report=report,
-            source="ChatGPT" if intent_result.used_ai else "interprete local",
+            source=self._source_label(intent_result),
             used_ai=bool(intent_result.used_ai),
         )
         self.last_result = result
@@ -76,3 +76,11 @@ class CustomerReportFlowService:
 
     def has_last_report(self) -> bool:
         return self.last_report is not None
+
+    @staticmethod
+    def _source_label(intent_result: ReportIntentResult) -> str:
+        if intent_result.provider == "local_ai":
+            return "IA local"
+        if intent_result.provider == "openai":
+            return "ChatGPT"
+        return "interprete local"

@@ -28,6 +28,36 @@ class _FakeReportService:
         return self.result
 
 
+class _DisabledLocalAI:
+    enabled = False
+
+
+class _FakeLocalAI:
+    enabled = True
+
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def generate_json(self, prompt: str):
+        self.prompts.append(prompt)
+        return type(
+            "Result",
+            (),
+            {
+                "ok": True,
+                "text": json.dumps(
+                    {
+                        "title": "Clientes activos",
+                        "columns": ["codigo", "nombre_comercial"],
+                        "filters": [{"field": "activo", "op": "=", "value": True}],
+                        "order_by": ["codigo"],
+                        "limit": 50,
+                    }
+                ),
+            },
+        )()
+
+
 def _report() -> CustomerReportResult:
     return CustomerReportResult(
         title="Listado de clientes",
@@ -160,7 +190,7 @@ def test_intent_service_ignores_inherited_proxy_settings(monkeypatch: pytest.Mon
     monkeypatch.setattr(customer_report_service_module, "build_opener", _fake_build_opener)
     monkeypatch.setattr(customer_report_service_module.OpenAISettingsService, "load", lambda self: {"api_key": "test-key", "use_ai_translation": False})
 
-    service = customer_report_service_module.CustomerReportIntentService()
+    service = customer_report_service_module.CustomerReportIntentService(local_ai_service=_DisabledLocalAI())
     result = service.parse("clientes activos")
 
     assert result.used_ai is True
@@ -206,7 +236,7 @@ def test_intent_service_keeps_full_limit_when_ai_returns_500_for_all_customers(m
         lambda self: {"api_key": "test-key", "use_ai_translation": True},
     )
 
-    service = customer_report_service_module.CustomerReportIntentService()
+    service = customer_report_service_module.CustomerReportIntentService(local_ai_service=_DisabledLocalAI())
     result = service.parse(
         "listado de todos los clientes, campos uuid, cod, codigo cliente distribuidor, nombre"
     )
@@ -214,3 +244,31 @@ def test_intent_service_keeps_full_limit_when_ai_returns_500_for_all_customers(m
     assert result.used_ai is True
     assert result.intent.limit == 5000
     assert result.intent.filters == []
+
+
+def test_intent_service_prefers_enabled_local_ai_and_keeps_reports_read_only() -> None:
+    local_ai = _FakeLocalAI()
+    service = customer_report_service_module.CustomerReportIntentService(
+        api_key="cloud-key",
+        local_ai_service=local_ai,
+    )
+
+    result = service.parse("listado de clientes activos")
+
+    assert result.ok is True
+    assert result.used_ai is True
+    assert result.provider == "local_ai"
+    assert result.intent.filters[0] == customer_report_service_module.ReportFilter("activo", "=", True)
+    assert local_ai.prompts
+    assert "No generes SQL" in local_ai.prompts[0]
+
+
+def test_report_flow_labels_local_ai_as_the_active_provider() -> None:
+    intent = CustomerReportIntent(columns=["codigo", "nombre_comercial"])
+    intent_result = ReportIntentResult(True, intent, "Generado con IA local.", True, "local_ai")
+    flow = CustomerReportFlowService(_FakeIntentService(intent_result), _FakeReportService(_report()))
+
+    result = flow.generate_report("clientes activos")
+
+    assert result.status == "ready"
+    assert result.source == "IA local"

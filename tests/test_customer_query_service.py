@@ -13,6 +13,10 @@ from app.services.customer_report_service import CustomerReportIntentService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
 
 
+class _DisabledLocalAI:
+    enabled = False
+
+
 def _sales_engine(tmp_path):
     db_engine = create_engine(
         f"sqlite:///{tmp_path / 'customer-queries.db'}",
@@ -77,7 +81,7 @@ def test_customer_query_interprets_current_year_and_kg_as_primary_metric() -> No
 
 
 def test_local_customer_parser_recognizes_activity_and_island() -> None:
-    result = CustomerReportIntentService(api_key="").parse("Dame las panaderías de Lanzarote")
+    result = CustomerReportIntentService(api_key="", local_ai_service=_DisabledLocalAI()).parse("Dame las panaderías de Lanzarote")
 
     filters = {(item.field, item.op, str(item.value).lower()) for item in result.intent.filters}
     assert ("actividad", "contiene", "panaderia") in filters
@@ -107,7 +111,7 @@ def test_customer_query_returns_only_repeated_commercial_names(tmp_path, monkeyp
 
 
 def test_local_customer_parser_does_not_filter_type_when_requesting_distributor_code() -> None:
-    result = CustomerReportIntentService(api_key="").parse(
+    result = CustomerReportIntentService(api_key="", local_ai_service=_DisabledLocalAI()).parse(
         "listado de todos los clientes, campos uuid, cod, codigo cliente distribuidor, nombre"
     )
 

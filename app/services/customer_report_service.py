@@ -9,6 +9,7 @@ from urllib.request import ProxyHandler, Request, build_opener
 
 from app.core.database import engine
 from app.services.customer_report_schema import CUSTOMER_REPORT_RESPONSE_FORMAT
+from app.services.local_ai_service import LocalAIService
 from app.services.openai_settings_service import OpenAISettingsService
 
 
@@ -86,6 +87,7 @@ class ReportIntentResult:
     intent: CustomerReportIntent
     message: str
     used_ai: bool = False
+    provider: str = "deterministic"
 
 
 @dataclass
@@ -99,11 +101,18 @@ class CustomerReportResult:
 class CustomerReportIntentService:
     BASE_URL = "https://api.openai.com/v1/responses"
 
-    def __init__(self, api_key: str | None = None, model: str = "gpt-4.1-mini", timeout: float = 20.0) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = "gpt-4.1-mini",
+        timeout: float = 20.0,
+        local_ai_service: LocalAIService | None = None,
+    ) -> None:
         cfg = OpenAISettingsService().load()
         self.api_key = str(api_key or cfg.get("api_key") or "").strip()
         self.model = str(model or "gpt-4.1-mini").strip()
         self.timeout = timeout
+        self.local_ai_service = local_ai_service or LocalAIService(timeout=max(float(timeout), 60.0))
         if api_key is not None:
             self.api_key = str(api_key).strip()
 
@@ -112,25 +121,24 @@ class CustomerReportIntentService:
         if not text:
             return ReportIntentResult(False, CustomerReportIntent(), "Escribe que listado necesitas.")
         fallback = self._fallback_parse(text)
+        if self.local_ai_service.enabled:
+            local_result = self.local_ai_service.generate_json(self._ai_instruction(text))
+            if local_result.ok:
+                try:
+                    parsed = self._parse_json(local_result.text)
+                    intent = self._intent_from_mapping(parsed, fallback)
+                    return ReportIntentResult(True, intent, "Generado con IA local.", True, "local_ai")
+                except Exception:
+                    pass
         if not self.api_key:
-            return ReportIntentResult(True, fallback, "Generado con interpretacion local. Falta API key de OpenAI.", False)
+            return ReportIntentResult(True, fallback, "Generado con interpretacion local. IA local no disponible.", False)
 
         payload: dict[str, Any] = {
             "model": self.model,
             "input": [
                 {
                     "role": "system",
-                    "content": (
-                        "Convierte peticiones en espanol sobre listados de clientes a JSON estricto. "
-                        "No generes SQL. Usa solo estos campos: "
-                        f"{', '.join(REPORT_COLUMNS)}. "
-                        "Operadores permitidos: =, !=, contiene, empieza, >, >=, <, <=. "
-                        "Si piden todos los clientes o listado completo usa limit 5000. "
-                        "Devuelve solo este JSON: "
-                        'Si piden nombre del contacto usa el campo "nombre_contacto"; si piden numero de contactos usa "contactos". '
-                        '{"title": "...", "columns": ["codigo"], "filters": [{"field": "activo", "op": "=", "value": true}], '
-                        '"order_by": ["codigo"], "limit": 500}.'
-                    ),
+                    "content": self._ai_instruction(),
                 },
                 {"role": "user", "content": text},
             ],
@@ -152,9 +160,23 @@ class CustomerReportIntentService:
             data = json.loads(body or "{}")
             parsed = self._parse_json(self._extract_text(data))
             intent = self._intent_from_mapping(parsed, fallback)
-            return ReportIntentResult(True, intent, "Generado con ChatGPT.", True)
+            return ReportIntentResult(True, intent, "Generado con ChatGPT.", True, "openai")
         except Exception as exc:  # noqa: BLE001
             return ReportIntentResult(True, fallback, "Generado con interprete local. ChatGPT no disponible.", False)
+
+    def _ai_instruction(self, prompt: str = "") -> str:
+        instruction = (
+            "Convierte peticiones en espanol sobre listados de clientes a JSON estricto. "
+            "No generes SQL. Usa solo estos campos: "
+            f"{', '.join(REPORT_COLUMNS)}. "
+            "Operadores permitidos: =, !=, contiene, empieza, >, >=, <, <=. "
+            "Si piden todos los clientes o listado completo usa limit 5000. "
+            "Devuelve solo este JSON: "
+            'Si piden nombre del contacto usa el campo "nombre_contacto"; si piden numero de contactos usa "contactos". '
+            '{"title": "...", "columns": ["codigo"], "filters": [{"field": "activo", "op": "=", "value": true}], '
+            '"order_by": ["codigo"], "limit": 500}.'
+        )
+        return f"{instruction}\n\nPeticion del usuario: {prompt}" if prompt else instruction
 
     def _fallback_parse(self, text: str) -> CustomerReportIntent:
         t = self._normalize(text)
