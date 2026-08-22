@@ -55,11 +55,11 @@ WarehousePage (QWidget, objectName `warehousePage`, fondo gris #EEF3F8, sin bord
             └── EntityPage (mantenimiento de envase)
 ```
 
-## Filtro global de almacén
+### Filtro global de almacén
 
 `almacen_combo` contiene `Todos` y las entidades que pueden operar como almacén: distribuidores y clientes directos. Al cambiarlo se propaga su identificador a Artículos, Entradas, Salidas, Stock, Pedidos mensual, Inventarios y Caducidad. La carga inicial selecciona `Todos` y aplica el contexto general sin disparar recargas duplicadas. No hay botón de actualización en la barra superior.
 
-## Pestaña Artículos
+### Resumen de Artículos
 
 La pestaña reutiliza el catálogo de `IngredientsIreksPage` en modo compacto. Oculta su título y ribbon propios y usa `IngredientWarehouseViewModel`.
 
@@ -74,7 +74,7 @@ Artículos
 
 La selección de un artículo se reutiliza desde Entradas y Salidas: doble clic sobre una línea de movimiento abre el artículo correspondiente en esta pestaña.
 
-## Pestañas Entradas y Salidas
+### Resumen de Entradas y Salidas
 
 Ambas instancias usan `MovimientosTab`; la diferencia funcional la determina `mode`.
 
@@ -101,7 +101,7 @@ MovimientosTab
 - `Salidas` muestra movimientos de salida y sus acumulados correspondientes.
 - Las tablas son de solo lectura, permiten selección de una fila y sus cabeceras son clicables para ordenar.
 
-## Pestaña Stock
+### Resumen de Stock
 
 ```text
 StockTab
@@ -126,7 +126,7 @@ StockTab
 
 El umbral de bajo stock se conserva mediante `WarehouseSettingsService`. Las columnas de cantidades se alinean a la derecha y el estado comunica riesgo de caducidad o disponibilidad.
 
-## Pestaña Pedidos mensual
+### Resumen de Pedidos mensual
 
 ```text
 AnnualMonthlyOrdersTab
@@ -142,7 +142,7 @@ AnnualMonthlyOrdersTab
 
 La tabla usa 18 columnas. Las cantidades mensuales, total, kg y pedidos se ordenan por valor numérico real; `Kg` muestra el sufijo `kg`. El doble clic abre el detalle de pedidos del artículo seleccionado.
 
-## Pestaña Inventarios
+### Resumen de Inventarios
 
 `InventariosTab` agrupa Conteo e Historial en `inner_tabs`.
 
@@ -162,7 +162,7 @@ Inventarios
 
 La aplicación de ajustes se realiza mediante los flujos específicos de inventario; el listado y la preparación no modifican movimientos hasta la acción de aprobación.
 
-## Pestaña Caducidad
+### Resumen de Caducidad
 
 ```text
 CaducidadTab
@@ -181,7 +181,7 @@ CaducidadTab
 
 Las caducidades vencidas se muestran en rojo y las próximas se distinguen visualmente. La tabla está ordenada desde su cabecera y opera sobre el contexto del almacén seleccionado.
 
-## Pestañas de mantenimiento
+### Resumen de mantenimiento
 
 `Fabricantes`, `Familias`, `Subfamilias` y `Envases` reutilizan `EntityPage` con sus columnas de código y nombre. Incorporan alta, edición, eliminación e importación mediante sus servicios de catálogo.
 
@@ -195,7 +195,7 @@ Otras referencias
 └── tabla: Ref. fabricante · Descripción fabricante · Ref. distribuidor · Descripción distribuidor
 ```
 
-## Aspecto visual actual
+### Aspecto visual actual
 
 - La ventana usa los estilos globales de `assets/styles.qss`: fondo claro, campos blancos, bordes grises suaves y botones por rol.
 - La zona superior es una barra compacta de ámbito de datos, sin título grande ni botón de actualización; queda separada 6 px de las pestañas para reducir el espacio vertical.
@@ -203,9 +203,9 @@ Otras referencias
 - La selección es por fila única; las columnas de unidades, kg y otras métricas numéricas se alinean a la derecha.
 - `main_tabs` separa el flujo operativo (Artículos a Caducidad) del mantenimiento de catálogos mediante la pestaña separadora `|` deshabilitada.
 
-## Desglose completo de componentes por pestaña
+### Componentes completos por pestaña
 
-### Artículos
+#### Artículos
 
 ```text
 articles_tab / IngredientsIreksPage (modo compacto)
@@ -222,7 +222,7 @@ articles_tab / IngredientsIreksPage (modo compacto)
 
 La cabecera propia y el ribbon de acciones de `IngredientsIreksPage` permanecen ocultos en este uso compacto. El filtro global de almacén se entrega al view-model de esta pestaña.
 
-### Entradas
+#### Entradas
 
 ```text
 entradas_tab / MovimientosTab(mode="in")
@@ -249,7 +249,7 @@ entradas_tab / MovimientosTab(mode="in")
 
 La tabla es de una única selección, no permite edición directa y abre el artículo asociado mediante doble clic.
 
-### Salidas
+#### Salidas
 
 ```text
 salidas_tab / MovimientosTab(mode="out")
@@ -270,7 +270,7 @@ salidas_tab / MovimientosTab(mode="out")
 
 Mantiene selección por fila, orden desde cabecera y apertura por doble clic del artículo correspondiente en Artículos.
 
-### Stock
+#### Stock
 
 ```text
 stock_tab / StockTab
@@ -289,7 +289,7 @@ stock_tab / StockTab
 
 El umbral se persiste con `WarehouseSettingsService`; la pestaña solamente visualiza el riesgo y las existencias calculadas por el servicio existente.
 
-### Pedidos mensual
+#### Pedidos mensual
 
 ```text
 monthly_orders_tab / AnnualMonthlyOrdersTab
@@ -305,7 +305,7 @@ monthly_orders_tab / AnnualMonthlyOrdersTab
 
 Las cabeceras ordenan por el valor real de los datos. El doble clic conserva la apertura del detalle de pedidos del artículo seleccionado.
 
-### Inventarios
+#### Inventarios
 
 ```text
 inventarios_tab / InventariosTab
@@ -329,7 +329,7 @@ inventarios_tab / InventariosTab
 
 Las acciones de ajuste quedan asociadas al flujo explícito de preparación y aprobación; consultar o filtrar no crea movimientos.
 
-### Caducidad
+#### Caducidad
 
 ```text
 caducidad_tab / CaducidadTab
@@ -348,7 +348,7 @@ caducidad_tab / CaducidadTab
 
 Los lotes caducados usan texto rojo; los próximos mantienen la señalización visual existente.
 
-### Fabricantes, Familias, Subfamilias y Envases
+#### Fabricantes, Familias, Subfamilias y Envases
 
 ```text
 EntityPage (una instancia por catálogo)
@@ -366,7 +366,7 @@ EntityPage (una instancia por catálogo)
 
 Los diálogos de alta y edición usan `EntityDialog` y los servicios del catálogo ya existentes; las tablas no permiten editar celdas directamente.
 
-### Otras ref.
+#### Otras ref.
 
 ```text
 OtrasReferenciasTab
