@@ -3,9 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 
-import pytest
-
 import app.services.customer_report_service as customer_report_service_module
+from app.services.customer_report_schema import CUSTOMER_REPORT_RESPONSE_FORMAT
 from app.services.customer_report_flow_service import CustomerReportFlowService
 from app.services.customer_report_service import CustomerReportIntent, CustomerReportResult, ReportIntentResult
 
@@ -26,6 +25,38 @@ class _FakeReportService:
     def run(self, intent: CustomerReportIntent) -> CustomerReportResult:
         self.intent = intent
         return self.result
+
+
+class _DisabledLocalAI:
+    enabled = False
+
+
+class _FakeLocalAI:
+    enabled = True
+
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+        self.schemas: list[dict | None] = []
+
+    def generate_json(self, prompt: str, *, schema: dict | None = None):
+        self.prompts.append(prompt)
+        self.schemas.append(schema)
+        return type(
+            "Result",
+            (),
+            {
+                "ok": True,
+                "text": json.dumps(
+                    {
+                        "title": "Clientes activos",
+                        "columns": ["codigo", "nombre_comercial"],
+                        "filters": [{"field": "activo", "op": "=", "value": True}],
+                        "order_by": ["codigo"],
+                        "limit": 50,
+                    }
+                ),
+            },
+        )()
 
 
 def _report() -> CustomerReportResult:
@@ -120,97 +151,42 @@ def test_has_last_report_reflects_state() -> None:
     assert service.has_last_report() is True
 
 
-def test_intent_service_ignores_inherited_proxy_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured_handlers: list[object] = []
-
-    class _FakeResponse:
-        def __init__(self, body: str) -> None:
-            self._body = body.encode("utf-8")
-
-        def __enter__(self) -> "_FakeResponse":
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def read(self) -> bytes:
-            return self._body
-
-    class _FakeOpener:
-        def open(self, req, timeout=None) -> _FakeResponse:
-            body = json.dumps(
-                {
-                    "output_text": json.dumps(
-                        {
-                            "title": "Listado de clientes",
-                            "columns": ["codigo", "nombre_comercial"],
-                            "filters": [],
-                            "order_by": ["codigo"],
-                            "limit": 50,
-                        }
-                    )
-                }
-            )
-            return _FakeResponse(body)
-
-    def _fake_build_opener(handler):
-        captured_handlers.append(handler)
-        return _FakeOpener()
-
-    monkeypatch.setattr(customer_report_service_module, "build_opener", _fake_build_opener)
-    monkeypatch.setattr(customer_report_service_module.OpenAISettingsService, "load", lambda self: {"api_key": "test-key", "use_ai_translation": False})
-
-    service = customer_report_service_module.CustomerReportIntentService()
-    result = service.parse("clientes activos")
-
-    assert result.used_ai is True
-    assert captured_handlers
-    assert captured_handlers[0].proxies == {}
-
-
-def test_intent_service_keeps_full_limit_when_ai_returns_500_for_all_customers(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _FakeResponse:
-        def __init__(self, body: str) -> None:
-            self._body = body.encode("utf-8")
-
-        def __enter__(self) -> "_FakeResponse":
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def read(self) -> bytes:
-            return self._body
-
-    class _FakeOpener:
-        def open(self, req, timeout=None) -> _FakeResponse:
-            body = json.dumps(
-                {
-                    "output_text": json.dumps(
-                        {
-                            "title": "Listado de todos los clientes",
-                            "columns": ["cliente_id", "codigo", "codigo_distribuidor", "nombre_comercial"],
-                            "filters": [],
-                            "order_by": ["codigo"],
-                            "limit": 500,
-                        }
-                    )
-                }
-            )
-            return _FakeResponse(body)
-
-    monkeypatch.setattr(customer_report_service_module, "build_opener", lambda handler: _FakeOpener())
-    monkeypatch.setattr(
-        customer_report_service_module.OpenAISettingsService,
-        "load",
-        lambda self: {"api_key": "test-key", "use_ai_translation": True},
-    )
-
-    service = customer_report_service_module.CustomerReportIntentService()
+def test_intent_service_uses_deterministic_fallback_when_local_ai_is_disabled() -> None:
+    service = customer_report_service_module.CustomerReportIntentService(local_ai_service=_DisabledLocalAI())
     result = service.parse(
         "listado de todos los clientes, campos uuid, cod, codigo cliente distribuidor, nombre"
     )
 
-    assert result.used_ai is True
+    assert result.used_ai is False
+    assert result.provider == "deterministic"
     assert result.intent.limit == 5000
     assert result.intent.filters == []
+
+
+def test_intent_service_prefers_enabled_local_ai_and_keeps_reports_read_only() -> None:
+    local_ai = _FakeLocalAI()
+    service = customer_report_service_module.CustomerReportIntentService(
+        api_key="cloud-key",
+        local_ai_service=local_ai,
+    )
+
+    result = service.parse("listado de clientes activos")
+
+    assert result.ok is True
+    assert result.used_ai is True
+    assert result.provider == "local_ai"
+    assert result.intent.filters[0] == customer_report_service_module.ReportFilter("activo", "=", True)
+    assert local_ai.prompts
+    assert "No generes SQL" in local_ai.prompts[0]
+    assert local_ai.schemas == [CUSTOMER_REPORT_RESPONSE_FORMAT["schema"]]
+
+
+def test_report_flow_labels_local_ai_as_the_active_provider() -> None:
+    intent = CustomerReportIntent(columns=["codigo", "nombre_comercial"])
+    intent_result = ReportIntentResult(True, intent, "Generado con IA local.", True, "local_ai")
+    flow = CustomerReportFlowService(_FakeIntentService(intent_result), _FakeReportService(_report()))
+
+    result = flow.generate_report("clientes activos")
+
+    assert result.status == "ready"
+    assert result.source == "IA local"

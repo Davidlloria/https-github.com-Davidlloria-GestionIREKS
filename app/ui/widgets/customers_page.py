@@ -1,8 +1,10 @@
 from pathlib import Path
 from datetime import date, datetime
+import threading
 import unicodedata
+from uuid import uuid4
 
-from PySide6.QtCore import QSize, QTimer, Qt
+from PySide6.QtCore import QObject, QSize, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap, QTextCharFormat, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
@@ -18,6 +20,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QFormLayout,
+    QGridLayout,
     QHeaderView,
     QHBoxLayout,
     QLineEdit,
@@ -47,16 +50,37 @@ except ModuleNotFoundError:  # pragma: no cover - dependency guard
 
 from app.models import CodigoPostal, Cliente, Contacto, Isla, Localidad, Municipio, Provincia, Receta
 from app.services.customer_report_document_helper import build_customer_report_html
+from app.services.customer_ai_summary_service import CustomerAISummaryResult, CustomerAISummaryService
 from app.services.customer_report_flow_service import CustomerReportFlowResult, CustomerReportFlowService
 from app.services.customer_query_service import CustomerQueryService
 from app.services.customer_service import CustomerService
 from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
+from app.ui.widgets.customer_ai_summary_dialog import CustomerAISummaryDialog
 from app.services.customer_report_service import CustomerReportIntentService, CustomerReportResult, CustomerReportService
 from app.services.report_export_service import ReportExportService
 from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
 from app.ui.widgets.entity_dialog import EntityDialog
 
 BASE_DIR = Path(__file__).resolve().parents[3]
+
+
+class _CustomerAISummaryRunner(QObject):
+    result_ready = Signal(str, object)
+    failed = Signal(str, str)
+
+    def start(self, token: str, service: CustomerAISummaryService, customer: object) -> None:
+        threading.Thread(
+            target=self._run,
+            args=(token, service, customer),
+            name="customer-ai-summary",
+            daemon=True,
+        ).start()
+
+    def _run(self, token: str, service: CustomerAISummaryService, customer: object) -> None:
+        try:
+            self.result_ready.emit(token, service.summarize(customer))
+        except Exception as exc:  # noqa: BLE001
+            self.failed.emit(token, f"No se pudo generar el resumen.\n{exc}")
 
 
 def _has_current_sales_activity(item: object) -> bool:
@@ -251,6 +275,15 @@ class NumericSortableTableWidgetItem(QTableWidgetItem):
         if isinstance(other, NumericSortableTableWidgetItem):
             return self._numeric_value < other._numeric_value
         return super().__lt__(other)
+
+
+class CustomersCatalogSelectionDelegate(QStyledItemDelegate):
+    """Paint the catalog selection accent without changing customer selection state."""
+
+    def paint(self, painter: QPainter, option, index) -> None:  # type: ignore[override]
+        super().paint(painter, option, index)
+        if index.column() == 0 and option.state & QStyle.StateFlag.State_Selected:
+            painter.fillRect(option.rect.x(), option.rect.y(), 3, option.rect.height(), QColor("#087E9C"))
 
 
 class AgendaIconDelegate(QStyledItemDelegate):
@@ -773,6 +806,12 @@ class CustomersPage(QWidget):
         self.customer_query_service = CustomerQueryService(
             report_flow_service=self.customer_report_flow_service
         )
+        self.customer_ai_summary_service = CustomerAISummaryService(customer_service=self.customer_service)
+        self._customer_ai_summary_runner = _CustomerAISummaryRunner(self)
+        self._customer_ai_summary_runner.result_ready.connect(self._handle_customer_ai_summary_result)
+        self._customer_ai_summary_runner.failed.connect(self._handle_customer_ai_summary_failure)
+        self._customer_ai_summary_request_token = ""
+        self._customer_ai_summary_dialog: CustomerAISummaryDialog | None = None
         self.schema = [
             {"name": "cliente_nombre_comercial", "label": "Nombre comercial"},
             {"name": "cliente_nombre_fiscal", "label": "Nombre fiscal"},
@@ -844,13 +883,8 @@ class CustomersPage(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._apply_modern_styles()
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setContentsMargins(14, 11, 14, 14)
         layout.setSpacing(10)
-
-        header = QLabel("Clientes")
-        header.setProperty("role", "pageTitle")
-        layout.addWidget(header)
-        header.hide()
 
         ribbon, ribbon_layout = create_standard_top_ribbon()
 
@@ -866,6 +900,14 @@ class CustomersPage(QWidget):
             object_name="customerQueriesButton",
             tooltip="Abrir consultas de clientes",
         )
+        self.ai_summary_btn = create_standard_ribbon_button(
+            "Resumen IA",
+            role="primary",
+            icon_name="brain.svg",
+            object_name="customerAISummaryButton",
+            tooltip="Generar un resumen comercial del cliente seleccionado",
+        )
+        self.ai_summary_btn.setEnabled(False)
         self.help_btn = create_standard_ribbon_button(
             "Ayuda",
             role="secondary",
@@ -878,6 +920,7 @@ class CustomersPage(QWidget):
         self.del_btn.clicked.connect(self._delete_entity)
         self.print_btn.clicked.connect(self._open_customer_reports_dialog)
         self.queries_btn.clicked.connect(self._open_customer_queries_dialog)
+        self.ai_summary_btn.clicked.connect(self._open_customer_ai_summary)
         self.refresh_btn.clicked.connect(self.reload)
 
         ribbon_layout.addWidget(self.new_btn)
@@ -886,6 +929,7 @@ class CustomersPage(QWidget):
         ribbon_layout.addWidget(self.print_btn)
         ribbon_layout.addWidget(self.refresh_btn)
         ribbon_layout.addWidget(self.queries_btn)
+        ribbon_layout.addWidget(self.ai_summary_btn)
         ribbon_layout.addStretch(1)
         ribbon_layout.addWidget(self.help_btn)
         layout.addWidget(ribbon)
@@ -898,13 +942,56 @@ class CustomersPage(QWidget):
         left_panel = QWidget()
         left_panel.setObjectName("customersLeftPanel")
         left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(14, 14, 14, 14)
-        left_layout.setSpacing(10)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
+
+        customers_catalog_header = QFrame(left_panel)
+        customers_catalog_header.setObjectName("customersCatalogHeader")
+        customers_catalog_header.setProperty("uiRole", "detailHeader")
+        customers_catalog_header.setFixedHeight(38)
+        customers_catalog_header_layout = QHBoxLayout(customers_catalog_header)
+        customers_catalog_header_layout.setContentsMargins(14, 0, 14, 0)
+        customers_catalog_header_layout.setSpacing(9)
+        customers_catalog_icon = QLabel(customers_catalog_header)
+        customers_catalog_icon.setObjectName("customersCatalogHeaderIcon")
+        customers_catalog_icon.setProperty("uiRole", "detailHeaderIcon")
+        catalog_icon_pixmap = QIcon(str(BASE_DIR / "assets" / "icons" / "users.svg")).pixmap(21, 21)
+        catalog_icon_image = catalog_icon_pixmap.toImage()
+        for x in range(catalog_icon_image.width()):
+            for y in range(catalog_icon_image.height()):
+                color = catalog_icon_image.pixelColor(x, y)
+                if color.alpha():
+                    catalog_icon_image.setPixelColor(x, y, QColor(255, 255, 255, color.alpha()))
+        customers_catalog_icon.setPixmap(QPixmap.fromImage(catalog_icon_image))
+        customers_catalog_icon.setFixedSize(22, 22)
+        customers_catalog_header_layout.addWidget(customers_catalog_icon)
+        customers_catalog_title = QLabel("CLIENTES", customers_catalog_header)
+        customers_catalog_title.setObjectName("customersCatalogHeaderTitle")
+        customers_catalog_title.setProperty("uiRole", "detailHeaderTitle")
+        customers_catalog_header_layout.addWidget(customers_catalog_title)
+        customers_catalog_header_layout.addStretch(1)
+        left_layout.addWidget(customers_catalog_header)
+
+        customers_catalog_body = QWidget(left_panel)
+        customers_catalog_body.setObjectName("customersCatalogBody")
+        customers_catalog_body_layout = QVBoxLayout(customers_catalog_body)
+        customers_catalog_body_layout.setContentsMargins(14, 10, 14, 14)
+        customers_catalog_body_layout.setSpacing(10)
 
         self.island_filter = QComboBox()
-        self.island_filter.setFixedWidth(390)
+        self.island_filter.setObjectName("customerIslandFilter")
+        self.island_filter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.island_filter.currentIndexChanged.connect(self.reload)
-        left_layout.addWidget(self.island_filter)
+        self.classification_filter = QComboBox()
+        self.classification_filter.setObjectName("customerClassificationFilter")
+        self.classification_filter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.classification_filter.currentIndexChanged.connect(self.reload)
+        filters_row = QHBoxLayout()
+        filters_row.setContentsMargins(0, 0, 0, 0)
+        filters_row.setSpacing(8)
+        filters_row.addWidget(self.island_filter, 1)
+        filters_row.addWidget(self.classification_filter, 1)
+        customers_catalog_body_layout.addLayout(filters_row)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Buscar cliente...")
@@ -935,7 +1022,7 @@ class CustomersPage(QWidget):
         search_row.addWidget(self.search_input)
         search_row.addWidget(self.clear_search_btn)
         search_row.addWidget(self.search_counter_label, 1)
-        left_layout.addLayout(search_row)
+        customers_catalog_body_layout.addLayout(search_row)
 
         self.table = QTableWidget(0, 3)
         self.table.setObjectName("customersListTable")
@@ -945,6 +1032,8 @@ class CustomersPage(QWidget):
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
+        self.table.setItemDelegate(CustomersCatalogSelectionDelegate(self.table))
         header = self.table.horizontalHeader()
         header.setSectionsClickable(True)
         header.setMinimumSectionSize(40)
@@ -962,8 +1051,8 @@ class CustomersPage(QWidget):
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._show_customers_context_menu)
         self.table.verticalHeader().setDefaultSectionSize(42)
-        self.table.setAlternatingRowColors(True)
-        left_layout.addWidget(self.table, 1)
+        customers_catalog_body_layout.addWidget(self.table, 1)
+        left_layout.addWidget(customers_catalog_body, 1)
         splitter.addWidget(left_panel)
 
         right_panel = QWidget()
@@ -991,27 +1080,84 @@ class CustomersPage(QWidget):
         left_card = QFrame(detail_panel)
         left_card.setObjectName("detailLeftCard")
         self.left_card = left_card
-        detail_title = QLabel("Detalle de cliente", left_card)
-        detail_title.setProperty("role", "sectionTitle")
-        self.detail_title = detail_title
         left_card_layout = QVBoxLayout(left_card)
-        left_card_layout.setContentsMargins(12, 10, 12, 12)
-        left_card_layout.setSpacing(8)
-        left_card_layout.addWidget(self.detail_title, 0)
+        left_card_layout.setContentsMargins(0, 0, 0, 0)
+        left_card_layout.setSpacing(0)
+        customer_detail_header = QFrame(left_card)
+        customer_detail_header.setObjectName("customerDetailHeader")
+        customer_detail_header.setProperty("uiRole", "detailHeader")
+        customer_detail_header.setFixedHeight(38)
+        customer_detail_header_layout = QHBoxLayout(customer_detail_header)
+        customer_detail_header_layout.setContentsMargins(14, 0, 14, 0)
+        customer_detail_header_layout.setSpacing(9)
+        customer_detail_icon = QLabel(customer_detail_header)
+        customer_detail_icon.setObjectName("customerDetailHeaderIcon")
+        customer_detail_icon.setProperty("uiRole", "detailHeaderIcon")
+        detail_icon_pixmap = QIcon(str(BASE_DIR / "assets" / "icons" / "users.svg")).pixmap(21, 21)
+        detail_icon_image = detail_icon_pixmap.toImage()
+        for x in range(detail_icon_image.width()):
+            for y in range(detail_icon_image.height()):
+                color = detail_icon_image.pixelColor(x, y)
+                if color.alpha():
+                    detail_icon_image.setPixelColor(x, y, QColor(255, 255, 255, color.alpha()))
+        customer_detail_icon.setPixmap(QPixmap.fromImage(detail_icon_image))
+        customer_detail_icon.setFixedSize(22, 22)
+        customer_detail_header_layout.addWidget(customer_detail_icon)
+        self.detail_title = QLabel("DETALLE DEL CLIENTE", customer_detail_header)
+        self.detail_title.setObjectName("customerDetailHeaderTitle")
+        self.detail_title.setProperty("uiRole", "detailHeaderTitle")
+        customer_detail_header_layout.addWidget(self.detail_title)
+        customer_detail_header_layout.addStretch(1)
+        left_card_layout.addWidget(customer_detail_header)
+        customer_detail_body = QWidget(left_card)
+        customer_detail_body.setObjectName("customerDetailBody")
+        customer_detail_body_layout = QVBoxLayout(customer_detail_body)
+        customer_detail_body_layout.setContentsMargins(4, 4, 4, 4)
+        customer_detail_body_layout.setSpacing(0)
         left_detail_panel = self._build_upper_left_detail_panel()
-        left_card_layout.addWidget(left_detail_panel, 1)
+        customer_detail_body_layout.addWidget(left_detail_panel, 1)
+        left_card_layout.addWidget(customer_detail_body, 1)
 
         right_card = QFrame(detail_panel)
         right_card.setObjectName("detailRightCard")
         self.right_card = right_card
-        self.detail_tipo_header = QLabel("Clasificación del cliente", right_card)
-        self.detail_tipo_header.setProperty("role", "sectionTitle")
         right_card_layout = QVBoxLayout(right_card)
-        right_card_layout.setContentsMargins(12, 6, 12, 10)
-        right_card_layout.setSpacing(2)
-        right_card_layout.addWidget(self.detail_tipo_header, 0)
+        right_card_layout.setContentsMargins(0, 0, 0, 0)
+        right_card_layout.setSpacing(0)
+        customer_classification_header = QFrame(right_card)
+        customer_classification_header.setObjectName("customerClassificationHeader")
+        customer_classification_header.setProperty("uiRole", "detailHeader")
+        customer_classification_header.setFixedHeight(38)
+        customer_classification_header_layout = QHBoxLayout(customer_classification_header)
+        customer_classification_header_layout.setContentsMargins(14, 0, 14, 0)
+        customer_classification_header_layout.setSpacing(9)
+        customer_classification_icon = QLabel(customer_classification_header)
+        customer_classification_icon.setObjectName("customerClassificationHeaderIcon")
+        customer_classification_icon.setProperty("uiRole", "detailHeaderIcon")
+        classification_icon_pixmap = QIcon(str(BASE_DIR / "assets" / "icons" / "briefcase.svg")).pixmap(21, 21)
+        classification_icon_image = classification_icon_pixmap.toImage()
+        for x in range(classification_icon_image.width()):
+            for y in range(classification_icon_image.height()):
+                color = classification_icon_image.pixelColor(x, y)
+                if color.alpha():
+                    classification_icon_image.setPixelColor(x, y, QColor(255, 255, 255, color.alpha()))
+        customer_classification_icon.setPixmap(QPixmap.fromImage(classification_icon_image))
+        customer_classification_icon.setFixedSize(22, 22)
+        customer_classification_header_layout.addWidget(customer_classification_icon)
+        self.detail_tipo_header = QLabel("CLASIFICACIÓN DEL CLIENTE", customer_classification_header)
+        self.detail_tipo_header.setObjectName("customerClassificationHeaderTitle")
+        self.detail_tipo_header.setProperty("uiRole", "detailHeaderTitle")
+        customer_classification_header_layout.addWidget(self.detail_tipo_header)
+        customer_classification_header_layout.addStretch(1)
+        right_card_layout.addWidget(customer_classification_header)
+        customer_classification_body = QWidget(right_card)
+        customer_classification_body.setObjectName("customerClassificationBody")
+        customer_classification_body_layout = QVBoxLayout(customer_classification_body)
+        customer_classification_body_layout.setContentsMargins(12, 2, 12, 2)
+        customer_classification_body_layout.setSpacing(0)
         right_detail_panel = self._build_upper_right_detail_panel()
-        right_card_layout.addWidget(right_detail_panel, 1)
+        customer_classification_body_layout.addWidget(right_detail_panel, 1)
+        right_card_layout.addWidget(customer_classification_body, 1)
         self._layout_detail_cards_abs()
         right_splitter.addWidget(detail_panel)
 
@@ -1059,6 +1205,7 @@ class CustomersPage(QWidget):
         self._layout_detail_cards_abs()
         self._layout_left_detail_abs()
         self._layout_right_detail_abs()
+        QTimer.singleShot(0, self._layout_left_detail_abs)
 
     def _apply_fixed_split_ratio(self) -> None:
         splitter = self._main_splitter
@@ -2637,14 +2784,15 @@ class CustomersPage(QWidget):
         row_gap = 14
         col_gap = 10
         w = max(10, panel.width() - 8)
+        right_edge = max(5, panel.width() - 4)
         col1 = 120
         col2 = max(180, w - col1 - col_gap)
 
         self.lbl_cod.setGeometry(5, 2, 80, 20)
-        self.lbl_nombre_comercial.setGeometry(95, 2, 455, 20)
+        self.lbl_nombre_comercial.setGeometry(95, 2, max(0, right_edge - 95), 20)
         y += label_h + 4
         self.detail_codigo.setGeometry(5, 26, 80, 28)
-        self.detail_nombre_comercial.setGeometry(95, 26, 455, 28)
+        self.detail_nombre_comercial.setGeometry(95, 26, max(0, right_edge - 95), 28)
 
         y += field_h + row_gap
         c1 = (w - 2 * col_gap) // 3
@@ -2652,20 +2800,20 @@ class CustomersPage(QWidget):
         c3 = w - c1 - c2 - 2 * col_gap
         self.lbl_telefono.setGeometry(5, 64, 120, 20)
         self.lbl_cif.setGeometry(135, 64, 100, 20)
-        self.lbl_nombre_fiscal.setGeometry(245, 64, 305, 20)
+        self.lbl_nombre_fiscal.setGeometry(245, 64, max(0, right_edge - 245), 20)
         y += label_h + 4
         self.detail_telefono.setGeometry(5, 86, 120, 28)
         self.detail_cif.setGeometry(135, 86, 100, 28)
-        self.detail_nombre_fiscal.setGeometry(245, 86, 305, 28)
+        self.detail_nombre_fiscal.setGeometry(245, 86, max(0, right_edge - 245), 28)
 
         y += field_h + row_gap
         self.lbl_provincia.setGeometry(5, 126, 165, 20)
         self.lbl_isla.setGeometry(175, 126, 100, 20)
-        self.lbl_municipio.setGeometry(285, 126, 260, 20)
+        self.lbl_municipio.setGeometry(285, 126, max(0, right_edge - 285), 20)
         y += label_h + 4
         self.detail_provincia.setGeometry(5, 150, 165, 28)
         self.detail_isla.setGeometry(175, 150, 100, 28)
-        self.detail_municipio.setGeometry(285, 150, 260, 28)
+        self.detail_municipio.setGeometry(285, 150, max(0, right_edge - 285), 28)
 
         y += field_h + row_gap
         c1b = int(w * 0.52)
@@ -2673,11 +2821,11 @@ class CustomersPage(QWidget):
         c3b = w - c1b - c2b - 2 * col_gap
         self.lbl_calle.setGeometry(5, 190, 270, 20)
         self.lbl_cp.setGeometry(285, 190, 80, 20)
-        self.lbl_localidad.setGeometry(375, 190, 175, 20)
+        self.lbl_localidad.setGeometry(375, 190, max(0, right_edge - 375), 20)
         y += label_h + 4
         self.detail_direccion.setGeometry(5, 214, 270, 28)
         self.detail_cp.setGeometry(285, 214, 80, 28)
-        self.detail_localidad.setGeometry(375, 214, 175, 28)
+        self.detail_localidad.setGeometry(375, 214, max(0, right_edge - 375), 28)
 
     def _build_upper_right_detail_panel(self) -> QWidget:
         panel = QWidget()
@@ -2687,8 +2835,7 @@ class CustomersPage(QWidget):
         self.sectors_box = QFrame(panel)
         sectors_box = self.sectors_box
         sectors_box.setObjectName("plainGroup")
-        sectors_box.setFrameShape(QFrame.Shape.Box)
-        sectors_box.setFixedHeight(128)
+        sectors_box.setFrameShape(QFrame.Shape.NoFrame)
         self.tipo_checks: dict[str, QCheckBox] = {}
         labels = [
             ("PANADERIA", "🥖"),
@@ -2709,8 +2856,21 @@ class CustomersPage(QWidget):
         for idx, (label, icon) in enumerate(labels):
             checkbox = QCheckBox(f"{icon} {label}", sectors_box)
             checkbox.setObjectName(pill_name_by_label[label])
-            checkbox.setMinimumHeight(28)
+            checkbox.setMinimumHeight(32)
             self.tipo_checks[label] = checkbox
+
+        self.otros_placeholder = QCheckBox("Otros", sectors_box)
+        self.otros_placeholder.setObjectName("otros_placeholder")
+        self.otros_placeholder.setMinimumHeight(32)
+        self.tipo_checks["OTROS"] = self.otros_placeholder
+
+        sectors_layout = QGridLayout(sectors_box)
+        sectors_layout.setContentsMargins(0, 0, 0, 0)
+        sectors_layout.setHorizontalSpacing(8)
+        sectors_layout.setVerticalSpacing(8)
+        for idx, (label, _icon) in enumerate(labels):
+            sectors_layout.addWidget(self.tipo_checks[label], idx // 2, idx % 2)
+        sectors_layout.addWidget(self.otros_placeholder, 3, 0, 1, 2)
 
         self.section_info = QLabel("Tipo", panel)
         self.section_info.setProperty("role", "blockTitle")
@@ -2725,10 +2885,10 @@ class CustomersPage(QWidget):
         self.status_box = QFrame(panel)
         status_box = self.status_box
         status_box.setObjectName("plainGroup")
-        status_box.setFrameShape(QFrame.Shape.Box)
+        status_box.setFrameShape(QFrame.Shape.NoFrame)
         self.status_group = QButtonGroup(self)
-        self.detail_activo = QPushButton("ACTIVO", status_box)
-        self.detail_inactivo = QPushButton("INACTIVO", status_box)
+        self.detail_activo = QPushButton("Activo", status_box)
+        self.detail_inactivo = QPushButton("Inactivo", status_box)
         self.detail_activo.setCheckable(True)
         self.detail_inactivo.setCheckable(True)
         self.detail_activo.setObjectName("stateChipActive")
@@ -2742,7 +2902,33 @@ class CustomersPage(QWidget):
         self.detail_prospeccion_no.setChecked(True)
         self.prospeccion_group.addButton(self.detail_prospeccion_si)
         self.prospeccion_group.addButton(self.detail_prospeccion_no)
-        self._layout_right_detail_abs()
+        self.lbl_prospeccion.setVisible(False)
+        self.detail_prospeccion_si.setVisible(False)
+        self.detail_prospeccion_no.setVisible(False)
+
+        status_layout = QHBoxLayout(status_box)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        status_layout.setSpacing(0)
+        status_layout.addWidget(self.detail_activo)
+        status_layout.addWidget(self.detail_inactivo)
+
+        fields_layout = QGridLayout()
+        fields_layout.setContentsMargins(0, 0, 0, 0)
+        fields_layout.setHorizontalSpacing(10)
+        fields_layout.setVerticalSpacing(3)
+        fields_layout.addWidget(self.section_info, 0, 0)
+        fields_layout.addWidget(self.lbl_abrev, 0, 1)
+        fields_layout.addWidget(self.detail_tipo, 1, 0)
+        fields_layout.addWidget(self.detail_abreviatura, 1, 1)
+        fields_layout.setColumnStretch(0, 1)
+        fields_layout.setColumnStretch(1, 1)
+
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        layout.addWidget(sectors_box)
+        layout.addLayout(fields_layout)
+        layout.addWidget(status_box)
 
         for line_edit in (
             self.detail_codigo,
@@ -2753,7 +2939,10 @@ class CustomersPage(QWidget):
             self.detail_abreviatura,
         ):
             line_edit.editingFinished.connect(self._schedule_autosave)
-        for checkbox in self.tipo_checks.values():
+        for label, checkbox in self.tipo_checks.items():
+            checkbox.toggled.connect(
+                lambda checked, activity_label=label: self._enforce_activity_exclusivity(activity_label, checked)
+            )
             checkbox.toggled.connect(self._schedule_autosave)
         self.detail_tipo.currentTextChanged.connect(self._schedule_autosave)
         self.detail_activo.toggled.connect(self._schedule_autosave)
@@ -2763,27 +2952,25 @@ class CustomersPage(QWidget):
 
         return panel
 
-    def _layout_right_detail_abs(self) -> None:
-        panel = getattr(self, "right_detail_panel", None)
-        if panel is None:
+    def _enforce_activity_exclusivity(self, selected_label: str, checked: bool) -> None:
+        """Keep the visual 'Otros' category mutually exclusive without changing persistence."""
+        if not checked or getattr(self, "_syncing_activity_selection", False):
             return
-        self.sectors_box.setGeometry(0, 0, 274, 128)
-        self.section_info.setGeometry(5, 119, 120, 24)
-        self.detail_tipo.setGeometry(5, 145, 120, 28)
-        self.lbl_abrev.setGeometry(145, 119, 120, 24)
-        self.detail_abreviatura.setGeometry(145, 145, 120, 28)
-        self.status_box.setGeometry(0, 182, 274, 76)
-        self.detail_activo.setGeometry(8, 10, 124, 28)
-        self.detail_inactivo.setGeometry(140, 10, 124, 28)
-        self.lbl_prospeccion.setGeometry(8, 45, 110, 24)
-        self.detail_prospeccion_si.setGeometry(130, 45, 50, 24)
-        self.detail_prospeccion_no.setGeometry(190, 45, 60, 24)
-        self.tipo_checks["PANADERIA"].setGeometry(8, 10, 125, 24)
-        self.tipo_checks["PASTELERIA"].setGeometry(141, 10, 125, 24)
-        self.tipo_checks["HELADERIA"].setGeometry(8, 48, 125, 24)
-        self.tipo_checks["CAFETERIA"].setGeometry(141, 48, 125, 24)
-        self.tipo_checks["RESTAURANTE"].setGeometry(8, 86, 125, 24)
-        self.tipo_checks["HOTEL"].setGeometry(141, 86, 125, 24)
+        self._syncing_activity_selection = True
+        try:
+            if selected_label == "OTROS":
+                for label, checkbox in self.tipo_checks.items():
+                    if label != "OTROS":
+                        checkbox.setChecked(False)
+            elif self.otros_placeholder.isChecked():
+                self.otros_placeholder.setChecked(False)
+        finally:
+            self._syncing_activity_selection = False
+
+    def _layout_right_detail_abs(self) -> None:
+        # Kept as a compatibility hook for callers that also lay out the detail cards.
+        # The classification panel itself uses layouts so its controls remain responsive.
+        return
 
     def _load_address_catalogs(self) -> None:
         catalogs = self.customer_service.address_catalogs()
@@ -2945,6 +3132,7 @@ class CustomersPage(QWidget):
         )
         self._load_address_catalogs()
         self._populate_island_filter()
+        self._populate_classification_filter()
         term = self.search_input.text().strip()
         all_rows = self._list("")
         self.rows = self._list(term) if term else list(all_rows)
@@ -2954,6 +3142,17 @@ class CustomersPage(QWidget):
                 row
                 for row in self.rows
                 if str(getattr(row, "cliente_direccion_isla_id", "") or "").strip() == selected_isla_id
+            ]
+        selected_classification = (
+            str(self.classification_filter.currentData() or "").strip()
+            if hasattr(self, "classification_filter")
+            else ""
+        )
+        if selected_classification:
+            self.rows = [
+                row
+                for row in self.rows
+                if self._matches_customer_classification(row, selected_classification)
             ]
         self._update_search_counter(len(self.rows), len(all_rows))
         self._render_table()
@@ -2981,6 +3180,32 @@ class CustomersPage(QWidget):
         self.island_filter.setCurrentIndex(idx if idx >= 0 else 0)
         self.island_filter.blockSignals(False)
 
+    def _populate_classification_filter(self) -> None:
+        if not hasattr(self, "classification_filter"):
+            return
+        current = str(self.classification_filter.currentData() or "").strip()
+        classifications = [
+            ("Todas las clasificaciones", ""),
+            ("Panadería", "PANADERIA"),
+            ("Pastelería", "PASTELERIA"),
+            ("Heladería", "HELADERIA"),
+            ("Cafetería", "CAFETERIA"),
+            ("Restaurante", "RESTAURANTE"),
+            ("Hotel", "HOTEL"),
+            ("Otros", "OTROS"),
+        ]
+        self.classification_filter.blockSignals(True)
+        self.classification_filter.clear()
+        for label, value in classifications:
+            self.classification_filter.addItem(label, value)
+        index = self.classification_filter.findData(current)
+        self.classification_filter.setCurrentIndex(index if index >= 0 else 0)
+        self.classification_filter.blockSignals(False)
+
+    def _matches_customer_classification(self, row: Cliente, classification: str) -> bool:
+        activity = str(getattr(row, "cliente_actividad", "") or "")
+        return self._activity_matches(activity, classification)
+
     def _render_table(self) -> None:
         self.table.setSortingEnabled(False)
         self.table.setRowCount(len(self.rows))
@@ -2996,6 +3221,9 @@ class CustomersPage(QWidget):
             icon = self._customer_icon(item)
             label = f"{icon} {name}".strip() if icon else name
             name_item = QTableWidgetItem(label)
+            list_icon = self._customer_list_icon(item)
+            if not list_icon.isNull():
+                name_item.setIcon(list_icon)
             island_item = QTableWidgetItem(self._island_initials(item))
             island_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             code_item.setData(Qt.ItemDataRole.UserRole, getattr(item, "cliente_id", None))
@@ -3011,9 +3239,12 @@ class CustomersPage(QWidget):
         self.table.setSortingEnabled(True)
 
     def _customer_icon(self, item: Cliente) -> str:
+        activity = str(getattr(item, "cliente_actividad", "") or "")
+        if self._activity_matches(activity, "OTROS"):
+            return ""
         text = ",".join(
             [
-                str(getattr(item, "cliente_actividad", "") or ""),
+                activity,
                 str(getattr(item, "cliente_tipo", "") or ""),
                 str(getattr(item, "cliente_nombre_comercial", "") or ""),
             ]
@@ -3031,6 +3262,12 @@ class CustomersPage(QWidget):
         if self._activity_matches(text, "HOTEL"):
             return "🏨"
         return "•"
+
+    def _customer_list_icon(self, item: Cliente) -> QIcon:
+        activity = str(getattr(item, "cliente_actividad", "") or "")
+        if self._activity_matches(activity, "OTROS"):
+            return QIcon(str(BASE_DIR / "assets" / "icons" / "circle-question-mark.svg"))
+        return QIcon()
 
     def _activity_matches(self, text: str, activity: str) -> bool:
         normalized_text = unicodedata.normalize("NFD", text).encode("ascii", "ignore").decode("ascii").upper()
@@ -3065,6 +3302,8 @@ class CustomersPage(QWidget):
 
     def _show_selected_details(self) -> None:
         row = self._selected_row()
+        if hasattr(self, "ai_summary_btn"):
+            self.ai_summary_btn.setEnabled(row is not None)
         self._is_loading_details = True
         if not row:
             self._last_selected_customer_id = ""
@@ -3133,6 +3372,48 @@ class CustomersPage(QWidget):
         self._render_related_recipes(str(getattr(row, "cliente_id", "") or ""))
         self._render_customer_agenda(str(getattr(row, "cliente_id", "") or ""))
         self._is_loading_details = False
+
+    def _open_customer_ai_summary(self) -> None:
+        customer = self._selected_row()
+        if customer is None:
+            QMessageBox.information(self, "Resumen IA", "Selecciona un cliente para generar el resumen.")
+            return
+
+        customer_name = str(
+            getattr(customer, "cliente_nombre_comercial", "")
+            or getattr(customer, "cliente_nombre_fiscal", "")
+            or "Cliente"
+        ).strip()
+        if self._customer_ai_summary_dialog is not None:
+            self._customer_ai_summary_dialog.close()
+        dialog = CustomerAISummaryDialog(customer_name=customer_name, parent=self)
+        self._customer_ai_summary_dialog = dialog
+        dialog.retry_requested.connect(lambda: self._start_customer_ai_summary(customer, dialog))
+        dialog.show()
+        self._start_customer_ai_summary(customer, dialog)
+
+    def _start_customer_ai_summary(self, customer: object, dialog: CustomerAISummaryDialog) -> None:
+        token = uuid4().hex
+        self._customer_ai_summary_request_token = token
+        dialog.set_loading()
+        self.ai_summary_btn.setEnabled(False)
+        self._customer_ai_summary_runner.start(token, self.customer_ai_summary_service, customer)
+
+    def _handle_customer_ai_summary_result(self, token: str, result: CustomerAISummaryResult) -> None:
+        if token != self._customer_ai_summary_request_token:
+            return
+        self.ai_summary_btn.setEnabled(self._selected_row() is not None)
+        dialog = self._customer_ai_summary_dialog
+        if dialog is not None:
+            dialog.set_result(result)
+
+    def _handle_customer_ai_summary_failure(self, token: str, message: str) -> None:
+        if token != self._customer_ai_summary_request_token:
+            return
+        self.ai_summary_btn.setEnabled(self._selected_row() is not None)
+        dialog = self._customer_ai_summary_dialog
+        if dialog is not None:
+            dialog.set_result(CustomerAISummaryResult(False, "", message))
 
     def _restore_customer_selection(self, customer_id: str) -> bool:
         clean_id = str(customer_id or "").strip()
@@ -3428,6 +3709,7 @@ class CustomersPage(QWidget):
 
     def _apply_modern_styles(self) -> None:
         agenda_arrow_icon = (BASE_DIR / "assets" / "icons" / "arrow-down.svg").as_posix()
+        checkmark_white_icon = (BASE_DIR / "assets" / "icons" / "checkmark_white.svg").as_posix()
         style = """
             QWidget {
                 font-family: 'Segoe UI', 'Inter';
@@ -3449,6 +3731,24 @@ class CustomersPage(QWidget):
                 background: #FFFFFF;
                 border: 1px solid #D7DEE8;
                 border-radius: 8px;
+            }
+            QWidget#customersCatalogBody {
+                background: #FFFFFF;
+                border: 1px solid #D7DEE8;
+                border-bottom-left-radius: 7px;
+                border-bottom-right-radius: 7px;
+            }
+            QWidget#customerDetailBody {
+                background: #FFFFFF;
+                border: none;
+                border-bottom-left-radius: 7px;
+                border-bottom-right-radius: 7px;
+            }
+            QWidget#customerClassificationBody {
+                background: #FFFFFF;
+                border: none;
+                border-bottom-left-radius: 7px;
+                border-bottom-right-radius: 7px;
             }
             QWidget#customersRightPanel {
                 background: transparent;
@@ -3669,6 +3969,46 @@ class CustomersPage(QWidget):
             }
             QTableWidget[tableVariant="standard"] QHeaderView::section:last {
                 border-right: 0;
+            }
+            QTableWidget#customersListTable {
+                background: #FFFFFF;
+                color: #0B2F5B;
+                border: 1px solid #D6E0EA;
+                border-radius: 8px;
+                gridline-color: #E1E8F0;
+                alternate-background-color: #F8FAFD;
+                selection-background-color: #E5F7F4;
+                selection-color: #0B2F5B;
+            }
+            QTableWidget#customersListTable::item {
+                padding: 4px 7px;
+            }
+            QTableWidget#customersListTable::item:selected {
+                background: #E5F7F4;
+                color: #0B2F5B;
+            }
+            QTableWidget#customersListTable QHeaderView::section {
+                background: #EEF3F8;
+                color: #0B2F5B;
+                border: 0;
+                border-right: 1px solid #D6E0EA;
+                border-bottom: 1px solid #D6E0EA;
+                padding: 7px 6px;
+                font-weight: 700;
+            }
+            QTableWidget#customersListTable QScrollBar:vertical {
+                width: 8px;
+                background: transparent;
+                margin: 3px 1px;
+            }
+            QTableWidget#customersListTable QScrollBar::handle:vertical {
+                min-height: 24px;
+                background: #B8C7D8;
+                border-radius: 4px;
+            }
+            QTableWidget#customersListTable QScrollBar::add-line:vertical,
+            QTableWidget#customersListTable QScrollBar::sub-line:vertical {
+                height: 0;
             }
             QWidget#relatedContactsPanel,
             QWidget#customerSalesPanel,
@@ -3993,12 +4333,14 @@ class CustomersPage(QWidget):
             QCheckBox#sectorChipPillHeladeria, QCheckBox#sectorChipPillCafeteria,
             QCheckBox#sectorChipPillRestaurante, QCheckBox#sectorChipPillHotel {
                 spacing: 6px;
-                min-height: 22px;
-                padding: 1px 9px;
+                min-height: 30px;
+                padding: 0px 10px;
                 font-size: 11px;
                 color: #0F172A;
                 font-weight: 600;
-                border-radius: 18px;
+                background: #FFFFFF;
+                border: 1px solid #D7DEE8;
+                border-radius: 10px;
             }
             QCheckBox#sectorChipPillPanaderia::indicator,
             QCheckBox#sectorChipPillPasteleria::indicator,
@@ -4006,61 +4348,97 @@ class CustomersPage(QWidget):
             QCheckBox#sectorChipPillCafeteria::indicator,
             QCheckBox#sectorChipPillRestaurante::indicator,
             QCheckBox#sectorChipPillHotel::indicator {
-                width: 11px;
-                height: 11px;
+                width: 13px;
+                height: 13px;
+                border-radius: 3px;
+                border: 1px solid #94A3B8;
+                background: #FFFFFF;
             }
-            QCheckBox#sectorChipPillPanaderia {
-                background: #FEF3C7;
-                border: 1px solid #F59E0B;
+            QCheckBox#sectorChipPillPanaderia::indicator:checked,
+            QCheckBox#sectorChipPillPasteleria::indicator:checked,
+            QCheckBox#sectorChipPillHeladeria::indicator:checked,
+            QCheckBox#sectorChipPillCafeteria::indicator:checked,
+            QCheckBox#sectorChipPillRestaurante::indicator:checked,
+            QCheckBox#sectorChipPillHotel::indicator:checked {
+                border-color: #2563EB;
+                background: #2563EB;
+                image: url("__CHECKMARK_WHITE_ICON__");
             }
-            QCheckBox#sectorChipPillPasteleria {
-                background: #FCE7F3;
-                border: 1px solid #EC4899;
+            QCheckBox#sectorChipPillPanaderia:checked,
+            QCheckBox#sectorChipPillPasteleria:checked,
+            QCheckBox#sectorChipPillHeladeria:checked,
+            QCheckBox#sectorChipPillCafeteria:checked,
+            QCheckBox#sectorChipPillRestaurante:checked,
+            QCheckBox#sectorChipPillHotel:checked {
+                background: #EFF6FF;
+                border: 1px solid #2563EB;
+                color: #0B2F5B;
             }
-            QCheckBox#sectorChipPillHeladeria {
-                background: #DBEAFE;
-                border: 1px solid #3B82F6;
+            QCheckBox#otros_placeholder {
+                spacing: 6px;
+                min-height: 30px;
+                padding: 0px 10px;
+                font-size: 11px;
+                font-weight: 600;
+                color: #94A3B8;
+                background: #F8FAFC;
+                border: 1px solid #D7DEE8;
+                border-radius: 10px;
             }
-            QCheckBox#sectorChipPillCafeteria {
-                background: #EDE9FE;
-                border: 1px solid #8B5CF6;
+            QCheckBox#otros_placeholder::indicator {
+                width: 13px;
+                height: 13px;
+                border-radius: 3px;
+                border: 1px solid #CBD5E1;
+                background: #FFFFFF;
             }
-            QCheckBox#sectorChipPillRestaurante {
-                background: #DCFCE7;
-                border: 1px solid #22C55E;
+            QCheckBox#otros_placeholder::indicator:checked {
+                border-color: #2563EB;
+                background: #2563EB;
+                image: url("__CHECKMARK_WHITE_ICON__");
             }
-            QCheckBox#sectorChipPillHotel {
-                background: #FFE4E6;
-                border: 1px solid #F43F5E;
+            QCheckBox#otros_placeholder:checked {
+                background: #EFF6FF;
+                border: 1px solid #2563EB;
+                color: #0B2F5B;
             }
             QPushButton#stateChipActive, QPushButton#stateChipInactive {
                 spacing: 0;
-                border-radius: 12px;
+                border-radius: 0px;
                 min-height: 26px;
                 padding: 0px;
                 font-size: 10px;
                 font-weight: 600;
                 text-align: center;
-                background: #E5E7EB;
-                border: 1px solid #9CA3AF;
-                color: #1F2937;
+                background: #FFFFFF;
+                border: 1px solid #D7DEE8;
+                color: #334155;
             }
             QPushButton#stateChipActive {
+                border-top-left-radius: 8px;
+                border-bottom-left-radius: 8px;
             }
             QPushButton#stateChipInactive {
+                border-left: 0px;
+                border-top-right-radius: 8px;
+                border-bottom-right-radius: 8px;
             }
             QPushButton#stateChipActive:checked {
-                background: #DCFCE7;
-                border: 1px solid #22C55E;
-                color: #166534;
+                background: #2563EB;
+                border: 1px solid #2563EB;
+                color: #FFFFFF;
             }
             QPushButton#stateChipInactive:checked {
-                background: #FEE2E2;
-                border: 1px solid #EF4444;
-                color: #991B1B;
+                background: #2563EB;
+                border: 1px solid #2563EB;
+                color: #FFFFFF;
             }
             """
-        self.setStyleSheet(style.replace("__AGENDA_ARROW_ICON__", agenda_arrow_icon))
+        self.setStyleSheet(
+            style.replace("__AGENDA_ARROW_ICON__", agenda_arrow_icon).replace(
+                "__CHECKMARK_WHITE_ICON__", checkmark_white_icon
+            )
+        )
 
     def _show_related_contacts_context_menu(self, pos) -> None:
         source = self.sender()

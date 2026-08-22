@@ -9,8 +9,8 @@ Implementación principal:
 
 ```text
 CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin borde, WA_StyledBackground=True)
-└── layout principal (QVBoxLayout, márgenes 14 px, separación 10 px)
-    ├── título de página "Clientes" (QLabel, actualmente oculto)
+└── layout principal (QVBoxLayout, márgenes 14 / 11 / 14 / 14 px, separación 10 px)
+    ├── topRibbon (QFrame, objectName `topRibbon`, pageType="contacts", fondo #FFFFFF, borde #E2E8F1, radio 8 px)
     │   ├── Nuevo (verde claro #DCFCE7, texto #166534, icono `assets/icons/user-round-plus.svg`, ancho fijo 110 px, alto 30 px, icono 20 px)
     │   ├── Editar (amarillo claro #FEF3C7, texto #92400E, icono `assets/icons/file-pen.svg`, ancho fijo 110 px, alto 30 px, icono 20 px)
     │   ├── Eliminar (rojo claro #FEE2E2, texto #B91C1C, icono `assets/icons/trash.svg`, ancho fijo 110 px, alto 30 px, icono 20 px)
@@ -21,23 +21,30 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
     │   └── Ayuda (gris azulado #E2E8F0, texto #334155, icono `assets/icons/circle-question-mark.svg`, ancho fijo 110 px, alto 30 px, icono 20 px)
     └── customersMainSplitter (QSplitter horizontal, fondo transparente, sin borde, tirador oculto)
         ├── customersLeftPanel (QWidget, fondo blanco #FFFFFF, borde #D7DEE8)
-        │   └── layout vertical (QVBoxLayout, márgenes 14 px, separación 10 px)
-        │       ├── filtro de isla (QComboBox, blanco #FFFFFF, borde #D1D5DB, ancho 390 px)
-        │       ├── fila de búsqueda
-        │       │   ├── buscador "Buscar cliente..." (QLineEdit, blanco #FFFFFF, borde #D1D5DB, ancho 220 px)
-        │       │   ├── limpiar filtro (QPushButton rojo #EF4444, texto blanco, 30 × 30 px)
-        │       │   └── contador `encontrados/totales` (QLabel, objectName `customerSearchCounterLabel`, formato `xxx/yyy`, ocupa el espacio restante)
-        │       └── customersListTable (QTableWidget, blanco #FFFFFF, alterno #FAFBFF, selección #3083FF, cabecera gris #D1D1D1 con esquina superior izquierda redondeada y separadores grises, ancho 390 px, tableVariant="standard")
-        │           ├── Cod. (60 px)
-        │           ├── Nombre (268 px)
-        │           └── Isla (48 px)
+        │   └── layout vertical exterior (QVBoxLayout, sin márgenes ni separación)
+        │       ├── customersCatalogHeader (QFrame, alto fijo 38 px, ancho completo, ajustado al borde superior, estándar `uiRole="detailHeader"`, fondo azul marino #0B2F5B, radio superior 8 px y esquinas inferiores rectas)
+        │       │   ├── icono `assets/icons/users.svg` (blanco, 21 px)
+        │       │   └── título “CLIENTES” (blanco, 16 px, negrita)
+        │       └── customersCatalogBody (QWidget, fondo blanco #FFFFFF, borde gris #D7DEE8, radio inferior 7 px, márgenes 14 / 10 / 14 / 14 px, separación 10 px)
+        │           ├── filtro de isla (QComboBox, blanco #FFFFFF, borde #D1D5DB, ancho 390 px)
+        │           ├── fila de búsqueda
+        │           │   ├── buscador "Buscar cliente..." (QLineEdit, blanco #FFFFFF, borde #D1D5DB, ancho 220 px)
+        │           │   ├── limpiar filtro (QPushButton rojo #EF4444, texto blanco, 30 × 30 px)
+        │           │   └── contador `encontrados/totales` (QLabel, objectName `customerSearchCounterLabel`, formato `xxx/yyy`, ocupa el espacio restante)
+        │           └── customersListTable (QTableWidget, blanco #FFFFFF, alterno #FAFBFF, selección #3083FF, cabecera gris #D1D1D1 con esquina superior izquierda redondeada y separadores grises, ancho 390 px, tableVariant="standard")
+        │               ├── Cod. (60 px)
+        │               ├── Nombre (268 px)
+        │               └── Isla (48 px)
         └── customersRightPanel (QWidget, fondo transparente, sin borde)
             └── layout vertical sin márgenes
                 └── customersDetailSplitter (QSplitter vertical, fondo transparente, sin borde)
                     ├── detailTopArea (QWidget, fondo transparente, sin borde, x=0, y=0, ancho 932 px, alto 300 px)
                     │   ├── detailLeftCard (QFrame, blanco #FFFFFF, borde #D7DEE8, x=5, y=0, ancho 590 px, alto 300 px)
-                    │   │   ├── título "Detalle de cliente"
-                    │   │   └── ficha principal del cliente
+                    │   │   ├── customerDetailHeader (QFrame, alto fijo 38 px, ancho completo, ajustado al borde superior, estándar `uiRole="detailHeader"`, fondo azul marino #0B2F5B, radio superior 8 px y esquinas inferiores rectas)
+                    │   │   │   ├── icono `assets/icons/users.svg` (blanco, 21 px)
+                    │   │   │   └── título “DETALLE DEL CLIENTE” (blanco, 16 px, negrita)
+                    │   │   └── customerDetailBody (QWidget, fondo blanco #FFFFFF, sin borde, márgenes internos 4 px)
+                    │   │       └── ficha principal del cliente
                     │   │       ├── código
                     │   │       ├── nombre comercial
                     │   │       ├── teléfono
@@ -46,8 +53,11 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                     │   │       ├── provincia / isla / municipio
                     │   │       └── calle / CP / localidad
                     │   └── detailRightCard (QFrame, blanco #FFFFFF, borde #D7DEE8, x=600, y=0, ancho 300 px, alto 300 px)
-                    │       ├── título "Clasificación del cliente"
-                    │       └── clasificación del cliente
+                    │       ├── customerClassificationHeader (QFrame, alto fijo 38 px, ancho completo, ajustado al borde superior, estándar `uiRole="detailHeader"`, fondo azul marino #0B2F5B, radio superior 8 px y esquinas inferiores rectas)
+                    │       │   ├── icono `assets/icons/briefcase.svg` (blanco, 21 px)
+                    │       │   └── título “CLASIFICACIÓN DEL CLIENTE” (blanco, 16 px, negrita)
+                    │       └── customerClassificationBody (QWidget, fondo blanco #FFFFFF, sin borde, márgenes 12 / 2 / 12 / 2 px)
+                    │           └── clasificación del cliente
                     │           ├── actividades / sectores seleccionables
                     │           ├── tipo de cliente
                     │           ├── abreviatura de pedido
@@ -149,6 +159,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 - Las dos tarjetas usan geometría absoluta dentro de `detailTopArea`:
 - `detailLeftCard`: x=5, y=0, ancho=590, alto=300.
   - separación entre tarjetas: 5 px.
+  - Los campos de la última columna de su ficha se estiran hasta dejar un margen derecho interno de 4 px.
 - `detailRightCard`: x=600, y=0, ancho=300, alto=300.
 - El bloque inferior de pestañas tiene un mínimo de 300 px y ocupa el resto del alto.
 - Los tiradores de ambos splitters están ocultos y deshabilitados.
@@ -157,7 +168,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 ## Aspecto visual actual
 
 - `CustomersPageRoot` tiene fondo gris `#EEF3F8`, sin borde y `WA_StyledBackground=True`; `customersMainSplitter` usa fondo transparente y sin borde; `customersDetailSplitter` usa fondo transparente y sin borde; `detailTopArea` usa fondo transparente y sin borde; `customersRightPanel` tiene fondo transparente y sin borde.
-- `customersLeftPanel` tiene fondo blanco `#FFFFFF`, borde gris `#D7DEE8` y radio de 8 px.
+- `customersLeftPanel` tiene fondo blanco `#FFFFFF`, borde gris `#D7DEE8` y radio de 8 px. `customersCatalogBody` usa el mismo fondo blanco, borde gris `#D7DEE8` y radio inferior de 7 px.
 - `detailLeftCard` y `detailRightCard` son blancas, con borde gris y radio de 8 px.
 - `customerTabs`: x=5, y=5, ancho=crmCard-10, alto=crmCard-10, panel verde `#0BF75D` en las páginas internas (rellena `crmCard` con márgenes uniformes de 5 px).
 

@@ -1177,7 +1177,7 @@ class OrdersPage(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setContentsMargins(14, 11, 14, 14)
         layout.setSpacing(10)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)

@@ -5,11 +5,10 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.request import ProxyHandler, Request, build_opener
 
 from app.core.database import engine
+from app.services.local_ai_service import LocalAIService
 from app.services.customer_report_schema import CUSTOMER_REPORT_RESPONSE_FORMAT
-from app.services.openai_settings_service import OpenAISettingsService
 
 
 REPORT_COLUMNS: dict[str, tuple[str, str]] = {
@@ -86,6 +85,7 @@ class ReportIntentResult:
     intent: CustomerReportIntent
     message: str
     used_ai: bool = False
+    provider: str = "deterministic"
 
 
 @dataclass
@@ -97,64 +97,48 @@ class CustomerReportResult:
 
 
 class CustomerReportIntentService:
-    BASE_URL = "https://api.openai.com/v1/responses"
-
-    def __init__(self, api_key: str | None = None, model: str = "gpt-4.1-mini", timeout: float = 20.0) -> None:
-        cfg = OpenAISettingsService().load()
-        self.api_key = str(api_key or cfg.get("api_key") or "").strip()
-        self.model = str(model or "gpt-4.1-mini").strip()
-        self.timeout = timeout
-        if api_key is not None:
-            self.api_key = str(api_key).strip()
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = "gpt-4.1-mini",
+        timeout: float = 20.0,
+        local_ai_service: LocalAIService | None = None,
+    ) -> None:
+        _ = (api_key, model)
+        self.local_ai_service = local_ai_service or LocalAIService(timeout=max(float(timeout), 60.0))
 
     def parse(self, prompt: str) -> ReportIntentResult:
         text = str(prompt or "").strip()
         if not text:
             return ReportIntentResult(False, CustomerReportIntent(), "Escribe que listado necesitas.")
         fallback = self._fallback_parse(text)
-        if not self.api_key:
-            return ReportIntentResult(True, fallback, "Generado con interpretacion local. Falta API key de OpenAI.", False)
+        if self.local_ai_service.enabled:
+            local_result = self.local_ai_service.generate_json(
+                self._ai_instruction(text),
+                schema=CUSTOMER_REPORT_RESPONSE_FORMAT["schema"],
+            )
+            if local_result.ok:
+                try:
+                    parsed = self._parse_json(local_result.text)
+                    intent = self._intent_from_mapping(parsed, fallback)
+                    return ReportIntentResult(True, intent, "Generado con IA local.", True, "local_ai")
+                except Exception:
+                    pass
+        return ReportIntentResult(True, fallback, "Generado con interprete local. IA local no disponible.", False)
 
-        payload: dict[str, Any] = {
-            "model": self.model,
-            "input": [
-                {
-                    "role": "system",
-                    "content": (
-                        "Convierte peticiones en espanol sobre listados de clientes a JSON estricto. "
-                        "No generes SQL. Usa solo estos campos: "
-                        f"{', '.join(REPORT_COLUMNS)}. "
-                        "Operadores permitidos: =, !=, contiene, empieza, >, >=, <, <=. "
-                        "Si piden todos los clientes o listado completo usa limit 5000. "
-                        "Devuelve solo este JSON: "
-                        'Si piden nombre del contacto usa el campo "nombre_contacto"; si piden numero de contactos usa "contactos". '
-                        '{"title": "...", "columns": ["codigo"], "filters": [{"field": "activo", "op": "=", "value": true}], '
-                        '"order_by": ["codigo"], "limit": 500}.'
-                    ),
-                },
-                {"role": "user", "content": text},
-            ],
-            "temperature": 0,
-            "max_output_tokens": 500,
-        }
-        payload["text"] = {"format": CUSTOMER_REPORT_RESPONSE_FORMAT}
-        try:
-            raw = json.dumps(payload).encode("utf-8")
-            req = Request(self.BASE_URL, data=raw, method="POST")
-            req.add_header("Authorization", f"Bearer {self.api_key}")
-            req.add_header("Content-Type", "application/json")
-            req.add_header("Accept", "application/json")
-            # Ignore inherited proxy settings so local runs do not get routed
-            # through a broken system proxy like 127.0.0.1:9.
-            opener = build_opener(ProxyHandler({}))
-            with opener.open(req, timeout=self.timeout) as resp:
-                body = resp.read().decode("utf-8")
-            data = json.loads(body or "{}")
-            parsed = self._parse_json(self._extract_text(data))
-            intent = self._intent_from_mapping(parsed, fallback)
-            return ReportIntentResult(True, intent, "Generado con ChatGPT.", True)
-        except Exception as exc:  # noqa: BLE001
-            return ReportIntentResult(True, fallback, "Generado con interprete local. ChatGPT no disponible.", False)
+    def _ai_instruction(self, prompt: str = "") -> str:
+        instruction = (
+            "Convierte peticiones en espanol sobre listados de clientes a JSON estricto. "
+            "No generes SQL. Usa solo estos campos: "
+            f"{', '.join(REPORT_COLUMNS)}. "
+            "Operadores permitidos: =, !=, contiene, empieza, >, >=, <, <=. "
+            "Si piden todos los clientes o listado completo usa limit 5000. "
+            "Devuelve solo este JSON: "
+            'Si piden nombre del contacto usa el campo "nombre_contacto"; si piden numero de contactos usa "contactos". '
+            '{"title": "...", "columns": ["codigo"], "filters": [{"field": "activo", "op": "=", "value": true}], '
+            '"order_by": ["codigo"], "limit": 500}.'
+        )
+        return f"{instruction}\n\nPeticion del usuario: {prompt}" if prompt else instruction
 
     def _fallback_parse(self, text: str) -> CustomerReportIntent:
         t = self._normalize(text)
@@ -318,17 +302,6 @@ class CustomerReportIntentService:
             if key in REPORT_COLUMNS and key not in out:
                 out.append(key)
         return out
-
-    def _extract_text(self, payload: dict[str, Any]) -> str:
-        out = str(payload.get("output_text") or "").strip()
-        if out:
-            return out
-        for item in payload.get("output") or []:
-            for block in item.get("content") or []:
-                txt = str(block.get("text") or "").strip()
-                if txt:
-                    return txt
-        return ""
 
     def _parse_json(self, text: str) -> dict[str, Any]:
         raw = str(text or "").strip()

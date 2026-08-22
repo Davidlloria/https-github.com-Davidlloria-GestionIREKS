@@ -5,14 +5,48 @@ from pathlib import Path
 import pytest
 from sqlmodel import SQLModel, Session, create_engine
 
+import app.services.sales_ai_assistant_service as sales_ai_assistant_service_module
 import app.services.sales_annual_comparison_service as sales_annual_service_module
 from app.models import Cliente, Fabricante, Familia, IngredienteIreks, Subfamilia, VentaMensualRaw
 from app.services.sales_ai_assistant_service import (
+    SALES_QUERY_INTENT_SCHEMA,
     SalesQueryAssistantService,
     SalesQueryIntent,
     SalesQueryIntentResult,
 )
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService, SalesComparisonRow
+
+
+class _FakeLocalAI:
+    enabled = True
+
+    def generate_json(self, _prompt: str, *, schema: dict | None = None):
+        self.schema = schema
+        return type(
+            "R",
+            (),
+            {
+                "ok": True,
+                "text": '{"query_type":"detalle","year":2026,"month":7,"producto_texto":"muffin","limit":20}',
+                "message": "ok",
+            },
+        )()
+
+    def generate_process(self, _prompt: str):
+        return type("R", (), {"ok": True, "text": "Respuesta local", "message": "IA local"})()
+
+
+class _DisabledLocalAI:
+    enabled = False
+
+
+@pytest.fixture(autouse=True)
+def _disable_default_local_ai(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        sales_ai_assistant_service_module,
+        "LocalAIService",
+        lambda **_kwargs: _DisabledLocalAI(),
+    )
 
 
 @pytest.fixture()
@@ -278,6 +312,21 @@ def _seed_sales(session: Session) -> tuple[str, str, str, str, str]:
     )
     session.commit()
     return cliente_id, fabricante_id, familia_id, subfamilia_id, articulo_id
+
+
+def test_sales_assistant_prefers_enabled_local_ai_for_intent() -> None:
+    local_ai = _FakeLocalAI()
+    assistant = SalesQueryAssistantService(sales_service=object(), api_key="cloud-key", local_ai_service=local_ai)
+
+    result = assistant.interpret("ventas de muffin en julio de 2026")
+
+    assert assistant.answer_service is local_ai
+    assert result.used_ai is True
+    assert result.intent.query_type == "detalle"
+    assert result.intent.year == 2026
+    assert result.intent.month == 7
+    assert result.intent.producto_texto == "muffin"
+    assert local_ai.schema == SALES_QUERY_INTENT_SCHEMA
 
 
 def test_listar_detalle_ventas_filters_by_client_and_product_text(isolated_engine) -> None:

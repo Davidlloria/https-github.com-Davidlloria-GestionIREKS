@@ -7,7 +7,7 @@ from types import SimpleNamespace
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QDateEdit, QPushButton
+from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, QCheckBox, QDateEdit, QFrame, QLabel, QPushButton, QWidget
 
 from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
 from app.services.customer_query_service import CustomerQueryResult
@@ -104,8 +104,17 @@ class _StubReportExportService:
         self.calls.append(("excel", path, title, headers, rows, sheet_title))
         return Path(path)
 
-    def export_pdf(self, path: str, title: str, headers: list[str], rows: list[list[str]]) -> Path:
-        self.calls.append(("pdf", path, title, headers, rows))
+    def export_pdf(
+        self,
+        path: str,
+        title: str,
+        headers: list[str],
+        rows: list[list[str]],
+        *,
+        summary: str = "",
+        format_measure_columns: bool = False,
+    ) -> Path:
+        self.calls.append(("pdf", path, title, headers, rows, summary, format_measure_columns))
         return Path(path)
 
 
@@ -158,6 +167,8 @@ def test_customer_query_exports_visible_results(monkeypatch, tmp_path) -> None:
             "Consulta ventas",
             ["Nombre comercial", "Kg"],
             [["Cliente Uno", 12.5]],
+            "",
+            True,
         ),
     ]
     assert messages
@@ -176,6 +187,11 @@ def test_customers_top_ribbon_contains_queries_button(monkeypatch) -> None:
     assert button is not None
     assert button.text() == "Consultas"
     assert not button.icon().isNull()
+    summary_button = page.findChild(QPushButton, "customerAISummaryButton")
+    assert summary_button is not None
+    assert summary_button.text() == "Resumen IA"
+    assert not summary_button.icon().isNull()
+    assert not summary_button.isEnabled()
     page.close()
     page.deleteLater()
     QApplication.processEvents()
@@ -194,6 +210,174 @@ def test_customers_search_row_has_counter(monkeypatch) -> None:
     page._update_search_counter(12, 720)
 
     assert page.search_counter_label.text() == "12/720"
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customers_catalog_uses_the_standard_detail_header(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    header = page.findChild(QFrame, "customersCatalogHeader")
+    title = page.findChild(QLabel, "customersCatalogHeaderTitle")
+    icon = page.findChild(QLabel, "customersCatalogHeaderIcon")
+
+    assert header is not None
+    assert header.property("uiRole") == "detailHeader"
+    assert header.height() == 38
+    assert title is not None
+    assert title.text() == "CLIENTES"
+    assert icon is not None
+    assert not icon.pixmap().isNull()
+    panel = page.findChild(QWidget, "customersLeftPanel")
+    body = page.findChild(QWidget, "customersCatalogBody")
+    page.resize(1360, 820)
+    page.show()
+    QApplication.processEvents()
+    assert panel is not None
+    assert body is not None
+    assert header.geometry().top() == panel.contentsRect().top()
+    assert header.geometry().left() == panel.contentsRect().left()
+    assert header.width() == panel.contentsRect().width()
+    assert "QWidget#customersCatalogBody" in page.styleSheet()
+    assert "QWidget#customersCatalogBody {\n                background: #FFFFFF;\n                border: 1px solid #D7DEE8;" in page.styleSheet()
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_detail_card_uses_the_standard_detail_header(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    header = page.findChild(QFrame, "customerDetailHeader")
+    title = page.findChild(QLabel, "customerDetailHeaderTitle")
+    icon = page.findChild(QLabel, "customerDetailHeaderIcon")
+    body = page.findChild(QWidget, "customerDetailBody")
+
+    assert header is not None
+    assert header.property("uiRole") == "detailHeader"
+    assert header.height() == 38
+    assert title is not None
+    assert title.text() == "DETALLE DEL CLIENTE"
+    assert icon is not None
+    assert not icon.pixmap().isNull()
+    assert body is not None
+    assert body.layout().contentsMargins().left() == 4
+    assert body.layout().contentsMargins().right() == 4
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_detail_rightmost_fields_keep_a_four_pixel_margin(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+    page.resize(1360, 820)
+    page.show()
+    QApplication.processEvents()
+
+    panel = page.left_detail_panel
+    expected_right = panel.width() - 5
+    for field in (
+        page.detail_nombre_comercial,
+        page.detail_nombre_fiscal,
+        page.detail_municipio,
+        page.detail_localidad,
+    ):
+        assert field.geometry().right() == expected_right
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_classification_card_uses_the_standard_detail_header(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    header = page.findChild(QFrame, "customerClassificationHeader")
+    title = page.findChild(QLabel, "customerClassificationHeaderTitle")
+    icon = page.findChild(QLabel, "customerClassificationHeaderIcon")
+    body = page.findChild(QWidget, "customerClassificationBody")
+
+    assert header is not None
+    assert header.property("uiRole") == "detailHeader"
+    assert header.height() == 38
+    assert title is not None
+    assert title.text() == "CLASIFICACIÓN DEL CLIENTE"
+    assert icon is not None
+    assert not icon.pixmap().isNull()
+    assert body is not None
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_classification_panel_keeps_persistence_controls_hidden(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    placeholder = page.findChild(QCheckBox, "otros_placeholder")
+
+    assert placeholder is not None
+    assert placeholder.isEnabled()
+    assert page.detail_prospeccion_si.isHidden()
+    assert page.detail_prospeccion_no.isHidden()
+    assert page.lbl_prospeccion.isHidden()
+    assert page.right_detail_panel.layout() is not None
+    assert len(page.tipo_checks) == 7
+
+    page.tipo_checks["PANADERIA"].setChecked(True)
+    page.tipo_checks["PASTELERIA"].setChecked(True)
+    placeholder.setChecked(True)
+    assert placeholder.isChecked()
+    assert not page.tipo_checks["PANADERIA"].isChecked()
+    assert not page.tipo_checks["PASTELERIA"].isChecked()
+
+    page.tipo_checks["HOTEL"].setChecked(True)
+    assert page.tipo_checks["HOTEL"].isChecked()
+    assert not placeholder.isChecked()
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_list_uses_the_other_icon_for_the_other_activity(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+    customer = SimpleNamespace(cliente_actividad="OTROS")
+
+    assert page._customer_icon(customer) == ""
+    assert not page._customer_list_icon(customer).isNull()
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_catalog_has_a_classification_filter(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+    other_customer = SimpleNamespace(cliente_actividad="OTROS")
+    bakery_customer = SimpleNamespace(cliente_actividad="PANADERIA,CAFETERIA")
+    page._populate_classification_filter()
+
+    assert page.classification_filter.itemData(0) == ""
+    assert page.classification_filter.findData("OTROS") >= 0
+    assert page._matches_customer_classification(other_customer, "OTROS")
+    assert page._matches_customer_classification(bakery_customer, "PANADERIA")
+    assert not page._matches_customer_classification(bakery_customer, "OTROS")
+
     page.close()
     page.deleteLater()
     QApplication.processEvents()

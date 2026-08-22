@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 
 from PySide6.QtCore import QDate, QTimer, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QTextDocument
+from PySide6.QtGui import QBrush, QColor, QFont, QIcon, QPainter, QPen, QPixmap, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSplitter,
     QStyle,
+    QStyledItemDelegate,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -59,6 +60,7 @@ from app.services.product_report_flow_service import ProductReportFlowService
 from app.services.product_report_service import ProductReportResult
 from app.services.report_export_service import ReportExportService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
+from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
 from app.ui.widgets.entity_page import EntityPage
 from app.ui.widgets.ingredient_distributors_tab import IngredientDistributorsTab
 from app.viewmodels import IngredientIreksViewModel, IngredientStdViewModel
@@ -73,6 +75,15 @@ class _SortableNumberItem(QTableWidgetItem):
         if isinstance(other, _SortableNumberItem):
             return self._value < other._value
         return super().__lt__(other)
+
+
+class _CatalogSelectionDelegate(QStyledItemDelegate):
+    """Paint the catalog's left selection accent without altering table state."""
+
+    def paint(self, painter, option, index) -> None:  # type: ignore[override]
+        super().paint(painter, option, index)
+        if index.column() == 0 and option.state & QStyle.StateFlag.State_Selected:
+            painter.fillRect(option.rect.x(), option.rect.y(), 3, option.rect.height(), QColor("#087E9C"))
 
 
 class TarifaDistribuidorChart(QWidget):
@@ -586,6 +597,8 @@ class IngredientsIreksPage(QWidget):
         vm: Any | None = None,
     ) -> None:
         QWidget.__init__(self)
+        self.setObjectName("IngredientsIreksPageRoot")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.show_header = show_header
         self.show_actions_ribbon = show_actions_ribbon
         self.compact_mode = compact_mode
@@ -634,12 +647,31 @@ class IngredientsIreksPage(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
-        if self.show_header:
-            header = QLabel("Productos IREKS")
-            header.setProperty("role", "pageTitle")
-            layout.addWidget(header)
+        layout.setContentsMargins(14, 11, 14, 14)
+        layout.setSpacing(10)
+
+        if self.show_actions_ribbon:
+            ribbon, ribbon_layout = create_standard_top_ribbon()
+            self.new_product_btn = create_standard_ribbon_button("Nuevo", role="success", icon_name="plus.svg")
+            self.delete_product_btn = create_standard_ribbon_button("Eliminar", role="danger", icon_name="trash.svg")
+            self.product_id_btn = create_standard_ribbon_button("ID", role="secondary", icon_name="package.svg")
+            self.product_reports_btn = create_standard_ribbon_button("Listados", role="primary", icon_name="list.svg")
+            self.new_product_btn.clicked.connect(self._new_product)
+            self.delete_product_btn.clicked.connect(self._delete_product)
+            self.product_id_btn.clicked.connect(self._show_product_id_dialog)
+            self.product_reports_btn.clicked.connect(self._open_product_reports_dialog)
+            for button in (
+                self.new_product_btn,
+                self.delete_product_btn,
+                self.product_id_btn,
+                self.product_reports_btn,
+            ):
+                ribbon_layout.addWidget(button)
+            ribbon_layout.addStretch(1)
+            layout.addWidget(ribbon)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setObjectName("ireksMainSplitter")
         layout.addWidget(splitter, 1)
 
         left_panel = QWidget()
@@ -647,51 +679,131 @@ class IngredientsIreksPage(QWidget):
         left_width = 420
         left_panel.setFixedWidth(left_width)
         left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
+        left_panel.setStyleSheet(
+            "QWidget#sidePanel { background: #FFFFFF; border: 1px solid #D7DEE8; border-radius: 10px; }"
+            "QWidget#catalogBody { background: #FFFFFF; border: none; border-bottom-left-radius: 9px; border-bottom-right-radius: 9px; }"
+            "QFrame#catalogHeader { background: #0B2F5B; border: 0; border-top-left-radius: 9px; border-top-right-radius: 9px; "
+            "border-bottom-left-radius: 0; border-bottom-right-radius: 0; }"
+            "QLabel#catalogTitle { color: #FFFFFF; font-size: 14px; font-weight: 700; background: transparent; }"
+            "QLabel#catalogSubtitle { color: #CDECE8; font-size: 10px; background: transparent; }"
+            "QLabel#catalogFilterLabel { color: #5E6C84; font-size: 10px; font-weight: 600; background: transparent; }"
+            "QLabel#catalogResultCount { color: #0B2F5B; background: #DDF3F0; border: 1px solid #9DDCD4; border-radius: 10px; padding: 4px 7px; font-weight: 700; }"
+            "QComboBox#catalogFilter, QLineEdit#catalogSearch { min-height: 30px; color: #0B2F5B; background: #FFFFFF; border: 1px solid #C9D7E8; border-radius: 6px; padding: 2px 7px; }"
+            "QComboBox#catalogFilter:focus, QLineEdit#catalogSearch:focus { border: 1px solid #16B8A6; }"
+            "QTableWidget#catalogProductTable { background: #FFFFFF; color: #0B2F5B; border: 1px solid #D6E0EA; border-radius: 8px; gridline-color: #E1E8F0; alternate-background-color: #F8FAFD; selection-background-color: #E5F7F4; selection-color: #0B2F5B; }"
+            "QTableWidget#catalogProductTable::item { padding: 4px 7px; }"
+            "QTableWidget#catalogProductTable::item:selected { background: #E5F7F4; color: #0B2F5B; }"
+            "QHeaderView::section { background: #EEF3F8; color: #0B2F5B; border: 0; border-right: 1px solid #D6E0EA; border-bottom: 1px solid #D6E0EA; padding: 7px 6px; font-weight: 700; }"
+            "QScrollBar:vertical { width: 8px; background: transparent; margin: 3px 1px; }"
+            "QScrollBar::handle:vertical { min-height: 24px; background: #B8C7D8; border-radius: 4px; }"
+            "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
+        )
 
-        fabricante_row = QHBoxLayout()
-        fabricante_row.setSpacing(5)
+        catalog_header = QFrame(left_panel)
+        catalog_header.setObjectName("catalogHeader")
+        catalog_header.setFixedHeight(54)
+        catalog_header_layout = QHBoxLayout(catalog_header)
+        catalog_header_layout.setContentsMargins(10, 7, 10, 7)
+        catalog_header_layout.setSpacing(7)
+        catalog_icon = QLabel(catalog_header)
+        catalog_pixmap = QIcon(
+            str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "product-tag.svg")
+        ).pixmap(20, 20)
+        catalog_image = catalog_pixmap.toImage()
+        for x in range(catalog_image.width()):
+            for y in range(catalog_image.height()):
+                color = catalog_image.pixelColor(x, y)
+                if color.alpha():
+                    catalog_image.setPixelColor(x, y, QColor(255, 255, 255, color.alpha()))
+        catalog_white_icon = QPixmap.fromImage(catalog_image)
+        catalog_white_icon.setDevicePixelRatio(catalog_pixmap.devicePixelRatio())
+        catalog_icon.setPixmap(catalog_white_icon)
+        catalog_icon.setFixedSize(20, 20)
+        catalog_header_layout.addWidget(catalog_icon)
+        catalog_copy = QVBoxLayout()
+        catalog_copy.setContentsMargins(0, 0, 0, 0)
+        catalog_copy.setSpacing(1)
+        catalog_title = QLabel("CATÁLOGO DE PRODUCTOS", catalog_header)
+        catalog_title.setObjectName("catalogTitle")
+        catalog_subtitle = QLabel("Filtra y selecciona productos", catalog_header)
+        catalog_subtitle.setObjectName("catalogSubtitle")
+        catalog_copy.addWidget(catalog_title)
+        catalog_copy.addWidget(catalog_subtitle)
+        catalog_header_layout.addLayout(catalog_copy)
+        catalog_header_layout.addStretch(1)
+        left_layout.addWidget(catalog_header)
+
+        catalog_body = QWidget(left_panel)
+        catalog_body.setObjectName("catalogBody")
+        catalog_body_layout = QVBoxLayout(catalog_body)
+        catalog_body_layout.setContentsMargins(10, 10, 10, 10)
+        catalog_body_layout.setSpacing(8)
+
+        def filter_field(label: str, field: QComboBox) -> QVBoxLayout:
+            field.setObjectName("catalogFilter")
+            field.setMinimumWidth(0)
+            field.setMaximumWidth(16777215)
+            field.setFixedHeight(34)
+            field_layout = QVBoxLayout()
+            field_layout.setContentsMargins(0, 0, 0, 0)
+            field_layout.setSpacing(3)
+            field_label = QLabel(label, left_panel)
+            field_label.setObjectName("catalogFilterLabel")
+            field_layout.addWidget(field_label)
+            field_layout.addWidget(field)
+            return field_layout
+
+        filters_grid = QGridLayout()
+        filters_grid.setContentsMargins(0, 0, 0, 0)
+        filters_grid.setHorizontalSpacing(8)
+        filters_grid.setVerticalSpacing(6)
         self.fabricante_filter = QComboBox()
-        self.fabricante_filter.addItem("Fabricante (todos)", "")
+        self.fabricante_filter.addItem("Todos", "")
         self.fabricante_filter.currentIndexChanged.connect(self._on_fabricante_filter_changed)
-        self.fabricante_filter.setFixedWidth(280)
-        fabricante_row.addWidget(self.fabricante_filter)
         self.activity_filter = QComboBox()
         self.activity_filter.addItem("Todos", "all")
         self.activity_filter.addItem("Activos", "active")
         self.activity_filter.addItem("Inactivos", "inactive")
-        self.activity_filter.setFixedWidth(120)
         self.activity_filter.currentIndexChanged.connect(self.reload)
-        fabricante_row.addWidget(self.activity_filter)
-        left_layout.addLayout(fabricante_row)
-
-        filters_row = QHBoxLayout()
-        filters_row.setSpacing(5)
         self.familia_filter = QComboBox()
-        self.familia_filter.addItem("Familia (todas)", "")
+        self.familia_filter.addItem("Todas", "")
         self.familia_filter.currentIndexChanged.connect(self._on_familia_filter_changed)
-        taxonomy_width = 200
-        self.familia_filter.setFixedWidth(taxonomy_width)
         self.subfamilia_filter = QComboBox()
-        self.subfamilia_filter.addItem("Subfamilia (todas)", "")
+        self.subfamilia_filter.addItem("Todas", "")
         self.subfamilia_filter.currentIndexChanged.connect(self.reload)
-        self.subfamilia_filter.setFixedWidth(taxonomy_width)
-        filters_row.addWidget(self.familia_filter, 1)
-        filters_row.addWidget(self.subfamilia_filter, 1)
-        filters_row.addStretch(2)
-        left_layout.addLayout(filters_row)
+        filters_grid.addLayout(filter_field("Fabricante", self.fabricante_filter), 0, 0)
+        filters_grid.addLayout(filter_field("Estado", self.activity_filter), 0, 1)
+        filters_grid.addLayout(filter_field("Familia", self.familia_filter), 1, 0)
+        filters_grid.addLayout(filter_field("Subfamilia", self.subfamilia_filter), 1, 1)
+        filters_grid.setColumnStretch(0, 1)
+        filters_grid.setColumnStretch(1, 1)
+        catalog_body_layout.addLayout(filters_grid)
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Buscar productos...")
+        self.search_input.setObjectName("catalogSearch")
+        self.search_input.setPlaceholderText("Buscar por referencia o nombre")
         self.search_input.textChanged.connect(lambda *_: self._search_timer.start(200))
-        self.search_input.setFixedWidth(left_width - 15)
-        left_layout.addWidget(self.search_input)
+        self.search_input.setFixedHeight(36)
+        search_row = QHBoxLayout()
+        search_row.setContentsMargins(0, 0, 0, 0)
+        search_row.setSpacing(7)
+        search_row.addWidget(self.search_input, 1)
+        self.catalog_result_count = QLabel("0 productos", left_panel)
+        self.catalog_result_count.setObjectName("catalogResultCount")
+        search_row.addWidget(self.catalog_result_count)
+        catalog_body_layout.addLayout(search_row)
 
         self.table = QTableWidget(0, 3)
+        self.table.setObjectName("catalogProductTable")
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.verticalHeader().setVisible(False)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.table.setAlternatingRowColors(True)
+        self.table.setItemDelegate(_CatalogSelectionDelegate(self.table))
         self.table.setStyleSheet("QTableWidget::item:focus { border: none; outline: 0; }")
         table_header = self.table.horizontalHeader()
         table_header.setSectionsClickable(True)
@@ -700,74 +812,274 @@ class IngredientsIreksPage(QWidget):
         table_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self.table.setColumnWidth(0, 90)
         self.table.setColumnWidth(2, 55)
-        self.table.setHorizontalHeaderLabels(["Ref", "Nombre", "Sel."])
+        self.table.setHorizontalHeaderLabels(["REF.", "NOMBRE", "SEL."])
         self.table.setSortingEnabled(False)
         table_header.setSortIndicatorShown(True)
         table_header.setSortIndicator(self._left_sort_col, self._left_sort_order)
         table_header.sectionClicked.connect(self._on_left_header_clicked)
         self.table.itemSelectionChanged.connect(self._show_selected_details)
-        left_layout.addWidget(self.table, 1)
+        catalog_body_layout.addWidget(self.table, 1)
+        left_layout.addWidget(catalog_body, 1)
         splitter.addWidget(left_panel)
 
         right_panel = QWidget()
+        right_panel.setObjectName("ireksContentPanel")
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(6)
 
-        if self.show_actions_ribbon:
-            ribbon = QFrame()
-            ribbon.setObjectName("topRibbon")
-            ribbon.setFrameShape(QFrame.Shape.StyledPanel)
-            ribbon_layout = QHBoxLayout(ribbon)
-            ribbon_layout.setContentsMargins(8, 6, 8, 6)
-            ribbon_layout.setSpacing(6)
-            for text, role, handler in [
-                ("Nuevo", "success", self._new_product),
-                ("Eliminar", "danger", self._delete_product),
-                ("ID", "secondary", self._show_product_id_dialog),
-                ("Importar Excel/CSV", "secondary", self._import_products),
-                ("Listados", "primary", self._open_product_reports_dialog),
-                ("Refrescar", "secondary", self.reload),
-            ]:
-                btn = QPushButton(text)
-                btn.setProperty("btnRole", role)
-                btn.clicked.connect(handler)
-                ribbon_layout.addWidget(btn)
-            ribbon_layout.addStretch(1)
-            right_layout.addWidget(ribbon)
-
         right_splitter = QSplitter(Qt.Orientation.Vertical)
+        right_splitter.setObjectName("ireksDetailSplitter")
         right_layout.addWidget(right_splitter, 1)
 
         detail_panel = QWidget()
         detail_panel.setObjectName("detailPanel")
-        if self.compact_mode:
-            detail_panel.setFixedHeight(82)
-        else:
-            detail_panel.setFixedHeight(168)
+        detail_panel.setFixedHeight(232)
+        icon_dir = Path(__file__).resolve().parents[3] / "assets" / "icons"
+        detail_panel.setStyleSheet(
+            f"""
+            QWidget#detailPanel {{
+                background-color: #F8FAFC;
+                border: 1px solid #CBD5E1;
+                border-radius: 9px;
+            }}
+            QFrame#productDetailHeader {{
+                background-color: #0B2F5B;
+                border: none;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                border-bottom-left-radius: 0px;
+                border-bottom-right-radius: 0px;
+            }}
+            QLabel#productDetailTitle {{
+                color: #FFFFFF;
+                font-size: 16px;
+                font-weight: 700;
+            }}
+            QFrame#productDetailBody {{
+                background-color: #FFFFFF;
+                border: 1px solid #CBD5E1;
+                border-top: none;
+            }}
+            QLabel[detailGroup="true"] {{
+                color: #315176;
+                font-size: 10px;
+                font-weight: 700;
+            }}
+            QLabel[detailField="true"] {{
+                color: #37516F;
+                font-size: 11px;
+                font-weight: 600;
+            }}
+            QWidget[detailFieldBox="true"] {{
+                background: transparent;
+                border: none;
+            }}
+            QWidget#detailPanel QLineEdit,
+            QWidget#detailPanel QComboBox {{
+                min-height: 28px;
+                max-height: 28px;
+                padding: 0 9px;
+                color: #102A48;
+                background-color: #FFFFFF;
+                border: 1px solid #C5D0DE;
+                border-radius: 6px;
+            }}
+            QWidget#detailPanel QLineEdit:focus,
+            QWidget#detailPanel QComboBox:focus {{
+                border-color: #087E9C;
+            }}
+            QWidget#detailPanel QComboBox::drop-down {{
+                width: 26px;
+                border: none;
+            }}
+            QWidget#detailPanel QComboBox::down-arrow {{
+                image: url({(icon_dir / "chevron-down-navy.svg").as_posix()});
+                width: 13px;
+                height: 13px;
+            }}
+            QFrame#productDetailDivider {{
+                background-color: #D9E2EC;
+                border: none;
+                max-height: 1px;
+            }}
+            QFrame#productDetailStatusRail {{
+                background-color: #F1F5F9;
+                border: 1px solid #D6E0EA;
+                border-radius: 7px;
+            }}
+            QLabel[detailStatusLabel="true"] {{
+                color: #315176;
+                font-size: 11px;
+                font-weight: 600;
+            }}
+            QRadioButton[detailSegment="true"] {{
+                min-height: 26px;
+                padding: 0 12px;
+                spacing: 0;
+                color: #17324F;
+                background-color: #FFFFFF;
+                border: 1px solid #C7D2DF;
+                border-radius: 5px;
+                font-weight: 600;
+            }}
+            QRadioButton[detailSegment="true"]::indicator {{
+                width: 0;
+                height: 0;
+            }}
+            QRadioButton[detailSegment="true"]:hover {{
+                background-color: #E6F2F6;
+                border-color: #77AFC0;
+            }}
+            QRadioButton[detailSegment="true"]:checked {{
+                color: #FFFFFF;
+                background-color: #087E9C;
+                border-color: #087E9C;
+            }}
+            QFrame[detailStatusDivider="true"] {{
+                background-color: #CBD5E1;
+                border: none;
+                min-width: 1px;
+                max-width: 1px;
+            }}
+            """
+        )
 
-        # Malla fija (coordenadas absolutas) para el bloque de detalle.
-        detail_title = QLabel("Detalle del producto", detail_panel)
-        detail_title.setProperty("role", "sectionTitle")
-        detail_title.setGeometry(14, 8, 260, 24)
+        detail_layout = QVBoxLayout(detail_panel)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
+        detail_layout.setSpacing(0)
 
-        QLabel("Ref.", detail_panel).setGeometry(14, 50, 30, 24)
-        self.detail_referencia = QLineEdit()
-        self.detail_referencia.setParent(detail_panel)
-        self.detail_referencia.setGeometry(45, 46, 92 if self.compact_mode else 100, 24)
-        QLabel("Ref. corta", detail_panel).setGeometry(150, 50, 82, 24)
-        self.detail_ref_corta = QLineEdit()
-        self.detail_ref_corta.setParent(detail_panel)
-        self.detail_ref_corta.setGeometry(210, 46, 95 if self.compact_mode else 100, 24)
-        QLabel("Descripcion", detail_panel).setGeometry(333 if self.compact_mode else 350, 50, 82, 24)
-        self.detail_descripcion = QLineEdit()
-        self.detail_descripcion.setParent(detail_panel)
-        self.detail_descripcion.setGeometry(415 if self.compact_mode else 432, 46, 385, 24)
+        detail_header = QFrame(detail_panel)
+        detail_header.setObjectName("productDetailHeader")
+        detail_header.setProperty("uiRole", "detailHeader")
+        detail_header.setFixedHeight(38)
+        detail_header_layout = QHBoxLayout(detail_header)
+        detail_header_layout.setContentsMargins(14, 0, 14, 0)
+        detail_header_layout.setSpacing(9)
+        detail_icon = QLabel(detail_header)
+        detail_icon.setProperty("uiRole", "detailHeaderIcon")
+        detail_icon.setPixmap(QIcon(str(icon_dir / "product-detail.svg")).pixmap(21, 21))
+        detail_icon.setFixedSize(22, 22)
+        detail_header_layout.addWidget(detail_icon)
+        detail_title = QLabel("Detalle del producto", detail_header)
+        detail_title.setObjectName("productDetailTitle")
+        detail_title.setProperty("uiRole", "detailHeaderTitle")
+        detail_header_layout.addWidget(detail_title)
+        detail_header_layout.addStretch(1)
+        detail_layout.addWidget(detail_header)
 
+        detail_body = QFrame(detail_panel)
+        detail_body.setObjectName("productDetailBody")
+        detail_body_layout = QVBoxLayout(detail_body)
+        detail_body_layout.setContentsMargins(12, 7, 12, 7)
+        detail_body_layout.setSpacing(3)
+
+        def add_detail_field(row: QHBoxLayout, label_text: str, field: QWidget, stretch: int) -> None:
+            field_box = QWidget(detail_body)
+            field_box.setProperty("detailFieldBox", True)
+            field_layout = QVBoxLayout(field_box)
+            field_layout.setContentsMargins(0, 0, 0, 0)
+            field_layout.setSpacing(1)
+            label = QLabel(label_text, field_box)
+            label.setProperty("detailField", True)
+            field_layout.addWidget(label)
+            field_layout.addWidget(field)
+            row.addWidget(field_box, stretch)
+
+        product_group_label = QLabel("PRODUCTO", detail_body)
+        product_group_label.setProperty("detailGroup", True)
+        detail_body_layout.addWidget(product_group_label)
+
+        self.detail_referencia = QLineEdit(detail_body)
+        self.detail_ref_corta = QLineEdit(detail_body)
+        self.detail_descripcion = QLineEdit(detail_body)
+        product_row = QHBoxLayout()
+        product_row.setContentsMargins(0, 0, 0, 0)
+        product_row.setSpacing(8)
+        add_detail_field(product_row, "Ref.", self.detail_referencia, 2)
+        add_detail_field(product_row, "Ref. corta", self.detail_ref_corta, 2)
+        add_detail_field(product_row, "Descripción", self.detail_descripcion, 5)
+        detail_body_layout.addLayout(product_row)
+
+        product_divider = QFrame(detail_body)
+        product_divider.setObjectName("productDetailDivider")
+        product_divider.setFixedHeight(1)
+        detail_body_layout.addWidget(product_divider)
+
+        distributor_group_label = QLabel("DISTRIBUIDOR", detail_body)
+        distributor_group_label.setProperty("detailGroup", True)
+        detail_body_layout.addWidget(distributor_group_label)
+
+        self.detail_distribuidor_id = QComboBox(detail_body)
+        self.detail_distribuidor_id.addItem("", "")
+        self.detail_referencia_distribuidor = QLineEdit(detail_body)
+        self.detail_descripcion_distribuidor = QLineEdit(detail_body)
+        distributor_row = QHBoxLayout()
+        distributor_row.setContentsMargins(0, 0, 0, 0)
+        distributor_row.setSpacing(8)
+        add_detail_field(distributor_row, "Distribuidor", self.detail_distribuidor_id, 3)
+        add_detail_field(distributor_row, "Referencia", self.detail_referencia_distribuidor, 2)
+        add_detail_field(distributor_row, "Descripción", self.detail_descripcion_distribuidor, 5)
+        detail_body_layout.addLayout(distributor_row)
+
+        status_rail = QFrame(detail_body)
+        status_rail.setObjectName("productDetailStatusRail")
+        status_rail_layout = QHBoxLayout(status_rail)
+        status_rail_layout.setContentsMargins(9, 4, 9, 4)
+        status_rail_layout.setSpacing(7)
+
+        def add_status_label(text: str) -> None:
+            label = QLabel(text, status_rail)
+            label.setProperty("detailStatusLabel", True)
+            status_rail_layout.addWidget(label)
+
+        def add_status_button(text: str) -> QRadioButton:
+            button = QRadioButton(text, status_rail)
+            button.setProperty("detailSegment", True)
+            status_rail_layout.addWidget(button)
+            return button
+
+        def add_status_divider() -> None:
+            divider = QFrame(status_rail)
+            divider.setProperty("detailStatusDivider", True)
+            divider.setFixedHeight(24)
+            status_rail_layout.addWidget(divider)
+
+        add_status_label("Status activo")
+        self.detail_status_activo_si = add_status_button("Sí")
+        self.detail_status_activo_no = add_status_button("No")
+        self.detail_status_activo_group = QButtonGroup(detail_panel)
+        self.detail_status_activo_group.setExclusive(True)
+        self.detail_status_activo_group.addButton(self.detail_status_activo_si)
+        self.detail_status_activo_group.addButton(self.detail_status_activo_no)
+        self.detail_status_activo_si.setChecked(True)
+
+        add_status_divider()
+        add_status_label("Status en lista")
+        self.detail_status_en_lista_si = add_status_button("Sí")
+        self.detail_status_en_lista_no = add_status_button("No")
+        self.detail_status_en_lista_group = QButtonGroup(detail_panel)
+        self.detail_status_en_lista_group.setExclusive(True)
+        self.detail_status_en_lista_group.addButton(self.detail_status_en_lista_si)
+        self.detail_status_en_lista_group.addButton(self.detail_status_en_lista_no)
+        self.detail_status_en_lista_no.setChecked(True)
+
+        add_status_divider()
+        add_status_label("Categoría")
+        self.detail_categoria_harina = add_status_button("Harina")
+        self.detail_categoria_liquido = add_status_button("Líquido")
+        self.detail_categoria_group = QButtonGroup(detail_panel)
+        self.detail_categoria_group.setExclusive(True)
+        self.detail_categoria_group.addButton(self.detail_categoria_harina)
+        self.detail_categoria_group.addButton(self.detail_categoria_liquido)
+        self._set_ireks_category("")
+        status_rail_layout.addStretch(1)
+        detail_body_layout.addWidget(status_rail)
+        detail_layout.addWidget(detail_body, 1)
+
+        # Estos campos se reutilizan en la pestaña Datos mediante reparentado.
         self.detail_data_top_separator = QFrame(detail_panel)
-        self.detail_data_top_separator.setFrameShape(QFrame.Shape.HLine)
-        self.detail_data_top_separator.setFrameShadow(QFrame.Shadow.Sunken)
-        self.detail_data_top_separator.setGeometry(14, 82, 810 if self.compact_mode else 850, 2)
+        self.detail_data_top_separator.hide()
 
         self.lbl_detail_envase = QLabel("Envase", detail_panel)
         self.lbl_detail_envase.setGeometry(14, 92, 45, 24)
@@ -818,75 +1130,7 @@ class IngredientsIreksPage(QWidget):
         self.detail_subfamilia_id.addItem("", "")
 
         self.detail_data_row_separator = QFrame(detail_panel)
-        self.detail_data_row_separator.setFrameShape(QFrame.Shape.HLine)
-        self.detail_data_row_separator.setFrameShadow(QFrame.Shadow.Sunken)
-        self.detail_data_row_separator.setGeometry(14, 128, 810 if self.compact_mode else 850, 2)
-
-        QLabel("Distribuidor", detail_panel).setGeometry(14, 94, 70, 24)
-        self.detail_distribuidor_id = QComboBox(detail_panel)
-        self.detail_distribuidor_id.setGeometry(86, 90, 180 if self.compact_mode else 210, 24)
-        self.detail_distribuidor_id.addItem("", "")
-
-        QLabel("Referencia", detail_panel).setGeometry(280 if self.compact_mode else 305, 94, 64, 24)
-        self.detail_referencia_distribuidor = QLineEdit(detail_panel)
-        self.detail_referencia_distribuidor.setGeometry(
-            345 if self.compact_mode else 375,
-            90,
-            60 if self.compact_mode else 95,
-            24,
-        )
-
-        QLabel("Descripcion", detail_panel).setGeometry(480 if self.compact_mode else 485, 94, 68, 24)
-        self.detail_descripcion_distribuidor = QLineEdit(detail_panel)
-        self.detail_descripcion_distribuidor.setGeometry(
-            550 if self.compact_mode else 555,
-            90,
-            260 if self.compact_mode else 270,
-            24,
-        )
-
-        row_separator_3 = QFrame(detail_panel)
-        row_separator_3.setFrameShape(QFrame.Shape.HLine)
-        row_separator_3.setFrameShadow(QFrame.Shadow.Sunken)
-        row_separator_3.setGeometry(14, 82, 810 if self.compact_mode else 850, 2)
-
-        row_separator_4 = QFrame(detail_panel)
-        row_separator_4.setFrameShape(QFrame.Shape.HLine)
-        row_separator_4.setFrameShadow(QFrame.Shadow.Sunken)
-        row_separator_4.setGeometry(14, 124, 810 if self.compact_mode else 850, 2)
-
-        QLabel("Status activo", detail_panel).setGeometry(14, 132, 88, 24)
-        self.detail_status_activo_si = QRadioButton("Si", detail_panel)
-        self.detail_status_activo_si.setGeometry(106, 132, 50, 24)
-        self.detail_status_activo_no = QRadioButton("No", detail_panel)
-        self.detail_status_activo_no.setGeometry(160, 132, 50, 24)
-        self.detail_status_activo_group = QButtonGroup(detail_panel)
-        self.detail_status_activo_group.setExclusive(True)
-        self.detail_status_activo_group.addButton(self.detail_status_activo_si)
-        self.detail_status_activo_group.addButton(self.detail_status_activo_no)
-        self.detail_status_activo_si.setChecked(True)
-
-        QLabel("Status en lista", detail_panel).setGeometry(220, 132, 92, 24)
-        self.detail_status_en_lista_si = QRadioButton("Si", detail_panel)
-        self.detail_status_en_lista_si.setGeometry(316, 132, 50, 24)
-        self.detail_status_en_lista_no = QRadioButton("No", detail_panel)
-        self.detail_status_en_lista_no.setGeometry(370, 132, 50, 24)
-        self.detail_status_en_lista_group = QButtonGroup(detail_panel)
-        self.detail_status_en_lista_group.setExclusive(True)
-        self.detail_status_en_lista_group.addButton(self.detail_status_en_lista_si)
-        self.detail_status_en_lista_group.addButton(self.detail_status_en_lista_no)
-        self.detail_status_en_lista_no.setChecked(True)
-
-        QLabel("Categoria", detail_panel).setGeometry(440, 132, 70, 24)
-        self.detail_categoria_harina = QRadioButton("Harina", detail_panel)
-        self.detail_categoria_harina.setGeometry(512, 132, 70, 24)
-        self.detail_categoria_liquido = QRadioButton("Líquido", detail_panel)
-        self.detail_categoria_liquido.setGeometry(590, 132, 80, 24)
-        self.detail_categoria_group = QButtonGroup(detail_panel)
-        self.detail_categoria_group.setExclusive(True)
-        self.detail_categoria_group.addButton(self.detail_categoria_harina)
-        self.detail_categoria_group.addButton(self.detail_categoria_liquido)
-        self._set_ireks_category("")
+        self.detail_data_row_separator.hide()
 
         for field in (
             self.detail_ref_corta,
@@ -922,6 +1166,33 @@ class IngredientsIreksPage(QWidget):
         tabs_layout.setContentsMargins(0, 4, 0, 0)
         tabs = QTabWidget()
         self.detail_tabs = tabs
+        tabs.setObjectName("ireksDetailTabs")
+        tabs.tabBar().setExpanding(True)
+        tabs.setStyleSheet(
+            """
+            QTabWidget#ireksDetailTabs::pane { border: 0; background: transparent; }
+            QTabWidget#ireksDetailTabs QTabBar::tab {
+                background: #F4F7FB; color: #5E6C84; border: 1px solid #DCE5F1;
+                border-bottom-color: #DCE5F1; border-top-left-radius: 8px;
+                border-top-right-radius: 8px; min-width: 0; padding: 8px 6px;
+                margin-right: 2px;
+            }
+            QTabWidget#ireksDetailTabs QTabBar::tab:selected {
+                background: #FFFFFF; color: #087E9C; font-weight: 600;
+                border-bottom: 3px solid #087E9C;
+            }
+            QWidget#entradasTab, QWidget#salidasTab, QWidget#stockTab, QWidget#mensualTab,
+            QWidget#pedidosTab, QWidget#tarifaTab, QWidget#nutricionTab, QWidget#clientesTab {
+                background: #FFFFFF; border: 1px solid #D6E0EA; border-radius: 8px;
+            }
+            QWidget#entradasTab QDateEdit, QWidget#salidasTab QDateEdit, QWidget#stockTab QDateEdit,
+            QWidget#mensualTab QDateEdit, QWidget#pedidosTab QDateEdit, QWidget#tarifaTab QComboBox,
+            QWidget#clientesTab QComboBox {
+                background: #FFFFFF; color: #0B2F5B; border: 1px solid #C9D7E8;
+                border-radius: 6px; padding: 3px 8px; min-height: 28px;
+            }
+            """
+        )
         tabs.setDocumentMode(False)
         tabs.tabBar().setDrawBase(False)
 
@@ -994,13 +1265,18 @@ class IngredientsIreksPage(QWidget):
             """
         )
         entradas_layout = QVBoxLayout(entradas_tab)
-        entradas_layout.setContentsMargins(8, 8, 8, 8)
-        entradas_layout.setSpacing(6)
+        entradas_layout.setContentsMargins(0, 0, 0, 0)
+        entradas_layout.setSpacing(0)
         entradas_card = QFrame()
         entradas_card.setObjectName("entradasCard")
         entradas_card_layout = QVBoxLayout(entradas_card)
-        entradas_card_layout.setContentsMargins(10, 10, 10, 10)
-        entradas_card_layout.setSpacing(8)
+        entradas_card_layout.setContentsMargins(0, 0, 0, 0)
+        entradas_card_layout.setSpacing(0)
+        entradas_card_layout.addWidget(self._ireks_tab_header(entradas_card, "Entradas de almacén", "package.svg"))
+        entradas_body = QWidget(entradas_card)
+        entradas_body_layout = QVBoxLayout(entradas_body)
+        entradas_body_layout.setContentsMargins(10, 10, 10, 10)
+        entradas_body_layout.setSpacing(8)
         entradas_filters_row = QHBoxLayout()
         entradas_filters_row.setObjectName("entradasToolbar")
         entradas_filters_row.addWidget(QLabel("Desde"))
@@ -1025,7 +1301,7 @@ class IngredientsIreksPage(QWidget):
         clear_dates_btn.clicked.connect(self._reset_entradas_date_filters)
         entradas_filters_row.addWidget(clear_dates_btn)
         entradas_filters_row.addStretch(1)
-        entradas_card_layout.addLayout(entradas_filters_row)
+        entradas_body_layout.addLayout(entradas_filters_row)
         self.entradas_table = QTableWidget(0, 7)
         self.entradas_table.setObjectName("entradasTable")
         self.entradas_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -1034,7 +1310,7 @@ class IngredientsIreksPage(QWidget):
         self.entradas_table.verticalHeader().setVisible(False)
         self.entradas_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.entradas_table.setAlternatingRowColors(True)
-        self.entradas_table.setStyleSheet("QTableWidget::item:focus { border: none; outline: 0; }")
+        self._apply_ireks_table_style(self.entradas_table)
         entradas_header = self.entradas_table.horizontalHeader()
         entradas_header.setSectionsClickable(True)
         entradas_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
@@ -1051,7 +1327,7 @@ class IngredientsIreksPage(QWidget):
         self.entradas_table.setColumnWidth(3, 85)
         self.entradas_table.setColumnWidth(4, 105)
         self.entradas_table.setColumnWidth(6, 110)
-        entradas_card_layout.addWidget(self.entradas_table, 1)
+        entradas_body_layout.addWidget(self.entradas_table, 1)
         self.entradas_totals_table = QTableWidget(1, 7)
         self.entradas_totals_table.setObjectName("entradasTotalsTable")
         self.entradas_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -1076,14 +1352,22 @@ class IngredientsIreksPage(QWidget):
         self.entradas_totals_table.setColumnWidth(3, 85)
         self.entradas_totals_table.setColumnWidth(4, 105)
         self.entradas_totals_table.setColumnWidth(6, 110)
-        entradas_card_layout.addWidget(self.entradas_totals_table)
+        self._apply_ireks_table_style(self.entradas_totals_table, totals=True)
+        entradas_body_layout.addWidget(self.entradas_totals_table)
+        entradas_card_layout.addWidget(entradas_body, 1)
         entradas_layout.addWidget(entradas_card, 1)
         self._entradas_tab_index = tabs.addTab(entradas_tab, "Entradas")
 
         salidas_tab = QWidget()
+        salidas_tab.setObjectName("salidasTab")
         salidas_layout = QVBoxLayout(salidas_tab)
-        salidas_layout.setContentsMargins(8, 8, 8, 8)
-        salidas_layout.setSpacing(6)
+        salidas_layout.setContentsMargins(0, 0, 0, 0)
+        salidas_layout.setSpacing(0)
+        salidas_layout.addWidget(self._ireks_tab_header(salidas_tab, "Salidas de almacén", "package.svg"))
+        salidas_body = QWidget(salidas_tab)
+        salidas_body_layout = QVBoxLayout(salidas_body)
+        salidas_body_layout.setContentsMargins(10, 10, 10, 10)
+        salidas_body_layout.setSpacing(8)
         salidas_filters_row = QHBoxLayout()
         salidas_filters_row.addWidget(QLabel("Desde"))
         self.salidas_date_from = QDateEdit()
@@ -1104,7 +1388,7 @@ class IngredientsIreksPage(QWidget):
         salidas_clear_dates_btn.clicked.connect(self._reset_salidas_date_filters)
         salidas_filters_row.addWidget(salidas_clear_dates_btn)
         salidas_filters_row.addStretch(1)
-        salidas_layout.addLayout(salidas_filters_row)
+        salidas_body_layout.addLayout(salidas_filters_row)
         self.salidas_table = QTableWidget(0, 7)
         self.salidas_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.salidas_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -1112,7 +1396,7 @@ class IngredientsIreksPage(QWidget):
         self.salidas_table.verticalHeader().setVisible(False)
         self.salidas_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.salidas_table.setAlternatingRowColors(True)
-        self.salidas_table.setStyleSheet("QTableWidget::item:focus { border: none; outline: 0; }")
+        self._apply_ireks_table_style(self.salidas_table)
         salidas_header = self.salidas_table.horizontalHeader()
         salidas_header.setSectionsClickable(True)
         salidas_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
@@ -1129,7 +1413,13 @@ class IngredientsIreksPage(QWidget):
         self.salidas_table.setColumnWidth(3, 85)
         self.salidas_table.setColumnWidth(4, 105)
         self.salidas_table.setColumnWidth(6, 110)
-        salidas_layout.addWidget(self.salidas_table, 1)
+        salidas_body_layout.addWidget(self.salidas_table, 1)
+        self.salidas_empty = QLabel("No hay salidas en el período seleccionado", salidas_tab)
+        self.salidas_empty.setObjectName("ireksSalesEmpty")
+        self.salidas_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.salidas_empty.setStyleSheet("color: #5E6C84; background: #FBFCFE; border: 1px dashed #D6E0EA; border-radius: 8px;")
+        self.salidas_empty.hide()
+        salidas_body_layout.addWidget(self.salidas_empty, 1)
         self.salidas_totals_table = QTableWidget(1, 7)
         self.salidas_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.salidas_totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -1153,13 +1443,21 @@ class IngredientsIreksPage(QWidget):
         self.salidas_totals_table.setColumnWidth(3, 85)
         self.salidas_totals_table.setColumnWidth(4, 105)
         self.salidas_totals_table.setColumnWidth(6, 110)
-        salidas_layout.addWidget(self.salidas_totals_table)
+        self._apply_ireks_table_style(self.salidas_totals_table, totals=True)
+        salidas_body_layout.addWidget(self.salidas_totals_table)
+        salidas_layout.addWidget(salidas_body, 1)
         self._salidas_tab_index = tabs.addTab(salidas_tab, "Salidas")
 
         stock_tab = QWidget()
+        stock_tab.setObjectName("stockTab")
         stock_layout = QVBoxLayout(stock_tab)
-        stock_layout.setContentsMargins(8, 8, 8, 8)
-        stock_layout.setSpacing(6)
+        stock_layout.setContentsMargins(0, 0, 0, 0)
+        stock_layout.setSpacing(0)
+        stock_layout.addWidget(self._ireks_tab_header(stock_tab, "Stock y movimientos", "pallet.svg"))
+        stock_body = QWidget(stock_tab)
+        stock_body_layout = QVBoxLayout(stock_body)
+        stock_body_layout.setContentsMargins(10, 10, 10, 10)
+        stock_body_layout.setSpacing(8)
         stock_filters_row = QHBoxLayout()
         stock_filters_row.addWidget(QLabel("Desde"))
         self.stock_date_from = QDateEdit()
@@ -1180,7 +1478,7 @@ class IngredientsIreksPage(QWidget):
         stock_clear_dates_btn.clicked.connect(self._reset_stock_date_filters)
         stock_filters_row.addWidget(stock_clear_dates_btn)
         stock_filters_row.addStretch(1)
-        stock_layout.addLayout(stock_filters_row)
+        stock_body_layout.addLayout(stock_filters_row)
         self.stock_table = QTableWidget(0, 8)
         self.stock_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.stock_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -1188,7 +1486,7 @@ class IngredientsIreksPage(QWidget):
         self.stock_table.verticalHeader().setVisible(False)
         self.stock_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.stock_table.setAlternatingRowColors(True)
-        self.stock_table.setStyleSheet("QTableWidget::item:focus { border: none; outline: 0; }")
+        self._apply_ireks_table_style(self.stock_table)
         stock_header = self.stock_table.horizontalHeader()
         stock_header.setSectionsClickable(True)
         stock_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
@@ -1207,7 +1505,7 @@ class IngredientsIreksPage(QWidget):
         self.stock_table.setColumnWidth(4, 85)
         self.stock_table.setColumnWidth(5, 105)
         self.stock_table.setColumnWidth(7, 110)
-        stock_layout.addWidget(self.stock_table, 1)
+        stock_body_layout.addWidget(self.stock_table, 1)
         self.stock_totals_table = QTableWidget(1, 8)
         self.stock_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.stock_totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -1233,13 +1531,21 @@ class IngredientsIreksPage(QWidget):
         self.stock_totals_table.setColumnWidth(4, 85)
         self.stock_totals_table.setColumnWidth(5, 105)
         self.stock_totals_table.setColumnWidth(7, 110)
-        stock_layout.addWidget(self.stock_totals_table)
+        self._apply_ireks_table_style(self.stock_totals_table, totals=True)
+        stock_body_layout.addWidget(self.stock_totals_table)
+        stock_layout.addWidget(stock_body, 1)
         tabs.addTab(stock_tab, "Stock")
 
         mensual_tab = QWidget()
+        mensual_tab.setObjectName("mensualTab")
         mensual_layout = QVBoxLayout(mensual_tab)
-        mensual_layout.setContentsMargins(8, 8, 8, 8)
-        mensual_layout.setSpacing(6)
+        mensual_layout.setContentsMargins(0, 0, 0, 0)
+        mensual_layout.setSpacing(0)
+        mensual_layout.addWidget(self._ireks_tab_header(mensual_tab, "Resumen mensual", "calendar-chart.svg"))
+        mensual_body = QWidget(mensual_tab)
+        mensual_body_layout = QVBoxLayout(mensual_body)
+        mensual_body_layout.setContentsMargins(10, 10, 10, 10)
+        mensual_body_layout.setSpacing(8)
         mensual_filters = QHBoxLayout()
         mensual_filters.addWidget(QLabel("Desde"))
         self.monthly_orders_date_from = QDateEdit()
@@ -1263,7 +1569,7 @@ class IngredientsIreksPage(QWidget):
         monthly_reset_btn.clicked.connect(self._reset_monthly_orders_date_filters)
         mensual_filters.addWidget(monthly_reset_btn)
         mensual_filters.addStretch(1)
-        mensual_layout.addLayout(mensual_filters)
+        mensual_body_layout.addLayout(mensual_filters)
         self.monthly_orders_table = QTableWidget(0, 7)
         self.monthly_orders_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.monthly_orders_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -1271,7 +1577,7 @@ class IngredientsIreksPage(QWidget):
         self.monthly_orders_table.verticalHeader().setVisible(False)
         self.monthly_orders_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.monthly_orders_table.setAlternatingRowColors(True)
-        self.monthly_orders_table.setStyleSheet("QTableWidget::item:focus { border: none; outline: 0; }")
+        self._apply_ireks_table_style(self.monthly_orders_table)
         monthly_header = self.monthly_orders_table.horizontalHeader()
         monthly_header.setSectionsClickable(True)
         monthly_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
@@ -1290,13 +1596,20 @@ class IngredientsIreksPage(QWidget):
         self.monthly_orders_table.setColumnWidth(3, 95)
         self.monthly_orders_table.setColumnWidth(4, 95)
         self.monthly_orders_table.setColumnWidth(5, 105)
-        mensual_layout.addWidget(self.monthly_orders_table, 1)
+        mensual_body_layout.addWidget(self.monthly_orders_table, 1)
+        mensual_layout.addWidget(mensual_body, 1)
         tabs.addTab(mensual_tab, "Mensual")
 
         pedidos_tab = QWidget()
+        pedidos_tab.setObjectName("pedidosTab")
         pedidos_layout = QVBoxLayout(pedidos_tab)
-        pedidos_layout.setContentsMargins(8, 8, 8, 8)
-        pedidos_layout.setSpacing(6)
+        pedidos_layout.setContentsMargins(0, 0, 0, 0)
+        pedidos_layout.setSpacing(0)
+        pedidos_layout.addWidget(self._ireks_tab_header(pedidos_tab, "Pedidos relacionados", "list.svg"))
+        pedidos_body = QWidget(pedidos_tab)
+        pedidos_body_layout = QVBoxLayout(pedidos_body)
+        pedidos_body_layout.setContentsMargins(10, 10, 10, 10)
+        pedidos_body_layout.setSpacing(8)
         pedidos_filters = QHBoxLayout()
         pedidos_filters.addWidget(QLabel("Desde"))
         self.pedidos_date_from = QDateEdit()
@@ -1316,7 +1629,7 @@ class IngredientsIreksPage(QWidget):
         self.pedidos_reset_btn.clicked.connect(self._reset_pedidos_date_filters)
         pedidos_filters.addWidget(self.pedidos_reset_btn)
         pedidos_filters.addStretch(1)
-        pedidos_layout.addLayout(pedidos_filters)
+        pedidos_body_layout.addLayout(pedidos_filters)
         self.pedidos_table = QTableWidget(0, 6)
         self.pedidos_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.pedidos_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -1324,7 +1637,7 @@ class IngredientsIreksPage(QWidget):
         self.pedidos_table.verticalHeader().setVisible(False)
         self.pedidos_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.pedidos_table.setAlternatingRowColors(True)
-        self.pedidos_table.setStyleSheet("QTableWidget::item:focus { border: none; outline: 0; }")
+        self._apply_ireks_table_style(self.pedidos_table)
         pedidos_header = self.pedidos_table.horizontalHeader()
         pedidos_header.setSectionsClickable(True)
         pedidos_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
@@ -1339,13 +1652,20 @@ class IngredientsIreksPage(QWidget):
         self.pedidos_table.setColumnWidth(2, 150)
         self.pedidos_table.setColumnWidth(3, 95)
         self.pedidos_table.setColumnWidth(5, 110)
-        pedidos_layout.addWidget(self.pedidos_table, 1)
+        pedidos_body_layout.addWidget(self.pedidos_table, 1)
+        pedidos_layout.addWidget(pedidos_body, 1)
         tabs.addTab(pedidos_tab, "Pedidos")
 
         tarifa_tab = QWidget()
+        tarifa_tab.setObjectName("tarifaTab")
         tarifa_layout = QVBoxLayout(tarifa_tab)
-        tarifa_layout.setContentsMargins(8, 8, 8, 8)
-        tarifa_layout.setSpacing(6)
+        tarifa_layout.setContentsMargins(0, 0, 0, 0)
+        tarifa_layout.setSpacing(0)
+        tarifa_layout.addWidget(self._ireks_tab_header(tarifa_tab, "Histórico de tarifas", "product-tag.svg"))
+        tarifa_body = QWidget(tarifa_tab)
+        tarifa_body_layout = QVBoxLayout(tarifa_body)
+        tarifa_body_layout.setContentsMargins(10, 10, 10, 10)
+        tarifa_body_layout.setSpacing(8)
         tarifa_filters = QHBoxLayout()
         tarifa_filters.addWidget(QLabel("Año"))
         self.tarifa_year_filter = QComboBox()
@@ -1373,21 +1693,31 @@ class IngredientsIreksPage(QWidget):
         )
         self.add_tarifa_btn = QPushButton("Añadir tarifa")
         self.add_tarifa_btn.setFixedHeight(tarifa_button_h)
-        self.add_tarifa_btn.setStyleSheet(tarifa_add_style)
+        self.add_tarifa_btn.setStyleSheet(
+            "QPushButton { min-height: 0px; padding: 0 10px; border: 1px solid #087E9C; border-radius: 5px; "
+            "background: #087E9C; color: #FFFFFF; font-weight: 600; }"
+            "QPushButton:hover { background: #066B84; }"
+        )
         self.add_tarifa_btn.clicked.connect(self._add_tarifa_row)
         tarifa_filters.addWidget(self.add_tarifa_btn)
         self.edit_tarifa_btn = QPushButton("Editar")
         self.edit_tarifa_btn.setFixedHeight(tarifa_button_h)
-        self.edit_tarifa_btn.setStyleSheet(tarifa_edit_style)
+        self.edit_tarifa_btn.setStyleSheet(
+            "QPushButton { min-height: 0px; padding: 0 10px; border: 1px solid #0B2F5B; border-radius: 5px; "
+            "background: #FFFFFF; color: #0B2F5B; font-weight: 600; }"
+        )
         self.edit_tarifa_btn.clicked.connect(self._edit_tarifa_row)
         tarifa_filters.addWidget(self.edit_tarifa_btn)
         self.delete_tarifa_btn = QPushButton("Eliminar")
         self.delete_tarifa_btn.setFixedHeight(tarifa_button_h)
-        self.delete_tarifa_btn.setStyleSheet(tarifa_delete_style)
+        self.delete_tarifa_btn.setStyleSheet(
+            "QPushButton { min-height: 0px; padding: 0 10px; border: 1px solid #D92D20; border-radius: 5px; "
+            "background: #FFFFFF; color: #D92D20; font-weight: 600; }"
+        )
         self.delete_tarifa_btn.clicked.connect(self._delete_tarifa_row)
         tarifa_filters.addWidget(self.delete_tarifa_btn)
         tarifa_filters.addStretch(1)
-        tarifa_layout.addLayout(tarifa_filters)
+        tarifa_body_layout.addLayout(tarifa_filters)
         tarifa_content = QHBoxLayout()
         tarifa_content.setSpacing(10)
         tarifa_table_wrap = QWidget()
@@ -1442,7 +1772,7 @@ class IngredientsIreksPage(QWidget):
         self.tarifa_table.verticalHeader().setVisible(False)
         self.tarifa_table.horizontalHeader().setVisible(False)
         self.tarifa_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.tarifa_table.setStyleSheet("QTableWidget::item:focus { border: none; outline: 0; }")
+        self._apply_ireks_table_style(self.tarifa_table)
         tarifa_header = self.tarifa_table.horizontalHeader()
         tarifa_header.setSectionsClickable(True)
         tarifa_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
@@ -1454,7 +1784,7 @@ class IngredientsIreksPage(QWidget):
         tarifa_header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
         tarifa_header.setSectionResizeMode(7, QHeaderView.ResizeMode.Fixed)
         tarifa_header.setSectionResizeMode(8, QHeaderView.ResizeMode.Fixed)
-        tarifa_header.setSectionResizeMode(9, QHeaderView.ResizeMode.Fixed)
+        tarifa_header.setSectionResizeMode(9, QHeaderView.ResizeMode.Stretch)
         self.tarifa_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         tarifa_column_widths = [58, 86, 86, 92, 82, 86, 86, 86, 92, 88]
         for col_idx, width in enumerate(tarifa_column_widths):
@@ -1475,14 +1805,30 @@ class IngredientsIreksPage(QWidget):
         )
         self._adjust_tarifa_table_width()
         tarifa_table_layout.addWidget(self.tarifa_table, 1)
-        tarifa_content.addWidget(tarifa_table_wrap, 0)
-        tarifa_layout.addLayout(tarifa_content, 1)
+        tarifa_content.addWidget(tarifa_table_wrap, 1)
+        tarifa_body_layout.addLayout(tarifa_content, 1)
+        tarifa_layout.addWidget(tarifa_body, 1)
         tabs.insertTab(1, tarifa_tab, "Tarifa")
 
         nutricion_tab = QWidget()
+        nutricion_tab.setObjectName("nutricionTab")
         nutricion_layout = QVBoxLayout(nutricion_tab)
-        nutricion_layout.setContentsMargins(8, 8, 8, 8)
-        nutricion_layout.setSpacing(6)
+        nutricion_layout.setContentsMargins(0, 0, 0, 0)
+        nutricion_layout.setSpacing(0)
+        nutrition_header = self._ireks_tab_header(nutricion_tab, "Información nutricional", "nutrition-lab.svg")
+        nutrition_badge = QLabel("Valores por 100 g", nutrition_header)
+        nutrition_badge.setObjectName("ireksNutritionBadge")
+        nutrition_badge.setFixedHeight(22)
+        nutrition_header.layout().addWidget(nutrition_badge)
+        nutrition_header.setStyleSheet(
+            nutrition_header.styleSheet()
+            + "QLabel#ireksNutritionBadge { background: #E5F7F4; color: #087E9C; border-radius: 6px; padding: 1px 8px; font-weight: 600; }"
+        )
+        nutricion_layout.addWidget(nutrition_header)
+        nutricion_body = QWidget(nutricion_tab)
+        nutricion_body_layout = QVBoxLayout(nutricion_body)
+        nutricion_body_layout.setContentsMargins(10, 10, 10, 10)
+        nutricion_body_layout.setSpacing(8)
         self.nutricion_table = QTableWidget(9, 2)
         self.nutricion_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.nutricion_table.setEditTriggers(
@@ -1496,6 +1842,7 @@ class IngredientsIreksPage(QWidget):
         self.nutricion_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         self.nutricion_table.setColumnWidth(1, 140)
         self.nutricion_table.setHorizontalHeaderLabels(["Nutriente", "Por 100 g"])
+        self._apply_ireks_table_style(self.nutricion_table)
         nutrientes = [
             ("Energia (kJ)", "energia_kj"),
             ("Energia (kcal)", "energia_kcal"),
@@ -1516,25 +1863,32 @@ class IngredientsIreksPage(QWidget):
             self.nutricion_table.setItem(row_idx, 0, name_item)
             self.nutricion_table.setItem(row_idx, 1, value_item)
         self.nutricion_table.itemChanged.connect(self._on_nutricion_item_changed)
-        nutricion_layout.addWidget(self.nutricion_table, 1)
-        tabs.addTab(nutricion_tab, "Nutición")
+        nutricion_body_layout.addWidget(self.nutricion_table, 1)
+        nutricion_layout.addWidget(nutricion_body, 1)
+        tabs.addTab(nutricion_tab, "Nutrición")
 
         clientes_tab = QWidget()
+        clientes_tab.setObjectName("clientesTab")
         clientes_layout = QVBoxLayout(clientes_tab)
-        clientes_layout.setContentsMargins(8, 8, 8, 8)
-        clientes_layout.setSpacing(6)
+        clientes_layout.setContentsMargins(0, 0, 0, 0)
+        clientes_layout.setSpacing(0)
+        clientes_layout.addWidget(self._ireks_tab_header(clientes_tab, "Consumo por cliente", "users.svg"))
+        clientes_body = QWidget(clientes_tab)
+        clientes_body_layout = QVBoxLayout(clientes_body)
+        clientes_body_layout.setContentsMargins(10, 10, 10, 10)
+        clientes_body_layout.setSpacing(8)
         clientes_filter_row = QHBoxLayout()
         clientes_filter_row.addWidget(QLabel("Año"))
         self.customer_consumption_year = QComboBox(clientes_tab)
         self.customer_consumption_year.currentIndexChanged.connect(self._reload_customer_consumption_table)
         clientes_filter_row.addWidget(self.customer_consumption_year)
         clientes_filter_row.addStretch(1)
-        clientes_layout.addLayout(clientes_filter_row)
+        clientes_body_layout.addLayout(clientes_filter_row)
         self.customer_consumption_empty = QLabel("Selecciona un producto para ver sus clientes consumidores.", clientes_tab)
         self.customer_consumption_empty.setObjectName("ireksCustomerConsumptionEmpty")
         self.customer_consumption_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.customer_consumption_empty.setWordWrap(True)
-        clientes_layout.addWidget(self.customer_consumption_empty)
+        clientes_body_layout.addWidget(self.customer_consumption_empty)
         self.customer_consumption_table = QTableWidget(0, 5, clientes_tab)
         self.customer_consumption_table.setObjectName("ireksCustomerConsumptionTable")
         self.customer_consumption_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -1550,8 +1904,12 @@ class IngredientsIreksPage(QWidget):
         customer_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         for column in range(1, 5):
             customer_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-        clientes_layout.addWidget(self.customer_consumption_table, 1)
+        self._apply_ireks_table_style(self.customer_consumption_table)
+        clientes_body_layout.addWidget(self.customer_consumption_table, 1)
+        clientes_layout.addWidget(clientes_body, 1)
         self._clientes_tab_index = tabs.addTab(clientes_tab, "Clientes")
+        for tab_index in range(tabs.count()):
+            tabs.widget(tab_index).setContentsMargins(4, 4, 4, 4)
         tabs.currentChanged.connect(self._on_detail_tab_changed)
         tabs_layout.addWidget(tabs)
         right_splitter.addWidget(tabs_host)
@@ -1562,7 +1920,7 @@ class IngredientsIreksPage(QWidget):
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 1)
         splitter.setChildrenCollapsible(False)
-        splitter.setHandleWidth(0)
+        splitter.setHandleWidth(5)
         splitter.handle(1).setEnabled(False)
 
     def _build_product_reports_panel(self) -> QWidget:
@@ -1639,26 +1997,111 @@ class IngredientsIreksPage(QWidget):
             if button is not None:
                 button.setEnabled(enabled)
 
+    def _ireks_tab_header(
+        self,
+        parent: QWidget,
+        title: str,
+        icon_name: str,
+        subtitle: str = "",
+        *,
+        icon_size: int = 21,
+        title_size: int = 16,
+        height: int = 38,
+    ) -> QFrame:
+        """Create the compact, local heading used by IREKS detail tabs."""
+        header = QFrame(parent)
+        header.setObjectName("ireksTabHeader")
+        header.setProperty("uiRole", "detailHeader")
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(14, 0, 14, 0)
+        layout.setSpacing(9)
+        icon = QLabel(header)
+        icon.setObjectName("ireksTabHeaderIcon")
+        icon.setProperty("uiRole", "detailHeaderIcon")
+        icon_path = Path(__file__).resolve().parents[3] / "assets" / "icons" / icon_name
+        pixmap = QIcon(str(icon_path)).pixmap(icon_size, icon_size)
+        image = pixmap.toImage()
+        for x in range(image.width()):
+            for y in range(image.height()):
+                color = image.pixelColor(x, y)
+                if color.alpha():
+                    image.setPixelColor(x, y, QColor(255, 255, 255, color.alpha()))
+        recolored_pixmap = QPixmap.fromImage(image)
+        recolored_pixmap.setDevicePixelRatio(pixmap.devicePixelRatio())
+        icon.setPixmap(recolored_pixmap)
+        icon.setFixedSize(22, 22)
+        layout.addWidget(icon)
+        title_box = QVBoxLayout()
+        title_box.setContentsMargins(0, 0, 0, 0)
+        title_box.setSpacing(1)
+        title_label = QLabel(title.upper(), header)
+        title_label.setObjectName("ireksTabHeaderTitle")
+        title_label.setProperty("uiRole", "detailHeaderTitle")
+        title_box.addWidget(title_label)
+        if subtitle:
+            subtitle_label = QLabel(subtitle, header)
+            subtitle_label.setObjectName("ireksTabHeaderSubtitle")
+            title_box.addWidget(subtitle_label)
+        layout.addLayout(title_box)
+        layout.addStretch(1)
+        header.setFixedHeight(height)
+        header.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        header.setStyleSheet(
+            "QFrame#ireksTabHeader { background: #0B2F5B; border: none; border-top-left-radius: 8px; border-top-right-radius: 8px; "
+            "border-bottom-left-radius: 0; border-bottom-right-radius: 0; }"
+            f"QLabel#ireksTabHeaderTitle {{ color: #FFFFFF; background: transparent; font-size: {title_size}px; font-weight: 700; }}"
+            "QLabel#ireksTabHeaderSubtitle { color: #CDECE8; background: transparent; }"
+            "QLabel#ireksTabHeaderIcon { background: transparent; }"
+        )
+        return header
+
+    def _apply_ireks_table_style(self, table: QTableWidget, *, totals: bool = False) -> None:
+        """Apply the IREKS tab table treatment without leaking QSS to other pages."""
+        if not table.objectName():
+            table.setObjectName("ireksTotalsTable" if totals else "ireksDataTable")
+        table.setAlternatingRowColors(not totals)
+        table.setStyleSheet(
+            "QTableWidget { background: %s; color: #0B2F5B; border: 1px solid #DCE5F1; border-radius: 8px; "
+            "gridline-color: #DCE5F1; selection-background-color: #E5F4F2; selection-color: #0B2F5B; }"
+            "QTableWidget::item { padding: 5px 8px; %s }"
+            "QHeaderView::section { background: #EEF3F9; color: #0B2F5B; border: 0; border-right: 1px solid #DCE5F1; "
+            "border-bottom: 1px solid #DCE5F1; padding: 7px 8px; font-weight: 700; }"
+            % (
+                "#E5F7F4" if totals else "#FFFFFF",
+                "font-weight: 700; color: #0B2F5B;" if totals else "",
+            )
+        )
+        if totals:
+            table.setFixedHeight(34)
+
     def _build_ireks_data_tab(self) -> QWidget:
         tab = QWidget()
         tab.setObjectName("ireksDataTab")
         tab.setStyleSheet(
             """
             QWidget#ireksDataTab {
-                background: #FFFFFF;
+                background: #EEF3F8;
             }
             QWidget#ireksDataTab QLabel {
-                color: #486081;
+                color: #5E6C84;
                 font-weight: 500;
             }
             QWidget#ireksDataTab QComboBox,
             QWidget#ireksDataTab QLineEdit {
                 min-height: 28px;
+                color: #0B2F5B;
+                background: #FFFFFF;
+                border: 1px solid #C9D7E8;
+                border-radius: 6px;
+                padding: 2px 7px;
             }
+            QWidget#ireksDataTab QComboBox:focus, QWidget#ireksDataTab QLineEdit:focus { border-color: #087E9C; }
+            QWidget#ireksDataTab QLineEdit[readOnly="true"] { background: #F4F7FB; }
+            QFrame[ireksCard="true"] { background: #FFFFFF; border: 1px solid #EEF3F8; border-radius: 8px; }
             """
         )
         layout = QVBoxLayout(tab)
-        layout.setContentsMargins(8, 10, 8, 8)
+        layout.setContentsMargins(8, 0, 8, 8)
         layout.setSpacing(8)
 
         for widget in (self.detail_data_top_separator, self.detail_data_row_separator):
@@ -1770,20 +2213,127 @@ class IngredientsIreksPage(QWidget):
         row_taxonomy.addWidget(self._reparent_detail_widget(self.detail_subfamilia_id, tab), 3)
         row_taxonomy.addStretch(1)
 
-        layout.addLayout(row_taxonomy)
-        line = QFrame()
-        line.setFrameShape(QFrame.Shape.HLine)
-        line.setFrameShadow(QFrame.Shadow.Sunken)
-        layout.addWidget(line)
-        layout.addLayout(row_presentacion_1)
-        layout.addLayout(row_presentacion_2)
-        line_2 = QFrame()
-        line_2.setFrameShape(QFrame.Shape.HLine)
-        line_2.setFrameShadow(QFrame.Shadow.Sunken)
-        layout.addWidget(line_2)
-        layout.addLayout(row_transporte_1)
-        layout.addLayout(row_transporte_2)
-        layout.addLayout(row_transporte_obs)
+        classification_card = QFrame(tab)
+        classification_card.setObjectName("ireksClassificationCard")
+        classification_card.setProperty("ireksCard", True)
+        classification_card.setFixedHeight(146)
+        classification_layout = QVBoxLayout(classification_card)
+        classification_layout.setContentsMargins(0, 0, 0, 12)
+        classification_layout.setSpacing(9)
+        classification_layout.addWidget(
+            self._ireks_tab_header(
+                classification_card,
+                "Clasificación",
+                "product-tag.svg",
+                icon_size=21,
+                title_size=16,
+                height=38,
+            )
+        )
+        taxonomy_grid = QGridLayout()
+        taxonomy_grid.setContentsMargins(12, 0, 12, 0)
+        taxonomy_grid.setHorizontalSpacing(10)
+        taxonomy_grid.setVerticalSpacing(5)
+        for column, (field_label, field) in enumerate(
+            (
+                (self.lbl_detail_fabricante, self.detail_fabricante_id),
+                (self.lbl_detail_familia, self.detail_familia_id),
+                (self.lbl_detail_subfamilia, self.detail_subfamilia_id),
+            )
+        ):
+            field.setMinimumWidth(0)
+            field.setMaximumWidth(16777215)
+            taxonomy_grid.addWidget(field_label, 0, column)
+            taxonomy_grid.addWidget(field, 1, column)
+            taxonomy_grid.setColumnStretch(column, 1)
+        taxonomy_grid.setRowMinimumHeight(0, 20)
+        taxonomy_grid.setRowMinimumHeight(1, 34)
+        classification_layout.addLayout(taxonomy_grid)
+        layout.addWidget(classification_card)
+
+        # Keep both dense groups at their natural height. The old stretched
+        # vertical layout could compress fields below their required space.
+        lower_cards = QHBoxLayout()
+        lower_cards.setSpacing(10)
+        presentation_card = QFrame(tab)
+        presentation_card.setObjectName("ireksPresentationCard")
+        presentation_card.setProperty("ireksCard", True)
+        presentation_card.setFixedHeight(204)
+        presentation_layout = QVBoxLayout(presentation_card)
+        presentation_layout.setContentsMargins(0, 0, 0, 12)
+        presentation_layout.setSpacing(9)
+        presentation_layout.addWidget(self._ireks_tab_header(presentation_card, "Presentación", "presentation-container.svg"))
+        presentation_grid = QGridLayout()
+        presentation_grid.setContentsMargins(12, 0, 12, 0)
+        presentation_grid.setHorizontalSpacing(10)
+        presentation_grid.setVerticalSpacing(8)
+        presentation_fields = (
+            (self.lbl_detail_envase, self.detail_envase_id),
+            (self.lbl_detail_envase_cantidad, self.detail_envase_cantidad),
+            (self.lbl_detail_contenido_unidad, self.detail_contenido_unidad),
+            (self.lbl_detail_envase_peso, self.detail_envase_peso),
+            (self.lbl_detail_envase_unidad, self.detail_envase_unidad),
+            (self.lbl_detail_envase_total, self.detail_envase_total),
+        )
+        for index, (field_label, field) in enumerate(presentation_fields):
+            row, column = divmod(index, 3)
+            grid_row = row * 2
+            field.setMinimumWidth(0)
+            field.setMaximumWidth(16777215)
+            presentation_grid.addWidget(field_label, grid_row, column)
+            presentation_grid.addWidget(field, grid_row + 1, column)
+            presentation_grid.setColumnStretch(column, 1)
+        presentation_grid.setRowMinimumHeight(0, 20)
+        presentation_grid.setRowMinimumHeight(1, 34)
+        presentation_grid.setRowMinimumHeight(2, 20)
+        presentation_grid.setRowMinimumHeight(3, 34)
+        presentation_layout.addLayout(presentation_grid)
+        lower_cards.addWidget(presentation_card, 1)
+
+        pallet_card = QFrame(tab)
+        pallet_card.setObjectName("ireksPalletCard")
+        pallet_card.setProperty("ireksCard", True)
+        pallet_card.setFixedHeight(204)
+        pallet_layout = QVBoxLayout(pallet_card)
+        pallet_layout.setContentsMargins(0, 0, 0, 12)
+        pallet_layout.setSpacing(9)
+        pallet_layout.addWidget(self._ireks_tab_header(pallet_card, "Paletización", "pallet.svg"))
+        pallet_grid = QGridLayout()
+        pallet_grid.setContentsMargins(12, 0, 12, 0)
+        pallet_grid.setHorizontalSpacing(10)
+        pallet_grid.setVerticalSpacing(8)
+        pallet_fields = (
+            (self.lbl_transporte_pallet, self.transporte_pallet_tipo),
+            (self.lbl_transporte_cajas_capa, self.transporte_cajas_por_capa),
+            (self.lbl_transporte_capas, self.transporte_capas_por_pallet),
+            (self.lbl_transporte_cajas_pallet, self.transporte_cajas_por_pallet),
+            (self.lbl_transporte_unidades, self.transporte_unidades_por_pallet),
+            (self.lbl_transporte_kg, self.transporte_kg_por_pallet),
+        )
+        for index, (field_label, field) in enumerate(pallet_fields):
+            row, column = divmod(index, 3)
+            grid_row = row * 2
+            field.setMaximumWidth(16777215)
+            pallet_grid.addWidget(field_label, grid_row, column)
+            pallet_grid.addWidget(field, grid_row + 1, column)
+            pallet_grid.setColumnStretch(column, 1)
+        pallet_grid.setRowMinimumHeight(0, 20)
+        pallet_grid.setRowMinimumHeight(1, 34)
+        pallet_grid.setRowMinimumHeight(2, 20)
+        pallet_grid.setRowMinimumHeight(3, 34)
+        pallet_layout.addLayout(pallet_grid)
+        lower_cards.addWidget(pallet_card, 1)
+        layout.addLayout(lower_cards)
+        observations_card = QFrame(tab)
+        observations_card.setObjectName("ireksObservationsCard")
+        observations_card.setProperty("ireksCard", True)
+        observations_card.setFixedHeight(46)
+        observations_layout = QHBoxLayout(observations_card)
+        observations_layout.setContentsMargins(12, 6, 12, 6)
+        observations_layout.setSpacing(8)
+        observations_layout.addWidget(self.lbl_transporte_obs)
+        observations_layout.addWidget(self.transporte_observaciones, 1)
+        layout.addWidget(observations_card)
         layout.addStretch(1)
 
         self.transporte_pallet_tipo.currentIndexChanged.connect(self._schedule_autosave)
@@ -1831,6 +2381,8 @@ class IngredientsIreksPage(QWidget):
             self._current_filter_value(self.detail_subfamilia_id),
         )
         self.rows = payload.rows
+        if hasattr(self, "catalog_result_count"):
+            self.catalog_result_count.setText(f"{len(self.rows)} productos")
         self.table.setRowCount(len(self.rows))
         for row_idx, row in enumerate(self.rows):
             ref_item = QTableWidgetItem(str(row.articulo_referencia_corta or ""))
@@ -1999,7 +2551,7 @@ class IngredientsIreksPage(QWidget):
         self.subfamilia_filter.blockSignals(True)
 
         self.fabricante_filter.clear()
-        self.fabricante_filter.addItem("Fabricante (todos)", "")
+        self.fabricante_filter.addItem("Todos", "")
         for value in fabricantes:
             fabricante_id = str(value.fabricante_id or "").strip()
             label = str(value.fabricante_nombre or "").strip() or fabricante_id
@@ -2010,7 +2562,7 @@ class IngredientsIreksPage(QWidget):
         if current_familia and current_familia not in {str(x.articulo_familia_id or "").strip() for x in familias}:
             current_familia = ""
         self.familia_filter.clear()
-        self.familia_filter.addItem("Familia (todas)", "")
+        self.familia_filter.addItem("Todas", "")
         for value in familias:
             familia_id = str(value.articulo_familia_id or "").strip()
             nombre = str(value.articulo_familia_nombre or "").strip()
@@ -2022,7 +2574,7 @@ class IngredientsIreksPage(QWidget):
         if current_subfamilia and current_subfamilia not in {str(x.articulo_subfamilia_id or "").strip() for x in subfamilias}:
             current_subfamilia = ""
         self.subfamilia_filter.clear()
-        self.subfamilia_filter.addItem("Subfamilia (todas)", "")
+        self.subfamilia_filter.addItem("Todas", "")
         for value in subfamilias:
             subfamilia_id = str(value.articulo_subfamilia_id or "").strip()
             nombre = str(value.articulo_subfamilia_nombre or "").strip()
@@ -2249,12 +2801,12 @@ class IngredientsIreksPage(QWidget):
                 height: 15px;
                 border: 1px solid #BFC9D8;
                 border-radius: 4px;
-                background: transparent;
+                background: #FFFFFF;
             }
             QCheckBox::indicator:checked {
-                border: 1px solid #BFC9D8;
-                background: transparent;
-                image: url(assets/icons/checkmark_green.svg);
+                border: 1px solid #087E9C;
+                background: #087E9C;
+                image: url(assets/icons/checkmark_white.svg);
             }
             """
         )
@@ -2651,6 +3203,8 @@ class IngredientsIreksPage(QWidget):
         articulo_id = str(articulo_id or "").strip()
         if not articulo_id:
             self._set_salidas_totals(0.0, 0.0)
+            self.salidas_table.hide()
+            self.salidas_empty.show()
             return
         moves, items = self.ireks_service.movement_payload(articulo_id)
         q_from = self.salidas_date_from.date()
@@ -2664,6 +3218,8 @@ class IngredientsIreksPage(QWidget):
             for mov in moves
             if mov.fecha_pedido is not None and from_date <= mov.fecha_pedido <= to_date and float(mov.cantidad or 0.0) < 0
         ]
+        self.salidas_table.setVisible(bool(filtered_moves))
+        self.salidas_empty.setVisible(not filtered_moves)
         peso_total = float(items[0].articulo_envase_peso_total or 0.0) if items else 0.0
         self.salidas_table.setRowCount(len(filtered_moves))
         total_unidades = 0.0
@@ -2747,6 +3303,13 @@ class IngredientsIreksPage(QWidget):
                 item = QTableWidgetItem(value)
                 if col in (4, 5):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if col == 1:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    item.setForeground(QBrush(QColor("#087E9C" if cantidad_signed >= 0 else "#B42318")))
+                    item.setBackground(QBrush(QColor("#E5F7F4" if cantidad_signed >= 0 else "#FEE4E2")))
+                    font = item.font()
+                    font.setBold(True)
+                    item.setFont(font)
                 if col in (4, 5) and cantidad_signed < 0:
                     item.setForeground(QBrush(QColor("#B42318")))
                 if is_expiring and col == 7:
@@ -3103,17 +3666,16 @@ class IngredientsIreksPage(QWidget):
         table = self.tarifa_table
         header_table = getattr(self, "tarifa_header_table", None)
         if header_table is not None:
-            for idx in range(table.columnCount()):
+            for idx in range(table.columnCount() - 1):
                 header_table.setColumnWidth(idx, table.columnWidth(idx))
+            header_table.horizontalHeader().setSectionResizeMode(table.columnCount() - 1, QHeaderView.ResizeMode.Stretch)
             header_table.setRowHeight(0, 34)
             header_table.setRowHeight(1, 28)
-        total_cols = sum(table.columnWidth(idx) for idx in range(table.columnCount()))
-        total_width = total_cols + (2 * table.frameWidth()) + 2
-        table.setMinimumWidth(total_width)
-        table.setMaximumWidth(total_width)
+        table.setMinimumWidth(0)
+        table.setMaximumWidth(16777215)
         if header_table is not None:
-            header_table.setMinimumWidth(total_width)
-            header_table.setMaximumWidth(total_width)
+            header_table.setMinimumWidth(0)
+            header_table.setMaximumWidth(16777215)
 
     def _autosave_selected(self) -> None:
         row = self._selected_row()

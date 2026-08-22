@@ -18,6 +18,49 @@ QWidget#RecipesPageRoot {
     border: none;
 }
 
+QWidget#IngredientsIreksPageRoot {
+    background-color: #EEF3F8;
+    border: none;
+}
+
+/* Standard detail-card header: opt in with uiRole properties. */
+QFrame[uiRole="detailHeader"] {
+    background-color: #0B2F5B;
+    border: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+}
+
+QLabel[uiRole="detailHeaderTitle"] {
+    color: #FFFFFF;
+    background: transparent;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+QLabel[uiRole="detailHeaderIcon"] {
+    background: transparent;
+}
+
+QWidget#ireksContentPanel {
+    background-color: transparent;
+    border: none;
+}
+
+QSplitter#ireksMainSplitter,
+QSplitter#ireksMainSplitter::handle {
+    background-color: transparent;
+    border: none;
+}
+
+QSplitter#ireksDetailSplitter,
+QSplitter#ireksDetailSplitter::handle {
+    background-color: transparent;
+    border: none;
+}
+
 QSplitter#recipesMainSplitter,
 QWidget#recipesContentPanel,
 QWidget#recipesImagesRibbon {

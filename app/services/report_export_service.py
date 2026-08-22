@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,7 @@ from app.core.config import DATA_DIR
 
 
 class ReportExportService:
+    PREFERENCES_PATH = DATA_DIR / "export_preferences.json"
     AGENDA_STATE_PALETTE = {
         'pending': ('#1D4ED8', '#DBEAFE', '#93C5FD'),
         'completed': ('#15803D', '#DCFCE7', '#86EFAC'),
@@ -48,11 +50,36 @@ class ReportExportService:
         return date_width, customer_width, state_width, card_horizontal_padding
 
     def default_path(self, title: str, suffix: str, folder: str = "listados_clientes") -> Path:
-        reports_dir = DATA_DIR / "exports" / folder
+        normalized_suffix = suffix.lstrip(".").lower()
+        reports_dir = self._remembered_directory(normalized_suffix) or (DATA_DIR / "exports" / folder)
         reports_dir.mkdir(parents=True, exist_ok=True)
         safe = "".join(ch if ch.isalnum() else "_" for ch in str(title or "listado").lower()).strip("_")
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return reports_dir / f"{safe[:40] or 'listado'}_{stamp}.{suffix.lstrip('.')}"
+        return reports_dir / f"{safe[:40] or 'listado'}_{stamp}.{normalized_suffix}"
+
+    def _remembered_directory(self, suffix: str) -> Path | None:
+        try:
+            data = json.loads(self.PREFERENCES_PATH.read_text(encoding="utf-8"))
+            value = str(data.get("last_directories", {}).get(suffix) or "").strip()
+            path = Path(value)
+            return path if value and path.is_dir() else None
+        except (OSError, ValueError, TypeError):
+            return None
+
+    def _remember_export_directory(self, path: Path) -> None:
+        suffix = path.suffix.lstrip(".").lower()
+        if suffix not in {"pdf", "xlsx"}:
+            return
+        try:
+            data = json.loads(self.PREFERENCES_PATH.read_text(encoding="utf-8")) if self.PREFERENCES_PATH.exists() else {}
+            if not isinstance(data, dict):
+                data = {}
+            directories = data.setdefault("last_directories", {})
+            directories[suffix] = str(path.parent.resolve())
+            self.PREFERENCES_PATH.parent.mkdir(parents=True, exist_ok=True)
+            self.PREFERENCES_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        except (OSError, ValueError, TypeError):
+            pass
 
     def export_excel(self, path: str | Path, title: str, headers: list[str], rows: list[list[Any]], sheet_title: str = "Listado clientes") -> Path:
         out = Path(path)
@@ -74,9 +101,19 @@ class ReportExportService:
             ws.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 45)
         ws.freeze_panes = "A3"
         wb.save(out)
+        self._remember_export_directory(out)
         return out
 
-    def export_pdf(self, path: str | Path, title: str, headers: list[str], rows: list[list[Any]]) -> Path:
+    def export_pdf(
+        self,
+        path: str | Path,
+        title: str,
+        headers: list[str],
+        rows: list[list[Any]],
+        *,
+        summary: str = "",
+        format_measure_columns: bool = False,
+    ) -> Path:
         out = Path(path)
         out.parent.mkdir(parents=True, exist_ok=True)
         doc = SimpleDocTemplate(str(out), pagesize=landscape(A4), leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24)
@@ -86,8 +123,26 @@ class ReportExportService:
             parent=styles["Title"],
             alignment=0,
         )
-        story = [Paragraph(str(title or "Listado de clientes"), title_style), Spacer(1, 10)]
-        table_data = [headers] + [[str(value) for value in row] for row in rows]
+        summary_style = ParagraphStyle(
+            "ListingSummary",
+            parent=styles["Normal"],
+            fontSize=9,
+            leading=12,
+            textColor=colors.HexColor("#475569"),
+            alignment=0,
+        )
+        story = [Paragraph(xml_escape(str(title or "Listado de clientes")), title_style)]
+        if summary:
+            story.extend([Spacer(1, 3), Paragraph(xml_escape(str(summary)), summary_style)])
+        story.append(Spacer(1, 10))
+        table_data = [headers] + [
+            [
+                self._format_pdf_value(headers[index] if index < len(headers) else "", value)
+                if format_measure_columns else str(value)
+                for index, value in enumerate(row)
+            ]
+            for row in rows
+        ]
         column_count = max(1, len(headers))
         content_widths = [0] * column_count
         for row in table_data:
@@ -103,13 +158,18 @@ class ReportExportService:
             col_widths = [max(min_widths[idx], width * scale) for idx, width in enumerate(max_widths)]
         else:
             col_widths = max_widths[:]
+        if format_measure_columns:
+            self._match_pdf_measure_columns(headers, col_widths)
         width_delta = available_width - sum(col_widths)
-        if width_delta != 0 and column_count:
-            col_widths[-1] = max(min_widths[-1], col_widths[-1] + width_delta)
+        if width_delta > 0 and column_count:
+            flexible_columns = [
+                index for index, header in enumerate(headers)
+                if not self._is_pdf_numeric_header(header)
+            ] if format_measure_columns else []
+            target = flexible_columns[-1] if flexible_columns else column_count - 1
+            col_widths[target] += width_delta
         table = Table(table_data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
-        table.setStyle(
-            TableStyle(
-                [
+        table_style = [
                     ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#3A78CF")),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
@@ -121,11 +181,42 @@ class ReportExportService:
                     ("LEFTPADDING", (0, 0), (-1, -1), 4),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 4),
                 ]
-            )
-        )
+        for index, header in enumerate(headers):
+            if format_measure_columns and self._is_pdf_numeric_header(header):
+                table_style.append(("ALIGN", (index, 0), (index, 0), "CENTER"))
+                table_style.append(("ALIGN", (index, 1), (index, -1), "RIGHT"))
+        table.setStyle(TableStyle(table_style))
         story.append(table)
         doc.build(story)
+        self._remember_export_directory(out)
         return out
+
+    @staticmethod
+    def _format_pdf_value(header: str, value: Any) -> str:
+        normalized_header = str(header or "").strip().casefold()
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            formatted = f"{float(value):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+            if normalized_header in {"kg", "kgs", "kilogramos"}:
+                return f"{formatted} kg"
+            if normalized_header in {"€", "eur", "euros"}:
+                return f"{formatted} €"
+            return formatted
+        return str(value or "")
+
+    @staticmethod
+    def _is_pdf_numeric_header(header: str) -> bool:
+        return str(header or "").strip().casefold() in {"kg", "kgs", "kilogramos", "€", "eur", "euros"}
+
+    @staticmethod
+    def _match_pdf_measure_columns(headers: list[str], widths: list[float]) -> None:
+        measure_columns = [
+            index for index, header in enumerate(headers)
+            if str(header or "").strip().casefold() in {"kg", "kgs", "kilogramos", "€", "eur", "euros"}
+        ]
+        if measure_columns:
+            shared_width = max(widths[index] for index in measure_columns)
+            for index in measure_columns:
+                widths[index] = shared_width
 
     def export_dashboard_agenda_pdf(self, path: str | Path, title: str, rows: list[list[Any]]) -> Path:
         out = Path(path)
@@ -203,6 +294,177 @@ class ReportExportService:
             )
             story.append(KeepTogether([card, Spacer(1, 7)]))
         doc.build(story)
+        self._remember_export_directory(out)
+        return out
+
+    def export_customer_ai_summary_pdf(
+        self,
+        path: str | Path,
+        *,
+        customer_name: str,
+        result: Any,
+    ) -> Path:
+        snapshot = getattr(result, "snapshot", None)
+        sections = getattr(result, "sections", None)
+        if snapshot is None or sections is None:
+            raise ValueError("El resumen no contiene datos exportables.")
+
+        out = Path(path)
+        if out.suffix.lower() != ".pdf":
+            out = out.with_suffix(".pdf")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        doc = SimpleDocTemplate(
+            str(out),
+            pagesize=A4,
+            leftMargin=16 * mm,
+            rightMargin=16 * mm,
+            topMargin=17 * mm,
+            bottomMargin=17 * mm,
+            title=f"Resumen comercial - {customer_name}",
+        )
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "CustomerAISummaryTitle",
+            parent=styles["Title"],
+            fontName="Helvetica-Bold",
+            fontSize=17,
+            leading=21,
+            alignment=0,
+            textColor=colors.HexColor("#17365D"),
+            spaceAfter=5,
+        )
+        subtitle_style = ParagraphStyle(
+            "CustomerAISummarySubtitle",
+            parent=styles["Normal"],
+            fontSize=9.5,
+            leading=12,
+            textColor=colors.HexColor("#64748B"),
+            spaceAfter=11,
+        )
+        section_style = ParagraphStyle(
+            "CustomerAISummarySection",
+            parent=styles["Heading2"],
+            fontName="Helvetica-Bold",
+            fontSize=12,
+            leading=15,
+            textColor=colors.HexColor("#264A73"),
+            spaceBefore=9,
+            spaceAfter=4,
+        )
+        body_style = ParagraphStyle(
+            "CustomerAISummaryBody",
+            parent=styles["BodyText"],
+            fontSize=9.5,
+            leading=13.5,
+            textColor=colors.HexColor("#263E5C"),
+            spaceAfter=4,
+        )
+        metric_caption_style = ParagraphStyle(
+            "CustomerAISummaryMetricCaption",
+            parent=styles["Normal"],
+            fontSize=7,
+            leading=9,
+            textColor=colors.HexColor("#64748B"),
+        )
+        metric_value_style = ParagraphStyle(
+            "CustomerAISummaryMetricValue",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            leading=12,
+            textColor=colors.HexColor("#264A73"),
+        )
+
+        def clean(value: Any) -> str:
+            return (
+                str(value or "")
+                .replace("\u2013", "-")
+                .replace("\u2014", "-")
+                .replace("\u00b7", "-")
+            )
+
+        def paragraph(value: Any, style: ParagraphStyle = body_style) -> Paragraph:
+            return Paragraph(xml_escape(clean(value)).replace("\n", "<br/>"), style)
+
+        def number(value: Any) -> str:
+            return f"{float(value or 0.0):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+
+        variation = "No comparable"
+        if bool(getattr(snapshot, "comparison_available", False)):
+            delta_pct = getattr(snapshot, "delta_kg_pct", None)
+            variation = "Sin base" if delta_pct is None else f"{float(delta_pct):+.1f}%"
+        metrics = [
+            ("VOLUMEN ACTUAL", f"{number(getattr(snapshot, 'kg_current', 0.0))} kg"),
+            ("VARIACIÓN", variation),
+            ("FACTURACIÓN", f"{number(getattr(snapshot, 'euros_current', 0.0))} EUR"),
+            ("ÚLTIMA ACTIVIDAD", clean(getattr(snapshot, "latest_activity", "")) or "Sin registrar"),
+        ]
+        metric_table = Table(
+            [[
+                [Paragraph(caption, metric_caption_style), Paragraph(xml_escape(value), metric_value_style)]
+                for caption, value in metrics
+            ]],
+            colWidths=[doc.width / 4] * 4,
+        )
+        metric_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+                    ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#CBD5E1")),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#DCE3EC")),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                    ("TOPPADDING", (0, 0), (-1, -1), 7),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                ]
+            )
+        )
+
+        story: list[Any] = [
+            Paragraph(xml_escape(f"Resumen comercial - {clean(customer_name)}"), title_style),
+            Paragraph(xml_escape(clean(getattr(snapshot, "period_label", ""))), subtitle_style),
+            metric_table,
+            Spacer(1, 4),
+        ]
+
+        def add_section(title: str, value: Any) -> None:
+            story.append(Paragraph(title, section_style))
+            story.append(paragraph(value))
+
+        def add_list_section(title: str, values: Any, empty_text: str) -> None:
+            story.append(Paragraph(title, section_style))
+            clean_values = tuple(values or ()) or (empty_text,)
+            story.extend(paragraph(f"- {value}") for value in clean_values)
+
+        add_section("Situación", getattr(sections, "situation", ""))
+        add_section("Ventas", getattr(sections, "sales", ""))
+        add_list_section("Productos", getattr(sections, "products", ()), "Sin observaciones de producto.")
+        add_list_section(
+            "Oportunidades",
+            getattr(sections, "opportunities", ()),
+            "Sin acciones automáticas sugeridas.",
+        )
+        add_section("Conclusión", getattr(sections, "conclusion", ""))
+        story.extend(
+            [
+                Spacer(1, 10),
+                paragraph("Datos de GestionIREKS - redacción local y privada", subtitle_style),
+            ]
+        )
+
+        def draw_footer(canvas: Any, document: Any) -> None:
+            canvas.saveState()
+            canvas.setStrokeColor(colors.HexColor("#D7DEE8"))
+            canvas.line(document.leftMargin, 11 * mm, A4[0] - document.rightMargin, 11 * mm)
+            canvas.setFont("Helvetica", 7.5)
+            canvas.setFillColor(colors.HexColor("#64748B"))
+            canvas.drawString(document.leftMargin, 7 * mm, "GestionIREKS - Resumen comercial")
+            canvas.drawRightString(A4[0] - document.rightMargin, 7 * mm, f"Página {document.page}")
+            canvas.restoreState()
+
+        doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
+        self._remember_export_directory(out)
         return out
 
     def export_customer_sales_comparison_pdf(
@@ -331,4 +593,5 @@ class ReportExportService:
             table,
         ]
         doc.build(story, onFirstPage=add_page_number, onLaterPages=add_page_number)
+        self._remember_export_directory(out)
         return out

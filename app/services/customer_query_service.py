@@ -2,12 +2,68 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
+import json
 import re
 import unicodedata
 from typing import Any
 
+from app.core.database import engine
 from app.services.customer_report_flow_service import CustomerReportFlowService
+from app.services.local_ai_service import LocalAIService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
+
+
+CUSTOMER_QUERY_INTENT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "query_type": {
+            "type": "string",
+            "enum": [
+                "customer_filter",
+                "duplicate_customer_names",
+                "sales_customer_year_comparison",
+                "sales_customer_list",
+                "sales_drop_ranking",
+                "sales_growth_ranking",
+            ],
+        },
+        "year": {"type": "integer"},
+        "compare_year": {"type": "integer"},
+        "limit": {"type": "integer"},
+        "customer_type": {"type": "string", "enum": ["", "directo", "indirecto", "distribuidor"]},
+        "island": {
+            "type": "string",
+            "enum": ["", "Gran Canaria", "Tenerife", "Lanzarote", "Fuerteventura", "La Palma", "La Gomera", "El Hierro"],
+        },
+        "direction": {"type": "string", "enum": ["asc", "desc"]},
+        "metric": {"type": "string", "enum": ["kg"]},
+        "zero_consumption": {"type": "boolean"},
+        "columns": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": ["isla", "codigo", "nombre", "kg", "euros", "kg_curr", "kg_prev", "delta_kg", "delta_kg_pct"],
+            },
+        },
+        "sort_by_island": {"type": "boolean"},
+        "sort_metric": {"type": "string", "enum": ["kg", "kg_curr", "delta_kg"]},
+    },
+    "required": [
+        "query_type",
+        "year",
+        "compare_year",
+        "limit",
+        "customer_type",
+        "island",
+        "direction",
+        "metric",
+        "zero_consumption",
+        "columns",
+        "sort_by_island",
+        "sort_metric",
+    ],
+    "additionalProperties": False,
+}
 
 
 @dataclass
@@ -24,6 +80,7 @@ class CustomerQueryIntent:
     columns: list[str] = field(default_factory=list)
     sort_by_island: bool = True
     sort_metric: str = "kg"
+    ai_interpreted: bool = False
 
 
 @dataclass
@@ -55,14 +112,35 @@ class CustomerQueryService:
         "diez": 10,
         "veinte": 20,
     }
+    _QUERY_TYPES = {
+        "customer_filter",
+        "duplicate_customer_names",
+        "sales_customer_year_comparison",
+        "sales_customer_list",
+        "sales_drop_ranking",
+        "sales_growth_ranking",
+    }
+    _CUSTOMER_TYPES = {"", "directo", "indirecto", "distribuidor"}
+    _ISLANDS = {
+        "Gran Canaria",
+        "Tenerife",
+        "Lanzarote",
+        "Fuerteventura",
+        "La Palma",
+        "La Gomera",
+        "El Hierro",
+    }
+    _SALES_COLUMNS = {"isla", "codigo", "nombre", "kg", "euros", "kg_curr", "kg_prev", "delta_kg", "delta_kg_pct"}
 
     def __init__(
         self,
         report_flow_service: CustomerReportFlowService | None = None,
         sales_service: SalesAnnualComparisonService | None = None,
+        local_ai_service: LocalAIService | None = None,
     ) -> None:
         self.report_flow_service = report_flow_service or CustomerReportFlowService()
         self.sales_service = sales_service or SalesAnnualComparisonService()
+        self.local_ai_service = local_ai_service or LocalAIService(timeout=60.0)
 
     def run(self, prompt: str) -> CustomerQueryResult:
         text = str(prompt or "").strip()
@@ -70,6 +148,8 @@ class CustomerQueryService:
             return CustomerQueryResult(status="empty", message="Escribe una consulta sobre los clientes.")
 
         intent = self.interpret(text)
+        if intent.query_type == "duplicate_customer_names":
+            return self._run_duplicate_customer_names(intent)
         if intent.query_type == 'sales_customer_year_comparison':
             return self._run_sales_customer_year_comparison(intent)
         if intent.query_type == 'sales_customer_list':
@@ -79,11 +159,42 @@ class CustomerQueryService:
         return self._run_customer_filter(text, intent)
 
     def interpret(self, prompt: str) -> CustomerQueryIntent:
+        fallback = self._interpret_deterministic(prompt)
+        if not self.local_ai_service.enabled:
+            return fallback
+        result = self.local_ai_service.generate_json(
+            self._local_ai_instruction(prompt),
+            schema=CUSTOMER_QUERY_INTENT_SCHEMA,
+        )
+        if not result.ok:
+            return fallback
+        try:
+            return self._intent_from_local_ai(result.text, fallback)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return fallback
+
+    def _interpret_deterministic(self, prompt: str) -> CustomerQueryIntent:
         normalized = self._normalize(prompt)
         years = [int(item) for item in re.findall(r"\b(20\d{2})\b", normalized)]
         year = years[0] if years else date.today().year
         compare_year = years[1] if len(years) > 1 else 0
         limit = self._extract_limit(normalized)
+
+        duplicate_name_terms = (
+            "nombre repetido",
+            "nombres repetidos",
+            "nombre duplicado",
+            "nombres duplicados",
+            "cliente duplicado",
+            "clientes duplicados",
+            "cliente repetido",
+            "clientes repetidos",
+        )
+        if any(term in normalized for term in duplicate_name_terms):
+            return CustomerQueryIntent(
+                query_type="duplicate_customer_names",
+                limit=limit,
+            )
 
         sales_terms = ("compra", "venta", "kg", "kilo", "consumo")
         drop_terms = ("bajada", "bajado", "bajan", "caida", "caido", "descenso", "perdido", "menos")
@@ -197,10 +308,10 @@ class CustomerQueryService:
             )
         )
         zero_consumption = bool(
-            re.search(r'\bconsumo\s*(?:=|igual\s+a)?\s*0(?:[,.]0+)?\b', normalized)
+            re.search(r'\b(?:consumo|compra(?:s)?|venta(?:s)?)\s*(?:=|igual\s+a)?\s*0(?:[,.]0+)?\b', normalized)
             or any(
                 term in normalized
-                for term in ('sin consumo', 'no han consumido', 'no ha consumido')
+                for term in ('sin consumo', 'sin compras', 'sin ventas', 'no han consumido', 'no ha consumido')
             )
         )
 
@@ -244,6 +355,84 @@ class CustomerQueryService:
             )
         return CustomerQueryIntent(query_type="customer_filter", year=year, limit=limit, metric="kg")
 
+    def _local_ai_instruction(self, prompt: str) -> str:
+        return (
+            "Convierte la pregunta del usuario sobre clientes a un JSON estricto para un interprete "
+            "determinista de solo lectura. No generes SQL, no inventes campos ni datos. "
+            f"query_type permitido: {', '.join(sorted(self._QUERY_TYPES))}. "
+            "Campos JSON permitidos: query_type, year, compare_year, limit, customer_type, island, "
+            "direction, metric, zero_consumption, columns, sort_by_island, sort_metric. "
+            "customer_type permitido: directo, indirecto, distribuidor o cadena vacia. "
+            "direction permitido: asc o desc. metric siempre kg. "
+            "columns permitidas: isla, codigo, nombre, kg, euros, kg_curr, kg_prev, delta_kg, delta_kg_pct. "
+            "Usa euros para el total monetario mostrado como €. "
+            "Interpreta ventas = 0, compras = 0, sin compras y sin consumo como zero_consumption=true "
+            "en kg. Devuelve solo JSON valido.\n\n"
+            f"Pregunta: {str(prompt or '').strip()}"
+        )
+
+    def _intent_from_local_ai(self, text: str, fallback: CustomerQueryIntent) -> CustomerQueryIntent:
+        parsed = json.loads(str(text or "").strip())
+        if not isinstance(parsed, dict):
+            raise ValueError("La IA local no devolvio un objeto JSON.")
+
+        query_type = str(parsed.get("query_type") or fallback.query_type).strip()
+        if query_type not in self._QUERY_TYPES:
+            raise ValueError("Tipo de consulta no permitido.")
+        if fallback.query_type.startswith("sales_"):
+            query_type = fallback.query_type
+        year = self._safe_year(parsed.get("year"), fallback.year)
+        compare_year = self._safe_year(parsed.get("compare_year"), fallback.compare_year, allow_zero=True)
+        customer_type = str(parsed.get("customer_type") or fallback.customer_type).strip().lower()
+        if customer_type not in self._CUSTOMER_TYPES:
+            customer_type = fallback.customer_type
+        island = str(parsed.get("island") or fallback.island).strip()
+        if island not in self._ISLANDS:
+            island = fallback.island
+        direction = str(parsed.get("direction") or fallback.direction).strip().lower()
+        if direction not in {"asc", "desc"}:
+            direction = fallback.direction
+        columns = self._validated_sales_columns(parsed.get("columns", fallback.columns))
+        return CustomerQueryIntent(
+            query_type=query_type,
+            year=year,
+            compare_year=compare_year,
+            limit=min(max(int(parsed.get("limit", fallback.limit) or fallback.limit), 1), 5000),
+            customer_type=customer_type,
+            island=island,
+            direction=direction,
+            metric="kg",
+            zero_consumption=parsed.get("zero_consumption") if isinstance(parsed.get("zero_consumption"), bool) else fallback.zero_consumption,
+            columns=list(dict.fromkeys(columns)),
+            sort_by_island=parsed.get("sort_by_island") if isinstance(parsed.get("sort_by_island"), bool) else fallback.sort_by_island,
+            sort_metric=(
+                str(parsed.get("sort_metric") or fallback.sort_metric)
+                if str(parsed.get("sort_metric") or fallback.sort_metric) in {"kg", "kg_curr", "delta_kg"}
+                else fallback.sort_metric
+            ),
+            ai_interpreted=True,
+        )
+
+    def _validated_sales_columns(self, values: Any) -> list[str]:
+        aliases = {"€": "euros", "euro": "euros", "euros": "euros", "total €": "euros", "total euros": "euros"}
+        return list(
+            dict.fromkeys(
+                aliases.get(str(column).strip().lower(), str(column).strip())
+                for column in values if isinstance(values, list)
+                if aliases.get(str(column).strip().lower(), str(column).strip()) in self._SALES_COLUMNS
+            )
+        )
+
+    @staticmethod
+    def _safe_year(value: Any, fallback: int, *, allow_zero: bool = False) -> int:
+        try:
+            year = int(value)
+        except (TypeError, ValueError):
+            return fallback
+        if allow_zero and year == 0:
+            return 0
+        return year if 2000 <= year <= 2100 else fallback
+
     def _run_customer_filter(self, prompt: str, intent: CustomerQueryIntent) -> CustomerQueryResult:
         flow_result = self.report_flow_service.generate_report(prompt)
         report = flow_result.report
@@ -268,6 +457,47 @@ class CustomerQueryService:
             intent=intent,
         )
 
+    def _run_duplicate_customer_names(self, intent: CustomerQueryIntent) -> CustomerQueryResult:
+        """List customers whose commercial names are repeated after normalization."""
+        with engine.begin() as conn:
+            source_rows = conn.exec_driver_sql(
+                """
+                SELECT cliente_id, cliente_codigo, cliente_nombre_comercial
+                FROM clientes
+                WHERE TRIM(COALESCE(cliente_nombre_comercial, '')) <> ''
+                """
+            ).fetchall()
+
+        grouped: dict[str, list[tuple[str, str, str]]] = {}
+        for cliente_id, cliente_codigo, nombre_comercial in source_rows:
+            name = str(nombre_comercial or "").strip()
+            normalized_name = self._normalize_duplicate_name(name)
+            if not normalized_name:
+                continue
+            grouped.setdefault(normalized_name, []).append(
+                (str(cliente_id or ""), str(cliente_codigo or ""), name)
+            )
+
+        rows: list[list[Any]] = []
+        for group in sorted(grouped.values(), key=lambda items: self._normalize_duplicate_name(items[0][2])):
+            if len(group) < 2:
+                continue
+            for _cliente_id, codigo, nombre in sorted(group, key=lambda item: (item[1], item[0])):
+                rows.append([nombre, codigo, len(group)])
+
+        safe_limit = min(max(int(intent.limit or 500), 1), 5000)
+        rows = rows[:safe_limit]
+        return CustomerQueryResult(
+            status="ready" if rows else "empty",
+            title="Clientes con nombres comerciales repetidos",
+            headers=["Nombre comercial", "Cod.", "Coincidencias"],
+            rows=rows,
+            message="" if rows else "No se encontraron nombres comerciales repetidos.",
+            source="cálculo local",
+            interpretation="Clientes agrupados por nombre comercial normalizado.",
+            intent=intent,
+        )
+
     def _run_sales_customer_list(self, intent: CustomerQueryIntent) -> CustomerQueryResult:
         rows = self.sales_service.listar_ventas_anuales_clientes(
             year=intent.year,
@@ -284,6 +514,7 @@ class CustomerQueryService:
             'codigo': ('Cod.', lambda row: row.cliente_codigo),
             'nombre': ('Nombre comercial', lambda row: row.cliente_nombre),
             'kg': ('Kg', lambda row: row.kg),
+            'euros': ('€', lambda row: row.euros),
         }
         selected_columns = [key for key in intent.columns if key in column_map] or ['isla', 'codigo', 'nombre', 'kg']
         headers = [column_map[key][0] for key in selected_columns]
@@ -441,6 +672,8 @@ class CustomerQueryService:
                 key = 'delta_kg'
             elif token in {'kg', 'kilos', 'kilogramos'}:
                 key = 'kg'
+            elif token in {'€', 'euro', 'euros', 'total €', 'total euro', 'total euros'}:
+                key = 'euros'
             if key and key not in columns:
                 columns.append(key)
         return columns
@@ -449,3 +682,9 @@ class CustomerQueryService:
     def _normalize(value: str) -> str:
         decomposed = unicodedata.normalize("NFKD", str(value or "").lower())
         return "".join(char for char in decomposed if not unicodedata.combining(char))
+
+    @staticmethod
+    def _normalize_duplicate_name(value: str) -> str:
+        text = unicodedata.normalize("NFKD", str(value or "").lower())
+        accent_free = "".join(char for char in text if not unicodedata.combining(char))
+        return " ".join(accent_free.split())

@@ -13,12 +13,14 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QHeaderView,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -1436,19 +1438,36 @@ class SettingsPage(QWidget):
     def _build_api_tab(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
         provider_view = self.settings_provider_service.build_ui_view()
+
+        cards_column = QWidget(panel)
+        cards_column.setObjectName("settingsApiCards")
+        cards_column.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        cards_layout = QGridLayout(cards_column)
+        cards_layout.setContentsMargins(0, 0, 0, 0)
+        cards_layout.setHorizontalSpacing(12)
+        cards_layout.setVerticalSpacing(12)
+        for column in range(3):
+            cards_layout.setColumnStretch(column, 1)
+        cards_layout.setRowStretch(0, 1)
+        cards_layout.setRowStretch(1, 1)
+        layout.addWidget(cards_column, 1)
 
         fdc_card = QFrame()
         fdc_card.setObjectName("card")
+        fdc_card.setProperty("apiCard", "fdc")
         fdc_layout = QVBoxLayout(fdc_card)
         fdc_layout.setContentsMargins(10, 10, 10, 10)
         fdc_layout.setSpacing(8)
 
         fdc_title = QLabel(provider_view.fdc_title)
         fdc_title.setProperty("role", "sectionTitle")
+        fdc_title.setWordWrap(True)
         fdc_layout.addWidget(fdc_title)
 
-        form = QFormLayout()
+        form = QVBoxLayout()
         self.fdc_api_key_input = QLineEdit()
         self.fdc_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.fdc_api_key_input.setPlaceholderText(provider_view.fdc_placeholder)
@@ -1460,11 +1479,12 @@ class SettingsPage(QWidget):
         idx = self.fdc_data_type_combo.findText(current_data_type)
         if idx >= 0:
             self.fdc_data_type_combo.setCurrentIndex(idx)
-        form.addRow(provider_view.fdc_api_key_label, self.fdc_api_key_input)
-        form.addRow(provider_view.fdc_data_type_label, self.fdc_data_type_combo)
+        self._add_api_field(form, provider_view.fdc_api_key_label, self.fdc_api_key_input)
+        self._add_api_field(form, provider_view.fdc_data_type_label, self.fdc_data_type_combo)
+        self._configure_api_fields(form, self.fdc_api_key_input, self.fdc_data_type_combo)
         fdc_layout.addLayout(form)
 
-        actions = QHBoxLayout()
+        actions = QVBoxLayout()
         self.fdc_save_btn = QPushButton(provider_view.save_button_label)
         self.fdc_save_btn.setProperty("btnRole", "success")
         self.fdc_test_btn = QPushButton(provider_view.test_button_label)
@@ -1473,26 +1493,30 @@ class SettingsPage(QWidget):
         self.fdc_test_btn.clicked.connect(self._test_fdc_connection)
         actions.addWidget(self.fdc_save_btn)
         actions.addWidget(self.fdc_test_btn)
-        actions.addStretch(1)
+        self._configure_api_actions(actions, self.fdc_save_btn, self.fdc_test_btn)
         fdc_layout.addLayout(actions)
 
         self.fdc_info_label = QLabel(provider_view.secret_info_label)
+        self.fdc_info_label.setObjectName("settingsApiFdcInfo")
         self.fdc_info_label.setWordWrap(True)
         fdc_layout.addWidget(self.fdc_info_label)
-        layout.addWidget(fdc_card)
+        self._finalize_api_card(fdc_card, 248)
+        cards_layout.addWidget(fdc_card, 0, 0)
 
         fat_card = QFrame()
         fat_card.setObjectName("card")
+        fat_card.setProperty("apiCard", "fatsecret")
         fat_layout = QVBoxLayout(fat_card)
         fat_layout.setContentsMargins(10, 10, 10, 10)
         fat_layout.setSpacing(8)
 
         fat_title = QLabel(provider_view.fatsecret_title)
         fat_title.setProperty("role", "sectionTitle")
+        fat_title.setWordWrap(True)
         fat_layout.addWidget(fat_title)
         fat_loaded = self.settings_provider_service.load_fatsecret()
 
-        fat_form = QFormLayout()
+        fat_form = QVBoxLayout()
         self.fatsecret_client_id_input = QLineEdit()
         self.fatsecret_client_id_input.setPlaceholderText(provider_view.fatsecret_client_id_placeholder)
         self.fatsecret_client_id_input.setText(str(fat_loaded.get("client_id") or ""))
@@ -1503,12 +1527,18 @@ class SettingsPage(QWidget):
         self.fatsecret_scope_input = QLineEdit()
         self.fatsecret_scope_input.setPlaceholderText(provider_view.fatsecret_scope_placeholder)
         self.fatsecret_scope_input.setText(str(fat_loaded.get("scope") or "basic"))
-        fat_form.addRow(provider_view.fatsecret_client_id_label, self.fatsecret_client_id_input)
-        fat_form.addRow(provider_view.fatsecret_client_secret_label, self.fatsecret_client_secret_input)
-        fat_form.addRow(provider_view.fatsecret_scope_label, self.fatsecret_scope_input)
+        self._add_api_field(fat_form, provider_view.fatsecret_client_id_label, self.fatsecret_client_id_input)
+        self._add_api_field(fat_form, provider_view.fatsecret_client_secret_label, self.fatsecret_client_secret_input)
+        self._add_api_field(fat_form, provider_view.fatsecret_scope_label, self.fatsecret_scope_input)
+        self._configure_api_fields(
+            fat_form,
+            self.fatsecret_client_id_input,
+            self.fatsecret_client_secret_input,
+            self.fatsecret_scope_input,
+        )
         fat_layout.addLayout(fat_form)
 
-        fat_actions = QHBoxLayout()
+        fat_actions = QVBoxLayout()
         self.fatsecret_save_btn = QPushButton(provider_view.save_button_label)
         self.fatsecret_save_btn.setProperty("btnRole", "success")
         self.fatsecret_test_btn = QPushButton(provider_view.test_button_label)
@@ -1517,36 +1547,41 @@ class SettingsPage(QWidget):
         self.fatsecret_test_btn.clicked.connect(self._test_fatsecret_connection)
         fat_actions.addWidget(self.fatsecret_save_btn)
         fat_actions.addWidget(self.fatsecret_test_btn)
-        fat_actions.addStretch(1)
+        self._configure_api_actions(fat_actions, self.fatsecret_save_btn, self.fatsecret_test_btn)
         fat_layout.addLayout(fat_actions)
 
         fat_info = QLabel(provider_view.secret_info_label)
+        fat_info.setObjectName("settingsApiFatSecretInfo")
         fat_info.setWordWrap(True)
         fat_layout.addWidget(fat_info)
-        layout.addWidget(fat_card)
+        self._finalize_api_card(fat_card, 304)
+        cards_layout.addWidget(fat_card, 0, 1)
 
         openai_card = QFrame()
         openai_card.setObjectName("card")
+        openai_card.setProperty("apiCard", "openai")
         openai_layout = QVBoxLayout(openai_card)
         openai_layout.setContentsMargins(10, 10, 10, 10)
         openai_layout.setSpacing(8)
         openai_title = QLabel(provider_view.openai_title)
         openai_title.setProperty("role", "sectionTitle")
+        openai_title.setWordWrap(True)
         openai_layout.addWidget(openai_title)
         oa_loaded = self.settings_provider_service.load_openai()
 
-        openai_form = QFormLayout()
+        openai_form = QVBoxLayout()
         self.openai_api_key_input = QLineEdit()
         self.openai_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.openai_api_key_input.setPlaceholderText(provider_view.openai_placeholder)
         self.openai_api_key_input.setText(str(oa_loaded.get("api_key") or ""))
-        openai_form.addRow(provider_view.openai_api_key_label, self.openai_api_key_input)
+        self._add_api_field(openai_form, provider_view.openai_api_key_label, self.openai_api_key_input)
+        self._configure_api_fields(openai_form, self.openai_api_key_input)
         openai_layout.addLayout(openai_form)
         self.use_ai_translation_check = QCheckBox(provider_view.openai_ai_translation_label)
         self.use_ai_translation_check.setChecked(bool(oa_loaded.get("use_ai_translation", False)))
         openai_layout.addWidget(self.use_ai_translation_check)
 
-        openai_actions = QHBoxLayout()
+        openai_actions = QVBoxLayout()
         self.openai_save_btn = QPushButton(provider_view.save_button_label)
         self.openai_save_btn.setProperty("btnRole", "success")
         self.openai_test_btn = QPushButton(provider_view.test_button_label)
@@ -1555,16 +1590,99 @@ class SettingsPage(QWidget):
         self.openai_test_btn.clicked.connect(self._test_openai_connection)
         openai_actions.addWidget(self.openai_save_btn)
         openai_actions.addWidget(self.openai_test_btn)
-        openai_actions.addStretch(1)
+        self._configure_api_actions(openai_actions, self.openai_save_btn, self.openai_test_btn)
         openai_layout.addLayout(openai_actions)
 
         openai_info = QLabel(provider_view.secret_info_label)
+        openai_info.setObjectName("settingsApiOpenAiInfo")
         openai_info.setWordWrap(True)
         openai_layout.addWidget(openai_info)
-        layout.addWidget(openai_card)
+        self._finalize_api_card(openai_card, 270)
+        cards_layout.addWidget(openai_card, 0, 2)
+
+        local_ai_card = QFrame()
+        local_ai_card.setObjectName("card")
+        local_ai_card.setProperty("apiCard", "local_ai")
+        local_ai_layout = QVBoxLayout(local_ai_card)
+        local_ai_layout.setContentsMargins(10, 10, 10, 10)
+        local_ai_layout.setSpacing(8)
+
+        local_ai_title = QLabel(provider_view.local_ai_title)
+        local_ai_title.setProperty("role", "sectionTitle")
+        local_ai_title.setWordWrap(True)
+        local_ai_layout.addWidget(local_ai_title)
+        local_ai_loaded = self.settings_provider_service.load_local_ai()
+
+        self.local_ai_enabled_check = QCheckBox(provider_view.local_ai_enabled_label)
+        self.local_ai_enabled_check.setChecked(bool(local_ai_loaded.get("enabled", False)))
+        local_ai_layout.addWidget(self.local_ai_enabled_check)
+
+        local_ai_form = QVBoxLayout()
+        self.local_ai_base_url_input = QLineEdit()
+        self.local_ai_base_url_input.setPlaceholderText(provider_view.local_ai_base_url_placeholder)
+        self.local_ai_base_url_input.setText(str(local_ai_loaded.get("base_url") or ""))
+        self.local_ai_model_input = QLineEdit()
+        self.local_ai_model_input.setPlaceholderText(provider_view.local_ai_model_placeholder)
+        self.local_ai_model_input.setText(str(local_ai_loaded.get("model") or ""))
+        self._add_api_field(local_ai_form, provider_view.local_ai_base_url_label, self.local_ai_base_url_input)
+        self._add_api_field(local_ai_form, provider_view.local_ai_model_label, self.local_ai_model_input)
+        self._configure_api_fields(local_ai_form, self.local_ai_base_url_input, self.local_ai_model_input)
+        local_ai_layout.addLayout(local_ai_form)
+
+        local_ai_actions = QVBoxLayout()
+        self.local_ai_save_btn = QPushButton(provider_view.save_button_label)
+        self.local_ai_save_btn.setProperty("btnRole", "success")
+        self.local_ai_test_btn = QPushButton(provider_view.test_button_label)
+        self.local_ai_test_btn.setProperty("btnRole", "secondary")
+        self.local_ai_save_btn.clicked.connect(self._save_local_ai_settings)
+        self.local_ai_test_btn.clicked.connect(self._test_local_ai_connection)
+        local_ai_actions.addWidget(self.local_ai_save_btn)
+        local_ai_actions.addWidget(self.local_ai_test_btn)
+        self._configure_api_actions(local_ai_actions, self.local_ai_save_btn, self.local_ai_test_btn)
+        local_ai_layout.addLayout(local_ai_actions)
+
+        local_ai_info = QLabel(provider_view.local_ai_info_label)
+        local_ai_info.setObjectName("settingsApiLocalAiInfo")
+        local_ai_info.setWordWrap(True)
+        local_ai_layout.addWidget(local_ai_info)
+        self._finalize_api_card(local_ai_card, 300)
+        cards_layout.addWidget(local_ai_card, 1, 0)
 
         layout.addStretch(1)
         return panel
+
+    @staticmethod
+    def _add_api_field(layout: QVBoxLayout, label_text: str, field: QWidget) -> None:
+        label = QLabel(label_text)
+        label.setProperty("role", "formLabel")
+        layout.addWidget(label)
+        layout.addWidget(field)
+
+    @staticmethod
+    def _configure_api_fields(layout: QVBoxLayout, *fields: QWidget) -> None:
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        for field in fields:
+            field.setFixedHeight(34)
+            field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+    @staticmethod
+    def _configure_api_actions(actions: QVBoxLayout, *buttons: QPushButton) -> None:
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.setSpacing(8)
+        for button in buttons:
+            button.setMinimumWidth(0)
+            button.setFixedHeight(34)
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+    @staticmethod
+    def _finalize_api_card(card: QFrame, minimum_height: int) -> None:
+        card_layout = card.layout()
+        if card_layout is None:
+            return
+        card_layout.activate()
+        card.setMinimumHeight(max(minimum_height, card_layout.sizeHint().height()))
+        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
     def _build_db_maintenance_tab(self) -> QWidget:
         panel = QWidget()
@@ -2349,6 +2467,28 @@ class SettingsPage(QWidget):
                 QMessageBox.warning(self, "OpenAI", result.message or "No se obtuvo respuesta valida.")
         except Exception as exc:
             QMessageBox.warning(self, "OpenAI", f"Error de conexion.\n{exc}")
+
+    def _save_local_ai_settings(self) -> None:
+        enabled = self.local_ai_enabled_check.isChecked() if hasattr(self, "local_ai_enabled_check") else False
+        base_url = self.local_ai_base_url_input.text().strip() if hasattr(self, "local_ai_base_url_input") else ""
+        model = self.local_ai_model_input.text().strip() if hasattr(self, "local_ai_model_input") else ""
+        try:
+            result = self.settings_provider_service.save_local_ai(enabled=enabled, base_url=base_url, model=model)
+            QMessageBox.information(self, "IA local", f"{result.message}\n{result.path}")
+        except Exception as exc:
+            QMessageBox.warning(self, "IA local", f"No se pudo guardar la configuracion.\n{exc}")
+
+    def _test_local_ai_connection(self) -> None:
+        base_url = self.local_ai_base_url_input.text().strip() if hasattr(self, "local_ai_base_url_input") else ""
+        model = self.local_ai_model_input.text().strip() if hasattr(self, "local_ai_model_input") else ""
+        try:
+            result = self.settings_provider_service.test_local_ai(base_url=base_url, model=model)
+            if result.ok:
+                QMessageBox.information(self, "IA local", result.message)
+            else:
+                QMessageBox.warning(self, "IA local", result.message or "No se obtuvo respuesta valida.")
+        except Exception as exc:
+            QMessageBox.warning(self, "IA local", f"Error de conexion.\n{exc}")
 
     def _pick_orders_historico_dir(self) -> None:
         current = self.orders_historico_dir_input.text().strip() if hasattr(self, "orders_historico_dir_input") else ""

@@ -27,7 +27,7 @@ Implementación principal:
 
 ```text
 OrdersPage (QWidget, objectName `OrdersPageRoot`, fondo #EEF3F8, sin borde, WA_StyledBackground=True)
-└── layout principal (QVBoxLayout, márgenes 14 px, separación 10 px)
+└── layout principal (QVBoxLayout, márgenes 14 / 11 / 14 / 14 px, separación 10 px)
     ├── topRibbon (QFrame, objectName `topRibbon`, pageType="contacts", fondo #FFFFFF, borde #E2E8F1, radio 8 px)
     │   ├── new_btn (QPushButton "Nuevo", btnRole="success", icono `assets/icons/order.svg`, alto 30 px, icono 20 px, ancho fijo 110 px)
     │   ├── edit_btn (QPushButton "Editar", btnRole="warning", icono `assets/icons/file-pen.svg`, alto 30 px, icono 20 px, ancho fijo 110 px)

@@ -1,0 +1,400 @@
+# VENTANA PRODUCTOS IREKS — PYSIDE6 / BACKEND
+
+Implementación principal:
+
+- UI: `app/ui/widgets/ingredients_page.py` (`IngredientsIreksPage`)
+- Estilos compartidos: `assets/styles.qss`
+- Servicios principales:
+  - `app/services/ingredient_ireks_service.py`
+  - `app/services/ingredient_ireks_autosave_flow_service.py`
+  - `app/services/sales_annual_comparison_service.py`
+  - `app/services/monthly_orders_service.py`
+  - `app/services/product_report_flow_service.py`
+- Modelos relevantes:
+  - `IngredienteIreks`
+  - `Fabricante`, `Familia`, `Subfamilia`, `Envase`
+  - `ReferenciaDistribuidor`
+  - `TarifaPrecioIreks`
+  - `MateriaPrimaValorNutricional`
+  - `AlmacenMovimiento`, `PedidoItem`
+
+La sección se registra como `Productos IREKS` en `app/ui/main_window.py` y usa el widget `IngredientsIreksPage`.
+
+## Estructura UI real
+
+```text
+IngredientsIreksPage (QWidget, objectName `IngredientsIreksPageRoot`, fondo #EEF3F8, sin borde, WA_StyledBackground=True)
+└── layout principal (QVBoxLayout, márgenes 14 / 11 / 14 / 14 px, separación 10 px)
+    ├── topRibbon (QFrame, objectName `topRibbon`, pageType="contacts", fondo #FFFFFF, borde #E2E8F1, radio 8 px)
+    │   ├── Nuevo (QPushButton, icono `plus.svg`, rol `success`, 110 x 30 px)
+    │   ├── Eliminar (QPushButton, icono `trash.svg`, rol `danger`, 110 x 30 px)
+    │   ├── ID (QPushButton, icono `package.svg`, rol `secondary`, 110 x 30 px)
+    │   ├── Listados (QPushButton, icono `list.svg`, rol `primary`, 110 x 30 px)
+    │   └── espacio flexible
+    └── splitter horizontal (QSplitter, objectName `ireksMainSplitter`, fondo transparente, sin borde, childrenCollapsible=False, handleWidth=5 px)
+        ├── panel izquierdo (QWidget, objectName `sidePanel`, ancho fijo 420 px, fondo #FFFFFF, borde gris #D7DEE8)
+        │   └── catálogo lateral (layout vertical sin márgenes ni separación, fondo #FFFFFF, borde #D7DEE8, radio 10 px)
+        │       ├── catalogHeader (QFrame, alto fijo 54 px, ancho total, ajustado al borde superior, fondo #0B2F5B, radio superior 9 px y esquinas inferiores rectas)
+        │       │   ├── icono `product-tag.svg` (blanco, 20 px)
+        │       │   ├── título “CATÁLOGO DE PRODUCTOS” (blanco, 14 px, negrita)
+        │       │   └── subtítulo “Filtra y selecciona productos” (#CDECE8, 10 px)
+        │       └── catalogBody (QWidget, márgenes 10 px, separación 8 px, fondo #FFFFFF, sin borde, radio inferior 9 px)
+        │           ├── cuadrícula 2 × 2 de filtros
+        │       │   ├── Fabricante / fabricante_filter (QComboBox; valor inicial “Todos”)
+        │       │   ├── Estado / activity_filter (QComboBox; Todos, Activos, Inactivos)
+        │       │   ├── Familia / familia_filter (QComboBox; valor inicial “Todas”)
+        │       │   └── Subfamilia / subfamilia_filter (QComboBox; valor inicial “Todas”)
+        │           ├── fila de búsqueda
+        │       │   ├── search_input (QLineEdit, placeholder “Buscar por referencia o nombre”, alto 36 px)
+        │       │   └── catalog_result_count (QLabel, contador real, fondo #DDF3F0, borde #9DDCD4)
+        │           └── table / catalogProductTable (QTableWidget, selección de fila única, solo lectura, cabeceras ordenables)
+        │           ├── Ref (90 px)
+        │           ├── Nombre (stretch)
+        │           └── SEL. (55 px; selector de inclusión para listados)
+        └── panel derecho (QWidget, objectName `ireksContentPanel`, fondo transparente, sin borde)
+            └── layout vertical sin márgenes
+                └── splitter vertical derecho (QSplitter, objectName `ireksDetailSplitter`, fondo transparente, sin borde)
+                    ├── detailPanel (QWidget, alto fijo 232 px, fondo #F8FAFC, borde #CBD5E1, radio 9 px)
+                    │   ├── productDetailHeader (QFrame, alto 38 px, fondo azul marino #0B2F5B, esquinas inferiores rectas)
+                    │   │   ├── icono `assets/icons/product-detail.svg` (blanco, 21 px)
+                    │   │   └── título “Detalle del producto” (blanco, 16 px, negrita)
+                    │   └── productDetailBody (QFrame, fondo #FFFFFF, borde gris #CBD5E1)
+                    │       ├── grupo PRODUCTO (etiqueta azul grisácea, 10 px)
+                    │       │   ├── Ref. / detail_referencia (QLineEdit; factor 2)
+                    │       │   ├── Ref. corta / detail_ref_corta (QLineEdit; factor 2)
+                    │       │   └── Descripción / detail_descripcion (QLineEdit; factor 5)
+                    │       ├── divisor horizontal #D9E2EC
+                    │       ├── grupo DISTRIBUIDOR (etiqueta azul grisácea, 10 px)
+                    │       │   ├── Distribuidor / detail_distribuidor_id (QComboBox; factor 3)
+                    │       │   ├── Referencia / detail_referencia_distribuidor (QLineEdit; factor 2)
+                    │       │   └── Descripción / detail_descripcion_distribuidor (QLineEdit; factor 5)
+                    │       └── productDetailStatusRail (QFrame #F1F5F9, borde #D6E0EA, radio 7 px)
+                    │           ├── Status activo: botones segmentados Sí / No
+                    │           ├── Status en lista: botones segmentados Sí / No
+                    │           └── Categoría: botones segmentados Harina / Líquido
+                    └── tabs_host
+                        └── detail_tabs (QTabWidget; cada página deja un margen exterior de 4 px)
+                            ├── Datos
+                            │   └── ireksDataTab (QWidget, fondo #EEF3F8)
+                            │       ├── tarjeta CLASIFICACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #EEF3F8, radio 8 px)
+                            │       │   ├── cabecera estándar `uiRole="detailHeader"` (alto fijo 38 px, fondo #0B2F5B, icono blanco `product-tag.svg` 21 px, título blanco 16 px)
+                            │       │   └── Fabricante / detail_fabricante_id · Familia / detail_familia_id · Subfamilia / detail_subfamilia_id
+                            │       ├── tarjeta PRESENTACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #EEF3F8, radio 8 px)
+                            │       │   ├── cabecera `ireksTabHeader` (icono blanco `presentation-container.svg`)
+                            │       │   └── cuadrícula 3 columnas: Presentación / detail_envase_id · Contenido / detail_envase_cantidad · Unidad contenido / detail_contenido_unidad
+                            │       │       Peso unidad / detail_envase_peso · Unidad peso / detail_envase_unidad · Total presentación / detail_envase_total (solo lectura, #F4F7FB)
+                            │       └── tarjeta PALETIZACIÓN (QFrame `ireksCard=True`, fondo #FFFFFF, borde #EEF3F8, radio 8 px)
+                            │           ├── cabecera `ireksTabHeader` (icono blanco `pallet.svg`)
+                            │           └── cuadrícula 3 columnas: Pallet / transporte_pallet_tipo · Presentaciones/capa / transporte_cajas_por_capa · Capas / transporte_capas_por_pallet
+                            │               Presentaciones/pallet / transporte_cajas_por_pallet · Uds/pallet / transporte_unidades_por_pallet · Total pallet / transporte_kg_por_pallet (los tres derivados, solo lectura, #F4F7FB)
+                            │       └── tarjeta OBSERVACIONES (QFrame `ireksObservationsCard`, ancho completo)
+                            │           └── Obs. / transporte_observaciones (QLineEdit editable)
+                            ├── Tarifa (QWidget `tarifaTab`, blanco, borde #D6E0EA, radio 8 px)
+                            │   ├── ireksTabHeader: product-tag.svg · “Histórico de tarifas”
+                            │   └── tarifa_body (márgenes 10 px)
+                            │       ├── Año / tarifa_year_filter · Añadir tarifa · Editar · Eliminar
+                            │       └── tarifa_table_wrap
+                            │           ├── tarifa_header_table (2 filas: Año · IREKS · Dto % · DISTRIBUIDOR)
+                            │           └── tarifa_table (10 columnas: Año · €/Env. · €/kg · Delta · Dto % · Costo · €/Env. · €/kg · Delta · Margen)
+                            ├── Entradas (QWidget `entradasTab`, tarjeta `entradasCard`)
+                            │   ├── ireksTabHeader: package.svg · “Entradas de almacén”
+                            │   └── entradas_body (márgenes 10 px)
+                            │       ├── entradasToolbar: Desde / entradasDateFrom · Hasta / entradasDateTo · Todo / entradasResetBtn
+                            │       ├── entradasTable (Fecha · Pedido Nº · Albarán · Uds · Kg · Lote · Caduca)
+                            │       └── entradasTotalsTable (fila fija: acumulados de Uds y Kg)
+                            ├── Salidas (QWidget `salidasTab`, blanco, borde #D6E0EA, radio 8 px)
+                            │   ├── ireksTabHeader: package.svg · “Salidas de almacén”
+                            │   └── salidas_body (márgenes 10 px)
+                            │       ├── Desde / salidas_date_from · Hasta / salidas_date_to · Todo
+                            │       ├── salidas_table (Fecha · Pedido Nº · Albarán · Uds · Kg · Lote · Caduca)
+                            │       ├── ireksSalesEmpty (QLabel, estado vacío centrado)
+                            │       └── salidas_totals_table (fila fija: acumulados de Uds y Kg)
+                            ├── Stock (QWidget `stockTab`, blanco, borde #D6E0EA, radio 8 px)
+                            │   ├── ireksTabHeader: pallet.svg · “Stock y movimientos”
+                            │   └── stock_body (márgenes 10 px)
+                            │       ├── Desde / stock_date_from · Hasta / stock_date_to · Todo
+                            │       ├── stock_table (Fecha · Tipo · Pedido Nº · Albarán · Uds · Kg · Lote · Caduca)
+                            │       └── stock_totals_table (fila fija: saldo neto de Uds y Kg)
+                            ├── Mensual (QWidget `mensualTab`, blanco, borde #D6E0EA, radio 8 px)
+                            │   ├── ireksTabHeader: calendar-chart.svg · “Resumen mensual”
+                            │   └── mensual_body (márgenes 10 px)
+                            │       ├── Desde / monthly_date_from · Hasta / monthly_date_to · Limpiar
+                            │       └── monthly_orders_table (Mes · Pedidos · Cantidad · Kg · Media · Ult. fecha · Ult. pedido)
+                            ├── Pedidos (QWidget `pedidosTab`, blanco, borde #D6E0EA, radio 8 px)
+                            │   ├── ireksTabHeader: list.svg · “Pedidos relacionados”
+                            │   └── pedidos_body (márgenes 10 px)
+                            │       ├── Desde / pedidos_date_from · Hasta / pedidos_date_to · Limpiar / pedidos_reset_btn
+                            │       └── pedidos_table (Fecha · Pedido Nº · Albarán · Cantidad · Lote · Caducidad)
+                            ├── Nutrición (QWidget `nutricionTab`, blanco, borde #D6E0EA, radio 8 px)
+                            │   ├── ireksTabHeader: nutrition-lab.svg · “Información nutricional”
+                            │   │   └── ireksNutritionBadge (QLabel, alto fijo 22 px): “Valores por 100 g”
+                            │   └── nutricion_body (márgenes 10 px)
+                            │       └── nutricion_table (Nutriente / Por 100 g; 9 nutrientes, valor editable)
+                            └── Clientes (QWidget `clientesTab`, blanco, borde #D6E0EA, radio 8 px)
+                                ├── ireksTabHeader: users.svg · “Consumo por cliente”
+                                └── clientes_body (márgenes 10 px)
+                                    ├── Año / customer_consumption_year (QComboBox)
+                                    ├── ireksCustomerConsumptionEmpty (estado vacío)
+                                    └── ireksCustomerConsumptionTable (Cliente · Último período · Kg · Unidades · €; ordenable)
+```
+
+Las páginas de `detail_tabs` dejan un margen exterior uniforme de 4 px: esta es la separación entre cada `ireksTabHeader` y el propio `QTabWidget`, sin añadir margen dentro de las tarjetas. Tarifa, Entradas, Salidas, Stock, Mensual, Pedidos, Nutrición y Clientes usan la propia pestaña como tarjeta blanca con borde `#D6E0EA` y radio de 8 px. Su cabecera estándar `ireksTabHeader` ocupa todo el ancho de su tarjeta y queda ajustada a su borde superior; el contenido restante se aloja en un cuerpo interno con márgenes de 10 px. La tabla de Tarifa ocupa todo el ancho disponible de ese cuerpo y estira su última columna para mantener sincronizadas las dos filas de cabecera.
+
+## Estructura de la pestaña Datos
+
+`ireksDataTab` organiza los campos en tres tarjetas. CLASIFICACIÓN ocupa la primera fila; PRESENTACIÓN y PALETIZACIÓN comparten una segunda fila horizontal y reciben el mismo factor de estiramiento. Las alturas fijas de cada tarjeta evitan que las cuadrículas compriman etiquetas o controles.
+
+```text
+ireksDataTab (QWidget, fondo #EEF3F8)
+├── tarjeta CLASIFICACIÓN (QFrame, propiedad ireksCard=True)
+│   ├── cabecera `ireksTabHeader` (azul marino #0B2F5B, icono blanco `product-tag.svg`)
+│   └── taxonomía (fila responsiva)
+│       ├── Fabricante / detail_fabricante_id (QComboBox)
+│       ├── Familia / detail_familia_id (QComboBox)
+│       └── Subfamilia / detail_subfamilia_id (QComboBox)
+└── lower_cards (QHBoxLayout, separación 10 px, factor 1 para cada tarjeta)
+    ├── tarjeta PRESENTACIÓN (QFrame `ireksPresentationCard`, alto fijo 204 px)
+    │   ├── cabecera `ireksTabHeader` (icono blanco `presentation-container.svg`)
+    │   └── cuadrícula de 3 columnas y 2 grupos de campos
+    │       ├── Presentación / detail_envase_id (QComboBox)
+    │       ├── Contenido / detail_envase_cantidad (QLineEdit)
+    │       ├── Unidad contenido / detail_contenido_unidad (QComboBox editable)
+    │       ├── Peso unidad / detail_envase_peso (QLineEdit)
+    │       ├── Unidad peso / detail_envase_unidad (QComboBox)
+    │       └── Total presentación / detail_envase_total (QLineEdit, solo lectura)
+    └── tarjeta PALETIZACIÓN (QFrame `ireksPalletCard`, alto fijo 204 px)
+        ├── cabecera `ireksTabHeader` (icono blanco `pallet.svg`)
+        ├── cuadrícula de 3 columnas y 2 grupos de campos
+        │   ├── Pallet / transporte_pallet_tipo (QComboBox)
+        │   ├── Presentaciones/capa / transporte_cajas_por_capa (QLineEdit)
+        │   ├── Capas / transporte_capas_por_pallet (QLineEdit)
+        │   ├── Presentaciones/pallet / transporte_cajas_por_pallet (QLineEdit, solo lectura)
+        │   ├── Uds/pallet / transporte_unidades_por_pallet (QLineEdit, solo lectura)
+        │   └── Total pallet / transporte_kg_por_pallet (QLineEdit, solo lectura)
+        └── Sin campo de observaciones
+└── tarjeta OBSERVACIONES (QFrame `ireksObservationsCard`, alto fijo 46 px, ancho completo)
+    └── Obs. / transporte_observaciones (QLabel y QLineEdit en una misma fila)
+```
+
+- Las etiquetas quedan encima de los controles en Presentación y Paletización; así no se comprimen ni se solapan con sus campos.
+- Los controles derivados de cálculo son de solo lectura, con fondo `#F4F7FB`.
+- Los valores de presentación y paletización mantienen los mismos eventos de autosave y los mismos cálculos existentes: total de presentación, presentaciones por pallet, unidades por pallet y kg por pallet.
+
+### Especificación visual por tarjeta
+
+| Tarjeta | Cabecera | Componentes y disposición | Campos calculados / aspecto |
+| --- | --- | --- | --- |
+| **CLASIFICACIÓN** | Cabecera estándar `uiRole="detailHeader"`: alto fijo 38 px, ancho completo, ajustada al borde superior de la tarjeta, fondo azul marino `#0B2F5B`, radio solo en esquinas superiores de 8 px, icono blanco de 21 px y título blanco de 16 px. | Cuadrícula de tres columnas con etiqueta encima del control: **Fabricante** / `detail_fabricante_id`, **Familia** / `detail_familia_id` y **Subfamilia** / `detail_subfamilia_id`. `ireksClassificationCard` tiene alto fijo 146 px. | No incorpora cálculo. Etiquetas `#5E6C84`, peso 500. Combos blancos, texto `#0B2F5B`, borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco turquesa `#087E9C`. |
+| **PRESENTACIÓN** | Cabecera estándar `uiRole="detailHeader"`: alto fijo 38 px, fondo `#0B2F5B`, radio superior de 8 px, icono blanco de 21 px y título blanco de 16 px. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Presentación** / `detail_envase_id`, **Contenido** / `detail_envase_cantidad`, **Unidad contenido** / `detail_contenido_unidad`; fila 2: **Peso unidad** / `detail_envase_peso`, **Unidad peso** / `detail_envase_unidad`, **Total presentación** / `detail_envase_total`. `ireksPresentationCard` tiene alto fijo 204 px. | `detail_envase_total` es solo lectura, fondo `#F4F7FB` y texto `#0B2F5B`; los otros controles son blancos con borde `#C9D7E8`, radio 6 px, alto mínimo 28 px y foco `#087E9C`. |
+| **PALETIZACIÓN** | Cabecera estándar `uiRole="detailHeader"`: alto fijo 38 px, fondo `#0B2F5B`, radio superior de 8 px, icono blanco de 21 px y título blanco de 16 px. | Cuadrícula de tres columnas con etiqueta sobre control: fila 1: **Pallet** / `transporte_pallet_tipo`, **Presentaciones/capa** / `transporte_cajas_por_capa`, **Capas** / `transporte_capas_por_pallet`; fila 2: **Presentaciones/pallet** / `transporte_cajas_por_pallet`, **Uds/pallet** / `transporte_unidades_por_pallet`, **Total pallet** / `transporte_kg_por_pallet`. `ireksPalletCard` tiene alto fijo 204 px. | `transporte_cajas_por_pallet`, `transporte_unidades_por_pallet` y `transporte_kg_por_pallet` son solo lectura, fondo `#F4F7FB`; los campos fuente son editables. Todos usan texto marino `#0B2F5B`, etiquetas `#5E6C84`, borde `#C9D7E8`, radio 6 px y foco turquesa `#087E9C`. |
+| **OBSERVACIONES** | No utiliza cabecera; es una tarjeta compacta `ireksObservationsCard` de fondo blanco, borde `#D6E0EA`, radio 8 px y alto fijo 46 px. | Una sola fila: etiqueta **Obs.** a la izquierda y `transporte_observaciones` ocupando el resto del ancho. Se sitúa debajo de la fila PRESENTACIÓN / PALETIZACIÓN. | Campo editable, mismo texto, borde, radio y foco que los demás controles. |
+
+#### Contenedor común de las tres tarjetas
+
+- `QFrame` con propiedad `ireksCard=True`: fondo `#FFFFFF`, borde de 1 px `#EEF3F8` —el mismo color que el fondo de Datos— y radio de 8 px; el borde no contrasta visualmente con la cabecera.
+- La cabecera ocupa el ancho total y queda pegada al borde superior de cada tarjeta. Los campos conservan márgenes horizontales de 12 px y una separación vertical de 9 px.
+- `ireksDataTab`: fondo azul grisáceo claro `#EEF3F8`, márgenes 8 / 0 / 8 / 8 px y separación de 8 px. El margen exterior de 4 px de `detail_tabs` es la única separación superior antes de CLASIFICACIÓN.
+- Orden: **CLASIFICACIÓN** arriba; debajo, **PRESENTACIÓN** y **PALETIZACIÓN** en paralelo, separadas 10 px y con el mismo factor de crecimiento horizontal. Las alturas fijas y filas mínimas de 20 / 34 px evitan que etiquetas y controles se solapen.
+- Las cabeceras no llevan sombra ni borde/acento turquesa; los iconos se renderizan en blanco sobre el azul marino.
+
+## Estructura de la pestaña Tarifa
+
+```text
+tarifaTab (QWidget, fondo blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader (QFrame, alto 38 px, ancho completo, fondo #0B2F5B)
+│   ├── product-tag.svg (blanco, 21 px)
+│   └── “Histórico de tarifas” (blanco, 16 px, negrita)
+└── tarifa_body (QWidget, márgenes 10 px, separación 8 px)
+    ├── fila de acciones
+    │   ├── Año / tarifa_year_filter (QComboBox; “Todos” y años disponibles)
+    │   ├── Añadir tarifa (QPushButton, turquesa #087E9C)
+    │   ├── Editar (QPushButton, blanco, borde y texto #0B2F5B)
+    │   └── Eliminar (QPushButton, blanco, borde y texto rojo #D92D20)
+    └── tarifa_table_wrap (ancho completo)
+        ├── tarifa_header_table (QTableWidget, dos filas de cabecera agrupada)
+        │   ├── Año
+        │   ├── IREKS: €/Env. · €/kg · Delta
+        │   ├── Dto %
+        │   └── DISTRIBUIDOR: Costo · €/Env. · €/kg · Delta · Margen
+        └── tarifa_table (QTableWidget, 10 columnas, solo lectura y selección de fila)
+```
+
+- La cabecera y la tabla comparten el mismo reparto de columnas; la última columna se estira para ocupar todo el ancho disponible sin barra horizontal.
+- Las dos tablas usan fondo blanco, bordes suaves `#D6E0EA`, filas alternas y números alineados a la derecha.
+
+## Estructura de la pestaña Entradas
+
+```text
+entradasTab (QWidget, fondo #F5F7FB)
+└── entradasCard (QFrame, blanco, borde #E5EAF1, radio 10 px)
+    ├── ireksTabHeader: package.svg · “Entradas de almacén”
+    └── entradas_body (márgenes 10 px, separación 8 px)
+        ├── entradasToolbar
+        │   ├── Desde / entradasDateFrom (QDateEdit)
+        │   ├── Hasta / entradasDateTo (QDateEdit)
+        │   └── Todo / entradasResetBtn (QPushButton)
+        ├── entradasTable (QTableWidget)
+        │   └── Fecha · Pedido Nº · Albarán · Uds · Kg · Lote · Caduca
+        └── entradasTotalsTable (QTableWidget, una fila fija sincronizada)
+```
+
+- La columna **Lote** absorbe el ancho sobrante. La fila de totales no tiene scroll, conserva las anchuras de la tabla y muestra los acumulados de Uds/Kg.
+
+## Estructura de la pestaña Salidas
+
+```text
+salidasTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader: package.svg · “Salidas de almacén”
+└── salidas_body (márgenes 10 px, separación 8 px)
+    ├── filtros: Desde / salidas_date_from · Hasta / salidas_date_to · Todo
+    ├── salidas_table (QTableWidget)
+    │   └── Fecha · Pedido Nº · Albarán · Uds · Kg · Lote · Caduca
+    ├── ireksSalesEmpty (QLabel, estado vacío centrado, borde discontinuo #D6E0EA)
+    └── salidas_totals_table (QTableWidget, una fila fija sincronizada)
+```
+
+- Cuando no existen filas en el período, se muestra `ireksSalesEmpty`; la tabla se oculta y la fila de totales se conserva sincronizada con sus columnas.
+
+## Estructura de la pestaña Stock
+
+```text
+stockTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader: pallet.svg · “Stock y movimientos”
+└── stock_body (márgenes 10 px, separación 8 px)
+    ├── filtros: Desde / stock_date_from · Hasta / stock_date_to · Todo
+    ├── stock_table (QTableWidget)
+    │   └── Fecha · Tipo · Pedido Nº · Albarán · Uds · Kg · Lote · Caduca
+    └── stock_totals_table (QTableWidget, una fila fija sincronizada)
+```
+
+- **Tipo** representa visualmente el movimiento de entrada o salida; **Lote** se estira y los totales muestran el saldo neto de Uds/Kg sin desplazamiento horizontal.
+
+## Estructura de la pestaña Mensual
+
+```text
+mensualTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader: calendar-chart.svg · “Resumen mensual”
+└── mensual_body (márgenes 10 px, separación 8 px)
+    ├── filtros: Desde / monthly_date_from · Hasta / monthly_date_to · Limpiar
+    └── monthly_orders_table (QTableWidget, solo lectura)
+        └── Mes · Pedidos · Cantidad · Kg · Media · Ult. fecha · Ult. pedido
+```
+
+- La tabla resume los pedidos del producto por mes; mantiene filas alternas, cabecera azul grisácea, y alinea las magnitudes numéricas a la derecha.
+
+## Estructura de la pestaña Pedidos
+
+```text
+pedidosTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader: list.svg · “Pedidos relacionados”
+└── pedidos_body (márgenes 10 px, separación 8 px)
+    ├── filtros: Desde / pedidos_date_from · Hasta / pedidos_date_to · Limpiar / pedidos_reset_btn
+    └── pedidos_table (QTableWidget, solo lectura y selección de fila)
+        └── Fecha · Pedido Nº · Albarán · Cantidad · Lote · Caducidad
+```
+
+- **Lote** ocupa el espacio flexible. Los filtros conservan los límites temporales y no modifican datos ni pedidos.
+
+## Estructura de la pestaña Nutrición
+
+```text
+nutricionTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader: nutrition-lab.svg · “Información nutricional”
+│   └── ireksNutritionBadge (QLabel, alto fijo 22 px, “Valores por 100 g”, fondo #E5F7F4, texto #087E9C)
+└── nutricion_body (márgenes 10 px, separación 8 px)
+    └── nutricion_table (QTableWidget, 9 filas)
+        ├── Nutriente (solo lectura)
+        └── Por 100 g (editable)
+            Energía kJ · Energía kcal · Grasas · Saturadas · Hidratos · Azúcares · Fibra · Proteínas · Sal
+```
+
+- La primera columna se estira y la columna **Por 100 g** mide 140 px; los valores se editan en la tabla y mantienen el autoguardado existente.
+
+## Estructura de la pestaña Clientes
+
+```text
+clientesTab (QWidget, blanco, borde #D6E0EA, radio 8 px)
+├── ireksTabHeader: users.svg · “Consumo por cliente”
+└── clientes_body (márgenes 10 px, separación 8 px)
+    ├── Año / customer_consumption_year (QComboBox)
+    ├── ireksCustomerConsumptionEmpty (QLabel, mensaje centrado cuando no hay producto o resultados)
+    └── ireksCustomerConsumptionTable (QTableWidget, solo lectura, ordenable)
+        └── Cliente · Último período · Kg · Unidades · €
+```
+
+- La columna **Cliente** se estira; las demás ajustan su ancho al contenido. Las cabeceras son clicables y las columnas numéricas se ordenan por sus valores reales.
+
+## Comportamiento actual
+
+- Al abrir la pantalla se cargan el catálogo de productos y sus filtros. Si hay productos, se selecciona el primero y se completa su ficha.
+- La búsqueda espera 200 ms antes de recargar, y filtra junto con fabricante, familia, subfamilia, estado y distribuidor externo cuando se ha recibido ese filtro.
+- La lista izquierda conserva la ordenación elegida de Ref. o Nombre. La columna `SEL.` permite marcar productos para los listados.
+- Seleccionar un producto actualiza la ficha, la presentación, la taxonomía, la referencia de distribuidor y las pestañas relacionadas.
+- Los cambios de ficha se guardan mediante autosave diferido de 350 ms. Durante la carga de datos, el autosave queda bloqueado.
+- El total de presentación se calcula a partir de contenido y peso. Los campos de transporte derivados (presentaciones/pallet, uds/pallet y total pallet) son de solo lectura y se recalculan desde los datos de pallet.
+- Cambiar fabricante restringe las familias disponibles; cambiar familia restringe las subfamilias.
+- Las pestañas Entradas, Salidas y Stock se actualizan con el producto activo y respetan sus filtros de fechas. Sus filas de total no se desplazan y se alinean con las tablas.
+- Mensual resume los pedidos por período; Pedidos muestra los artículos de pedido del producto filtrados por fechas.
+- Tarifa permite crear, editar y eliminar tarifas del producto. La cabecera agrupa visualmente los datos IREKS y los del distribuidor.
+- Nutición guarda valores por 100 g del producto seleccionado. La pestaña usa valores de energía, grasas, saturadas, hidratos, azúcares, fibra, proteínas y sal.
+- La pestaña Clientes carga los consumidores del producto seleccionado. Filtra por año y, para un año concreto, muestra solo clientes con kg o euros actuales positivos. Sus magnitudes se ordenan numéricamente.
+- `Nuevo` abre una ficha de creación; `Eliminar` requiere producto seleccionado y confirmación; `ID` muestra el identificador técnico del producto.
+- `Listados` abre una ventana no modal para generar un listado desde una petición en lenguaje natural, previsualizarlo y exportarlo a Excel, PDF o impresora.
+
+## Geometría actual
+
+- El panel de lista tiene ancho fijo de 420 px; el panel de detalle comparte el resto del ancho con factor de estiramiento equivalente.
+- El separador principal deja un espacio transparente de 5 px entre los paneles y no es arrastrable (`handleWidth(5)`).
+- El ribbon se sitúa antes del splitter horizontal y tiene márgenes internos de 8 x 6 px y separación de 6 px entre acciones.
+- `detailPanel` tiene alto fijo de 232 px. La cabecera mide 38 px; el cuerpo usa márgenes 12 × 7 px, filas de campos responsivas con separación de 8 px y rail de estado con márgenes 9 × 4 px.
+- El splitter vertical derecho da prioridad a las pestañas (factor 9) sobre la ficha superior (factor 1).
+- Las pestañas de movimientos usan tablas de siete u ocho columnas; fecha, pedido, albarán, unidades, kg y caducidad mantienen anchuras fijas y Lote absorbe el ancho restante.
+- La tabla de tarifas fija diez columnas entre 58 y 92 px y elimina el desplazamiento horizontal; su cabecera de dos filas mide 62 px.
+
+## Aspecto visual actual
+
+- La página usa el estilo global de controles y tablas de `assets/styles.qss`.
+- El catálogo lateral usa un tratamiento local enterprise: cabecera azul marino, filtros en cuadrícula, búsqueda y contador. Sus combos y búsqueda son blancos con borde `#C9D7E8`; el foco es turquesa `#16B8A6`.
+- `catalogProductTable` alterna filas blancas y `#F8FAFD`. La selección usa fondo `#E5F7F4`, texto `#0B2F5B` y una franja vertical izquierda `#087E9C`; los checks marcados son turquesa con icono blanco y los no marcados son blancos con borde azul grisáceo. Su scrollbar vertical tiene 8 px de ancho.
+- Las listas son de solo lectura, con selección de fila, cabeceras clicables y sin borde de foco en los ítems.
+- `detailPanel` usa el diseño enterprise compacto: cabecera azul marino, icono de producto blanco y cuerpo gris muy claro. Sus grupos PRODUCTO y DISTRIBUIDOR ordenan los campos en proporciones responsivas 2/2/5 y 3/2/5 respectivamente.
+- Los campos de detalle tienen fondo blanco, borde #C5D0DE, radio 6 px, alto 28 px y foco turquesa #087E9C. El desplegable usa `assets/icons/chevron-down-navy.svg`.
+- Los radios de estado se muestran como controles segmentados: blanco con borde gris en reposo y turquesa #087E9C con texto blanco al seleccionarse; los indicadores circulares nativos quedan ocultos.
+- `ireksDataTab` usa fondo blanco; sus etiquetas son azul grisáceo `#486081` y los campos tienen altura mínima de 28 px.
+- Entradas se presenta en una tarjeta blanca con borde `#E5EAF1`, radio 10 px, tabla blanca y cabecera `#F7F9FC`; las filas alternas y el hover aportan contraste suave.
+- Las tablas de totales de movimientos no muestran scroll, usan fondo `#F7F9FC` y quedan unidas visualmente a su tabla.
+- Los botones de tarifa tienen colores propios: añadir verde, editar azul y eliminar rojo.
+- Los botones del ribbon siguen los roles estándar: verde para altas, rojo para eliminación, azul para listados y gris para acciones auxiliares.
+
+## Diálogos y flujos relacionados
+
+- `IngredientIreksCreateDialog`: alta de un producto IREKS con catálogos disponibles.
+- `AddTarifaIreksDialog`: alta o edición de una tarifa, calculando los valores por envase y por kg.
+- Diálogo de ID: muestra el identificador técnico del producto seleccionado.
+- Diálogo `Listados de productos IREKS`: permite generar, exportar a Excel/PDF e imprimir el resultado del listado.
+- Confirmación de eliminación: evita borrar un producto sin confirmación explícita.
+
+## Relación con backend / datos
+
+- `IngredientsIreksPage` es UI PySide6 y consulta servicios locales; no utiliza el frontend React.
+- `IngredientIreksService` centraliza la consulta de catálogo, alta, actualización, eliminación, tarifas, nutrición, referencias de distribuidor y movimientos/pedidos.
+- `IngredientIreksAutosaveFlowService` valida y ejecuta la actualización diferida de la ficha seleccionada.
+- `SalesAnnualComparisonService` proporciona los años y clientes consumidores de la pestaña Clientes.
+- `MonthlyOrdersService` construye el resumen de pedidos mensuales.
+- `ProductReportFlowService` interpreta la petición de listado y prepara las filas exportables; `ReportExportService` resuelve los destinos de exportación.
+
+## Ajustes y limitaciones relevantes documentados
+
+- La ficha es editable y su autosave persiste cambios reales; no existe un botón general Guardar para deshacerlos.
+- El rediseño solo reorganiza visualmente los mismos campos, grupos y señales de autoguardado; no modifica la persistencia ni los contratos de datos.
+- La eliminación de producto y las operaciones de tarifa son mutaciones reales sobre datos locales.
+- Las pestañas de movimientos, pedidos, tarifas, nutrición y clientes dependen del producto seleccionado; sin selección muestran tabla vacía o estado vacío.
+- La pestaña Clientes es de consulta: no permite cambiar la relación entre cliente y producto desde esta pantalla.
+- El diálogo de listados se abre como no modal y las exportaciones solo se habilitan después de generar un resultado válido.
+
+## Modales principales
+
+- Modal `Nuevo producto IREKS`: `IngredientIreksCreateDialog`.
+- Modal `Añadir/Editar tarifa`: `AddTarifaIreksDialog`.
+- Modal `ID de producto`: muestra el ID del producto seleccionado.
+- Ventana `Listados de productos IREKS`: generación, previsualización y exportación de listados.

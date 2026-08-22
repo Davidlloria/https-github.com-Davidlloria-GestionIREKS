@@ -25,7 +25,7 @@ La sección principal se registra como `Formulas` en `app/ui/main_window.py`, au
 
 ```text
 RecipesPage (QWidget, objectName `RecipesPageRoot`, fondo #EEF3F8, sin borde, WA_StyledBackground=True)
-└── root (QVBoxLayout, transparente, sin borde, márgenes 14 px, separación 10 px)
+└── root (QVBoxLayout, transparente, sin borde, márgenes 14 / 11 / 14 / 14 px, separación 10 px)
     ├── topRibbon (QFrame, objectName `topRibbon`, pageType="contacts", fondo #FFFFFF, borde #E2E8F1, radio 8 px)
     │   ├── Nueva (QPushButton, icono `plus.svg`, fondo #DCFCE7, borde #86EFAC, radio 7 px, 110 x 30 px)
     │   ├── Guardar (QPushButton, icono `save.svg`, fondo #DBEAFE, borde #93C5FD, radio 7 px, 110 x 30 px)

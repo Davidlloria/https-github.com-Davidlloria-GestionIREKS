@@ -1,15 +1,40 @@
 from __future__ import annotations
 
 from datetime import date
+import json
 
 import pytest
 from sqlmodel import SQLModel, Session, create_engine
 
+import app.services.customer_query_service as customer_query_service_module
 from app.models import Cliente, Isla, VentaClientesRaw
-from app.services.customer_query_service import CustomerQueryService
+from app.services.customer_query_service import CUSTOMER_QUERY_INTENT_SCHEMA, CustomerQueryService
 from app.services.customer_report_schema import CUSTOMER_REPORT_RESPONSE_FORMAT
 from app.services.customer_report_service import CustomerReportIntentService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
+
+
+class _DisabledLocalAI:
+    enabled = False
+
+
+class _FakeLocalAI:
+    enabled = True
+
+    def __init__(self, response: dict) -> None:
+        self.response = response
+        self.prompts: list[str] = []
+        self.schemas: list[dict | None] = []
+
+    def generate_json(self, prompt: str, *, schema: dict | None = None):
+        self.prompts.append(prompt)
+        self.schemas.append(schema)
+        return type("Result", (), {"ok": True, "text": json.dumps(self.response)})()
+
+
+@pytest.fixture(autouse=True)
+def _disable_default_local_ai(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(customer_query_service_module, "LocalAIService", lambda **_kwargs: _DisabledLocalAI())
 
 
 def _sales_engine(tmp_path):
@@ -21,7 +46,7 @@ def _sales_engine(tmp_path):
     return db_engine
 
 
-def _add_sale(session: Session, raw_id: str, cliente_id: str, year: int, kg: float) -> None:
+def _add_sale(session: Session, raw_id: str, cliente_id: str, year: int, kg: float, euros: float = 0.0) -> None:
     session.add(
         VentaClientesRaw(
             raw_id=raw_id,
@@ -29,6 +54,7 @@ def _add_sale(session: Session, raw_id: str, cliente_id: str, year: int, kg: flo
             cliente_id=cliente_id,
             anio=year,
             kg=kg,
+            euros=euros,
         )
     )
 
@@ -76,15 +102,37 @@ def test_customer_query_interprets_current_year_and_kg_as_primary_metric() -> No
 
 
 def test_local_customer_parser_recognizes_activity_and_island() -> None:
-    result = CustomerReportIntentService(api_key="").parse("Dame las panaderías de Lanzarote")
+    result = CustomerReportIntentService(api_key="", local_ai_service=_DisabledLocalAI()).parse("Dame las panaderías de Lanzarote")
 
     filters = {(item.field, item.op, str(item.value).lower()) for item in result.intent.filters}
     assert ("actividad", "contiene", "panaderia") in filters
     assert ("isla", "contiene", "lanzarote") in filters
 
 
+def test_customer_query_returns_only_repeated_commercial_names(tmp_path, monkeypatch) -> None:
+    db_engine = _sales_engine(tmp_path)
+    with Session(db_engine) as session:
+        session.add_all(
+            [
+                Cliente(cliente_id="c1", cliente_codigo=11, cliente_nombre_comercial="Pan Ávila"),
+                Cliente(cliente_id="c2", cliente_codigo=12, cliente_nombre_comercial="  pan avila  "),
+                Cliente(cliente_id="c3", cliente_codigo=13, cliente_nombre_comercial="Nombre único"),
+                Cliente(cliente_id="c4", cliente_codigo=14, cliente_nombre_comercial=""),
+            ]
+        )
+        session.commit()
+    monkeypatch.setattr(customer_query_service_module, "engine", db_engine)
+
+    result = CustomerQueryService().run("lista de clientes con nombres repetidos")
+
+    assert result.status == "ready"
+    assert result.intent.query_type == "duplicate_customer_names"
+    assert result.headers == ["Nombre comercial", "Cod.", "Coincidencias"]
+    assert result.rows == [["Pan Ávila", "11", 2], ["pan avila", "12", 2]]
+
+
 def test_local_customer_parser_does_not_filter_type_when_requesting_distributor_code() -> None:
-    result = CustomerReportIntentService(api_key="").parse(
+    result = CustomerReportIntentService(api_key="", local_ai_service=_DisabledLocalAI()).parse(
         "listado de todos los clientes, campos uuid, cod, codigo cliente distribuidor, nombre"
     )
 
@@ -159,6 +207,62 @@ def test_zero_consumption_is_not_interpreted_as_a_one_row_limit() -> None:
     assert intent.zero_consumption is True
 
 
+def test_local_ai_translates_natural_sales_query_to_a_valid_deterministic_intent() -> None:
+    local_ai = _FakeLocalAI(
+        {
+            "query_type": "sales_customer_list",
+            "year": 2026,
+            "limit": 500,
+            "direction": "asc",
+            "metric": "kg",
+            "zero_consumption": True,
+            "columns": ["codigo", "nombre", "kg", "€"],
+            "sort_by_island": False,
+        }
+    )
+    service = CustomerQueryService(local_ai_service=local_ai)
+
+    intent = service.interpret("lista de clientes con ventas = 0 en 2026, campos cod y nombre comercial")
+
+    assert intent.query_type == "sales_customer_list"
+    assert intent.year == 2026
+    assert intent.zero_consumption is True
+    assert intent.columns == ["codigo", "nombre", "kg", "euros"]
+    assert intent.ai_interpreted is True
+    assert "No generes SQL" in local_ai.prompts[0]
+    assert local_ai.schemas == [CUSTOMER_QUERY_INTENT_SCHEMA]
+
+
+def test_invalid_local_ai_intent_falls_back_to_the_deterministic_interpreter() -> None:
+    local_ai = _FakeLocalAI({"query_type": "drop_all_tables", "year": 2026})
+    service = CustomerQueryService(local_ai_service=local_ai)
+
+    intent = service.interpret("lista de clientes con ventas = 0 en 2026")
+
+    assert intent.query_type == "sales_customer_list"
+    assert intent.zero_consumption is True
+    assert intent.ai_interpreted is False
+
+
+def test_local_ai_cannot_reroute_the_sales_zero_query_from_the_screenshot() -> None:
+    local_ai = _FakeLocalAI(
+        {
+            "query_type": "customer_filter",
+            "year": 2026,
+            "columns": ["codigo", "nombre"],
+        }
+    )
+    service = CustomerQueryService(local_ai_service=local_ai)
+
+    intent = service.interpret("lista de clientes con ventas = 0 en 2026, campos cod y nombre comercial")
+
+    assert intent.query_type == "sales_customer_list"
+    assert intent.year == 2026
+    assert intent.zero_consumption is True
+    assert intent.columns == ["codigo", "nombre"]
+    assert intent.ai_interpreted is True
+
+
 def test_sales_customer_list_returns_codes_as_text_and_orders_by_island_and_kg(tmp_path) -> None:
     db_engine = _sales_engine(tmp_path)
     with Session(db_engine) as session:
@@ -170,23 +274,24 @@ def test_sales_customer_list_returns_codes_as_text_and_orders_by_island_and_kg(t
             Cliente(cliente_id='c3', cliente_codigo=50, cliente_nombre_comercial='Pan Teide', cliente_tipo='indirecto', cliente_direccion_isla_id='tfe'),
             Cliente(cliente_id='c4', cliente_codigo=60, cliente_nombre_comercial='Directo', cliente_tipo='directo', cliente_direccion_isla_id='fue'),
         ])
-        _add_sale(session, 's1', 'c1', 2025, 10.0)
-        _add_sale(session, 's2', 'c2', 2025, 5.0)
-        _add_sale(session, 's3', 'c3', 2025, 2.0)
-        _add_sale(session, 's4', 'c4', 2025, 1.0)
+        _add_sale(session, 's1', 'c1', 2025, 10.0, 25.0)
+        _add_sale(session, 's2', 'c2', 2025, 5.0, 10.0)
+        _add_sale(session, 's3', 'c3', 2025, 2.0, 4.0)
+        _add_sale(session, 's4', 'c4', 2025, 1.0, 2.0)
         session.commit()
 
     service = CustomerQueryService(
         sales_service=SalesAnnualComparisonService(db_engine=db_engine)
     )
     result = service.run(
-        'ventas del 2025 de clientes indirectos, isla, cod, nombre y kg, '
+        'ventas del 2025 de clientes indirectos, campos: isla, cod, nombre, kg y €, '
         'ordenadas por isla y kg de menor a mayor'
     )
 
-    assert result.headers == ['Isla', 'Cod.', 'Nombre comercial', 'Kg']
+    assert result.headers == ['Isla', 'Cod.', 'Nombre comercial', 'Kg', '€']
     assert [row[1] for row in result.rows] == ['36', '35', '50']
     assert [row[3] for row in result.rows] == [5.0, 10.0, 2.0]
+    assert [row[4] for row in result.rows] == [10.0, 25.0, 4.0]
     assert all(isinstance(row[1], str) for row in result.rows)
 
 

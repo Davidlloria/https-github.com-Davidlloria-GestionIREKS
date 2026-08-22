@@ -8,6 +8,8 @@ from app.services.fatsecret_client import FatSecretClient
 from app.services.fatsecret_settings_service import FatSecretSettingsService
 from app.services.fdc_nutrition_service import FdcNutritionService
 from app.services.fdc_settings_service import FdcSettingsService
+from app.services.local_ai_service import LocalAIService
+from app.services.local_ai_settings_service import LocalAISettingsService
 from app.services.openai_settings_service import OpenAISettingsService
 from app.services.openai_translation_service import OpenAITranslationService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
@@ -53,6 +55,13 @@ class SettingsProviderView:
     openai_placeholder: str = "OPENAI_API_KEY"
     openai_api_key_label: str = "API key"
     openai_ai_translation_label: str = "Usar traduccion IA (ES->EN) en busquedas FDC"
+    local_ai_title: str = "Configuracion IA local"
+    local_ai_enabled_label: str = "Usar IA local en el asistente de ventas"
+    local_ai_base_url_label: str = "URL local"
+    local_ai_base_url_placeholder: str = "http://127.0.0.1:11434"
+    local_ai_model_label: str = "Modelo"
+    local_ai_model_placeholder: str = "qwen3.5:4b"
+    local_ai_info_label: str = "Solo se admiten servidores locales en 127.0.0.1, localhost o ::1."
 
 
 class SettingsProviderService:
@@ -62,18 +71,22 @@ class SettingsProviderService:
         fdc_settings: FdcSettingsService | None = None,
         fatsecret_settings: FatSecretSettingsService | None = None,
         openai_settings: OpenAISettingsService | None = None,
+        local_ai_settings: LocalAISettingsService | None = None,
         orders_mail_settings: OrdersMailSettingsService | None = None,
         fdc_nutrition_factory: type[FdcNutritionService] = FdcNutritionService,
         fatsecret_client_factory: type[FatSecretClient] = FatSecretClient,
         openai_translation_factory: type[OpenAITranslationService] = OpenAITranslationService,
+        local_ai_factory: type[LocalAIService] = LocalAIService,
     ) -> None:
         self.fdc_settings = fdc_settings or FdcSettingsService()
         self.fatsecret_settings = fatsecret_settings or FatSecretSettingsService()
         self.openai_settings = openai_settings or OpenAISettingsService()
+        self.local_ai_settings = local_ai_settings or LocalAISettingsService()
         self.orders_mail_settings = orders_mail_settings or OrdersMailSettingsService()
         self.fdc_nutrition_factory = fdc_nutrition_factory
         self.fatsecret_client_factory = fatsecret_client_factory
         self.openai_translation_factory = openai_translation_factory
+        self.local_ai_factory = local_ai_factory
 
     def load_fdc(self) -> dict[str, Any]:
         data = self.fdc_settings.load()
@@ -85,6 +98,10 @@ class SettingsProviderService:
 
     def load_openai(self) -> dict[str, Any]:
         data = self.openai_settings.load()
+        return dict(data) if isinstance(data, dict) else {}
+
+    def load_local_ai(self) -> dict[str, Any]:
+        data = self.local_ai_settings.load()
         return dict(data) if isinstance(data, dict) else {}
 
     def load_orders_mail(self) -> dict[str, Any]:
@@ -130,6 +147,10 @@ class SettingsProviderService:
         path = self.openai_settings.save(api_key=api_key, use_ai_translation=use_ai_translation)
         return SettingsProviderResult(ok=True, message="Configuracion de OpenAI guardada.", path=path)
 
+    def save_local_ai(self, *, enabled: bool, base_url: str, model: str) -> SettingsProviderResult:
+        path = self.local_ai_settings.save(enabled=enabled, base_url=base_url, model=model)
+        return SettingsProviderResult(ok=True, message="Configuracion de IA local guardada.", path=path)
+
     def test_openai(self, api_key: str, use_ai_translation: bool) -> SettingsProviderResult:
         self.openai_settings.save(api_key=api_key, use_ai_translation=use_ai_translation)
         service = self.openai_translation_factory(api_key=api_key)
@@ -137,6 +158,11 @@ class SettingsProviderService:
         if result.ok:
             return SettingsProviderResult(ok=True, message="Conexion OK y respuesta valida.")
         return SettingsProviderResult(ok=False, message=str(result.message or "No se obtuvo respuesta valida."))
+
+    def test_local_ai(self, *, base_url: str, model: str) -> SettingsProviderResult:
+        service = self.local_ai_factory(enabled=True, base_url=base_url, model=model)
+        result = service.test_connection()
+        return SettingsProviderResult(ok=bool(result.ok), message=str(result.message or result.text or "Sin respuesta."))
 
     def save_orders_mail(self, destino_email: str, historico_dir: str) -> SettingsProviderResult:
         destino = str(destino_email or "").strip()
