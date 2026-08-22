@@ -21,13 +21,12 @@ La sección se registra como `Almacen` en `app/ui/main_window.py` y se construye
 
 ```text
 WarehousePage (QWidget)
-└── layout principal (QVBoxLayout)
-    ├── título “Almacen” (QLabel, role="pageTitle")
-    ├── filtro global (QHBoxLayout)
-    │   ├── etiqueta “Cliente/Distribuidor”
-    │   ├── almacen_combo (QComboBox; “Todos” + clientes directos/distribuidores)
-    │   ├── Refrescar (QPushButton, rol secondary)
-    │   └── espacio flexible
+└── layout principal (QVBoxLayout, márgenes 10 / 8 / 10 / 10 px, separación 6 px)
+    ├── warehouseScopeBar (QFrame, fondo #F8FAFC, borde #D6E0EA, radio 10 px)
+    │   ├── icono `users.svg` (20 px)
+    │   ├── “ÁMBITO DE DATOS” (QLabel, #64748B, 9 px, negrita)
+    │   ├── “Cliente / distribuidor” (QLabel, #0B2F5B, 13 px, negrita)
+    │   └── almacen_combo / warehouseScopeCombo (QComboBox expansible; “Todos” + clientes directos/distribuidores)
     └── main_tabs (QTabWidget)
         ├── Artículos
         │   └── IngredientsIreksPage (sin cabecera ni ribbon propios, `compact_mode=True`)
@@ -58,7 +57,7 @@ WarehousePage (QWidget)
 
 ## Filtro global de almacén
 
-`almacen_combo` contiene `Todos` y las entidades que pueden operar como almacén: distribuidores y clientes directos. Al cambiarlo se propaga su identificador a Artículos, Entradas, Salidas, Stock, Pedidos mensual, Inventarios y Caducidad. El botón `Refrescar` recarga el selector y restablece el contexto global a `Todos`.
+`almacen_combo` contiene `Todos` y las entidades que pueden operar como almacén: distribuidores y clientes directos. Al cambiarlo se propaga su identificador a Artículos, Entradas, Salidas, Stock, Pedidos mensual, Inventarios y Caducidad. La carga inicial selecciona `Todos` y aplica el contexto general sin disparar recargas duplicadas. No hay botón de actualización en la barra superior.
 
 ## Pestaña Artículos
 
@@ -199,6 +198,7 @@ Otras referencias
 ## Aspecto visual actual
 
 - La ventana usa los estilos globales de `assets/styles.qss`: fondo claro, campos blancos, bordes grises suaves y botones por rol.
+- La zona superior es una barra compacta de ámbito de datos, sin título grande ni botón de actualización; queda separada 6 px de las pestañas para reducir el espacio vertical.
 - Las tablas son blancas, con cuadrícula tenue, filas alternas y cabeceras gris azulado. Las tablas de movimientos, stock, pedidos, caducidad y mantenimiento evitan el foco de celda visible.
 - La selección es por fila única; las columnas de unidades, kg y otras métricas numéricas se alinean a la derecha.
 - `main_tabs` separa el flujo operativo (Artículos a Caducidad) del mantenimiento de catálogos mediante la pestaña separadora `|` deshabilitada.

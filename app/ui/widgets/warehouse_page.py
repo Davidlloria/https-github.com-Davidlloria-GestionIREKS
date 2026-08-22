@@ -7,7 +7,7 @@ from typing import Any, cast as tcast
 from uuid import uuid4
 
 from PySide6.QtCore import QDate, Qt
-from PySide6.QtGui import QBrush, QColor
+from PySide6.QtGui import QBrush, QColor, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QDoubleSpinBox,
+    QFrame,
     QFormLayout,
     QHeaderView,
     QHBoxLayout,
@@ -2615,23 +2616,40 @@ class WarehousePage(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 8, 10, 10)
+        layout.setSpacing(6)
 
-        title = QLabel("Almacen")
-        title.setProperty("role", "pageTitle")
-        layout.addWidget(title)
-
-        row = QHBoxLayout()
-        row.addWidget(QLabel("Cliente/Distribuidor"))
+        scope_bar = QFrame(self)
+        scope_bar.setObjectName("warehouseScopeBar")
+        scope_bar.setStyleSheet(
+            "QFrame#warehouseScopeBar { background: #F8FAFC; border: 1px solid #D6E0EA; border-radius: 10px; }"
+            "QLabel#warehouseScopeCaption { color: #64748B; font-size: 9px; font-weight: 700; background: transparent; }"
+            "QLabel#warehouseScopeLabel { color: #0B2F5B; font-size: 13px; font-weight: 700; background: transparent; }"
+            "QComboBox#warehouseScopeCombo { min-height: 30px; background: #FFFFFF; color: #0B2F5B; border: 1px solid #C9D7E8; border-radius: 7px; padding: 2px 8px; }"
+            "QComboBox#warehouseScopeCombo:focus { border-color: #087E9C; }"
+        )
+        row = QHBoxLayout(scope_bar)
+        row.setContentsMargins(10, 6, 10, 6)
+        row.setSpacing(8)
+        scope_icon = QLabel(scope_bar)
+        scope_icon.setPixmap(QIcon(str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "users.svg")).pixmap(18, 18))
+        scope_icon.setFixedSize(20, 20)
+        row.addWidget(scope_icon)
+        scope_copy = QVBoxLayout()
+        scope_copy.setContentsMargins(0, 0, 0, 0)
+        scope_copy.setSpacing(0)
+        scope_caption = QLabel("ÁMBITO DE DATOS", scope_bar)
+        scope_caption.setObjectName("warehouseScopeCaption")
+        scope_label = QLabel("Cliente / distribuidor", scope_bar)
+        scope_label.setObjectName("warehouseScopeLabel")
+        scope_copy.addWidget(scope_caption)
+        scope_copy.addWidget(scope_label)
+        row.addLayout(scope_copy)
         self.almacen_combo = QComboBox()
-        row.addWidget(self.almacen_combo, 2)
+        self.almacen_combo.setObjectName("warehouseScopeCombo")
+        row.addWidget(self.almacen_combo, 1)
         self.almacen_combo.currentIndexChanged.connect(self._on_combo_filter_changed)
-
-        refresh_btn = QPushButton("Refrescar")
-        refresh_btn.setProperty("btnRole", "secondary")
-        refresh_btn.clicked.connect(self.reload)
-        row.addWidget(refresh_btn)
-        row.addStretch(1)
-        layout.addLayout(row)
+        layout.addWidget(scope_bar)
 
         self.main_tabs = QTabWidget()
         self.articles_tab = IngredientsIreksPage(
