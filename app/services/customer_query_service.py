@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
+import json
 import re
 import unicodedata
 from typing import Any
 
 from app.core.database import engine
 from app.services.customer_report_flow_service import CustomerReportFlowService
+from app.services.local_ai_service import LocalAIService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
 
 
@@ -25,6 +27,7 @@ class CustomerQueryIntent:
     columns: list[str] = field(default_factory=list)
     sort_by_island: bool = True
     sort_metric: str = "kg"
+    ai_interpreted: bool = False
 
 
 @dataclass
@@ -56,14 +59,35 @@ class CustomerQueryService:
         "diez": 10,
         "veinte": 20,
     }
+    _QUERY_TYPES = {
+        "customer_filter",
+        "duplicate_customer_names",
+        "sales_customer_year_comparison",
+        "sales_customer_list",
+        "sales_drop_ranking",
+        "sales_growth_ranking",
+    }
+    _CUSTOMER_TYPES = {"", "directo", "indirecto", "distribuidor"}
+    _ISLANDS = {
+        "Gran Canaria",
+        "Tenerife",
+        "Lanzarote",
+        "Fuerteventura",
+        "La Palma",
+        "La Gomera",
+        "El Hierro",
+    }
+    _SALES_COLUMNS = {"isla", "codigo", "nombre", "kg", "kg_curr", "kg_prev", "delta_kg", "delta_kg_pct"}
 
     def __init__(
         self,
         report_flow_service: CustomerReportFlowService | None = None,
         sales_service: SalesAnnualComparisonService | None = None,
+        local_ai_service: LocalAIService | None = None,
     ) -> None:
         self.report_flow_service = report_flow_service or CustomerReportFlowService()
         self.sales_service = sales_service or SalesAnnualComparisonService()
+        self.local_ai_service = local_ai_service or LocalAIService(timeout=60.0)
 
     def run(self, prompt: str) -> CustomerQueryResult:
         text = str(prompt or "").strip()
@@ -82,6 +106,18 @@ class CustomerQueryService:
         return self._run_customer_filter(text, intent)
 
     def interpret(self, prompt: str) -> CustomerQueryIntent:
+        fallback = self._interpret_deterministic(prompt)
+        if not self.local_ai_service.enabled:
+            return fallback
+        result = self.local_ai_service.generate_json(self._local_ai_instruction(prompt))
+        if not result.ok:
+            return fallback
+        try:
+            return self._intent_from_local_ai(result.text, fallback)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return fallback
+
+    def _interpret_deterministic(self, prompt: str) -> CustomerQueryIntent:
         normalized = self._normalize(prompt)
         years = [int(item) for item in re.findall(r"\b(20\d{2})\b", normalized)]
         year = years[0] if years else date.today().year
@@ -216,10 +252,10 @@ class CustomerQueryService:
             )
         )
         zero_consumption = bool(
-            re.search(r'\bconsumo\s*(?:=|igual\s+a)?\s*0(?:[,.]0+)?\b', normalized)
+            re.search(r'\b(?:consumo|compra(?:s)?|venta(?:s)?)\s*(?:=|igual\s+a)?\s*0(?:[,.]0+)?\b', normalized)
             or any(
                 term in normalized
-                for term in ('sin consumo', 'no han consumido', 'no ha consumido')
+                for term in ('sin consumo', 'sin compras', 'sin ventas', 'no han consumido', 'no ha consumido')
             )
         )
 
@@ -262,6 +298,75 @@ class CustomerQueryService:
                 metric="kg",
             )
         return CustomerQueryIntent(query_type="customer_filter", year=year, limit=limit, metric="kg")
+
+    def _local_ai_instruction(self, prompt: str) -> str:
+        return (
+            "Convierte la pregunta del usuario sobre clientes a un JSON estricto para un interprete "
+            "determinista de solo lectura. No generes SQL, no inventes campos ni datos. "
+            f"query_type permitido: {', '.join(sorted(self._QUERY_TYPES))}. "
+            "Campos JSON permitidos: query_type, year, compare_year, limit, customer_type, island, "
+            "direction, metric, zero_consumption, columns, sort_by_island, sort_metric. "
+            "customer_type permitido: directo, indirecto, distribuidor o cadena vacia. "
+            "direction permitido: asc o desc. metric siempre kg. "
+            "columns permitidas: isla, codigo, nombre, kg, kg_curr, kg_prev, delta_kg, delta_kg_pct. "
+            "Interpreta ventas = 0, compras = 0, sin compras y sin consumo como zero_consumption=true "
+            "en kg. Devuelve solo JSON valido.\n\n"
+            f"Pregunta: {str(prompt or '').strip()}"
+        )
+
+    def _intent_from_local_ai(self, text: str, fallback: CustomerQueryIntent) -> CustomerQueryIntent:
+        parsed = json.loads(str(text or "").strip())
+        if not isinstance(parsed, dict):
+            raise ValueError("La IA local no devolvio un objeto JSON.")
+
+        query_type = str(parsed.get("query_type") or fallback.query_type).strip()
+        if query_type not in self._QUERY_TYPES:
+            raise ValueError("Tipo de consulta no permitido.")
+        year = self._safe_year(parsed.get("year"), fallback.year)
+        compare_year = self._safe_year(parsed.get("compare_year"), fallback.compare_year, allow_zero=True)
+        customer_type = str(parsed.get("customer_type") or fallback.customer_type).strip().lower()
+        if customer_type not in self._CUSTOMER_TYPES:
+            customer_type = fallback.customer_type
+        island = str(parsed.get("island") or fallback.island).strip()
+        if island not in self._ISLANDS:
+            island = fallback.island
+        direction = str(parsed.get("direction") or fallback.direction).strip().lower()
+        if direction not in {"asc", "desc"}:
+            direction = fallback.direction
+        columns = [
+            str(column).strip()
+            for column in parsed.get("columns", fallback.columns)
+            if str(column).strip() in self._SALES_COLUMNS
+        ]
+        return CustomerQueryIntent(
+            query_type=query_type,
+            year=year,
+            compare_year=compare_year,
+            limit=min(max(int(parsed.get("limit", fallback.limit) or fallback.limit), 1), 5000),
+            customer_type=customer_type,
+            island=island,
+            direction=direction,
+            metric="kg",
+            zero_consumption=parsed.get("zero_consumption") if isinstance(parsed.get("zero_consumption"), bool) else fallback.zero_consumption,
+            columns=list(dict.fromkeys(columns)),
+            sort_by_island=parsed.get("sort_by_island") if isinstance(parsed.get("sort_by_island"), bool) else fallback.sort_by_island,
+            sort_metric=(
+                str(parsed.get("sort_metric") or fallback.sort_metric)
+                if str(parsed.get("sort_metric") or fallback.sort_metric) in {"kg", "kg_curr", "delta_kg"}
+                else fallback.sort_metric
+            ),
+            ai_interpreted=True,
+        )
+
+    @staticmethod
+    def _safe_year(value: Any, fallback: int, *, allow_zero: bool = False) -> int:
+        try:
+            year = int(value)
+        except (TypeError, ValueError):
+            return fallback
+        if allow_zero and year == 0:
+            return 0
+        return year if 2000 <= year <= 2100 else fallback
 
     def _run_customer_filter(self, prompt: str, intent: CustomerQueryIntent) -> CustomerQueryResult:
         flow_result = self.report_flow_service.generate_report(prompt)

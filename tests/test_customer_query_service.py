@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import json
 
 import pytest
 from sqlmodel import SQLModel, Session, create_engine
@@ -15,6 +16,23 @@ from app.services.sales_annual_comparison_service import SalesAnnualComparisonSe
 
 class _DisabledLocalAI:
     enabled = False
+
+
+class _FakeLocalAI:
+    enabled = True
+
+    def __init__(self, response: dict) -> None:
+        self.response = response
+        self.prompts: list[str] = []
+
+    def generate_json(self, prompt: str):
+        self.prompts.append(prompt)
+        return type("Result", (), {"ok": True, "text": json.dumps(self.response)})()
+
+
+@pytest.fixture(autouse=True)
+def _disable_default_local_ai(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(customer_query_service_module, "LocalAIService", lambda **_kwargs: _DisabledLocalAI())
 
 
 def _sales_engine(tmp_path):
@@ -184,6 +202,42 @@ def test_zero_consumption_is_not_interpreted_as_a_one_row_limit() -> None:
     assert intent.island == 'Gran Canaria'
     assert intent.limit == 500
     assert intent.zero_consumption is True
+
+
+def test_local_ai_translates_natural_sales_query_to_a_valid_deterministic_intent() -> None:
+    local_ai = _FakeLocalAI(
+        {
+            "query_type": "sales_customer_list",
+            "year": 2026,
+            "limit": 500,
+            "direction": "asc",
+            "metric": "kg",
+            "zero_consumption": True,
+            "columns": ["codigo", "nombre"],
+            "sort_by_island": False,
+        }
+    )
+    service = CustomerQueryService(local_ai_service=local_ai)
+
+    intent = service.interpret("lista de clientes con ventas = 0 en 2026, campos cod y nombre comercial")
+
+    assert intent.query_type == "sales_customer_list"
+    assert intent.year == 2026
+    assert intent.zero_consumption is True
+    assert intent.columns == ["codigo", "nombre"]
+    assert intent.ai_interpreted is True
+    assert "No generes SQL" in local_ai.prompts[0]
+
+
+def test_invalid_local_ai_intent_falls_back_to_the_deterministic_interpreter() -> None:
+    local_ai = _FakeLocalAI({"query_type": "drop_all_tables", "year": 2026})
+    service = CustomerQueryService(local_ai_service=local_ai)
+
+    intent = service.interpret("lista de clientes con ventas = 0 en 2026")
+
+    assert intent.query_type == "sales_customer_list"
+    assert intent.zero_consumption is True
+    assert intent.ai_interpreted is False
 
 
 def test_sales_customer_list_returns_codes_as_text_and_orders_by_island_and_kg(tmp_path) -> None:
