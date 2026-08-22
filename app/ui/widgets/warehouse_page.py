@@ -2602,6 +2602,9 @@ class AnnualMonthlyOrdersTab(QWidget):
 class WarehousePage(QWidget):
     def __init__(self) -> None:
         super().__init__()
+        self.setObjectName("warehousePage")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet("QWidget#warehousePage { background: #EEF3F8; border: 0; }")
         self.rows: list[Cliente] = []
         self.articles_tab: IngredientsIreksPage | None = None
         self.entradas_tab: MovimientosTab | None = None
@@ -2632,7 +2635,7 @@ class WarehousePage(QWidget):
         row.setContentsMargins(10, 6, 10, 6)
         row.setSpacing(8)
         scope_icon = QLabel(scope_bar)
-        scope_icon.setPixmap(QIcon(str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "users.svg")).pixmap(18, 18))
+        scope_icon.setPixmap(QIcon(str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "data-scope.svg")).pixmap(18, 18))
         scope_icon.setFixedSize(20, 20)
         row.addWidget(scope_icon)
         scope_copy = QVBoxLayout()
