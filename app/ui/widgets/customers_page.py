@@ -254,6 +254,15 @@ class NumericSortableTableWidgetItem(QTableWidgetItem):
         return super().__lt__(other)
 
 
+class CustomersCatalogSelectionDelegate(QStyledItemDelegate):
+    """Paint the catalog selection accent without changing customer selection state."""
+
+    def paint(self, painter: QPainter, option, index) -> None:  # type: ignore[override]
+        super().paint(painter, option, index)
+        if index.column() == 0 and option.state & QStyle.StateFlag.State_Selected:
+            painter.fillRect(option.rect.x(), option.rect.y(), 3, option.rect.height(), QColor("#087E9C"))
+
+
 class AgendaIconDelegate(QStyledItemDelegate):
     def __init__(self, page: "CustomersPage", parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -984,6 +993,8 @@ class CustomersPage(QWidget):
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
+        self.table.setItemDelegate(CustomersCatalogSelectionDelegate(self.table))
         header = self.table.horizontalHeader()
         header.setSectionsClickable(True)
         header.setMinimumSectionSize(40)
@@ -1001,7 +1012,6 @@ class CustomersPage(QWidget):
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._show_customers_context_menu)
         self.table.verticalHeader().setDefaultSectionSize(42)
-        self.table.setAlternatingRowColors(True)
         customers_catalog_body_layout.addWidget(self.table, 1)
         left_layout.addWidget(customers_catalog_body, 1)
         splitter.addWidget(left_panel)
@@ -3876,6 +3886,46 @@ class CustomersPage(QWidget):
             }
             QTableWidget[tableVariant="standard"] QHeaderView::section:last {
                 border-right: 0;
+            }
+            QTableWidget#customersListTable {
+                background: #FFFFFF;
+                color: #0B2F5B;
+                border: 1px solid #D6E0EA;
+                border-radius: 8px;
+                gridline-color: #E1E8F0;
+                alternate-background-color: #F8FAFD;
+                selection-background-color: #E5F7F4;
+                selection-color: #0B2F5B;
+            }
+            QTableWidget#customersListTable::item {
+                padding: 4px 7px;
+            }
+            QTableWidget#customersListTable::item:selected {
+                background: #E5F7F4;
+                color: #0B2F5B;
+            }
+            QTableWidget#customersListTable QHeaderView::section {
+                background: #EEF3F8;
+                color: #0B2F5B;
+                border: 0;
+                border-right: 1px solid #D6E0EA;
+                border-bottom: 1px solid #D6E0EA;
+                padding: 7px 6px;
+                font-weight: 700;
+            }
+            QTableWidget#customersListTable QScrollBar:vertical {
+                width: 8px;
+                background: transparent;
+                margin: 3px 1px;
+            }
+            QTableWidget#customersListTable QScrollBar::handle:vertical {
+                min-height: 24px;
+                background: #B8C7D8;
+                border-radius: 4px;
+            }
+            QTableWidget#customersListTable QScrollBar::add-line:vertical,
+            QTableWidget#customersListTable QScrollBar::sub-line:vertical {
+                height: 0;
             }
             QWidget#relatedContactsPanel,
             QWidget#customerSalesPanel,
