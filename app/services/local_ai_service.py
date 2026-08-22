@@ -141,9 +141,8 @@ class OllamaModelLifecycle:
     """Keeps the configured local Ollama model warm while the desktop app is open."""
 
     def __init__(self, service: LocalAIService | None = None, *, timeout: float = 2.0) -> None:
-        self.service = service or LocalAIService(timeout=timeout)
+        self.service = service or LocalAIService(timeout=180.0)
         self.timeout = float(timeout)
-        self.service.timeout = min(float(self.service.timeout), self.timeout)
         self.status = ""
         self._closing = threading.Event()
         self._operation_lock = threading.Lock()

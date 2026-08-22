@@ -472,3 +472,20 @@ def test_listar_ventas_mensuales_cliente_producto_groups_selected_year_by_month(
     assert rows[2].kg == pytest.approx(10.0)
     assert rows[2].euros == pytest.approx(30.0)
     assert rows[1].kg == pytest.approx(0.0)
+
+
+def test_latest_sales_month_clientes_uses_global_imported_period(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        session.add_all(
+            [
+                VentaClientesRaw(raw_id="latest-1", lote_id="latest", anio=2026, mes=2, kg=1),
+                VentaClientesRaw(raw_id="latest-2", lote_id="latest", anio=2026, mes=7, kg=1),
+                VentaClientesRaw(raw_id="latest-3", lote_id="latest", anio=2025, mes=12, kg=1),
+            ]
+        )
+        session.commit()
+
+    service = SalesAnnualComparisonService(db_engine=isolated_engine)
+
+    assert service.latest_sales_month_clientes(2026) == 7
+    assert service.latest_sales_month_clientes(2024) == 0

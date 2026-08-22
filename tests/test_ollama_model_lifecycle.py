@@ -24,6 +24,15 @@ def test_preload_uses_tags_and_native_chat_payload(monkeypatch) -> None:
     assert calls[1][2] == {"model": "model", "messages": [], "stream": False, "think": False, "keep_alive": -1}
 
 
+def test_lifecycle_health_timeout_does_not_shorten_model_request_timeout() -> None:
+    service = LocalAIService(enabled=True, timeout=180.0)
+
+    lifecycle = OllamaModelLifecycle(service, timeout=2.0)
+
+    assert lifecycle.timeout == 2.0
+    assert lifecycle.service.timeout == 180.0
+
+
 def test_unload_is_controlled_when_connection_fails(monkeypatch) -> None:
     service = LocalAIService(enabled=True, base_url="http://localhost:11434", model="model")
     lifecycle = OllamaModelLifecycle(service)

@@ -5,15 +5,23 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.customer_ai_summary_service import CustomerAISummaryService
+from app.services.customer_ai_summary_service import CUSTOMER_AI_SUMMARY_SCHEMA, CustomerAISummaryService
 
 
 class _FakeCustomerService:
+    def __init__(self) -> None:
+        self.period = None
+
     def related_sales_years(self):
         return [2025, 2026]
 
-    def related_sales(self, _customer_id: str, year: int):
+    def related_sales_latest_month(self, year: int):
         assert year == 2026
+        return 7
+
+    def related_sales(self, _customer_id: str, year: int, *, month_from: int, month_to: int):
+        assert year == 2026
+        self.period = (month_from, month_to)
         return [
             SimpleNamespace(codigo="A", nombre="Producto principal", kg_prev=100.0, kg_curr=60.0, euros_curr=300.0),
             SimpleNamespace(codigo="B", nombre="Producto perdido", kg_prev=30.0, kg_curr=0.0, euros_curr=0.0),
@@ -37,9 +45,26 @@ class _DisabledLocalAI:
 class _EnabledLocalAI:
     enabled = True
 
-    def generate_process(self, prompt: str):
+    def generate_json(self, prompt: str, *, schema: dict):
         self.prompt = prompt
-        return SimpleNamespace(ok=True, text="Resumen redactado con datos reales.", message="IA local")
+        self.schema = schema
+        return SimpleNamespace(
+            ok=True,
+            text=(
+                '{"situation":"Cliente activo.","sales":"El volumen desciende.",'
+                '"products":["Producto perdido requiere revisión."],'
+                '"opportunities":["Contactar al cliente."],"conclusion":"Priorizar seguimiento."}'
+            ),
+            message="IA local",
+        )
+
+
+class _InvalidLocalAI:
+    enabled = True
+
+    def generate_json(self, _prompt: str, *, schema: dict):
+        assert schema == CUSTOMER_AI_SUMMARY_SCHEMA
+        return SimpleNamespace(ok=True, text="respuesta sin JSON", message="IA local")
 
 
 def _customer():
@@ -54,8 +79,9 @@ def _customer():
 
 
 def test_customer_summary_calculates_real_sales_and_opportunities() -> None:
+    customer_service = _FakeCustomerService()
     result = CustomerAISummaryService(
-        customer_service=_FakeCustomerService(),
+        customer_service=customer_service,
         local_ai_service=_DisabledLocalAI(),
     ).summarize(_customer())
 
@@ -66,6 +92,9 @@ def test_customer_summary_calculates_real_sales_and_opportunities() -> None:
     assert result.snapshot.kg_previous == pytest.approx(130.0)
     assert result.snapshot.delta_kg == pytest.approx(-50.0)
     assert result.snapshot.delta_kg_pct == pytest.approx(-38.461538)
+    assert result.snapshot.month_to == 7
+    assert result.snapshot.period_label == "enero–julio 2026 frente a enero–julio 2025"
+    assert customer_service.period == (1, 7)
     assert result.snapshot.contact_count == 0
     assert result.snapshot.recipe_count == 1
     assert result.snapshot.stopped_products == ("B · Producto perdido: 30,00 kg",)
@@ -85,10 +114,29 @@ def test_customer_summary_asks_ai_only_to_explain_calculated_context() -> None:
 
     assert result.ok is True
     assert result.used_ai is True
-    assert result.text == "Resumen redactado con datos reales."
+    assert result.sections is not None
+    assert result.sections.situation == "Cliente activo."
+    assert result.sections.opportunities == ("Contactar al cliente.",)
+    assert "Situación" in result.text
+    assert "**" not in result.text
     assert "No inventes" in local_ai.prompt
     assert "Producto perdido" in local_ai.prompt
     assert "80,00" in local_ai.prompt
+    assert "enero–julio 2026" in local_ai.prompt
+    assert local_ai.schema == CUSTOMER_AI_SUMMARY_SCHEMA
+
+
+def test_customer_summary_falls_back_when_ai_json_is_invalid() -> None:
+    result = CustomerAISummaryService(
+        customer_service=_FakeCustomerService(),
+        local_ai_service=_InvalidLocalAI(),
+    ).summarize(_customer())
+
+    assert result.ok is True
+    assert result.used_ai is False
+    assert result.sections is not None
+    assert "formato esperado" in result.message
+    assert "Producto perdido" in result.text
 
 
 def test_customer_summary_requires_a_selected_customer() -> None:

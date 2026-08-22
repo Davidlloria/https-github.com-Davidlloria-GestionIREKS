@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 import unicodedata
 
 from sqlmodel import Session, col, select
@@ -361,6 +362,9 @@ class CustomerService:
 
     def related_sales_years(self) -> list[int]:
         return self.sales_summary_service.list_years_clientes()
+
+    def related_sales_latest_month(self, year: int) -> int:
+        return self.sales_summary_service.latest_sales_month_clientes(year)
 
     def related_sales(self, cliente_id: str, year: int, *, month_from: int = 1, month_to: int = 12) -> list[Any]:
         clean_id = str(cliente_id or "").strip()

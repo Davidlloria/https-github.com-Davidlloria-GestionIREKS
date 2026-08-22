@@ -1,11 +1,43 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
 from app.services.customer_service import CustomerService
 from app.services.local_ai_service import LocalAIService
+
+
+CUSTOMER_AI_SUMMARY_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "situation": {"type": "string"},
+        "sales": {"type": "string"},
+        "products": {
+            "type": "array",
+            "items": {"type": "string"},
+            "maxItems": 5,
+        },
+        "opportunities": {
+            "type": "array",
+            "items": {"type": "string"},
+            "maxItems": 5,
+        },
+        "conclusion": {"type": "string"},
+    },
+    "required": ["situation", "sales", "products", "opportunities", "conclusion"],
+    "additionalProperties": False,
+}
+
+
+@dataclass(frozen=True)
+class CustomerAISummarySections:
+    situation: str
+    sales: str
+    products: tuple[str, ...] = ()
+    opportunities: tuple[str, ...] = ()
+    conclusion: str = ""
 
 
 @dataclass(frozen=True)
@@ -17,6 +49,9 @@ class CustomerAISnapshot:
     active: bool
     year: int
     previous_year: int
+    month_from: int
+    month_to: int
+    period_label: str
     kg_current: float
     kg_previous: float
     euros_current: float
@@ -39,6 +74,7 @@ class CustomerAISummaryResult:
     message: str
     used_ai: bool = False
     snapshot: CustomerAISnapshot | None = None
+    sections: CustomerAISummarySections | None = None
 
 
 class CustomerAISummaryService:
@@ -51,7 +87,7 @@ class CustomerAISummaryService:
         local_ai_service: LocalAIService | None = None,
     ) -> None:
         self.customer_service = customer_service or CustomerService()
-        self.local_ai_service = local_ai_service or LocalAIService(timeout=90.0)
+        self.local_ai_service = local_ai_service or LocalAIService(timeout=180.0)
 
     def summarize(self, customer: Any) -> CustomerAISummaryResult:
         customer_id = str(getattr(customer, "cliente_id", "") or "").strip()
@@ -63,7 +99,8 @@ class CustomerAISummaryService:
         except Exception as exc:  # noqa: BLE001
             return CustomerAISummaryResult(False, "", f"No se pudieron preparar los datos del cliente.\n{exc}")
 
-        deterministic_text = self._deterministic_summary(snapshot)
+        fallback_sections = self._fallback_sections(snapshot)
+        deterministic_text = self._sections_text(fallback_sections)
         if not self.local_ai_service.enabled:
             return CustomerAISummaryResult(
                 True,
@@ -71,9 +108,13 @@ class CustomerAISummaryService:
                 "Resumen calculado. La IA local no está activada.",
                 False,
                 snapshot,
+                fallback_sections,
             )
 
-        ai_result = self.local_ai_service.generate_process(self._build_prompt(snapshot))
+        ai_result = self.local_ai_service.generate_json(
+            self._build_prompt(snapshot),
+            schema=CUSTOMER_AI_SUMMARY_SCHEMA,
+        )
         if not ai_result.ok:
             return CustomerAISummaryResult(
                 True,
@@ -81,13 +122,26 @@ class CustomerAISummaryService:
                 f"Resumen calculado sin redacción IA: {ai_result.message}",
                 False,
                 snapshot,
+                fallback_sections,
+            )
+        try:
+            sections = self._parse_sections(ai_result.text)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return CustomerAISummaryResult(
+                True,
+                deterministic_text,
+                "Resumen calculado sin redacción IA: la respuesta no tenía el formato esperado.",
+                False,
+                snapshot,
+                fallback_sections,
             )
         return CustomerAISummaryResult(
             True,
-            ai_result.text.strip(),
+            self._sections_text(sections),
             "Resumen redactado con IA local a partir de datos calculados por GestionIREKS.",
             True,
             snapshot,
+            sections,
         )
 
     def _build_snapshot(self, customer: Any) -> CustomerAISnapshot:
@@ -97,7 +151,17 @@ class CustomerAISummaryService:
             reverse=True,
         )
         year = years[0] if years else date.today().year
-        rows = list(self.customer_service.related_sales(customer_id, year) or [])
+        latest_month = int(self.customer_service.related_sales_latest_month(year) or 0)
+        month_to = max(1, min(latest_month or 12, 12))
+        rows = list(
+            self.customer_service.related_sales(
+                customer_id,
+                year,
+                month_from=1,
+                month_to=month_to,
+            )
+            or []
+        )
         contacts = list(self.customer_service.related_contacts(customer_id) or [])
         recipes = list(self.customer_service.related_recipes(customer_id) or [])
         agenda = list(self.customer_service.related_agenda(customer_id) or [])
@@ -158,6 +222,9 @@ class CustomerAISummaryService:
             active=bool(getattr(customer, "activo", False)),
             year=year,
             previous_year=year - 1,
+            month_from=1,
+            month_to=month_to,
+            period_label=self._period_label(year, month_to),
             kg_current=kg_current,
             kg_previous=kg_previous,
             euros_current=euros_current,
@@ -230,7 +297,7 @@ class CustomerAISummaryService:
                 f"Contactos: {data.contact_count} · Recetas: {data.recipe_count} · Actividades de agenda: {data.agenda_count}",
                 f"Última actividad: {data.latest_activity or 'Sin actividad registrada'}",
                 "",
-                f"Ventas {data.year} frente a {data.previous_year}",
+                f"Ventas {data.period_label}",
                 f"Kg actuales: {self._number(data.kg_current)} · Kg anteriores: {self._number(data.kg_previous)} · Variación: {variation}",
                 f"Facturación actual: {self._number(data.euros_current)} €",
                 "",
@@ -250,12 +317,102 @@ class CustomerAISummaryService:
 
     def _build_prompt(self, data: CustomerAISnapshot) -> str:
         return (
-            "Redacta en español un resumen comercial breve y claro usando exclusivamente los datos siguientes. "
+            "Devuelve un JSON en español con un resumen comercial breve usando exclusivamente los datos siguientes. "
             "No inventes causas, fechas, productos ni importes. Distingue los hechos de las acciones sugeridas. "
-            "No propongas modificar la base de datos. Conserva las cifras y organiza la respuesta en: situación, "
-            "ventas, productos y oportunidades.\n\n"
+            "No propongas modificar la base de datos. Conserva las cifras y el periodo comparado. "
+            "Usa situation para el perfil, sales para la comparación, products para un máximo de cinco observaciones, "
+            "opportunities para acciones sugeridas y conclusion para una frase final. Sin Markdown ni texto fuera del JSON.\n\n"
             f"{self._deterministic_summary(data)}"
         )
+
+    def _fallback_sections(self, data: CustomerAISnapshot) -> CustomerAISummarySections:
+        variation = "sin base de comparación"
+        if data.delta_kg_pct is not None:
+            variation = f"{data.delta_kg_pct:+.1f}%"
+        product_notes = [
+            f"Productos principales: {', '.join(data.top_products)}"
+            if data.top_products
+            else "Sin ventas de productos en el periodo actual.",
+            f"Sin consumo actual: {', '.join(data.stopped_products)}"
+            if data.stopped_products
+            else "No se detectan productos abandonados.",
+            f"En descenso: {', '.join(data.declining_products)}"
+            if data.declining_products
+            else "No se detectan productos en descenso.",
+        ]
+        return CustomerAISummarySections(
+            situation=(
+                f"Cliente {'activo' if data.active else 'inactivo'}, tipo {data.customer_type or 'no indicado'}, "
+                f"actividad {data.activity or 'no indicada'}. Contactos: {data.contact_count}; recetas: "
+                f"{data.recipe_count}; actividades de agenda: {data.agenda_count}. Última actividad: "
+                f"{data.latest_activity or 'sin actividad registrada'}."
+            ),
+            sales=(
+                f"{data.period_label}: {self._number(data.kg_current)} kg frente a "
+                f"{self._number(data.kg_previous)} kg; variación {variation}. "
+                f"Facturación actual: {self._number(data.euros_current)} €."
+            ),
+            products=tuple(product_notes),
+            opportunities=data.opportunities,
+            conclusion="Resumen calculado exclusivamente con datos de GestionIREKS.",
+        )
+
+    @staticmethod
+    def _parse_sections(text: str) -> CustomerAISummarySections:
+        parsed = json.loads(str(text or "").strip())
+        if not isinstance(parsed, dict):
+            raise ValueError("La respuesta no es un objeto.")
+
+        def clean_list(value: Any) -> tuple[str, ...]:
+            if not isinstance(value, list):
+                raise ValueError("La respuesta no contiene una lista válida.")
+            return tuple(str(item or "").strip() for item in value if str(item or "").strip())[:5]
+
+        situation = str(parsed.get("situation") or "").strip()
+        sales = str(parsed.get("sales") or "").strip()
+        conclusion = str(parsed.get("conclusion") or "").strip()
+        if not situation or not sales or not conclusion:
+            raise ValueError("Faltan secciones obligatorias.")
+        return CustomerAISummarySections(
+            situation=situation,
+            sales=sales,
+            products=clean_list(parsed.get("products")),
+            opportunities=clean_list(parsed.get("opportunities")),
+            conclusion=conclusion,
+        )
+
+    @staticmethod
+    def _sections_text(sections: CustomerAISummarySections) -> str:
+        product_text = "\n".join(f"• {item}" for item in sections.products)
+        opportunity_text = "\n".join(f"• {item}" for item in sections.opportunities)
+        return "\n\n".join(
+            [
+                f"Situación\n{sections.situation}",
+                f"Ventas\n{sections.sales}",
+                f"Productos\n{product_text}",
+                f"Oportunidades\n{opportunity_text}",
+                f"Conclusión\n{sections.conclusion}",
+            ]
+        )
+
+    @staticmethod
+    def _period_label(year: int, month_to: int) -> str:
+        month_names = (
+            "enero",
+            "febrero",
+            "marzo",
+            "abril",
+            "mayo",
+            "junio",
+            "julio",
+            "agosto",
+            "septiembre",
+            "octubre",
+            "noviembre",
+            "diciembre",
+        )
+        end_month = month_names[max(1, min(int(month_to or 12), 12)) - 1]
+        return f"enero–{end_month} {year} frente a enero–{end_month} {year - 1}"
 
     @staticmethod
     def _bullets(items: tuple[str, ...], empty_text: str) -> str:

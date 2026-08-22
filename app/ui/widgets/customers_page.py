@@ -1,8 +1,10 @@
 from pathlib import Path
 from datetime import date, datetime
+import threading
 import unicodedata
+from uuid import uuid4
 
-from PySide6.QtCore import QSize, QTimer, Qt
+from PySide6.QtCore import QObject, QSize, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap, QTextCharFormat, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
@@ -48,7 +50,7 @@ except ModuleNotFoundError:  # pragma: no cover - dependency guard
 
 from app.models import CodigoPostal, Cliente, Contacto, Isla, Localidad, Municipio, Provincia, Receta
 from app.services.customer_report_document_helper import build_customer_report_html
-from app.services.customer_ai_summary_service import CustomerAISummaryService
+from app.services.customer_ai_summary_service import CustomerAISummaryResult, CustomerAISummaryService
 from app.services.customer_report_flow_service import CustomerReportFlowResult, CustomerReportFlowService
 from app.services.customer_query_service import CustomerQueryService
 from app.services.customer_service import CustomerService
@@ -60,6 +62,25 @@ from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_s
 from app.ui.widgets.entity_dialog import EntityDialog
 
 BASE_DIR = Path(__file__).resolve().parents[3]
+
+
+class _CustomerAISummaryRunner(QObject):
+    result_ready = Signal(str, object)
+    failed = Signal(str, str)
+
+    def start(self, token: str, service: CustomerAISummaryService, customer: object) -> None:
+        threading.Thread(
+            target=self._run,
+            args=(token, service, customer),
+            name="customer-ai-summary",
+            daemon=True,
+        ).start()
+
+    def _run(self, token: str, service: CustomerAISummaryService, customer: object) -> None:
+        try:
+            self.result_ready.emit(token, service.summarize(customer))
+        except Exception as exc:  # noqa: BLE001
+            self.failed.emit(token, f"No se pudo generar el resumen.\n{exc}")
 
 
 def _has_current_sales_activity(item: object) -> bool:
@@ -786,6 +807,11 @@ class CustomersPage(QWidget):
             report_flow_service=self.customer_report_flow_service
         )
         self.customer_ai_summary_service = CustomerAISummaryService(customer_service=self.customer_service)
+        self._customer_ai_summary_runner = _CustomerAISummaryRunner(self)
+        self._customer_ai_summary_runner.result_ready.connect(self._handle_customer_ai_summary_result)
+        self._customer_ai_summary_runner.failed.connect(self._handle_customer_ai_summary_failure)
+        self._customer_ai_summary_request_token = ""
+        self._customer_ai_summary_dialog: CustomerAISummaryDialog | None = None
         self.schema = [
             {"name": "cliente_nombre_comercial", "label": "Nombre comercial"},
             {"name": "cliente_nombre_fiscal", "label": "Nombre fiscal"},
@@ -3353,28 +3379,41 @@ class CustomersPage(QWidget):
             QMessageBox.information(self, "Resumen IA", "Selecciona un cliente para generar el resumen.")
             return
 
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            result = self.customer_ai_summary_service.summarize(customer)
-        finally:
-            QApplication.restoreOverrideCursor()
-        if not result.ok:
-            QMessageBox.warning(self, "Resumen IA", result.message)
-            return
-
         customer_name = str(
             getattr(customer, "cliente_nombre_comercial", "")
             or getattr(customer, "cliente_nombre_fiscal", "")
             or "Cliente"
         ).strip()
-        dialog = CustomerAISummaryDialog(
-            customer_name=customer_name,
-            summary=result.text,
-            status=result.message,
-            parent=self,
-        )
+        if self._customer_ai_summary_dialog is not None:
+            self._customer_ai_summary_dialog.close()
+        dialog = CustomerAISummaryDialog(customer_name=customer_name, parent=self)
         self._customer_ai_summary_dialog = dialog
-        dialog.exec()
+        dialog.retry_requested.connect(lambda: self._start_customer_ai_summary(customer, dialog))
+        dialog.show()
+        self._start_customer_ai_summary(customer, dialog)
+
+    def _start_customer_ai_summary(self, customer: object, dialog: CustomerAISummaryDialog) -> None:
+        token = uuid4().hex
+        self._customer_ai_summary_request_token = token
+        dialog.set_loading()
+        self.ai_summary_btn.setEnabled(False)
+        self._customer_ai_summary_runner.start(token, self.customer_ai_summary_service, customer)
+
+    def _handle_customer_ai_summary_result(self, token: str, result: CustomerAISummaryResult) -> None:
+        if token != self._customer_ai_summary_request_token:
+            return
+        self.ai_summary_btn.setEnabled(self._selected_row() is not None)
+        dialog = self._customer_ai_summary_dialog
+        if dialog is not None:
+            dialog.set_result(result)
+
+    def _handle_customer_ai_summary_failure(self, token: str, message: str) -> None:
+        if token != self._customer_ai_summary_request_token:
+            return
+        self.ai_summary_btn.setEnabled(self._selected_row() is not None)
+        dialog = self._customer_ai_summary_dialog
+        if dialog is not None:
+            dialog.set_result(CustomerAISummaryResult(False, "", message))
 
     def _restore_customer_selection(self, customer_id: str) -> bool:
         clean_id = str(customer_id or "").strip()
