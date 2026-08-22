@@ -2675,17 +2675,21 @@ class WarehousePage(QWidget):
             classification_layout = classification_card.layout()
             classification_layout.setContentsMargins(0, 0, 0, 3)
             classification_layout.setSpacing(2)
+            classification_header = classification_layout.itemAt(0).widget()
+            if classification_header is not None:
+                classification_header.setFixedHeight(54)
             taxonomy_grid = classification_layout.itemAt(1).layout()
             if taxonomy_grid is not None:
                 taxonomy_grid.setVerticalSpacing(1)
-                taxonomy_grid.setRowMinimumHeight(0, 30)
+                taxonomy_grid.setRowMinimumHeight(0, 14)
                 taxonomy_grid.setRowMinimumHeight(1, 34)
                 for label, field in (
                     (self.articles_tab.lbl_detail_fabricante, self.articles_tab.detail_fabricante_id),
                     (self.articles_tab.lbl_detail_familia, self.articles_tab.detail_familia_id),
                     (self.articles_tab.lbl_detail_subfamilia, self.articles_tab.detail_subfamilia_id),
                 ):
-                    label.setFixedHeight(30)
+                    label.setFixedHeight(14)
+                    label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
                     field.setFixedHeight(34)
             classification_card.setFixedHeight(110)
         self.entradas_tab = MovimientosTab(mode="in")

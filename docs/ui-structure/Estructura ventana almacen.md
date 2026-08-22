@@ -35,8 +35,8 @@ WarehousePage (QWidget, objectName `warehousePage`, fondo gris #EEF3F8, sin bord
         │       ├── filtros: Fabricante, Estado, Familia y Subfamilia
         │       ├── búsqueda “Buscar por referencia o nombre”
         │       ├── Datos > Clasificación (solo Almacén): cabecera-etiquetas 2 px,
-        │       │   etiquetas-campos 1 px, margen inferior 3 px, etiquetas de 30 px,
-        │       │   campos de 34 px y alto fijo 110 px
+        │       │   etiquetas-campos 1 px, margen inferior 3 px, cabecera 54 px,
+        │       │   etiquetas alineadas arriba de 14 px, campos de 34 px y alto fijo 110 px
         │       └── detalle del producto: Datos, Tarifa, Entradas, Salidas, Stock,
         │           Mensual, Pedidos, Nutrición y Clientes
         ├── Entradas
