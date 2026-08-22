@@ -77,7 +77,7 @@ class CustomerQueryService:
         "La Gomera",
         "El Hierro",
     }
-    _SALES_COLUMNS = {"isla", "codigo", "nombre", "kg", "kg_curr", "kg_prev", "delta_kg", "delta_kg_pct"}
+    _SALES_COLUMNS = {"isla", "codigo", "nombre", "kg", "euros", "kg_curr", "kg_prev", "delta_kg", "delta_kg_pct"}
 
     def __init__(
         self,
@@ -308,7 +308,8 @@ class CustomerQueryService:
             "direction, metric, zero_consumption, columns, sort_by_island, sort_metric. "
             "customer_type permitido: directo, indirecto, distribuidor o cadena vacia. "
             "direction permitido: asc o desc. metric siempre kg. "
-            "columns permitidas: isla, codigo, nombre, kg, kg_curr, kg_prev, delta_kg, delta_kg_pct. "
+            "columns permitidas: isla, codigo, nombre, kg, euros, kg_curr, kg_prev, delta_kg, delta_kg_pct. "
+            "Usa euros para el total monetario mostrado como €. "
             "Interpreta ventas = 0, compras = 0, sin compras y sin consumo como zero_consumption=true "
             "en kg. Devuelve solo JSON valido.\n\n"
             f"Pregunta: {str(prompt or '').strip()}"
@@ -335,11 +336,7 @@ class CustomerQueryService:
         direction = str(parsed.get("direction") or fallback.direction).strip().lower()
         if direction not in {"asc", "desc"}:
             direction = fallback.direction
-        columns = [
-            str(column).strip()
-            for column in parsed.get("columns", fallback.columns)
-            if str(column).strip() in self._SALES_COLUMNS
-        ]
+        columns = self._validated_sales_columns(parsed.get("columns", fallback.columns))
         return CustomerQueryIntent(
             query_type=query_type,
             year=year,
@@ -358,6 +355,16 @@ class CustomerQueryService:
                 else fallback.sort_metric
             ),
             ai_interpreted=True,
+        )
+
+    def _validated_sales_columns(self, values: Any) -> list[str]:
+        aliases = {"€": "euros", "euro": "euros", "euros": "euros", "total €": "euros", "total euros": "euros"}
+        return list(
+            dict.fromkeys(
+                aliases.get(str(column).strip().lower(), str(column).strip())
+                for column in values if isinstance(values, list)
+                if aliases.get(str(column).strip().lower(), str(column).strip()) in self._SALES_COLUMNS
+            )
         )
 
     @staticmethod
@@ -451,6 +458,7 @@ class CustomerQueryService:
             'codigo': ('Cod.', lambda row: row.cliente_codigo),
             'nombre': ('Nombre comercial', lambda row: row.cliente_nombre),
             'kg': ('Kg', lambda row: row.kg),
+            'euros': ('€', lambda row: row.euros),
         }
         selected_columns = [key for key in intent.columns if key in column_map] or ['isla', 'codigo', 'nombre', 'kg']
         headers = [column_map[key][0] for key in selected_columns]
@@ -608,6 +616,8 @@ class CustomerQueryService:
                 key = 'delta_kg'
             elif token in {'kg', 'kilos', 'kilogramos'}:
                 key = 'kg'
+            elif token in {'€', 'euro', 'euros', 'total €', 'total euro', 'total euros'}:
+                key = 'euros'
             if key and key not in columns:
                 columns.append(key)
         return columns

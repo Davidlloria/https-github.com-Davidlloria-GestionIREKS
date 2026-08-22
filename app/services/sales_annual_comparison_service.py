@@ -139,6 +139,7 @@ class SalesCustomerAnnualSalesRow:
     cliente_nombre: str
     cliente_tipo: str
     kg: float
+    euros: float
 
 
 class SalesAnnualComparisonService:
@@ -890,12 +891,13 @@ class SalesAnnualComparisonService:
                 continue
             eligible_clients[cliente_id] = client
 
-        totals = defaultdict(float)
+        totals = defaultdict(lambda: {"kg": 0.0, "euros": 0.0})
         for raw_row in raw_rows:
             cliente_id = str(getattr(raw_row, 'cliente_id', '') or '').strip()
             if cliente_id not in eligible_clients:
                 continue
-            totals[cliente_id] += float(getattr(raw_row, 'kg', 0.0) or 0.0)
+            totals[cliente_id]["kg"] += float(getattr(raw_row, 'kg', 0.0) or 0.0)
+            totals[cliente_id]["euros"] += float(getattr(raw_row, 'euros', 0.0) or 0.0)
 
         result = []
         candidates = eligible_clients.items() if zero_consumption else (
@@ -903,7 +905,8 @@ class SalesAnnualComparisonService:
             for cliente_id in totals
         )
         for cliente_id, client in candidates:
-            kg = float(totals.get(cliente_id, 0.0) or 0.0)
+            values = totals.get(cliente_id, {})
+            kg = float(values.get("kg", 0.0) or 0.0)
             if zero_consumption and abs(kg) > 1e-9:
                 continue
             island_id = str(getattr(client, 'cliente_direccion_isla_id', '') or '').strip()
@@ -919,6 +922,7 @@ class SalesAnnualComparisonService:
                     ),
                     cliente_tipo=str(getattr(client, 'cliente_tipo', '') or ''),
                     kg=float(kg or 0.0),
+                    euros=float(values.get("euros", 0.0) or 0.0),
                 )
             )
         kg_factor = -1.0 if str(direction or 'asc').strip().lower() == 'desc' else 1.0
