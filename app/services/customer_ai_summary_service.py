@@ -17,12 +17,12 @@ CUSTOMER_AI_SUMMARY_SCHEMA: dict[str, Any] = {
         "products": {
             "type": "array",
             "items": {"type": "string"},
-            "maxItems": 5,
+            "maxItems": 3,
         },
         "opportunities": {
             "type": "array",
             "items": {"type": "string"},
-            "maxItems": 5,
+            "maxItems": 3,
         },
         "conclusion": {"type": "string"},
     },
@@ -52,10 +52,12 @@ class CustomerAISnapshot:
     month_from: int
     month_to: int
     period_label: str
+    comparison_available: bool
+    comparison_note: str
     kg_current: float
     kg_previous: float
     euros_current: float
-    delta_kg: float
+    delta_kg: float | None
     delta_kg_pct: float | None
     top_products: tuple[str, ...] = ()
     stopped_products: tuple[str, ...] = ()
@@ -114,6 +116,7 @@ class CustomerAISummaryService:
         ai_result = self.local_ai_service.generate_json(
             self._build_prompt(snapshot),
             schema=CUSTOMER_AI_SUMMARY_SCHEMA,
+            max_tokens=700,
         )
         if not ai_result.ok:
             return CustomerAISummaryResult(
@@ -153,6 +156,8 @@ class CustomerAISummaryService:
         year = years[0] if years else date.today().year
         latest_month = int(self.customer_service.related_sales_latest_month(year) or 0)
         month_to = max(1, min(latest_month or 12, 12))
+        previous_months = self.customer_service.related_sales_months(customer_id, year - 1)
+        previous_is_annual_total = month_to < 12 and previous_months == (12,)
         rows = list(
             self.customer_service.related_sales(
                 customer_id,
@@ -162,15 +167,31 @@ class CustomerAISummaryService:
             )
             or []
         )
+        reference_rows = rows
+        if previous_is_annual_total:
+            reference_rows = list(
+                self.customer_service.related_sales(
+                    customer_id,
+                    year,
+                    month_from=1,
+                    month_to=12,
+                )
+                or []
+            )
         contacts = list(self.customer_service.related_contacts(customer_id) or [])
         recipes = list(self.customer_service.related_recipes(customer_id) or [])
         agenda = list(self.customer_service.related_agenda(customer_id) or [])
 
         kg_current = sum(float(getattr(row, "kg_curr", 0.0) or 0.0) for row in rows)
-        kg_previous = sum(float(getattr(row, "kg_prev", 0.0) or 0.0) for row in rows)
+        kg_previous = sum(float(getattr(row, "kg_prev", 0.0) or 0.0) for row in reference_rows)
         euros_current = sum(float(getattr(row, "euros_curr", 0.0) or 0.0) for row in rows)
-        delta_kg = kg_current - kg_previous
-        delta_kg_pct = (delta_kg / kg_previous * 100.0) if abs(kg_previous) > 1e-9 else None
+        comparison_available = not previous_is_annual_total
+        delta_kg = kg_current - kg_previous if comparison_available else None
+        delta_kg_pct = (
+            delta_kg / kg_previous * 100.0
+            if comparison_available and delta_kg is not None and abs(kg_previous) > 1e-9
+            else None
+        )
 
         current_rows = [row for row in rows if float(getattr(row, "kg_curr", 0.0) or 0.0) > 1e-9]
         top_rows = sorted(
@@ -187,7 +208,7 @@ class CustomerAISummaryService:
             ),
             key=lambda row: float(getattr(row, "kg_prev", 0.0) or 0.0),
             reverse=True,
-        )[:5]
+        )[:5] if comparison_available else []
         declining_rows = sorted(
             (
                 row
@@ -196,7 +217,7 @@ class CustomerAISummaryService:
                 and float(getattr(row, "kg_curr", 0.0) or 0.0) < float(getattr(row, "kg_prev", 0.0) or 0.0)
             ),
             key=lambda row: float(getattr(row, "kg_curr", 0.0) or 0.0) - float(getattr(row, "kg_prev", 0.0) or 0.0),
-        )[:5]
+        )[:5] if comparison_available else []
 
         agenda_dates = [getattr(item, "fecha_actividad", None) for item in agenda]
         valid_agenda_dates = [value for value in agenda_dates if isinstance(value, date)]
@@ -206,6 +227,7 @@ class CustomerAISummaryService:
             kg_previous=kg_previous,
             delta_kg_pct=delta_kg_pct,
             stopped_rows=stopped_rows,
+            comparison_available=comparison_available,
             contact_count=len(contacts),
             latest_activity=latest_date,
         )
@@ -224,7 +246,13 @@ class CustomerAISummaryService:
             previous_year=year - 1,
             month_from=1,
             month_to=month_to,
-            period_label=self._period_label(year, month_to),
+            period_label=self._period_label(year, month_to, comparison_available=comparison_available),
+            comparison_available=comparison_available,
+            comparison_note=(
+                f"{year - 1} solo dispone de un acumulado anual; no se calcula una variación comparable."
+                if previous_is_annual_total
+                else ""
+            ),
             kg_current=kg_current,
             kg_previous=kg_previous,
             euros_current=euros_current,
@@ -247,15 +275,16 @@ class CustomerAISummaryService:
         kg_previous: float,
         delta_kg_pct: float | None,
         stopped_rows: list[Any],
+        comparison_available: bool,
         contact_count: int,
         latest_activity: date | None,
     ) -> list[str]:
         items: list[str] = []
-        if kg_previous > 1e-9 and kg_current <= 1e-9:
+        if comparison_available and kg_previous > 1e-9 and kg_current <= 1e-9:
             items.append("Revisar la pérdida total de consumo respecto al periodo anterior.")
-        elif delta_kg_pct is not None and delta_kg_pct <= -20.0:
+        elif comparison_available and delta_kg_pct is not None and delta_kg_pct <= -20.0:
             items.append(f"Revisar la caída de consumo del {abs(delta_kg_pct):.1f}% respecto al periodo anterior.")
-        if stopped_rows:
+        if comparison_available and stopped_rows:
             items.append(f"Revisar {len(stopped_rows)} producto(s) con consumo anterior y sin consumo actual.")
         if contact_count == 0:
             items.append("Completar un contacto comercial antes del próximo seguimiento.")
@@ -285,9 +314,7 @@ class CustomerAISummaryService:
         return f"{label}: {CustomerAISummaryService._number(previous)} → {CustomerAISummaryService._number(current)} kg"
 
     def _deterministic_summary(self, data: CustomerAISnapshot) -> str:
-        variation = "sin base de comparación"
-        if data.delta_kg_pct is not None:
-            variation = f"{data.delta_kg_pct:+.1f}%"
+        variation = self._variation_text(data)
         return "\n".join(
             [
                 f"RESUMEN COMERCIAL · {data.customer_name}",
@@ -300,6 +327,7 @@ class CustomerAISummaryService:
                 f"Ventas {data.period_label}",
                 f"Kg actuales: {self._number(data.kg_current)} · Kg anteriores: {self._number(data.kg_previous)} · Variación: {variation}",
                 f"Facturación actual: {self._number(data.euros_current)} €",
+                data.comparison_note,
                 "",
                 "Productos principales",
                 self._bullets(data.top_products, "Sin ventas de productos en el periodo actual."),
@@ -320,26 +348,33 @@ class CustomerAISummaryService:
             "Devuelve un JSON en español con un resumen comercial breve usando exclusivamente los datos siguientes. "
             "No inventes causas, fechas, productos ni importes. Distingue los hechos de las acciones sugeridas. "
             "No propongas modificar la base de datos. Conserva las cifras y el periodo comparado. "
-            "Usa situation para el perfil, sales para la comparación, products para un máximo de cinco observaciones, "
-            "opportunities para acciones sugeridas y conclusion para una frase final. Sin Markdown ni texto fuera del JSON.\n\n"
+            "Cada texto debe tener una sola frase corta. Usa situation para el perfil, sales para las ventas, products "
+            "para un máximo de tres observaciones, opportunities para un máximo de tres acciones y conclusion para una "
+            "frase final. Si se indica que los periodos no son comparables, no calcules ni sugieras una variación. "
+            "Sin Markdown ni texto fuera del JSON.\n\n"
             f"{self._deterministic_summary(data)}"
         )
 
     def _fallback_sections(self, data: CustomerAISnapshot) -> CustomerAISummarySections:
-        variation = "sin base de comparación"
-        if data.delta_kg_pct is not None:
-            variation = f"{data.delta_kg_pct:+.1f}%"
+        variation = self._variation_text(data)
         product_notes = [
             f"Productos principales: {', '.join(data.top_products)}"
             if data.top_products
-            else "Sin ventas de productos en el periodo actual.",
-            f"Sin consumo actual: {', '.join(data.stopped_products)}"
-            if data.stopped_products
-            else "No se detectan productos abandonados.",
-            f"En descenso: {', '.join(data.declining_products)}"
-            if data.declining_products
-            else "No se detectan productos en descenso.",
+            else "Sin ventas de productos en el periodo actual."
         ]
+        if data.comparison_available:
+            product_notes.extend(
+                [
+                    f"Sin consumo actual: {', '.join(data.stopped_products)}"
+                    if data.stopped_products
+                    else "No se detectan productos abandonados.",
+                    f"En descenso: {', '.join(data.declining_products)}"
+                    if data.declining_products
+                    else "No se detectan productos en descenso.",
+                ]
+            )
+        else:
+            product_notes.append("No se evalúan abandonos ni descensos porque el histórico no es mensual.")
         return CustomerAISummarySections(
             situation=(
                 f"Cliente {'activo' if data.active else 'inactivo'}, tipo {data.customer_type or 'no indicado'}, "
@@ -348,9 +383,9 @@ class CustomerAISummaryService:
                 f"{data.latest_activity or 'sin actividad registrada'}."
             ),
             sales=(
-                f"{data.period_label}: {self._number(data.kg_current)} kg frente a "
-                f"{self._number(data.kg_previous)} kg; variación {variation}. "
-                f"Facturación actual: {self._number(data.euros_current)} €."
+                f"{data.period_label}: {self._number(data.kg_current)} kg actuales; "
+                f"referencia anterior {self._number(data.kg_previous)} kg; variación {variation}. "
+                f"Facturación actual: {self._number(data.euros_current)} €. {data.comparison_note}"
             ),
             products=tuple(product_notes),
             opportunities=data.opportunities,
@@ -366,7 +401,7 @@ class CustomerAISummaryService:
         def clean_list(value: Any) -> tuple[str, ...]:
             if not isinstance(value, list):
                 raise ValueError("La respuesta no contiene una lista válida.")
-            return tuple(str(item or "").strip() for item in value if str(item or "").strip())[:5]
+            return tuple(str(item or "").strip() for item in value if str(item or "").strip())[:3]
 
         situation = str(parsed.get("situation") or "").strip()
         sales = str(parsed.get("sales") or "").strip()
@@ -396,7 +431,7 @@ class CustomerAISummaryService:
         )
 
     @staticmethod
-    def _period_label(year: int, month_to: int) -> str:
+    def _period_label(year: int, month_to: int, *, comparison_available: bool = True) -> str:
         month_names = (
             "enero",
             "febrero",
@@ -412,7 +447,17 @@ class CustomerAISummaryService:
             "diciembre",
         )
         end_month = month_names[max(1, min(int(month_to or 12), 12)) - 1]
+        if not comparison_available:
+            return f"enero–{end_month} {year} · referencia anual {year - 1} no comparable"
         return f"enero–{end_month} {year} frente a enero–{end_month} {year - 1}"
+
+    @staticmethod
+    def _variation_text(data: CustomerAISnapshot) -> str:
+        if not data.comparison_available:
+            return "no comparable"
+        if data.delta_kg_pct is None:
+            return "sin base de comparación"
+        return f"{data.delta_kg_pct:+.1f}%"
 
     @staticmethod
     def _bullets(items: tuple[str, ...], empty_text: str) -> str:

@@ -96,10 +96,11 @@ def test_local_ai_json_mode_accepts_a_strict_schema(monkeypatch) -> None:
 
     monkeypatch.setattr(service, "_post_json", fake_post)
 
-    result = service.generate_json("Devuelve JSON", schema=schema)
+    result = service.generate_json("Devuelve JSON", schema=schema, max_tokens=700)
 
     assert result.ok is True
     assert captured["format"] == schema
+    assert captured["options"] == {"temperature": 0.0, "num_predict": 700}
 
 
 def test_local_ai_returns_controlled_message_for_empty_ollama_content(monkeypatch) -> None:

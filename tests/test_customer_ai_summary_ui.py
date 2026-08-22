@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -35,6 +36,8 @@ def _result() -> CustomerAISummaryResult:
         month_from=1,
         month_to=7,
         period_label="enero–julio 2026 frente a enero–julio 2025",
+        comparison_available=True,
+        comparison_note="",
         kg_current=80.0,
         kg_previous=130.0,
         euros_current=380.0,
@@ -97,6 +100,29 @@ def test_customer_ai_summary_dialog_emits_retry() -> None:
     dialog.retry_button.click()
 
     assert calls == [True]
+    dialog.close()
+    dialog.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_ai_summary_dialog_marks_annual_reference_as_not_comparable() -> None:
+    _application()
+    dialog = CustomerAISummaryDialog(customer_name="Panadería Ejemplo")
+    result = _result()
+    snapshot = replace(
+        result.snapshot,
+        period_label="enero–agosto 2026 · referencia anual 2025 no comparable",
+        comparison_available=False,
+        comparison_note="2025 solo dispone de un acumulado anual.",
+        kg_previous=30307.0,
+        delta_kg=None,
+        delta_kg_pct=None,
+    )
+
+    dialog.set_result(replace(result, snapshot=snapshot))
+
+    assert dialog.variation_value.text() == "No comparable"
+    assert "referencia anual 2025 no comparable" in dialog.period_label.text()
     dialog.close()
     dialog.deleteLater()
     QApplication.processEvents()

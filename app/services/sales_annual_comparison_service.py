@@ -211,6 +211,18 @@ class SalesAnnualComparisonService:
         valid_months = [int(month or 0) for month in months if 1 <= int(month or 0) <= 12]
         return max(valid_months, default=0)
 
+    def sales_months_clientes(self, year: int, *, cliente_id: str = "") -> tuple[int, ...]:
+        clean_year = int(year or 0)
+        if clean_year <= 0:
+            return ()
+        stmt = select(VentaClientesRaw.mes).where(VentaClientesRaw.anio == clean_year)
+        clean_customer_id = str(cliente_id or "").strip()
+        if clean_customer_id:
+            stmt = stmt.where(VentaClientesRaw.cliente_id == clean_customer_id)
+        with Session(self._engine) as session:
+            months = list(session.exec(stmt))
+        return tuple(sorted({int(month or 0) for month in months if 1 <= int(month or 0) <= 12}))
+
     def list_filter_clients(self) -> list[Cliente]:
         with Session(self._engine) as session:
             rows = list(session.exec(select(Cliente).order_by(Cliente.cliente_nombre_comercial, Cliente.cliente_nombre_fiscal)))

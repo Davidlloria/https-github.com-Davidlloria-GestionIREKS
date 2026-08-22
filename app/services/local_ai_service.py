@@ -53,14 +53,20 @@ class LocalAIService:
             max_tokens=1200,
         )
 
-    def generate_json(self, prompt: str, *, schema: dict[str, Any] | None = None) -> LocalAIResult:
+    def generate_json(
+        self,
+        prompt: str,
+        *,
+        schema: dict[str, Any] | None = None,
+        max_tokens: int = 400,
+    ) -> LocalAIResult:
         src = str(prompt or "").strip()
         if not src:
             return LocalAIResult(False, "", "Prompt vacío.")
         return self.chat(
             [{"role": "user", "content": src}],
             temperature=0.0,
-            max_tokens=400,
+            max_tokens=max(1, int(max_tokens)),
             json_mode=True,
             json_schema=schema,
         )

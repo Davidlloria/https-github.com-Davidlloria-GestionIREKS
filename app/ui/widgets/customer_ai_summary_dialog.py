@@ -121,7 +121,10 @@ class CustomerAISummaryDialog(QDialog):
         data = result.snapshot
         self.period_label.setText(data.period_label.capitalize())
         self.kg_value.setText(f"{self._number(data.kg_current)} kg")
-        variation = "Sin base" if data.delta_kg_pct is None else f"{data.delta_kg_pct:+.1f}%"
+        if not data.comparison_available:
+            variation = "No comparable"
+        else:
+            variation = "Sin base" if data.delta_kg_pct is None else f"{data.delta_kg_pct:+.1f}%"
         self.variation_value.setText(variation)
         self.revenue_value.setText(f"{self._number(data.euros_current)} €")
         self.activity_value.setText(data.latest_activity or "Sin registrar")

@@ -10,7 +10,7 @@ from app.services.customer_ai_summary_service import CUSTOMER_AI_SUMMARY_SCHEMA,
 
 class _FakeCustomerService:
     def __init__(self) -> None:
-        self.period = None
+        self.periods = []
 
     def related_sales_years(self):
         return [2025, 2026]
@@ -19,9 +19,13 @@ class _FakeCustomerService:
         assert year == 2026
         return 7
 
+    def related_sales_months(self, _customer_id: str, year: int):
+        assert year == 2025
+        return (1, 2, 3, 4, 5, 6, 7)
+
     def related_sales(self, _customer_id: str, year: int, *, month_from: int, month_to: int):
         assert year == 2026
-        self.period = (month_from, month_to)
+        self.periods.append((month_from, month_to))
         return [
             SimpleNamespace(codigo="A", nombre="Producto principal", kg_prev=100.0, kg_curr=60.0, euros_curr=300.0),
             SimpleNamespace(codigo="B", nombre="Producto perdido", kg_prev=30.0, kg_curr=0.0, euros_curr=0.0),
@@ -45,9 +49,10 @@ class _DisabledLocalAI:
 class _EnabledLocalAI:
     enabled = True
 
-    def generate_json(self, prompt: str, *, schema: dict):
+    def generate_json(self, prompt: str, *, schema: dict, max_tokens: int):
         self.prompt = prompt
         self.schema = schema
+        self.max_tokens = max_tokens
         return SimpleNamespace(
             ok=True,
             text=(
@@ -62,9 +67,30 @@ class _EnabledLocalAI:
 class _InvalidLocalAI:
     enabled = True
 
-    def generate_json(self, _prompt: str, *, schema: dict):
+    def generate_json(self, _prompt: str, *, schema: dict, max_tokens: int):
         assert schema == CUSTOMER_AI_SUMMARY_SCHEMA
+        assert max_tokens == 700
         return SimpleNamespace(ok=True, text="respuesta sin JSON", message="IA local")
+
+
+class _AnnualPreviousCustomerService(_FakeCustomerService):
+    def related_sales_months(self, _customer_id: str, year: int):
+        assert year == 2025
+        return (12,)
+
+    def related_sales(self, _customer_id: str, year: int, *, month_from: int, month_to: int):
+        assert year == 2026
+        self.periods.append((month_from, month_to))
+        previous = 30307.0 if month_to == 12 else 0.0
+        return [
+            SimpleNamespace(
+                codigo="A",
+                nombre="Producto principal",
+                kg_prev=previous,
+                kg_curr=18456.0,
+                euros_curr=85585.45,
+            )
+        ]
 
 
 def _customer():
@@ -94,7 +120,8 @@ def test_customer_summary_calculates_real_sales_and_opportunities() -> None:
     assert result.snapshot.delta_kg_pct == pytest.approx(-38.461538)
     assert result.snapshot.month_to == 7
     assert result.snapshot.period_label == "enero–julio 2026 frente a enero–julio 2025"
-    assert customer_service.period == (1, 7)
+    assert customer_service.periods == [(1, 7)]
+    assert result.snapshot.comparison_available is True
     assert result.snapshot.contact_count == 0
     assert result.snapshot.recipe_count == 1
     assert result.snapshot.stopped_products == ("B · Producto perdido: 30,00 kg",)
@@ -124,6 +151,30 @@ def test_customer_summary_asks_ai_only_to_explain_calculated_context() -> None:
     assert "80,00" in local_ai.prompt
     assert "enero–julio 2026" in local_ai.prompt
     assert local_ai.schema == CUSTOMER_AI_SUMMARY_SCHEMA
+    assert local_ai.max_tokens == 700
+
+
+def test_customer_summary_keeps_annual_reference_without_false_variation() -> None:
+    customer_service = _AnnualPreviousCustomerService()
+    result = CustomerAISummaryService(
+        customer_service=customer_service,
+        local_ai_service=_DisabledLocalAI(),
+    ).summarize(_customer())
+
+    assert result.ok is True
+    assert result.snapshot is not None
+    assert customer_service.periods == [(1, 7), (1, 12)]
+    assert result.snapshot.kg_current == pytest.approx(18456.0)
+    assert result.snapshot.kg_previous == pytest.approx(30307.0)
+    assert result.snapshot.comparison_available is False
+    assert result.snapshot.delta_kg is None
+    assert result.snapshot.delta_kg_pct is None
+    assert result.snapshot.stopped_products == ()
+    assert result.snapshot.declining_products == ()
+    assert "referencia anual 2025 no comparable" in result.snapshot.period_label
+    assert "30.307,00" in result.text
+    assert "no se calcula una variación comparable" in result.text
+    assert "No se evalúan abandonos" in result.text
 
 
 def test_customer_summary_falls_back_when_ai_json_is_invalid() -> None:

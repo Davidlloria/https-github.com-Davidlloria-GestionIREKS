@@ -366,6 +366,9 @@ class CustomerService:
     def related_sales_latest_month(self, year: int) -> int:
         return self.sales_summary_service.latest_sales_month_clientes(year)
 
+    def related_sales_months(self, cliente_id: str, year: int) -> tuple[int, ...]:
+        return self.sales_summary_service.sales_months_clientes(year, cliente_id=cliente_id)
+
     def related_sales(self, cliente_id: str, year: int, *, month_from: int = 1, month_to: int = 12) -> list[Any]:
         clean_id = str(cliente_id or "").strip()
         clean_year = int(year or 0)

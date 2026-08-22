@@ -489,3 +489,5 @@ def test_latest_sales_month_clientes_uses_global_imported_period(isolated_engine
 
     assert service.latest_sales_month_clientes(2026) == 7
     assert service.latest_sales_month_clientes(2024) == 0
+    assert service.sales_months_clientes(2026) == (2, 7)
+    assert service.sales_months_clientes(2025) == (12,)
