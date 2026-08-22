@@ -18,7 +18,7 @@ def _application() -> QApplication:
     return _APP
 
 
-def test_api_cards_keep_fields_and_actions_inside_the_centered_column() -> None:
+def test_api_cards_use_a_three_column_two_row_grid_without_overlaps() -> None:
     _application()
     page = SettingsPage()
     page.resize(1280, 900)
@@ -28,12 +28,18 @@ def test_api_cards_keep_fields_and_actions_inside_the_centered_column() -> None:
 
     column = page.findChild(QWidget, "settingsApiCards")
     cards = [card for card in page.findChildren(QFrame, "card") if card.property("apiCard")]
+    cards_by_name = {str(card.property("apiCard")): card for card in cards}
 
     assert column is not None
-    assert column.width() <= 720
     assert len(cards) == 4
-    assert all(card.width() == column.width() for card in cards)
-    assert all(cards[index].geometry().bottom() < cards[index + 1].geometry().top() for index in range(3))
+    assert cards_by_name["fdc"].geometry().top() == cards_by_name["fatsecret"].geometry().top()
+    assert cards_by_name["fatsecret"].geometry().top() == cards_by_name["openai"].geometry().top()
+    assert cards_by_name["fdc"].geometry().right() < cards_by_name["fatsecret"].geometry().left()
+    assert cards_by_name["fatsecret"].geometry().right() < cards_by_name["openai"].geometry().left()
+    assert cards_by_name["local_ai"].geometry().top() > cards_by_name["fdc"].geometry().bottom()
+    for index, card in enumerate(cards):
+        for other in cards[index + 1 :]:
+            assert not card.geometry().intersects(other.geometry())
 
     for field in (
         page.fdc_api_key_input,
