@@ -34,6 +34,8 @@ WarehousePage (QWidget, objectName `warehousePage`, fondo gris #EEF3F8, sin bord
         │       ├── catálogo lateral: cabecera, contador real y tabla Ref. / Nombre / selección
         │       ├── filtros: Fabricante, Estado, Familia y Subfamilia
         │       ├── búsqueda “Buscar por referencia o nombre”
+        │       ├── Datos > Clasificación (solo Almacén): cabecera-etiquetas 3 px,
+        │       │   etiquetas-campos 3 px, margen inferior 4 px y alto 102 px
         │       └── detalle del producto: Datos, Tarifa, Entradas, Salidas, Stock,
         │           Mensual, Pedidos, Nutrición y Clientes
         ├── Entradas
