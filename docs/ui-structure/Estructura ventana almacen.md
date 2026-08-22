@@ -30,29 +30,73 @@ WarehousePage (QWidget, objectName `warehousePage`, fondo gris #EEF3F8, sin bord
     └── main_tabs / warehouseMainTabs (QTabWidget, fondo transparente, sin borde)
         ├── Artículos
         │   └── IngredientsIreksPage (sin cabecera ni ribbon propios, `compact_mode=True`)
+        │       ├── catálogo lateral: cabecera, contador real y tabla Ref. / Nombre / selección
+        │       ├── filtros: Fabricante, Estado, Familia y Subfamilia
+        │       ├── búsqueda “Buscar por referencia o nombre”
+        │       └── detalle del producto: Datos, Tarifa, Entradas, Salidas, Stock,
+        │           Mensual, Pedidos, Nutrición y Clientes
         ├── Entradas
         │   └── MovimientosTab (`mode="in"`)
+        │       ├── filtros: Año, Mes inicial/final, Fabricante, Familia, Subfamilia
+        │       ├── búsqueda “Producto o lote” (nombre, referencia o lote)
+        │       ├── acciones: Nueva manual, Editar manual y Anular manual
+        │       ├── tabla: Fecha, Ref., Nombre flexible, Uds, Kg, Lote, Caduca, Albarán
+        │       └── entriesTotalsTable (totales sincronizados de Uds y Kg)
         ├── Salidas
         │   └── MovimientosTab (`mode="out"`)
+        │       ├── filtros: Año, Mes inicial/final, Fabricante, Familia, Subfamilia
+        │       ├── búsqueda “Producto” (nombre o referencia)
+        │       ├── acciones: Nueva manual, Editar manual y Anular manual
+        │       └── tabla: Fecha, Ref., Nombre flexible, Uds, Kg, Lote, Concepto
         ├── Stock
         │   └── StockTab
+        │       ├── filtros: Fabricante, Familia, Subfamilia y Riesgo
+        │       ├── Riesgo: Todos, Caducado, Caduca <= 30 días y Bajo stock
+        │       ├── Umbral bajo stock (QDoubleSpinBox, 2 decimales)
+        │       ├── búsqueda “Nombre o ref...”
+        │       └── tabla: Ref., Nombre, Lote, Caduca, Días, Stock Uds, Stock Kg,
+        │           Últ. mov. y Estado
         ├── Pedidos mensual
         │   └── AnnualMonthlyOrdersTab
+        │       ├── filtros: Año, Producto (“Ref. o nombre...”) y Refrescar
+        │       └── tabla anual: Ref., Producto, Ene–Dic, Total, Kg, Ped. y Último
         ├── Inventarios
         │   └── InventariosTab
+        │       └── inner_tabs (QTabWidget)
+        │           ├── Conteo
+        │           │   ├── Exportar plantilla, Importar conteo, Refrescar,
+        │           │   │   Preparar ajustes y Aprobar y aplicar
+        │           │   ├── búsqueda, campos Contador / Aprobador e indicador pendientes
+        │           │   └── tabla: Ref., Nombre, Lote, Caduca, Teórico Uds,
+        │           │       Conteo Uds editable, Diferencia y Kg ajuste
+        │           └── Historial
+        │               ├── Exportar historial
+        │               ├── tabla: Código, Fecha, Contador, Aprobador, Líneas,
+        │               │   Ajustes y Estado
+        │               └── tabla de detalle del inventario seleccionado
         ├── Caducidad
         │   └── CaducidadTab
+        │       ├── filtros: Caduca desde/hasta, Próxima caducidad (7–120 días),
+        │       │   modo y acción Todo
+        │       └── tabla: Pedido Nº, Albarán, Fecha, Ref., Nombre, Uds, Kg, Lote,
+        │           Caduca (caducados en rojo)
         ├── separador visual “|” (QWidget, pestaña deshabilitada)
         ├── Fabricantes
-        │   └── EntityPage (mantenimiento de fabricante)
+        │   └── EntityPage: título, búsqueda, Nuevo, Editar, Eliminar,
+        │       Importar Excel/CSV cuando aplica, Refrescar y tabla del catálogo
         ├── Otras ref.
         │   └── OtrasReferenciasTab
+        │       ├── título, búsqueda libre y filtro Distribuidor
+        │       ├── Nuevo, Editar, Eliminar, Importar Excel/CSV y Refrescar
+        │       └── tabla ordenable: Ref. fabricante, Descripción fabricante,
+        │           Ref. distribuidor y Descripción distribuidor
         ├── Familias
-        │   └── EntityPage (mantenimiento de familia)
+        │   └── EntityPage: título, búsqueda, acciones de mantenimiento y tabla
         ├── Subfamilias
-        │   └── EntityPage (mantenimiento de subfamilia)
+        │   └── EntityPage: título, búsqueda, filtros Familia/Subfamilia cuando
+        │       aplica, acciones de mantenimiento y tabla
         └── Envases
-            └── EntityPage (mantenimiento de envase)
+            └── EntityPage: título, búsqueda, acciones de mantenimiento y tabla
 ```
 
 ### Filtro global de almacén
