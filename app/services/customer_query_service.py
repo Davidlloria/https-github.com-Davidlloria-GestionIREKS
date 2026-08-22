@@ -6,6 +6,7 @@ import re
 import unicodedata
 from typing import Any
 
+from app.core.database import engine
 from app.services.customer_report_flow_service import CustomerReportFlowService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
 
@@ -70,6 +71,8 @@ class CustomerQueryService:
             return CustomerQueryResult(status="empty", message="Escribe una consulta sobre los clientes.")
 
         intent = self.interpret(text)
+        if intent.query_type == "duplicate_customer_names":
+            return self._run_duplicate_customer_names(intent)
         if intent.query_type == 'sales_customer_year_comparison':
             return self._run_sales_customer_year_comparison(intent)
         if intent.query_type == 'sales_customer_list':
@@ -84,6 +87,22 @@ class CustomerQueryService:
         year = years[0] if years else date.today().year
         compare_year = years[1] if len(years) > 1 else 0
         limit = self._extract_limit(normalized)
+
+        duplicate_name_terms = (
+            "nombre repetido",
+            "nombres repetidos",
+            "nombre duplicado",
+            "nombres duplicados",
+            "cliente duplicado",
+            "clientes duplicados",
+            "cliente repetido",
+            "clientes repetidos",
+        )
+        if any(term in normalized for term in duplicate_name_terms):
+            return CustomerQueryIntent(
+                query_type="duplicate_customer_names",
+                limit=limit,
+            )
 
         sales_terms = ("compra", "venta", "kg", "kilo", "consumo")
         drop_terms = ("bajada", "bajado", "bajan", "caida", "caido", "descenso", "perdido", "menos")
@@ -268,6 +287,47 @@ class CustomerQueryService:
             intent=intent,
         )
 
+    def _run_duplicate_customer_names(self, intent: CustomerQueryIntent) -> CustomerQueryResult:
+        """List customers whose commercial names are repeated after normalization."""
+        with engine.begin() as conn:
+            source_rows = conn.exec_driver_sql(
+                """
+                SELECT cliente_id, cliente_codigo, cliente_nombre_comercial
+                FROM clientes
+                WHERE TRIM(COALESCE(cliente_nombre_comercial, '')) <> ''
+                """
+            ).fetchall()
+
+        grouped: dict[str, list[tuple[str, str, str]]] = {}
+        for cliente_id, cliente_codigo, nombre_comercial in source_rows:
+            name = str(nombre_comercial or "").strip()
+            normalized_name = self._normalize_duplicate_name(name)
+            if not normalized_name:
+                continue
+            grouped.setdefault(normalized_name, []).append(
+                (str(cliente_id or ""), str(cliente_codigo or ""), name)
+            )
+
+        rows: list[list[Any]] = []
+        for group in sorted(grouped.values(), key=lambda items: self._normalize_duplicate_name(items[0][2])):
+            if len(group) < 2:
+                continue
+            for _cliente_id, codigo, nombre in sorted(group, key=lambda item: (item[1], item[0])):
+                rows.append([nombre, codigo, len(group)])
+
+        safe_limit = min(max(int(intent.limit or 500), 1), 5000)
+        rows = rows[:safe_limit]
+        return CustomerQueryResult(
+            status="ready" if rows else "empty",
+            title="Clientes con nombres comerciales repetidos",
+            headers=["Nombre comercial", "Cod.", "Coincidencias"],
+            rows=rows,
+            message="" if rows else "No se encontraron nombres comerciales repetidos.",
+            source="cálculo local",
+            interpretation="Clientes agrupados por nombre comercial normalizado.",
+            intent=intent,
+        )
+
     def _run_sales_customer_list(self, intent: CustomerQueryIntent) -> CustomerQueryResult:
         rows = self.sales_service.listar_ventas_anuales_clientes(
             year=intent.year,
@@ -449,3 +509,9 @@ class CustomerQueryService:
     def _normalize(value: str) -> str:
         decomposed = unicodedata.normalize("NFKD", str(value or "").lower())
         return "".join(char for char in decomposed if not unicodedata.combining(char))
+
+    @staticmethod
+    def _normalize_duplicate_name(value: str) -> str:
+        text = unicodedata.normalize("NFKD", str(value or "").lower())
+        accent_free = "".join(char for char in text if not unicodedata.combining(char))
+        return " ".join(accent_free.split())

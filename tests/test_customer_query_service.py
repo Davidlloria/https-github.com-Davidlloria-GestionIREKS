@@ -5,6 +5,7 @@ from datetime import date
 import pytest
 from sqlmodel import SQLModel, Session, create_engine
 
+import app.services.customer_query_service as customer_query_service_module
 from app.models import Cliente, Isla, VentaClientesRaw
 from app.services.customer_query_service import CustomerQueryService
 from app.services.customer_report_schema import CUSTOMER_REPORT_RESPONSE_FORMAT
@@ -81,6 +82,28 @@ def test_local_customer_parser_recognizes_activity_and_island() -> None:
     filters = {(item.field, item.op, str(item.value).lower()) for item in result.intent.filters}
     assert ("actividad", "contiene", "panaderia") in filters
     assert ("isla", "contiene", "lanzarote") in filters
+
+
+def test_customer_query_returns_only_repeated_commercial_names(tmp_path, monkeypatch) -> None:
+    db_engine = _sales_engine(tmp_path)
+    with Session(db_engine) as session:
+        session.add_all(
+            [
+                Cliente(cliente_id="c1", cliente_codigo=11, cliente_nombre_comercial="Pan Ávila"),
+                Cliente(cliente_id="c2", cliente_codigo=12, cliente_nombre_comercial="  pan avila  "),
+                Cliente(cliente_id="c3", cliente_codigo=13, cliente_nombre_comercial="Nombre único"),
+                Cliente(cliente_id="c4", cliente_codigo=14, cliente_nombre_comercial=""),
+            ]
+        )
+        session.commit()
+    monkeypatch.setattr(customer_query_service_module, "engine", db_engine)
+
+    result = CustomerQueryService().run("lista de clientes con nombres repetidos")
+
+    assert result.status == "ready"
+    assert result.intent.query_type == "duplicate_customer_names"
+    assert result.headers == ["Nombre comercial", "Cod.", "Coincidencias"]
+    assert result.rows == [["Pan Ávila", "11", 2], ["pan avila", "12", 2]]
 
 
 def test_local_customer_parser_does_not_filter_type_when_requesting_distributor_code() -> None:
