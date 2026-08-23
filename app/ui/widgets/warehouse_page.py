@@ -2673,14 +2673,14 @@ class WarehousePage(QWidget):
         classification_card = self.articles_tab.findChild(QFrame, "ireksClassificationCard")
         if classification_card is not None and classification_card.layout() is not None:
             classification_layout = classification_card.layout()
-            classification_layout.setContentsMargins(0, 0, 0, 18)
+            classification_layout.setContentsMargins(0, 0, 0, 4)
             classification_layout.setSpacing(2)
             classification_header = classification_layout.itemAt(0).widget()
             if classification_header is not None:
                 classification_header.setFixedHeight(38)
             taxonomy_grid = classification_layout.itemAt(1).layout()
             if taxonomy_grid is not None:
-                taxonomy_grid.setVerticalSpacing(2)
+                taxonomy_grid.setVerticalSpacing(3)
                 taxonomy_grid.setRowMinimumHeight(0, 14)
                 taxonomy_grid.setRowMinimumHeight(1, 34)
                 for label, field in (
@@ -2691,7 +2691,41 @@ class WarehousePage(QWidget):
                     label.setFixedHeight(14)
                     label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
                     field.setFixedHeight(34)
-            classification_card.setFixedHeight(110)
+            # Reduce the card together with the label-field gap so the
+            # four-pixel bottom margin remains visually compact.
+            classification_card.setFixedHeight(101)
+        presentation_card = self.articles_tab.findChild(QFrame, "ireksPresentationCard")
+        if presentation_card is not None and presentation_card.layout() is not None:
+            presentation_layout = presentation_card.layout()
+            presentation_layout.setContentsMargins(0, 0, 0, 4)
+            presentation_layout.setSpacing(4)
+            presentation_header = presentation_layout.itemAt(0).widget()
+            if presentation_header is not None:
+                presentation_header.setFixedHeight(38)
+            presentation_grid = presentation_layout.itemAt(1).layout()
+            if presentation_grid is not None:
+                # Four explicit rows allow the two label-field gaps and the
+                # intermediate field-label gap to keep different measurements.
+                presentation_grid.setVerticalSpacing(0)
+                presentation_grid.setRowMinimumHeight(0, 17)  # label 14 + gap 3
+                presentation_grid.setRowMinimumHeight(1, 38)  # field 34 + gap 4
+                presentation_grid.setRowMinimumHeight(2, 17)  # label 14 + gap 3
+                presentation_grid.setRowMinimumHeight(3, 34)
+                presentation_fields = (
+                    (self.articles_tab.lbl_detail_envase, self.articles_tab.detail_envase_id),
+                    (self.articles_tab.lbl_detail_envase_cantidad, self.articles_tab.detail_envase_cantidad),
+                    (self.articles_tab.lbl_detail_contenido_unidad, self.articles_tab.detail_contenido_unidad),
+                    (self.articles_tab.lbl_detail_envase_peso, self.articles_tab.detail_envase_peso),
+                    (self.articles_tab.lbl_detail_envase_unidad, self.articles_tab.detail_envase_unidad),
+                    (self.articles_tab.lbl_detail_envase_total, self.articles_tab.detail_envase_total),
+                )
+                for label, field in presentation_fields:
+                    label.setFixedHeight(14)
+                    label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+                    field.setFixedHeight(34)
+                    presentation_grid.setAlignment(label, Qt.AlignmentFlag.AlignTop)
+                    presentation_grid.setAlignment(field, Qt.AlignmentFlag.AlignTop)
+            presentation_card.setFixedHeight(154)
         self.entradas_tab = MovimientosTab(mode="in")
         self.salidas_tab = MovimientosTab(mode="out")
         self.stock_tab = StockTab()
