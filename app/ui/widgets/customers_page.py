@@ -3211,12 +3211,8 @@ class CustomersPage(QWidget):
         self.table.setRowCount(len(self.rows))
         for row_idx, item in enumerate(self.rows):
             code_item = QTableWidgetItem()
-            raw_code = getattr(item, "cliente_codigo", 0) or 0
-            try:
-                code_value = int(raw_code)
-            except (TypeError, ValueError):
-                code_value = 0
-            code_item.setData(Qt.ItemDataRole.DisplayRole, code_value if code_value > 0 else "")
+            distributor_code = str(getattr(item, "cliente_codigo_distribuidor", "") or "").strip()
+            code_item.setData(Qt.ItemDataRole.DisplayRole, distributor_code)
             name = str(item.cliente_nombre_comercial or item.cliente_nombre_fiscal or "")
             icon = self._customer_icon(item)
             label = f"{icon} {name}".strip() if icon else name
