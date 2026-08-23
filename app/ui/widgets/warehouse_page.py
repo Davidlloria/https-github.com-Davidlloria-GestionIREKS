@@ -309,49 +309,104 @@ class CaducidadTab(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+
+        icon_dir = Path(__file__).resolve().parents[3] / "assets" / "icons"
+        filter_panel = QFrame(self)
+        filter_panel.setObjectName("expirationFilterPanel")
+        filter_panel.setStyleSheet(
+            "QFrame#expirationFilterPanel { background: #FFFFFF; border: 1px solid #D5E0EC; border-radius: 8px; }"
+            "QLabel[expirationPanelTitle='true'] { color: #0D3564; font-size: 13px; font-weight: 700; background: transparent; }"
+            "QLabel[expirationFilterLabel='true'] { color: #435B78; font-size: 11px; font-weight: 600; background: transparent; }"
+            "QComboBox, QDateEdit { min-height: 30px; color: #102A4C; background: #FFFFFF; border: 1px solid #C9D7E8; border-radius: 6px; padding: 2px 8px; }"
+            "QComboBox:focus, QDateEdit:focus { border-color: #0A879A; }"
+            "QPushButton#expirationResetButton { min-height: 32px; color: #0D3564; background: #FFFFFF; border: 1px solid #8FA7C2; border-radius: 6px; padding: 0 14px; font-weight: 600; }"
+            "QPushButton#expirationResetButton:hover { background: #F2F7FC; border-color: #0D3564; }"
+        )
+        filter_panel_layout = QVBoxLayout(filter_panel)
+        filter_panel_layout.setContentsMargins(12, 10, 12, 12)
+        filter_panel_layout.setSpacing(8)
+
+        filter_title_row = QHBoxLayout()
+        filter_title_row.setContentsMargins(0, 0, 0, 0)
+        filter_title_row.setSpacing(7)
+        filter_icon = QLabel(filter_panel)
+        filter_icon.setObjectName("expirationFilterIcon")
+        filter_icon.setPixmap(QIcon(str(icon_dir / "filtro.svg")).pixmap(18, 18))
+        filter_icon.setFixedSize(18, 18)
+        filter_title = QLabel("FILTROS DE CADUCIDAD", filter_panel)
+        filter_title.setProperty("expirationPanelTitle", True)
+        filter_title_row.addWidget(filter_icon)
+        filter_title_row.addWidget(filter_title)
+        filter_title_row.addStretch(1)
+        filter_panel_layout.addLayout(filter_title_row)
 
         filters = QHBoxLayout()
-        filters.addWidget(QLabel("Caduca desde"))
+        filters.setContentsMargins(0, 0, 0, 0)
+        filters.setSpacing(10)
+
+        def add_filter_column(label_text: str, widget: QWidget, stretch: int = 1) -> None:
+            column = QVBoxLayout()
+            column.setContentsMargins(0, 0, 0, 0)
+            column.setSpacing(3)
+            label = QLabel(label_text, filter_panel)
+            label.setProperty("expirationFilterLabel", True)
+            column.addWidget(label)
+            column.addWidget(widget)
+            filters.addLayout(column, stretch)
+
         self.date_from = QDateEdit()
+        self.date_from.setObjectName("expirationDateFrom")
         self.date_from.setCalendarPopup(True)
         self.date_from.setDisplayFormat("dd/MM/yyyy")
         self.date_from.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.date_from.setMinimumWidth(138)
+        self.date_from.setMaximumWidth(155)
         self.date_from.setDate(QDate(2000, 1, 1))
         self.date_from.dateChanged.connect(lambda _d: self.reload())
-        filters.addWidget(self.date_from)
 
-        filters.addWidget(QLabel("Caduca hasta"))
         self.date_to = QDateEdit()
+        self.date_to.setObjectName("expirationDateTo")
         self.date_to.setCalendarPopup(True)
         self.date_to.setDisplayFormat("dd/MM/yyyy")
         self.date_to.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.date_to.setMinimumWidth(138)
+        self.date_to.setMaximumWidth(155)
         self.date_to.setDate(QDate(2100, 12, 31))
         self.date_to.dateChanged.connect(lambda _d: self.reload())
-        filters.addWidget(self.date_to)
 
-        filters.addWidget(QLabel("Próxima caducidad"))
         self.near_days_combo = QComboBox()
+        self.near_days_combo.setObjectName("expirationNearDays")
         for days in (7, 15, 30, 45, 60, 90, 120):
             self.near_days_combo.addItem(f"{days} días", days)
         self.near_days_combo.setCurrentIndex(self.near_days_combo.findData(30))
         self.near_days_combo.currentIndexChanged.connect(self.reload)
-        filters.addWidget(self.near_days_combo)
 
         self.mode_combo = QComboBox()
+        self.mode_combo.setObjectName("expirationMode")
         self.mode_combo.addItem("Caducados + próximos", "both")
         self.mode_combo.addItem("Solo caducados", "expired")
         self.mode_combo.addItem("Solo próximos", "soon")
         self.mode_combo.currentIndexChanged.connect(self.reload)
-        filters.addWidget(self.mode_combo)
 
-        clear_btn = QPushButton("Todo")
-        clear_btn.setProperty("btnRole", "secondary")
+        add_filter_column("Caduca desde", self.date_from, 1)
+        add_filter_column("Caduca hasta", self.date_to, 1)
+        add_filter_column("Próxima caducidad", self.near_days_combo, 1)
+        add_filter_column("Vista", self.mode_combo, 2)
+
+        clear_btn = QPushButton("Restablecer")
+        clear_btn.setObjectName("expirationResetButton")
+        clear_btn.setIcon(QIcon(str(icon_dir / "eraser.svg")))
+        clear_btn.setIconSize(QSize(17, 17))
         clear_btn.clicked.connect(self._reset_filters)
         filters.addWidget(clear_btn)
         filters.addStretch(1)
-        layout.addLayout(filters)
+        filter_panel_layout.addLayout(filters)
+        layout.addWidget(filter_panel)
 
         self.table = QTableWidget(0, 9)
+        self.table.setObjectName("expirationTable")
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -379,7 +434,58 @@ class CaducidadTab(QWidget):
         self.table.setColumnWidth(6, 105)
         self.table.setColumnWidth(7, 105)
         self.table.setColumnWidth(8, 110)
-        layout.addWidget(self.table, 1)
+
+        results_panel = QFrame(self)
+        results_panel.setObjectName("expirationResultsPanel")
+        results_panel.setStyleSheet(
+            "QFrame#expirationResultsPanel { background: #FFFFFF; border: 1px solid #D5E0EC; border-radius: 8px; }"
+            "QLabel[expirationPanelTitle='true'] { color: #0D3564; font-size: 13px; font-weight: 700; background: transparent; }"
+            "QLabel[expirationExpiredMetric='true'] { color: #9B1C1C; background: #FDECEC; border: 1px solid #E9A8A8; border-radius: 5px; padding: 5px 12px; font-weight: 700; }"
+            "QLabel[expirationSoonMetric='true'] { color: #8A4B00; background: #FFF4D6; border: 1px solid #E8C46A; border-radius: 5px; padding: 5px 12px; font-weight: 700; }"
+            "QLabel[expirationKgMetric='true'] { color: #087E8F; background: #F5FBFC; border: 1px solid #A9D7DE; border-radius: 5px; padding: 5px 12px; font-weight: 700; }"
+            "QTableWidget#expirationTable { background: #FFFFFF; alternate-background-color: #F7FAFD; border: 0; gridline-color: #DCE5EF; color: #10233F; }"
+            "QTableWidget#expirationTable::item { padding: 3px 8px; border: 0; }"
+            "QTableWidget#expirationTable::item:selected { background: #2F80ED; color: #FFFFFF; }"
+            "QTableWidget#expirationTable QHeaderView::section { background: #0D3564; color: #FFFFFF; border: 0; border-right: 1px solid #34577F; border-bottom: 1px solid #34577F; padding: 6px 8px; font-weight: 700; }"
+        )
+        results_layout = QVBoxLayout(results_panel)
+        results_layout.setContentsMargins(8, 8, 8, 8)
+        results_layout.setSpacing(6)
+
+        results_title_row = QHBoxLayout()
+        results_title_row.setContentsMargins(2, 0, 2, 0)
+        results_title_row.setSpacing(7)
+        results_icon = QLabel(results_panel)
+        results_icon.setObjectName("expirationResultsIcon")
+        results_icon.setPixmap(QIcon(str(icon_dir / "calendar-clock.svg")).pixmap(18, 18))
+        results_icon.setFixedSize(18, 18)
+        results_title = QLabel("CONTROL DE CADUCIDADES", results_panel)
+        results_title.setProperty("expirationPanelTitle", True)
+        self.expired_summary = QLabel("0 caducados", results_panel)
+        self.expired_summary.setObjectName("expirationExpiredSummary")
+        self.expired_summary.setProperty("expirationExpiredMetric", True)
+        self.soon_summary = QLabel("0 próximos", results_panel)
+        self.soon_summary.setObjectName("expirationSoonSummary")
+        self.soon_summary.setProperty("expirationSoonMetric", True)
+        self.expiration_kg_summary = QLabel("0 kg", results_panel)
+        self.expiration_kg_summary.setObjectName("expirationKgSummary")
+        self.expiration_kg_summary.setProperty("expirationKgMetric", True)
+        results_title_row.addWidget(results_icon)
+        results_title_row.addWidget(results_title)
+        results_title_row.addStretch(1)
+        results_title_row.addWidget(self.expired_summary)
+        results_title_row.addWidget(self.soon_summary)
+        results_title_row.addWidget(self.expiration_kg_summary)
+        results_layout.addLayout(results_title_row)
+
+        self.table.setAlternatingRowColors(True)
+        self.table.setShowGrid(True)
+        self.table.verticalHeader().setDefaultSectionSize(31)
+        self.table.horizontalHeader().setMinimumHeight(34)
+        self.table.setSortingEnabled(True)
+        self.table.sortByColumn(8, Qt.SortOrder.AscendingOrder)
+        results_layout.addWidget(self.table, 1)
+        layout.addWidget(results_panel, 1)
 
     def _reset_filters(self) -> None:
         self.date_from.blockSignals(True)
@@ -466,11 +572,20 @@ class CaducidadTab(QWidget):
             peso_total = peso_by_articulo.get(str(getattr(mov, "articulo_id", "") or "").strip(), 0.0)
             rows.append((mov, peso_total, is_expired, is_soon))
 
+        sort_column = self.table.horizontalHeader().sortIndicatorSection()
+        sort_order = self.table.horizontalHeader().sortIndicatorOrder()
+        self.table.setSortingEnabled(False)
         self.table.setRowCount(len(rows))
+        expired_count = 0
+        soon_count = 0
+        total_kg = 0.0
         for row_idx, (mov, peso_total, is_expired, is_soon) in enumerate(rows):
             fecha = mov.fecha_pedido.strftime("%d/%m/%Y") if mov.fecha_pedido else ""
             cantidad = float(getattr(mov, "cantidad", 0.0) or 0.0)
             kg = cantidad * float(peso_total or 0.0)
+            total_kg += kg
+            expired_count += int(is_expired)
+            soon_count += int(is_soon)
             caduca = mov.articulo_caducidad.strftime("%d/%m/%Y") if mov.articulo_caducidad else ""
             articulo_id = str(getattr(mov, "articulo_id", "") or "").strip()
             ref = ref_by_articulo.get(articulo_id, "") or articulo_id
@@ -487,14 +602,38 @@ class CaducidadTab(QWidget):
                 caduca,
             ]
             for col_idx, value in enumerate(values):
-                item = QTableWidgetItem(value)
+                if col_idx in (2, 8):
+                    sort_date = mov.fecha_pedido if col_idx == 2 else mov.articulo_caducidad
+                    sort_value: Any = sort_date.toordinal() if sort_date else 0
+                elif col_idx == 5:
+                    sort_value = cantidad
+                elif col_idx == 6:
+                    sort_value = kg
+                elif col_idx in (0, 3, 7) and str(value).isdigit():
+                    sort_value = int(str(value))
+                else:
+                    sort_value = str(value).casefold()
+                item = SortableTableWidgetItem(value, sort_value)
                 if col_idx in (5, 6):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 if is_expired:
-                    item.setForeground(QBrush(QColor("#c62828")))
+                    item.setBackground(QBrush(QColor("#FDECEC")))
                 elif is_soon:
-                    item.setForeground(QBrush(QColor("#ef6c00")))
+                    item.setBackground(QBrush(QColor("#FFF4D6")))
                 self.table.setItem(row_idx, col_idx, item)
+        expired_label = "caducado" if expired_count == 1 else "caducados"
+        soon_label = "próximo" if soon_count == 1 else "próximos"
+        self.expired_summary.setText(f"{expired_count} {expired_label}")
+        self.soon_summary.setText(f"{soon_count} {soon_label}")
+        self.expiration_kg_summary.setText(f"{self._format_expiration_number(total_kg)} kg")
+        self.table.setSortingEnabled(True)
+        self.table.sortItems(sort_column, sort_order)
+
+    @staticmethod
+    def _format_expiration_number(value: float) -> str:
+        formatted = f"{float(value or 0.0):,.2f}"
+        formatted = formatted.replace(",", "_").replace(".", ",").replace("_", ".")
+        return formatted[:-3] if formatted.endswith(",00") else formatted
 
 
 class MovimientosTab(QWidget):
