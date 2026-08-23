@@ -93,7 +93,8 @@ WarehousePage (QWidget, objectName `warehousePage`, fondo gris #EEF3F8, sin bord
     │                   │   │   │   ajustada al borde superior, sin borde y radios inferiores rectos.
     │                   │   │   └── grid de tres columnas: Fabricante, Familia y Subfamilia;
     │                   │   │       etiquetas #5E6C84 y selects blancos de 34 px, borde #C9D7E8,
-    │                   │   │       radio 6 px; margen horizontal 12 px.
+    │                   │   │       radio 6 px; margen horizontal 10 px y separación vertical
+    │                   │   │       etiqueta-selector de 2 px.
     │                   │   ├── fila de dos tarjetas, separación 10 px:
     │                   │   │   ├── ireksPresentationCard (alto fijo 204 px) con cabecera estándar
     │                   │   │   │   “PRESENTACIÓN”, icono `presentation-container.svg`; grid 3 × 2:

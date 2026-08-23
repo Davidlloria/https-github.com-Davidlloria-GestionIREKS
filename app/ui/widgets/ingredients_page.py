@@ -2231,9 +2231,9 @@ class IngredientsIreksPage(QWidget):
             )
         )
         taxonomy_grid = QGridLayout()
-        taxonomy_grid.setContentsMargins(12, 0, 12, 0)
+        taxonomy_grid.setContentsMargins(10, 0, 10, 0)
         taxonomy_grid.setHorizontalSpacing(10)
-        taxonomy_grid.setVerticalSpacing(5)
+        taxonomy_grid.setVerticalSpacing(2)
         for column, (field_label, field) in enumerate(
             (
                 (self.lbl_detail_fabricante, self.detail_fabricante_id),
