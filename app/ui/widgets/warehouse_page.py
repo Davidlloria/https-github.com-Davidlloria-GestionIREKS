@@ -1723,54 +1723,103 @@ class StockTab(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
-        filters = QHBoxLayout()
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
 
-        filters.addWidget(QLabel("Fabricante"))
+        icon_dir = Path(__file__).resolve().parents[3] / "assets" / "icons"
+        filter_panel = QFrame(self)
+        filter_panel.setObjectName("stockFilterPanel")
+        filter_panel.setStyleSheet(
+            "QFrame#stockFilterPanel { background: #FFFFFF; border: 1px solid #D5E0EC; border-radius: 8px; }"
+            "QLabel[stockPanelTitle='true'] { color: #0D3564; font-size: 13px; font-weight: 700; background: transparent; }"
+            "QLabel[stockFilterLabel='true'] { color: #435B78; font-size: 11px; font-weight: 600; background: transparent; }"
+            "QComboBox, QLineEdit, QDoubleSpinBox { min-height: 30px; color: #102A4C; background: #FFFFFF; border: 1px solid #C9D7E8; border-radius: 6px; padding: 2px 8px; }"
+            "QComboBox:focus, QLineEdit:focus, QDoubleSpinBox:focus { border-color: #0A879A; }"
+        )
+        filter_panel_layout = QVBoxLayout(filter_panel)
+        filter_panel_layout.setContentsMargins(12, 10, 12, 12)
+        filter_panel_layout.setSpacing(8)
+
+        filter_title_row = QHBoxLayout()
+        filter_title_row.setContentsMargins(0, 0, 0, 0)
+        filter_title_row.setSpacing(7)
+        filter_icon = QLabel(filter_panel)
+        filter_icon.setObjectName("stockFilterIcon")
+        filter_icon.setPixmap(QIcon(str(icon_dir / "filtro.svg")).pixmap(18, 18))
+        filter_icon.setFixedSize(18, 18)
+        filter_title = QLabel("FILTROS DE STOCK", filter_panel)
+        filter_title.setProperty("stockPanelTitle", True)
+        filter_title_row.addWidget(filter_icon)
+        filter_title_row.addWidget(filter_title)
+        filter_title_row.addStretch(1)
+        filter_panel_layout.addLayout(filter_title_row)
+
+        filters = QHBoxLayout()
+        filters.setContentsMargins(0, 0, 0, 0)
+        filters.setSpacing(10)
+
+        def add_filter_column(label_text: str, widget: QWidget, stretch: int = 1) -> None:
+            column = QVBoxLayout()
+            column.setContentsMargins(0, 0, 0, 0)
+            column.setSpacing(3)
+            label = QLabel(label_text, filter_panel)
+            label.setProperty("stockFilterLabel", True)
+            column.addWidget(label)
+            column.addWidget(widget)
+            filters.addLayout(column, stretch)
+
         self.manufacturer_filter = QComboBox()
         self.manufacturer_filter.currentIndexChanged.connect(self.reload)
-        filters.addWidget(self.manufacturer_filter)
 
-        filters.addWidget(QLabel("Familia"))
         self.family_filter = QComboBox()
         self.family_filter.currentIndexChanged.connect(self.reload)
-        filters.addWidget(self.family_filter)
 
-        filters.addWidget(QLabel("Subfamilia"))
         self.subfamily_filter = QComboBox()
         self.subfamily_filter.currentIndexChanged.connect(self.reload)
-        filters.addWidget(self.subfamily_filter)
 
-        filters.addWidget(QLabel("Riesgo"))
         self.risk_filter = QComboBox()
         self.risk_filter.addItem("Todos", "all")
         self.risk_filter.addItem("Caducado", "expired")
         self.risk_filter.addItem("Caduca <= 30 días", "soon")
         self.risk_filter.addItem("Bajo stock", "low")
         self.risk_filter.currentIndexChanged.connect(self.reload)
-        filters.addWidget(self.risk_filter)
 
-        filters.addWidget(QLabel("Umbral bajo stock (uds)"))
         self.low_stock_spin = QDoubleSpinBox()
         self.low_stock_spin.setDecimals(2)
         self.low_stock_spin.setRange(0.0, 999999.0)
         self.low_stock_spin.setSingleStep(0.5)
         self.low_stock_spin.setValue(self.low_stock_threshold_units)
         self.low_stock_spin.valueChanged.connect(self._on_low_stock_changed)
-        filters.addWidget(self.low_stock_spin)
 
-        filters.addStretch(1)
-        layout.addLayout(filters)
+        self.manufacturer_filter.setMinimumWidth(150)
+        self.family_filter.setMinimumWidth(190)
+        self.subfamily_filter.setMinimumWidth(210)
+        self.risk_filter.setMinimumWidth(150)
+        self.low_stock_spin.setMinimumWidth(145)
+        add_filter_column("Fabricante", self.manufacturer_filter, 2)
+        add_filter_column("Familia", self.family_filter, 3)
+        add_filter_column("Subfamilia", self.subfamily_filter, 3)
+        add_filter_column("Riesgo", self.risk_filter, 2)
+        add_filter_column("Umbral bajo stock (uds)", self.low_stock_spin, 2)
+        filter_panel_layout.addLayout(filters)
+
         product_filters = QHBoxLayout()
-        product_filters.addWidget(QLabel("Producto"))
+        product_filters.setContentsMargins(0, 0, 0, 0)
+        product_filters.setSpacing(8)
+        product_label = QLabel("Producto", filter_panel)
+        product_label.setProperty("stockFilterLabel", True)
+        product_filters.addWidget(product_label)
         self.product_filter = QLineEdit()
         self.product_filter.setPlaceholderText("Nombre o ref...")
         self.product_filter.setMinimumWidth(420)
         self.product_filter.textChanged.connect(self.reload)
         product_filters.addWidget(self.product_filter)
         product_filters.addStretch(1)
-        layout.addLayout(product_filters)
+        filter_panel_layout.addLayout(product_filters)
+        layout.addWidget(filter_panel)
 
         self.table = QTableWidget(0, 9)
+        self.table.setObjectName("stockTable")
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -1798,7 +1847,83 @@ class StockTab(QWidget):
         self.table.setColumnWidth(6, 95)
         self.table.setColumnWidth(7, 110)
         self.table.setColumnWidth(8, 120)
-        layout.addWidget(self.table, 1)
+
+        stock_panel = QFrame(self)
+        stock_panel.setObjectName("stockMovementsPanel")
+        stock_panel.setStyleSheet(
+            "QFrame#stockMovementsPanel { background: #FFFFFF; border: 1px solid #D5E0EC; border-radius: 8px; }"
+            "QLabel[stockPanelTitle='true'] { color: #0D3564; font-size: 13px; font-weight: 700; background: transparent; }"
+            "QLabel[stockMetric='true'] { color: #087E8F; background: #F5FBFC; border: 1px solid #A9D7DE; border-radius: 5px; padding: 5px 12px; font-weight: 700; }"
+            "QLabel[stockRiskMetric='true'] { color: #B54708; background: #FFF8EB; border: 1px solid #F4C98B; border-radius: 5px; padding: 5px 12px; font-weight: 700; }"
+            "QTableWidget#stockTable { background: #FFFFFF; alternate-background-color: #F7FAFD; border: 0; gridline-color: #DCE5EF; color: #10233F; }"
+            "QTableWidget#stockTable::item { padding: 3px 8px; border: 0; }"
+            "QTableWidget#stockTable::item:selected { background: #DDF1F4; color: #0D3564; }"
+            "QTableWidget#stockTable QHeaderView::section { background: #0D3564; color: #FFFFFF; border: 0; border-right: 1px solid #34577F; border-bottom: 1px solid #34577F; padding: 6px 8px; font-weight: 700; }"
+            "QTableWidget#stockTotalsTable { background: #F8FBFE; border: 0; border-top: 1px solid #CBD8E7; gridline-color: #DCE5EF; color: #0D3564; }"
+            "QTableWidget#stockTotalsTable::item { padding: 4px 8px; border: 0; font-weight: 700; }"
+        )
+        stock_panel_layout = QVBoxLayout(stock_panel)
+        stock_panel_layout.setContentsMargins(8, 8, 8, 8)
+        stock_panel_layout.setSpacing(6)
+
+        stock_title_row = QHBoxLayout()
+        stock_title_row.setContentsMargins(2, 0, 2, 0)
+        stock_title_row.setSpacing(7)
+        stock_icon = QLabel(stock_panel)
+        stock_icon.setObjectName("stockPanelIcon")
+        stock_icon.setPixmap(QIcon(str(icon_dir / "boxes.svg")).pixmap(18, 18))
+        stock_icon.setFixedSize(18, 18)
+        stock_title = QLabel("EXISTENCIAS POR LOTE", stock_panel)
+        stock_title.setProperty("stockPanelTitle", True)
+        self.stock_lots_summary = QLabel("0 lotes", stock_panel)
+        self.stock_lots_summary.setObjectName("stockLotsSummary")
+        self.stock_lots_summary.setProperty("stockMetric", True)
+        self.stock_units_summary = QLabel("0 uds", stock_panel)
+        self.stock_units_summary.setObjectName("stockUnitsSummary")
+        self.stock_units_summary.setProperty("stockMetric", True)
+        self.stock_kg_summary = QLabel("0 kg", stock_panel)
+        self.stock_kg_summary.setObjectName("stockKgSummary")
+        self.stock_kg_summary.setProperty("stockMetric", True)
+        self.stock_risks_summary = QLabel("0 riesgos", stock_panel)
+        self.stock_risks_summary.setObjectName("stockRisksSummary")
+        self.stock_risks_summary.setProperty("stockRiskMetric", True)
+        stock_title_row.addWidget(stock_icon)
+        stock_title_row.addWidget(stock_title)
+        stock_title_row.addStretch(1)
+        stock_title_row.addWidget(self.stock_lots_summary)
+        stock_title_row.addWidget(self.stock_units_summary)
+        stock_title_row.addWidget(self.stock_kg_summary)
+        stock_title_row.addWidget(self.stock_risks_summary)
+        stock_panel_layout.addLayout(stock_title_row)
+
+        self.table.setAlternatingRowColors(True)
+        self.table.setShowGrid(True)
+        self.table.verticalHeader().setDefaultSectionSize(31)
+        self.table.horizontalHeader().setMinimumHeight(34)
+        stock_panel_layout.addWidget(self.table, 1)
+
+        self.stock_totals_table = QTableWidget(1, 9)
+        self.stock_totals_table.setObjectName("stockTotalsTable")
+        self.stock_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.stock_totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.stock_totals_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.stock_totals_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.stock_totals_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.stock_totals_table.verticalHeader().setVisible(False)
+        self.stock_totals_table.horizontalHeader().setVisible(False)
+        totals_header = self.stock_totals_table.horizontalHeader()
+        for column in range(9):
+            totals_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+            self.stock_totals_table.setColumnWidth(column, self.table.columnWidth(column))
+        self.stock_totals_table.setFixedHeight(32)
+        header.sectionResized.connect(
+            lambda column, _old, new: self.stock_totals_table.setColumnWidth(column, new)
+        )
+        self.table.horizontalScrollBar().valueChanged.connect(
+            self.stock_totals_table.horizontalScrollBar().setValue
+        )
+        stock_panel_layout.addWidget(self.stock_totals_table)
+        layout.addWidget(stock_panel, 1)
 
     def set_almacen_filter(self, almacen_id: str) -> None:
         self._almacen_id = str(almacen_id or "").strip()
@@ -1984,7 +2109,59 @@ class StockTab(QWidget):
                     else:
                         item.setForeground(QBrush(QColor("#067647")))
                 self.table.setItem(row_idx, col_idx, item)
+        self._set_stock_totals(filtered_rows, peso_by_articulo)
         self.table.setSortingEnabled(True)
+
+    @staticmethod
+    def _format_stock_number(value: float, suffix: str = "") -> str:
+        formatted = f"{float(value or 0.0):,.2f}"
+        return formatted.replace(",", "_").replace(".", ",").replace("_", ".") + suffix
+
+    def _set_stock_totals(
+        self,
+        rows: list[dict[str, Any]],
+        peso_by_articulo: dict[str, float],
+    ) -> None:
+        total_units = sum(float(row.get("cantidad", 0.0) or 0.0) for row in rows)
+        total_kg = sum(
+            float(row.get("cantidad", 0.0) or 0.0)
+            * float(peso_by_articulo.get(str(row.get("articulo_id", "") or "").strip(), 0.0) or 0.0)
+            for row in rows
+        )
+        risk_count = sum(1 for row in rows if str(row.get("estado", "OK")) != "OK")
+        units_summary = self._format_stock_number(total_units)
+        kg_summary = self._format_stock_number(total_kg)
+        if units_summary.endswith(",00"):
+            units_summary = units_summary[:-3]
+        if kg_summary.endswith(",00"):
+            kg_summary = kg_summary[:-3]
+        lot_label = "lote" if len(rows) == 1 else "lotes"
+        risk_label = "riesgo" if risk_count == 1 else "riesgos"
+        self.stock_lots_summary.setText(f"{len(rows)} {lot_label}")
+        self.stock_units_summary.setText(f"{units_summary} uds")
+        self.stock_kg_summary.setText(f"{kg_summary} kg")
+        self.stock_risks_summary.setText(f"{risk_count} {risk_label}")
+
+        values = [
+            "TOTALES",
+            "",
+            "",
+            "",
+            "",
+            self._format_stock_number(total_units),
+            self._format_stock_number(total_kg, " kg"),
+            "",
+            "",
+        ]
+        for column, value in enumerate(values):
+            item = QTableWidgetItem(value)
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            if column in (5, 6):
+                item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                item.setForeground(QBrush(QColor("#087E8F")))
+            self.stock_totals_table.setItem(0, column, item)
 
     def _on_low_stock_changed(self, value: float) -> None:
         self.low_stock_threshold_units = max(0.0, float(value or 0.0))
