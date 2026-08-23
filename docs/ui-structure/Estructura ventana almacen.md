@@ -30,7 +30,7 @@ WarehousePage (QWidget, objectName `warehousePage`, fondo gris #EEF3F8, sin bord
     └── main_tabs / warehouseMainTabs (QTabWidget, fondo transparente, sin borde)
         ├── Artículos
     │   └── IngredientsIreksPage (QWidget, `compact_mode=True`; sin título de página
-    │       ni ribbon propios; margen izquierdo local 0 px, fondo #EEF3F8)
+    │       ni ribbon propios; márgenes locales 0 / 11 / 14 / 14 px, fondo #EEF3F8)
     │       ├── ireksMainSplitter (QSplitter horizontal, separación visual 5 px)
     │       ├── sidePanel / catálogo lateral (QWidget, ancho fijo 420 px, fondo #FFFFFF,
     │       │   borde #D7DEE8 de 1 px, radio 10 px)
@@ -86,26 +86,33 @@ WarehousePage (QWidget, objectName `warehousePage`, fondo gris #EEF3F8, sin bord
     │                   │   seminegrita y línea inferior turquesa de 3 px.
     │                   ├── Datos / ireksDataTab (fondo #EEF3F8, márgenes 8 / 0 / 8 / 8 px,
     │                   │   separación 8 px)
-    │                   │   ├── ireksClassificationCard (QFrame, alto fijo 146 px, blanco,
+    │                   │   ├── ireksClassificationCard (QFrame, alto fijo 101 px, blanco,
     │                   │   │   borde #EEF3F8, radio 8 px)
     │                   │   │   ├── cabecera estándar “CLASIFICACIÓN”, 38 px, #0B2F5B,
     │                   │   │   │   icono blanco `product-tag.svg` 21 px, título blanco 16 px;
     │                   │   │   │   ajustada al borde superior, sin borde y radios inferiores rectos.
     │                   │   │   └── grid de tres columnas: Fabricante, Familia y Subfamilia;
-    │                   │   │       etiquetas #5E6C84 y selects blancos de 34 px, borde #C9D7E8,
-    │                   │   │       radio 6 px; margen horizontal 10 px y separación vertical
-    │                   │   │       etiqueta-selector de 2 px.
+    │                   │   │       margen horizontal 10 px, filas de 14 / 34 px y separación
+    │                   │   │       vertical de 3 px. Las etiquetas #5E6C84 tienen 14 px de alto,
+    │                   │   │       y los selects blancos 34 px, borde #C9D7E8 y radio 6 px.
+    │                   │   │       El layout conserva 2 px bajo la cabecera y 4 px al borde inferior.
     │                   │   ├── fila de dos tarjetas, separación 10 px:
-    │                   │   │   ├── ireksPresentationCard (alto fijo 204 px) con cabecera estándar
+    │                   │   │   ├── ireksPresentationCard (alto fijo 154 px) con cabecera estándar
     │                   │   │   │   “PRESENTACIÓN”, icono `presentation-container.svg`; grid 3 × 2:
     │                   │   │   │   Presentación, Contenido, Unidad contenido, Peso unidad,
-    │                   │   │   │   Unidad peso y Total presentación (solo lectura #F4F7FB).
-    │                   │   │   └── ireksPalletCard (alto fijo 204 px) con cabecera estándar
+    │                   │   │   │   Unidad peso y Total presentación (solo lectura #F4F7FB). Cabecera
+    │                   │   │   │   de 38 px; etiquetas de 14 px, campos de 34 px; 3 px entre
+    │                   │   │   │   etiqueta-campo, 4 px entre filas y 4 px de margen inferior.
+    │                   │   │   └── ireksPalletCard (alto fijo 154 px) con cabecera estándar
     │                   │   │       “PALETIZACIÓN”, icono `pallet.svg`; grid 3 × 2: Pallet,
     │                   │   │       Presentaciones/capa, Capas, Presentaciones/pallet, Uds/pallet
     │                   │   │       y Total pallet (las tres últimas calculadas, solo lectura #F4F7FB).
-    │                   │   └── ireksObservationsCard (alto fijo 46 px, blanco, borde #EEF3F8,
-    │                   │       radio 8 px; margen 12 / 6 px): etiqueta “Obs.” y QLineEdit expansivo.
+    │                   │   │       Cabecera de 38 px; etiquetas de 14 px, campos de 34 px; 3 px entre
+    │                   │   │       etiqueta-campo, 4 px entre filas y 4 px de margen inferior.
+    │                   │   └── ireksObservationsCard (QFrame blanco, borde #EEF3F8, radio 8 px;
+    │                   │       mínimo 46 px y altura expansiva): absorbe el espacio libre de Datos.
+    │                   │       La etiqueta “Obs.” se alinea arriba a la izquierda y el QLineEdit
+    │                   │       expansivo tiene mínimo 34 px y crece verticalmente con la tarjeta.
     │                   ├── Tarifa / tarifaTab: tarjeta con cabecera estándar “HISTÓRICO DE TARIFAS”,
     │                   │   icono `product-tag.svg`; filtro Año, acciones Añadir tarifa / Editar /
     │                   │   Eliminar y tabla de precios IREKS y distribuidor.
