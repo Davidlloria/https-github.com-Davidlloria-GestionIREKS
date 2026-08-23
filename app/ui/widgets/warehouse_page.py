@@ -2726,6 +2726,36 @@ class WarehousePage(QWidget):
                     presentation_grid.setAlignment(label, Qt.AlignmentFlag.AlignTop)
                     presentation_grid.setAlignment(field, Qt.AlignmentFlag.AlignTop)
             presentation_card.setFixedHeight(154)
+        pallet_card = self.articles_tab.findChild(QFrame, "ireksPalletCard")
+        if pallet_card is not None and pallet_card.layout() is not None:
+            pallet_layout = pallet_card.layout()
+            pallet_layout.setContentsMargins(0, 0, 0, 4)
+            pallet_layout.setSpacing(4)
+            pallet_header = pallet_layout.itemAt(0).widget()
+            if pallet_header is not None:
+                pallet_header.setFixedHeight(38)
+            pallet_grid = pallet_layout.itemAt(1).layout()
+            if pallet_grid is not None:
+                pallet_grid.setVerticalSpacing(0)
+                pallet_grid.setRowMinimumHeight(0, 17)  # label 14 + gap 3
+                pallet_grid.setRowMinimumHeight(1, 38)  # field 34 + gap 4
+                pallet_grid.setRowMinimumHeight(2, 17)  # label 14 + gap 3
+                pallet_grid.setRowMinimumHeight(3, 34)
+                pallet_fields = (
+                    (self.articles_tab.lbl_transporte_pallet, self.articles_tab.transporte_pallet_tipo),
+                    (self.articles_tab.lbl_transporte_cajas_capa, self.articles_tab.transporte_cajas_por_capa),
+                    (self.articles_tab.lbl_transporte_capas, self.articles_tab.transporte_capas_por_pallet),
+                    (self.articles_tab.lbl_transporte_cajas_pallet, self.articles_tab.transporte_cajas_por_pallet),
+                    (self.articles_tab.lbl_transporte_unidades, self.articles_tab.transporte_unidades_por_pallet),
+                    (self.articles_tab.lbl_transporte_kg, self.articles_tab.transporte_kg_por_pallet),
+                )
+                for label, field in pallet_fields:
+                    label.setFixedHeight(14)
+                    label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+                    field.setFixedHeight(34)
+                    pallet_grid.setAlignment(label, Qt.AlignmentFlag.AlignTop)
+                    pallet_grid.setAlignment(field, Qt.AlignmentFlag.AlignTop)
+            pallet_card.setFixedHeight(154)
         self.entradas_tab = MovimientosTab(mode="in")
         self.salidas_tab = MovimientosTab(mode="out")
         self.stock_tab = StockTab()
