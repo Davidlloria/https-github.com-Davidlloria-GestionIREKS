@@ -4,7 +4,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QLineEdit
 
 from app.models import CodigoPostal, Isla, Localidad, Municipio, Provincia
 from app.ui.widgets.customers_page import CustomerEditorDialog
@@ -43,31 +43,34 @@ def _dialog() -> CustomerEditorDialog:
     )
 
 
-def _labels(combo) -> list[str]:
-    return [combo.itemText(index) for index in range(1, combo.count())]
-
-
 def test_customer_address_filters_cp_and_municipio_bidirectionally() -> None:
     dialog = _dialog()
     dialog.provincia_combo.setCurrentIndex(dialog.provincia_combo.findData("prov"))
     dialog.isla_combo.setCurrentIndex(dialog.isla_combo.findData("isla"))
 
-    assert dialog.cp_combo.isEditable()
-    assert _labels(dialog.municipio_combo) == ["Municipio A", "Municipio B"]
-    assert _labels(dialog.cp_combo) == ["35001", "35002", "35003"]
+    assert isinstance(dialog.municipio_edit, QLineEdit)
+    assert isinstance(dialog.cp_edit, QLineEdit)
+    assert dialog.municipio_edit.completer() is not None
+    assert dialog.cp_edit.completer() is not None
+    assert list(dialog._municipio_options) == ["Municipio A", "Municipio B"]
+    assert dialog._cp_options == {"35001", "35002", "35003"}
 
-    dialog.cp_combo.lineEdit().setText("35002")
-    dialog.cp_combo.lineEdit().editingFinished.emit()
-    assert dialog.cp_combo.currentData() == "35002"
-    assert _labels(dialog.municipio_combo) == ["Municipio A"]
+    dialog.cp_edit.setText("35002")
+    dialog.cp_edit.editingFinished.emit()
+    assert dialog._selected_cp == "35002"
+    assert list(dialog._municipio_options) == ["Municipio A"]
 
-    dialog.municipio_combo.setCurrentIndex(dialog.municipio_combo.findData("mun-a"))
-    assert _labels(dialog.cp_combo) == ["35001", "35002"]
-    assert dialog.cp_combo.currentData() == "35002"
-    assert _labels(dialog.localidad_combo) == ["Localidad A2"]
+    dialog.municipio_edit.setText("Municipio A")
+    dialog.municipio_edit.editingFinished.emit()
+    assert dialog._selected_municipio_id == "mun-a"
+    assert dialog._cp_options == {"35001", "35002"}
+    assert dialog._selected_cp == "35002"
+    assert dialog.localidad_combo.itemText(1) == "Localidad A2"
 
-    dialog.cp_combo.setCurrentIndex(0)
-    dialog.municipio_combo.setCurrentIndex(dialog.municipio_combo.findData("mun-b"))
-    assert _labels(dialog.cp_combo) == ["35001", "35003"]
-    assert dialog.cp_combo.currentData() == ""
-    assert _labels(dialog.localidad_combo) == []
+    dialog.cp_edit.clear()
+    dialog.cp_edit.editingFinished.emit()
+    dialog.municipio_edit.setText("Municipio B")
+    dialog.municipio_edit.editingFinished.emit()
+    assert dialog._cp_options == {"35001", "35003"}
+    assert dialog._selected_cp == ""
+    assert dialog.localidad_combo.count() == 1

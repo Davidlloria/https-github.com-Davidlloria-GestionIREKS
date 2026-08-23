@@ -4,7 +4,7 @@ import threading
 import unicodedata
 from uuid import uuid4
 
-from PySide6.QtCore import QObject, QSize, QTimer, Qt, Signal
+from PySide6.QtCore import QObject, QSize, QTimer, Qt, Signal, QStringListModel
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap, QTextCharFormat, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QComboBox,
+    QCompleter,
     QCalendarWidget,
     QDateEdit,
     QDialog,
@@ -510,14 +511,14 @@ class CustomerEditorDialog(QDialog):
         self.lbl_isla = QLabel("Isla", panel)
         self.isla_combo = QComboBox(panel)
         self.lbl_municipio = QLabel("Municipio", panel)
-        self.municipio_combo = QComboBox(panel)
+        self.municipio_edit = QLineEdit(panel)
+        self.municipio_edit.setPlaceholderText("Escribe o selecciona un municipio")
 
         self.lbl_calle = QLabel("Calle", panel)
         self.direccion_edit = QLineEdit(panel)
         self.lbl_cp = QLabel("C.P.", panel)
-        self.cp_combo = QComboBox(panel)
-        self.cp_combo.setEditable(True)
-        self.cp_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.cp_edit = QLineEdit(panel)
+        self.cp_edit.setPlaceholderText("C.P.")
         self.lbl_localidad = QLabel("Localidad", panel)
         self.localidad_combo = QComboBox(panel)
 
@@ -525,9 +526,16 @@ class CustomerEditorDialog(QDialog):
 
         self.provincia_combo.currentIndexChanged.connect(self._on_provincia_changed)
         self.isla_combo.currentIndexChanged.connect(self._on_isla_changed)
-        self.municipio_combo.currentIndexChanged.connect(self._on_municipio_changed)
-        self.cp_combo.currentIndexChanged.connect(self._on_cp_changed)
-        self.cp_combo.lineEdit().editingFinished.connect(self._on_cp_editing_finished)
+        self._municipio_options: dict[str, str] = {}
+        self._cp_options: set[str] = set()
+        self._selected_municipio_id = ""
+        self._selected_cp = ""
+        self._municipio_completer = self._build_lookup_completer(self.municipio_edit)
+        self._cp_completer = self._build_lookup_completer(self.cp_edit)
+        self.municipio_edit.editingFinished.connect(self._on_municipio_editing_finished)
+        self.cp_edit.editingFinished.connect(self._on_cp_editing_finished)
+        self._municipio_completer.activated.connect(self._on_municipio_editing_finished)
+        self._cp_completer.activated.connect(self._on_cp_editing_finished)
         return panel
 
     def _layout_left_panel(self) -> None:
@@ -548,13 +556,13 @@ class CustomerEditorDialog(QDialog):
         self.lbl_municipio.setGeometry(285, 126, 260, 20)
         self.provincia_combo.setGeometry(5, 150, 165, 28)
         self.isla_combo.setGeometry(175, 150, 100, 28)
-        self.municipio_combo.setGeometry(285, 150, 260, 28)
+        self.municipio_edit.setGeometry(285, 150, 260, 28)
 
         self.lbl_calle.setGeometry(5, 190, 270, 20)
         self.lbl_cp.setGeometry(285, 190, 80, 20)
         self.lbl_localidad.setGeometry(375, 190, 175, 20)
         self.direccion_edit.setGeometry(5, 214, 270, 28)
-        self.cp_combo.setGeometry(285, 214, 80, 28)
+        self.cp_edit.setGeometry(285, 214, 80, 28)
         self.localidad_combo.setGeometry(375, 214, 175, 28)
 
     def _build_right_panel(self) -> QWidget:
@@ -636,6 +644,34 @@ class CustomerEditorDialog(QDialog):
             combo.setCurrentIndex(0)
         combo.blockSignals(False)
 
+    def _build_lookup_completer(self, field: QLineEdit) -> QCompleter:
+        model = QStringListModel(self)
+        completer = QCompleter(model, self)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        field.setCompleter(completer)
+        return completer
+
+    @staticmethod
+    def _lookup_value_for_id(options: dict[str, str], selected_id: str) -> str:
+        for label, value in options.items():
+            if value == selected_id:
+                return label
+        return ""
+
+    def _set_municipio_options(self, items: list[tuple[str, str]], selected_id: str = "") -> None:
+        self._municipio_options = {label: value for label, value in items}
+        self._municipio_completer.model().setStringList(list(self._municipio_options))
+        self._selected_municipio_id = selected_id if selected_id in self._municipio_options.values() else ""
+        self.municipio_edit.setText(self._lookup_value_for_id(self._municipio_options, self._selected_municipio_id))
+
+    def _set_cp_options(self, items: list[tuple[str, str]], selected_cp: str = "") -> None:
+        self._cp_options = {value for _label, value in items}
+        self._cp_completer.model().setStringList(sorted(self._cp_options))
+        self._selected_cp = selected_cp if selected_cp in self._cp_options else ""
+        self.cp_edit.setText(self._selected_cp)
+
     def _populate_provincias(self, selected_id: str = "") -> None:
         items = [(str(p.provincia_nombre or ""), str(p.provincia_id or "")) for p in self._provincias if p.provincia_nombre]
         self._fill_combo(self.provincia_combo, items, selected_id)
@@ -664,7 +700,7 @@ class CustomerEditorDialog(QDialog):
                 and (not cp or str(m.municipio_id or "") in municipality_ids_for_cp)
             )
         ]
-        self._fill_combo(self.municipio_combo, items, selected_id)
+        self._set_municipio_options(items, selected_id)
 
     def _populate_cps(self, isla_id: str, selected_cp: str = "", municipio_id: str = "") -> None:
         items = [
@@ -687,7 +723,7 @@ class CustomerEditorDialog(QDialog):
                 continue
             seen.add(value)
             unique_items.append((label, value))
-        self._fill_combo(self.cp_combo, unique_items, selected_cp)
+        self._set_cp_options(unique_items, selected_cp)
 
     def _populate_localidades(
         self,
@@ -711,13 +747,6 @@ class CustomerEditorDialog(QDialog):
             ]
         self._fill_combo(self.localidad_combo, items, selected_localidad_id)
 
-    def _current_cp(self) -> str:
-        value = str(self.cp_combo.currentData() or "").strip()
-        if value:
-            return value
-        text = self.cp_combo.currentText().strip()
-        return text if self.cp_combo.findData(text) >= 0 else ""
-
     def _on_provincia_changed(self, _idx: int) -> None:
         if self._is_loading:
             return
@@ -735,32 +764,27 @@ class CustomerEditorDialog(QDialog):
         self._populate_cps(isla_id, "")
         self._populate_localidades("", "", "")
 
-    def _on_municipio_changed(self, _idx: int) -> None:
+    def _on_municipio_editing_finished(self, *_args) -> None:
         if self._is_loading:
             return
+        entered_name = self.municipio_edit.text().strip()
+        self._selected_municipio_id = self._municipio_options.get(entered_name, "")
+        if not self._selected_municipio_id:
+            self.municipio_edit.clear()
         isla_id = str(self.isla_combo.currentData() or "")
-        municipio_id = str(self.municipio_combo.currentData() or "")
-        codigo_postal = self._current_cp()
-        self._populate_cps(isla_id, codigo_postal, municipio_id)
-        self._populate_localidades(municipio_id, self._current_cp(), "")
+        self._populate_cps(isla_id, self._selected_cp, self._selected_municipio_id)
+        self._populate_localidades(self._selected_municipio_id, self._selected_cp, "")
 
-    def _on_cp_changed(self, _idx: int) -> None:
+    def _on_cp_editing_finished(self, *_args) -> None:
         if self._is_loading:
             return
+        entered_cp = self.cp_edit.text().strip()
+        self._selected_cp = entered_cp if entered_cp in self._cp_options else ""
+        if not self._selected_cp:
+            self.cp_edit.clear()
         isla_id = str(self.isla_combo.currentData() or "")
-        codigo_postal = self._current_cp()
-        municipio_id = str(self.municipio_combo.currentData() or "")
-        self._populate_municipios(isla_id, municipio_id, codigo_postal)
-        municipio_id = str(self.municipio_combo.currentData() or "")
-        self._populate_localidades(municipio_id, codigo_postal, "")
-
-    def _on_cp_editing_finished(self) -> None:
-        if self._is_loading:
-            return
-        entered_cp = self.cp_combo.currentText().strip()
-        index = self.cp_combo.findData(entered_cp)
-        self.cp_combo.setCurrentIndex(index if index >= 0 else 0)
-        self._on_cp_changed(self.cp_combo.currentIndex())
+        self._populate_municipios(isla_id, self._selected_municipio_id, self._selected_cp)
+        self._populate_localidades(self._selected_municipio_id, self._selected_cp, "")
 
     def _normalize_phone(self, raw: str) -> str:
         digits = "".join(ch for ch in str(raw or "") if ch.isdigit())
@@ -826,10 +850,10 @@ class CustomerEditorDialog(QDialog):
                 "cliente_direccion": self.direccion_edit.text().strip(),
                 "cliente_abreviatura": self.abreviatura_edit.text().strip().upper(),
                 "cliente_cif": self.cif_edit.text().strip(),
-                "cliente_direccion_cp": str(self.cp_combo.currentData() or "").strip(),
+                "cliente_direccion_cp": self._selected_cp,
                 "cliente_direccion_provincia_id": str(self.provincia_combo.currentData() or "").strip(),
                 "cliente_direccion_isla_id": str(self.isla_combo.currentData() or "").strip(),
-                "cliente_direccion_municipio_id": str(self.municipio_combo.currentData() or "").strip(),
+                "cliente_direccion_municipio_id": self._selected_municipio_id,
                 "cliente_direccion_localidad_id": str(self.localidad_combo.currentData() or "").strip(),
                 "cliente_tipo": (self.tipo_combo.currentText() or "").strip().lower(),
                 "cliente_actividad": ",".join(
@@ -2808,19 +2832,29 @@ class CustomersPage(QWidget):
         self.lbl_isla = QLabel("Isla", panel)
         self.detail_isla = QComboBox(panel)
         self.lbl_municipio = QLabel("Municipio", panel)
-        self.detail_municipio = QComboBox(panel)
+        self.detail_municipio = QLineEdit(panel)
+        self.detail_municipio.setPlaceholderText("Escribe o selecciona un municipio")
         self.lbl_calle = QLabel("Calle", panel)
         self.detail_direccion = QLineEdit(panel)
         self.lbl_cp = QLabel("C.P.", panel)
-        self.detail_cp = QComboBox(panel)
+        self.detail_cp = QLineEdit(panel)
+        self.detail_cp.setPlaceholderText("C.P.")
         self.lbl_localidad = QLabel("Localidad", panel)
         self.detail_localidad = QComboBox(panel)
         self._layout_left_detail_abs()
 
         self.detail_provincia.currentIndexChanged.connect(self._on_provincia_changed)
         self.detail_isla.currentIndexChanged.connect(self._on_isla_changed)
-        self.detail_municipio.currentIndexChanged.connect(self._on_municipio_changed)
-        self.detail_cp.currentIndexChanged.connect(self._on_cp_changed)
+        self.detail_municipio_options: dict[str, str] = {}
+        self.detail_cp_options: set[str] = set()
+        self.detail_selected_municipio_id = ""
+        self.detail_selected_cp = ""
+        self.detail_municipio_completer = self._build_detail_lookup_completer(self.detail_municipio)
+        self.detail_cp_completer = self._build_detail_lookup_completer(self.detail_cp)
+        self.detail_municipio.editingFinished.connect(self._on_detail_municipio_editing_finished)
+        self.detail_cp.editingFinished.connect(self._on_detail_cp_editing_finished)
+        self.detail_municipio_completer.activated.connect(self._on_detail_municipio_editing_finished)
+        self.detail_cp_completer.activated.connect(self._on_detail_cp_editing_finished)
         self.detail_localidad.currentIndexChanged.connect(self._schedule_autosave)
         self.detail_telefono.editingFinished.connect(self._format_customer_phone_field)
 
@@ -3051,6 +3085,33 @@ class CustomersPage(QWidget):
             combo.setCurrentIndex(0)
         combo.blockSignals(False)
 
+    def _build_detail_lookup_completer(self, field: QLineEdit) -> QCompleter:
+        model = QStringListModel(self)
+        completer = QCompleter(model, self)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        field.setCompleter(completer)
+        return completer
+
+    @staticmethod
+    def _detail_lookup_value_for_id(options: dict[str, str], selected_id: str) -> str:
+        return next((label for label, value in options.items() if value == selected_id), "")
+
+    def _set_detail_municipio_options(self, items: list[tuple[str, str]], selected_id: str = "") -> None:
+        self.detail_municipio_options = {label: value for label, value in items}
+        self.detail_municipio_completer.model().setStringList(list(self.detail_municipio_options))
+        self.detail_selected_municipio_id = selected_id if selected_id in self.detail_municipio_options.values() else ""
+        self.detail_municipio.setText(
+            self._detail_lookup_value_for_id(self.detail_municipio_options, self.detail_selected_municipio_id)
+        )
+
+    def _set_detail_cp_options(self, items: list[tuple[str, str]], selected_cp: str = "") -> None:
+        self.detail_cp_options = {value for _label, value in items}
+        self.detail_cp_completer.model().setStringList(sorted(self.detail_cp_options))
+        self.detail_selected_cp = selected_cp if selected_cp in self.detail_cp_options else ""
+        self.detail_cp.setText(self.detail_selected_cp)
+
     def _populate_provincias(self, selected_id: str = "") -> None:
         items = [(str(p.provincia_nombre or ""), str(p.provincia_id or "")) for p in self.provincias if p.provincia_nombre]
         self._fill_combo(self.detail_provincia, items, selected_id)
@@ -3063,19 +3124,37 @@ class CustomersPage(QWidget):
         ]
         self._fill_combo(self.detail_isla, items, selected_id)
 
-    def _populate_municipios(self, isla_id: str, selected_id: str = "") -> None:
+    def _populate_municipios(self, isla_id: str, selected_id: str = "", codigo_postal: str = "") -> None:
+        cp = str(codigo_postal or "").strip()
+        municipality_ids_for_cp = {
+            str(item.municipio_id or "")
+            for item in self.codigos_postales
+            if str(item.codigo_postal or "").strip() == cp
+        }
         items = [
             (str(m.municipio_nombre or ""), str(m.municipio_id or ""))
             for m in self.municipios
-            if str(m.isla_id or "") == str(isla_id or "") and m.municipio_nombre
+            if (
+                str(m.isla_id or "") == str(isla_id or "")
+                and m.municipio_nombre
+                and (not cp or str(m.municipio_id or "") in municipality_ids_for_cp)
+            )
         ]
-        self._fill_combo(self.detail_municipio, items, selected_id)
+        self._set_detail_municipio_options(items, selected_id)
 
-    def _populate_cps(self, municipio_id: str, selected_cp: str = "") -> None:
+    def _populate_cps(self, isla_id: str, selected_cp: str = "", municipio_id: str = "") -> None:
         items = [
             (str(cp.codigo_postal or ""), str(cp.codigo_postal or ""))
             for cp in self.codigos_postales
-            if str(cp.municipio_id or "") == str(municipio_id or "") and str(cp.codigo_postal or "").strip()
+            if (
+                str(cp.codigo_postal or "").strip()
+                and (not municipio_id or str(cp.municipio_id or "") == str(municipio_id or ""))
+                and any(
+                    str(m.municipio_id or "") == str(cp.municipio_id or "")
+                    and str(m.isla_id or "") == str(isla_id or "")
+                    for m in self.municipios
+                )
+            )
         ]
         unique_items: list[tuple[str, str]] = []
         seen: set[str] = set()
@@ -3084,17 +3163,27 @@ class CustomersPage(QWidget):
                 continue
             seen.add(value)
             unique_items.append((label, value))
-        self._fill_combo(self.detail_cp, unique_items, selected_cp)
+        self._set_detail_cp_options(unique_items, selected_cp)
 
-    def _populate_localidades(self, codigo_postal: str, selected_localidad_id: str = "") -> None:
+    def _populate_localidades(
+        self,
+        municipio_id: str,
+        codigo_postal: str,
+        selected_localidad_id: str = "",
+    ) -> None:
         cp = str(codigo_postal or "").strip()
-        if not cp:
+        municipality_id = str(municipio_id or "").strip()
+        if not cp or not municipality_id:
             items: list[tuple[str, str]] = []
         else:
             items = [
                 (str(loc.localidad_nombre or ""), str(loc.localidad_id or ""))
                 for loc in self.localidades
-                if str(loc.codigo_postal or "").strip() == cp and loc.localidad_nombre
+                if (
+                    str(loc.municipio_id or "") == municipality_id
+                    and str(loc.codigo_postal or "").strip() == cp
+                    and loc.localidad_nombre
+                )
             ]
         self._fill_combo(self.detail_localidad, items, selected_localidad_id)
 
@@ -3105,7 +3194,7 @@ class CustomersPage(QWidget):
         self._populate_islas(provincia_id, "")
         self._populate_municipios("", "")
         self._populate_cps("", "")
-        self._populate_localidades("", "")
+        self._populate_localidades("", "", "")
         self._schedule_autosave()
 
     def _on_isla_changed(self, _idx: int) -> None:
@@ -3113,23 +3202,32 @@ class CustomersPage(QWidget):
             return
         isla_id = str(self.detail_isla.currentData() or "")
         self._populate_municipios(isla_id, "")
-        self._populate_cps("", "")
-        self._populate_localidades("", "")
+        self._populate_cps(isla_id, "")
+        self._populate_localidades("", "", "")
         self._schedule_autosave()
 
-    def _on_municipio_changed(self, _idx: int) -> None:
+    def _on_detail_municipio_editing_finished(self, *_args) -> None:
         if self._is_loading_details:
             return
-        municipio_id = str(self.detail_municipio.currentData() or "")
-        self._populate_cps(municipio_id, "")
-        self._populate_localidades("", "")
+        entered_name = self.detail_municipio.text().strip()
+        self.detail_selected_municipio_id = self.detail_municipio_options.get(entered_name, "")
+        if not self.detail_selected_municipio_id:
+            self.detail_municipio.clear()
+        isla_id = str(self.detail_isla.currentData() or "")
+        self._populate_cps(isla_id, self.detail_selected_cp, self.detail_selected_municipio_id)
+        self._populate_localidades(self.detail_selected_municipio_id, self.detail_selected_cp, "")
         self._schedule_autosave()
 
-    def _on_cp_changed(self, _idx: int) -> None:
+    def _on_detail_cp_editing_finished(self, *_args) -> None:
         if self._is_loading_details:
             return
-        codigo_postal = str(self.detail_cp.currentData() or "")
-        self._populate_localidades(codigo_postal, "")
+        entered_cp = self.detail_cp.text().strip()
+        self.detail_selected_cp = entered_cp if entered_cp in self.detail_cp_options else ""
+        if not self.detail_selected_cp:
+            self.detail_cp.clear()
+        isla_id = str(self.detail_isla.currentData() or "")
+        self._populate_municipios(isla_id, self.detail_selected_municipio_id, self.detail_selected_cp)
+        self._populate_localidades(self.detail_selected_municipio_id, self.detail_selected_cp, "")
         self._schedule_autosave()
 
     def _normalize_customer_phone(self, raw: str) -> str:
@@ -3366,7 +3464,7 @@ class CustomersPage(QWidget):
             self._populate_islas("", "")
             self._populate_municipios("", "")
             self._populate_cps("", "")
-            self._populate_localidades("", "")
+            self._populate_localidades("", "", "")
             self.detail_tipo.setCurrentIndex(0)
             for checkbox in self.tipo_checks.values():
                 checkbox.setChecked(False)
@@ -3395,8 +3493,8 @@ class CustomersPage(QWidget):
         self._populate_provincias(provincia_id)
         self._populate_islas(provincia_id, isla_id)
         self._populate_municipios(isla_id, municipio_id)
-        self._populate_cps(municipio_id, codigo_postal)
-        self._populate_localidades(codigo_postal, localidad_id)
+        self._populate_cps(isla_id, codigo_postal, municipio_id)
+        self._populate_localidades(municipio_id, codigo_postal, localidad_id)
         self.detail_tipo.setCurrentIndex(0)
 
         grupos = (getattr(row, "cliente_actividad", "") or "").upper()
@@ -4596,8 +4694,8 @@ class CustomersPage(QWidget):
         self.detail_telefono.setText(telefono)
         provincia_id = str(self.detail_provincia.currentData() or "").strip()
         isla_id = str(self.detail_isla.currentData() or "").strip()
-        municipio_id = str(self.detail_municipio.currentData() or "").strip()
-        codigo_postal = str(self.detail_cp.currentData() or "").strip()
+        municipio_id = str(self.detail_selected_municipio_id or "").strip()
+        codigo_postal = str(self.detail_selected_cp or "").strip()
         localidad_id = str(self.detail_localidad.currentData() or "").strip()
 
         payload = {
