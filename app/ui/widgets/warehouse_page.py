@@ -511,90 +511,177 @@ class MovimientosTab(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
+        if self._mode == "in":
+            layout.setContentsMargins(8, 8, 8, 8)
+            layout.setSpacing(8)
+
+        entries_filter_panel: QFrame | None = None
+        entries_filter_layout: QVBoxLayout | None = None
+        if self._mode == "in":
+            entries_filter_panel = QFrame(self)
+            entries_filter_panel.setObjectName("entriesFilterPanel")
+            entries_filter_panel.setStyleSheet(
+                "QFrame#entriesFilterPanel { background: #FFFFFF; border: 1px solid #D5E0EC; border-radius: 8px; }"
+                "QLabel[entriesPanelTitle='true'] { color: #0D3564; font-size: 13px; font-weight: 700; background: transparent; }"
+                "QLabel[entriesFilterLabel='true'] { color: #435B78; font-size: 11px; font-weight: 600; background: transparent; }"
+                "QComboBox, QLineEdit { min-height: 30px; color: #102A4C; background: #FFFFFF; border: 1px solid #C9D7E8; border-radius: 6px; padding: 2px 8px; }"
+                "QComboBox:focus, QLineEdit:focus { border-color: #0A879A; }"
+                "QPushButton { min-height: 32px; border-radius: 6px; padding: 0 14px; font-weight: 600; }"
+                "QPushButton#entriesAddManual { color: #FFFFFF; background: #0D3564; border: 1px solid #0D3564; }"
+                "QPushButton#entriesAddManual:hover { background: #174A82; border-color: #174A82; }"
+                "QPushButton#entriesEditManual { color: #0D3564; background: #FFFFFF; border: 1px solid #8FA7C2; }"
+                "QPushButton#entriesEditManual:hover { background: #F2F7FC; border-color: #0D3564; }"
+                "QPushButton#entriesReverseManual { color: #C62828; background: #FFFFFF; border: 1px solid #E57373; }"
+                "QPushButton#entriesReverseManual:hover { background: #FFF3F3; border-color: #C62828; }"
+            )
+            entries_filter_layout = QVBoxLayout(entries_filter_panel)
+            entries_filter_layout.setContentsMargins(12, 10, 12, 12)
+            entries_filter_layout.setSpacing(8)
+            filter_title_row = QHBoxLayout()
+            filter_title_row.setContentsMargins(0, 0, 0, 0)
+            filter_title_row.setSpacing(7)
+            filter_icon = QLabel(entries_filter_panel)
+            filter_icon.setPixmap(
+                QIcon(str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "filtro.svg")).pixmap(18, 18)
+            )
+            filter_icon.setFixedSize(18, 18)
+            filter_title = QLabel("FILTROS DE ENTRADAS", entries_filter_panel)
+            filter_title.setProperty("entriesPanelTitle", True)
+            filter_title_row.addWidget(filter_icon)
+            filter_title_row.addWidget(filter_title)
+            filter_title_row.addStretch(1)
+            entries_filter_layout.addLayout(filter_title_row)
 
         if self._mode in {"in", "out", "all"}:
             filters = QHBoxLayout()
-            filters.addWidget(QLabel("Año"))
+            filters.setContentsMargins(0, 0, 0, 0)
+            filters.setSpacing(10)
             self.year_filter = QComboBox()
             self.year_filter.currentIndexChanged.connect(self.reload)
-            filters.addWidget(self.year_filter)
 
             if self._mode in {"in", "out"}:
-                filters.addWidget(QLabel("Mes inicial"))
                 self.month_from_filter = QComboBox()
                 self.month_from_filter.currentIndexChanged.connect(self.reload)
-                filters.addWidget(self.month_from_filter)
-
-                filters.addWidget(QLabel("Mes final"))
                 self.month_to_filter = QComboBox()
                 self.month_to_filter.currentIndexChanged.connect(self.reload)
-                filters.addWidget(self.month_to_filter)
             else:
-                filters.addWidget(QLabel("Mes"))
                 self.month_filter = QComboBox()
                 self.month_filter.currentIndexChanged.connect(self.reload)
-                filters.addWidget(self.month_filter)
 
-            filters.addWidget(QLabel("Fabricante"))
             self.manufacturer_filter = QComboBox()
             self.manufacturer_filter.currentIndexChanged.connect(self.reload)
-            filters.addWidget(self.manufacturer_filter)
-
-            filters.addWidget(QLabel("Familia"))
             self.family_filter = QComboBox()
             self.family_filter.currentIndexChanged.connect(self.reload)
-            filters.addWidget(self.family_filter)
-
-            filters.addWidget(QLabel("Subfamilia"))
             self.subfamily_filter = QComboBox()
             self.subfamily_filter.currentIndexChanged.connect(self.reload)
-            filters.addWidget(self.subfamily_filter)
 
             self.occurrence_filter = QLineEdit()
             self.occurrence_filter.setPlaceholderText(
                 "Nombre, referencia o lote..." if self._mode == "in" else "Nombre o ref..."
             )
             self.occurrence_filter.textChanged.connect(self.reload)
+
+            if self._mode == "in" and entries_filter_layout is not None:
+                def add_filter_column(label_text: str, widget: QWidget, stretch: int = 1) -> None:
+                    column = QVBoxLayout()
+                    column.setContentsMargins(0, 0, 0, 0)
+                    column.setSpacing(3)
+                    label = QLabel(label_text, entries_filter_panel)
+                    label.setProperty("entriesFilterLabel", True)
+                    column.addWidget(label)
+                    column.addWidget(widget)
+                    filters.addLayout(column, stretch)
+
+                self.year_filter.setMinimumWidth(90)
+                self.month_from_filter.setMinimumWidth(125)
+                self.month_to_filter.setMinimumWidth(125)
+                self.manufacturer_filter.setMinimumWidth(150)
+                self.family_filter.setMinimumWidth(190)
+                self.subfamily_filter.setMinimumWidth(210)
+                add_filter_column("Año", self.year_filter, 1)
+                add_filter_column("Mes inicial", self.month_from_filter, 2)
+                add_filter_column("Mes final", self.month_to_filter, 2)
+                add_filter_column("Fabricante", self.manufacturer_filter, 2)
+                add_filter_column("Familia", self.family_filter, 3)
+                add_filter_column("Subfamilia", self.subfamily_filter, 3)
+                entries_filter_layout.addLayout(filters)
+            else:
+                filters.addWidget(QLabel("Año"))
+                filters.addWidget(self.year_filter)
+                if self._mode in {"in", "out"}:
+                    filters.addWidget(QLabel("Mes inicial"))
+                    filters.addWidget(self.month_from_filter)
+                    filters.addWidget(QLabel("Mes final"))
+                    filters.addWidget(self.month_to_filter)
+                else:
+                    filters.addWidget(QLabel("Mes"))
+                    filters.addWidget(self.month_filter)
+                filters.addWidget(QLabel("Fabricante"))
+                filters.addWidget(self.manufacturer_filter)
+                filters.addWidget(QLabel("Familia"))
+                filters.addWidget(self.family_filter)
+                filters.addWidget(QLabel("Subfamilia"))
+                filters.addWidget(self.subfamily_filter)
             if self._mode == "all":
                 filters.addWidget(QLabel("Producto"))
                 filters.addWidget(self.occurrence_filter)
-            filters.addStretch(1)
-            layout.addLayout(filters)
+            if self._mode != "in":
+                filters.addStretch(1)
+                layout.addLayout(filters)
         if self._mode in {"in", "out"}:
             actions = QHBoxLayout()
+            actions.setContentsMargins(0, 0, 0, 0)
+            actions.setSpacing(8)
             field_height = self.occurrence_filter.sizeHint().height()
-            actions.addWidget(QLabel("Producto o lote" if self._mode == "in" else "Producto"))
+            search_label = QLabel("Producto o lote" if self._mode == "in" else "Producto")
+            if self._mode == "in":
+                search_label.setProperty("entriesFilterLabel", True)
+            actions.addWidget(search_label)
             self.occurrence_filter.setMinimumWidth(420)
-            actions.addWidget(self.occurrence_filter)
+            actions.addWidget(self.occurrence_filter, 1 if self._mode == "in" else 0)
             add_btn = QPushButton("Nueva manual")
-            add_btn.setFixedHeight(field_height)
-            add_btn.setStyleSheet(
-                "QPushButton { background-color: #198754; color: #FFFFFF; border: 1px solid #198754; border-radius: 4px; padding: 0 12px; font-weight: 600; }"
-                "QPushButton:hover { background-color: #157347; border-color: #157347; }"
-                "QPushButton:pressed { background-color: #125f3b; border-color: #125f3b; }"
-            )
+            add_btn.setObjectName("entriesAddManual" if self._mode == "in" else "")
+            add_btn.setFixedHeight(34 if self._mode == "in" else field_height)
+            if self._mode != "in":
+                add_btn.setStyleSheet(
+                    "QPushButton { background-color: #198754; color: #FFFFFF; border: 1px solid #198754; border-radius: 4px; padding: 0 12px; font-weight: 600; }"
+                    "QPushButton:hover { background-color: #157347; border-color: #157347; }"
+                    "QPushButton:pressed { background-color: #125f3b; border-color: #125f3b; }"
+                )
             add_btn.clicked.connect(self._create_manual_move)
             edit_btn = QPushButton("Editar manual")
-            edit_btn.setFixedHeight(field_height)
-            edit_btn.setStyleSheet(
-                "QPushButton { background-color: #F59E0B; color: #111827; border: 1px solid #D97706; border-radius: 4px; padding: 0 12px; font-weight: 600; }"
-                "QPushButton:hover { background-color: #D97706; border-color: #B45309; color: #FFFFFF; }"
-                "QPushButton:pressed { background-color: #B45309; border-color: #92400E; color: #FFFFFF; }"
-            )
+            edit_btn.setObjectName("entriesEditManual" if self._mode == "in" else "")
+            edit_btn.setFixedHeight(34 if self._mode == "in" else field_height)
+            if self._mode != "in":
+                edit_btn.setStyleSheet(
+                    "QPushButton { background-color: #F59E0B; color: #111827; border: 1px solid #D97706; border-radius: 4px; padding: 0 12px; font-weight: 600; }"
+                    "QPushButton:hover { background-color: #D97706; border-color: #B45309; color: #FFFFFF; }"
+                    "QPushButton:pressed { background-color: #B45309; border-color: #92400E; color: #FFFFFF; }"
+                )
             edit_btn.clicked.connect(self._edit_manual_move)
             reverse_btn = QPushButton("Anular manual")
-            reverse_btn.setFixedHeight(field_height)
-            reverse_btn.setStyleSheet(
-                "QPushButton { background-color: #DC2626; color: #FFFFFF; border: 1px solid #DC2626; border-radius: 4px; padding: 0 12px; font-weight: 600; }"
-                "QPushButton:hover { background-color: #B91C1C; border-color: #B91C1C; }"
-                "QPushButton:pressed { background-color: #991B1B; border-color: #991B1B; }"
-            )
+            reverse_btn.setObjectName("entriesReverseManual" if self._mode == "in" else "")
+            reverse_btn.setFixedHeight(34 if self._mode == "in" else field_height)
+            if self._mode != "in":
+                reverse_btn.setStyleSheet(
+                    "QPushButton { background-color: #DC2626; color: #FFFFFF; border: 1px solid #DC2626; border-radius: 4px; padding: 0 12px; font-weight: 600; }"
+                    "QPushButton:hover { background-color: #B91C1C; border-color: #B91C1C; }"
+                    "QPushButton:pressed { background-color: #991B1B; border-color: #991B1B; }"
+                )
             reverse_btn.clicked.connect(self._reverse_manual_move)
+            if self._mode == "in":
+                add_btn.setMinimumWidth(132)
+                edit_btn.setMinimumWidth(132)
+                reverse_btn.setMinimumWidth(132)
             actions.addWidget(add_btn)
             actions.addWidget(edit_btn)
             actions.addWidget(reverse_btn)
-            actions.addStretch(1)
-            layout.addLayout(actions)
+            if self._mode == "in" and entries_filter_layout is not None and entries_filter_panel is not None:
+                entries_filter_layout.addLayout(actions)
+                layout.addWidget(entries_filter_panel)
+            else:
+                actions.addStretch(1)
+                layout.addLayout(actions)
 
         col_count = 8 if self._mode in {"in", "all"} else 7
         self.table = QTableWidget(0, col_count)
@@ -660,7 +747,55 @@ class MovimientosTab(QWidget):
             self.table.setColumnWidth(6, 105)
             self.table.setColumnWidth(7, 100)
 
-        layout.addWidget(self.table, 1)
+        entries_movements_panel: QFrame | None = None
+        entries_movements_layout: QVBoxLayout | None = None
+        if self._mode == "in":
+            self.table.setObjectName("entriesMovementsTable")
+            self.table.setAlternatingRowColors(True)
+            self.table.setShowGrid(True)
+            self.table.verticalHeader().setDefaultSectionSize(31)
+            self.table.horizontalHeader().setMinimumHeight(34)
+            entries_movements_panel = QFrame(self)
+            entries_movements_panel.setObjectName("entriesMovementsPanel")
+            entries_movements_panel.setStyleSheet(
+                "QFrame#entriesMovementsPanel { background: #FFFFFF; border: 1px solid #D5E0EC; border-radius: 8px; }"
+                "QLabel[entriesPanelTitle='true'] { color: #0D3564; font-size: 13px; font-weight: 700; background: transparent; }"
+                "QLabel[entriesMetric='true'] { color: #087E8F; background: #F5FBFC; border: 1px solid #A9D7DE; border-radius: 5px; padding: 5px 12px; font-weight: 700; }"
+                "QTableWidget#entriesMovementsTable { background: #FFFFFF; alternate-background-color: #F7FAFD; border: 0; gridline-color: #DCE5EF; color: #10233F; }"
+                "QTableWidget#entriesMovementsTable::item { padding: 3px 8px; border: 0; }"
+                "QTableWidget#entriesMovementsTable::item:selected { background: #DDF1F4; color: #0D3564; }"
+                "QTableWidget#entriesMovementsTable QHeaderView::section { background: #0D3564; color: #FFFFFF; border: 0; border-right: 1px solid #34577F; border-bottom: 1px solid #34577F; padding: 6px 8px; font-weight: 700; }"
+                "QTableWidget#entriesTotalsTable { background: #F8FBFE; border: 0; border-top: 1px solid #CBD8E7; gridline-color: #DCE5EF; color: #0D3564; }"
+                "QTableWidget#entriesTotalsTable::item { padding: 4px 8px; border: 0; font-weight: 700; }"
+            )
+            entries_movements_layout = QVBoxLayout(entries_movements_panel)
+            entries_movements_layout.setContentsMargins(8, 8, 8, 8)
+            entries_movements_layout.setSpacing(6)
+            movements_title_row = QHBoxLayout()
+            movements_title_row.setContentsMargins(2, 0, 2, 0)
+            movements_title_row.setSpacing(7)
+            movements_icon = QLabel(entries_movements_panel)
+            movements_icon.setPixmap(
+                QIcon(str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "package-open.svg")).pixmap(18, 18)
+            )
+            movements_icon.setFixedSize(18, 18)
+            movements_title = QLabel("MOVIMIENTOS DE ENTRADA", entries_movements_panel)
+            movements_title.setProperty("entriesPanelTitle", True)
+            self.entries_units_summary = QLabel("0 uds", entries_movements_panel)
+            self.entries_units_summary.setObjectName("entriesUnitsSummary")
+            self.entries_units_summary.setProperty("entriesMetric", True)
+            self.entries_kg_summary = QLabel("0 kg", entries_movements_panel)
+            self.entries_kg_summary.setObjectName("entriesKgSummary")
+            self.entries_kg_summary.setProperty("entriesMetric", True)
+            movements_title_row.addWidget(movements_icon)
+            movements_title_row.addWidget(movements_title)
+            movements_title_row.addStretch(1)
+            movements_title_row.addWidget(self.entries_units_summary)
+            movements_title_row.addWidget(self.entries_kg_summary)
+            entries_movements_layout.addLayout(movements_title_row)
+            entries_movements_layout.addWidget(self.table, 1)
+        else:
+            layout.addWidget(self.table, 1)
         if self._mode == "in":
             self.totals_table = QTableWidget(1, 8)
             self.totals_table.setObjectName("entriesTotalsTable")
@@ -682,7 +817,9 @@ class MovimientosTab(QWidget):
             self.table.horizontalScrollBar().valueChanged.connect(
                 self.totals_table.horizontalScrollBar().setValue
             )
-            layout.addWidget(self.totals_table)
+            if entries_movements_layout is not None and entries_movements_panel is not None:
+                entries_movements_layout.addWidget(self.totals_table)
+                layout.addWidget(entries_movements_panel, 1)
 
     def set_almacen_filter(self, almacen_id: str) -> None:
         self._almacen_id = str(almacen_id or "").strip()
@@ -1045,6 +1182,14 @@ class MovimientosTab(QWidget):
         self.table.setSortingEnabled(True)
 
     def _set_entry_totals(self, total_units: float, total_kg: float) -> None:
+        units_summary = self._format_entry_number(total_units)
+        kg_summary = self._format_entry_number(total_kg)
+        if units_summary.endswith(",00"):
+            units_summary = units_summary[:-3]
+        if kg_summary.endswith(",00"):
+            kg_summary = kg_summary[:-3]
+        self.entries_units_summary.setText(f"{units_summary} uds")
+        self.entries_kg_summary.setText(f"{kg_summary} kg")
         values = [
             "TOTALES",
             "",

@@ -6,7 +6,7 @@ from datetime import date
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QHeaderView
+from PySide6.QtWidgets import QApplication, QFrame, QHeaderView, QPushButton
 
 from app.models import AlmacenMovimiento, IngredienteIreks
 from app.services.warehouse_movement_service import WarehouseMovementService
@@ -109,7 +109,17 @@ def test_entries_filters_columns_date_sort_and_fixed_totals(monkeypatch) -> None
     assert tab.totals_table.item(0, 0).text() == "TOTALES"
     assert tab.totals_table.item(0, 3).text() == "3.002,00"
     assert tab.totals_table.item(0, 4).text() == "75.050,00 kg"
-    assert tab.layout().itemAt(tab.layout().count() - 1).widget() is tab.totals_table
+    filter_panel = tab.findChild(QFrame, "entriesFilterPanel")
+    movements_panel = tab.findChild(QFrame, "entriesMovementsPanel")
+    assert filter_panel is not None
+    assert movements_panel is not None
+    assert tab.findChild(QPushButton, "entriesAddManual").text() == "Nueva manual"
+    assert tab.findChild(QPushButton, "entriesEditManual").text() == "Editar manual"
+    assert tab.findChild(QPushButton, "entriesReverseManual").text() == "Anular manual"
+    assert tab.entries_units_summary.text() == "3.002 uds"
+    assert tab.entries_kg_summary.text() == "75.050 kg"
+    assert tab.layout().itemAt(tab.layout().count() - 1).widget() is movements_panel
+    assert movements_panel.layout().itemAt(movements_panel.layout().count() - 1).widget() is tab.totals_table
 
     tab.occurrence_filter.setText("Producto ")
     app.processEvents()
@@ -137,6 +147,8 @@ def test_entries_filters_columns_date_sort_and_fixed_totals(monkeypatch) -> None
     assert tab.table.item(0, 7).text() == "ALB-2"
     assert tab.totals_table.item(0, 3).text() == "2,00"
     assert tab.totals_table.item(0, 4).text() == "50,00 kg"
+    assert tab.entries_units_summary.text() == "2 uds"
+    assert tab.entries_kg_summary.text() == "50 kg"
 
     tab.deleteLater()
 
