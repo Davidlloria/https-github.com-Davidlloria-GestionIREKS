@@ -2218,7 +2218,7 @@ class IngredientsIreksPage(QWidget):
         classification_card.setProperty("ireksCard", True)
         classification_card.setFixedHeight(146)
         classification_layout = QVBoxLayout(classification_card)
-        classification_layout.setContentsMargins(0, 0, 0, 12)
+        classification_layout.setContentsMargins(0, 0, 0, 3)
         classification_layout.setSpacing(9)
         classification_layout.addWidget(
             self._ireks_tab_header(
@@ -2233,7 +2233,7 @@ class IngredientsIreksPage(QWidget):
         taxonomy_grid = QGridLayout()
         taxonomy_grid.setContentsMargins(10, 0, 10, 0)
         taxonomy_grid.setHorizontalSpacing(10)
-        taxonomy_grid.setVerticalSpacing(2)
+        taxonomy_grid.setVerticalSpacing(12)
         for column, (field_label, field) in enumerate(
             (
                 (self.lbl_detail_fabricante, self.detail_fabricante_id),

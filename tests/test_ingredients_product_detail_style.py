@@ -152,6 +152,29 @@ def test_ireks_data_cards_keep_their_controls_in_a_compact_desktop_layout(monkey
     page.close()
 
 
+def test_ireks_classification_fields_have_clear_label_spacing_and_compact_bottom_margin(monkeypatch) -> None:
+    monkeypatch.setattr(IngredientsIreksPage, "reload", lambda self: None)
+    app = QApplication.instance() or QApplication([])
+
+    page = IngredientsIreksPage()
+    page.resize(1600, 900)
+    page.show()
+    app.processEvents()
+
+    classification = page.findChild(QWidget, "ireksClassificationCard")
+    assert classification is not None
+
+    label_bottom = page.lbl_detail_fabricante.mapTo(classification, page.lbl_detail_fabricante.rect().bottomLeft()).y()
+    field_top = page.detail_fabricante_id.mapTo(classification, page.detail_fabricante_id.rect().topLeft()).y()
+    field_bottom = page.detail_fabricante_id.mapTo(classification, page.detail_fabricante_id.rect().bottomLeft()).y()
+    content_bottom = classification.contentsRect().bottom()
+
+    assert field_top - label_bottom - 1 >= 14
+    assert content_bottom - field_bottom <= 9
+
+    page.close()
+
+
 def test_ireks_data_cards_do_not_add_a_top_header_gap() -> None:
     source = (Path(__file__).resolve().parents[1] / "app" / "ui" / "widgets" / "ingredients_page.py").read_text(
         encoding="utf-8"
