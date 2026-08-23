@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 from datetime import date
+from pathlib import Path
+from xml.etree import ElementTree
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -113,9 +115,15 @@ def test_entries_filters_columns_date_sort_and_fixed_totals(monkeypatch) -> None
     movements_panel = tab.findChild(QFrame, "entriesMovementsPanel")
     assert filter_panel is not None
     assert movements_panel is not None
-    assert tab.findChild(QPushButton, "entriesAddManual").text() == "Nueva manual"
-    assert tab.findChild(QPushButton, "entriesEditManual").text() == "Editar manual"
-    assert tab.findChild(QPushButton, "entriesReverseManual").text() == "Anular manual"
+    entries_add = tab.findChild(QPushButton, "entriesAddManual")
+    entries_edit = tab.findChild(QPushButton, "entriesEditManual")
+    entries_reverse = tab.findChild(QPushButton, "entriesReverseManual")
+    assert entries_add.text() == "Nueva manual"
+    assert entries_edit.text() == "Editar manual"
+    assert entries_reverse.text() == "Anular manual"
+    assert not entries_add.icon().isNull()
+    assert not entries_edit.icon().isNull()
+    assert not entries_reverse.icon().isNull()
     assert tab.entries_units_summary.text() == "3.002 uds"
     assert tab.entries_kg_summary.text() == "75.050 kg"
     assert tab.layout().itemAt(tab.layout().count() - 1).widget() is movements_panel
@@ -198,10 +206,47 @@ def test_outputs_default_to_current_year_and_use_month_range(monkeypatch) -> Non
     assert tab.month_from_filter.currentData() == "1"
     assert tab.month_to_filter.currentData() == "12"
     assert tab.table.rowCount() == 2
+    assert tab.table.objectName() == "outputsMovementsTable"
+    filter_panel = tab.findChild(QFrame, "outputsFilterPanel")
+    movements_panel = tab.findChild(QFrame, "outputsMovementsPanel")
+    assert filter_panel is not None
+    assert movements_panel is not None
+    outputs_add = tab.findChild(QPushButton, "outputsAddManual")
+    outputs_edit = tab.findChild(QPushButton, "outputsEditManual")
+    outputs_reverse = tab.findChild(QPushButton, "outputsReverseManual")
+    assert outputs_add.text() == "Nueva manual"
+    assert outputs_edit.text() == "Editar manual"
+    assert outputs_reverse.text() == "Anular manual"
+    assert not outputs_add.icon().isNull()
+    assert not outputs_edit.icon().isNull()
+    assert not outputs_reverse.icon().isNull()
+    assert tab.outputs_units_summary.text() == "5 uds"
+    assert tab.outputs_kg_summary.text() == "125 kg"
+    assert tab.totals_table.objectName() == "outputsTotalsTable"
+    assert tab.totals_table.item(0, 0).text() == "TOTALES"
+    assert tab.totals_table.item(0, 3).text() == "-5,00"
+    assert tab.totals_table.item(0, 4).text() == "-125,00 kg"
+    assert tab.layout().itemAt(tab.layout().count() - 1).widget() is movements_panel
 
     tab.month_from_filter.setCurrentIndex(tab.month_from_filter.findData("2"))
     app.processEvents()
     assert tab.table.rowCount() == 1
     assert tab.table.item(0, 0).text() == f"05/03/{current_year}"
+    assert tab.outputs_units_summary.text() == "2 uds"
+    assert tab.outputs_kg_summary.text() == "50 kg"
+    assert tab.totals_table.item(0, 3).text() == "-2,00"
+    assert tab.totals_table.item(0, 4).text() == "-50,00 kg"
 
     tab.deleteLater()
+
+
+def test_movement_action_svg_assets_are_valid() -> None:
+    icon_dir = Path(__file__).resolve().parents[1] / "assets" / "icons"
+    for icon_name in (
+        "movement-add-white.svg",
+        "movement-edit-navy.svg",
+        "movement-cancel-red.svg",
+    ):
+        icon_path = icon_dir / icon_name
+        assert icon_path.is_file()
+        assert ElementTree.parse(icon_path).getroot().tag.endswith("svg")
