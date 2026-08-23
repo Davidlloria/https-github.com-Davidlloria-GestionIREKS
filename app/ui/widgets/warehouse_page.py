@@ -2706,54 +2706,102 @@ class AnnualMonthlyOrdersTab(QWidget):
         self._almacen_id = ""
         self._loading_filters = False
         self.service = MonthlyOrdersService()
+        self.movement_service = WarehouseMovementService()
         self._build_ui()
         self.reload()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+
+        icon_dir = Path(__file__).resolve().parents[3] / "assets" / "icons"
+        filter_panel = QFrame(self)
+        filter_panel.setObjectName("monthlyOrdersFilterPanel")
+        filter_panel.setStyleSheet(
+            "QFrame#monthlyOrdersFilterPanel { background: #FFFFFF; border: 1px solid #D5E0EC; border-radius: 8px; }"
+            "QLabel[monthlyPanelTitle='true'] { color: #0D3564; font-size: 13px; font-weight: 700; background: transparent; }"
+            "QLabel[monthlyFilterLabel='true'] { color: #435B78; font-size: 11px; font-weight: 600; background: transparent; }"
+            "QComboBox, QLineEdit { min-height: 30px; color: #102A4C; background: #FFFFFF; border: 1px solid #C9D7E8; border-radius: 6px; padding: 2px 8px; }"
+            "QComboBox:focus, QLineEdit:focus { border-color: #0A879A; }"
+        )
+        filter_panel_layout = QVBoxLayout(filter_panel)
+        filter_panel_layout.setContentsMargins(12, 10, 12, 12)
+        filter_panel_layout.setSpacing(8)
+
+        filter_title_row = QHBoxLayout()
+        filter_title_row.setContentsMargins(0, 0, 0, 0)
+        filter_title_row.setSpacing(7)
+        filter_icon = QLabel(filter_panel)
+        filter_icon.setObjectName("monthlyOrdersFilterIcon")
+        filter_icon.setPixmap(QIcon(str(icon_dir / "filtro.svg")).pixmap(18, 18))
+        filter_icon.setFixedSize(18, 18)
+        filter_title = QLabel("FILTROS DE PEDIDOS MENSUALES", filter_panel)
+        filter_title.setProperty("monthlyPanelTitle", True)
+        filter_title_row.addWidget(filter_icon)
+        filter_title_row.addWidget(filter_title)
+        filter_title_row.addStretch(1)
+        filter_panel_layout.addLayout(filter_title_row)
+
         filters = QHBoxLayout()
-        filters.addWidget(QLabel("Año"))
+        filters.setContentsMargins(0, 0, 0, 0)
+        filters.setSpacing(10)
+
+        def add_filter_column(label_text: str, widget: QWidget, stretch: int = 1) -> None:
+            column = QVBoxLayout()
+            column.setContentsMargins(0, 0, 0, 0)
+            column.setSpacing(3)
+            label = QLabel(label_text, filter_panel)
+            label.setProperty("monthlyFilterLabel", True)
+            column.addWidget(label)
+            column.addWidget(widget)
+            filters.addLayout(column, stretch)
+
         self.year_filter = QComboBox()
+        self.year_filter.setObjectName("monthlyOrdersYearFilter")
         self.year_filter.setMinimumWidth(95)
         self.year_filter.currentIndexChanged.connect(self.reload)
-        filters.addWidget(self.year_filter)
-        filters.addWidget(QLabel("Producto"))
+
+        self.manufacturer_filter = QComboBox()
+        self.manufacturer_filter.setObjectName("monthlyOrdersManufacturerFilter")
+        self.manufacturer_filter.currentIndexChanged.connect(self.reload)
+        self.family_filter = QComboBox()
+        self.family_filter.setObjectName("monthlyOrdersFamilyFilter")
+        self.family_filter.currentIndexChanged.connect(self.reload)
+        self.subfamily_filter = QComboBox()
+        self.subfamily_filter.setObjectName("monthlyOrdersSubfamilyFilter")
+        self.subfamily_filter.currentIndexChanged.connect(self.reload)
+
+        add_filter_column("Año", self.year_filter, 1)
+        add_filter_column("Fabricante", self.manufacturer_filter, 2)
+        add_filter_column("Familia", self.family_filter, 3)
+        add_filter_column("Subfamilia", self.subfamily_filter, 3)
+        filter_panel_layout.addLayout(filters)
+
+        search_row = QHBoxLayout()
+        search_row.setContentsMargins(0, 0, 0, 0)
+        search_row.setSpacing(8)
+        search_label = QLabel("Producto", filter_panel)
+        search_label.setProperty("monthlyFilterLabel", True)
+        search_row.addWidget(search_label)
         self.search_input = QLineEdit()
+        self.search_input.setObjectName("monthlyOrdersSearch")
         self.search_input.setPlaceholderText("Ref. o nombre...")
-        self.search_input.setMinimumWidth(320)
+        self.search_input.setMinimumWidth(420)
         self.search_input.textChanged.connect(self.reload)
-        filters.addWidget(self.search_input, 1)
-        refresh_btn = QPushButton("Refrescar")
-        refresh_btn.setProperty("btnRole", "secondary")
-        refresh_btn.clicked.connect(self.reload)
-        filters.addWidget(refresh_btn)
-        layout.addLayout(filters)
+        search_row.addWidget(self.search_input, 1)
+        search_row.addStretch(1)
+        filter_panel_layout.addLayout(search_row)
+        layout.addWidget(filter_panel)
 
         self.table = QTableWidget(0, 18)
+        self.table.setObjectName("monthlyOrdersTable")
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.verticalHeader().setVisible(False)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.setAlternatingRowColors(True)
-        self.table.setStyleSheet(
-            """
-            QTableWidget {
-                font-size: 11px;
-            }
-            QTableWidget::item {
-                padding: 2px 3px;
-            }
-            QTableWidget::item:focus {
-                border: none;
-                outline: 0;
-            }
-            QHeaderView::section {
-                font-size: 11px;
-                padding: 3px 2px;
-            }
-            """
-        )
         header = self.table.horizontalHeader()
         header.setSectionsClickable(True)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
@@ -2790,7 +2838,76 @@ class AnnualMonthlyOrdersTab(QWidget):
         self.table.setColumnWidth(16, 58)
         self.table.setColumnWidth(17, 82)
         self.table.itemDoubleClicked.connect(self._open_article_orders_dialog)
-        layout.addWidget(self.table, 1)
+
+        orders_panel = QFrame(self)
+        orders_panel.setObjectName("monthlyOrdersPanel")
+        orders_panel.setStyleSheet(
+            "QFrame#monthlyOrdersPanel { background: #FFFFFF; border: 1px solid #D5E0EC; border-radius: 8px; }"
+            "QLabel[monthlyPanelTitle='true'] { color: #0D3564; font-size: 13px; font-weight: 700; background: transparent; }"
+            "QLabel[monthlyMetric='true'] { color: #087E8F; background: #F5FBFC; border: 1px solid #A9D7DE; border-radius: 5px; padding: 5px 12px; font-weight: 700; }"
+            "QTableWidget#monthlyOrdersTable { background: #FFFFFF; alternate-background-color: #F7FAFD; border: 0; gridline-color: #DCE5EF; color: #10233F; font-size: 11px; }"
+            "QTableWidget#monthlyOrdersTable::item { padding: 2px 4px; border: 0; }"
+            "QTableWidget#monthlyOrdersTable::item:selected { background: #2F80ED; color: #FFFFFF; }"
+            "QTableWidget#monthlyOrdersTable QHeaderView::section { background: #0D3564; color: #FFFFFF; border: 0; border-right: 1px solid #34577F; border-bottom: 1px solid #34577F; padding: 5px 3px; font-size: 11px; font-weight: 700; }"
+            "QTableWidget#monthlyOrdersTotalsTable { background: #F8FBFE; border: 0; border-top: 1px solid #CBD8E7; gridline-color: #DCE5EF; color: #0D3564; font-size: 11px; }"
+            "QTableWidget#monthlyOrdersTotalsTable::item { padding: 3px 4px; border: 0; font-weight: 700; }"
+        )
+        orders_panel_layout = QVBoxLayout(orders_panel)
+        orders_panel_layout.setContentsMargins(8, 8, 8, 8)
+        orders_panel_layout.setSpacing(6)
+
+        orders_title_row = QHBoxLayout()
+        orders_title_row.setContentsMargins(2, 0, 2, 0)
+        orders_title_row.setSpacing(7)
+        orders_icon = QLabel(orders_panel)
+        orders_icon.setObjectName("monthlyOrdersPanelIcon")
+        orders_icon.setPixmap(QIcon(str(icon_dir / "calendar-range.svg")).pixmap(18, 18))
+        orders_icon.setFixedSize(18, 18)
+        orders_title = QLabel("PLANIFICACIÓN ANUAL POR PRODUCTO", orders_panel)
+        orders_title.setProperty("monthlyPanelTitle", True)
+        self.monthly_products_summary = QLabel("0 productos", orders_panel)
+        self.monthly_products_summary.setObjectName("monthlyOrdersProductsSummary")
+        self.monthly_products_summary.setProperty("monthlyMetric", True)
+        self.monthly_units_summary = QLabel("0 uds", orders_panel)
+        self.monthly_units_summary.setObjectName("monthlyOrdersUnitsSummary")
+        self.monthly_units_summary.setProperty("monthlyMetric", True)
+        self.monthly_kg_summary = QLabel("0 kg", orders_panel)
+        self.monthly_kg_summary.setObjectName("monthlyOrdersKgSummary")
+        self.monthly_kg_summary.setProperty("monthlyMetric", True)
+        orders_title_row.addWidget(orders_icon)
+        orders_title_row.addWidget(orders_title)
+        orders_title_row.addStretch(1)
+        orders_title_row.addWidget(self.monthly_products_summary)
+        orders_title_row.addWidget(self.monthly_units_summary)
+        orders_title_row.addWidget(self.monthly_kg_summary)
+        orders_panel_layout.addLayout(orders_title_row)
+
+        self.table.verticalHeader().setDefaultSectionSize(29)
+        self.table.horizontalHeader().setMinimumHeight(32)
+        orders_panel_layout.addWidget(self.table, 1)
+
+        self.monthly_totals_table = QTableWidget(1, 18)
+        self.monthly_totals_table.setObjectName("monthlyOrdersTotalsTable")
+        self.monthly_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.monthly_totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.monthly_totals_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.monthly_totals_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.monthly_totals_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.monthly_totals_table.verticalHeader().setVisible(False)
+        self.monthly_totals_table.horizontalHeader().setVisible(False)
+        totals_header = self.monthly_totals_table.horizontalHeader()
+        for column in range(18):
+            totals_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+            self.monthly_totals_table.setColumnWidth(column, self.table.columnWidth(column))
+        self.monthly_totals_table.setFixedHeight(30)
+        header.sectionResized.connect(
+            lambda column, _old, new: self.monthly_totals_table.setColumnWidth(column, new)
+        )
+        self.table.horizontalScrollBar().valueChanged.connect(
+            self.monthly_totals_table.horizontalScrollBar().setValue
+        )
+        orders_panel_layout.addWidget(self.monthly_totals_table)
+        layout.addWidget(orders_panel, 1)
 
     def set_almacen_filter(self, almacen_id: str) -> None:
         self._almacen_id = str(almacen_id or "").strip()
@@ -2815,6 +2932,40 @@ class AnnualMonthlyOrdersTab(QWidget):
         finally:
             self._loading_filters = False
 
+    @staticmethod
+    def _selected_filter_value(combo: QComboBox) -> str:
+        return str(combo.currentData() or "").strip()
+
+    def _reload_classification_filters(
+        self,
+        *,
+        manufacturer_options: list[tuple[str, str]],
+        family_options: list[tuple[str, str]],
+        subfamily_options: list[tuple[str, str]],
+    ) -> None:
+        selections = {
+            "manufacturer": self._selected_filter_value(self.manufacturer_filter),
+            "family": self._selected_filter_value(self.family_filter),
+            "subfamily": self._selected_filter_value(self.subfamily_filter),
+        }
+        self._loading_filters = True
+        try:
+            for combo, first_label, options, selected in (
+                (self.manufacturer_filter, "Todos", manufacturer_options, selections["manufacturer"]),
+                (self.family_filter, "Todas", family_options, selections["family"]),
+                (self.subfamily_filter, "Todas", subfamily_options, selections["subfamily"]),
+            ):
+                combo.blockSignals(True)
+                combo.clear()
+                combo.addItem(first_label, "")
+                for value, label in options:
+                    combo.addItem(label, value)
+                index = combo.findData(selected)
+                combo.setCurrentIndex(index if index >= 0 else 0)
+                combo.blockSignals(False)
+        finally:
+            self._loading_filters = False
+
     def reload(self) -> None:
         if self._loading_filters:
             return
@@ -2823,11 +2974,67 @@ class AnnualMonthlyOrdersTab(QWidget):
         rows = self.service.annual_product_matrix_for(
             year=self._selected_year(),
             almacen_id=self._almacen_id,
-            search=self.search_input.text(),
+            search="",
         )
+        _moves, items, manufacturer_rows, family_rows, subfamily_rows = self.movement_service.movement_payload(
+            almacen_id=self._almacen_id,
+            mode="all",
+        )
+        meta_by_articulo = {
+            str(getattr(item, "articulo_id", "") or "").strip(): {
+                "fabricante_id": str(getattr(item, "fabricante_id", "") or "").strip(),
+                "familia_id": str(getattr(item, "articulo_familia_id", "") or "").strip(),
+                "subfamilia_id": str(getattr(item, "articulo_subfamilia_id", "") or "").strip(),
+            }
+            for item in items
+        }
+        active_article_ids = {str(row.articulo_id or "").strip() for row in rows}
+        active_meta = [meta_by_articulo.get(article_id, {}) for article_id in active_article_ids]
+        manufacturer_names = {
+            str(value or "").strip(): str(label or value or "").strip()
+            for value, label in manufacturer_rows
+        }
+        family_names = {
+            str(value or "").strip(): str(label or value or "").strip()
+            for value, label in family_rows
+        }
+        subfamily_names = {
+            str(value or "").strip(): str(label or value or "").strip()
+            for value, label in subfamily_rows
+        }
+        manufacturer_ids = sorted({str(meta.get("fabricante_id", "")) for meta in active_meta if meta.get("fabricante_id")})
+        family_ids = sorted({str(meta.get("familia_id", "")) for meta in active_meta if meta.get("familia_id")})
+        subfamily_ids = sorted({str(meta.get("subfamilia_id", "")) for meta in active_meta if meta.get("subfamilia_id")})
+        self._reload_classification_filters(
+            manufacturer_options=[(value, manufacturer_names.get(value, value)) for value in manufacturer_ids],
+            family_options=[(value, family_names.get(value, value)) for value in family_ids],
+            subfamily_options=[(value, subfamily_names.get(value, value)) for value in subfamily_ids],
+        )
+
+        manufacturer_filter = self._selected_filter_value(self.manufacturer_filter)
+        family_filter = self._selected_filter_value(self.family_filter)
+        subfamily_filter = self._selected_filter_value(self.subfamily_filter)
+        search_terms = [
+            term for term in str(self.search_input.text() or "").strip().lower().split() if term
+        ]
+        filtered_rows = []
+        for row in rows:
+            article_id = str(row.articulo_id or "").strip()
+            meta = meta_by_articulo.get(article_id, {})
+            if manufacturer_filter and str(meta.get("fabricante_id", "")) != manufacturer_filter:
+                continue
+            if family_filter and str(meta.get("familia_id", "")) != family_filter:
+                continue
+            if subfamily_filter and str(meta.get("subfamilia_id", "")) != subfamily_filter:
+                continue
+            searchable = " ".join([article_id, row.referencia, row.descripcion]).lower()
+            if search_terms and not all(term in searchable for term in search_terms):
+                continue
+            filtered_rows.append(row)
+
         self.table.setSortingEnabled(False)
-        self.table.setRowCount(len(rows))
-        for row_idx, row in enumerate(rows):
+        self.table.setRowCount(len(filtered_rows))
+        for row_idx, row in enumerate(filtered_rows):
             ref_item = QTableWidgetItem(row.referencia)
             ref_item.setData(Qt.ItemDataRole.UserRole, row.articulo_id)
             self.table.setItem(row_idx, 0, ref_item)
@@ -2863,7 +3070,47 @@ class AnnualMonthlyOrdersTab(QWidget):
             )
             last_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.table.setItem(row_idx, 17, last_item)
+        self._set_monthly_totals(filtered_rows)
         self.table.setSortingEnabled(True)
+
+    @staticmethod
+    def _format_monthly_summary(value: float) -> str:
+        formatted = f"{float(value or 0.0):,.2f}"
+        formatted = formatted.replace(",", "_").replace(".", ",").replace("_", ".")
+        return formatted[:-3] if formatted.endswith(",00") else formatted
+
+    def _set_monthly_totals(self, rows: list[Any]) -> None:
+        month_totals = [
+            sum(float(row.monthly_quantities[month] or 0.0) for row in rows)
+            for month in range(12)
+        ]
+        total_units = sum(float(row.total_quantity or 0.0) for row in rows)
+        total_kg = sum(float(row.total_kg or 0.0) for row in rows)
+        total_orders = sum(int(row.order_count or 0) for row in rows)
+        product_label = "producto" if len(rows) == 1 else "productos"
+        self.monthly_products_summary.setText(f"{len(rows)} {product_label}")
+        self.monthly_units_summary.setText(f"{self._format_monthly_summary(total_units)} uds")
+        self.monthly_kg_summary.setText(f"{self._format_monthly_summary(total_kg)} kg")
+
+        values = [
+            "TOTALES",
+            "",
+            *(f"{value:.2f}" if abs(value) > 1e-12 else "" for value in month_totals),
+            f"{total_units:.2f}",
+            f"{total_kg:.2f} kg",
+            str(total_orders),
+            "",
+        ]
+        for column, value in enumerate(values):
+            item = QTableWidgetItem(str(value))
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            if 2 <= column <= 16:
+                item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            if column in (14, 15):
+                item.setForeground(QBrush(QColor("#087E8F")))
+            self.monthly_totals_table.setItem(0, column, item)
 
     def _open_article_orders_dialog(self, item: QTableWidgetItem) -> None:
         articulo_id = ""
