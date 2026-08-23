@@ -29,16 +29,105 @@ WarehousePage (QWidget, objectName `warehousePage`, fondo gris #EEF3F8, sin bord
     │   └── almacen_combo / warehouseScopeCombo (QComboBox expansible; “Todos” + clientes directos/distribuidores)
     └── main_tabs / warehouseMainTabs (QTabWidget, fondo transparente, sin borde)
         ├── Artículos
-    │   └── IngredientsIreksPage (sin cabecera ni ribbon propios, `compact_mode=True`;
-    │       margen izquierdo local 0 px para ajustar el catálogo al borde de `main_tabs`)
-        │       ├── catálogo lateral: cabecera, contador real y tabla Ref. / Nombre / selección
-        │       ├── filtros: Fabricante, Estado, Familia y Subfamilia
-        │       ├── búsqueda “Buscar por referencia o nombre”
-        │       ├── Datos > Clasificación (solo Almacén): cabecera-etiquetas 2 px,
-        │       │   etiquetas-campos 2 px, margen inferior 18 px, cabecera 38 px,
-        │       │   etiquetas alineadas arriba de 14 px, campos de 34 px y alto fijo 110 px
-        │       └── detalle del producto: Datos, Tarifa, Entradas, Salidas, Stock,
-        │           Mensual, Pedidos, Nutrición y Clientes
+    │   └── IngredientsIreksPage (QWidget, `compact_mode=True`; sin título de página
+    │       ni ribbon propios; margen izquierdo local 0 px, fondo #EEF3F8)
+    │       ├── ireksMainSplitter (QSplitter horizontal, separación visual 5 px)
+    │       ├── sidePanel / catálogo lateral (QWidget, ancho fijo 420 px, fondo #FFFFFF,
+    │       │   borde #D7DEE8 de 1 px, radio 10 px)
+    │       │   ├── catalogHeader (QFrame, alto fijo 54 px, ancho completo, fondo #0B2F5B,
+    │       │   │   sin borde; radios superiores 9 px e inferiores rectos)
+    │       │   │   ├── icono `product-tag.svg` recoloreado en blanco, 20 × 20 px
+    │       │   │   ├── “CATÁLOGO DE PRODUCTOS” (QLabel, blanco, 14 px, negrita)
+    │       │   │   └── “Filtra y selecciona productos” (QLabel, #CDECE8, 10 px)
+    │       │   └── catalogBody (QWidget, fondo #FFFFFF, sin borde; radios inferiores 9 px;
+    │       │       márgenes 10 px, separación interna 8 px)
+    │       │       ├── filtersGrid (QGridLayout 2 × 2; separación horizontal 8 px,
+    │       │       │   vertical 6 px; columnas equitativas)
+    │       │       │   ├── Fabricante / fabricante_filter (QComboBox: “Todos”)
+    │       │       │   ├── Estado / activity_filter (QComboBox: Todos, Activos, Inactivos)
+    │       │       │   ├── Familia / familia_filter (QComboBox: “Todas”)
+    │       │       │   └── Subfamilia / subfamilia_filter (QComboBox: “Todas”)
+    │       │       │       └── Cada etiqueta: #5E6C84, 10 px, seminegrita; cada selector:
+    │       │       │           alto fijo 34 px, fondo blanco, texto #0B2F5B, borde #C9D7E8,
+    │       │       │           radio 6 px y borde turquesa #16B8A6 al foco.
+    │       │       ├── catalogSearch (QLineEdit, alto fijo 36 px, placeholder
+    │       │       │   “Buscar por referencia o nombre”; blanco, #0B2F5B, borde #C9D7E8,
+    │       │       │   radio 6 px)
+    │       │       ├── catalogResultCount (QLabel; contador real de productos, texto #0B2F5B,
+    │       │       │   fondo #DDF3F0, borde #9DDCD4, radio 10 px, padding 4 / 7 px, negrita)
+    │       │       └── catalogProductTable (QTableWidget, expansiva; columnas REF. 90 px,
+    │       │           NOMBRE flexible y SEL. 55 px; una única fila seleccionable; sin edición)
+    │       │           ├── fondo blanco, borde #D6E0EA, radio 8 px, cuadrícula #E1E8F0,
+    │       │           │   filas alternas #F8FAFD y scrollbar vertical de 8 px
+    │       │           ├── cabecera #EEF3F8, texto #0B2F5B, negrita, padding 7 / 6 px
+    │       │           └── selección #E5F7F4, texto #0B2F5B; check turquesa y blanco
+    │       └── ireksContentPanel (QWidget, transparente, sin borde)
+    │           └── ireksDetailSplitter (QSplitter vertical)
+    │               ├── detailPanel (QWidget, alto fijo 232 px, fondo #F8FAFC,
+    │               │   borde #CBD5E1, radio 9 px)
+    │               │   ├── productDetailHeader (QFrame, alto fijo 38 px, fondo #0B2F5B,
+    │               │   │   sin borde; radios superiores 8 px e inferiores rectos)
+    │               │   │   ├── icono `product-detail.svg` blanco, 21 px
+    │               │   │   └── “Detalle del producto” (QLabel, blanco, 16 px, negrita)
+    │               │   └── productDetailBody (QFrame, fondo blanco, borde #CBD5E1 sin borde
+    │               │       superior; márgenes 12 / 7 px, separación 3 px)
+    │               │       ├── grupo PRODUCTO y campos Ref., Ref. corta y Descripción
+    │               │       ├── divisor #D9E2EC de 1 px
+    │               │       ├── grupo DISTRIBUIDOR y campos Distribuidor, Referencia y Descripción
+    │               │       └── productDetailStatusRail (QFrame, #F1F5F9, borde #D6E0EA,
+    │               │           radio 7 px): segmentos Status activo Sí/No, Status en lista Sí/No
+    │               │           y Categoría Harina/Líquido; seleccionado #087E9C con texto blanco.
+    │               └── ireksDetailTabs (QTabWidget; margen superior 4 px; panel transparente,
+    │                   sin borde; pestañas expansivas)
+    │                   ├── pestañas: Datos, Tarifa, Entradas, Salidas, Stock, Mensual, Pedidos,
+    │                   │   Nutrición y Clientes
+    │                   ├── pestaña inactiva: #F4F7FB, texto #5E6C84, borde #DCE5F1,
+    │                   │   radios superiores 8 px, padding 8 / 6 px; activa: blanca, texto #087E9C,
+    │                   │   seminegrita y línea inferior turquesa de 3 px.
+    │                   ├── Datos / ireksDataTab (fondo #EEF3F8, márgenes 8 / 0 / 8 / 8 px,
+    │                   │   separación 8 px)
+    │                   │   ├── ireksClassificationCard (QFrame, alto fijo 146 px, blanco,
+    │                   │   │   borde #EEF3F8, radio 8 px)
+    │                   │   │   ├── cabecera estándar “CLASIFICACIÓN”, 38 px, #0B2F5B,
+    │                   │   │   │   icono blanco `product-tag.svg` 21 px, título blanco 16 px;
+    │                   │   │   │   ajustada al borde superior, sin borde y radios inferiores rectos.
+    │                   │   │   └── grid de tres columnas: Fabricante, Familia y Subfamilia;
+    │                   │   │       etiquetas #5E6C84 y selects blancos de 34 px, borde #C9D7E8,
+    │                   │   │       radio 6 px; margen horizontal 12 px.
+    │                   │   ├── fila de dos tarjetas, separación 10 px:
+    │                   │   │   ├── ireksPresentationCard (alto fijo 204 px) con cabecera estándar
+    │                   │   │   │   “PRESENTACIÓN”, icono `presentation-container.svg`; grid 3 × 2:
+    │                   │   │   │   Presentación, Contenido, Unidad contenido, Peso unidad,
+    │                   │   │   │   Unidad peso y Total presentación (solo lectura #F4F7FB).
+    │                   │   │   └── ireksPalletCard (alto fijo 204 px) con cabecera estándar
+    │                   │   │       “PALETIZACIÓN”, icono `pallet.svg`; grid 3 × 2: Pallet,
+    │                   │   │       Presentaciones/capa, Capas, Presentaciones/pallet, Uds/pallet
+    │                   │   │       y Total pallet (las tres últimas calculadas, solo lectura #F4F7FB).
+    │                   │   └── ireksObservationsCard (alto fijo 46 px, blanco, borde #EEF3F8,
+    │                   │       radio 8 px; margen 12 / 6 px): etiqueta “Obs.” y QLineEdit expansivo.
+    │                   ├── Tarifa / tarifaTab: tarjeta con cabecera estándar “HISTÓRICO DE TARIFAS”,
+    │                   │   icono `product-tag.svg`; filtro Año, acciones Añadir tarifa / Editar /
+    │                   │   Eliminar y tabla de precios IREKS y distribuidor.
+    │                   ├── Entradas / entradasTab: tarjeta “ENTRADAS DE ALMACÉN”, icono de entrada;
+    │                   │   filtros Desde/Hasta y Todo, tabla Fecha, Pedido Nº, Albarán, Uds, Kg,
+    │                   │   Lote y Caduca, más fila Total sincronizada.
+    │                   ├── Salidas / salidasTab: tarjeta “SALIDAS DE ALMACÉN”, icono de salida;
+    │                   │   filtros Desde/Hasta y Todo, tabla Fecha, Pedido Nº, Albarán, Uds, Kg,
+    │                   │   Lote y Caduca; empty state cuando no hay registros.
+    │                   ├── Stock / stockTab: tarjeta “STOCK Y MOVIMIENTOS”, icono de almacén;
+    │                   │   filtros Desde/Hasta y Todo, tabla Fecha, Tipo, Pedido Nº, Albarán, Uds,
+    │                   │   Kg, Lote y Caduca; Tipo se muestra como chip y Total neto resaltado.
+    │                   ├── Mensual / mensualTab: tarjeta “RESUMEN MENSUAL”, icono
+    │                   │   `calendar-chart.svg`; filtros Desde/Hasta y Limpiar; tabla Mes, Pedidos,
+    │                   │   Cantidad, Kg, Media, Últ. fecha y Últ. pedido.
+    │                   ├── Pedidos / pedidosTab: tarjeta “PEDIDOS RELACIONADOS”, icono de pedido;
+    │                   │   filtros Desde/Hasta y Limpiar; tabla Fecha, Pedido Nº, Albarán, Cantidad,
+    │                   │   Lote y Caducidad.
+    │                   ├── Nutrición / nutricionTab: tarjeta “INFORMACIÓN NUTRICIONAL”, icono
+    │                   │   `nutrition-lab.svg`, badge `ireksNutritionBadge` “Valores por 100 g”;
+    │                   │   tabla Nutriente / Por 100 g.
+    │                   └── Clientes / clientesTab: tarjeta “CONSUMO POR CLIENTE”, icono de usuarios;
+    │                       filtro Año y tabla Cliente, Último período, Kg, Unidades y €.
         ├── Entradas
         │   └── MovimientosTab (`mode="in"`)
         │       ├── filtros: Año, Mes inicial/final, Fabricante, Familia, Subfamilia
