@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QApplication, QSizePolicy, QWidget
 
 from app.ui.widgets.ingredients_page import IngredientsIreksPage
 from app.ui.widgets.warehouse_page import WarehousePage
@@ -106,5 +106,41 @@ def test_warehouse_palletization_uses_exact_vertical_spacing(monkeypatch) -> Non
     assert top(second_field) - bottom(second_label) - 1 == 3
     assert pallet_layout.contentsMargins().bottom() == 4
     assert pallet.height() == 154
+
+    page.close()
+
+
+def test_warehouse_observations_fill_remaining_detail_tab_height(monkeypatch) -> None:
+    monkeypatch.setattr(IngredientsIreksPage, "reload", lambda self: None)
+    monkeypatch.setattr(WarehousePage, "reload", lambda self: None)
+    app = QApplication.instance() or QApplication([])
+
+    page = WarehousePage()
+    page.resize(1800, 950)
+    page.show()
+    app.processEvents()
+
+    assert page.articles_tab is not None
+    observations = page.articles_tab.findChild(QWidget, "ireksObservationsCard")
+    assert observations is not None
+    data_tab = observations.parentWidget()
+    assert data_tab is not None
+    data_layout = data_tab.layout()
+    assert data_layout is not None
+
+    assert observations.height() > 46
+    assert page.articles_tab.transporte_observaciones.height() > 30
+    assert observations.sizePolicy().verticalPolicy() == QSizePolicy.Policy.Expanding
+    assert page.articles_tab.transporte_observaciones.sizePolicy().verticalPolicy() == QSizePolicy.Policy.Expanding
+    assert data_layout.itemAt(data_layout.count() - 1).widget() is observations
+    assert (
+        data_tab.contentsRect().bottom() - observations.geometry().bottom()
+        == data_layout.contentsMargins().bottom()
+    )
+    assert (
+        observations.contentsRect().bottom()
+        - page.articles_tab.transporte_observaciones.geometry().bottom()
+        <= observations.layout().contentsMargins().bottom()
+    )
 
     page.close()

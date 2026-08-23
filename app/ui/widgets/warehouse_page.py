@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -2756,6 +2757,31 @@ class WarehousePage(QWidget):
                     pallet_grid.setAlignment(label, Qt.AlignmentFlag.AlignTop)
                     pallet_grid.setAlignment(field, Qt.AlignmentFlag.AlignTop)
             pallet_card.setFixedHeight(154)
+        observations_card = self.articles_tab.findChild(QFrame, "ireksObservationsCard")
+        if observations_card is not None and observations_card.layout() is not None:
+            observations_card.setMinimumHeight(46)
+            observations_card.setMaximumHeight(16777215)
+            observations_card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+            observations_layout = observations_card.layout()
+            observations_layout.setAlignment(
+                self.articles_tab.lbl_transporte_obs,
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+            )
+            self.articles_tab.transporte_observaciones.setMinimumHeight(34)
+            self.articles_tab.transporte_observaciones.setMaximumHeight(16777215)
+            self.articles_tab.transporte_observaciones.setSizePolicy(
+                QSizePolicy.Policy.Expanding,
+                QSizePolicy.Policy.Expanding,
+            )
+            data_tab = observations_card.parentWidget()
+            data_layout = data_tab.layout() if data_tab is not None else None
+            if data_layout is not None:
+                last_item = data_layout.itemAt(data_layout.count() - 1)
+                if last_item is not None and last_item.spacerItem() is not None:
+                    data_layout.takeAt(data_layout.count() - 1)
+                observations_index = data_layout.indexOf(observations_card)
+                if observations_index >= 0:
+                    data_layout.setStretch(observations_index, 1)
         self.entradas_tab = MovimientosTab(mode="in")
         self.salidas_tab = MovimientosTab(mode="out")
         self.stock_tab = StockTab()
