@@ -1070,7 +1070,7 @@ class CustomersPage(QWidget):
         customers_catalog_body_layout.addLayout(filters_row)
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Buscar cliente...")
+        self.search_input.setPlaceholderText("Buscar cliente o código distribuidor...")
         self.search_input.setFixedWidth(220)
         self.search_input.setFixedHeight(30)
         self.search_input.textChanged.connect(self._schedule_reload)

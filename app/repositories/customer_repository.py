@@ -18,6 +18,7 @@ class CustomerRepository(BaseRepository[Cliente]):
             .where(
                 or_(
                     func.lower(cast(col(Cliente.cliente_codigo), String)).like(like_term),
+                    func.lower(col(Cliente.cliente_codigo_distribuidor)).like(like_term),
                     func.lower(col(Cliente.cliente_id)).like(like_term),
                     func.lower(col(Cliente.cliente_nombre_fiscal)).like(like_term),
                     func.lower(col(Cliente.cliente_nombre_comercial)).like(like_term),
