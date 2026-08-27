@@ -21,6 +21,12 @@ class RecipeLineBase(AppSchema):
     porcentaje_panadero: float = 0.0
     cantidad_calculada_g: float = 0.0
     precio_kg_snapshot: float = 0.0
+    promocion_id_snapshot: int | None = None
+    promocion_compra_snapshot: int = 0
+    promocion_sin_cargo_snapshot: int = 0
+    precio_kg_efectivo_snapshot: float = 0.0
+    coste_sin_promocion: float = 0.0
+    ahorro_promocion: float = 0.0
     coste_linea: float = 0.0
     tipo_linea: str = "ingrediente"
     proceso_nombre: str = "Masa final"

@@ -465,7 +465,9 @@ class PdfService:
 
             total_coste = 0.0
             for line in lineas:
-                eur_kg = float(getattr(line, "precio_kg_snapshot", 0.0) or 0.0)
+                eur_kg = float(getattr(line, "precio_kg_efectivo_snapshot", 0.0) or 0.0) or float(
+                    getattr(line, "precio_kg_snapshot", 0.0) or 0.0
+                )
                 qty_g = float(getattr(line, "cantidad_base_g", 0.0) or 0.0)
                 total_coste += (qty_g / 1000.0) * eur_kg
             precio_venta = self._to_float(esc.get("precio_venta"))
@@ -834,14 +836,14 @@ class PdfService:
             Paragraph("INGREDIENTE", header_style),
             Paragraph("CANTIDAD", header_style),
             Paragraph("% PANADERO", header_style),
-            Paragraph("€/kg", header_style),
+            Paragraph("€/kg EFECTIVO", header_style),
             Paragraph("€/INGREDIENTE", header_style),
         ]]
         total_cost = 0.0
         for line in lineas:
             if not (line.nombre_mostrado or line.notas or line.cantidad_base_g):
                 continue
-            eur_kg = float(line.precio_kg_snapshot or 0.0)
+            eur_kg = float(line.precio_kg_efectivo_snapshot or 0.0) or float(line.precio_kg_snapshot or 0.0)
             cost = (float(line.cantidad_base_g or 0.0) / 1000.0) * eur_kg
             total_cost += cost
             data.append([
@@ -872,7 +874,8 @@ class PdfService:
         peso_pieza = self._to_float(esc.get("peso_pieza")) or float(receta.peso_pieza_g or 0.0)
         total_piezas = (total_masa / peso_pieza) if peso_pieza > 0 else float(receta.numero_piezas or 0.0)
         coste_ingredientes = sum(
-            (float(line.cantidad_base_g or 0.0) / 1000.0) * float(line.precio_kg_snapshot or 0.0)
+            (float(line.cantidad_base_g or 0.0) / 1000.0)
+            * (float(line.precio_kg_efectivo_snapshot or 0.0) or float(line.precio_kg_snapshot or 0.0))
             for line in lineas
         )
         costes_adicionales = sum(
@@ -1446,7 +1449,7 @@ class PdfService:
             process_total = 0.0
             for line in named_lines:
                 name = (line.nombre_mostrado or "").strip()
-                eur_kg = float(line.precio_kg_snapshot or 0.0)
+                eur_kg = float(line.precio_kg_efectivo_snapshot or 0.0) or float(line.precio_kg_snapshot or 0.0)
                 coste = (float(line.cantidad_base_g or 0.0) / 1000.0) * eur_kg
                 total_coste += coste
                 process_total += coste

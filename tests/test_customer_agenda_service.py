@@ -162,6 +162,7 @@ def test_customer_merge_moves_dependencies_and_deletes_source(isolated_engine) -
         "recetas": 1,
         "agenda": 1,
         "asistentes": 1,
+        "promociones": 0,
         "ventas_clientes": 1,
     }
 

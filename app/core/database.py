@@ -1408,6 +1408,17 @@ def _migrate_receta_lineas_process_fields() -> None:
             conn.exec_driver_sql("ALTER TABLE receta_lineas ADD COLUMN proceso_origen_nombre TEXT NOT NULL DEFAULT ''")
         if "cantidad_origen_g" not in columns:
             conn.exec_driver_sql("ALTER TABLE receta_lineas ADD COLUMN cantidad_origen_g FLOAT NOT NULL DEFAULT 0")
+        promotion_columns = {
+            "promocion_id_snapshot": "INTEGER",
+            "promocion_compra_snapshot": "INTEGER NOT NULL DEFAULT 0",
+            "promocion_sin_cargo_snapshot": "INTEGER NOT NULL DEFAULT 0",
+            "precio_kg_efectivo_snapshot": "FLOAT NOT NULL DEFAULT 0",
+            "coste_sin_promocion": "FLOAT NOT NULL DEFAULT 0",
+            "ahorro_promocion": "FLOAT NOT NULL DEFAULT 0",
+        }
+        for column, ddl in promotion_columns.items():
+            if column not in columns:
+                conn.exec_driver_sql(f"ALTER TABLE receta_lineas ADD COLUMN {column} {ddl}")
         conn.exec_driver_sql(
             """
             UPDATE receta_lineas

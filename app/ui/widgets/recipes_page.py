@@ -1,6 +1,6 @@
 ﻿from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 import json
 import os
 from pathlib import Path
@@ -16,6 +16,7 @@ from PySide6.QtPdfWidgets import QPdfView
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -407,6 +408,187 @@ class CustomerRecipeSelectionDialog(QDialog):
         self.selected_customer_id = customer_id
         self.selected_customer_label = (self.table.item(selected[0].row(), 1).text() if self.table.item(selected[0].row(), 1) else "")
         self.accept()
+
+
+class PromotionEditorDialog(QDialog):
+    def __init__(self, service: RecipeService, promotion_row: Any | None = None, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Promoción cliente-producto")
+        self.setMinimumWidth(520)
+        self._promotion_id = getattr(getattr(promotion_row, "promotion", None), "id", None)
+        promotion = getattr(promotion_row, "promotion", None)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        self.product_combo = QComboBox()
+        self.product_combo.setEditable(True)
+        self.product_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        for item in service.search_ingredients(""):
+            if item.tipo_origen == "ireks" and item.ingrediente_id:
+                self.product_combo.addItem(f"{item.codigo} · {item.nombre}", item.ingrediente_id)
+        self.product_combo.setCurrentIndex(-1)
+        self.buy_spin = QSpinBox()
+        self.buy_spin.setRange(1, 1_000_000)
+        self.buy_spin.setValue(10)
+        self.free_spin = QSpinBox()
+        self.free_spin.setRange(1, 1_000_000)
+        self.free_spin.setValue(1)
+        self.from_input = QLineEdit()
+        self.from_input.setPlaceholderText("AAAA-MM-DD (opcional)")
+        self.until_input = QLineEdit()
+        self.until_input.setPlaceholderText("AAAA-MM-DD (opcional)")
+        self.active_check = QCheckBox("Promoción activa")
+        self.active_check.setChecked(True)
+        self.notes_input = QLineEdit()
+        form.addRow("Producto IREKS", self.product_combo)
+        form.addRow("Unidades compradas", self.buy_spin)
+        form.addRow("Unidades sin cargo", self.free_spin)
+        form.addRow("Vigente desde", self.from_input)
+        form.addRow("Vigente hasta", self.until_input)
+        form.addRow("Estado", self.active_check)
+        form.addRow("Observaciones", self.notes_input)
+        layout.addLayout(form)
+
+        if promotion is not None:
+            self.product_combo.setCurrentIndex(self.product_combo.findData(int(promotion.producto_ireks_id)))
+            self.buy_spin.setValue(int(promotion.unidades_compra or 1))
+            self.free_spin.setValue(int(promotion.unidades_sin_cargo or 1))
+            self.from_input.setText(promotion.fecha_desde.isoformat() if promotion.fecha_desde else "")
+            self.until_input.setText(promotion.fecha_hasta.isoformat() if promotion.fecha_hasta else "")
+            self.active_check.setChecked(bool(promotion.activa))
+            self.notes_input.setText(str(promotion.observaciones or ""))
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        buttons.button(QDialogButtonBox.StandardButton.Save).setText("Guardar")
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    @staticmethod
+    def _parse_date(value: str) -> date | None:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        try:
+            return date.fromisoformat(text)
+        except ValueError as exc:
+            raise ValueError("Las fechas deben tener formato AAAA-MM-DD.") from exc
+
+    def payload(self) -> dict[str, Any]:
+        product_id = self.product_combo.currentData()
+        if not product_id:
+            raise ValueError("Selecciona un producto IREKS de la lista.")
+        return {
+            "promotion_id": self._promotion_id,
+            "producto_ireks_id": int(product_id),
+            "unidades_compra": self.buy_spin.value(),
+            "unidades_sin_cargo": self.free_spin.value(),
+            "fecha_desde": self._parse_date(self.from_input.text()),
+            "fecha_hasta": self._parse_date(self.until_input.text()),
+            "activa": self.active_check.isChecked(),
+            "observaciones": self.notes_input.text().strip(),
+        }
+
+
+class CustomerPromotionsDialog(QDialog):
+    def __init__(self, service: RecipeService, customer_id: str, customer_name: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.service = service
+        self.customer_id = str(customer_id or "").strip()
+        self.setWindowTitle(f"Promociones · {customer_name or self.customer_id}")
+        self.resize(920, 420)
+        self._rows: list[Any] = []
+
+        layout = QVBoxLayout(self)
+        help_label = QLabel("El escandallo prorratea cada promoción como precio medio efectivo.")
+        layout.addWidget(help_label)
+        self.table = QTableWidget(0, 7)
+        self.table.setHorizontalHeaderLabels(["Producto", "Compra", "S/C", "Desde", "Hasta", "Activa", "Observaciones"])
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
+        self.table.doubleClicked.connect(self._edit)
+        layout.addWidget(self.table, 1)
+
+        actions = QHBoxLayout()
+        add_button = QPushButton("Añadir")
+        edit_button = QPushButton("Editar")
+        delete_button = QPushButton("Eliminar")
+        close_button = QPushButton("Cerrar")
+        add_button.clicked.connect(self._add)
+        edit_button.clicked.connect(self._edit)
+        delete_button.clicked.connect(self._delete)
+        close_button.clicked.connect(self.accept)
+        actions.addWidget(add_button)
+        actions.addWidget(edit_button)
+        actions.addWidget(delete_button)
+        actions.addStretch(1)
+        actions.addWidget(close_button)
+        layout.addLayout(actions)
+        self._reload()
+
+    def _reload(self) -> None:
+        self._rows = self.service.list_customer_promotions(self.customer_id)
+        self.table.setRowCount(len(self._rows))
+        for row_index, row in enumerate(self._rows):
+            promotion = row.promotion
+            product = row.product
+            values = [
+                f"{product.articulo_referencia} · {product.articulo_descripcion}",
+                str(promotion.unidades_compra),
+                str(promotion.unidades_sin_cargo),
+                promotion.fecha_desde.isoformat() if promotion.fecha_desde else "",
+                promotion.fecha_hasta.isoformat() if promotion.fecha_hasta else "",
+                "Sí" if promotion.activa else "No",
+                promotion.observaciones,
+            ]
+            for column, value in enumerate(values):
+                self.table.setItem(row_index, column, QTableWidgetItem(str(value or "")))
+
+    def _selected_row(self) -> Any | None:
+        selected = self.table.selectionModel().selectedRows()
+        if not selected:
+            return None
+        index = selected[0].row()
+        return self._rows[index] if 0 <= index < len(self._rows) else None
+
+    def _add(self) -> None:
+        self._open_editor(None)
+
+    def _edit(self, *_args: Any) -> None:
+        row = self._selected_row()
+        if row is not None:
+            self._open_editor(row)
+
+    def _open_editor(self, row: Any | None) -> None:
+        dialog = PromotionEditorDialog(self.service, row, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            payload = dialog.payload()
+            self.service.save_customer_promotion(cliente_id=self.customer_id, **payload)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Promociones", str(exc))
+            return
+        self._reload()
+
+    def _delete(self) -> None:
+        row = self._selected_row()
+        if row is None:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Eliminar promoción",
+            "¿Eliminar la promoción seleccionada?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.service.delete_customer_promotion(int(row.promotion.id or 0))
+            self._reload()
 
 
 class RecipeScaleDialog(QDialog):
@@ -1850,7 +2032,9 @@ class RecipesPage(QWidget):
     ESC_COL_CANTIDAD = 1
     ESC_COL_PCT = 2
     ESC_COL_EUR_KG = 3
-    ESC_COL_EUR_LINEA = 4
+    ESC_COL_PROMOCION = 4
+    ESC_COL_EUR_KG_EFECTIVO = 5
+    ESC_COL_EUR_LINEA = 6
     ESC_TOTALS_OFFSET = 1
     LINES_TOTALS_OFFSET = 1
     MIN_LINE_ROWS = 10
@@ -1895,6 +2079,7 @@ class RecipesPage(QWidget):
         self.duplicate_recipe_btn = create_standard_ribbon_button("Duplicar", role="secondary", icon_name="file-text.svg")
         self.delete_recipe_btn = create_standard_ribbon_button("Eliminar", role="danger", icon_name="trash.svg")
         self.recalculate_recipe_btn = create_standard_ribbon_button("Recalcular", role="info", icon_name="refresh-cw.svg")
+        self.promotions_btn = create_standard_ribbon_button("Promociones", role="warning", icon_name="badge-euro.svg")
         self.print_recipe_btn = create_standard_ribbon_button("Imprimir", role="secondary", icon_name="printer.svg")
         self.export_pdf_btn = create_standard_ribbon_button("PDF", role="secondary", icon_name="file-text.svg")
         self.export_excel_btn = create_standard_ribbon_button("Excel", role="secondary", icon_name="sheet.svg")
@@ -1905,6 +2090,7 @@ class RecipesPage(QWidget):
         self.duplicate_recipe_btn.clicked.connect(self._duplicate_recipe)
         self.delete_recipe_btn.clicked.connect(self._delete_recipe)
         self.recalculate_recipe_btn.clicked.connect(self._recalculate)
+        self.promotions_btn.clicked.connect(self._open_customer_promotions)
         self.print_recipe_btn.clicked.connect(self._print_recipe)
         self.export_pdf_btn.clicked.connect(self._export_pdf)
         self.export_excel_btn.clicked.connect(self._export_excel)
@@ -1916,6 +2102,7 @@ class RecipesPage(QWidget):
             self.duplicate_recipe_btn,
             self.delete_recipe_btn,
             self.recalculate_recipe_btn,
+            self.promotions_btn,
             self.print_recipe_btn,
             self.export_pdf_btn,
             self.export_excel_btn,
@@ -2395,13 +2582,22 @@ class RecipesPage(QWidget):
         escandallo_group_layout = QVBoxLayout(escandallo_group)
         escandallo_group_layout.setContentsMargins(8, 8, 8, 8)
         escandallo_group_layout.setSpacing(6)
-        self.escandallo_table = QTableWidget(0, 5)
+        self.escandallo_table = QTableWidget(0, 7)
         self.escandallo_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.escandallo_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.escandallo_table.setHorizontalHeaderLabels(["Ingrediente", "Cantidad", "% panadero", "€/kg", "€/ingrediente"])
+        self.escandallo_table.setHorizontalHeaderLabels(
+            ["Ingrediente", "Cantidad", "% panadero", "€/kg base", "Promoción", "€/kg efectivo", "€/ingrediente"]
+        )
         escandallo_header = self.escandallo_table.horizontalHeader()
         escandallo_header.setSectionResizeMode(self.ESC_COL_INGREDIENTE, QHeaderView.ResizeMode.Stretch)
-        for column, width in ((self.ESC_COL_CANTIDAD, 96), (self.ESC_COL_PCT, 92), (self.ESC_COL_EUR_KG, 72), (self.ESC_COL_EUR_LINEA, 108)):
+        for column, width in (
+            (self.ESC_COL_CANTIDAD, 96),
+            (self.ESC_COL_PCT, 92),
+            (self.ESC_COL_EUR_KG, 84),
+            (self.ESC_COL_PROMOCION, 94),
+            (self.ESC_COL_EUR_KG_EFECTIVO, 96),
+            (self.ESC_COL_EUR_LINEA, 108),
+        ):
             escandallo_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
             self.escandallo_table.setColumnWidth(column, width)
         self.escandallo_table.itemChanged.connect(self._on_escandallo_item_changed)
@@ -2412,7 +2608,7 @@ class RecipesPage(QWidget):
         self.escandallo_totals_frame.setObjectName("escandalloTotalsFrame")
         escandallo_totals_layout = QVBoxLayout(self.escandallo_totals_frame)
         escandallo_totals_layout.setContentsMargins(0, 0, 0, 0)
-        self.escandallo_totals_table = QTableWidget(1, 6)
+        self.escandallo_totals_table = QTableWidget(1, 8)
         self.escandallo_totals_table.horizontalHeader().setVisible(False)
         self.escandallo_totals_table.verticalHeader().setVisible(False)
         self.escandallo_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -3375,11 +3571,25 @@ class RecipesPage(QWidget):
         is_customer_tab = self.recipe_tabs.currentIndex() == 1
         self.customer_header_box.setVisible(is_customer_tab)
         self.change_customer_btn.setEnabled(is_customer_tab and bool(self.current_recipe_id) and not self.current_recipe_is_ireks)
+        if hasattr(self, "promotions_btn"):
+            self.promotions_btn.setEnabled(is_customer_tab and bool(self._selected_cliente_id()))
         if not is_customer_tab:
             self.customer_name_value.clear()
             return
         customer_name = (self.cliente_combo.currentText() or "").strip()
         self.customer_name_value.setText(customer_name)
+
+    def _open_customer_promotions(self) -> None:
+        customer_id = self._selected_cliente_id()
+        if not customer_id:
+            QMessageBox.information(self, "Promociones", "Selecciona primero una receta de cliente.")
+            return
+        dialog = CustomerPromotionsDialog(self.recipe_service, customer_id, self.cliente_combo.currentText(), self)
+        dialog.exec()
+        self._recalculate()
+        self._refresh_escandallo_table()
+        if self.current_recipe_id:
+            self._perform_autosave()
 
     def resizeEvent(self, event) -> None:  # type: ignore[override]
         super().resizeEvent(event)
@@ -3433,6 +3643,7 @@ class RecipesPage(QWidget):
         self._refresh_customer_filter_input(dialog.selected_customer_label)
         self._reload_recipe_list()
         self._select_recipe_in_active_table(self.current_recipe_id)
+        self._load_recipe(self.current_recipe_id)
         QMessageBox.information(self, "Recetas", "Cliente de la receta actualizado.")
 
     def _add_ingredient(self) -> None:
@@ -3844,10 +4055,14 @@ class RecipesPage(QWidget):
         total_pct = 0.0
         total_cost = 0.0
         for row, (source_row, line) in enumerate(rows):
-            eur_kg = float(line.precio_kg_snapshot or 0.0)
-            if eur_kg <= 0 and (line.tipo_origen or "").strip().lower() == "std":
-                eur_kg = float(price_by_code.get((line.codigo_ingrediente or "").strip().lower()) or 0.0)
-            cost = (float(line.cantidad_base_g or 0.0) / 1000.0) * eur_kg
+            base_eur_kg = float(line.precio_kg_snapshot or 0.0)
+            if base_eur_kg <= 0 and (line.tipo_origen or "").strip().lower() == "std":
+                base_eur_kg = float(price_by_code.get((line.codigo_ingrediente or "").strip().lower()) or 0.0)
+            effective_eur_kg = float(line.precio_kg_efectivo_snapshot or 0.0) or base_eur_kg
+            cost = (float(line.cantidad_base_g or 0.0) / 1000.0) * effective_eur_kg
+            promotion_text = ""
+            if line.promocion_compra_snapshot > 0 and line.promocion_sin_cargo_snapshot > 0:
+                promotion_text = f"{line.promocion_compra_snapshot} + {line.promocion_sin_cargo_snapshot} S/C"
             ingredient = (line.nombre_mostrado or "").strip()
             if line.notas:
                 ingredient = f"{ingredient} ({line.notas})"
@@ -3855,16 +4070,27 @@ class RecipesPage(QWidget):
                 ingredient,
                 f"{self._format_number(line.cantidad_base_g)} g",
                 f"{self._format_number(line.porcentaje_panadero, 2)} %",
-                f"{self._format_number(eur_kg, 2)} €" if eur_kg > 0 else "",
-                f"{self._format_number(cost, 2)} €" if eur_kg > 0 else "",
+                f"{self._format_number(base_eur_kg, 2)} €" if base_eur_kg > 0 else "",
+                promotion_text,
+                f"{self._format_number(effective_eur_kg, 2)} €" if effective_eur_kg > 0 else "",
+                f"{self._format_number(cost, 2)} €" if effective_eur_kg > 0 else "",
             ]
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
                 item.setData(Qt.ItemDataRole.UserRole, source_row)
-                if column in {self.ESC_COL_INGREDIENTE, self.ESC_COL_CANTIDAD, self.ESC_COL_PCT, self.ESC_COL_EUR_LINEA}:
+                if column != self.ESC_COL_EUR_KG:
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                if column in {self.ESC_COL_CANTIDAD, self.ESC_COL_PCT, self.ESC_COL_EUR_KG, self.ESC_COL_EUR_LINEA}:
+                if column in {
+                    self.ESC_COL_CANTIDAD,
+                    self.ESC_COL_PCT,
+                    self.ESC_COL_EUR_KG,
+                    self.ESC_COL_EUR_KG_EFECTIVO,
+                    self.ESC_COL_EUR_LINEA,
+                }:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if promotion_text:
+                    saving = (float(line.cantidad_base_g or 0.0) / 1000.0) * max(base_eur_kg - effective_eur_kg, 0.0)
+                    item.setToolTip(f"Ahorro promocional en esta cantidad: {self._format_number(saving, 2)} €")
                 table.setItem(row, column, item)
             total_qty_g += float(line.cantidad_base_g or 0.0)
             total_pct += float(line.porcentaje_panadero or 0.0)
@@ -3881,6 +4107,8 @@ class RecipesPage(QWidget):
             "",
             f"{self._format_number(total_qty_g, 2)} g",
             f"{self._format_number(total_pct, 2)} %",
+            "",
+            "",
             "",
             f"{self._format_number(total_cost, 2)} €",
         ]
@@ -3948,10 +4176,10 @@ class RecipesPage(QWidget):
         line = self._line_from_row(source_row)
         price = self._parse_decimal(item.text())
         line.precio_kg_snapshot = price
-        line.coste_linea = (float(line.cantidad_base_g or 0.0) / 1000.0) * price
         ingredient_item = self.lines_table.item(source_row, self.COL_INGREDIENTE)
         if ingredient_item is not None:
             ingredient_item.setData(Qt.ItemDataRole.UserRole, line.model_dump())
+        self._auto_recalculate_summary()
         self._refresh_escandallo_table()
         self._schedule_autosave()
 

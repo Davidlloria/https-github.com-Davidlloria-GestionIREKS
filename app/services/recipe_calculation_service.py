@@ -25,6 +25,11 @@ class _ProcessStats:
 
 
 class RecipeCalculationService:
+    @staticmethod
+    def _effective_price(linea: RecetaLinea) -> float:
+        promotional = float(getattr(linea, "precio_kg_efectivo_snapshot", 0.0) or 0.0)
+        return promotional if promotional > 0 else float(getattr(linea, "precio_kg_snapshot", 0.0) or 0.0)
+
     def _normalize_process_name(self, value: str | None) -> str:
         text = str(value or "").strip()
         return text if text else "Masa final"
@@ -72,7 +77,7 @@ class RecipeCalculationService:
                 stats.harina_g += qty
             if bool(getattr(linea, "es_liquido", False)):
                 stats.liquido_g += qty
-            eur_kg = float(getattr(linea, "precio_kg_snapshot", 0.0) or 0.0)
+            eur_kg = self._effective_price(linea)
             if eur_kg > 0:
                 stats.coste += (qty * eur_kg) / 1000.0
             stats.masa_g += qty
@@ -155,7 +160,12 @@ class RecipeCalculationService:
                 cost_per_g = (float(source_stats.coste or 0.0) / source_masa) if source_stats and source_masa > 0 else 0.0
                 linea.coste_linea = float(linea.cantidad_calculada_g or 0.0) * cost_per_g
             else:
-                linea.coste_linea = (linea.cantidad_calculada_g * linea.precio_kg_snapshot) / 1000
+                base_price = float(linea.precio_kg_snapshot or 0.0)
+                effective_price = self._effective_price(linea)
+                linea.precio_kg_efectivo_snapshot = effective_price
+                linea.coste_sin_promocion = (linea.cantidad_calculada_g * base_price) / 1000
+                linea.coste_linea = (linea.cantidad_calculada_g * effective_price) / 1000
+                linea.ahorro_promocion = max(linea.coste_sin_promocion - linea.coste_linea, 0.0)
 
         coste_total = sum(linea.coste_linea for linea in lineas)
         masa_total = sum(linea.cantidad_calculada_g for linea in lineas)

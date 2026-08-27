@@ -8,14 +8,16 @@ from sqlmodel import Session, select
 from app.core.database import engine
 from app.models import IngredienteIreks, IngredienteStd, MateriaPrimaPrecio, MateriaPrimaValorNutricional, Receta, RecetaLinea
 from app.repositories.recipe_repository import RecipeAggregate
+from app.services.customer_product_promotion_service import CustomerProductPromotionService
 from app.services.recipe_calculation_service import CalculationResult
 from app.services.recipe_scaling_service import ScaleMode, ScalingResult
 from app.viewmodels import IngredientChoice, RecipeViewModel
 
 
 class RecipeService:
-    def __init__(self) -> None:
+    def __init__(self, promotion_service: CustomerProductPromotionService | None = None) -> None:
         self.vm = RecipeViewModel()
+        self.promotion_service = promotion_service or CustomerProductPromotionService(db_engine=engine)
 
     def search_ingredients(self, term: str = "") -> list[IngredientChoice]:
         with Session(engine) as session:
@@ -47,6 +49,7 @@ class RecipeService:
     def calculate(self, receta: Receta, lineas: list[RecetaLinea], *, sync_categories: bool = False) -> CalculationResult:
         if sync_categories:
             lineas = self.sync_line_categories(lineas)
+        lineas = self.promotion_service.apply_to_lines(receta.cliente_id, lineas)
         return self.vm.calculate(receta, lineas)
 
     def scale_recipe(
@@ -65,6 +68,7 @@ class RecipeService:
     def save_recipe(self, receta: Receta, lineas: list[RecetaLinea], *, sync_categories: bool = False) -> RecipeAggregate:
         if sync_categories:
             lineas = self.sync_line_categories(lineas)
+        lineas = self.promotion_service.apply_to_lines(receta.cliente_id, lineas)
         result = self.vm.calculate(receta, lineas)
         with Session(engine) as session:
             return self.vm.save_recipe(session, result.receta, result.lineas)
@@ -75,7 +79,9 @@ class RecipeService:
 
     def duplicate_recipe(self, recipe_id: int, target_cliente_id: str | None = None) -> RecipeAggregate:
         with Session(engine) as session:
-            return self.vm.duplicate_recipe(session, recipe_id, target_cliente_id)
+            cloned = self.vm.duplicate_recipe(session, recipe_id, target_cliente_id)
+        recalculated = self.calculate(cloned.receta, cloned.lineas)
+        return self.save_recipe(recalculated.receta, recalculated.lineas)
 
     def delete_recipe(self, recipe_id: int) -> bool:
         with Session(engine) as session:
@@ -83,7 +89,23 @@ class RecipeService:
 
     def update_recipe_customer(self, recipe_id: int, customer_id: str) -> bool:
         with Session(engine) as session:
-            return self.vm.update_recipe_customer(session, recipe_id, customer_id)
+            updated = self.vm.update_recipe_customer(session, recipe_id, customer_id)
+        if not updated:
+            return False
+        aggregate = self.get_recipe(recipe_id)
+        if aggregate is not None:
+            recalculated = self.calculate(aggregate.receta, aggregate.lineas)
+            self.save_recipe(recalculated.receta, recalculated.lineas)
+        return True
+
+    def list_customer_promotions(self, customer_id: str):
+        return self.promotion_service.list_for_customer(customer_id)
+
+    def save_customer_promotion(self, **payload):
+        return self.promotion_service.save(**payload)
+
+    def delete_customer_promotion(self, promotion_id: int) -> bool:
+        return self.promotion_service.delete(promotion_id)
 
     def std_prices_by_code(self) -> dict[str, float]:
         with Session(engine) as session:

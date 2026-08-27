@@ -742,6 +742,20 @@ class Receta(TimeStampedModel, table=True):
     estado: str = Field(default="borrador", max_length=30)
 
 
+class PromocionClienteProducto(TimeStampedModel, table=True):
+    __tablename__: ClassVar[str] = "promociones_clientes_productos"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    cliente_id: str = Field(foreign_key="clientes.cliente_id", nullable=False, index=True, max_length=36)
+    producto_ireks_id: int = Field(foreign_key="productos_ireks.id", nullable=False, index=True)
+    unidades_compra: int = Field(default=0, nullable=False)
+    unidades_sin_cargo: int = Field(default=0, nullable=False)
+    fecha_desde: Optional[date] = Field(default=None, nullable=True, index=True)
+    fecha_hasta: Optional[date] = Field(default=None, nullable=True, index=True)
+    activa: bool = Field(default=True, nullable=False, index=True)
+    observaciones: str = Field(default="")
+
+
 class RecetaLinea(SQLModel, table=True):
     __tablename__: ClassVar[str] = "receta_lineas"
 
@@ -760,6 +774,12 @@ class RecetaLinea(SQLModel, table=True):
     porcentaje_panadero: float = Field(default=0.0)
     cantidad_calculada_g: float = Field(default=0.0)
     precio_kg_snapshot: float = Field(default=0.0)
+    promocion_id_snapshot: Optional[int] = Field(default=None)
+    promocion_compra_snapshot: int = Field(default=0)
+    promocion_sin_cargo_snapshot: int = Field(default=0)
+    precio_kg_efectivo_snapshot: float = Field(default=0.0)
+    coste_sin_promocion: float = Field(default=0.0)
+    ahorro_promocion: float = Field(default=0.0)
     coste_linea: float = Field(default=0.0)
     tipo_linea: str = Field(default="ingrediente", max_length=20, index=True)
     proceso_nombre: str = Field(default="Masa final", max_length=120, index=True)

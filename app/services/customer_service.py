@@ -187,7 +187,14 @@ class CustomerService:
             if target is None:
                 raise ValueError("Cliente destino no encontrado.")
             counts = self._customer_merge_counts(conn, source_id, target_id)
-            for table_name in ("contactos", "recetas", "clientes_agenda", "asistentes", "ventas_clientes_raw"):
+            for table_name in (
+                "contactos",
+                "recetas",
+                "clientes_agenda",
+                "asistentes",
+                "promociones_clientes_productos",
+                "ventas_clientes_raw",
+            ):
                 if table_name == "ventas_clientes_raw":
                     continue
                 conn.exec_driver_sql(
@@ -236,6 +243,10 @@ class CustomerService:
                     "SELECT COUNT(*) FROM ventas_clientes_raw WHERE cliente_id = ?",
                     (customer_id,),
                 ).scalar_one(),
+                "promociones": conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM promociones_clientes_productos WHERE cliente_id = ?",
+                    (customer_id,),
+                ).scalar_one(),
             }
         labels = {
             "contactos": "contacto(s)",
@@ -243,6 +254,7 @@ class CustomerService:
             "agenda": "actividad(es) de agenda",
             "asistentes": "asistente(s) en cursos",
             "ventas_clientes": "venta(s) de clientes",
+            "promociones": "promoción(es) comercial(es)",
         }
         return [f"{count} {labels[name]}" for name, count in counts.items() if int(count or 0) > 0]
 
@@ -279,6 +291,7 @@ class CustomerService:
             "recetas": "SELECT COUNT(*) FROM recetas WHERE cliente_id = ?",
             "agenda": "SELECT COUNT(*) FROM clientes_agenda WHERE cliente_id = ?",
             "asistentes": "SELECT COUNT(*) FROM asistentes WHERE cliente_id = ?",
+            "promociones": "SELECT COUNT(*) FROM promociones_clientes_productos WHERE cliente_id = ?",
         }
         counts = {
             name: int(conn.exec_driver_sql(query, (customer_id,)).scalar_one() or 0)
