@@ -171,8 +171,11 @@ class PdfService:
 
     @staticmethod
     def _pdf_quantity_g(line: RecetaLinea) -> float:
+        base = float(getattr(line, "cantidad_base_g", 0.0) or 0.0)
+        if base > 0:
+            return base
         calculated = float(getattr(line, "cantidad_calculada_g", 0.0) or 0.0)
-        return calculated if calculated > 0 else float(getattr(line, "cantidad_base_g", 0.0) or 0.0)
+        return calculated if calculated > 0 else 0.0
 
     def _pdf_line_cost(self, line: RecetaLinea) -> float:
         if str(getattr(line, "tipo_linea", "ingrediente") or "ingrediente").strip().lower() == "proceso":
@@ -348,7 +351,9 @@ class PdfService:
         elab_obj = self._json_to_obj(receta.parametros_elaboracion_json)
         process_names = [name for name, _items in self._group_lines_by_process(lineas)]
         elab_by_process = self._resolve_elab_by_process(elab_obj, elab, process_names)
-        masa_total = float(receta.masa_total_g or 0.0)
+        masa_total = sum(self._pdf_quantity_g(line) for line in lineas)
+        if masa_total <= 0:
+            masa_total = float(receta.masa_total_g or 0.0)
         peso_pieza = self._to_float(esc.get("peso_pieza")) or float(receta.peso_pieza_g or 0.0)
         piezas = float(receta.numero_piezas or 0.0)
         if piezas <= 0 and peso_pieza > 0:
@@ -883,7 +888,9 @@ class PdfService:
         body_right: ParagraphStyle,
     ) -> Table:
         esc = self._json_to_dict(receta.escandallo_detalle_json)
-        total_masa = float(receta.masa_total_g or sum(self._pdf_quantity_g(line) for line in lineas))
+        total_masa = sum(self._pdf_quantity_g(line) for line in lineas)
+        if total_masa <= 0:
+            total_masa = float(receta.masa_total_g or 0.0)
         peso_pieza = self._to_float(esc.get("peso_pieza")) or float(receta.peso_pieza_g or 0.0)
         total_piezas = float(receta.numero_piezas or 0.0)
         if total_piezas <= 0 and peso_pieza > 0:
@@ -1219,6 +1226,7 @@ class PdfService:
     def _build_ingredients_block(self, receta: Receta, lineas: list[RecetaLinea]) -> list:
         data = [[Paragraph("INGREDIENTE", self.label_style), Paragraph("% PANADERO", self.label_right_style), Paragraph("CANT. (g)", self.label_right_style)]]
         process_rows: list[int] = []
+        formula_total_g = 0.0
         for process_name, process_lines in self._group_lines_by_process(lineas):
             named_lines = [line for line in process_lines if str(getattr(line, "nombre_mostrado", "") or "").strip()]
             if not named_lines:
@@ -1233,11 +1241,13 @@ class PdfService:
             )
             for line in named_lines:
                 name = (line.nombre_mostrado or "").strip()
+                quantity_g = self._pdf_quantity_g(line)
+                formula_total_g += quantity_g
                 data.append(
                     [
                         Paragraph(name, self.body_style),
                         Paragraph(f"{self._fmt(line.porcentaje_panadero, 2)} %", self.body_right_style),
-                        Paragraph(f"{self._fmt(self._pdf_quantity_g(line), 2)} g", self.body_right_style),
+                        Paragraph(f"{self._fmt(quantity_g, 2)} g", self.body_right_style),
                     ]
                 )
 
@@ -1245,7 +1255,7 @@ class PdfService:
             [
                 Paragraph("<b>TOTAL MASA</b>", self.label_style),
                 Paragraph(f"<b>{self._fmt(receta.total_porcentaje_panadero, 2)} %</b>", self.label_right_style),
-                Paragraph(f"<b>{self._fmt(receta.masa_total_g, 2)} g</b>", self.label_right_style),
+                Paragraph(f"<b>{self._fmt(formula_total_g, 2)} g</b>", self.label_right_style),
             ]
         )
 
@@ -1274,7 +1284,7 @@ class PdfService:
             self._to_float(elab.get(key))
             for key in ("am1_lenta", "am1_rapida", "rep_bloque_1", "rep_bloque_2", "rep_fermentacion", "tiempo_coccion_coc")
         )
-        rendimiento_kg = float(receta.masa_total_g or 0.0) / 1000.0
+        rendimiento_kg = formula_total_g / 1000.0
 
         hidratacion = self._kpi_card("gota", "HIDRATACION", f"{self._fmt(receta.hidratacion_pct, 2)}%", 23.75)
         temp = self._kpi_card("termometro", "TEMP. MASA", f"{temp_masa} C", 23.75)
@@ -1846,9 +1856,9 @@ class PdfService:
         if not valid_lines:
             return totals
 
-        masa_total_g = float(getattr(receta, "masa_total_g", 0.0) or 0.0)
+        masa_total_g = sum(self._pdf_quantity_g(line) for line in valid_lines)
         if masa_total_g <= 0:
-            masa_total_g = sum(self._pdf_quantity_g(line) for line in valid_lines)
+            masa_total_g = float(getattr(receta, "masa_total_g", 0.0) or 0.0)
         if masa_total_g <= 0:
             return totals
 

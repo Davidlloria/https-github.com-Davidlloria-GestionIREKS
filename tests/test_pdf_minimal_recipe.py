@@ -101,7 +101,7 @@ def test_minimal_recipe_pdf_can_hide_baker_percentage(tmp_path) -> None:
 
 
 @pytest.mark.parametrize("layout_mode", ["minimal", "extended"])
-def test_recipe_pdf_uses_scaled_quantities_for_formula_cost_and_unit_price(
+def test_recipe_pdf_preserves_base_formula_for_cost_and_unit_price(
     tmp_path,
     monkeypatch,
     layout_mode: str,
@@ -158,7 +158,7 @@ def test_recipe_pdf_uses_scaled_quantities_for_formula_cost_and_unit_price(
     )
 
     text = "\n".join(page.extract_text() or "" for page in PdfReader(str(output_path)).pages)
-    assert "2.000,00 g" in text
-    assert "1.670,00 g" not in text
-    assert "1,37" in text
-    assert "0,17" in text
+    assert "1.670,00 g" in text
+    assert "2.000,00 g" not in text
+    assert "1,15" in text
+    assert "0,14" in text
