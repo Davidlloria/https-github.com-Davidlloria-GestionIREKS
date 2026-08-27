@@ -169,6 +169,19 @@ class PdfService:
             return [("Masa final", [])]
         return [(name, grouped.get(name, [])) for name in order]
 
+    @staticmethod
+    def _pdf_quantity_g(line: RecetaLinea) -> float:
+        calculated = float(getattr(line, "cantidad_calculada_g", 0.0) or 0.0)
+        return calculated if calculated > 0 else float(getattr(line, "cantidad_base_g", 0.0) or 0.0)
+
+    def _pdf_line_cost(self, line: RecetaLinea) -> float:
+        if str(getattr(line, "tipo_linea", "ingrediente") or "ingrediente").strip().lower() == "proceso":
+            return float(getattr(line, "coste_linea", 0.0) or 0.0)
+        eur_kg = float(getattr(line, "precio_kg_efectivo_snapshot", 0.0) or 0.0) or float(
+            getattr(line, "precio_kg_snapshot", 0.0) or 0.0
+        )
+        return (self._pdf_quantity_g(line) / 1000.0) * eur_kg
+
     def _parse_process_sections(self, raw_text: str, process_names: list[str]) -> dict[str, str]:
         raw = str(raw_text or "").strip()
         if not raw:
@@ -337,7 +350,9 @@ class PdfService:
         elab_by_process = self._resolve_elab_by_process(elab_obj, elab, process_names)
         masa_total = float(receta.masa_total_g or 0.0)
         peso_pieza = self._to_float(esc.get("peso_pieza")) or float(receta.peso_pieza_g or 0.0)
-        piezas = (masa_total / peso_pieza) if peso_pieza > 0 else float(receta.numero_piezas or 0.0)
+        piezas = float(receta.numero_piezas or 0.0)
+        if piezas <= 0 and peso_pieza > 0:
+            piezas = masa_total / peso_pieza
 
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -465,11 +480,7 @@ class PdfService:
 
             total_coste = 0.0
             for line in lineas:
-                eur_kg = float(getattr(line, "precio_kg_efectivo_snapshot", 0.0) or 0.0) or float(
-                    getattr(line, "precio_kg_snapshot", 0.0) or 0.0
-                )
-                qty_g = float(getattr(line, "cantidad_base_g", 0.0) or 0.0)
-                total_coste += (qty_g / 1000.0) * eur_kg
+                total_coste += self._pdf_line_cost(line)
             precio_venta = self._to_float(esc.get("precio_venta"))
             igic_pct = self._to_float(esc.get("igic"))
             rendimiento = float(piezas or 0.0)
@@ -760,7 +771,7 @@ class PdfService:
         process_rows: list[int] = []
         header_rows: list[int] = []
         for process_name, process_lines in self._group_lines_by_process(lineas):
-            named_lines = [line for line in process_lines if line.nombre_mostrado or line.notas or line.cantidad_base_g]
+            named_lines = [line for line in process_lines if line.nombre_mostrado or line.notas or self._pdf_quantity_g(line)]
             if not named_lines:
                 continue
             process_rows.append(len(data))
@@ -771,12 +782,13 @@ class PdfService:
             header_rows.append(len(data))
             data.append(headers)
             for line in named_lines:
-                total_qty += float(line.cantidad_base_g or 0.0)
+                quantity_g = self._pdf_quantity_g(line)
+                total_qty += quantity_g
                 total_pct += float(line.porcentaje_panadero or 0.0)
                 row = [
                     Paragraph(escape((line.nombre_mostrado or "").strip()), body_style),
                     Paragraph(escape((line.notas or "").strip()), body_style),
-                    Paragraph(f"{self._fmt(line.cantidad_base_g, 2)} g", body_right),
+                    Paragraph(f"{self._fmt(quantity_g, 2)} g", body_right),
                 ]
                 if include_baker_percentage:
                     row.append(Paragraph(f"{self._fmt(line.porcentaje_panadero, 2)} %", body_right))
@@ -841,14 +853,15 @@ class PdfService:
         ]]
         total_cost = 0.0
         for line in lineas:
-            if not (line.nombre_mostrado or line.notas or line.cantidad_base_g):
+            if not (line.nombre_mostrado or line.notas or self._pdf_quantity_g(line)):
                 continue
             eur_kg = float(line.precio_kg_efectivo_snapshot or 0.0) or float(line.precio_kg_snapshot or 0.0)
-            cost = (float(line.cantidad_base_g or 0.0) / 1000.0) * eur_kg
+            quantity_g = self._pdf_quantity_g(line)
+            cost = self._pdf_line_cost(line)
             total_cost += cost
             data.append([
                 Paragraph(escape((line.nombre_mostrado or "").strip()), body_style),
-                Paragraph(f"{self._fmt(line.cantidad_base_g, 2)} g", body_right),
+                Paragraph(f"{self._fmt(quantity_g, 2)} g", body_right),
                 Paragraph(f"{self._fmt(line.porcentaje_panadero, 2)} %", body_right),
                 Paragraph(f"{self._fmt(eur_kg, 2)} €", body_right),
                 Paragraph(f"{self._fmt(cost, 2)} €", body_right),
@@ -870,14 +883,12 @@ class PdfService:
         body_right: ParagraphStyle,
     ) -> Table:
         esc = self._json_to_dict(receta.escandallo_detalle_json)
-        total_masa = float(receta.masa_total_g or sum(float(line.cantidad_base_g or 0.0) for line in lineas))
+        total_masa = float(receta.masa_total_g or sum(self._pdf_quantity_g(line) for line in lineas))
         peso_pieza = self._to_float(esc.get("peso_pieza")) or float(receta.peso_pieza_g or 0.0)
-        total_piezas = (total_masa / peso_pieza) if peso_pieza > 0 else float(receta.numero_piezas or 0.0)
-        coste_ingredientes = sum(
-            (float(line.cantidad_base_g or 0.0) / 1000.0)
-            * (float(line.precio_kg_efectivo_snapshot or 0.0) or float(line.precio_kg_snapshot or 0.0))
-            for line in lineas
-        )
+        total_piezas = float(receta.numero_piezas or 0.0)
+        if total_piezas <= 0 and peso_pieza > 0:
+            total_piezas = total_masa / peso_pieza
+        coste_ingredientes = sum(self._pdf_line_cost(line) for line in lineas)
         costes_adicionales = sum(
             self._to_float(esc.get(key)) for key in ("costes_fijos", "costes_variables", "otros_costes")
         )
@@ -1226,7 +1237,7 @@ class PdfService:
                     [
                         Paragraph(name, self.body_style),
                         Paragraph(f"{self._fmt(line.porcentaje_panadero, 2)} %", self.body_right_style),
-                        Paragraph(f"{self._fmt(line.cantidad_base_g, 2)} g", self.body_right_style),
+                        Paragraph(f"{self._fmt(self._pdf_quantity_g(line), 2)} g", self.body_right_style),
                     ]
                 )
 
@@ -1450,13 +1461,14 @@ class PdfService:
             for line in named_lines:
                 name = (line.nombre_mostrado or "").strip()
                 eur_kg = float(line.precio_kg_efectivo_snapshot or 0.0) or float(line.precio_kg_snapshot or 0.0)
-                coste = (float(line.cantidad_base_g or 0.0) / 1000.0) * eur_kg
+                quantity_g = self._pdf_quantity_g(line)
+                coste = self._pdf_line_cost(line)
                 total_coste += coste
                 process_total += coste
                 data.append(
                     [
                         Paragraph(name, self.body_style),
-                        Paragraph(f"{self._fmt(line.cantidad_base_g, 2)} g", self.body_right_style),
+                        Paragraph(f"{self._fmt(quantity_g, 2)} g", self.body_right_style),
                         Paragraph(f"{self._fmt(eur_kg, 2)} €", self.body_right_style),
                         Paragraph(f"{self._fmt(coste, 2)} €", self.body_right_style),
                     ]
@@ -1808,7 +1820,7 @@ class PdfService:
         for line in lineas:
             if str(getattr(line, "tipo_linea", "ingrediente") or "ingrediente").strip().lower() != "ingrediente":
                 continue
-            cantidad = float(getattr(line, "cantidad_base_g", 0.0) or 0.0)
+            cantidad = self._pdf_quantity_g(line)
             if cantidad <= 0:
                 continue
             code = str(getattr(line, "codigo_ingrediente", "") or "").strip()
@@ -1836,7 +1848,7 @@ class PdfService:
 
         masa_total_g = float(getattr(receta, "masa_total_g", 0.0) or 0.0)
         if masa_total_g <= 0:
-            masa_total_g = sum(float(getattr(line, "cantidad_base_g", 0.0) or 0.0) for line in valid_lines)
+            masa_total_g = sum(self._pdf_quantity_g(line) for line in valid_lines)
         if masa_total_g <= 0:
             return totals
 
@@ -1963,7 +1975,7 @@ class PdfService:
             nutrition = nutrition_by_articulo.get(aid)
             if nutrition is None:
                 continue
-            cantidad_g = float(getattr(line, "cantidad_base_g", 0.0) or 0.0)
+            cantidad_g = self._pdf_quantity_g(line)
             factor = cantidad_g / 100.0
             totals["energia_kj"] += float(getattr(nutrition, "energia_kj", 0.0) or 0.0) * factor
             totals["energia_kcal"] += float(getattr(nutrition, "energia_kcal", 0.0) or 0.0) * factor
