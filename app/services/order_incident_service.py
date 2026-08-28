@@ -105,7 +105,7 @@ class OrderIncidentService:
         *,
         pedido_id: str,
         albaran_item_id: str,
-        unidades_afectadas: float,
+        unidades_afectadas: int,
         observaciones: str,
         fecha_incidencia: date | None = None,
     ) -> PedidoIncidencia:
@@ -117,7 +117,10 @@ class OrderIncidentService:
             item = session.get(AlbaranItem, clean_item_id)
             if item is None or str(item.pedido_id or "").strip() != clean_pedido_id:
                 raise ValueError("El artículo recibido no pertenece al pedido seleccionado.")
-            clean_units = float(unidades_afectadas or 0.0)
+            raw_units = float(unidades_afectadas or 0)
+            if not raw_units.is_integer():
+                raise ValueError("Las unidades afectadas deben ser un número entero.")
+            clean_units = int(raw_units)
             received_units = float(item.articulo_cantidad or 0.0)
             if clean_units <= 0:
                 raise ValueError("Las unidades afectadas deben ser mayores que cero.")
@@ -139,7 +142,7 @@ class OrderIncidentService:
         self,
         incidencia_id: str,
         *,
-        unidades_afectadas: float,
+        unidades_afectadas: int,
         observaciones: str,
         fecha_incidencia: date,
     ) -> None:
@@ -148,7 +151,10 @@ class OrderIncidentService:
             item = session.get(AlbaranItem, row.albaran_item_id)
             if item is None:
                 raise ValueError("El artículo recibido de la incidencia ya no existe.")
-            clean_units = float(unidades_afectadas or 0.0)
+            raw_units = float(unidades_afectadas or 0)
+            if not raw_units.is_integer():
+                raise ValueError("Las unidades afectadas deben ser un número entero.")
+            clean_units = int(raw_units)
             received_units = float(item.articulo_cantidad or 0.0)
             if clean_units <= 0:
                 raise ValueError("Las unidades afectadas deben ser mayores que cero.")

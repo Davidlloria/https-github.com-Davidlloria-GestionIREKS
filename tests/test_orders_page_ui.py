@@ -167,7 +167,7 @@ def test_edit_incident_modal_loads_line_and_image_grid(tmp_path) -> None:
         incidencia_id="incident-1",
         pedido_id="order-1",
         albaran_item_id=article.item_id,
-        unidades_afectadas=0.5,
+        unidades_afectadas=1,
         observaciones="Saco roto visible",
         fecha_incidencia=date(2026, 8, 26),
     )
@@ -190,7 +190,7 @@ def test_edit_incident_modal_loads_line_and_image_grid(tmp_path) -> None:
     assert dialog.windowTitle() == "Editar incidencia"
     assert dialog.article_selector.currentData() == "line-1"
     assert dialog.article_selector.isEnabled() is False
-    assert dialog.units_affected.value() == 0.5
+    assert dialog.units_affected.value() == 1
     assert dialog.observations.toPlainText() == "Saco roto visible"
     assert dialog.images_grid.count() == 1
     assert dialog.images_grid.item(0).text() == "evidencia.jpg"

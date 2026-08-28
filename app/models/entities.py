@@ -639,7 +639,7 @@ class PedidoIncidencia(SQLModel, table=True):
     albaran_item_id: str = Field(
         foreign_key="albaranes_items.item_id", nullable=False, max_length=36, index=True
     )
-    unidades_afectadas: float = Field(default=0.0, nullable=False)
+    unidades_afectadas: int = Field(default=0, nullable=False)
     observaciones: str = Field(default="", nullable=False)
     fecha_incidencia: date = Field(default_factory=date.today, nullable=False, index=True)
     creado_en: datetime = Field(default_factory=datetime.utcnow, nullable=False, index=True)

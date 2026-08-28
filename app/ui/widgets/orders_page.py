@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (
     QDateEdit,
     QDialog,
     QDialogButtonBox,
-    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QFrame,
@@ -36,6 +35,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QProgressDialog,
     QPushButton,
+    QSpinBox,
     QSplitter,
     QTabWidget,
     QTableWidget,
@@ -266,11 +266,10 @@ class OrderIncidentDialog(QDialog):
         for article in articles:
             self.article_selector.addItem(article.label, article.item_id)
         form.addRow("Artículo recibido", self.article_selector)
-        self.units_affected = QDoubleSpinBox()
-        self.units_affected.setDecimals(2)
-        self.units_affected.setMinimum(0.01)
-        self.units_affected.setMaximum(1_000_000.0)
-        self.units_affected.setSingleStep(1.0)
+        self.units_affected = QSpinBox()
+        self.units_affected.setMinimum(1)
+        self.units_affected.setMaximum(1_000_000)
+        self.units_affected.setSingleStep(1)
         self.units_affected.setSuffix(" uds.")
         self.units_affected.setEnabled(False)
         self.article_selector.currentIndexChanged.connect(self._update_units_range)
@@ -323,7 +322,7 @@ class OrderIncidentDialog(QDialog):
             target_index = self.article_selector.findData(incident.albaran_item_id)
             self.article_selector.setCurrentIndex(target_index if target_index >= 0 else 0)
             self.article_selector.setEnabled(False)
-            self.units_affected.setValue(float(incident.unidades_afectadas or 0.0))
+            self.units_affected.setValue(int(incident.unidades_afectadas or 0))
             incident_date = incident.fecha_incidencia
             self.incident_date.setDate(QDate(incident_date.year, incident_date.month, incident_date.day))
             self.observations.setPlainText(str(incident.observaciones or ""))
@@ -339,10 +338,10 @@ class OrderIncidentDialog(QDialog):
     def article_item_id(self) -> str:
         return str(self.article_selector.currentData() or "").strip()
 
-    def incident_values(self) -> tuple[date, float, str]:
+    def incident_values(self) -> tuple[date, int, str]:
         return (
             self.incident_date.date().toPython(),
-            float(self.units_affected.value()),
+            int(self.units_affected.value()),
             self.observations.toPlainText(),
         )
 
@@ -414,9 +413,9 @@ class OrderIncidentDialog(QDialog):
         article = self._article_by_item_id.get(self.article_item_id())
         self.units_affected.setEnabled(article is not None)
         if article is None:
-            self.units_affected.setMaximum(1_000_000.0)
+            self.units_affected.setMaximum(1_000_000)
             return
-        self.units_affected.setMaximum(max(0.01, float(article.unidades or 0.0)))
+        self.units_affected.setMaximum(max(1, int(float(article.unidades or 0.0))))
 
     def _update_image_actions(self) -> None:
         self.remove_image_btn.setEnabled(self.images_grid.currentItem() is not None)

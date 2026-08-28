@@ -66,7 +66,7 @@ def test_incident_crud_and_received_article_filter(incident_context) -> None:
     service.create_incident(
         pedido_id="pedido-1",
         albaran_item_id="received-1",
-        unidades_afectadas=0.5,
+        unidades_afectadas=1,
         observaciones="Segunda incidencia",
     )
 
@@ -76,13 +76,13 @@ def test_incident_crud_and_received_article_filter(incident_context) -> None:
 
     service.update_incident(
         first.incidencia_id,
-        unidades_afectadas=0.75,
+        unidades_afectadas=1,
         observaciones="Actualizada",
         fecha_incidencia=date(2026, 8, 27),
     )
     updated = next(row for row in service.list_incidents("pedido-1") if row.incidencia.incidencia_id == first.incidencia_id)
     assert updated.incidencia.observaciones == "Actualizada"
-    assert updated.incidencia.unidades_afectadas == 0.75
+    assert updated.incidencia.unidades_afectadas == 1
     assert updated.incidencia.fecha_incidencia == date(2026, 8, 27)
 
     service.delete_incident(first.incidencia_id)
@@ -110,6 +110,18 @@ def test_incident_rejects_units_above_received_quantity(incident_context) -> Non
             albaran_item_id="received-1",
             unidades_afectadas=2,
             observaciones="Cantidad incorrecta",
+        )
+
+
+def test_incident_rejects_fractional_affected_units(incident_context) -> None:
+    service, _engine = incident_context
+
+    with pytest.raises(ValueError, match="número entero"):
+        service.create_incident(
+            pedido_id="pedido-1",
+            albaran_item_id="received-1",
+            unidades_afectadas=0.5,  # type: ignore[arg-type]
+            observaciones="Cantidad fraccionaria",
         )
 
 

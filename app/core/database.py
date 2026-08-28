@@ -2009,8 +2009,18 @@ def _migrate_pedidos_incidencias_columns() -> None:
         }
         if "unidades_afectadas" not in columns:
             conn.exec_driver_sql(
-                "ALTER TABLE pedidos_incidencias ADD COLUMN unidades_afectadas REAL NOT NULL DEFAULT 0"
+                "ALTER TABLE pedidos_incidencias ADD COLUMN unidades_afectadas INTEGER NOT NULL DEFAULT 0"
             )
+        conn.exec_driver_sql(
+            """
+            UPDATE pedidos_incidencias
+            SET unidades_afectadas = CASE
+                WHEN unidades_afectadas > 0
+                    THEN MAX(1, CAST(ROUND(unidades_afectadas) AS INTEGER))
+                ELSE 0
+            END
+            """
+        )
 
 
 def _ensure_pedidos_email_log_table() -> None:
