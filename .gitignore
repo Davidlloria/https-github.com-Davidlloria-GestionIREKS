@@ -39,6 +39,7 @@ data/*.db
 data/*.json
 data/backups/
 data/exports/
+data/incidencias_pedidos/
 runtime/
 
 # Build artifacts
