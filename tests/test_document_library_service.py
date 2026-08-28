@@ -151,10 +151,12 @@ def test_unavailable_library_does_not_deactivate_catalog(tmp_path: Path) -> None
     _write_document(library / "Calidad/ficha.pdf")
     service = _service(library, database)
     service.refresh_catalog()
+    assert service.is_library_available() is True
     library.rename(tmp_path / "library-offline")
 
     result = service.refresh_catalog()
 
+    assert service.is_library_available() is False
     assert result.available is False
     assert result.scan_complete is False
     assert result.deactivated == 0

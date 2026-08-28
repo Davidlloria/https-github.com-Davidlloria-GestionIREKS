@@ -20,6 +20,7 @@ from app.ui.widgets.dashboard_page import DashboardPage
 from app.ui.widgets.courses_page import CoursesPage
 from app.ui.widgets.customers_page import CustomersPage
 from app.ui.widgets.distributors_page import DistributorsPage
+from app.ui.widgets.document_library_page import DocumentLibraryPage
 from app.ui.widgets.ingredients_page import IngredientsIreksPage, IngredientsStdPage
 from app.ui.widgets.orders_page import OrdersPage
 from app.ui.widgets.placeholder_page import PlaceholderPage
@@ -86,6 +87,7 @@ class MainWindow(QMainWindow):
         )
         self._add_page("Cursos", CoursesPage())
         self._add_page("Formulas", RecipesPage())
+        self._add_page("Documentos", DocumentLibraryPage())
         self._add_page("Almacen", WarehousePage())
         self._add_page("Productos IREKS", IngredientsIreksPage())
         self._add_page("Materias primas", IngredientsStdPage())
@@ -130,7 +132,7 @@ class MainWindow(QMainWindow):
     def _build_ribbon_groups(self) -> None:
         groups = [
             ["Inicio", "Clientes", "Contactos", "Tecnicos", "Distribuidores", "Colaboradores"],
-            ["Cursos", "Formulas"],
+            ["Cursos", "Formulas", "Documentos"],
             ["Almacen", "Productos IREKS", "Materias primas"],
             ["Pedidos", "Ventas"],
             ["Configuracion"],

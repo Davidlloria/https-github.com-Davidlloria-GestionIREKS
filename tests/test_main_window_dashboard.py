@@ -32,6 +32,7 @@ def test_main_window_starts_on_inicio_page(monkeypatch) -> None:
     monkeypatch.setattr(main_window_module, "ContactsPage", lambda: _stub_page("contacts"))
     monkeypatch.setattr(main_window_module, "CoursesPage", lambda: _stub_page("courses"))
     monkeypatch.setattr(main_window_module, "DistributorsPage", lambda: _stub_page("distributors"))
+    monkeypatch.setattr(main_window_module, "DocumentLibraryPage", lambda: _stub_page("documents"))
     monkeypatch.setattr(main_window_module, "IngredientsIreksPage", lambda: _stub_page("ireks"))
     monkeypatch.setattr(main_window_module, "IngredientsStdPage", lambda: _stub_page("std"))
     monkeypatch.setattr(main_window_module, "OrdersPage", lambda: _stub_page("orders"))
@@ -48,6 +49,10 @@ def test_main_window_starts_on_inicio_page(monkeypatch) -> None:
     assert window.pages.currentIndex() == 0
     assert window.pages.widget(0).objectName() == "dashboard"
     assert window.ribbon_buttons.button(0).text() == "Inicio"
+    documents_index = window.page_names.index("Documentos")
+    assert window.page_names[documents_index - 1] == "Formulas"
+    assert window.pages.widget(documents_index).objectName() == "documents"
+    assert window.ribbon_buttons.button(documents_index).text() == "Documentos"
 
     statuses = []
     window.dashboard_page.set_local_ai_status = lambda code, message: statuses.append((code, message))

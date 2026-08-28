@@ -81,6 +81,12 @@ class DocumentLibraryService:
         self.database_path = Path(database_path or DOCUMENT_LIBRARY_DB_PATH).resolve()
         self._clock = clock or (lambda: datetime.now(timezone.utc))
 
+    def is_library_available(self) -> bool:
+        try:
+            return self.documents_dir.exists() and self.documents_dir.is_dir()
+        except OSError:
+            return False
+
     def refresh_catalog(self) -> DocumentLibraryScanResult:
         self._initialize_database()
         try:
