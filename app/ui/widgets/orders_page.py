@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QDateEdit,
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QFrame,
@@ -259,11 +260,21 @@ class OrderIncidentDialog(QDialog):
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
+        self._article_by_item_id = {article.item_id: article for article in articles}
         self.article_selector = QComboBox()
         self.article_selector.addItem("Selecciona un artículo recibido...", "")
         for article in articles:
             self.article_selector.addItem(article.label, article.item_id)
         form.addRow("Artículo recibido", self.article_selector)
+        self.units_affected = QDoubleSpinBox()
+        self.units_affected.setDecimals(2)
+        self.units_affected.setMinimum(0.01)
+        self.units_affected.setMaximum(1_000_000.0)
+        self.units_affected.setSingleStep(1.0)
+        self.units_affected.setSuffix(" uds.")
+        self.units_affected.setEnabled(False)
+        self.article_selector.currentIndexChanged.connect(self._update_units_range)
+        form.addRow("Unidades afectadas", self.units_affected)
         self.incident_date = QDateEdit()
         self.incident_date.setCalendarPopup(True)
         self.incident_date.setDisplayFormat("dd/MM/yyyy")
@@ -312,6 +323,7 @@ class OrderIncidentDialog(QDialog):
             target_index = self.article_selector.findData(incident.albaran_item_id)
             self.article_selector.setCurrentIndex(target_index if target_index >= 0 else 0)
             self.article_selector.setEnabled(False)
+            self.units_affected.setValue(float(incident.unidades_afectadas or 0.0))
             incident_date = incident.fecha_incidencia
             self.incident_date.setDate(QDate(incident_date.year, incident_date.month, incident_date.day))
             self.observations.setPlainText(str(incident.observaciones or ""))
@@ -327,8 +339,12 @@ class OrderIncidentDialog(QDialog):
     def article_item_id(self) -> str:
         return str(self.article_selector.currentData() or "").strip()
 
-    def incident_values(self) -> tuple[date, str]:
-        return self.incident_date.date().toPython(), self.observations.toPlainText()
+    def incident_values(self) -> tuple[date, float, str]:
+        return (
+            self.incident_date.date().toPython(),
+            float(self.units_affected.value()),
+            self.observations.toPlainText(),
+        )
 
     def pending_image_paths(self) -> list[Path]:
         return list(self._pending_image_paths)
@@ -393,6 +409,14 @@ class OrderIncidentDialog(QDialog):
                 QMessageBox.warning(self, "Incidencias", f"La imagen supera el límite de 10 MB:\n{path.name}")
                 return
         self.accept()
+
+    def _update_units_range(self, _index: int = -1) -> None:
+        article = self._article_by_item_id.get(self.article_item_id())
+        self.units_affected.setEnabled(article is not None)
+        if article is None:
+            self.units_affected.setMaximum(1_000_000.0)
+            return
+        self.units_affected.setMaximum(max(0.01, float(article.unidades or 0.0)))
 
     def _update_image_actions(self) -> None:
         self.remove_image_btn.setEnabled(self.images_grid.currentItem() is not None)
@@ -1791,20 +1815,19 @@ class OrdersPage(QWidget):
         incidencias_actions.addStretch(1)
         incidencias_layout.addWidget(incidencias_ribbon)
 
-        self.incidents_table = QTableWidget(0, 9)
+        self.incidents_table = QTableWidget(0, 5)
         self.incidents_table.setObjectName("ordersIncidentsTable")
         self.incidents_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.incidents_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.incidents_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.incidents_table.verticalHeader().setVisible(False)
         self.incidents_table.setHorizontalHeaderLabels(
-            ["Código", "Descripción", "Lote", "F. cad.", "Uds.", "Observaciones", "Albarán", "Recepción", "Incidencia"]
+            ["Fecha incidencia", "Código", "Descripción", "Lote", "Albarán"]
         )
         incident_header = self.incidents_table.horizontalHeader()
         incident_header.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
-        incident_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        incident_header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
-        for column, width in {0: 85, 2: 95, 3: 85, 4: 60, 6: 105, 7: 85, 8: 85}.items():
+        incident_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        for column, width in {0: 105, 1: 85, 3: 105, 4: 115}.items():
             self.incidents_table.setColumnWidth(column, width)
         self.incidents_table.itemSelectionChanged.connect(self._update_incident_action_states)
         self.incidents_table.itemDoubleClicked.connect(lambda _item: self._edit_incident())
@@ -2401,15 +2424,11 @@ class OrdersPage(QWidget):
             article = row.articulo
             incidence = row.incidencia
             values = [
+                incidence.fecha_incidencia.strftime("%d/%m/%Y"),
                 article.codigo,
                 article.descripcion,
                 article.lote,
-                article.caducidad.strftime("%d/%m/%Y") if article.caducidad else "",
-                self._format_number_es(article.unidades, 2),
-                str(incidence.observaciones or "").strip(),
                 article.albaran_numero,
-                article.recepcion.strftime("%d/%m/%Y"),
-                incidence.fecha_incidencia.strftime("%d/%m/%Y"),
             ]
             for column, value in enumerate(values):
                 cell = QTableWidgetItem(value)
@@ -2448,12 +2467,13 @@ class OrdersPage(QWidget):
         )
         if dialog.exec() != int(QDialog.DialogCode.Accepted):
             return
-        incident_date, observations = dialog.incident_values()
+        incident_date, affected_units, observations = dialog.incident_values()
         incident_id = ""
         try:
             row = self.order_incident_service.create_incident(
                 pedido_id=selected.pedido_id,
                 albaran_item_id=dialog.article_item_id(),
+                unidades_afectadas=affected_units,
                 observaciones=observations,
                 fecha_incidencia=incident_date,
             )
@@ -2483,10 +2503,11 @@ class OrdersPage(QWidget):
         )
         if dialog.exec() != int(QDialog.DialogCode.Accepted):
             return
-        incident_date, observations = dialog.incident_values()
+        incident_date, affected_units, observations = dialog.incident_values()
         try:
             self.order_incident_service.update_incident(
                 incident_id,
+                unidades_afectadas=affected_units,
                 observaciones=observations,
                 fecha_incidencia=incident_date,
             )

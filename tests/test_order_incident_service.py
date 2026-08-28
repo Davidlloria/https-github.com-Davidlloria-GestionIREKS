@@ -59,12 +59,14 @@ def test_incident_crud_and_received_article_filter(incident_context) -> None:
     first = service.create_incident(
         pedido_id="pedido-1",
         albaran_item_id="received-1",
+        unidades_afectadas=1,
         observaciones="Saco roto visible",
         fecha_incidencia=date(2026, 8, 26),
     )
     service.create_incident(
         pedido_id="pedido-1",
         albaran_item_id="received-1",
+        unidades_afectadas=0.5,
         observaciones="Segunda incidencia",
     )
 
@@ -72,9 +74,15 @@ def test_incident_crud_and_received_article_filter(incident_context) -> None:
     assert len(rows) == 2
     assert {row.incidencia.observaciones for row in rows} == {"Saco roto visible", "Segunda incidencia"}
 
-    service.update_incident(first.incidencia_id, observaciones="Actualizada", fecha_incidencia=date(2026, 8, 27))
+    service.update_incident(
+        first.incidencia_id,
+        unidades_afectadas=0.75,
+        observaciones="Actualizada",
+        fecha_incidencia=date(2026, 8, 27),
+    )
     updated = next(row for row in service.list_incidents("pedido-1") if row.incidencia.incidencia_id == first.incidencia_id)
     assert updated.incidencia.observaciones == "Actualizada"
+    assert updated.incidencia.unidades_afectadas == 0.75
     assert updated.incidencia.fecha_incidencia == date(2026, 8, 27)
 
     service.delete_incident(first.incidencia_id)
@@ -88,7 +96,20 @@ def test_incident_rejects_received_line_from_another_order(incident_context) -> 
         service.create_incident(
             pedido_id="pedido-2",
             albaran_item_id="received-1",
+            unidades_afectadas=1,
             observaciones="No válida",
+        )
+
+
+def test_incident_rejects_units_above_received_quantity(incident_context) -> None:
+    service, _engine = incident_context
+
+    with pytest.raises(ValueError, match="no pueden superar"):
+        service.create_incident(
+            pedido_id="pedido-1",
+            albaran_item_id="received-1",
+            unidades_afectadas=2,
+            observaciones="Cantidad incorrecta",
         )
 
 
@@ -97,6 +118,7 @@ def test_images_are_copied_with_relative_paths_and_removed(incident_context, tmp
     incident = service.create_incident(
         pedido_id="pedido-1",
         albaran_item_id="received-1",
+        unidades_afectadas=1,
         observaciones="Con imagen",
     )
     source = tmp_path / "foto original.jpg"
@@ -121,6 +143,7 @@ def test_delete_incident_cleans_managed_images(incident_context, tmp_path: Path)
     incident = service.create_incident(
         pedido_id="pedido-1",
         albaran_item_id="received-1",
+        unidades_afectadas=1,
         observaciones="Con evidencia",
     )
     source = tmp_path / "evidencia.png"
@@ -140,6 +163,7 @@ def test_image_validation_rejects_unsupported_extension(incident_context, tmp_pa
     incident = service.create_incident(
         pedido_id="pedido-1",
         albaran_item_id="received-1",
+        unidades_afectadas=1,
         observaciones="",
     )
     source = tmp_path / "documento.pdf"
@@ -154,6 +178,7 @@ def test_incidents_block_received_line_and_order_deletion(incident_context, monk
     service.create_incident(
         pedido_id="pedido-1",
         albaran_item_id="received-1",
+        unidades_afectadas=1,
         observaciones="Evidencia activa",
     )
     monkeypatch.setattr(document_module, "engine", test_engine)

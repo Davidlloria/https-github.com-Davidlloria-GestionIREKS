@@ -96,15 +96,11 @@ def test_incidencias_tab_exposes_received_article_fields_and_actions(monkeypatch
     ]
     headers = [page.incidents_table.horizontalHeaderItem(i).text() for i in range(page.incidents_table.columnCount())]
     assert headers == [
+        "Fecha incidencia",
         "Código",
         "Descripción",
         "Lote",
-        "F. cad.",
-        "Uds.",
-        "Observaciones",
         "Albarán",
-        "Recepción",
-        "Incidencia",
     ]
     assert not hasattr(page, "incident_article_filter")
     assert not hasattr(page, "incident_observations")
@@ -150,6 +146,9 @@ def test_incident_modal_contains_form_image_grid_and_actions() -> None:
 
     assert dialog.windowTitle() == "Nueva incidencia"
     assert dialog.article_selector.count() == 2
+    dialog.article_selector.setCurrentIndex(1)
+    assert dialog.units_affected.isEnabled() is True
+    assert dialog.units_affected.maximum() == 1
     assert dialog.observations.isReadOnly() is False
     assert dialog.images_grid.objectName() == "incidentImagesGrid"
     assert dialog.add_image_btn.text() == "Añadir imagen"
@@ -168,6 +167,7 @@ def test_edit_incident_modal_loads_line_and_image_grid(tmp_path) -> None:
         incidencia_id="incident-1",
         pedido_id="order-1",
         albaran_item_id=article.item_id,
+        unidades_afectadas=0.5,
         observaciones="Saco roto visible",
         fecha_incidencia=date(2026, 8, 26),
     )
@@ -190,6 +190,7 @@ def test_edit_incident_modal_loads_line_and_image_grid(tmp_path) -> None:
     assert dialog.windowTitle() == "Editar incidencia"
     assert dialog.article_selector.currentData() == "line-1"
     assert dialog.article_selector.isEnabled() is False
+    assert dialog.units_affected.value() == 0.5
     assert dialog.observations.toPlainText() == "Saco roto visible"
     assert dialog.images_grid.count() == 1
     assert dialog.images_grid.item(0).text() == "evidencia.jpg"

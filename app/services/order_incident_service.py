@@ -105,6 +105,7 @@ class OrderIncidentService:
         *,
         pedido_id: str,
         albaran_item_id: str,
+        unidades_afectadas: float,
         observaciones: str,
         fecha_incidencia: date | None = None,
     ) -> PedidoIncidencia:
@@ -116,9 +117,16 @@ class OrderIncidentService:
             item = session.get(AlbaranItem, clean_item_id)
             if item is None or str(item.pedido_id or "").strip() != clean_pedido_id:
                 raise ValueError("El artículo recibido no pertenece al pedido seleccionado.")
+            clean_units = float(unidades_afectadas or 0.0)
+            received_units = float(item.articulo_cantidad or 0.0)
+            if clean_units <= 0:
+                raise ValueError("Las unidades afectadas deben ser mayores que cero.")
+            if clean_units > received_units + 1e-9:
+                raise ValueError("Las unidades afectadas no pueden superar las unidades recibidas.")
             row = PedidoIncidencia(
                 pedido_id=clean_pedido_id,
                 albaran_item_id=clean_item_id,
+                unidades_afectadas=clean_units,
                 observaciones=str(observaciones or "").strip(),
                 fecha_incidencia=fecha_incidencia or date.today(),
             )
@@ -127,9 +135,26 @@ class OrderIncidentService:
             session.refresh(row)
             return row
 
-    def update_incident(self, incidencia_id: str, *, observaciones: str, fecha_incidencia: date) -> None:
+    def update_incident(
+        self,
+        incidencia_id: str,
+        *,
+        unidades_afectadas: float,
+        observaciones: str,
+        fecha_incidencia: date,
+    ) -> None:
         with Session(engine) as session:
             row = self._get_incident(session, incidencia_id)
+            item = session.get(AlbaranItem, row.albaran_item_id)
+            if item is None:
+                raise ValueError("El artículo recibido de la incidencia ya no existe.")
+            clean_units = float(unidades_afectadas or 0.0)
+            received_units = float(item.articulo_cantidad or 0.0)
+            if clean_units <= 0:
+                raise ValueError("Las unidades afectadas deben ser mayores que cero.")
+            if clean_units > received_units + 1e-9:
+                raise ValueError("Las unidades afectadas no pueden superar las unidades recibidas.")
+            row.unidades_afectadas = clean_units
             row.observaciones = str(observaciones or "").strip()
             row.fecha_incidencia = fecha_incidencia
             row.actualizado_en = datetime.utcnow()

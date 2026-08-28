@@ -1999,6 +1999,20 @@ def _migrate_pedidos_estado_column() -> None:
             conn.exec_driver_sql("ALTER TABLE pedidos ADD COLUMN pedido_estado TEXT NOT NULL DEFAULT ''")
 
 
+def _migrate_pedidos_incidencias_columns() -> None:
+    with engine.begin() as conn:
+        tables = {row[0] for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        if "pedidos_incidencias" not in tables:
+            return
+        columns = {
+            str(row[1]) for row in conn.exec_driver_sql("PRAGMA table_info(pedidos_incidencias)").fetchall()
+        }
+        if "unidades_afectadas" not in columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE pedidos_incidencias ADD COLUMN unidades_afectadas REAL NOT NULL DEFAULT 0"
+            )
+
+
 def _ensure_pedidos_email_log_table() -> None:
     with engine.begin() as conn:
         conn.exec_driver_sql(
@@ -2097,6 +2111,7 @@ def init_db() -> None:
     _migrate_ingredientes_std_to_materias_primas()
     _migrate_nutrition_table_name()
     _migrate_pedidos_estado_column()
+    _migrate_pedidos_incidencias_columns()
     _ensure_pedidos_email_log_table()
     _ensure_productos_ireks_referencias_export_view()
     _migrate_codigos_postales_table()
