@@ -18,6 +18,11 @@ class _DisabledLocalAI:
     enabled = False
 
 
+class _DisabledOpenAI:
+    def generate_process(self, prompt: str):
+        return type("Result", (), {"ok": False, "text": ""})()
+
+
 class _FakeLocalAI:
     enabled = True
 
@@ -102,7 +107,10 @@ def test_customer_query_interprets_current_year_and_kg_as_primary_metric() -> No
 
 
 def test_local_customer_parser_recognizes_activity_and_island() -> None:
-    result = CustomerReportIntentService(api_key="", local_ai_service=_DisabledLocalAI()).parse("Dame las panaderías de Lanzarote")
+    result = CustomerReportIntentService(
+        local_ai_service=_DisabledLocalAI(),
+        openai_service=_DisabledOpenAI(),
+    ).parse("Dame las panaderías de Lanzarote")
 
     filters = {(item.field, item.op, str(item.value).lower()) for item in result.intent.filters}
     assert ("actividad", "contiene", "panaderia") in filters
@@ -132,7 +140,10 @@ def test_customer_query_returns_only_repeated_commercial_names(tmp_path, monkeyp
 
 
 def test_local_customer_parser_does_not_filter_type_when_requesting_distributor_code() -> None:
-    result = CustomerReportIntentService(api_key="", local_ai_service=_DisabledLocalAI()).parse(
+    result = CustomerReportIntentService(
+        local_ai_service=_DisabledLocalAI(),
+        openai_service=_DisabledOpenAI(),
+    ).parse(
         "listado de todos los clientes, campos uuid, cod, codigo cliente distribuidor, nombre"
     )
 

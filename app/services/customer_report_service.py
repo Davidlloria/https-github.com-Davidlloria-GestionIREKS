@@ -9,6 +9,7 @@ from typing import Any
 from app.core.database import engine
 from app.services.local_ai_service import LocalAIService
 from app.services.customer_report_schema import CUSTOMER_REPORT_RESPONSE_FORMAT
+from app.services.openai_process_service import OpenAIProcessService
 
 
 REPORT_COLUMNS: dict[str, tuple[str, str]] = {
@@ -103,9 +104,14 @@ class CustomerReportIntentService:
         model: str = "gpt-4.1-mini",
         timeout: float = 20.0,
         local_ai_service: LocalAIService | None = None,
+        openai_service: OpenAIProcessService | None = None,
     ) -> None:
-        _ = (api_key, model)
         self.local_ai_service = local_ai_service or LocalAIService(timeout=max(float(timeout), 60.0))
+        self.openai_service = openai_service or OpenAIProcessService(
+            api_key=api_key,
+            model=model,
+            timeout=timeout,
+        )
 
     def parse(self, prompt: str) -> ReportIntentResult:
         text = str(prompt or "").strip()
@@ -124,6 +130,14 @@ class CustomerReportIntentService:
                     return ReportIntentResult(True, intent, "Generado con IA local.", True, "local_ai")
                 except Exception:
                     pass
+        openai_result = self.openai_service.generate_process(self._ai_instruction(text))
+        if openai_result.ok:
+            try:
+                parsed = self._parse_json(openai_result.text)
+                intent = self._intent_from_mapping(parsed, fallback)
+                return ReportIntentResult(True, intent, "Generado con OpenAI.", True, "openai")
+            except Exception:
+                pass
         return ReportIntentResult(True, fallback, "Generado con interprete local. IA local no disponible.", False)
 
     def _ai_instruction(self, prompt: str = "") -> str:

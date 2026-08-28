@@ -15,6 +15,15 @@ from app.models import Cliente, CodigoPostal, Isla, Localidad, Municipio, Provin
 TEST_ENGINE = None
 
 
+class _DisabledLocalAI:
+    enabled = False
+
+
+class _DisabledOpenAI:
+    def generate_process(self, prompt: str):
+        return type("Result", (), {"ok": False, "text": ""})()
+
+
 @pytest.fixture()
 def api_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     global TEST_ENGINE
@@ -24,11 +33,8 @@ def api_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     )
     SQLModel.metadata.create_all(TEST_ENGINE)
     monkeypatch.setattr(customer_report_service_module, "engine", TEST_ENGINE)
-    monkeypatch.setattr(
-        customer_report_service_module.OpenAISettingsService,
-        "load",
-        lambda self: {"api_key": "", "use_ai_translation": False},
-    )
+    monkeypatch.setattr(customer_report_service_module, "LocalAIService", lambda **_kwargs: _DisabledLocalAI())
+    monkeypatch.setattr(customer_report_service_module, "OpenAIProcessService", lambda **_kwargs: _DisabledOpenAI())
     return TestClient(create_app())
 
 
