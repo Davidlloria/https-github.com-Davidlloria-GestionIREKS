@@ -9,6 +9,7 @@ LEGACY_DB_PATH = DATA_DIR / "gestion_formulas.db"
 DB_PATH = DATA_DIR / "gestion_ireks.db"
 DB_URL = f"sqlite:///{DB_PATH}"
 PEDIDOS_HISTORICO_DIR = DATA_DIR / "exports" / "pedidos_historico"
+PEDIDO_INCIDENCIAS_DIR = DATA_DIR / "incidencias_pedidos"
 PEDIDOS_EMAIL_DESTINO = ""
 
 # UI flags

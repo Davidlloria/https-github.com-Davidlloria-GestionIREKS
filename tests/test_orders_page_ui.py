@@ -4,7 +4,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QTabWidget
 
 from app.ui.widgets.orders_page import OrdersPage
 
@@ -71,6 +71,40 @@ def test_new_order_uses_typed_almacen_filter_text(monkeypatch) -> None:
     page.almacen_filter.lineEdit().setText("norte")
 
     assert page._selected_almacen_id() == "dist-norte"
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_incidencias_tab_exposes_received_article_fields_and_actions(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(OrdersPage, "reload", lambda self: None)
+    page = OrdersPage()
+
+    tab_widget = page.findChild(QTabWidget, "ordersTabs")
+    assert tab_widget is not None
+    assert [tab_widget.tabText(i) for i in range(tab_widget.count())] == [
+        "Pedido",
+        "Albarán",
+        "Incidencias",
+        "Factura",
+        "Pendientes",
+    ]
+    headers = [page.incidents_table.horizontalHeaderItem(i).text() for i in range(page.incidents_table.columnCount())]
+    assert headers == [
+        "Código",
+        "Descripción",
+        "Lote",
+        "F. cad.",
+        "Uds.",
+        "Observaciones",
+        "Albarán",
+        "Recepción",
+        "Imágenes",
+    ]
+    assert page.incident_observations.isReadOnly() is False
+    assert page.add_incident_image_btn.text() == "Añadir imagen"
 
     page.close()
     page.deleteLater()

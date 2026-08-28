@@ -8,7 +8,17 @@ from uuid import uuid4
 from sqlmodel import Session, select
 
 from app.core.database import engine
-from app.models import Albaran, AlbaranItem, AlmacenMovimiento, Factura, FacturaItem, Pedido, PedidoItem, PedidoPendiente
+from app.models import (
+    Albaran,
+    AlbaranItem,
+    AlmacenMovimiento,
+    Factura,
+    FacturaItem,
+    Pedido,
+    PedidoIncidencia,
+    PedidoItem,
+    PedidoPendiente,
+)
 from app.schemas.orders import OrderCreate, OrderItemRead, OrderLineWrite, OrderRead, OrderUpdate
 from app.services.order_document_import_service import OrderDocumentImportService
 from app.services.import_service import ImportService
@@ -265,6 +275,10 @@ class OrderService:
                 return
 
             clean_pedido_id = str(getattr(entity, "pedido_id", "") or "").strip()
+            if session.exec(
+                select(PedidoIncidencia).where(PedidoIncidencia.pedido_id == clean_pedido_id)
+            ).first() is not None:
+                raise ValueError("No se puede eliminar el pedido porque tiene incidencias registradas.")
             almacen_id = str(getattr(entity, "almacen_id", "") or "").strip()
             pedido_numero = str(getattr(entity, "pedido_numero", "") or "").strip()
             pedido_albaran_numero = str(getattr(entity, "pedido_albaran_numero", "") or "").strip()

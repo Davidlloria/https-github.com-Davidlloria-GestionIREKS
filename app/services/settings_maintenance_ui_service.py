@@ -46,7 +46,7 @@ class SettingsMaintenanceUiService:
 
     def build_backup_default_path(self, timestamp: datetime | None = None) -> Path:
         stamp = (timestamp or datetime.now()).strftime("%Y%m%d_%H%M%S")
-        return DATA_DIR / f"gestion_ireks_backup_{stamp}.db"
+        return DATA_DIR / f"gestion_ireks_backup_{stamp}.zip"
 
     def build_status_view(self) -> SettingsMaintenanceStatusView:
         status = self.settings_maintenance_service.database_status()

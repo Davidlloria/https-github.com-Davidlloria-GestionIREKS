@@ -17,6 +17,7 @@ from app.models import (
     FacturaItem,
     IngredienteIreks,
     Pedido,
+    PedidoIncidencia,
     PedidoItem,
     PedidoPendiente,
     TarifaPrecioIreks,
@@ -161,6 +162,11 @@ class OrderDocumentImportService:
                 raise ValueError("Pedido no encontrado.")
 
             items = list(session.exec(select(AlbaranItem).where(AlbaranItem.albaran_id == clean_albaran_id)))
+            item_ids = [str(item.item_id or "").strip() for item in items if str(item.item_id or "").strip()]
+            if item_ids and session.exec(
+                select(PedidoIncidencia).where(PedidoIncidencia.albaran_item_id.in_(item_ids))
+            ).first() is not None:
+                raise ValueError("No se puede eliminar el albarán porque tiene incidencias registradas.")
             for item in items:
                 self._delete_albaran_item_movements(session, item)
                 session.delete(item)
@@ -181,6 +187,10 @@ class OrderDocumentImportService:
             item = session.get(AlbaranItem, clean_item_id)
             if item is None:
                 raise ValueError("Linea de albaran no encontrada.")
+            if session.exec(
+                select(PedidoIncidencia).where(PedidoIncidencia.albaran_item_id == clean_item_id)
+            ).first() is not None:
+                raise ValueError("No se puede eliminar la línea porque tiene incidencias registradas.")
             pedido_id = str(getattr(item, "pedido_id", "") or "").strip()
             albaran_id = str(getattr(item, "albaran_id", "") or "").strip()
             if not pedido_id or not albaran_id:

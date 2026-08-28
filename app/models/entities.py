@@ -631,6 +631,34 @@ class AlbaranItem(SQLModel, table=True):
     articulo_caducidad: Optional[date] = Field(default=None, nullable=True, index=True)
 
 
+class PedidoIncidencia(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "pedidos_incidencias"
+
+    incidencia_id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True, max_length=36)
+    pedido_id: str = Field(foreign_key="pedidos.pedido_id", nullable=False, max_length=36, index=True)
+    albaran_item_id: str = Field(
+        foreign_key="albaranes_items.item_id", nullable=False, max_length=36, index=True
+    )
+    observaciones: str = Field(default="", nullable=False)
+    fecha_incidencia: date = Field(default_factory=date.today, nullable=False, index=True)
+    creado_en: datetime = Field(default_factory=datetime.utcnow, nullable=False, index=True)
+    actualizado_en: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+
+
+class PedidoIncidenciaImagen(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "pedidos_incidencias_imagenes"
+
+    imagen_id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True, max_length=36)
+    incidencia_id: str = Field(
+        foreign_key="pedidos_incidencias.incidencia_id", nullable=False, max_length=36, index=True
+    )
+    ruta_relativa: str = Field(default="", nullable=False, max_length=500)
+    nombre_original: str = Field(default="", nullable=False, max_length=255)
+    tipo_mime: str = Field(default="", max_length=100)
+    tamano_bytes: int = Field(default=0, nullable=False)
+    creado_en: datetime = Field(default_factory=datetime.utcnow, nullable=False, index=True)
+
+
 class Factura(SQLModel, table=True):
     __tablename__: ClassVar[str] = "facturas"
 

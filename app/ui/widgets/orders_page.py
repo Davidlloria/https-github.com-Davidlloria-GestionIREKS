@@ -8,8 +8,8 @@ import re
 import tempfile
 from typing import Any, Callable, cast
 
-from PySide6.QtCore import QDate, QSize, QTimer, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QIcon
+from PySide6.QtCore import QDate, QSize, QTimer, Qt, QUrl
+from PySide6.QtGui import QBrush, QColor, QDesktopServices, QFont, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -26,6 +26,8 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMenu,
     QMessageBox,
     QApplication,
@@ -58,6 +60,7 @@ from app.services.order_document_parser import OrderDocumentParser
 from app.services.order_export_service import OrderExportService
 from app.services.order_edit_flow_service import OrderEditFlowService
 from app.services.order_mail_flow_service import OrderMailFlowService
+from app.services.order_incident_service import OrderIncidentRow, OrderIncidentService
 from app.services.order_selected_flow_service import OrderSelectedFlowService
 from app.services.orders_documents_import_ui_service import (
     OrdersDocumentImportFlowError,
@@ -1151,6 +1154,7 @@ class OrdersPage(QWidget):
         self.order_mail_flow_service = OrderMailFlowService(order_export_service=self.order_export_service)
         self.order_query_service = OrderQueryService()
         self.order_service = OrderService()
+        self.order_incident_service = OrderIncidentService()
         self.order_edit_flow_service = OrderEditFlowService(
             order_query_service=self.order_query_service,
             order_service=self.order_service,
@@ -1172,6 +1176,7 @@ class OrdersPage(QWidget):
         self._autosave_timer.setSingleShot(True)
         self._autosave_timer.timeout.connect(self._autosave_selected_order)
         self._loading_pedido_items_table = False
+        self._editing_incident_id = ""
         self._build_ui()
         self.reload()
 
@@ -1591,6 +1596,104 @@ class OrdersPage(QWidget):
         self.albaran_items_totals_table.setColumnWidth(4, 100)
         albaran_tab_layout.addWidget(self.albaran_items_totals_table)
         tabs.addTab(albaran_tab, "Albarán")
+
+        incidencias_tab = QWidget()
+        incidencias_layout = QVBoxLayout(incidencias_tab)
+        incidencias_layout.setContentsMargins(8, 8, 8, 8)
+        incidencias_layout.setSpacing(6)
+
+        incidencias_ribbon = QFrame()
+        incidencias_ribbon.setObjectName("topRibbon")
+        incidencias_ribbon.setFrameShape(QFrame.Shape.StyledPanel)
+        incidencias_actions = QHBoxLayout(incidencias_ribbon)
+        incidencias_actions.setContentsMargins(8, 6, 8, 6)
+        incidencias_actions.setSpacing(6)
+        self.new_incident_btn = QPushButton("Nueva")
+        self.new_incident_btn.setProperty("btnRole", "success")
+        self.new_incident_btn.clicked.connect(self._new_incident)
+        self.save_incident_btn = QPushButton("Guardar")
+        self.save_incident_btn.setProperty("btnRole", "primary")
+        self.save_incident_btn.clicked.connect(self._save_incident)
+        self.delete_incident_btn = QPushButton("Eliminar")
+        self.delete_incident_btn.setProperty("btnRole", "danger")
+        self.delete_incident_btn.clicked.connect(self._delete_incident)
+        self.add_incident_image_btn = QPushButton("Añadir imagen")
+        self.add_incident_image_btn.setProperty("btnRole", "secondary")
+        self.add_incident_image_btn.clicked.connect(self._add_incident_image)
+        self.remove_incident_image_btn = QPushButton("Quitar imagen")
+        self.remove_incident_image_btn.setProperty("btnRole", "danger")
+        self.remove_incident_image_btn.clicked.connect(self._remove_incident_image)
+        for button in (
+            self.new_incident_btn,
+            self.save_incident_btn,
+            self.delete_incident_btn,
+            self.add_incident_image_btn,
+            self.remove_incident_image_btn,
+        ):
+            button.setFixedHeight(26)
+            incidencias_actions.addWidget(button)
+        incidencias_actions.addStretch(1)
+        incidencias_layout.addWidget(incidencias_ribbon)
+
+        incidencias_filter = QHBoxLayout()
+        incidencias_filter.addWidget(QLabel("Artículo recibido"))
+        self.incident_article_filter = QComboBox()
+        self.incident_article_filter.setMinimumWidth(420)
+        self.incident_article_filter.currentIndexChanged.connect(self._on_incident_filter_changed)
+        incidencias_filter.addWidget(self.incident_article_filter, 1)
+        incidencias_layout.addLayout(incidencias_filter)
+
+        self.incidents_table = QTableWidget(0, 9)
+        self.incidents_table.setObjectName("ordersIncidentsTable")
+        self.incidents_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.incidents_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.incidents_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.incidents_table.verticalHeader().setVisible(False)
+        self.incidents_table.setHorizontalHeaderLabels(
+            ["Código", "Descripción", "Lote", "F. cad.", "Uds.", "Observaciones", "Albarán", "Recepción", "Imágenes"]
+        )
+        incident_header = self.incidents_table.horizontalHeader()
+        incident_header.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        incident_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        incident_header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+        for column, width in {0: 85, 2: 95, 3: 85, 4: 60, 6: 105, 7: 85, 8: 75}.items():
+            self.incidents_table.setColumnWidth(column, width)
+        self.incidents_table.itemSelectionChanged.connect(self._on_incident_selection_changed)
+        incidencias_layout.addWidget(self.incidents_table, 2)
+
+        incident_detail = QSplitter(Qt.Orientation.Horizontal)
+        incident_detail.setChildrenCollapsible(False)
+        observation_panel = QWidget()
+        observation_layout = QVBoxLayout(observation_panel)
+        observation_layout.setContentsMargins(0, 0, 4, 0)
+        observation_layout.addWidget(QLabel("Observaciones"))
+        self.incident_observations = QTextEdit()
+        self.incident_observations.setPlaceholderText("Describe la incidencia observada en el artículo recibido...")
+        observation_layout.addWidget(self.incident_observations, 1)
+        date_row = QHBoxLayout()
+        date_row.addWidget(QLabel("Fecha de incidencia"))
+        self.incident_date = QDateEdit()
+        self.incident_date.setCalendarPopup(True)
+        self.incident_date.setDisplayFormat("dd/MM/yyyy")
+        self.incident_date.setDate(QDate.currentDate())
+        date_row.addWidget(self.incident_date)
+        date_row.addStretch(1)
+        observation_layout.addLayout(date_row)
+        incident_detail.addWidget(observation_panel)
+
+        images_panel = QWidget()
+        images_layout = QVBoxLayout(images_panel)
+        images_layout.setContentsMargins(4, 0, 0, 0)
+        images_layout.addWidget(QLabel("Imágenes adjuntas (doble clic para abrir)"))
+        self.incident_images_list = QListWidget()
+        self.incident_images_list.itemDoubleClicked.connect(self._open_incident_image)
+        self.incident_images_list.itemSelectionChanged.connect(self._update_incident_action_states)
+        images_layout.addWidget(self.incident_images_list, 1)
+        incident_detail.addWidget(images_panel)
+        incident_detail.setStretchFactor(0, 2)
+        incident_detail.setStretchFactor(1, 1)
+        incidencias_layout.addWidget(incident_detail, 1)
+        tabs.addTab(incidencias_tab, "Incidencias")
 
         factura_tab = QWidget()
         factura_tab_layout = QVBoxLayout(factura_tab)
@@ -2167,6 +2270,223 @@ class OrdersPage(QWidget):
         pedido_id = str(getattr(selected, "pedido_id", "") or "").strip() if selected else ""
         albaran_id = str(self.albaran_selector.currentData() or "").strip()
         self._reload_albaran_items_table(pedido_id, albaran_id)
+
+    def _load_incident_article_filter(self, pedido_id: str | None) -> None:
+        current_item_id = str(self.incident_article_filter.currentData() or "").strip()
+        self.incident_article_filter.blockSignals(True)
+        self.incident_article_filter.clear()
+        self.incident_article_filter.addItem("Todos los artículos recibidos", "")
+        if pedido_id:
+            for option in self.order_incident_service.list_received_articles(pedido_id):
+                self.incident_article_filter.addItem(option.label, option.item_id)
+        target_index = self.incident_article_filter.findData(current_item_id)
+        self.incident_article_filter.setCurrentIndex(target_index if target_index >= 0 else 0)
+        self.incident_article_filter.blockSignals(False)
+        self._update_incident_action_states()
+
+    def _reload_incidents(self, pedido_id: str | None, selected_incident_id: str = "") -> None:
+        self.incidents_table.blockSignals(True)
+        self.incidents_table.setRowCount(0)
+        rows: list[OrderIncidentRow] = []
+        if pedido_id:
+            rows = self.order_incident_service.list_incidents(
+                pedido_id,
+                str(self.incident_article_filter.currentData() or "").strip(),
+            )
+        self.incidents_table.setRowCount(len(rows))
+        selected_row = -1
+        for row_idx, row in enumerate(rows):
+            article = row.articulo
+            incidence = row.incidencia
+            values = [
+                article.codigo,
+                article.descripcion,
+                article.lote,
+                article.caducidad.strftime("%d/%m/%Y") if article.caducidad else "",
+                self._format_number_es(article.unidades, 2),
+                str(incidence.observaciones or "").strip(),
+                article.albaran_numero,
+                article.recepcion.strftime("%d/%m/%Y"),
+                str(row.image_count),
+            ]
+            for column, value in enumerate(values):
+                cell = QTableWidgetItem(value)
+                if column == 0:
+                    cell.setData(Qt.ItemDataRole.UserRole, incidence.incidencia_id)
+                self.incidents_table.setItem(row_idx, column, cell)
+            if incidence.incidencia_id == selected_incident_id:
+                selected_row = row_idx
+        self.incidents_table.blockSignals(False)
+        if selected_row >= 0:
+            self.incidents_table.selectRow(selected_row)
+        elif rows:
+            self.incidents_table.selectRow(0)
+        else:
+            self._clear_incident_detail()
+
+    def _on_incident_filter_changed(self, _index: int) -> None:
+        selected = self._selected_row()
+        pedido_id = str(getattr(selected, "pedido_id", "") or "").strip() if selected else ""
+        self._editing_incident_id = ""
+        self._reload_incidents(pedido_id)
+        self._update_incident_action_states()
+
+    def _selected_incident_id(self) -> str:
+        selected_rows = self.incidents_table.selectionModel().selectedRows()
+        if not selected_rows:
+            return ""
+        item = self.incidents_table.item(selected_rows[0].row(), 0)
+        return str(item.data(Qt.ItemDataRole.UserRole) or "").strip() if item else ""
+
+    def _on_incident_selection_changed(self) -> None:
+        incident_id = self._selected_incident_id()
+        self._editing_incident_id = incident_id
+        selected = self._selected_row()
+        if not incident_id or selected is None:
+            self._clear_incident_detail()
+            return
+        rows = self.order_incident_service.list_incidents(selected.pedido_id)
+        row = next((candidate for candidate in rows if candidate.incidencia.incidencia_id == incident_id), None)
+        if row is None:
+            self._clear_incident_detail()
+            return
+        self.incident_observations.setPlainText(str(row.incidencia.observaciones or ""))
+        incident_date = row.incidencia.fecha_incidencia
+        self.incident_date.setDate(QDate(incident_date.year, incident_date.month, incident_date.day))
+        self._reload_incident_images(incident_id)
+        self._update_incident_action_states()
+
+    def _clear_incident_detail(self) -> None:
+        self._editing_incident_id = ""
+        self.incident_observations.clear()
+        self.incident_date.setDate(QDate.currentDate())
+        self.incident_images_list.clear()
+        self._update_incident_action_states()
+
+    def _new_incident(self) -> None:
+        if not str(self.incident_article_filter.currentData() or "").strip():
+            QMessageBox.warning(self, "Incidencias", "Selecciona primero un artículo recibido en el filtro.")
+            return
+        self.incidents_table.clearSelection()
+        self._clear_incident_detail()
+        self.incident_observations.setFocus()
+
+    def _save_incident(self) -> None:
+        selected = self._selected_row()
+        if selected is None:
+            QMessageBox.warning(self, "Incidencias", "Selecciona un pedido.")
+            return
+        try:
+            if self._editing_incident_id:
+                self.order_incident_service.update_incident(
+                    self._editing_incident_id,
+                    observaciones=self.incident_observations.toPlainText(),
+                    fecha_incidencia=self.incident_date.date().toPython(),
+                )
+                incident_id = self._editing_incident_id
+            else:
+                article_item_id = str(self.incident_article_filter.currentData() or "").strip()
+                row = self.order_incident_service.create_incident(
+                    pedido_id=selected.pedido_id,
+                    albaran_item_id=article_item_id,
+                    observaciones=self.incident_observations.toPlainText(),
+                    fecha_incidencia=self.incident_date.date().toPython(),
+                )
+                incident_id = row.incidencia_id
+        except Exception as exc:
+            QMessageBox.warning(self, "Incidencias", str(exc))
+            return
+        self._reload_incidents(selected.pedido_id, incident_id)
+
+    def _delete_incident(self) -> None:
+        incident_id = self._selected_incident_id()
+        if not incident_id:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Eliminar incidencia",
+            "¿Eliminar la incidencia y todas sus imágenes?",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.order_incident_service.delete_incident(incident_id)
+        except Exception as exc:
+            QMessageBox.warning(self, "Incidencias", str(exc))
+            return
+        selected = self._selected_row()
+        self._reload_incidents(selected.pedido_id if selected else None)
+
+    def _reload_incident_images(self, incident_id: str) -> None:
+        self.incident_images_list.clear()
+        for image in self.order_incident_service.list_images(incident_id):
+            item = QListWidgetItem(f"{image.nombre_original} ({image.tamano_bytes / 1024:.0f} KB)")
+            item.setData(Qt.ItemDataRole.UserRole, image.imagen_id)
+            item.setData(Qt.ItemDataRole.UserRole + 1, image.ruta_relativa)
+            self.incident_images_list.addItem(item)
+
+    def _add_incident_image(self) -> None:
+        incident_id = self._selected_incident_id()
+        if not incident_id:
+            QMessageBox.warning(self, "Incidencias", "Guarda primero la incidencia.")
+            return
+        paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Añadir imágenes de la incidencia",
+            "",
+            "Imágenes (*.jpg *.jpeg *.png *.webp)",
+        )
+        if not paths:
+            return
+        try:
+            for path in paths:
+                self.order_incident_service.add_image(incident_id, Path(path))
+        except Exception as exc:
+            QMessageBox.warning(self, "Incidencias", str(exc))
+        selected = self._selected_row()
+        self._reload_incidents(selected.pedido_id if selected else None, incident_id)
+
+    def _remove_incident_image(self) -> None:
+        item = self.incident_images_list.currentItem()
+        if item is None:
+            return
+        image_id = str(item.data(Qt.ItemDataRole.UserRole) or "").strip()
+        answer = QMessageBox.question(self, "Quitar imagen", "¿Eliminar la imagen seleccionada?")
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.order_incident_service.delete_image(image_id)
+        except Exception as exc:
+            QMessageBox.warning(self, "Incidencias", str(exc))
+            return
+        incident_id = self._selected_incident_id()
+        selected = self._selected_row()
+        self._reload_incidents(selected.pedido_id if selected else None, incident_id)
+
+    def _open_incident_image(self, item: QListWidgetItem) -> None:
+        try:
+            path = self.order_incident_service.resolve_image_path(
+                str(item.data(Qt.ItemDataRole.UserRole + 1) or "")
+            )
+        except ValueError as exc:
+            QMessageBox.warning(self, "Incidencias", str(exc))
+            return
+        if not path.is_file():
+            QMessageBox.warning(self, "Incidencias", "El archivo de imagen ya no existe.")
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+
+    def _update_incident_action_states(self) -> None:
+        if not hasattr(self, "new_incident_btn"):
+            return
+        has_order = self._selected_row() is not None
+        has_article = bool(str(self.incident_article_filter.currentData() or "").strip())
+        has_incident = bool(self._selected_incident_id())
+        self.new_incident_btn.setEnabled(has_order and has_article)
+        self.save_incident_btn.setEnabled(has_order and (has_article or has_incident))
+        self.delete_incident_btn.setEnabled(has_incident)
+        self.add_incident_image_btn.setEnabled(has_incident)
+        self.remove_incident_image_btn.setEnabled(self.incident_images_list.currentItem() is not None)
 
     def _load_factura_selector(self, pedido_id: str | None) -> None:
         header = self.facturas_table.horizontalHeader()
@@ -2777,9 +3097,11 @@ class OrdersPage(QWidget):
         self.detail_fecha.setDate(QDate(row.pedido_fecha.year, row.pedido_fecha.month, row.pedido_fecha.day))
         self.detail_pedido_numero.setText(row.pedido_numero)
         self._load_albaran_selector(row.pedido_id)
+        self._load_incident_article_filter(row.pedido_id)
         self._load_factura_selector(row.pedido_id)
         self._reload_pedido_items_table(row.pedido_id)
         self._reload_albaran_items_table(row.pedido_id, str(self.albaran_selector.currentData() or "").strip())
+        self._reload_incidents(row.pedido_id)
         self._reload_factura_items_table(row.pedido_id, self._selected_factura_id())
         self._reload_pendientes_table(row.pedido_id)
         self.import_albaran_btn.setEnabled(True)
@@ -2795,9 +3117,11 @@ class OrdersPage(QWidget):
         self.detail_fecha.setDate(QDate(today.year, today.month, today.day))
         self.detail_pedido_numero.clear()
         self._load_albaran_selector(None)
+        self._load_incident_article_filter(None)
         self._load_factura_selector(None)
         self._reload_pedido_items_table(None)
         self._reload_albaran_items_table(None)
+        self._reload_incidents(None)
         self._reload_factura_items_table(None)
         self._reload_pendientes_table(None)
         self.import_albaran_btn.setEnabled(False)

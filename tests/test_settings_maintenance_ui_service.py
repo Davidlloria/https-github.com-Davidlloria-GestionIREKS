@@ -82,7 +82,7 @@ def test_build_status_view_and_outcomes(tmp_path: Path) -> None:
     assert fake.backup_calls == [destination]
 
     default_path = service.build_backup_default_path(datetime(2026, 5, 2, 13, 14, 15))
-    assert default_path.name == "gestion_ireks_backup_20260502_131415.db"
+    assert default_path.name == "gestion_ireks_backup_20260502_131415.zip"
     assert default_path.parent.name == "data"
 
     view = service.build_view()

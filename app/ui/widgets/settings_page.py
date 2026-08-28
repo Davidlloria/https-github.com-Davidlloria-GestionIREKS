@@ -2079,9 +2079,9 @@ class SettingsPage(QWidget):
         default_path = self.settings_maintenance_ui_service.build_backup_default_path()
         file_path, _ = QFileDialog.getSaveFileName(
             self,
-            "Guardar backup de base de datos",
+            "Guardar backup completo",
             str(default_path),
-            "SQLite (*.db)",
+            "Backup GestionIREKS (*.zip)",
         )
         if not file_path:
             return

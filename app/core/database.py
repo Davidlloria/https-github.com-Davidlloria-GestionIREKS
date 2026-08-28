@@ -1,15 +1,18 @@
 ﻿from collections.abc import Iterator, Sequence
+from contextlib import closing
 from datetime import date
 from pathlib import Path
 import os
 import shutil
 import sqlite3
+import tempfile
 from typing import Any
 from uuid import uuid4
+import zipfile
 from sqlalchemy import event
 from sqlmodel import Session, SQLModel, create_engine
 
-from app.core.config import DATA_DIR, DB_PATH, DB_URL, LEGACY_DB_PATH
+from app.core.config import DATA_DIR, DB_PATH, DB_URL, LEGACY_DB_PATH, PEDIDO_INCIDENCIAS_DIR
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 EXTERNAL_DATA_DIR = bool(os.environ.get("GESTION_IREKS_DATA_DIR"))
@@ -2215,7 +2218,19 @@ def optimize_database() -> None:
 
 def backup_database(destination: Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(DB_PATH) as source, sqlite3.connect(destination) as target:
+    if destination.suffix.lower() == ".zip":
+        with tempfile.TemporaryDirectory(prefix="gestion_ireks_backup_") as temp_dir:
+            database_copy = Path(temp_dir) / DB_PATH.name
+            with closing(sqlite3.connect(DB_PATH)) as source, closing(sqlite3.connect(database_copy)) as target:
+                source.backup(target)
+            with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.write(database_copy, DB_PATH.name)
+                if PEDIDO_INCIDENCIAS_DIR.is_dir():
+                    for image_path in PEDIDO_INCIDENCIAS_DIR.rglob("*"):
+                        if image_path.is_file() and image_path.resolve() != destination.resolve():
+                            archive.write(image_path, image_path.relative_to(DATA_DIR).as_posix())
+        return destination
+    with closing(sqlite3.connect(DB_PATH)) as source, closing(sqlite3.connect(destination)) as target:
         source.backup(target)
     return destination
 
