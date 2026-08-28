@@ -5,9 +5,16 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_DIR = BASE_DIR / "data"
 _DATA_DIR_ENV = os.environ.get("GESTION_IREKS_DATA_DIR")
 DATA_DIR = Path(_DATA_DIR_ENV) if _DATA_DIR_ENV else DEFAULT_DATA_DIR
+_DOCUMENTS_DIR_ENV = os.environ.get("GESTION_IREKS_DOCUMENTS_DIR")
+DOCUMENTS_DIR = (
+    Path(_DOCUMENTS_DIR_ENV)
+    if _DOCUMENTS_DIR_ENV
+    else BASE_DIR.parent / "IREKS-Servidor"
+)
 LEGACY_DB_PATH = DATA_DIR / "gestion_formulas.db"
 DB_PATH = DATA_DIR / "gestion_ireks.db"
 DB_URL = f"sqlite:///{DB_PATH}"
+DOCUMENT_LIBRARY_DB_PATH = DATA_DIR / "document_library.sqlite"
 PEDIDOS_HISTORICO_DIR = DATA_DIR / "exports" / "pedidos_historico"
 PEDIDO_INCIDENCIAS_DIR = DATA_DIR / "incidencias_pedidos"
 PEDIDOS_EMAIL_DESTINO = ""
