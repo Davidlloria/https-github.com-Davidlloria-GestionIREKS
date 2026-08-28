@@ -975,7 +975,7 @@ class DashboardPage(QWidget):
 
     def set_local_ai_status(self, status_code: str, message: str) -> None:
         state = str(status_code or 'unavailable')
-        if state not in {'disabled', 'checking', 'loading', 'ready', 'unavailable'}:
+        if state not in {'disabled', 'checking', 'starting', 'loading', 'ready', 'not_installed', 'unavailable'}:
             state = 'unavailable'
         self.local_ai_status_pill.setProperty('state', state)
         self.local_ai_status_label.setText(str(message or 'IA local no disponible'))
@@ -2304,19 +2304,22 @@ class DashboardPage(QWidget):
             QFrame#dashboardLocalAiStatusPill {
                 background-color: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 12px;
             }
-            QFrame#dashboardLocalAiStatusPill[state="checking"], QFrame#dashboardLocalAiStatusPill[state="loading"] {
+            QFrame#dashboardLocalAiStatusPill[state="checking"], QFrame#dashboardLocalAiStatusPill[state="starting"],
+            QFrame#dashboardLocalAiStatusPill[state="loading"] {
                 background-color: #EFF6FF; border-color: #93C5FD;
             }
             QFrame#dashboardLocalAiStatusPill[state="ready"] {
                 background-color: #F0FDF4; border-color: #86EFAC;
             }
-            QFrame#dashboardLocalAiStatusPill[state="unavailable"] {
+            QFrame#dashboardLocalAiStatusPill[state="not_installed"], QFrame#dashboardLocalAiStatusPill[state="unavailable"] {
                 background-color: #FEF2F2; border-color: #FCA5A5;
             }
             QLabel#dashboardLocalAiStatusDot { color: #64748B; font-size: 12px; background: transparent; }
             QFrame#dashboardLocalAiStatusPill[state="checking"] QLabel#dashboardLocalAiStatusDot,
+            QFrame#dashboardLocalAiStatusPill[state="starting"] QLabel#dashboardLocalAiStatusDot,
             QFrame#dashboardLocalAiStatusPill[state="loading"] QLabel#dashboardLocalAiStatusDot { color: #2563EB; }
             QFrame#dashboardLocalAiStatusPill[state="ready"] QLabel#dashboardLocalAiStatusDot { color: #16A34A; }
+            QFrame#dashboardLocalAiStatusPill[state="not_installed"] QLabel#dashboardLocalAiStatusDot,
             QFrame#dashboardLocalAiStatusPill[state="unavailable"] QLabel#dashboardLocalAiStatusDot { color: #DC2626; }
             QLabel#dashboardLocalAiStatusText {
                 color: #334155; font-size: 11px; font-weight: 600; background: transparent;

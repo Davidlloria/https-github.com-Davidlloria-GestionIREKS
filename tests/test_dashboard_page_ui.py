@@ -263,6 +263,10 @@ def test_dashboard_page_starts_in_agenda_mode() -> None:
     page.set_local_ai_status('ready', 'IA local disponible')
     assert page.local_ai_status_pill.property('state') == 'ready'
     assert page.local_ai_status_label.text() == 'IA local disponible'
+    page.set_local_ai_status('starting', 'Iniciando servidor Ollama...')
+    assert page.local_ai_status_pill.property('state') == 'starting'
+    page.set_local_ai_status('not_installed', 'Ollama no está instalado')
+    assert page.local_ai_status_pill.property('state') == 'not_installed'
     kpi_cards = page.findChildren(QFrame, 'dashboardKpiCard')
     assert len(kpi_cards) == 16
     assert all(card.minimumHeight() == 104 and card.maximumHeight() == 104 for card in kpi_cards)
