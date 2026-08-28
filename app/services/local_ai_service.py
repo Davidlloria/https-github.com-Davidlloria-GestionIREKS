@@ -149,13 +149,18 @@ class OllamaModelLifecycle:
     def __init__(self, service: LocalAIService | None = None, *, timeout: float = 2.0) -> None:
         self.service = service or LocalAIService(timeout=180.0)
         self.timeout = float(timeout)
-        self.status = ""
+        self.status_code = "disabled" if not self.service.enabled else "checking"
+        self.status = "IA local desactivada" if not self.service.enabled else "Comprobando IA local..."
         self._closing = threading.Event()
         self._operation_lock = threading.Lock()
 
     def preload_async(self) -> None:
-        if not self.service.enabled or self._closing.is_set():
+        if not self.service.enabled:
+            self._set_status("disabled", "IA local desactivada")
             return
+        if self._closing.is_set():
+            return
+        self._set_status("checking", "Comprobando IA local...")
         threading.Thread(target=self._preload, name="ollama-model-preload", daemon=True).start()
 
     def _preload(self) -> None:
@@ -168,13 +173,14 @@ class OllamaModelLifecycle:
                 self._get_json(f"{self.service._native_base_url()}/api/tags")
                 if self._closing.is_set():
                     return
+                self._set_status("loading", "Cargando modelo local...")
                 self.service._post_json(
                     self.service._chat_url(),
                     {"model": self.service.model, "messages": [], "stream": False, "think": False, "keep_alive": -1},
                 )
-                self.status = "Modelo local precargado."
+                self._set_status("ready", "IA local disponible")
             except Exception:  # noqa: BLE001
-                self.status = "Ollama no está disponible en la URL configurada."
+                self._set_status("unavailable", "IA local no disponible")
 
     def unload(self) -> None:
         self._closing.set()
@@ -187,7 +193,11 @@ class OllamaModelLifecycle:
                     {"model": self.service.model, "stream": False, "keep_alive": 0},
                 )
         except Exception:  # noqa: BLE001
-            self.status = "No se pudo descargar el modelo local."
+            self._set_status("unavailable", "No se pudo descargar el modelo local.")
+
+    def _set_status(self, code: str, message: str) -> None:
+        self.status_code = str(code or "unavailable")
+        self.status = str(message or "IA local no disponible")
 
     def _get_json(self, url: str) -> dict[str, Any]:
         request = Request(url, method="GET")

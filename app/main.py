@@ -34,9 +34,10 @@ def run() -> int:
     init_db()
     app = QApplication(sys.argv)
     _load_global_stylesheet(app)
+    lifecycle = _connect_local_ai_lifecycle(app)
     window = MainWindow()
+    window.bind_local_ai_lifecycle(lifecycle)
     window.show()
-    _connect_local_ai_lifecycle(app)
     return app.exec()
 
 

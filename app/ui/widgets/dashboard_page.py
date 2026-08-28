@@ -888,6 +888,23 @@ class DashboardPage(QWidget):
         sidebar_layout.addWidget(objetivos_btn)
 
         sidebar_layout.addStretch(1)
+
+        self.local_ai_status_pill = QFrame()
+        self.local_ai_status_pill.setObjectName('dashboardLocalAiStatusPill')
+        self.local_ai_status_pill.setProperty('state', 'disabled')
+        self.local_ai_status_pill.setMinimumHeight(52)
+        local_ai_status_layout = QHBoxLayout(self.local_ai_status_pill)
+        local_ai_status_layout.setContentsMargins(10, 8, 10, 8)
+        local_ai_status_layout.setSpacing(7)
+        self.local_ai_status_dot = QLabel('●')
+        self.local_ai_status_dot.setObjectName('dashboardLocalAiStatusDot')
+        self.local_ai_status_dot.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+        local_ai_status_layout.addWidget(self.local_ai_status_dot)
+        self.local_ai_status_label = QLabel('IA local desactivada')
+        self.local_ai_status_label.setObjectName('dashboardLocalAiStatusText')
+        self.local_ai_status_label.setWordWrap(True)
+        local_ai_status_layout.addWidget(self.local_ai_status_label, 1)
+        sidebar_layout.addWidget(self.local_ai_status_pill)
         root_layout.addWidget(sidebar)
 
         content_host = QWidget()
@@ -955,6 +972,16 @@ class DashboardPage(QWidget):
         self.content_layout.addWidget(self.footer_label)
         self._apply_styles()
         self._set_dashboard_mode('agenda', reload=False)
+
+    def set_local_ai_status(self, status_code: str, message: str) -> None:
+        state = str(status_code or 'unavailable')
+        if state not in {'disabled', 'checking', 'loading', 'ready', 'unavailable'}:
+            state = 'unavailable'
+        self.local_ai_status_pill.setProperty('state', state)
+        self.local_ai_status_label.setText(str(message or 'IA local no disponible'))
+        self.local_ai_status_pill.style().unpolish(self.local_ai_status_pill)
+        self.local_ai_status_pill.style().polish(self.local_ai_status_pill)
+        self.local_ai_status_pill.update()
 
     def _build_agenda_dashboard(self) -> QWidget:
         widget = QWidget()
@@ -2274,6 +2301,26 @@ class DashboardPage(QWidget):
             QWidget#dashboardPageRoot { background-color: #EEF3F8; font-family: "Segoe UI"; }
             QFrame#dashboardSidebar { background-color: #F8FAFC; border-right: 1px solid #E2E8F0; }
             QLabel#dashboardSidebarBrand { background-color: transparent; padding: 8px 0 6px 0; }
+            QFrame#dashboardLocalAiStatusPill {
+                background-color: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 12px;
+            }
+            QFrame#dashboardLocalAiStatusPill[state="checking"], QFrame#dashboardLocalAiStatusPill[state="loading"] {
+                background-color: #EFF6FF; border-color: #93C5FD;
+            }
+            QFrame#dashboardLocalAiStatusPill[state="ready"] {
+                background-color: #F0FDF4; border-color: #86EFAC;
+            }
+            QFrame#dashboardLocalAiStatusPill[state="unavailable"] {
+                background-color: #FEF2F2; border-color: #FCA5A5;
+            }
+            QLabel#dashboardLocalAiStatusDot { color: #64748B; font-size: 12px; background: transparent; }
+            QFrame#dashboardLocalAiStatusPill[state="checking"] QLabel#dashboardLocalAiStatusDot,
+            QFrame#dashboardLocalAiStatusPill[state="loading"] QLabel#dashboardLocalAiStatusDot { color: #2563EB; }
+            QFrame#dashboardLocalAiStatusPill[state="ready"] QLabel#dashboardLocalAiStatusDot { color: #16A34A; }
+            QFrame#dashboardLocalAiStatusPill[state="unavailable"] QLabel#dashboardLocalAiStatusDot { color: #DC2626; }
+            QLabel#dashboardLocalAiStatusText {
+                color: #334155; font-size: 11px; font-weight: 600; background: transparent;
+            }
             QPushButton#dashboardSidebarButton {
                 background-color: transparent;
                 color: #334155;

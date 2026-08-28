@@ -254,7 +254,15 @@ def test_dashboard_page_starts_in_agenda_mode() -> None:
     assert 'Última actualización:' in page.footer_label.text()
     assert not page.new_activity_btn.icon().isNull()
     assert not page.full_agenda_btn.icon().isNull()
-    assert page.findChild(QWidget, 'dashboardSidebar').width() == 184
+    sidebar = page.findChild(QWidget, 'dashboardSidebar')
+    assert sidebar.width() == 184
+    assert page.local_ai_status_pill.objectName() == 'dashboardLocalAiStatusPill'
+    assert sidebar.layout().itemAt(sidebar.layout().count() - 1).widget() is page.local_ai_status_pill
+    assert page.local_ai_status_pill.property('state') == 'disabled'
+    assert page.local_ai_status_label.text() == 'IA local desactivada'
+    page.set_local_ai_status('ready', 'IA local disponible')
+    assert page.local_ai_status_pill.property('state') == 'ready'
+    assert page.local_ai_status_label.text() == 'IA local disponible'
     kpi_cards = page.findChildren(QFrame, 'dashboardKpiCard')
     assert len(kpi_cards) == 16
     assert all(card.minimumHeight() == 104 and card.maximumHeight() == 104 for card in kpi_cards)

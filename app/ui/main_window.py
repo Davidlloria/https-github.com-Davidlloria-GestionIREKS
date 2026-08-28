@@ -1,5 +1,6 @@
 import os
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFrame,
@@ -73,7 +74,8 @@ class MainWindow(QMainWindow):
 
     def _build_pages(self) -> None:
         self.page_names: list[str] = []
-        self._add_page("Inicio", DashboardPage())
+        self.dashboard_page = DashboardPage()
+        self._add_page("Inicio", self.dashboard_page)
         self._add_page("Clientes", self._build_customers_page())
         self._add_page("Contactos", ContactsPage())
         self._add_page("Tecnicos", TechniciansPage())
@@ -90,6 +92,28 @@ class MainWindow(QMainWindow):
         self._add_page("Pedidos", OrdersPage())
         self._add_page("Ventas", SalesPage())
         self._add_page("Configuracion", SettingsPage())
+
+    def bind_local_ai_lifecycle(self, lifecycle) -> None:
+        self._local_ai_lifecycle = lifecycle
+        self._local_ai_status_snapshot: tuple[str, str] | None = None
+        self._local_ai_status_timer = QTimer(self)
+        self._local_ai_status_timer.setInterval(250)
+        self._local_ai_status_timer.timeout.connect(self._sync_local_ai_status)
+        self._sync_local_ai_status()
+        self._local_ai_status_timer.start()
+
+    def _sync_local_ai_status(self) -> None:
+        lifecycle = getattr(self, "_local_ai_lifecycle", None)
+        if lifecycle is None:
+            return
+        snapshot = (
+            str(getattr(lifecycle, "status_code", "unavailable")),
+            str(getattr(lifecycle, "status", "IA local no disponible")),
+        )
+        if snapshot == self._local_ai_status_snapshot:
+            return
+        self._local_ai_status_snapshot = snapshot
+        self.dashboard_page.set_local_ai_status(*snapshot)
 
     def _build_customers_page(self) -> QWidget:
         use_qml = use_qml_customers_enabled(

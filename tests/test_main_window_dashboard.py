@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -47,3 +48,16 @@ def test_main_window_starts_on_inicio_page(monkeypatch) -> None:
     assert window.pages.currentIndex() == 0
     assert window.pages.widget(0).objectName() == "dashboard"
     assert window.ribbon_buttons.button(0).text() == "Inicio"
+
+    statuses = []
+    window.dashboard_page.set_local_ai_status = lambda code, message: statuses.append((code, message))
+    lifecycle = SimpleNamespace(status_code="checking", status="Comprobando IA local...")
+    window.bind_local_ai_lifecycle(lifecycle)
+    assert statuses == [("checking", "Comprobando IA local...")]
+    window._sync_local_ai_status()
+    assert len(statuses) == 1
+    lifecycle.status_code = "ready"
+    lifecycle.status = "IA local disponible"
+    window._sync_local_ai_status()
+    assert statuses[-1] == ("ready", "IA local disponible")
+    window._local_ai_status_timer.stop()

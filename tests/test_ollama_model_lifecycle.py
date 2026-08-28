@@ -9,6 +9,8 @@ def test_disabled_lifecycle_makes_no_requests(monkeypatch) -> None:
     lifecycle = OllamaModelLifecycle(service)
     monkeypatch.setattr(lifecycle, "_get_json", lambda *_: (_ for _ in ()).throw(AssertionError()))
     lifecycle.preload_async()
+    assert lifecycle.status_code == "disabled"
+    assert lifecycle.status == "IA local desactivada"
     lifecycle.unload()
 
 
@@ -17,11 +19,30 @@ def test_preload_uses_tags_and_native_chat_payload(monkeypatch) -> None:
     lifecycle = OllamaModelLifecycle(service)
     calls = []
     monkeypatch.setattr(lifecycle, "_get_json", lambda url: calls.append(("get", url)) or {})
-    monkeypatch.setattr(service, "_post_json", lambda url, payload: calls.append(("post", url, payload)) or {})
+
+    def post_json(url, payload):
+        assert lifecycle.status_code == "loading"
+        calls.append(("post", url, payload))
+        return {}
+
+    monkeypatch.setattr(service, "_post_json", post_json)
     lifecycle._preload()
     assert calls[0] == ("get", "http://127.0.0.1:11434/api/tags")
     assert calls[1][1] == "http://127.0.0.1:11434/api/chat"
     assert calls[1][2] == {"model": "model", "messages": [], "stream": False, "think": False, "keep_alive": -1}
+    assert lifecycle.status_code == "ready"
+    assert lifecycle.status == "IA local disponible"
+
+
+def test_preload_exposes_unavailable_status_when_ollama_fails(monkeypatch) -> None:
+    service = LocalAIService(enabled=True, base_url="http://127.0.0.1:11434", model="model")
+    lifecycle = OllamaModelLifecycle(service)
+    monkeypatch.setattr(lifecycle, "_get_json", lambda *_: (_ for _ in ()).throw(ConnectionError()))
+
+    lifecycle._preload()
+
+    assert lifecycle.status_code == "unavailable"
+    assert lifecycle.status == "IA local no disponible"
 
 
 def test_lifecycle_health_timeout_does_not_shorten_model_request_timeout() -> None:
