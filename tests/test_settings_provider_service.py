@@ -42,14 +42,21 @@ class _FakeOpenaiSettings:
 
 
 class _FakeLocalAISettings:
-    def __init__(self) -> None:
-        self.saved: tuple[bool, str, str] | None = None
+    def __init__(self, embedding_model: str = "embeddinggemma") -> None:
+        self.embedding_model = embedding_model
+        self.saved: tuple[bool, str, str, str] | None = None
 
     def load(self) -> dict:
-        return {"enabled": True, "base_url": "http://127.0.0.1:11434/v1", "model": "qwen3.5:4b"}
+        return {
+            "enabled": True,
+            "base_url": "http://127.0.0.1:11434/v1",
+            "model": "qwen3.5:4b",
+            "embedding_model": self.embedding_model,
+        }
 
-    def save(self, *, enabled: bool, base_url: str, model: str) -> Path:
-        self.saved = (enabled, base_url, model)
+    def save(self, *, enabled: bool, base_url: str, model: str, embedding_model: str) -> Path:
+        self.embedding_model = embedding_model
+        self.saved = (enabled, base_url, model, embedding_model)
         return Path("data/api_config.json")
 
 
@@ -59,6 +66,31 @@ class _FakeLocalAI:
 
     def test_connection(self):
         return type("R", (), {"ok": True, "text": "OK", "message": "Respuesta generada con IA local."})()
+
+
+class _FakeLocalEmbedding:
+    instances = []
+    ok = True
+    message = ""
+
+    def __init__(self, **kwargs) -> None:
+        self.kwargs = kwargs
+        self.calls = []
+        type(self).instances.append(self)
+
+    def embed(self, texts):
+        self.calls.append(list(texts))
+        return type(
+            "R",
+            (),
+            {
+                "ok": type(self).ok,
+                "model": self.kwargs["model"],
+                "dimension": 768,
+                "message": type(self).message,
+                "vectors": ((1.0,),),
+            },
+        )()
 
 
 class _FakeOrdersMailSettings:
@@ -183,9 +215,14 @@ def test_load_operations_delegate_to_underlying_settings_services() -> None:
     assert ui_view.fatsecret_client_secret_label == "Client Secret"
     assert ui_view.fatsecret_scope_label == "Scope"
     assert ui_view.openai_api_key_label == "API key"
-    assert ui_view.local_ai_title == "Configuracion IA local"
+    assert ui_view.local_ai_title == "Configuración IA local"
     assert ui_view.local_ai_base_url_placeholder == "http://127.0.0.1:11434"
     assert ui_view.local_ai_model_placeholder == "qwen3.5:4b"
+    assert ui_view.local_ai_model_label == "Modelo conversacional"
+    assert ui_view.local_ai_embedding_model_label == "Modelo de embeddings"
+    assert ui_view.local_ai_embedding_model_placeholder == "embeddinggemma"
+    assert ui_view.local_ai_test_embedding_button_label == "Probar embeddings"
+    assert "no los descarga automáticamente" in ui_view.local_ai_info_label
 
 
 def test_local_ai_settings_can_be_loaded_saved_and_tested() -> None:
@@ -197,10 +234,101 @@ def test_local_ai_settings_can_be_loaded_saved_and_tested() -> None:
         enabled=True,
         base_url="http://127.0.0.1:11434/v1",
         model="qwen3.5:4b",
+        embedding_model="embeddinggemma",
     )
     tested = service.test_local_ai(base_url=loaded["base_url"], model=loaded["model"])
 
     assert loaded["enabled"] is True
     assert saved.ok is True
-    assert settings.saved == (True, "http://127.0.0.1:11434/v1", "qwen3.5:4b")
+    assert settings.saved == (
+        True,
+        "http://127.0.0.1:11434/v1",
+        "qwen3.5:4b",
+        "embeddinggemma",
+    )
     assert tested.ok is True
+
+
+def test_changed_embedding_model_adds_warning_and_same_model_does_not() -> None:
+    settings = _FakeLocalAISettings("embeddinggemma")
+    service = SettingsProviderService(local_ai_settings=settings)
+
+    same = service.save_local_ai(
+        enabled=True,
+        base_url="http://localhost:11434",
+        model="chat",
+        embedding_model="embeddinggemma",
+    )
+    changed = service.save_local_ai(
+        enabled=True,
+        base_url="http://localhost:11434",
+        model="chat",
+        embedding_model="new-embed",
+    )
+
+    assert "ha cambiado" not in same.message
+    assert (
+        "El modelo de embeddings ha cambiado. Actualiza el índice semántico documental."
+        in changed.message
+    )
+
+
+def test_omitted_embedding_model_preserves_previous_value() -> None:
+    settings = _FakeLocalAISettings("stored-embed")
+    service = SettingsProviderService(local_ai_settings=settings)
+
+    result = service.save_local_ai(
+        enabled=True,
+        base_url="http://localhost:11434",
+        model="chat",
+    )
+
+    assert result.ok
+    assert settings.saved[-1] == "stored-embed"
+    assert "ha cambiado" not in result.message
+
+
+def test_local_embedding_test_uses_entered_model_without_saving_or_exposing_vectors() -> None:
+    _FakeLocalEmbedding.instances.clear()
+    _FakeLocalEmbedding.ok = True
+    _FakeLocalEmbedding.message = ""
+    settings = _FakeLocalAISettings()
+    service = SettingsProviderService(
+        local_ai_settings=settings,
+        local_embedding_factory=_FakeLocalEmbedding,
+    )
+
+    result = service.test_local_embedding(
+        base_url="http://localhost:11434",
+        embedding_model="embed-screen",
+    )
+
+    instance = _FakeLocalEmbedding.instances[-1]
+    assert result.ok
+    assert "embed-screen" in result.message and "768" in result.message
+    assert "vector" not in result.message.casefold()
+    assert instance.kwargs == {
+        "enabled": True,
+        "base_url": "http://localhost:11434",
+        "model": "embed-screen",
+    }
+    assert instance.calls == [["Prueba de búsqueda documental de GestionIREKS."]]
+    assert settings.saved is None
+
+
+def test_local_embedding_failure_returns_safe_service_message() -> None:
+    _FakeLocalEmbedding.instances.clear()
+    _FakeLocalEmbedding.ok = False
+    _FakeLocalEmbedding.message = "El modelo local 'missing' no está instalado en Ollama."
+    service = SettingsProviderService(
+        local_ai_settings=_FakeLocalAISettings(),
+        local_embedding_factory=_FakeLocalEmbedding,
+    )
+
+    result = service.test_local_embedding(
+        base_url="http://localhost:11434",
+        embedding_model="missing",
+    )
+
+    assert not result.ok
+    assert result.message == "El modelo local 'missing' no está instalado en Ollama."

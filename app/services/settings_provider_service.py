@@ -10,6 +10,7 @@ from app.services.fdc_nutrition_service import FdcNutritionService
 from app.services.fdc_settings_service import FdcSettingsService
 from app.services.local_ai_service import LocalAIService
 from app.services.local_ai_settings_service import LocalAISettingsService
+from app.services.local_embedding_service import LocalEmbeddingService
 from app.services.openai_settings_service import OpenAISettingsService
 from app.services.openai_translation_service import OpenAITranslationService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
@@ -55,13 +56,20 @@ class SettingsProviderView:
     openai_placeholder: str = "OPENAI_API_KEY"
     openai_api_key_label: str = "API key"
     openai_ai_translation_label: str = "Usar traduccion IA (ES->EN) en busquedas FDC"
-    local_ai_title: str = "Configuracion IA local"
-    local_ai_enabled_label: str = "Usar IA local en el asistente de ventas"
+    local_ai_title: str = "Configuración IA local"
+    local_ai_enabled_label: str = "Usar IA local en asistentes y búsqueda documental"
     local_ai_base_url_label: str = "URL local"
     local_ai_base_url_placeholder: str = "http://127.0.0.1:11434"
-    local_ai_model_label: str = "Modelo"
+    local_ai_model_label: str = "Modelo conversacional"
     local_ai_model_placeholder: str = "qwen3.5:4b"
-    local_ai_info_label: str = "Solo se admiten servidores locales en 127.0.0.1, localhost o ::1."
+    local_ai_embedding_model_label: str = "Modelo de embeddings"
+    local_ai_embedding_model_placeholder: str = "embeddinggemma"
+    local_ai_test_embedding_button_label: str = "Probar embeddings"
+    local_ai_info_label: str = (
+        "Solo se permiten servidores locales. El modelo conversacional y el modelo "
+        "de embeddings son distintos, deben estar instalados previamente en Ollama "
+        "y la aplicación no los descarga automáticamente."
+    )
 
 
 class SettingsProviderService:
@@ -77,6 +85,7 @@ class SettingsProviderService:
         fatsecret_client_factory: type[FatSecretClient] = FatSecretClient,
         openai_translation_factory: type[OpenAITranslationService] = OpenAITranslationService,
         local_ai_factory: type[LocalAIService] = LocalAIService,
+        local_embedding_factory: type[LocalEmbeddingService] = LocalEmbeddingService,
     ) -> None:
         self.fdc_settings = fdc_settings or FdcSettingsService()
         self.fatsecret_settings = fatsecret_settings or FatSecretSettingsService()
@@ -87,6 +96,7 @@ class SettingsProviderService:
         self.fatsecret_client_factory = fatsecret_client_factory
         self.openai_translation_factory = openai_translation_factory
         self.local_ai_factory = local_ai_factory
+        self.local_embedding_factory = local_embedding_factory
 
     def load_fdc(self) -> dict[str, Any]:
         data = self.fdc_settings.load()
@@ -147,9 +157,37 @@ class SettingsProviderService:
         path = self.openai_settings.save(api_key=api_key, use_ai_translation=use_ai_translation)
         return SettingsProviderResult(ok=True, message="Configuracion de OpenAI guardada.", path=path)
 
-    def save_local_ai(self, *, enabled: bool, base_url: str, model: str) -> SettingsProviderResult:
-        path = self.local_ai_settings.save(enabled=enabled, base_url=base_url, model=model)
-        return SettingsProviderResult(ok=True, message="Configuracion de IA local guardada.", path=path)
+    def save_local_ai(
+        self,
+        *,
+        enabled: bool,
+        base_url: str,
+        model: str,
+        embedding_model: str | None = None,
+    ) -> SettingsProviderResult:
+        previous = self.load_local_ai()
+        previous_embedding_model = str(
+            previous.get("embedding_model")
+            or LocalAISettingsService.DEFAULT_EMBEDDING_MODEL
+        ).strip()
+        saved_embedding_model = str(
+            embedding_model
+            if embedding_model is not None
+            else previous_embedding_model
+        ).strip() or LocalAISettingsService.DEFAULT_EMBEDDING_MODEL
+        path = self.local_ai_settings.save(
+            enabled=enabled,
+            base_url=base_url,
+            model=model,
+            embedding_model=saved_embedding_model,
+        )
+        message = "Configuración de IA local guardada."
+        if saved_embedding_model != previous_embedding_model:
+            message += (
+                " El modelo de embeddings ha cambiado. "
+                "Actualiza el índice semántico documental."
+            )
+        return SettingsProviderResult(ok=True, message=message, path=path)
 
     def test_openai(self, api_key: str, use_ai_translation: bool) -> SettingsProviderResult:
         self.openai_settings.save(api_key=api_key, use_ai_translation=use_ai_translation)
@@ -163,6 +201,32 @@ class SettingsProviderService:
         service = self.local_ai_factory(enabled=True, base_url=base_url, model=model)
         result = service.test_connection()
         return SettingsProviderResult(ok=bool(result.ok), message=str(result.message or result.text or "Sin respuesta."))
+
+    def test_local_embedding(
+        self,
+        *,
+        base_url: str,
+        embedding_model: str,
+    ) -> SettingsProviderResult:
+        service = self.local_embedding_factory(
+            enabled=True,
+            base_url=base_url,
+            model=embedding_model,
+        )
+        result = service.embed(["Prueba de búsqueda documental de GestionIREKS."])
+        if result.ok:
+            model = str(result.model or embedding_model).strip()
+            return SettingsProviderResult(
+                ok=True,
+                message=(
+                    f"Modelo de embeddings '{model}' disponible. "
+                    f"Dimensión: {int(result.dimension)}."
+                ),
+            )
+        return SettingsProviderResult(
+            ok=False,
+            message=str(result.message or "No se obtuvo un embedding válido."),
+        )
 
     def save_orders_mail(self, destino_email: str, historico_dir: str) -> SettingsProviderResult:
         destino = str(destino_email or "").strip()

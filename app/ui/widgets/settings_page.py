@@ -1624,9 +1624,26 @@ class SettingsPage(QWidget):
         self.local_ai_model_input = QLineEdit()
         self.local_ai_model_input.setPlaceholderText(provider_view.local_ai_model_placeholder)
         self.local_ai_model_input.setText(str(local_ai_loaded.get("model") or ""))
+        self.local_ai_embedding_model_input = QLineEdit()
+        self.local_ai_embedding_model_input.setPlaceholderText(
+            provider_view.local_ai_embedding_model_placeholder
+        )
+        self.local_ai_embedding_model_input.setText(
+            str(local_ai_loaded.get("embedding_model") or "")
+        )
         self._add_api_field(local_ai_form, provider_view.local_ai_base_url_label, self.local_ai_base_url_input)
         self._add_api_field(local_ai_form, provider_view.local_ai_model_label, self.local_ai_model_input)
-        self._configure_api_fields(local_ai_form, self.local_ai_base_url_input, self.local_ai_model_input)
+        self._add_api_field(
+            local_ai_form,
+            provider_view.local_ai_embedding_model_label,
+            self.local_ai_embedding_model_input,
+        )
+        self._configure_api_fields(
+            local_ai_form,
+            self.local_ai_base_url_input,
+            self.local_ai_model_input,
+            self.local_ai_embedding_model_input,
+        )
         local_ai_layout.addLayout(local_ai_form)
 
         local_ai_actions = QVBoxLayout()
@@ -1634,18 +1651,31 @@ class SettingsPage(QWidget):
         self.local_ai_save_btn.setProperty("btnRole", "success")
         self.local_ai_test_btn = QPushButton(provider_view.test_button_label)
         self.local_ai_test_btn.setProperty("btnRole", "secondary")
+        self.local_ai_test_embedding_btn = QPushButton(
+            provider_view.local_ai_test_embedding_button_label
+        )
+        self.local_ai_test_embedding_btn.setProperty("btnRole", "secondary")
         self.local_ai_save_btn.clicked.connect(self._save_local_ai_settings)
         self.local_ai_test_btn.clicked.connect(self._test_local_ai_connection)
+        self.local_ai_test_embedding_btn.clicked.connect(
+            self._test_local_embedding_connection
+        )
         local_ai_actions.addWidget(self.local_ai_save_btn)
         local_ai_actions.addWidget(self.local_ai_test_btn)
-        self._configure_api_actions(local_ai_actions, self.local_ai_save_btn, self.local_ai_test_btn)
+        local_ai_actions.addWidget(self.local_ai_test_embedding_btn)
+        self._configure_api_actions(
+            local_ai_actions,
+            self.local_ai_save_btn,
+            self.local_ai_test_btn,
+            self.local_ai_test_embedding_btn,
+        )
         local_ai_layout.addLayout(local_ai_actions)
 
         local_ai_info = QLabel(provider_view.local_ai_info_label)
         local_ai_info.setObjectName("settingsApiLocalAiInfo")
         local_ai_info.setWordWrap(True)
         local_ai_layout.addWidget(local_ai_info)
-        self._finalize_api_card(local_ai_card, 300)
+        self._finalize_api_card(local_ai_card, 390)
         cards_layout.addWidget(local_ai_card, 1, 0)
 
         layout.addStretch(1)
@@ -2472,8 +2502,32 @@ class SettingsPage(QWidget):
         enabled = self.local_ai_enabled_check.isChecked() if hasattr(self, "local_ai_enabled_check") else False
         base_url = self.local_ai_base_url_input.text().strip() if hasattr(self, "local_ai_base_url_input") else ""
         model = self.local_ai_model_input.text().strip() if hasattr(self, "local_ai_model_input") else ""
+        embedding_model = (
+            self.local_ai_embedding_model_input.text().strip()
+            if hasattr(self, "local_ai_embedding_model_input")
+            else ""
+        )
+        missing = []
+        if not base_url:
+            missing.append("URL local")
+        if not model:
+            missing.append("Modelo conversacional")
+        if not embedding_model:
+            missing.append("Modelo de embeddings")
+        if missing:
+            QMessageBox.warning(
+                self,
+                "IA local",
+                f"Completa los campos obligatorios: {', '.join(missing)}.",
+            )
+            return
         try:
-            result = self.settings_provider_service.save_local_ai(enabled=enabled, base_url=base_url, model=model)
+            result = self.settings_provider_service.save_local_ai(
+                enabled=enabled,
+                base_url=base_url,
+                model=model,
+                embedding_model=embedding_model,
+            )
             QMessageBox.information(self, "IA local", f"{result.message}\n{result.path}")
         except Exception as exc:
             QMessageBox.warning(self, "IA local", f"No se pudo guardar la configuracion.\n{exc}")
@@ -2489,6 +2543,33 @@ class SettingsPage(QWidget):
                 QMessageBox.warning(self, "IA local", result.message or "No se obtuvo respuesta valida.")
         except Exception as exc:
             QMessageBox.warning(self, "IA local", f"Error de conexion.\n{exc}")
+
+    def _test_local_embedding_connection(self) -> None:
+        base_url = (
+            self.local_ai_base_url_input.text().strip()
+            if hasattr(self, "local_ai_base_url_input")
+            else ""
+        )
+        embedding_model = (
+            self.local_ai_embedding_model_input.text().strip()
+            if hasattr(self, "local_ai_embedding_model_input")
+            else ""
+        )
+        try:
+            result = self.settings_provider_service.test_local_embedding(
+                base_url=base_url,
+                embedding_model=embedding_model,
+            )
+            if result.ok:
+                QMessageBox.information(self, "IA local", result.message)
+            else:
+                QMessageBox.warning(
+                    self,
+                    "IA local",
+                    result.message or "No se obtuvo un embedding válido.",
+                )
+        except Exception as exc:
+            QMessageBox.warning(self, "IA local", f"Error de conexión.\n{exc}")
 
     def _pick_orders_historico_dir(self) -> None:
         current = self.orders_historico_dir_input.text().strip() if hasattr(self, "orders_historico_dir_input") else ""

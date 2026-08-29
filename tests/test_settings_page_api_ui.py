@@ -4,8 +4,9 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QLabel, QFrame, QWidget
+from PySide6.QtWidgets import QApplication, QLabel, QFrame, QMessageBox, QWidget
 
+from app.services.local_ai_settings_service import LocalAISettingsService
 from app.ui.widgets.settings_page import SettingsPage
 
 
@@ -50,6 +51,7 @@ def test_api_cards_use_a_three_column_two_row_grid_without_overlaps() -> None:
         page.openai_api_key_input,
         page.local_ai_base_url_input,
         page.local_ai_model_input,
+        page.local_ai_embedding_model_input,
     ):
         parent = field.parentWidget()
         assert parent is not None
@@ -82,8 +84,10 @@ def test_api_cards_use_a_three_column_two_row_grid_without_overlaps() -> None:
             page.local_ai_enabled_check,
             page.local_ai_base_url_input,
             page.local_ai_model_input,
+            page.local_ai_embedding_model_input,
             page.local_ai_save_btn,
             page.local_ai_test_btn,
+            page.local_ai_test_embedding_btn,
             page.findChild(QLabel, "settingsApiLocalAiInfo"),
         ],
     }
@@ -96,3 +100,150 @@ def test_api_cards_use_a_three_column_two_row_grid_without_overlaps() -> None:
     page.close()
     page.deleteLater()
     QApplication.processEvents()
+
+
+def test_local_ai_card_loads_embedding_field_in_visual_order(monkeypatch) -> None:
+    monkeypatch.setattr(
+        LocalAISettingsService,
+        "load",
+        lambda _self: {
+            "enabled": True,
+            "base_url": "http://localhost:11434",
+            "model": "chat-saved",
+            "embedding_model": "embed-saved",
+        },
+    )
+    _application()
+    page = SettingsPage()
+    page.resize(1280, 900)
+    page.main_tabs.setCurrentIndex(3)
+    page.show()
+    QApplication.processEvents()
+
+    labels = {label.text() for label in page.findChildren(QLabel)}
+    assert "Configuración IA local" in labels
+    assert "Modelo conversacional" in labels
+    assert "Modelo de embeddings" in labels
+    assert page.local_ai_model_input.placeholderText() == "qwen3.5:4b"
+    assert page.local_ai_embedding_model_input.placeholderText() == "embeddinggemma"
+    assert page.local_ai_model_input.text() == "chat-saved"
+    assert page.local_ai_embedding_model_input.text() == "embed-saved"
+    assert page.local_ai_base_url_input.y() < page.local_ai_model_input.y()
+    assert page.local_ai_model_input.y() < page.local_ai_embedding_model_input.y()
+    assert page.local_ai_embedding_model_input.height() == 34
+    assert page.local_ai_test_embedding_btn.height() == 34
+    assert page.local_ai_test_embedding_btn.text() == "Probar embeddings"
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+class _FakeLocalAIProvider:
+    def __init__(self, *, embedding_ok=True) -> None:
+        self.embedding_ok = embedding_ok
+        self.saved = None
+        self.tested_embedding = None
+
+    def save_local_ai(self, **kwargs):
+        self.saved = kwargs
+        return type("R", (), {"ok": True, "message": "Guardado", "path": "data/api_config.json"})()
+
+    def test_local_embedding(self, **kwargs):
+        self.tested_embedding = kwargs
+        if self.embedding_ok:
+            return type(
+                "R",
+                (),
+                {"ok": True, "message": "Modelo 'embed-ui' disponible. Dimensión: 768."},
+            )()
+        return type(
+            "R",
+            (),
+            {"ok": False, "message": "El modelo local 'missing' no está instalado en Ollama."},
+        )()
+
+
+def test_local_ai_save_and_embedding_test_transmit_independent_model(monkeypatch) -> None:
+    _application()
+    page = SettingsPage()
+    provider = _FakeLocalAIProvider()
+    page.settings_provider_service = provider
+    page.local_ai_enabled_check.setChecked(True)
+    page.local_ai_base_url_input.setText("http://localhost:11434")
+    page.local_ai_model_input.setText("chat-ui")
+    page.local_ai_embedding_model_input.setText("embed-ui")
+    information = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "information",
+        lambda _parent, title, message: information.append((title, message)),
+    )
+
+    page._save_local_ai_settings()
+    page._test_local_embedding_connection()
+
+    assert provider.saved == {
+        "enabled": True,
+        "base_url": "http://localhost:11434",
+        "model": "chat-ui",
+        "embedding_model": "embed-ui",
+    }
+    assert provider.tested_embedding == {
+        "base_url": "http://localhost:11434",
+        "embedding_model": "embed-ui",
+    }
+    assert any("Dimensión: 768" in message for _title, message in information)
+    assert all("vector" not in message.casefold() for _title, message in information)
+
+    page.close()
+    page.deleteLater()
+
+
+def test_local_embedding_missing_model_uses_warning_without_vectors(monkeypatch) -> None:
+    _application()
+    page = SettingsPage()
+    provider = _FakeLocalAIProvider(embedding_ok=False)
+    page.settings_provider_service = provider
+    page.local_ai_base_url_input.setText("http://localhost:11434")
+    page.local_ai_embedding_model_input.setText("missing")
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        lambda _parent, title, message: warnings.append((title, message)),
+    )
+
+    page._test_local_embedding_connection()
+
+    assert warnings == [
+        ("IA local", "El modelo local 'missing' no está instalado en Ollama.")
+    ]
+    assert "vector" not in warnings[0][1].casefold()
+
+    page.close()
+    page.deleteLater()
+
+
+def test_local_ai_save_requires_url_and_both_models(monkeypatch) -> None:
+    _application()
+    page = SettingsPage()
+    provider = _FakeLocalAIProvider()
+    page.settings_provider_service = provider
+    page.local_ai_base_url_input.setText("http://localhost:11434")
+    page.local_ai_model_input.setText("chat-ui")
+    page.local_ai_embedding_model_input.clear()
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        lambda _parent, title, message: warnings.append((title, message)),
+    )
+
+    page._save_local_ai_settings()
+
+    assert provider.saved is None
+    assert warnings and "Modelo de embeddings" in warnings[0][1]
+
+    page.close()
+    page.deleteLater()

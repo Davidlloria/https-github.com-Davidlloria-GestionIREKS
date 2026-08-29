@@ -8,6 +8,7 @@ from app.services.api_settings_service import ApiSettingsService
 class LocalAISettingsService:
     DEFAULT_BASE_URL = "http://127.0.0.1:11434"
     DEFAULT_MODEL = "qwen3.5:4b"
+    DEFAULT_EMBEDDING_MODEL = "embeddinggemma"
 
     def load(self) -> dict:
         data = ApiSettingsService().get_local_ai()
@@ -15,11 +16,26 @@ class LocalAISettingsService:
             "enabled": bool(data.get("enabled", False)),
             "base_url": str(data.get("base_url") or self.DEFAULT_BASE_URL).strip(),
             "model": str(data.get("model") or self.DEFAULT_MODEL).strip(),
+            "embedding_model": str(
+                data.get("embedding_model") or self.DEFAULT_EMBEDDING_MODEL
+            ).strip(),
         }
 
-    def save(self, *, enabled: bool, base_url: str, model: str) -> Path:
+    def save(
+        self,
+        *,
+        enabled: bool,
+        base_url: str,
+        model: str,
+        embedding_model: str | None = None,
+    ) -> Path:
         return ApiSettingsService().save_local_ai(
             enabled=bool(enabled),
             base_url=str(base_url or self.DEFAULT_BASE_URL).strip(),
             model=str(model or self.DEFAULT_MODEL).strip(),
+            embedding_model=(
+                str(embedding_model).strip()
+                if embedding_model is not None
+                else None
+            ),
         )

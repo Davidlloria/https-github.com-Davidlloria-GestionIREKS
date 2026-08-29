@@ -21,6 +21,7 @@ class ApiSettingsService:
     CONFIG_PATH = DATA_DIR / "api_config.json"
     LEGACY_FDC_PATH = DATA_DIR / "fdc_config.json"
     LEGACY_FATSECRET_PATH = DATA_DIR / "fatsecret_config.json"
+    DEFAULT_LOCAL_EMBEDDING_MODEL = "embeddinggemma"
 
     def load_raw(self) -> dict[str, Any]:
         if not self.CONFIG_PATH.exists():
@@ -82,14 +83,33 @@ class ApiSettingsService:
             "enabled": bool(section.get("enabled", False)),
             "base_url": str(section.get("base_url") or "http://127.0.0.1:11434").strip(),
             "model": str(section.get("model") or "qwen3.5:4b").strip(),
+            "embedding_model": str(
+                section.get("embedding_model") or self.DEFAULT_LOCAL_EMBEDDING_MODEL
+            ).strip(),
         }
 
-    def save_local_ai(self, *, enabled: bool, base_url: str, model: str) -> Path:
+    def save_local_ai(
+        self,
+        *,
+        enabled: bool,
+        base_url: str,
+        model: str,
+        embedding_model: str | None = None,
+    ) -> Path:
         root = self.load_raw()
+        previous = self._section(root, "local_ai")
+        saved_embedding_model = (
+            str(embedding_model).strip()
+            if embedding_model is not None
+            else str(
+                previous.get("embedding_model") or self.DEFAULT_LOCAL_EMBEDDING_MODEL
+            ).strip()
+        ) or self.DEFAULT_LOCAL_EMBEDDING_MODEL
         root["local_ai"] = {
             "enabled": bool(enabled),
             "base_url": str(base_url or "http://127.0.0.1:11434").strip(),
             "model": str(model or "qwen3.5:4b").strip(),
+            "embedding_model": saved_embedding_model,
         }
         return self.save_raw(root)
 
@@ -180,10 +200,16 @@ class ApiSettingsService:
                 use_ai_translation=bool(payload.get("use_ai_translation", False)),
             )
         elif clean_provider == "local_ai":
+            embedding_model = (
+                str(payload.get("embedding_model") or "").strip()
+                if "embedding_model" in payload
+                else None
+            )
             self.save_local_ai(
                 enabled=bool(payload.get("enabled", False)),
                 base_url=str(payload.get("base_url") or "http://127.0.0.1:11434").strip(),
                 model=str(payload.get("model") or "qwen3.5:4b").strip(),
+                embedding_model=embedding_model,
             )
         elif clean_provider == "fatsecret":
             self.save_fatsecret(

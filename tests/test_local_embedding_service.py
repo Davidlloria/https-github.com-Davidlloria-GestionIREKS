@@ -16,6 +16,18 @@ def _service(**kwargs) -> LocalEmbeddingService:
     return LocalEmbeddingService(enabled=True, base_url="http://127.0.0.1:11434", **kwargs)
 
 
+class _Settings:
+    def __init__(self, embedding_model=None):
+        self.embedding_model = embedding_model
+
+    def load(self):
+        return {
+            "enabled": False,
+            "base_url": "http://localhost:11434",
+            "embedding_model": self.embedding_model,
+        }
+
+
 def test_uses_native_ollama_endpoint_and_exact_payload(monkeypatch) -> None:
     service = _service(model="embeddinggemma")
     captured = {}
@@ -61,12 +73,13 @@ def test_configuration_and_input_validation(monkeypatch) -> None:
     assert not _service().embed(["x"] * (MAX_EMBEDDING_BATCH_SIZE + 1)).ok
 
 
-def test_environment_model_has_priority_over_default(monkeypatch) -> None:
+def test_embedding_model_precedence_is_explicit_environment_saved_default(monkeypatch) -> None:
     monkeypatch.setenv("GESTION_IREKS_EMBEDDING_MODEL", "env-model")
-    assert _service().model == "env-model"
-    assert _service(model="explicit").model == "explicit"
+    assert _service(settings_service=_Settings("saved-model")).model == "env-model"
+    assert _service(model="explicit", settings_service=_Settings("saved-model")).model == "explicit"
     monkeypatch.delenv("GESTION_IREKS_EMBEDDING_MODEL")
-    assert _service().model == DEFAULT_EMBEDDING_MODEL
+    assert _service(settings_service=_Settings("saved-model")).model == "saved-model"
+    assert _service(settings_service=_Settings()).model == DEFAULT_EMBEDDING_MODEL
 
 
 @pytest.mark.parametrize(

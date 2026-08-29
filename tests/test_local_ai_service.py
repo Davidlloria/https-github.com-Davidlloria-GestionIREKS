@@ -10,12 +10,18 @@ def test_local_ai_settings_round_trip(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(ApiSettingsService, "CONFIG_PATH", config_path)
     settings = LocalAISettingsService()
 
-    settings.save(enabled=True, base_url="http://localhost:8080/v1", model="local-model")
+    settings.save(
+        enabled=True,
+        base_url="http://localhost:8080/v1",
+        model="local-model",
+        embedding_model="embed-local",
+    )
 
     assert settings.load() == {
         "enabled": True,
         "base_url": "http://localhost:8080/v1",
         "model": "local-model",
+        "embedding_model": "embed-local",
     }
 
 
@@ -24,6 +30,50 @@ def test_local_ai_settings_uses_native_ollama_url_by_default(tmp_path, monkeypat
     monkeypatch.setattr(ApiSettingsService, "CONFIG_PATH", config_path)
 
     assert LocalAISettingsService().load()["base_url"] == "http://127.0.0.1:11434"
+
+
+def test_old_local_ai_settings_use_default_embedding_model(tmp_path, monkeypatch) -> None:
+    config_path = tmp_path / "api_config.json"
+    config_path.write_text(
+        '{"local_ai":{"enabled":true,"base_url":"http://localhost:11434","model":"chat"}}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(ApiSettingsService, "CONFIG_PATH", config_path)
+
+    assert LocalAISettingsService().load()["embedding_model"] == "embeddinggemma"
+
+
+def test_local_ai_settings_preserve_other_providers_and_omitted_embedding(tmp_path, monkeypatch) -> None:
+    config_path = tmp_path / "api_config.json"
+    config_path.write_text(
+        '{"openai":{"api_key":"keep"},"local_ai":{"embedding_model":"stored-embed"}}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(ApiSettingsService, "CONFIG_PATH", config_path)
+    service = ApiSettingsService()
+
+    service.save_local_ai(enabled=True, base_url="http://localhost:11434", model="chat")
+    loaded = service.load_raw()
+
+    assert loaded["openai"] == {"api_key": "keep"}
+    assert loaded["local_ai"]["embedding_model"] == "stored-embed"
+
+
+def test_save_provider_accepts_embedding_model(tmp_path, monkeypatch) -> None:
+    config_path = tmp_path / "api_config.json"
+    monkeypatch.setattr(ApiSettingsService, "CONFIG_PATH", config_path)
+
+    result = ApiSettingsService().save_provider(
+        "local_ai",
+        {
+            "enabled": True,
+            "base_url": "http://localhost:11434",
+            "model": "chat",
+            "embedding_model": "embed-provider",
+        },
+    )
+
+    assert result["config"]["embedding_model"] == "embed-provider"
 
 
 def test_local_ai_rejects_non_loopback_urls(monkeypatch) -> None:

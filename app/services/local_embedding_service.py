@@ -12,7 +12,7 @@ from urllib.request import ProxyHandler, Request, build_opener
 from app.services.local_ai_settings_service import LocalAISettingsService
 
 
-DEFAULT_EMBEDDING_MODEL = "embeddinggemma"
+DEFAULT_EMBEDDING_MODEL = LocalAISettingsService.DEFAULT_EMBEDDING_MODEL
 MAX_EMBEDDING_BATCH_SIZE = 16
 
 
@@ -43,7 +43,13 @@ class LocalEmbeddingService:
             base_url or settings.get("base_url") or LocalAISettingsService.DEFAULT_BASE_URL
         ).rstrip("/")
         configured_model = os.getenv("GESTION_IREKS_EMBEDDING_MODEL")
-        self.model = str(model if model is not None else configured_model or DEFAULT_EMBEDDING_MODEL).strip()
+        self.model = str(
+            model
+            if model is not None
+            else configured_model
+            or settings.get("embedding_model")
+            or DEFAULT_EMBEDDING_MODEL
+        ).strip()
         self.timeout = float(timeout)
 
     def embed(self, inputs: Iterable[str]) -> LocalEmbeddingResult:
