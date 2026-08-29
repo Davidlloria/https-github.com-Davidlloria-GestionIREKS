@@ -16,6 +16,7 @@ import app.ui.widgets.document_library_page as page_module
 from app.services.document_library_service import (
     DocumentLibraryItem,
     DocumentLibraryScanResult,
+    DocumentLibraryService,
     DocumentNotFoundError,
     UnsafeDocumentPathError,
 )
@@ -127,6 +128,11 @@ class _FakeContentIndexService:
 
     def search(self, *_args, **_kwargs):
         return []
+
+
+class _FakeQuestionAnswerService:
+    def answer(self, *_args, **_kwargs):
+        raise AssertionError("El test de apertura no debe consultar la IA.")
 
 
 def _sample_documents() -> list[DocumentLibraryItem]:
@@ -586,3 +592,74 @@ def test_content_result_for_disappeared_document_uses_safe_existing_state() -> N
 
     assert page._loaded_document_id is None
     assert "ya no está disponible" in page.preview_status_label.text()
+
+
+def test_question_answer_button_opens_only_one_injected_dialog_instance() -> None:
+    _application()
+    library = _FakeDocumentLibraryService(_sample_documents())
+    question_service = _FakeQuestionAnswerService()
+    page = DocumentLibraryPage(
+        library,
+        question_answer_service=question_service,  # type: ignore[arg-type]
+    )
+
+    page.question_answer_button.click()
+    _application().processEvents()
+    first_dialog = page._question_answer_dialog
+    page.question_answer_button.click()
+    _application().processEvents()
+
+    assert first_dialog is not None
+    assert page._question_answer_dialog is first_dialog
+    assert first_dialog.isVisible()
+    assert first_dialog._question_answer_service is question_service
+    first_dialog.close()
+    _application().processEvents()
+
+
+def test_default_question_service_reuses_page_content_index_and_database(
+    tmp_path: Path,
+) -> None:
+    _application()
+    library_dir = tmp_path / "library"
+    library_dir.mkdir()
+    database = tmp_path / "data" / "document_library.sqlite"
+    library = DocumentLibraryService(library_dir, database)
+    page = DocumentLibraryPage(library)
+
+    page.question_answer_button.click()
+    _application().processEvents()
+
+    assert page._question_answer_service is not None
+    assert page._content_index_service is not None
+    assert (
+        page._question_answer_service.content_index_service
+        is page._content_index_service
+    )
+    assert page._content_index_service.database_path == database.resolve()
+    assert page._question_answer_dialog is not None
+    page._question_answer_dialog.close()
+    _application().processEvents()
+
+
+def test_question_source_signal_reuses_pdf_navigation(tmp_path: Path) -> None:
+    _application()
+    document = _sample_documents()[0]
+    library = _FakeDocumentLibraryService([document])
+    library.resolved_path = _write_pdf(tmp_path / "three-pages-qa.pdf", pages=3)
+    page = DocumentLibraryPage(
+        library,
+        question_answer_service=_FakeQuestionAnswerService(),  # type: ignore[arg-type]
+    )
+    page.question_answer_button.click()
+    _application().processEvents()
+    dialog = page._question_answer_dialog
+    assert dialog is not None
+
+    dialog.source_requested.emit(document.document_id, 2)
+    _application().processEvents()
+
+    assert page._selected_document_id() == document.document_id
+    assert page._loaded_document_id == document.document_id
+    assert page.pdf_view.pageNavigator().currentPage() == 1
+    dialog.close()

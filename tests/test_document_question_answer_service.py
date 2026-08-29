@@ -10,6 +10,7 @@ from app.services.document_question_answer_service import (
     MAX_ANSWER_SOURCES,
     MAX_CONTEXT_CHARS,
     MAX_OUTPUT_TOKENS,
+    MAX_QUESTION_CHARS,
     MAX_RETRIEVAL_RESULTS,
     MAX_SOURCE_CHARS,
     NO_INFORMATION_ANSWER,
@@ -109,6 +110,18 @@ def test_empty_question_does_not_search_or_call_ai() -> None:
     assert content.search_calls == []
     assert ai.calls == []
     assert "Escribe una pregunta" in result.message
+
+
+def test_question_over_limit_does_not_search_or_call_ai() -> None:
+    service, content, ai = _service()
+
+    result = service.answer("x" * (MAX_QUESTION_CHARS + 1))
+
+    assert result.ok is False
+    assert result.used_ai is False
+    assert content.search_calls == []
+    assert ai.calls == []
+    assert str(MAX_QUESTION_CHARS) in result.message
 
 
 def test_no_matches_returns_deterministic_answer_without_ai() -> None:

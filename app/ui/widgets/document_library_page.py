@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.services.document_content_index_service import DocumentContentIndexService
 from app.services.document_library_service import (
     DocumentLibraryItem,
     DocumentLibraryScanResult,
@@ -31,8 +32,9 @@ from app.services.document_library_service import (
     DocumentNotFoundError,
     UnsafeDocumentPathError,
 )
-from app.services.document_content_index_service import DocumentContentIndexService
+from app.services.document_question_answer_service import DocumentQuestionAnswerService
 from app.ui.widgets.document_content_search_dialog import DocumentContentSearchDialog
+from app.ui.widgets.document_question_answer_dialog import DocumentQuestionAnswerDialog
 
 
 class DocumentCatalogRefreshWorker(QThread):
@@ -68,14 +70,19 @@ class DocumentLibraryPage(QWidget):
         self,
         service: DocumentLibraryService | None = None,
         content_index_service: DocumentContentIndexService | None = None,
+        question_answer_service: DocumentQuestionAnswerService | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("documentLibraryPage")
         self._service = service or DocumentLibraryService()
-        self._content_index_service = content_index_service
+        self._content_index_service = content_index_service or getattr(
+            question_answer_service, "content_index_service", None
+        )
+        self._question_answer_service = question_answer_service
         self._worker: DocumentCatalogRefreshWorker | None = None
         self._content_search_dialog: DocumentContentSearchDialog | None = None
+        self._question_answer_dialog: DocumentQuestionAnswerDialog | None = None
         self._documents_by_id: dict[str, DocumentLibraryItem] = {}
         self._loaded_document_id: str | None = None
         self._minimum_zoom = 0.25
@@ -140,6 +147,12 @@ class DocumentLibraryPage(QWidget):
         self.content_search_button.setProperty("btnRole", "secondary")
         self.content_search_button.clicked.connect(self._open_content_search)
         filters_layout.addWidget(self.content_search_button)
+
+        self.question_answer_button = QPushButton("Preguntar a la IA")
+        self.question_answer_button.setObjectName("documentLibraryQuestionAnswer")
+        self.question_answer_button.setProperty("btnRole", "secondary")
+        self.question_answer_button.clicked.connect(self._open_question_answer)
+        filters_layout.addWidget(self.question_answer_button)
 
         self.refresh_button = QPushButton("Actualizar catálogo")
         self.refresh_button.setObjectName("documentLibraryRefreshButton")
@@ -466,6 +479,31 @@ class DocumentLibraryPage(QWidget):
 
     def _content_search_dialog_closed(self) -> None:
         self._content_search_dialog = None
+
+    def _open_question_answer(self) -> None:
+        if self._question_answer_dialog is not None:
+            self._question_answer_dialog.raise_()
+            self._question_answer_dialog.activateWindow()
+            return
+        if self._question_answer_service is None:
+            if self._content_index_service is None:
+                self._content_index_service = DocumentContentIndexService(self._service)
+            self._question_answer_service = DocumentQuestionAnswerService(
+                self._content_index_service
+            )
+        dialog = DocumentQuestionAnswerDialog(
+            self._service,
+            self._question_answer_service,
+            self,
+        )
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.source_requested.connect(self._show_content_search_result)
+        dialog.destroyed.connect(self._question_answer_dialog_closed)
+        self._question_answer_dialog = dialog
+        dialog.open()
+
+    def _question_answer_dialog_closed(self) -> None:
+        self._question_answer_dialog = None
 
     def _show_content_search_result(self, document_id: str, page_number: int) -> None:
         self._clear_filters()

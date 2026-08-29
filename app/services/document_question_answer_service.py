@@ -18,6 +18,7 @@ MAX_ANSWER_SOURCES = 6
 MAX_SOURCE_CHARS = 3_000
 MAX_CONTEXT_CHARS = 10_000
 MAX_OUTPUT_TOKENS = 700
+MAX_QUESTION_CHARS = 1_000
 
 NO_INFORMATION_ANSWER = (
     "No se encontró información suficiente en la biblioteca documental."
@@ -80,6 +81,12 @@ class DocumentQuestionAnswerService:
                 False,
                 "",
                 "Escribe una pregunta sobre la biblioteca documental.",
+            )
+        if len(clean_question) > MAX_QUESTION_CHARS:
+            return DocumentQuestionAnswerResult(
+                False,
+                "",
+                f"La pregunta no puede superar {MAX_QUESTION_CHARS} caracteres.",
             )
 
         try:
