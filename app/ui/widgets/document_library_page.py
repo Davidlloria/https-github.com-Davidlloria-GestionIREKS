@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+
 from PySide6.QtCore import QThread, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
+from PySide6.QtPdf import QPdfDocument
+from PySide6.QtPdfWidgets import QPdfView
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -13,6 +16,8 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QSplitter,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -66,6 +71,11 @@ class DocumentLibraryPage(QWidget):
         self.setObjectName("documentLibraryPage")
         self._service = service or DocumentLibraryService()
         self._worker: DocumentCatalogRefreshWorker | None = None
+        self._documents_by_id: dict[str, DocumentLibraryItem] = {}
+        self._loaded_document_id: str | None = None
+        self._minimum_zoom = 0.25
+        self._maximum_zoom = 4.0
+        self._zoom_step = 0.25
         self._build_ui()
         self.reload()
 
@@ -127,6 +137,16 @@ class DocumentLibraryPage(QWidget):
         filters_layout.addWidget(self.refresh_button)
         layout.addWidget(filters)
 
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.main_splitter.setObjectName("documentLibrarySplitter")
+        self.main_splitter.setChildrenCollapsible(False)
+
+        table_panel = QFrame()
+        table_panel.setObjectName("documentLibraryTablePanel")
+        table_layout = QVBoxLayout(table_panel)
+        table_layout.setContentsMargins(0, 0, 0, 0)
+        table_layout.setSpacing(6)
+
         self.table = QTableWidget(0, 6)
         self.table.setObjectName("documentLibraryTable")
         self.table.setHorizontalHeaderLabels(
@@ -143,15 +163,22 @@ class DocumentLibraryPage(QWidget):
             self.table.horizontalHeader().setSectionResizeMode(
                 column, QHeaderView.ResizeMode.ResizeToContents
             )
-        self.table.itemSelectionChanged.connect(self._sync_open_button)
+        self.table.itemSelectionChanged.connect(self._selection_changed)
         self.table.itemDoubleClicked.connect(lambda _item: self._open_selected_document())
-        layout.addWidget(self.table, 1)
+        table_layout.addWidget(self.table, 1)
 
         self.empty_state_label = QLabel()
         self.empty_state_label.setObjectName("documentLibraryEmptyState")
         self.empty_state_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_state_label.setWordWrap(True)
-        layout.addWidget(self.empty_state_label)
+        table_layout.addWidget(self.empty_state_label)
+
+        self.main_splitter.addWidget(table_panel)
+        self.main_splitter.addWidget(self._build_preview_panel())
+        self.main_splitter.setStretchFactor(0, 3)
+        self.main_splitter.setStretchFactor(1, 2)
+        self.main_splitter.setSizes([760, 420])
+        layout.addWidget(self.main_splitter, 1)
 
         footer = QHBoxLayout()
         self.status_label = QLabel("Catálogo sin cargar.")
@@ -168,6 +195,72 @@ class DocumentLibraryPage(QWidget):
         self.open_button.clicked.connect(self._open_selected_document)
         footer.addWidget(self.open_button)
         layout.addLayout(footer)
+
+    def _build_preview_panel(self) -> QWidget:
+        panel = QFrame()
+        panel.setObjectName("documentLibraryPreviewPanel")
+        panel.setMinimumWidth(320)
+        preview_layout = QVBoxLayout(panel)
+        preview_layout.setContentsMargins(10, 8, 0, 0)
+        preview_layout.setSpacing(7)
+
+        self.preview_name_label = QLabel("Vista previa")
+        self.preview_name_label.setObjectName("documentLibraryPreviewName")
+        self.preview_name_label.setStyleSheet("font-weight: 600;")
+        preview_layout.addWidget(self.preview_name_label)
+
+        self.preview_path_label = QLabel("")
+        self.preview_path_label.setObjectName("documentLibraryPreviewPath")
+        self.preview_path_label.setWordWrap(True)
+        preview_layout.addWidget(self.preview_path_label)
+
+        controls = QHBoxLayout()
+        self.fit_width_button = QPushButton("Ajustar ancho")
+        self.fit_width_button.setObjectName("documentLibraryFitWidth")
+        self.fit_width_button.clicked.connect(self._fit_preview_to_width)
+        controls.addWidget(self.fit_width_button)
+        self.zoom_out_button = QPushButton("−")
+        self.zoom_out_button.setObjectName("documentLibraryZoomOut")
+        self.zoom_out_button.setToolTip("Reducir zoom")
+        self.zoom_out_button.clicked.connect(lambda: self._change_zoom(-self._zoom_step))
+        controls.addWidget(self.zoom_out_button)
+        self.zoom_in_button = QPushButton("+")
+        self.zoom_in_button.setObjectName("documentLibraryZoomIn")
+        self.zoom_in_button.setToolTip("Aumentar zoom")
+        self.zoom_in_button.clicked.connect(lambda: self._change_zoom(self._zoom_step))
+        controls.addWidget(self.zoom_in_button)
+        self.zoom_label = QLabel("100 %")
+        self.zoom_label.setObjectName("documentLibraryZoomLabel")
+        self.zoom_label.setMinimumWidth(58)
+        self.zoom_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        controls.addWidget(self.zoom_label)
+        controls.addStretch(1)
+        preview_layout.addLayout(controls)
+
+        self.preview_stack = QStackedWidget()
+        self.preview_stack.setObjectName("documentLibraryPreviewStack")
+        self.preview_placeholder = QLabel("Selecciona un PDF para previsualizarlo")
+        self.preview_placeholder.setObjectName("documentLibraryPreviewPlaceholder")
+        self.preview_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_placeholder.setWordWrap(True)
+        self.preview_stack.addWidget(self.preview_placeholder)
+
+        self.pdf_view = QPdfView()
+        self.pdf_view.setObjectName("documentLibraryPdfView")
+        self.pdf_document = QPdfDocument(self)
+        self.pdf_view.setDocument(self.pdf_document)
+        self.pdf_view.setPageMode(QPdfView.PageMode.MultiPage)
+        self.pdf_view.setZoomMode(QPdfView.ZoomMode.FitToWidth)
+        self.pdf_view.zoomFactorChanged.connect(self._update_zoom_controls)
+        self.preview_stack.addWidget(self.pdf_view)
+        preview_layout.addWidget(self.preview_stack, 1)
+
+        self.preview_status_label = QLabel("Selecciona un PDF para previsualizarlo")
+        self.preview_status_label.setObjectName("documentLibraryPreviewStatus")
+        self.preview_status_label.setWordWrap(True)
+        preview_layout.addWidget(self.preview_status_label)
+        self._set_preview_controls_enabled(False)
+        return panel
 
     def reload(self) -> None:
         selected_id = self._selected_document_id()
@@ -264,6 +357,7 @@ class DocumentLibraryPage(QWidget):
         *,
         selected_id: str | None = None,
     ) -> None:
+        self._documents_by_id = {document.document_id: document for document in documents}
         self.table.setSortingEnabled(False)
         self.table.clearContents()
         self.table.setRowCount(len(documents))
@@ -309,9 +403,11 @@ class DocumentLibraryPage(QWidget):
                 else "El catálogo está vacío. Pulsa «Actualizar catálogo» para crearlo."
             )
             self.empty_state_label.show()
-        self._sync_open_button()
+        self._selection_changed()
 
     def _clear_filters(self) -> None:
+        self.table.clearSelection()
+        self._clear_preview()
         self.search_input.blockSignals(True)
         self.search_input.clear()
         self.search_input.blockSignals(False)
@@ -380,14 +476,119 @@ class DocumentLibraryPage(QWidget):
         worker.deleteLater()
 
     def _selected_document_id(self) -> str | None:
-        row = self.table.currentRow()
-        if row < 0:
+        selected_rows = self.table.selectionModel().selectedRows()
+        if not selected_rows:
             return None
+        row = selected_rows[0].row()
         item = self.table.item(row, 0)
         return str(item.data(Qt.ItemDataRole.UserRole)) if item is not None else None
 
-    def _sync_open_button(self) -> None:
-        self.open_button.setEnabled(self._selected_document_id() is not None)
+    def _selected_document(self) -> DocumentLibraryItem | None:
+        document_id = self._selected_document_id()
+        return self._documents_by_id.get(document_id) if document_id else None
+
+    def _selection_changed(self) -> None:
+        document = self._selected_document()
+        self.open_button.setEnabled(document is not None)
+        if document is None:
+            self._clear_preview()
+            return
+        self._preview_document(document)
+
+    def _preview_document(self, document: DocumentLibraryItem) -> None:
+        self._close_pdf_document()
+        self.preview_name_label.setText(document.name)
+        self.preview_path_label.setText(document.relative_path)
+        if document.extension.casefold() != ".pdf":
+            self._show_preview_placeholder(
+                "La vista previa interna está disponible solo para PDF. "
+                "Usa «Abrir documento» para consultar este archivo."
+            )
+            return
+        if not self._service.is_library_available():
+            self._show_preview_placeholder("La biblioteca documental no está disponible.")
+            return
+
+        self._show_preview_placeholder("Cargando PDF...")
+        try:
+            resolved_path = self._service.resolve_document(document.document_id)
+        except DocumentNotFoundError as exc:
+            self._show_preview_placeholder(f"El archivo ha desaparecido: {exc}")
+            return
+        except UnsafeDocumentPathError as exc:
+            self._show_preview_placeholder(f"La ruta del documento no es segura: {exc}")
+            return
+
+        load_error = self.pdf_document.load(str(resolved_path))
+        if load_error != QPdfDocument.Error.None_ or self.pdf_document.pageCount() <= 0:
+            self._close_pdf_document()
+            self._show_preview_placeholder(
+                "El PDF está corrupto o no es compatible con el visor."
+            )
+            return
+
+        self._loaded_document_id = document.document_id
+        self.pdf_view.setZoomMode(QPdfView.ZoomMode.FitToWidth)
+        self.preview_stack.setCurrentWidget(self.pdf_view)
+        page_count = self.pdf_document.pageCount()
+        self.preview_status_label.setText(
+            f"PDF cargado · {page_count} página" if page_count == 1 else f"PDF cargado · {page_count} páginas"
+        )
+        self._set_preview_controls_enabled(True)
+        self._update_zoom_controls()
+
+    def _show_preview_placeholder(self, message: str) -> None:
+        self.preview_placeholder.setText(message)
+        self.preview_status_label.setText(message)
+        self.preview_stack.setCurrentWidget(self.preview_placeholder)
+        self._set_preview_controls_enabled(False)
+
+    def _clear_preview(self) -> None:
+        self._close_pdf_document()
+        self.preview_name_label.setText("Vista previa")
+        self.preview_path_label.clear()
+        self._show_preview_placeholder("Selecciona un PDF para previsualizarlo")
+
+    def _close_pdf_document(self) -> None:
+        self.pdf_view.setDocument(None)
+        self.pdf_document.close()
+        self.pdf_view.setDocument(self.pdf_document)
+        self._loaded_document_id = None
+        self._set_preview_controls_enabled(False)
+
+    def _set_preview_controls_enabled(self, enabled: bool) -> None:
+        self.fit_width_button.setEnabled(enabled)
+        self.zoom_out_button.setEnabled(enabled)
+        self.zoom_in_button.setEnabled(enabled)
+        if not enabled:
+            self.zoom_label.setText("—")
+
+    def _fit_preview_to_width(self) -> None:
+        if self._loaded_document_id is None:
+            return
+        self.pdf_view.setZoomMode(QPdfView.ZoomMode.FitToWidth)
+        self._update_zoom_controls()
+
+    def _change_zoom(self, amount: float) -> None:
+        if self._loaded_document_id is None:
+            return
+        current_zoom = float(self.pdf_view.zoomFactor())
+        target_zoom = max(
+            self._minimum_zoom,
+            min(self._maximum_zoom, current_zoom + amount),
+        )
+        self.pdf_view.setZoomMode(QPdfView.ZoomMode.Custom)
+        self.pdf_view.setZoomFactor(target_zoom)
+        self._update_zoom_controls(target_zoom)
+
+    def _update_zoom_controls(self, zoom_factor: float | None = None) -> None:
+        if self._loaded_document_id is None:
+            return
+        factor = float(zoom_factor if zoom_factor is not None else self.pdf_view.zoomFactor())
+        factor = max(self._minimum_zoom, min(self._maximum_zoom, factor))
+        self.zoom_label.setText(f"{round(factor * 100)} %")
+        self.zoom_out_button.setEnabled(factor > self._minimum_zoom)
+        self.zoom_in_button.setEnabled(factor < self._maximum_zoom)
 
     def _open_selected_document(self) -> None:
         document_id = self._selected_document_id()
@@ -404,6 +605,10 @@ class DocumentLibraryPage(QWidget):
                 "Documentos",
                 "Windows no pudo abrir el documento con la aplicación predeterminada.",
             )
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        self._close_pdf_document()
+        super().closeEvent(event)
 
     @staticmethod
     def _format_size(size_bytes: int) -> str:

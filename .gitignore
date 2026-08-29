@@ -36,6 +36,7 @@ frontend/.env.*
 
 # Runtime data
 data/*.db
+data/*.sqlite
 data/*.json
 data/backups/
 data/exports/
