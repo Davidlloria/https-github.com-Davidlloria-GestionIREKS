@@ -6,11 +6,15 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
 
-from app.services.document_content_index_service import (
-    DocumentContentIndexService,
-    DocumentContentSearchResult,
+from app.services.document_content_index_service import DocumentContentIndexService
+from app.services.document_hybrid_retrieval_service import (
+    DocumentHybridRetrievalError,
+    DocumentHybridRetrievalService,
+    DocumentHybridSearchResult,
 )
+from app.services.document_semantic_index_service import DocumentSemanticIndexService
 from app.services.local_ai_service import LocalAIService
+from app.services.local_embedding_service import LocalEmbeddingService
 
 
 MAX_RETRIEVAL_RESULTS = 18
@@ -47,6 +51,8 @@ class DocumentQuestionAnswerResult:
     message: str
     used_ai: bool = False
     sources: tuple[DocumentAnswerSource, ...] = ()
+    retrieval_mode: str = "none"
+    retrieval_warnings: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -56,17 +62,29 @@ class _ContextSource:
 
 
 class DocumentQuestionAnswerService:
-    """Ground a local-AI answer in pages from the lexical document index."""
+    """Ground a local-AI answer in pages from hybrid document retrieval."""
 
     def __init__(
         self,
         content_index_service: DocumentContentIndexService | None = None,
         local_ai_service: LocalAIService | None = None,
+        retrieval_service: DocumentHybridRetrievalService | None = None,
     ) -> None:
         self.content_index_service = (
             content_index_service or DocumentContentIndexService()
         )
         self.local_ai_service = local_ai_service or LocalAIService(timeout=180.0)
+        if retrieval_service is None:
+            embedding_service = LocalEmbeddingService()
+            semantic_index_service = DocumentSemanticIndexService(
+                self.content_index_service,
+                embedding_service,
+            )
+            retrieval_service = DocumentHybridRetrievalService(
+                self.content_index_service,
+                semantic_index_service,
+            )
+        self.retrieval_service = retrieval_service
 
     def answer(
         self,
@@ -90,18 +108,24 @@ class DocumentQuestionAnswerService:
             )
 
         try:
-            matches = self.content_index_service.search(
+            retrieval = self.retrieval_service.search(
                 clean_question,
                 area=area or None,
                 category=category or None,
                 limit=MAX_RETRIEVAL_RESULTS,
             )
-            context_sources = self._build_context_sources(matches)
-        except Exception as exc:  # noqa: BLE001
+            context_sources = self._build_context_sources(list(retrieval.results))
+        except DocumentHybridRetrievalError:
             return DocumentQuestionAnswerResult(
                 False,
                 "",
-                f"No se pudo consultar el índice documental: {exc}",
+                "No se pudo consultar el índice documental",
+            )
+        except Exception:  # noqa: BLE001
+            return DocumentQuestionAnswerResult(
+                False,
+                "",
+                "No se pudo consultar el índice documental",
             )
 
         if not context_sources:
@@ -109,6 +133,8 @@ class DocumentQuestionAnswerService:
                 True,
                 NO_INFORMATION_ANSWER,
                 "La búsqueda no recuperó páginas con texto utilizable.",
+                retrieval_mode=retrieval.mode,
+                retrieval_warnings=retrieval.warnings,
             )
 
         if not self.local_ai_service.enabled:
@@ -116,6 +142,8 @@ class DocumentQuestionAnswerService:
                 False,
                 "",
                 "La IA local no está activada. Actívala en Configuración > API.",
+                retrieval_mode=retrieval.mode,
+                retrieval_warnings=retrieval.warnings,
             )
 
         available_sources = {
@@ -133,6 +161,8 @@ class DocumentQuestionAnswerService:
                 False,
                 "",
                 f"No se pudo obtener una respuesta de la IA local: {ai_result.message}",
+                retrieval_mode=retrieval.mode,
+                retrieval_warnings=retrieval.warnings,
             )
 
         try:
@@ -142,6 +172,8 @@ class DocumentQuestionAnswerService:
                 False,
                 "",
                 "La IA local devolvió una respuesta con un formato no válido.",
+                retrieval_mode=retrieval.mode,
+                retrieval_warnings=retrieval.warnings,
             )
 
         valid_citations = self._valid_citations(citations, available_sources)
@@ -150,6 +182,8 @@ class DocumentQuestionAnswerService:
                 False,
                 "",
                 "La respuesta de la IA local no contiene fuentes documentales válidas.",
+                retrieval_mode=retrieval.mode,
+                retrieval_warnings=retrieval.warnings,
             )
         cited_sources = tuple(
             available_sources[source_id] for source_id in valid_citations
@@ -160,11 +194,13 @@ class DocumentQuestionAnswerService:
             "Respuesta generada con IA local y fuentes documentales verificadas.",
             True,
             cited_sources,
+            retrieval.mode,
+            retrieval.warnings,
         )
 
     def _build_context_sources(
         self,
-        matches: list[DocumentContentSearchResult],
+        matches: list[DocumentHybridSearchResult],
     ) -> tuple[_ContextSource, ...]:
         context_sources: list[_ContextSource] = []
         seen_pages: set[tuple[str, int]] = set()

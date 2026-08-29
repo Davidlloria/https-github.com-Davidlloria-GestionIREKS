@@ -5,7 +5,15 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from app.services.document_content_index_service import DocumentContentSearchResult
+from app.services.document_content_index_service import (
+    DocumentContentIndexService,
+    DocumentContentSearchResult,
+)
+from app.services.document_library_service import DocumentLibraryService
+from app.services.document_hybrid_retrieval_service import (
+    INTERNAL_CANDIDATE_MULTIPLIER,
+    DocumentHybridRetrievalService,
+)
 from app.services.document_question_answer_service import (
     MAX_ANSWER_SOURCES,
     MAX_CONTEXT_CHARS,
@@ -15,6 +23,10 @@ from app.services.document_question_answer_service import (
     MAX_SOURCE_CHARS,
     NO_INFORMATION_ANSWER,
     DocumentQuestionAnswerService,
+)
+from app.services.document_semantic_index_service import (
+    DocumentSemanticIndexError,
+    DocumentSemanticSearchResult,
 )
 
 
@@ -45,17 +57,39 @@ class _FakeContentIndexService:
         self.texts: dict[tuple[str, int], str | None] = {}
         self.search_calls: list[dict[str, object]] = []
         self.page_calls: list[tuple[str, int, int]] = []
+        self.error: Exception | None = None
 
     def search(self, query, *, area=None, category=None, limit=20):
         self.search_calls.append(
             {"query": query, "area": area, "category": category, "limit": limit}
         )
+        if self.error:
+            raise self.error
         return list(self.results)
 
     def get_page_text(self, document_id, page_number, *, max_chars):
         self.page_calls.append((document_id, page_number, max_chars))
         text = self.texts.get((document_id, page_number))
         return text[:max_chars] if text else text
+
+
+class _FakeSemanticIndexService:
+    def __init__(self) -> None:
+        self.results: list[DocumentSemanticSearchResult] = []
+        self.calls: list[dict[str, object]] = []
+        self.available = False
+        self.error: Exception | None = None
+
+    def is_search_available(self):
+        return self.available
+
+    def search(self, query, *, area=None, category=None, limit=20):
+        self.calls.append(
+            {"query": query, "area": area, "category": category, "limit": limit}
+        )
+        if self.error:
+            raise self.error
+        return list(self.results)
 
 
 class _FakeLocalAIService:
@@ -88,7 +122,13 @@ def _service(
 ]:
     content = _FakeContentIndexService()
     local_ai = ai or _FakeLocalAIService()
-    return DocumentQuestionAnswerService(content, local_ai), content, local_ai
+    semantic = _FakeSemanticIndexService()
+    retrieval = DocumentHybridRetrievalService(content, semantic)
+    return (
+        DocumentQuestionAnswerService(content, local_ai, retrieval),
+        content,
+        local_ai,
+    )
 
 
 def _add_source(
@@ -98,6 +138,24 @@ def _add_source(
 ) -> None:
     content.results.append(match)
     content.texts[(match.document_id, match.page_number)] = text
+
+
+def _semantic_match(
+    match: DocumentContentSearchResult,
+    *,
+    similarity: float = 0.8,
+) -> DocumentSemanticSearchResult:
+    return DocumentSemanticSearchResult(
+        document_id=match.document_id,
+        name=match.name,
+        relative_path=match.relative_path,
+        area=match.area,
+        category=match.category,
+        page_number=match.page_number,
+        chunk_index=0,
+        fragment="Fragmento semántico",
+        similarity=similarity,
+    )
 
 
 def test_empty_question_does_not_search_or_call_ai() -> None:
@@ -147,7 +205,7 @@ def test_area_category_and_retrieval_limit_are_sent_to_search() -> None:
             "query": "consulta",
             "area": "Calidad",
             "category": "Fichas",
-            "limit": MAX_RETRIEVAL_RESULTS,
+            "limit": MAX_RETRIEVAL_RESULTS * INTERNAL_CANDIDATE_MULTIPLIER,
         }
     ]
 
@@ -473,3 +531,116 @@ def test_valid_json_shape_is_revalidated_in_python() -> None:
 
     assert result.ok is False
     assert result.used_ai is False
+
+
+def test_default_retriever_is_built_on_same_document_database(tmp_path) -> None:
+    library = tmp_path / "library"
+    library.mkdir()
+    database = tmp_path / "data" / "document_library.sqlite"
+    catalog = DocumentLibraryService(library, database)
+    catalog.refresh_catalog()
+    content = DocumentContentIndexService(catalog, database)
+
+    service = DocumentQuestionAnswerService(content, _FakeLocalAIService())
+
+    assert isinstance(service.retrieval_service, DocumentHybridRetrievalService)
+    semantic = service.retrieval_service.semantic_index_service
+    assert semantic.content_index_service is content
+    assert semantic.database_path == content.database_path == database.resolve()
+
+
+def test_hybrid_retrieval_builds_sources_and_reports_mode() -> None:
+    content = _FakeContentIndexService()
+    semantic = _FakeSemanticIndexService()
+    semantic.available = True
+    match = _match(1, page=2)
+    _add_source(content, match)
+    semantic.results = [_semantic_match(match)]
+    retrieval = DocumentHybridRetrievalService(content, semantic)
+    service = DocumentQuestionAnswerService(
+        content, _FakeLocalAIService(), retrieval
+    )
+
+    result = service.answer("consulta")
+
+    assert result.ok and result.sources
+    assert result.retrieval_mode == "hybrid"
+    assert result.retrieval_warnings == ()
+
+
+def test_semantic_only_retrieval_builds_source() -> None:
+    content = _FakeContentIndexService()
+    content.error = RuntimeError("FTS no disponible")
+    semantic = _FakeSemanticIndexService()
+    semantic.available = True
+    match = _match(2, page=4)
+    content.texts[(match.document_id, match.page_number)] = "Texto semántico completo"
+    semantic.results = [_semantic_match(match)]
+    ai = _FakeLocalAIService()
+    service = DocumentQuestionAnswerService(
+        content, ai, DocumentHybridRetrievalService(content, semantic)
+    )
+
+    result = service.answer("consulta")
+
+    assert result.ok and result.sources[0].page_number == 4
+    assert result.retrieval_mode == "semantic"
+    assert result.retrieval_warnings == ("No se pudo consultar el índice léxico.",)
+
+
+def test_semantic_failure_falls_back_to_lexical_without_prompt_warning() -> None:
+    content = _FakeContentIndexService()
+    semantic = _FakeSemanticIndexService()
+    semantic.available = True
+    semantic.error = DocumentSemanticIndexError("C:/secreto/modelo caído")
+    match = _match(1)
+    _add_source(content, match)
+    ai = _FakeLocalAIService()
+    service = DocumentQuestionAnswerService(
+        content, ai, DocumentHybridRetrievalService(content, semantic)
+    )
+
+    result = service.answer("consulta")
+
+    assert result.ok and result.retrieval_mode == "lexical"
+    assert result.retrieval_warnings == (
+        "No se pudo consultar el índice semántico.",
+    )
+    prompt = ai.calls[0]["prompt"]
+    assert "índice semántico" not in prompt
+    assert "C:/secreto" not in prompt
+
+
+def test_successful_empty_retrieval_keeps_effective_mode_without_ai() -> None:
+    content = _FakeContentIndexService()
+    semantic = _FakeSemanticIndexService()
+    semantic.available = False
+    ai = _FakeLocalAIService()
+    service = DocumentQuestionAnswerService(
+        content, ai, DocumentHybridRetrievalService(content, semantic)
+    )
+
+    result = service.answer("consulta")
+
+    assert result.ok and result.answer == NO_INFORMATION_ANSWER
+    assert result.retrieval_mode == "lexical"
+    assert ai.calls == []
+
+
+def test_both_retrievers_failed_is_not_reported_as_no_information() -> None:
+    content = _FakeContentIndexService()
+    content.error = RuntimeError("FTS falló")
+    semantic = _FakeSemanticIndexService()
+    semantic.available = True
+    semantic.error = DocumentSemanticIndexError("embedding falló")
+    ai = _FakeLocalAIService()
+    service = DocumentQuestionAnswerService(
+        content, ai, DocumentHybridRetrievalService(content, semantic)
+    )
+
+    result = service.answer("consulta")
+
+    assert result.ok is False and result.answer == ""
+    assert result.message == "No se pudo consultar el índice documental"
+    assert result.answer != NO_INFORMATION_ANSWER
+    assert ai.calls == []

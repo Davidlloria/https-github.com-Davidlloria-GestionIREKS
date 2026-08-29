@@ -132,6 +132,11 @@ class DocumentSemanticIndexService:
         self.database_path = content_index_service.database_path
         self._clock = clock or (lambda: datetime.now(timezone.utc))
 
+    def is_search_available(self) -> bool:
+        """Return whether at least one current active document has a semantic index."""
+        self._initialize_schema()
+        return bool(self._active_index_models())
+
     def update_index(
         self,
         *,
