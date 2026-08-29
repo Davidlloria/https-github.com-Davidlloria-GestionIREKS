@@ -4,7 +4,14 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QLabel, QFrame, QMessageBox, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QFrame,
+    QMessageBox,
+    QScrollArea,
+    QWidget,
+)
 
 from app.services.local_ai_settings_service import LocalAISettingsService
 from app.ui.widgets.settings_page import SettingsPage
@@ -133,6 +140,44 @@ def test_local_ai_card_loads_embedding_field_in_visual_order(monkeypatch) -> Non
     assert page.local_ai_embedding_model_input.height() == 34
     assert page.local_ai_test_embedding_btn.height() == 34
     assert page.local_ai_test_embedding_btn.text() == "Probar embeddings"
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_local_ai_card_stays_accessible_at_reduced_api_tab_height() -> None:
+    _application()
+    page = SettingsPage()
+    page.resize(1180, 720)
+    page.main_tabs.setCurrentIndex(3)
+    page.show()
+    QApplication.processEvents()
+
+    scroll = page.findChild(QScrollArea, "settingsApiScrollArea")
+    local_card = next(
+        card
+        for card in page.findChildren(QFrame, "card")
+        if card.property("apiCard") == "local_ai"
+    )
+    info = page.findChild(QLabel, "settingsApiLocalAiInfo")
+
+    assert scroll is not None
+    assert info is not None
+    assert scroll.widgetResizable()
+    assert local_card.minimumHeight() <= 390
+    assert page.local_ai_save_btn.y() == page.local_ai_test_btn.y()
+    assert page.local_ai_test_btn.y() == page.local_ai_test_embedding_btn.y()
+    assert info.geometry().bottom() <= local_card.contentsRect().bottom()
+
+    scroll.setFixedHeight(420)
+    QApplication.processEvents()
+    assert scroll.verticalScrollBar().maximum() > 0
+    scroll.ensureWidgetVisible(info)
+    QApplication.processEvents()
+    assert scroll.viewport().rect().contains(
+        info.mapTo(scroll.viewport(), info.rect().center())
+    )
 
     page.close()
     page.deleteLater()

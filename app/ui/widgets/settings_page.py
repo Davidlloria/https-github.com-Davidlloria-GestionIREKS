@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
@@ -1442,9 +1443,31 @@ class SettingsPage(QWidget):
         layout.setSpacing(12)
         provider_view = self.settings_provider_service.build_ui_view()
 
-        cards_column = QWidget(panel)
+        self.api_scroll_area = QScrollArea(panel)
+        self.api_scroll_area.setObjectName("settingsApiScrollArea")
+        self.api_scroll_area.setWidgetResizable(True)
+        self.api_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.api_scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.api_scroll_area.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        layout.addWidget(self.api_scroll_area, 1)
+
+        scroll_content = QWidget()
+        scroll_content.setObjectName("settingsApiScrollContent")
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.setSpacing(0)
+        self.api_scroll_area.setWidget(scroll_content)
+
+        cards_column = QWidget(scroll_content)
         cards_column.setObjectName("settingsApiCards")
-        cards_column.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        cards_column.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Minimum,
+        )
         cards_layout = QGridLayout(cards_column)
         cards_layout.setContentsMargins(0, 0, 0, 0)
         cards_layout.setHorizontalSpacing(12)
@@ -1453,7 +1476,8 @@ class SettingsPage(QWidget):
             cards_layout.setColumnStretch(column, 1)
         cards_layout.setRowStretch(0, 1)
         cards_layout.setRowStretch(1, 1)
-        layout.addWidget(cards_column, 1)
+        scroll_layout.addWidget(cards_column)
+        scroll_layout.addStretch(1)
 
         fdc_card = QFrame()
         fdc_card.setObjectName("card")
@@ -1646,7 +1670,7 @@ class SettingsPage(QWidget):
         )
         local_ai_layout.addLayout(local_ai_form)
 
-        local_ai_actions = QVBoxLayout()
+        local_ai_actions = QHBoxLayout()
         self.local_ai_save_btn = QPushButton(provider_view.save_button_label)
         self.local_ai_save_btn.setProperty("btnRole", "success")
         self.local_ai_test_btn = QPushButton(provider_view.test_button_label)
@@ -1675,10 +1699,9 @@ class SettingsPage(QWidget):
         local_ai_info.setObjectName("settingsApiLocalAiInfo")
         local_ai_info.setWordWrap(True)
         local_ai_layout.addWidget(local_ai_info)
-        self._finalize_api_card(local_ai_card, 390)
+        self._finalize_api_card(local_ai_card, 350)
         cards_layout.addWidget(local_ai_card, 1, 0)
 
-        layout.addStretch(1)
         return panel
 
     @staticmethod
