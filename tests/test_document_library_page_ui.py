@@ -121,6 +121,14 @@ class _FakeDocumentLibraryService:
         return self.resolved_paths.get(document_id, self.resolved_path)
 
 
+class _FakeContentIndexService:
+    def __init__(self, library_service: _FakeDocumentLibraryService) -> None:
+        self.library_service = library_service
+
+    def search(self, *_args, **_kwargs):
+        return []
+
+
 def _sample_documents() -> list[DocumentLibraryItem]:
     return [
         _document(
@@ -497,3 +505,84 @@ def test_repeated_preview_cleanup_keeps_persistent_document_attached(
     assert page.pdf_view.document() is page.pdf_document
     assert page.pdf_document.pageCount() == 0
     assert page._loaded_document_id is None
+
+
+def test_content_search_dialog_opens_from_documents_page() -> None:
+    _application()
+    service = _FakeDocumentLibraryService(_sample_documents())
+    content_service = _FakeContentIndexService(service)
+    page = DocumentLibraryPage(service, content_service)  # type: ignore[arg-type]
+
+    page.content_search_button.click()
+    _application().processEvents()
+
+    assert page._content_search_dialog is not None
+    assert page._content_search_dialog.isVisible()
+    assert page._content_search_dialog._library_service is service
+    assert page._content_search_dialog._content_service is content_service
+    page._content_search_dialog.close()
+    _application().processEvents()
+
+
+def test_content_pdf_result_clears_filters_selects_document_and_converts_page(
+    tmp_path: Path,
+) -> None:
+    _application()
+    document = _sample_documents()[0]
+    service = _FakeDocumentLibraryService([document])
+    service.resolved_path = _write_pdf(tmp_path / "three-pages.pdf", pages=3)
+    page = DocumentLibraryPage(service)
+    page.search_input.setText("sin coincidencias")
+    assert page.table.rowCount() == 0
+
+    page._show_content_search_result(document.document_id, 2)
+    _application().processEvents()
+
+    assert page.search_input.text() == ""
+    assert page._selected_document_id() == document.document_id
+    assert page._loaded_document_id == document.document_id
+    assert page.pdf_view.pageNavigator().currentPage() == 1
+    assert service.resolved_ids == [document.document_id]
+
+
+def test_content_pdf_result_clamps_page_to_pdf_range(tmp_path: Path) -> None:
+    _application()
+    document = _sample_documents()[0]
+    service = _FakeDocumentLibraryService([document])
+    service.resolved_path = _write_pdf(tmp_path / "two-pages.pdf", pages=2)
+    page = DocumentLibraryPage(service)
+
+    page._show_content_search_result(document.document_id, 99)
+    _application().processEvents()
+
+    assert page.pdf_view.pageNavigator().currentPage() == 1
+
+
+def test_content_markdown_result_is_selected_without_loading_pdf() -> None:
+    _application()
+    document = _document(
+        "e" * 64,
+        "Calidad/Normas/Manual.md",
+        area="Calidad",
+        category="Normas",
+        extension=".md",
+    )
+    service = _FakeDocumentLibraryService([document])
+    page = DocumentLibraryPage(service)
+
+    page._show_content_search_result(document.document_id, 1)
+
+    assert page._selected_document_id() == document.document_id
+    assert page._loaded_document_id is None
+    assert service.resolved_ids == []
+    assert "solo para PDF" in page.preview_status_label.text()
+
+
+def test_content_result_for_disappeared_document_uses_safe_existing_state() -> None:
+    _application()
+    page = DocumentLibraryPage(_FakeDocumentLibraryService([]))
+
+    page._show_content_search_result("f" * 64, 1)
+
+    assert page._loaded_document_id is None
+    assert "ya no está disponible" in page.preview_status_label.text()

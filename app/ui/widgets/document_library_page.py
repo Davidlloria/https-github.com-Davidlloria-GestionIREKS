@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from PySide6.QtCore import QThread, Qt, QUrl, Signal
+from PySide6.QtCore import QPointF, QThread, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtPdf import QPdfDocument
 from PySide6.QtPdfWidgets import QPdfView
@@ -31,6 +31,8 @@ from app.services.document_library_service import (
     DocumentNotFoundError,
     UnsafeDocumentPathError,
 )
+from app.services.document_content_index_service import DocumentContentIndexService
+from app.ui.widgets.document_content_search_dialog import DocumentContentSearchDialog
 
 
 class DocumentCatalogRefreshWorker(QThread):
@@ -65,12 +67,15 @@ class DocumentLibraryPage(QWidget):
     def __init__(
         self,
         service: DocumentLibraryService | None = None,
+        content_index_service: DocumentContentIndexService | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("documentLibraryPage")
         self._service = service or DocumentLibraryService()
+        self._content_index_service = content_index_service
         self._worker: DocumentCatalogRefreshWorker | None = None
+        self._content_search_dialog: DocumentContentSearchDialog | None = None
         self._documents_by_id: dict[str, DocumentLibraryItem] = {}
         self._loaded_document_id: str | None = None
         self._minimum_zoom = 0.25
@@ -129,6 +134,12 @@ class DocumentLibraryPage(QWidget):
         self.clear_filters_button.setProperty("btnRole", "secondary")
         self.clear_filters_button.clicked.connect(self._clear_filters)
         filters_layout.addWidget(self.clear_filters_button)
+
+        self.content_search_button = QPushButton("Buscar en contenido")
+        self.content_search_button.setObjectName("documentLibraryContentSearch")
+        self.content_search_button.setProperty("btnRole", "secondary")
+        self.content_search_button.clicked.connect(self._open_content_search)
+        filters_layout.addWidget(self.content_search_button)
 
         self.refresh_button = QPushButton("Actualizar catálogo")
         self.refresh_button.setObjectName("documentLibraryRefreshButton")
@@ -434,6 +445,61 @@ class DocumentLibraryPage(QWidget):
         except Exception as exc:  # noqa: BLE001
             self._refresh_failed(str(exc) or "No se pudo iniciar la actualización.")
             self._finish_refresh(worker)
+
+    def _open_content_search(self) -> None:
+        if self._content_search_dialog is not None:
+            self._content_search_dialog.raise_()
+            self._content_search_dialog.activateWindow()
+            return
+        if self._content_index_service is None:
+            self._content_index_service = DocumentContentIndexService(self._service)
+        dialog = DocumentContentSearchDialog(
+            self._service,
+            self._content_index_service,
+            self,
+        )
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.document_requested.connect(self._show_content_search_result)
+        dialog.destroyed.connect(self._content_search_dialog_closed)
+        self._content_search_dialog = dialog
+        dialog.open()
+
+    def _content_search_dialog_closed(self) -> None:
+        self._content_search_dialog = None
+
+    def _show_content_search_result(self, document_id: str, page_number: int) -> None:
+        self._clear_filters()
+        matching_row = None
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item is not None and item.data(Qt.ItemDataRole.UserRole) == document_id:
+                matching_row = row
+                break
+        if matching_row is None:
+            self._show_preview_placeholder(
+                "El documento del resultado ya no está disponible en el catálogo."
+            )
+            return
+        self.table.selectRow(matching_row)
+        document = self._documents_by_id.get(document_id)
+        if document is None or document.extension.casefold() != ".pdf":
+            return
+        if self._loaded_document_id != document_id:
+            return
+        self._navigate_to_pdf_page(page_number)
+
+    def _navigate_to_pdf_page(self, page_number: int) -> None:
+        page_count = self.pdf_document.pageCount()
+        if page_count <= 0:
+            return
+        target_page = max(0, min(int(page_number) - 1, page_count - 1))
+        try:
+            navigator = self.pdf_view.pageNavigator()
+            navigator.jump(target_page, QPointF(), 0)
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            self.preview_status_label.setText(
+                f"PDF cargado, pero no se pudo ir a la página {target_page + 1}."
+            )
 
     def _set_refreshing(self, refreshing: bool) -> None:
         self.refresh_button.setEnabled(not refreshing)
