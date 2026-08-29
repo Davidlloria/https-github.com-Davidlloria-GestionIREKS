@@ -18,6 +18,11 @@ from app.services.document_content_index_service import (
     DocumentContentSearchResult,
 )
 from app.services.document_library_service import DocumentLibraryItem
+from app.services.document_semantic_index_service import (
+    DocumentSemanticIndexResult,
+    DocumentSemanticIndexStatus,
+)
+from app.services.local_embedding_service import LocalEmbeddingResult
 from app.ui.widgets.document_content_search_dialog import (
     DocumentContentSearchDialog,
 )
@@ -124,6 +129,72 @@ class _FakeContentService:
         )
 
 
+class _FakeEmbeddingService:
+    def __init__(self) -> None:
+        self.model = "embeddinggemma"
+        self.calls = []
+        self.ok = True
+        self.message = ""
+        self.thread_id = None
+
+    def embed(self, texts):
+        self.thread_id = threading.get_ident()
+        self.calls.append(list(texts))
+        if not self.ok:
+            return LocalEmbeddingResult(
+                False, model=self.model, message=self.message
+            )
+        return LocalEmbeddingResult(True, ((1.0, 0.0),), self.model, 2)
+
+
+class _FakeSemanticService:
+    def __init__(self, content_service) -> None:
+        self.content_index_service = content_service
+        self.embedding_service = _FakeEmbeddingService()
+        self.status = DocumentSemanticIndexStatus(
+            configured_model="embeddinggemma",
+            content_documents=3,
+            requires_reindex=True,
+        )
+        self.update_calls = 0
+        self.update_thread_id = None
+        self.cancel_observed = False
+        self.wait_for_cancel = False
+        self.error = None
+
+    def get_status(self):
+        return self.status
+
+    def update_index(self, *, progress_callback, cancellation_callback):
+        self.update_calls += 1
+        self.update_thread_id = threading.get_ident()
+        if self.error:
+            raise self.error
+        progress_callback(1, 3, "a" * 64)
+        if self.wait_for_cancel:
+            deadline = time.monotonic() + 2
+            while time.monotonic() < deadline:
+                if cancellation_callback():
+                    self.cancel_observed = True
+                    return DocumentSemanticIndexResult(candidates=3, cancelled=2)
+                time.sleep(0.005)
+        progress_callback(3, 3, "c" * 64)
+        self.status = DocumentSemanticIndexStatus(
+            configured_model="embeddinggemma",
+            indexed_documents=3,
+            available_chunks=7,
+            content_documents=3,
+            available=True,
+        )
+        return DocumentSemanticIndexResult(
+            candidates=3,
+            indexed=2,
+            unchanged=1,
+            chunks_generated=7,
+            errors=("detalle seguro",),
+        )
+
+
 def _result(
     document_id: str,
     name: str,
@@ -149,7 +220,11 @@ def _dialog() -> tuple[DocumentContentSearchDialog, _FakeContentService]:
     _application()
     library = _FakeLibraryService()
     content = _FakeContentService(library)
-    return DocumentContentSearchDialog(library, content), content
+    semantic = _FakeSemanticService(content)
+    content.semantic_service = semantic
+    return DocumentContentSearchDialog(
+        library, content, semantic_service=semantic
+    ), content
 
 
 def test_empty_query_does_not_call_search_service() -> None:
@@ -335,6 +410,141 @@ def test_clear_resets_query_filters_and_results() -> None:
     assert dialog.area_filter.currentData() == ""
     assert dialog.category_filter.currentData() == ""
     assert dialog.table.rowCount() == 0
+
+
+def test_semantic_section_shows_pending_available_and_incompatible_states() -> None:
+    dialog, content = _dialog()
+    semantic = content.semantic_service
+
+    assert (
+        dialog.semantic_index_title_label.text()
+        == "2. Actualizar índice semántico"
+    )
+    assert dialog.update_semantic_index_button.text() == "Actualizar índice semántico"
+    assert "pendiente" in dialog.semantic_status_label.text()
+    assert "embeddinggemma" in dialog.semantic_model_label.text()
+
+    semantic.status = DocumentSemanticIndexStatus(
+        configured_model="embeddinggemma",
+        indexed_documents=2,
+        available_chunks=8,
+        content_documents=2,
+        available=True,
+    )
+    dialog._refresh_semantic_status()
+    assert "2 documentos y 8 fragmentos" in dialog.semantic_status_label.text()
+
+    semantic.status = DocumentSemanticIndexStatus(
+        configured_model="new-model",
+        other_model_documents=2,
+        content_documents=2,
+        requires_reindex=True,
+    )
+    dialog._refresh_semantic_status()
+    assert "otro modelo" in dialog.semantic_status_label.text()
+    assert "new-model" in dialog.semantic_status_label.text()
+
+
+def test_semantic_update_preflight_and_index_run_outside_main_thread() -> None:
+    dialog, content = _dialog()
+    semantic = content.semantic_service
+    main_thread_id = threading.get_ident()
+    progress_messages = []
+    original = dialog._semantic_index_progress
+
+    def capture(*args):
+        original(*args)
+        progress_messages.append(dialog.semantic_progress_label.text())
+
+    dialog._semantic_index_progress = capture
+    dialog.update_semantic_index_button.click()
+    assert not dialog.update_index_button.isEnabled()
+    assert not dialog.search_button.isEnabled()
+    assert dialog.semantic_cancel_button.isEnabled()
+    _wait_until(lambda: dialog._worker is None)
+
+    assert semantic.embedding_service.thread_id != main_thread_id
+    assert semantic.update_thread_id != main_thread_id
+    assert semantic.embedding_service.calls == [
+        ["Prueba de búsqueda documental de GestionIREKS."]
+    ]
+    assert any("1 / 3" in message for message in progress_messages)
+    assert "3 candidatos" in dialog.semantic_progress_label.text()
+    assert "7 fragmentos" in dialog.semantic_progress_label.text()
+    assert "disponible" in dialog.semantic_status_label.text()
+    assert dialog.update_index_button.isEnabled()
+    assert dialog.update_semantic_index_button.isEnabled()
+    assert dialog.search_button.isEnabled()
+    assert not dialog.semantic_cancel_button.isEnabled()
+
+
+def test_semantic_preflight_failure_does_not_update_or_show_vector_or_path() -> None:
+    dialog, content = _dialog()
+    semantic = content.semantic_service
+    semantic.embedding_service.ok = False
+    semantic.embedding_service.message = (
+        "El modelo no está instalado; detalle C:/secret/vector.bin"
+    )
+
+    dialog.update_semantic_index_button.click()
+    _wait_until(lambda: dialog._worker is None)
+
+    assert semantic.update_calls == 0
+    assert "embeddinggemma" in dialog.semantic_progress_label.text()
+    assert "no está instalado" in dialog.semantic_progress_label.text()
+    assert "C:/secret" not in dialog.semantic_progress_label.text()
+    assert "vector.bin" not in dialog.semantic_progress_label.text()
+    assert dialog.update_semantic_index_button.isEnabled()
+    assert dialog.search_button.isEnabled()
+
+
+def test_missing_semantic_model_fails_before_preflight_and_update() -> None:
+    dialog, content = _dialog()
+    semantic = content.semantic_service
+    semantic.embedding_service.model = ""
+
+    dialog.update_semantic_index_button.click()
+    _wait_until(lambda: dialog._worker is None)
+
+    assert semantic.embedding_service.calls == []
+    assert semantic.update_calls == 0
+    assert "modelo de embeddings configurado" in dialog.semantic_progress_label.text()
+    assert dialog.update_semantic_index_button.isEnabled()
+    assert dialog.search_button.isEnabled()
+
+
+def test_semantic_cancel_is_cooperative_and_operations_cannot_overlap() -> None:
+    dialog, content = _dialog()
+    semantic = content.semantic_service
+    semantic.wait_for_cancel = True
+
+    dialog.update_semantic_index_button.click()
+    _wait_until(lambda: semantic.update_thread_id is not None)
+    assert not dialog.update_index_button.isEnabled()
+    dialog.update_index_button.click()
+    assert content.update_thread_id is None
+    dialog.semantic_cancel_button.click()
+    _wait_until(lambda: dialog._worker is None)
+
+    assert semantic.cancel_observed
+    assert "2 cancelados" in dialog.semantic_progress_label.text()
+    assert dialog.update_index_button.isEnabled()
+    assert dialog.update_semantic_index_button.isEnabled()
+
+
+def test_semantic_worker_failure_restores_all_controls() -> None:
+    dialog, content = _dialog()
+    semantic = content.semantic_service
+    semantic.error = RuntimeError("fallo semántico")
+
+    dialog.update_semantic_index_button.click()
+    _wait_until(lambda: dialog._worker is None)
+
+    assert "fallo semántico" in dialog.semantic_progress_label.text()
+    assert dialog.update_index_button.isEnabled()
+    assert dialog.update_semantic_index_button.isEnabled()
+    assert dialog.search_button.isEnabled()
+    assert not dialog.semantic_cancel_button.isEnabled()
 
 
 def test_ui_has_no_sqlite_access_and_backend_service_has_no_pyside_import() -> None:

@@ -235,3 +235,106 @@ def test_progress_contains_only_identifier_and_force_reindexes(tmp_path: Path) -
     result = semantic.update_index(force=True)
     assert result.indexed == 1 and len(embedding.calls) == calls + 1
     assert progress and str(library) not in repr(progress) and "texto" not in repr(progress)
+
+
+def test_status_without_semantic_index_reports_pending_without_embedding(tmp_path: Path) -> None:
+    _, _, _, _, embedding, semantic = _prepare(
+        tmp_path, {"Notas/a.md": "contenido disponible"}
+    )
+    calls = len(embedding.calls)
+
+    status = semantic.get_status()
+
+    assert status.configured_model == "fake-embed"
+    assert status.content_documents == 1
+    assert status.indexed_documents == status.available_chunks == 0
+    assert not status.available and status.requires_reindex
+    assert len(embedding.calls) == calls
+
+
+def test_status_available_counts_documents_chunks_and_date(tmp_path: Path) -> None:
+    _, _, _, _, embedding, semantic = _prepare(
+        tmp_path,
+        {"Calidad/a.md": "uno", "Tecnica/b.md": "dos " * 800},
+    )
+    result = semantic.update_index()
+    calls = len(embedding.calls)
+
+    status = semantic.get_status()
+
+    assert status.indexed_documents == 2
+    assert status.available_chunks == result.chunks_generated
+    assert status.failed_documents == status.other_model_documents == 0
+    assert status.available and not status.requires_reindex
+    assert status.last_indexed_at
+    assert semantic.is_search_available()
+    assert len(embedding.calls) == calls
+
+
+def test_status_partial_failure_remains_available_and_requires_reindex(tmp_path: Path) -> None:
+    _, database, _, _, _, semantic = _prepare(
+        tmp_path, {"A/uno.md": "uno", "B/dos.md": "dos"}
+    )
+    semantic.update_index()
+    with sqlite3.connect(database) as connection, connection:
+        failed_id = connection.execute(
+            "SELECT document_id FROM documents ORDER BY relative_path DESC LIMIT 1"
+        ).fetchone()[0]
+        connection.execute(
+            "DELETE FROM document_semantic_chunks WHERE document_id=?", (failed_id,)
+        )
+        connection.execute(
+            """UPDATE document_semantic_status
+               SET status='failed', dimension=0, chunk_count=0, error_message='fallo'
+               WHERE document_id=?""",
+            (failed_id,),
+        )
+
+    status = semantic.get_status()
+
+    assert status.indexed_documents == status.failed_documents == 1
+    assert status.available and status.requires_reindex
+
+
+def test_status_model_change_is_incompatible(tmp_path: Path) -> None:
+    _, _, _, _, embedding, semantic = _prepare(tmp_path, {"Notas/a.md": "texto"})
+    semantic.update_index()
+    embedding.model = "new-model"
+
+    status = semantic.get_status()
+
+    assert status.other_model_documents == 1
+    assert status.indexed_documents == 0
+    assert not status.available and status.requires_reindex
+    assert not semantic.is_search_available()
+
+
+def test_status_excludes_inactive_documents(tmp_path: Path) -> None:
+    library, _, catalog, _, _, semantic = _prepare(
+        tmp_path, {"Notas/a.md": "texto"}
+    )
+    semantic.update_index()
+    (library / "Notas/a.md").unlink()
+    catalog.refresh_catalog()
+
+    status = semantic.get_status()
+
+    assert status.indexed_documents == status.available_chunks == 0
+    assert not status.available
+
+
+def test_status_handles_database_not_initialized_without_creating_it(tmp_path: Path) -> None:
+    library = tmp_path / "library"
+    library.mkdir()
+    database = tmp_path / "data" / "missing.sqlite"
+    catalog = DocumentLibraryService(library, database)
+    content = DocumentContentIndexService(catalog, database)
+    embedding = FakeEmbeddingService()
+    semantic = DocumentSemanticIndexService(content, embedding)
+
+    status = semantic.get_status()
+
+    assert status.configured_model == "fake-embed"
+    assert not status.available and not status.requires_reindex
+    assert not database.exists()
+    assert embedding.calls == []

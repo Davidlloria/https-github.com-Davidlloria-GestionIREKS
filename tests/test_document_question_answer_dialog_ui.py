@@ -254,6 +254,47 @@ def test_valid_ai_answer_and_indicator_are_visible_as_plain_text() -> None:
     assert "fuentes verificadas" in dialog.status_label.text()
 
 
+def test_hybrid_retrieval_mode_is_shown_from_result() -> None:
+    dialog, _service = _dialog()
+    result = _valid_result()
+    result = DocumentQuestionAnswerResult(
+        result.ok,
+        result.answer,
+        result.message,
+        result.used_ai,
+        result.sources,
+        "hybrid",
+    )
+
+    dialog._question_succeeded(result)
+
+    assert dialog.retrieval_mode_label.text() == "Búsqueda híbrida"
+    assert "Búsqueda híbrida" in dialog.status_label.text()
+
+
+def test_lexical_fallback_warning_is_outside_answer_and_paths_are_redacted() -> None:
+    dialog, _service = _dialog()
+    result = _valid_result()
+    result = DocumentQuestionAnswerResult(
+        result.ok,
+        "Respuesta documental limpia.",
+        result.message,
+        result.used_ai,
+        result.sources,
+        "lexical",
+        ("Fallo semántico en C:/secret/model.bin",),
+    )
+
+    dialog._question_succeeded(result)
+
+    assert dialog.answer_output.toPlainText() == "Respuesta documental limpia."
+    assert "Fallo semántico" not in dialog.answer_output.toPlainText()
+    assert dialog.retrieval_mode_label.text() == "Búsqueda léxica"
+    assert "búsqueda textual" in dialog.status_label.text()
+    assert "C:/secret" not in dialog.retrieval_mode_label.toolTip()
+    assert "[RUTA OMITIDA]" in dialog.retrieval_mode_label.toolTip()
+
+
 def test_no_information_result_is_visible_without_ai_or_sources() -> None:
     dialog, _service = _dialog()
     result = DocumentQuestionAnswerResult(

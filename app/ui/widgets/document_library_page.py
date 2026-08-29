@@ -25,6 +25,9 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.document_content_index_service import DocumentContentIndexService
+from app.services.document_hybrid_retrieval_service import (
+    DocumentHybridRetrievalService,
+)
 from app.services.document_library_service import (
     DocumentLibraryItem,
     DocumentLibraryScanResult,
@@ -33,6 +36,8 @@ from app.services.document_library_service import (
     UnsafeDocumentPathError,
 )
 from app.services.document_question_answer_service import DocumentQuestionAnswerService
+from app.services.document_semantic_index_service import DocumentSemanticIndexService
+from app.services.local_embedding_service import LocalEmbeddingService
 from app.ui.widgets.document_content_search_dialog import DocumentContentSearchDialog
 from app.ui.widgets.document_question_answer_dialog import DocumentQuestionAnswerDialog
 
@@ -72,12 +77,26 @@ class DocumentLibraryPage(QWidget):
         content_index_service: DocumentContentIndexService | None = None,
         question_answer_service: DocumentQuestionAnswerService | None = None,
         parent=None,
+        semantic_index_service: DocumentSemanticIndexService | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("documentLibraryPage")
+        if content_index_service is None and semantic_index_service is not None:
+            content_index_service = semantic_index_service.content_index_service
+        if content_index_service is None:
+            content_index_service = getattr(
+                question_answer_service, "content_index_service", None
+            )
+        if service is None and content_index_service is not None:
+            service = content_index_service.library_service
         self._service = service or DocumentLibraryService()
         self._content_index_service = content_index_service or getattr(
             question_answer_service, "content_index_service", None
+        )
+        self._semantic_index_service = semantic_index_service or getattr(
+            getattr(question_answer_service, "retrieval_service", None),
+            "semantic_index_service",
+            None,
         )
         self._question_answer_service = question_answer_service
         self._worker: DocumentCatalogRefreshWorker | None = None
@@ -466,10 +485,16 @@ class DocumentLibraryPage(QWidget):
             return
         if self._content_index_service is None:
             self._content_index_service = DocumentContentIndexService(self._service)
+        if self._semantic_index_service is None:
+            self._semantic_index_service = DocumentSemanticIndexService(
+                self._content_index_service,
+                LocalEmbeddingService(),
+            )
         dialog = DocumentContentSearchDialog(
             self._service,
             self._content_index_service,
             self,
+            semantic_service=self._semantic_index_service,
         )
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.document_requested.connect(self._show_content_search_result)
@@ -488,8 +513,18 @@ class DocumentLibraryPage(QWidget):
         if self._question_answer_service is None:
             if self._content_index_service is None:
                 self._content_index_service = DocumentContentIndexService(self._service)
+            if self._semantic_index_service is None:
+                self._semantic_index_service = DocumentSemanticIndexService(
+                    self._content_index_service,
+                    LocalEmbeddingService(),
+                )
+            retrieval_service = DocumentHybridRetrievalService(
+                self._content_index_service,
+                self._semantic_index_service,
+            )
             self._question_answer_service = DocumentQuestionAnswerService(
-                self._content_index_service
+                self._content_index_service,
+                retrieval_service=retrieval_service,
             )
         dialog = DocumentQuestionAnswerDialog(
             self._service,

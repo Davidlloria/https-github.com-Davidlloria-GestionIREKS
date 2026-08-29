@@ -53,6 +53,19 @@ class DocumentSemanticIndexResult:
 
 
 @dataclass(frozen=True)
+class DocumentSemanticIndexStatus:
+    configured_model: str
+    indexed_documents: int = 0
+    failed_documents: int = 0
+    available_chunks: int = 0
+    other_model_documents: int = 0
+    content_documents: int = 0
+    available: bool = False
+    requires_reindex: bool = False
+    last_indexed_at: str | None = None
+
+
+@dataclass(frozen=True)
 class DocumentSemanticSearchResult:
     document_id: str
     name: str
@@ -134,8 +147,117 @@ class DocumentSemanticIndexService:
 
     def is_search_available(self) -> bool:
         """Return whether at least one current active document has a semantic index."""
-        self._initialize_schema()
-        return bool(self._active_index_models())
+        return self.get_status().available
+
+    def get_status(self) -> DocumentSemanticIndexStatus:
+        """Read semantic-index metadata without generating embeddings or changing schema."""
+        configured_model = str(self.embedding_service.model or "").strip()
+        empty = DocumentSemanticIndexStatus(configured_model=configured_model)
+        if not self.database_path.exists():
+            return empty
+        try:
+            with closing(sqlite3.connect(self.database_path)) as connection:
+                tables = {
+                    str(row[0])
+                    for row in connection.execute(
+                        "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+                    )
+                }
+                if "documents" not in tables:
+                    return empty
+                content_documents = 0
+                if {"document_content_status", "document_pages_fts"} <= tables:
+                    content_documents = int(
+                        connection.execute(
+                            """SELECT COUNT(DISTINCT d.document_id)
+                               FROM documents d
+                               JOIN document_content_status c
+                                 ON c.document_id=d.document_id
+                               WHERE d.active=1 AND c.status='indexed'
+                                 AND c.indexed_modified_ns=d.modified_ns
+                                 AND EXISTS (
+                                     SELECT 1 FROM document_pages_fts p
+                                     WHERE p.document_id=d.document_id
+                                       AND trim(p.text)<>''
+                                 )"""
+                        ).fetchone()[0]
+                    )
+                if "document_semantic_status" not in tables:
+                    return DocumentSemanticIndexStatus(
+                        configured_model=configured_model,
+                        content_documents=content_documents,
+                        requires_reindex=content_documents > 0,
+                    )
+                indexed_documents = int(
+                    connection.execute(
+                        """SELECT COUNT(*) FROM document_semantic_status s
+                           JOIN documents d ON d.document_id=s.document_id
+                           WHERE d.active=1 AND s.status='indexed'
+                             AND s.modified_ns=d.modified_ns AND s.model=?""",
+                        (configured_model,),
+                    ).fetchone()[0]
+                )
+                failed_documents = int(
+                    connection.execute(
+                        """SELECT COUNT(*) FROM document_semantic_status s
+                           JOIN documents d ON d.document_id=s.document_id
+                           WHERE d.active=1 AND s.status='failed'
+                             AND s.modified_ns=d.modified_ns AND s.model=?""",
+                        (configured_model,),
+                    ).fetchone()[0]
+                )
+                other_model_documents = int(
+                    connection.execute(
+                        """SELECT COUNT(*) FROM document_semantic_status s
+                           JOIN documents d ON d.document_id=s.document_id
+                           WHERE d.active=1 AND s.status='indexed'
+                             AND s.modified_ns=d.modified_ns AND s.model<>?""",
+                        (configured_model,),
+                    ).fetchone()[0]
+                )
+                available_chunks = 0
+                if "document_semantic_chunks" in tables:
+                    available_chunks = int(
+                        connection.execute(
+                            """SELECT COUNT(*) FROM document_semantic_chunks c
+                               JOIN document_semantic_status s
+                                 ON s.document_id=c.document_id
+                               JOIN documents d ON d.document_id=c.document_id
+                               WHERE d.active=1 AND s.status='indexed'
+                                 AND s.modified_ns=d.modified_ns
+                                 AND s.model=? AND c.model=s.model""",
+                            (configured_model,),
+                        ).fetchone()[0]
+                    )
+                row = connection.execute(
+                    """SELECT MAX(s.indexed_at) FROM document_semantic_status s
+                       JOIN documents d ON d.document_id=s.document_id
+                       WHERE d.active=1 AND s.model=?""",
+                    (configured_model,),
+                ).fetchone()
+        except sqlite3.Error:
+            return empty
+        available = (
+            indexed_documents > 0
+            and available_chunks > 0
+            and other_model_documents == 0
+        )
+        requires_reindex = (
+            other_model_documents > 0
+            or failed_documents > 0
+            or content_documents > indexed_documents
+        )
+        return DocumentSemanticIndexStatus(
+            configured_model=configured_model,
+            indexed_documents=indexed_documents,
+            failed_documents=failed_documents,
+            available_chunks=available_chunks,
+            other_model_documents=other_model_documents,
+            content_documents=content_documents,
+            available=available,
+            requires_reindex=requires_reindex,
+            last_indexed_at=str(row[0]) if row and row[0] else None,
+        )
 
     def update_index(
         self,

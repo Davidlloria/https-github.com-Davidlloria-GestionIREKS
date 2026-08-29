@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from PySide6.QtCore import QThread, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -23,6 +25,17 @@ from app.services.document_question_answer_service import (
     DocumentQuestionAnswerResult,
     DocumentQuestionAnswerService,
 )
+
+
+_ABSOLUTE_PATH_PATTERN = re.compile(
+    r"(?i)(?<![\w])(?:[a-z]:[\\/]|\\\\)[^\s]+|(?<![\w])/(?:[^/\s]+/)+[^\s]+"
+)
+_RETRIEVAL_MODE_LABELS = {
+    "hybrid": "Búsqueda híbrida",
+    "lexical": "Búsqueda léxica",
+    "semantic": "Búsqueda semántica",
+    "none": "Sin recuperación",
+}
 
 
 class DocumentQuestionAnswerWorker(QThread):
@@ -140,6 +153,9 @@ class DocumentQuestionAnswerDialog(QDialog):
         self.ai_indicator_label = QLabel("")
         self.ai_indicator_label.setObjectName("documentQuestionAIIndicator")
         status_row.addWidget(self.ai_indicator_label)
+        self.retrieval_mode_label = QLabel("Sin recuperación")
+        self.retrieval_mode_label.setObjectName("documentQuestionRetrievalMode")
+        status_row.addWidget(self.retrieval_mode_label)
         layout.addLayout(status_row)
 
         self.answer_output = QPlainTextEdit()
@@ -282,23 +298,41 @@ class DocumentQuestionAnswerDialog(QDialog):
 
     def _question_succeeded(self, result: DocumentQuestionAnswerResult) -> None:
         self._clear_result()
+        mode = str(result.retrieval_mode or "none")
+        mode_label = _RETRIEVAL_MODE_LABELS.get(mode, "Sin recuperación")
+        self.retrieval_mode_label.setText(mode_label)
+        safe_warnings = tuple(
+            self._safe_message(warning) for warning in result.retrieval_warnings
+        )
+        self.retrieval_mode_label.setToolTip("\n".join(safe_warnings))
         if not result.ok:
             self.status_label.setText(result.message)
             return
         self.answer_output.setPlainText(result.answer)
         self._render_sources(result)
         if result.used_ai:
-            self.status_label.setText(
-                "Respuesta generada con IA local y fuentes verificadas"
+            status = (
+                "Respuesta generada con IA local y fuentes verificadas "
+                f"· {mode_label}"
             )
             self.ai_indicator_label.setText("IA local · fuentes verificadas")
             self.ai_indicator_label.setProperty("status", "ready")
         else:
-            self.status_label.setText(
-                f"{result.message} Comprueba o actualiza el índice de contenido."
+            status = (
+                f"{result.message} Comprueba o actualiza el índice de contenido. "
+                f"· {mode_label}"
             )
             self.ai_indicator_label.setText("Sin uso de IA local")
             self.ai_indicator_label.setProperty("status", "neutral")
+        if safe_warnings:
+            if mode == "lexical":
+                status += (
+                    "\nEl índice semántico no está disponible; "
+                    "se utilizó búsqueda textual."
+                )
+            else:
+                status += "\nLa recuperación documental utilizó un fallback seguro."
+        self.status_label.setText(status)
         self.ai_indicator_label.style().unpolish(self.ai_indicator_label)
         self.ai_indicator_label.style().polish(self.ai_indicator_label)
 
@@ -336,7 +370,13 @@ class DocumentQuestionAnswerDialog(QDialog):
         self.sources_table.clearContents()
         self.sources_table.setRowCount(0)
         self.ai_indicator_label.clear()
+        self.retrieval_mode_label.setText("Sin recuperación")
+        self.retrieval_mode_label.setToolTip("")
         self.show_source_button.setEnabled(False)
+
+    @staticmethod
+    def _safe_message(message: str) -> str:
+        return _ABSOLUTE_PATH_PATTERN.sub("[RUTA OMITIDA]", str(message or ""))
 
     def _clear(self) -> None:
         self.question_input.clear()

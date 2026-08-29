@@ -20,6 +20,7 @@ from app.services.document_library_service import (
     DocumentNotFoundError,
     UnsafeDocumentPathError,
 )
+from app.services.document_semantic_index_service import DocumentSemanticIndexStatus
 from app.ui.widgets.document_library_page import DocumentLibraryPage
 
 
@@ -128,6 +129,19 @@ class _FakeContentIndexService:
 
     def search(self, *_args, **_kwargs):
         return []
+
+
+class _FakeSemanticIndexService:
+    def __init__(self, content_index_service) -> None:
+        self.content_index_service = content_index_service
+        self.embedding_service = type("Embedding", (), {"model": "embeddinggemma"})()
+
+    def get_status(self):
+        return DocumentSemanticIndexStatus(
+            configured_model="embeddinggemma",
+            content_documents=1,
+            requires_reindex=True,
+        )
 
 
 class _FakeQuestionAnswerService:
@@ -517,7 +531,12 @@ def test_content_search_dialog_opens_from_documents_page() -> None:
     _application()
     service = _FakeDocumentLibraryService(_sample_documents())
     content_service = _FakeContentIndexService(service)
-    page = DocumentLibraryPage(service, content_service)  # type: ignore[arg-type]
+    semantic_service = _FakeSemanticIndexService(content_service)
+    page = DocumentLibraryPage(
+        service,
+        content_service,  # type: ignore[arg-type]
+        semantic_index_service=semantic_service,  # type: ignore[arg-type]
+    )
 
     page.content_search_button.click()
     _application().processEvents()
@@ -526,6 +545,7 @@ def test_content_search_dialog_opens_from_documents_page() -> None:
     assert page._content_search_dialog.isVisible()
     assert page._content_search_dialog._library_service is service
     assert page._content_search_dialog._content_service is content_service
+    assert page._content_search_dialog._semantic_service is semantic_service
     page._content_search_dialog.close()
     _application().processEvents()
 
@@ -638,6 +658,38 @@ def test_default_question_service_reuses_page_content_index_and_database(
     )
     assert page._content_index_service.database_path == database.resolve()
     assert page._question_answer_dialog is not None
+    page._question_answer_dialog.close()
+    _application().processEvents()
+
+
+def test_search_and_question_dialogs_share_semantic_service_and_database(
+    tmp_path: Path,
+) -> None:
+    _application()
+    library_dir = tmp_path / "library"
+    library_dir.mkdir()
+    database = tmp_path / "data" / "document_library.sqlite"
+    library = DocumentLibraryService(library_dir, database)
+    page = DocumentLibraryPage(library)
+
+    page.content_search_button.click()
+    _application().processEvents()
+    page.question_answer_button.click()
+    _application().processEvents()
+
+    assert page._content_search_dialog is not None
+    assert page._question_answer_service is not None
+    semantic = page._semantic_index_service
+    assert semantic is not None
+    assert page._content_search_dialog._semantic_service is semantic
+    assert (
+        page._question_answer_service.retrieval_service.semantic_index_service
+        is semantic
+    )
+    assert semantic.database_path == database.resolve()
+    assert semantic.content_index_service is page._content_index_service
+
+    page._content_search_dialog.close()
     page._question_answer_dialog.close()
     _application().processEvents()
 
