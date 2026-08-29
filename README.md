@@ -2,6 +2,9 @@
 
 Aplicacion de gestion para clientes, contactos, ingredientes, recetas, pedidos, almacen, cursos y documentacion interna de IREKS.
 
+Incluye una biblioteca documental externa de solo lectura con catalogo local,
+busqueda FTS5, recuperacion semantica/hibrida y asistente local con fuentes.
+
 El proyecto esta en migracion desde una aplicacion de escritorio PySide6 hacia una arquitectura con servicios reutilizables, API FastAPI y frontend React.
 
 ## Stack
@@ -27,6 +30,7 @@ El proyecto esta en migracion desde una aplicacion de escritorio PySide6 hacia u
 
 - mapa documental: `docs/README.md`
 - entorno local: `docs/setup/local-environment.md`
+- biblioteca documental: `docs/setup/document-library.md`
 - roadmap de migracion: `docs/architecture/migration-roadmap.md`
 - estado corto del trabajo: `docs/worklog/progress-log.md`
 
@@ -86,6 +90,11 @@ npm run build
 ## Datos y seguridad
 
 `data/` puede contener base de datos real, exports, PDFs y configuraciones locales. No commitear claves, tokens, bases reales ni documentos sensibles.
+
+La biblioteca se configura con `GESTION_IREKS_DOCUMENTS_DIR` y el modelo local de
+embeddings con `GESTION_IREKS_EMBEDDING_MODEL`. Los documentos externos y
+`data/document_library.sqlite` son datos locales y no se commitean. Consulta la
+[guia de la biblioteca documental](docs/setup/document-library.md).
 
 ## Git
 

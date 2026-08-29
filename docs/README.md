@@ -3,6 +3,7 @@
 ## Lectura rapida
 
 - Entorno local: `docs/setup/local-environment.md`
+- Biblioteca documental local: `docs/setup/document-library.md`
 - Roadmap de migracion: `docs/architecture/migration-roadmap.md`
 - Estado corto: `docs/worklog/progress-log.md`
 - Estructura UI: `docs/ui-structure/`

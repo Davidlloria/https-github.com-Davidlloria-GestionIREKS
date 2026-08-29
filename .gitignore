@@ -12,11 +12,13 @@ node_modules/
 # Test and tooling caches
 .pytest_cache/
 .pytest_tmp/
+.tmp/
 .mypy_cache/
 .ruff_cache/
 .coverage
 coverage.xml
 htmlcov/
+validation-summary.json
 
 # IDE
 .vscode/

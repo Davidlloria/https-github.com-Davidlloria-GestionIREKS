@@ -31,3 +31,21 @@ Evitar crear una API sobre código todavía acoplado a UI.
 
 Decisión:
 React no debe construirse antes de tener contratos claros de datos.
+
+## ADR-005: Biblioteca documental local derivada
+
+Decisión:
+La biblioteca de origen es externa y de solo lectura. Un índice derivado y
+separado guarda metadatos, contenido FTS5 y embeddings reconstruibles. Los
+servicios Python de catálogo, contenido, semántica, recuperación híbrida y
+preguntas son compartidos; PySide6 los consume sin acceder directamente a
+SQLite. La IA documental usa Ollama local y las respuestas requieren fuentes
+documentales válidas.
+
+Consecuencias:
+
+- Los documentos originales quedan fuera de Git y de SQLite.
+- Los índices pueden eliminarse y reconstruirse sin alterar los originales.
+- Sin biblioteca documental, el resto de GestionIREKS continúa operativo.
+- Cambiar el modelo de embeddings requiere reindexación semántica.
+- OCR queda fuera del MVP documental.
