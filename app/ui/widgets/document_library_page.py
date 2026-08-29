@@ -158,11 +158,12 @@ class DocumentLibraryPage(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setSortingEnabled(True)
         self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for column in range(1, 6):
-            self.table.horizontalHeader().setSectionResizeMode(
-                column, QHeaderView.ResizeMode.ResizeToContents
-            )
+        header_view = self.table.horizontalHeader()
+        header_view.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        column_widths = {1: 130, 2: 160, 3: 70, 4: 90, 5: 135}
+        for column, width in column_widths.items():
+            header_view.setSectionResizeMode(column, QHeaderView.ResizeMode.Interactive)
+            self.table.setColumnWidth(column, width)
         self.table.itemSelectionChanged.connect(self._selection_changed)
         self.table.itemDoubleClicked.connect(lambda _item: self._open_selected_document())
         table_layout.addWidget(self.table, 1)
@@ -358,6 +359,7 @@ class DocumentLibraryPage(QWidget):
         selected_id: str | None = None,
     ) -> None:
         self._documents_by_id = {document.document_id: document for document in documents}
+        self.table.setUpdatesEnabled(False)
         self.table.setSortingEnabled(False)
         self.table.clearContents()
         self.table.setRowCount(len(documents))
@@ -378,6 +380,7 @@ class DocumentLibraryPage(QWidget):
             for column, item in enumerate(values):
                 self.table.setItem(row, column, item)
         self.table.setSortingEnabled(True)
+        self.table.setUpdatesEnabled(True)
         if selected_id:
             for row in range(self.table.rowCount()):
                 item = self.table.item(row, 0)

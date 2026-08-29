@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtPdfWidgets import QPdfView
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QHeaderView, QMessageBox
 from reportlab.pdfgen import canvas
 
 import app.ui.widgets.document_library_page as page_module
@@ -177,6 +177,16 @@ def test_page_loads_catalog_and_combines_search_and_filters() -> None:
     assert page.table.item(0, 0).text() == "Trigo.pdf"
     assert page.counter_label.text() == "1 documento"
     assert "C:/" not in page.table.item(0, 0).toolTip()
+
+
+def test_large_catalog_columns_do_not_use_resize_to_contents() -> None:
+    _application()
+    page = DocumentLibraryPage(_FakeDocumentLibraryService(_sample_documents()))
+    header = page.table.horizontalHeader()
+
+    assert header.sectionResizeMode(0) == QHeaderView.ResizeMode.Stretch
+    for column in range(1, page.table.columnCount()):
+        assert header.sectionResizeMode(column) == QHeaderView.ResizeMode.Interactive
 
 
 def test_open_uses_selected_identifier_and_safe_resolved_path(monkeypatch) -> None:
