@@ -550,9 +550,13 @@ class DocumentLibraryPage(QWidget):
         self._show_preview_placeholder("Selecciona un PDF para previsualizarlo")
 
     def _close_pdf_document(self) -> None:
+        self.pdf_document.close()
+        self._loaded_document_id = None
+        self._set_preview_controls_enabled(False)
+
+    def _dispose_pdf_view(self) -> None:
         self.pdf_view.setDocument(None)
         self.pdf_document.close()
-        self.pdf_view.setDocument(self.pdf_document)
         self._loaded_document_id = None
         self._set_preview_controls_enabled(False)
 
@@ -607,7 +611,7 @@ class DocumentLibraryPage(QWidget):
             )
 
     def closeEvent(self, event) -> None:  # noqa: N802
-        self._close_pdf_document()
+        self._dispose_pdf_view()
         super().closeEvent(event)
 
     @staticmethod

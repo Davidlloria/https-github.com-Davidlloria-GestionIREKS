@@ -466,3 +466,24 @@ def test_closing_page_releases_loaded_pdf(tmp_path: Path) -> None:
 
     assert page._loaded_document_id is None
     assert page.pdf_document.pageCount() == 0
+    assert page.pdf_view.document() is None
+
+
+def test_repeated_preview_cleanup_keeps_persistent_document_attached(
+    tmp_path: Path,
+) -> None:
+    _application()
+    document = _sample_documents()[0]
+    service = _FakeDocumentLibraryService([document])
+    service.resolved_path = _write_pdf(tmp_path / "valid.pdf")
+    page = DocumentLibraryPage(service)
+    page.table.selectRow(0)
+    assert page.pdf_view.document() is page.pdf_document
+
+    page.table.clearSelection()
+    page._clear_preview()
+    page._clear_preview()
+
+    assert page.pdf_view.document() is page.pdf_document
+    assert page.pdf_document.pageCount() == 0
+    assert page._loaded_document_id is None
