@@ -347,3 +347,80 @@ def test_content_index_service_does_not_import_pyside6() -> None:
         "app/services/document_content_index_service.py"
     ).read_text(encoding="utf-8")
     assert "PySide6" not in source
+
+
+def test_get_page_text_returns_existing_indexed_page(tmp_path: Path) -> None:
+    library, _, catalog, content = _build_services(tmp_path)
+    _write_pdf(
+        library / "Tecnica/paginas.pdf",
+        ["texto primera pagina", "texto segunda pagina"],
+    )
+    catalog.refresh_catalog()
+    document = catalog.list_documents()[0]
+    content.update_index()
+
+    page_text = content.get_page_text(document.document_id, 2)
+
+    assert page_text is not None
+    assert "segunda pagina" in page_text
+
+
+def test_get_page_text_returns_none_for_missing_page(tmp_path: Path) -> None:
+    library, _, catalog, content = _build_services(tmp_path)
+    _write_markdown(library / "Notas/unica.md", "pagina unica")
+    catalog.refresh_catalog()
+    document = catalog.list_documents()[0]
+    content.update_index()
+
+    assert content.get_page_text(document.document_id, 2) is None
+
+
+def test_get_page_text_excludes_inactive_document(tmp_path: Path) -> None:
+    library, _, catalog, content = _build_services(tmp_path)
+    path = _write_markdown(library / "Notas/inactivo.md", "texto retirado")
+    catalog.refresh_catalog()
+    document = catalog.list_documents()[0]
+    content.update_index()
+    path.unlink()
+    catalog.refresh_catalog()
+
+    assert content.get_page_text(document.document_id, 1) is None
+
+
+def test_get_page_text_excludes_document_not_yet_indexed(tmp_path: Path) -> None:
+    library, _, catalog, content = _build_services(tmp_path)
+    _write_markdown(library / "Notas/pendiente.md", "texto pendiente")
+    catalog.refresh_catalog()
+    document = catalog.list_documents()[0]
+
+    assert content.get_page_text(document.document_id, 1) is None
+
+
+def test_get_page_text_applies_character_limit(tmp_path: Path) -> None:
+    library, _, catalog, content = _build_services(tmp_path)
+    _write_markdown(library / "Notas/largo.md", "abcdefghij")
+    catalog.refresh_catalog()
+    document = catalog.list_documents()[0]
+    content.update_index()
+
+    assert content.get_page_text(document.document_id, 1, max_chars=4) == "abcd"
+
+
+@pytest.mark.parametrize("page_number", [0, -1, True, 1.5, "1"])
+def test_get_page_text_rejects_invalid_page_number(
+    tmp_path: Path,
+    page_number: object,
+) -> None:
+    library, _, catalog, content = _build_services(tmp_path)
+    _write_markdown(library / "Notas/valido.md", "texto valido")
+    catalog.refresh_catalog()
+    document = catalog.list_documents()[0]
+    content.update_index()
+
+    assert content.get_page_text(document.document_id, page_number) is None  # type: ignore[arg-type]
+
+
+def test_get_page_text_rejects_invalid_identifier(tmp_path: Path) -> None:
+    _library, _, _catalog, content = _build_services(tmp_path)
+
+    assert content.get_page_text("../documento", 1) is None

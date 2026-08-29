@@ -19,7 +19,10 @@ from app.services.document_library_service import (
 
 SUPPORTED_CONTENT_EXTENSIONS = frozenset({".pdf", ".md", ".markdown"})
 MAX_SEARCH_RESULTS = 100
+DEFAULT_PAGE_TEXT_MAX_CHARS = 4_000
+MAX_PAGE_TEXT_CHARS = 12_000
 _SEARCH_TOKEN_PATTERN = re.compile(r"[^\W_]+", re.UNICODE)
+_DOCUMENT_IDENTIFIER_PATTERN = re.compile(r"[0-9a-f]{64}")
 
 IndexStatus = Literal["indexed", "no_text", "failed"]
 ProgressCallback = Callable[[int, int, str], None]
@@ -233,6 +236,50 @@ class DocumentContentIndexService:
             )
             for row in rows
         ]
+
+    def get_page_text(
+        self,
+        document_id: str,
+        page_number: int,
+        *,
+        max_chars: int = DEFAULT_PAGE_TEXT_MAX_CHARS,
+    ) -> str | None:
+        safe_document_id = str(document_id or "")
+        if _DOCUMENT_IDENTIFIER_PATTERN.fullmatch(safe_document_id) is None:
+            return None
+        if isinstance(page_number, bool) or not isinstance(page_number, int):
+            return None
+        if page_number < 1:
+            return None
+        try:
+            safe_max_chars = min(int(max_chars), MAX_PAGE_TEXT_CHARS)
+        except (TypeError, ValueError):
+            return None
+        if safe_max_chars < 1:
+            return None
+
+        self._initialize_schema()
+        with closing(sqlite3.connect(self.database_path)) as connection:
+            row = connection.execute(
+                """
+                SELECT document_pages_fts.text
+                FROM document_pages_fts
+                JOIN documents
+                  ON documents.document_id = document_pages_fts.document_id
+                JOIN document_content_status
+                  ON document_content_status.document_id = documents.document_id
+                WHERE document_pages_fts.document_id = ?
+                  AND CAST(document_pages_fts.page_number AS INTEGER) = ?
+                  AND documents.active = 1
+                  AND document_content_status.status = 'indexed'
+                LIMIT 1
+                """,
+                (safe_document_id, page_number),
+            ).fetchone()
+        if row is None:
+            return None
+        text = str(row[0] or "")
+        return text[:safe_max_chars] or None
 
     def _initialize_schema(self) -> None:
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
