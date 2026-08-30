@@ -98,6 +98,27 @@ def test_sync_links_unique_technical_sheets_for_all_manufacturers(tmp_path: Path
     assert {link.matched_code for link in links} == {"114715E", "16403", "12500"}
     assert {link.relation_type for link in links} == {TECHNICAL_SHEET_RELATION}
     assert {link.origin for link in links} == {AUTOMATIC_FILENAME_ORIGIN}
+    ireks_documents = service.list_product_documents("ireks-product")
+    assert len(ireks_documents) == 1
+    assert ireks_documents[0].name == "114715E_es_MELLA TOP BISKUIT.pdf"
+    assert ireks_documents[0].category == "IREKS"
+    assert ireks_documents[0].relation_type == TECHNICAL_SHEET_RELATION
+
+
+def test_product_documents_exclude_inactive_catalog_records(tmp_path: Path) -> None:
+    library, document_database, service = _service(
+        tmp_path,
+        [("product", "14715", "114715E", 1, "ireks")],
+        ["FICHAS TECNICAS/IREKS/114715E_ficha.pdf"],
+    )
+    service.sync_technical_sheets()
+    assert len(service.list_product_documents("product")) == 1
+
+    (library / "FICHAS TECNICAS/IREKS/114715E_ficha.pdf").unlink()
+    DocumentLibraryService(library, document_database).refresh_catalog()
+
+    assert service.list_product_documents("product") == []
+    assert service.list_product_documents("") == []
 
 
 def test_sync_prioritizes_one_active_duplicate_and_rejects_active_ambiguity(

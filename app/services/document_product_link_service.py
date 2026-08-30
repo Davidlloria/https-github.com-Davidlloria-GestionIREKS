@@ -33,6 +33,19 @@ class DocumentProductLink:
 
 
 @dataclass(frozen=True)
+class ProductDocumentItem:
+    document_id: str
+    name: str
+    relative_path: str
+    area: str
+    category: str
+    extension: str
+    modified_at: str
+    relation_type: str
+    origin: str
+
+
+@dataclass(frozen=True)
 class DocumentProductLinkSyncResult:
     technical_documents: int = 0
     linked: int = 0
@@ -226,6 +239,40 @@ class DocumentProductLinkService:
                 matched_code=str(row["matched_code"]),
                 created_at=str(row["created_at"]),
                 updated_at=str(row["updated_at"]),
+            )
+            for row in rows
+        ]
+
+    def list_product_documents(self, product_articulo_id: str) -> list[ProductDocumentItem]:
+        clean_product_id = str(product_articulo_id or "").strip()
+        if not clean_product_id:
+            return []
+        self._initialize_schema()
+        with closing(sqlite3.connect(self.document_database_path)) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                """
+                SELECT d.document_id, d.name, d.relative_path, d.area, d.category,
+                       d.extension, d.modified_at, links.relation_type, links.origin
+                FROM document_product_links links
+                JOIN documents d ON d.document_id = links.document_id
+                WHERE links.product_articulo_id = ? AND d.active = 1
+                ORDER BY links.relation_type, d.name COLLATE NOCASE,
+                         d.relative_path COLLATE NOCASE
+                """,
+                (clean_product_id,),
+            ).fetchall()
+        return [
+            ProductDocumentItem(
+                document_id=str(row["document_id"]),
+                name=str(row["name"]),
+                relative_path=str(row["relative_path"]),
+                area=str(row["area"]),
+                category=str(row["category"]),
+                extension=str(row["extension"]),
+                modified_at=str(row["modified_at"]),
+                relation_type=str(row["relation_type"]),
+                origin=str(row["origin"]),
             )
             for row in rows
         ]

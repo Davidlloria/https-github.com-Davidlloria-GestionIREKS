@@ -3,8 +3,8 @@ from typing import Any
 from pathlib import Path
 import re
 
-from PySide6.QtCore import QDate, QTimer, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QIcon, QPainter, QPen, QPixmap, QTextDocument
+from PySide6.QtCore import QDate, QTimer, Qt, QUrl
+from PySide6.QtGui import QBrush, QColor, QDesktopServices, QFont, QIcon, QPainter, QPen, QPixmap, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -43,6 +43,15 @@ from app.models import AlmacenMovimiento, Distribuidor, Envase, Fabricante, Fami
 from app.services.ingredient_fatsecret_nutrition_flow_service import IngredientFatSecretNutritionFlowService
 from app.services.ingredient_fdc_nutrition_flow_service import IngredientFdcNutritionFlowService
 from app.services.ingredient_chatgpt_nutrition_flow_service import IngredientChatGPTNutritionFlowService
+from app.services.document_library_service import (
+    DocumentLibraryService,
+    DocumentNotFoundError,
+    UnsafeDocumentPathError,
+)
+from app.services.document_product_link_service import (
+    DocumentProductLinkService,
+    ProductDocumentItem,
+)
 from app.services.ingredient_entity_service import IngredientEntityService
 from app.services.ingredient_ireks_autosave_flow_service import (
     IngredientIreksAutosaveFlowService,
@@ -60,9 +69,11 @@ from app.services.product_report_flow_service import ProductReportFlowService
 from app.services.product_report_service import ProductReportResult
 from app.services.report_export_service import ReportExportService
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
+from app.services.whatsapp_share_service import WhatsAppShareService
 from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
 from app.ui.widgets.entity_page import EntityPage
 from app.ui.widgets.ingredient_distributors_tab import IngredientDistributorsTab
+from app.ui.widgets.whatsapp_share_dialog import WhatsAppShareDialog
 from app.viewmodels import IngredientIreksViewModel, IngredientStdViewModel
 
 
@@ -595,6 +606,9 @@ class IngredientsIreksPage(QWidget):
         show_actions_ribbon: bool = True,
         compact_mode: bool = False,
         vm: Any | None = None,
+        document_product_link_service: DocumentProductLinkService | None = None,
+        document_library_service: DocumentLibraryService | None = None,
+        whatsapp_share_service: WhatsAppShareService | None = None,
     ) -> None:
         QWidget.__init__(self)
         self.setObjectName("IngredientsIreksPageRoot")
@@ -609,6 +623,12 @@ class IngredientsIreksPage(QWidget):
         self.product_report_flow_service = ProductReportFlowService()
         self.report_export_service = ReportExportService()
         self.nutrition_query_service = IngredientNutritionQueryService()
+        self.document_product_link_service = (
+            document_product_link_service or DocumentProductLinkService()
+        )
+        self.document_library_service = document_library_service or DocumentLibraryService()
+        self.whatsapp_share_service = whatsapp_share_service or WhatsAppShareService()
+        self._product_documents_by_id: dict[str, ProductDocumentItem] = {}
         self.fdc_nutrition_flow_service = IngredientFdcNutritionFlowService(
             nutrition_query_service=self.nutrition_query_service,
         )
@@ -1867,6 +1887,82 @@ class IngredientsIreksPage(QWidget):
         nutricion_layout.addWidget(nutricion_body, 1)
         tabs.addTab(nutricion_tab, "Nutrición")
 
+        documentos_tab = QWidget()
+        documentos_tab.setObjectName("productDocumentsTab")
+        documentos_layout = QVBoxLayout(documentos_tab)
+        documentos_layout.setContentsMargins(0, 0, 0, 0)
+        documentos_layout.setSpacing(0)
+        documentos_layout.addWidget(
+            self._ireks_tab_header(
+                documentos_tab,
+                "Documentación del producto",
+                "file-text.svg",
+            )
+        )
+        documentos_body = QWidget(documentos_tab)
+        documentos_body_layout = QVBoxLayout(documentos_body)
+        documentos_body_layout.setContentsMargins(10, 10, 10, 10)
+        documentos_body_layout.setSpacing(8)
+        self.product_documents_empty = QLabel(
+            "Selecciona un producto para ver sus documentos.",
+            documentos_tab,
+        )
+        self.product_documents_empty.setObjectName("productDocumentsEmpty")
+        self.product_documents_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.product_documents_empty.setWordWrap(True)
+        documentos_body_layout.addWidget(self.product_documents_empty)
+        self.product_documents_table = QTableWidget(0, 4, documentos_tab)
+        self.product_documents_table.setObjectName("productDocumentsTable")
+        self.product_documents_table.setHorizontalHeaderLabels(
+            ["Documento", "Tipo", "Fabricante", "Actualizado"]
+        )
+        self.product_documents_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self.product_documents_table.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self.product_documents_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self.product_documents_table.setAlternatingRowColors(True)
+        self.product_documents_table.setSortingEnabled(True)
+        self.product_documents_table.verticalHeader().setVisible(False)
+        documents_header = self.product_documents_table.horizontalHeader()
+        documents_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        documents_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        documents_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        documents_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self._apply_ireks_table_style(self.product_documents_table)
+        self.product_documents_table.itemSelectionChanged.connect(
+            self._product_document_selection_changed
+        )
+        self.product_documents_table.itemDoubleClicked.connect(
+            lambda _item: self._open_selected_product_document()
+        )
+        documentos_body_layout.addWidget(self.product_documents_table, 1)
+        document_actions = QHBoxLayout()
+        self.product_documents_status = QLabel("")
+        self.product_documents_status.setObjectName("productDocumentsStatus")
+        document_actions.addWidget(self.product_documents_status, 1)
+        self.product_document_open_button = QPushButton("Abrir")
+        self.product_document_open_button.setProperty("btnRole", "secondary")
+        self.product_document_open_button.setEnabled(False)
+        self.product_document_open_button.clicked.connect(
+            self._open_selected_product_document
+        )
+        document_actions.addWidget(self.product_document_open_button)
+        self.product_document_whatsapp_button = QPushButton("WhatsApp")
+        self.product_document_whatsapp_button.setProperty("btnRole", "success")
+        self.product_document_whatsapp_button.setEnabled(False)
+        self.product_document_whatsapp_button.clicked.connect(
+            self._share_selected_product_document
+        )
+        document_actions.addWidget(self.product_document_whatsapp_button)
+        documentos_body_layout.addLayout(document_actions)
+        documentos_layout.addWidget(documentos_body, 1)
+        self._documents_tab_index = tabs.addTab(documentos_tab, "Documentos")
+
         clientes_tab = QWidget()
         clientes_tab.setObjectName("clientesTab")
         clientes_layout = QVBoxLayout(clientes_tab)
@@ -2409,8 +2505,152 @@ class IngredientsIreksPage(QWidget):
         return str(combo.currentData() or "")
 
     def _on_detail_tab_changed(self, index: int) -> None:
+        if int(index) == getattr(self, "_documents_tab_index", -1):
+            product = self._selected_row()
+            articulo_id = (
+                str(getattr(product, "articulo_id", "") or "").strip()
+                if product
+                else ""
+            )
+            self._reload_product_documents(articulo_id)
         if int(index) == getattr(self, "_clientes_tab_index", -1):
             self._reload_customer_consumption_table(refresh_years=True)
+
+    def _reload_product_documents(self, articulo_id: str) -> None:
+        if not hasattr(self, "product_documents_table"):
+            return
+        clean_articulo_id = str(articulo_id or "").strip()
+        self._product_documents_by_id = {}
+        self.product_documents_table.setSortingEnabled(False)
+        self.product_documents_table.clearContents()
+        self.product_documents_table.setRowCount(0)
+        self.product_documents_status.setText("")
+        if not clean_articulo_id:
+            self.product_documents_empty.setText(
+                "Selecciona un producto para ver sus documentos."
+            )
+            self.product_documents_empty.setVisible(True)
+            self.product_documents_table.setSortingEnabled(True)
+            self._product_document_selection_changed()
+            return
+        try:
+            documents = self.document_product_link_service.list_product_documents(
+                clean_articulo_id
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.product_documents_empty.setText(
+                f"No se pudieron cargar los documentos relacionados: {exc}"
+            )
+            self.product_documents_empty.setVisible(True)
+            self.product_documents_table.setSortingEnabled(True)
+            self._product_document_selection_changed()
+            return
+
+        self._product_documents_by_id = {
+            document.document_id: document for document in documents
+        }
+        self.product_documents_empty.setText(
+            "No hay fichas técnicas relacionadas con este producto."
+        )
+        self.product_documents_empty.setVisible(not documents)
+        self.product_documents_table.setRowCount(len(documents))
+        for row_index, document in enumerate(documents):
+            name_item = QTableWidgetItem(document.name)
+            name_item.setData(Qt.ItemDataRole.UserRole, document.document_id)
+            name_item.setToolTip(document.relative_path)
+            relation_label = (
+                "Ficha técnica"
+                if document.relation_type == "technical_sheet"
+                else document.relation_type
+            )
+            manufacturer = document.category.replace("\\", "/").split("/", 1)[0]
+            modified = str(document.modified_at or "")[:10]
+            for column, item in enumerate(
+                (
+                    name_item,
+                    QTableWidgetItem(relation_label),
+                    QTableWidgetItem(manufacturer),
+                    QTableWidgetItem(modified),
+                )
+            ):
+                self.product_documents_table.setItem(row_index, column, item)
+        self.product_documents_table.setSortingEnabled(True)
+        if documents:
+            self.product_documents_table.selectRow(0)
+            self.product_documents_status.setText(
+                f"{len(documents)} documento" + ("" if len(documents) == 1 else "s")
+            )
+        self._product_document_selection_changed()
+
+    def _selected_product_document(self) -> ProductDocumentItem | None:
+        selected = self.product_documents_table.selectionModel().selectedRows()
+        if not selected:
+            return None
+        item = self.product_documents_table.item(selected[0].row(), 0)
+        document_id = str(item.data(Qt.ItemDataRole.UserRole) or "") if item else ""
+        return self._product_documents_by_id.get(document_id)
+
+    def _product_document_selection_changed(self) -> None:
+        enabled = self._selected_product_document() is not None
+        self.product_document_open_button.setEnabled(enabled)
+        self.product_document_whatsapp_button.setEnabled(enabled)
+
+    def _open_selected_product_document(self) -> None:
+        document = self._selected_product_document()
+        if document is None:
+            return
+        try:
+            path = self.document_library_service.resolve_document(document.document_id)
+        except (DocumentNotFoundError, UnsafeDocumentPathError) as exc:
+            QMessageBox.warning(self, "Documentos", str(exc))
+            return
+        if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(path))):
+            QMessageBox.warning(
+                self,
+                "Documentos",
+                "Windows no pudo abrir el documento con la aplicación predeterminada.",
+            )
+
+    def _share_selected_product_document(self) -> None:
+        document = self._selected_product_document()
+        if document is None:
+            return
+        try:
+            path = self.document_library_service.resolve_document(document.document_id)
+        except (DocumentNotFoundError, UnsafeDocumentPathError) as exc:
+            QMessageBox.warning(self, "WhatsApp", str(exc))
+            return
+        dialog = WhatsAppShareDialog(
+            document.name,
+            self.whatsapp_share_service,
+            self,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        chat_url = self.whatsapp_share_service.build_chat_url(
+            dialog.normalized_phone,
+            dialog.message,
+        )
+        file_revealed = self.whatsapp_share_service.reveal_file(path)
+        chat_opened = QDesktopServices.openUrl(QUrl(chat_url))
+        if not chat_opened:
+            QMessageBox.warning(
+                self,
+                "WhatsApp",
+                "Windows no pudo abrir la conversación de WhatsApp.",
+            )
+            return
+        if not file_revealed:
+            QMessageBox.warning(
+                self,
+                "WhatsApp",
+                "La conversación se abrió, pero Windows no pudo mostrar el archivo. "
+                "Adjúntalo manualmente desde WhatsApp.",
+            )
+            return
+        self.product_documents_status.setText(
+            "WhatsApp abierto. Arrastra el documento marcado en el Explorador al chat."
+        )
 
     def _reload_customer_consumption_table(self, *_args, refresh_years: bool = False) -> None:
         if not hasattr(self, "customer_consumption_table"):
@@ -2987,6 +3227,7 @@ class IngredientsIreksPage(QWidget):
         self._reload_pedidos_table(selected_articulo_id)
         self._reload_tarifas_table(selected_articulo_id)
         self._reload_nutricion_table(selected_articulo_id)
+        self._reload_product_documents(selected_articulo_id)
         if self.detail_tabs.currentIndex() == getattr(self, "_clientes_tab_index", -1):
             self._reload_customer_consumption_table(refresh_years=True)
         self._update_envase_total_preview()
@@ -3033,6 +3274,7 @@ class IngredientsIreksPage(QWidget):
         self._reload_pedidos_table("")
         self._reload_tarifas_table("")
         self._reload_nutricion_table("")
+        self._reload_product_documents("")
 
     def _reset_entradas_date_filters(self) -> None:
         self.entradas_date_from.blockSignals(True)
