@@ -14,8 +14,8 @@ entire migration history first.
 ## Current Snapshot
 
 - Date: 2026-08-30
-- Branch: `feat/document-library-foundation`
-- HEAD before checkpoint documentation commit: `6fa79822248fff19240a87c1246506ad35e2465a`
+- Branch: `feat/technical-consultant`
+- HEAD before technical-consultant retrieval cut: `6eae28e92fccd2881138a7626e4a7823a16affa3`
 - Initial worktree: clean
 - App status: the PySide6 document MVP is complete for catalog, PDF preview,
   FTS5 content search, local semantic indexing, hybrid retrieval and grounded QA.
@@ -43,8 +43,18 @@ entire migration history first.
   the real semantic index is available.
 - Known limitation: the document assistant is operational, but specialist product
   comparison and ranking require the future technical-consultant phase.
-- Next recommendation: integrate this branch after reviewing the documentation-only
-  checkpoint commit.
+- Technical-consultant first cut: product retrieval is restricted to the real
+  `CALIDAD/FICHAS TECNICAS/IREKS` taxonomy, derives product identity from
+  certificate filenames, groups equivalent documents and limits evidence per
+  candidate without hardcoding product names.
+- Real retrieval smoke: the precooked-and-frozen bread query returned distinct
+  technical sheets headed by `FRISCH UND FROSTIG`, `PREBACK` and
+  `IDEAL FROST`; tariffs, posters and general catalogs were excluded.
+- Validation for the new retrieval service: 212 document/architecture tests and
+  the complete 799-test Python suite passed; the complete suite reported the 151
+  known non-blocking warnings.
+- Next recommendation: implement structured extraction and comparison of the
+  retrieved technical-product candidates without changing the PySide6 UI yet.
 
 ## Historical Snapshot — 2026-06-21
 
