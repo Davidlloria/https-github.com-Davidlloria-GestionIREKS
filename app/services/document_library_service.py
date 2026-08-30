@@ -7,9 +7,12 @@ from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from app.core.config import DOCUMENT_LIBRARY_DB_PATH, DOCUMENTS_DIR
+
+if TYPE_CHECKING:
+    from app.services.document_product_link_service import DocumentProductLinkSyncResult
 
 
 ALLOWED_DOCUMENT_EXTENSIONS = frozenset(
@@ -52,6 +55,8 @@ class DocumentLibraryScanResult:
     unchanged: int = 0
     deactivated: int = 0
     errors: tuple[str, ...] = ()
+    product_links: DocumentProductLinkSyncResult | None = None
+    product_link_error: str = ""
 
 
 @dataclass(frozen=True)

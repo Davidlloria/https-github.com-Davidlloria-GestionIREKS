@@ -20,6 +20,7 @@ from app.services.document_library_service import (
     DocumentNotFoundError,
     UnsafeDocumentPathError,
 )
+from app.services.document_product_link_service import DocumentProductLinkSyncResult
 from app.services.document_semantic_index_service import DocumentSemanticIndexStatus
 from app.ui.widgets.document_library_page import DocumentLibraryPage
 
@@ -364,6 +365,7 @@ def test_refresh_status_and_button_recover_after_success_and_error() -> None:
     assert page.refresh_button.isEnabled() is True
     assert "1 añadidos" in page.status_label.text()
     assert "Errores parciales: 1" in page.status_label.text()
+    assert "relaciones no se actualizaron" in page.status_label.text()
 
     second_worker = _FinishedWorker()
     page._worker = second_worker  # type: ignore[assignment]
@@ -372,6 +374,50 @@ def test_refresh_status_and_button_recover_after_success_and_error() -> None:
     page._finish_refresh(second_worker)  # type: ignore[arg-type]
     assert page.refresh_button.isEnabled() is True
     assert page.status_label.text() == "No se pudo actualizar el catálogo: fallo simulado"
+
+
+def test_complete_refresh_status_includes_product_link_summary() -> None:
+    _application()
+    page = DocumentLibraryPage(_FakeDocumentLibraryService(_sample_documents()[:1]))
+
+    page._refresh_succeeded(
+        DocumentLibraryScanResult(
+            available=True,
+            scan_complete=True,
+            unchanged=1,
+            product_links=DocumentProductLinkSyncResult(
+                technical_documents=12,
+                linked=10,
+                created=2,
+                unchanged=8,
+                removed=1,
+                unmatched=2,
+            ),
+        )
+    )
+
+    assert "10 vinculadas" in page.status_label.text()
+    assert "2 nuevas" in page.status_label.text()
+    assert "8 conservadas" in page.status_label.text()
+    assert "1 retiradas" in page.status_label.text()
+    assert "2 sin producto" in page.status_label.text()
+
+
+def test_complete_refresh_status_reports_product_link_error() -> None:
+    _application()
+    page = DocumentLibraryPage(_FakeDocumentLibraryService(_sample_documents()[:1]))
+
+    page._refresh_succeeded(
+        DocumentLibraryScanResult(
+            available=True,
+            scan_complete=True,
+            unchanged=1,
+            product_link_error="productos no disponibles",
+        )
+    )
+
+    assert "catálogo se actualizó" in page.status_label.text()
+    assert "productos no disponibles" in page.status_label.text()
 
 
 def test_inactive_documents_are_not_shown() -> None:

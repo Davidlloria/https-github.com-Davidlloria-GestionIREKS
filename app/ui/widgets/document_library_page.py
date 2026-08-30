@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.services.document_catalog_refresh_service import DocumentCatalogRefreshService
 from app.services.document_content_index_service import DocumentContentIndexService
 from app.services.document_hybrid_retrieval_service import (
     DocumentHybridRetrievalService,
@@ -37,6 +38,7 @@ from app.services.document_library_service import (
     UnsafeDocumentPathError,
 )
 from app.services.document_question_answer_service import DocumentQuestionAnswerService
+from app.services.document_product_link_service import DocumentProductLinkService
 from app.services.document_semantic_index_service import DocumentSemanticIndexService
 from app.services.local_embedding_service import LocalEmbeddingService
 from app.services.technical_consultant_service import TechnicalConsultantService
@@ -60,7 +62,7 @@ class DocumentCatalogRefreshWorker(QThread):
     result_ready = Signal(object)
     failed = Signal(str)
 
-    def __init__(self, service: DocumentLibraryService, parent=None) -> None:
+    def __init__(self, service: DocumentCatalogRefreshService, parent=None) -> None:
         super().__init__(parent)
         self._service = service
 
@@ -94,6 +96,7 @@ class DocumentLibraryPage(QWidget):
         semantic_index_service: DocumentSemanticIndexService | None = None,
         technical_consultant_service: TechnicalConsultantService | None = None,
         whatsapp_share_service: WhatsAppShareService | None = None,
+        product_link_service: DocumentProductLinkService | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("documentLibraryPage")
@@ -106,6 +109,13 @@ class DocumentLibraryPage(QWidget):
         if service is None and content_index_service is not None:
             service = content_index_service.library_service
         self._service = service or DocumentLibraryService()
+        self._product_link_service = product_link_service or DocumentProductLinkService(
+            document_database_path=getattr(self._service, "database_path", None)
+        )
+        self._catalog_refresh_service = DocumentCatalogRefreshService(
+            self._service,
+            self._product_link_service,
+        )
         self._content_index_service = content_index_service or getattr(
             question_answer_service, "content_index_service", None
         )
@@ -504,7 +514,7 @@ class DocumentLibraryPage(QWidget):
         if self._worker is not None and self._worker.isRunning():
             return
         self._set_refreshing(True)
-        worker = DocumentCatalogRefreshWorker(self._service, self)
+        worker = DocumentCatalogRefreshWorker(self._catalog_refresh_service, self)
         self._worker = worker
         worker.result_ready.connect(self._refresh_succeeded)
         worker.failed.connect(self._refresh_failed)
@@ -673,6 +683,21 @@ class DocumentLibraryPage(QWidget):
             f"{result.updated} actualizados, {result.unchanged} sin cambios y "
             f"{result.deactivated} desactivados."
         )
+        if result.product_links is not None:
+            links = result.product_links
+            summary += (
+                f" Relaciones: {links.linked} vinculadas, {links.created} nuevas, "
+                f"{links.updated} actualizadas, {links.unchanged} conservadas y "
+                f"{links.removed} retiradas; {links.unmatched} sin producto y "
+                f"{links.ambiguous} ambiguas."
+            )
+        elif result.product_link_error:
+            summary += (
+                " El catálogo se actualizó, pero falló la relación con productos: "
+                f"{result.product_link_error}"
+            )
+        elif not result.scan_complete:
+            summary += " Las relaciones no se actualizaron porque el escaneo quedó incompleto."
         if result.errors:
             summary += (
                 f" Errores parciales: {len(result.errors)}. "
