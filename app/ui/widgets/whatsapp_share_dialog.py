@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
+    QCompleter,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -41,8 +42,24 @@ class WhatsAppShareDialog(QDialog):
         form = QFormLayout()
         self.recipient_combo = QComboBox()
         self.recipient_combo.setObjectName("whatsappRecipientCombo")
+        self.recipient_combo.setEditable(True)
+        self.recipient_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.recipient_combo.addItem("Introducir otro número", "")
         self._load_recipients()
+        recipient_completer = self.recipient_combo.completer()
+        recipient_completer.setCaseSensitivity(
+            Qt.CaseSensitivity.CaseInsensitive
+        )
+        recipient_completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        recipient_completer.setCompletionMode(
+            QCompleter.CompletionMode.PopupCompletion
+        )
+        recipient_editor = self.recipient_combo.lineEdit()
+        if recipient_editor is not None:
+            recipient_editor.setPlaceholderText(
+                "Buscar por nombre, empresa o teléfono..."
+            )
+            recipient_editor.setClearButtonEnabled(True)
         self.recipient_combo.currentIndexChanged.connect(
             self._recipient_changed
         )
