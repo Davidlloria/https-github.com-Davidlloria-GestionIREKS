@@ -789,6 +789,38 @@ QFrame#topRibbon QPushButton[btnRole="info"]:hover {
     border-radius: 8px;
 }
 
+QFrame#settingsApiMenu {
+    background-color: #F8FAFC;
+    border: 1px solid #D7DEE8;
+    border-radius: 8px;
+}
+
+QLabel#settingsApiMenuTitle {
+    padding: 2px 6px 6px 6px;
+}
+
+QListWidget#settingsApiList {
+    background-color: transparent;
+    border: none;
+    outline: none;
+}
+
+QListWidget#settingsApiList::item {
+    color: #334155;
+    padding: 10px 8px;
+    margin: 2px 0;
+    border-radius: 6px;
+}
+
+QListWidget#settingsApiList::item:hover {
+    background-color: #E8EEF8;
+}
+
+QListWidget#settingsApiList::item:selected {
+    background-color: #2563EB;
+    color: #FFFFFF;
+}
+
 QTableWidget#contactsTable {
     background-color: #FFFFFF;
     border: 1px solid #DCE4EF;

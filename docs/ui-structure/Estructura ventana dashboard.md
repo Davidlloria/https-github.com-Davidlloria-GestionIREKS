@@ -610,6 +610,9 @@ Flujo del Dashboard
 ├── SettingsPage
 │   ├── se integra dentro de Inicio, sin página independiente en el ribbon superior
 │   ├── conserva Exportación BD, Importación BD, Mantenimiento BD, API, Correo y Auxiliares
+│   ├── organiza API como vista maestro-detalle
+│   │   ├── menú lateral: FoodData Central, FatSecret, OpenAI e IA local
+│   │   └── tarjeta derecha: formulario del servicio seleccionado con scroll vertical localizado
 │   └── refresca el estado de mantenimiento al activar el modo Configuración
 ├── dashboardFooterLabel
 │   └── hora de generación y contexto del snapshot

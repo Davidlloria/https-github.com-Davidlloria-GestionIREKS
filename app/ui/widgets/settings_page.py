@@ -13,15 +13,16 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QFrame,
-    QGridLayout,
     QHeaderView,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
     QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -1441,10 +1442,31 @@ class SettingsPage(QWidget):
 
     def _build_api_tab(self) -> QWidget:
         panel = QWidget()
-        layout = QVBoxLayout(panel)
+        layout = QHBoxLayout(panel)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(12)
         provider_view = self.settings_provider_service.build_ui_view()
+
+        api_menu = QFrame(panel)
+        api_menu.setObjectName("settingsApiMenu")
+        api_menu.setFixedWidth(220)
+        api_menu_layout = QVBoxLayout(api_menu)
+        api_menu_layout.setContentsMargins(8, 10, 8, 10)
+        api_menu_layout.setSpacing(8)
+
+        api_menu_title = QLabel("Servicios API", api_menu)
+        api_menu_title.setObjectName("settingsApiMenuTitle")
+        api_menu_title.setProperty("role", "sectionTitle")
+        api_menu_layout.addWidget(api_menu_title)
+
+        self.api_list = QListWidget(api_menu)
+        self.api_list.setObjectName("settingsApiList")
+        self.api_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.api_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.api_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.api_list.addItems(["FoodData Central", "FatSecret", "OpenAI", "IA local"])
+        api_menu_layout.addWidget(self.api_list, 1)
+        layout.addWidget(api_menu)
 
         self.api_scroll_area = QScrollArea(panel)
         self.api_scroll_area.setObjectName("settingsApiScrollArea")
@@ -1465,21 +1487,13 @@ class SettingsPage(QWidget):
         scroll_layout.setSpacing(0)
         self.api_scroll_area.setWidget(scroll_content)
 
-        cards_column = QWidget(scroll_content)
-        cards_column.setObjectName("settingsApiCards")
-        cards_column.setSizePolicy(
+        self.api_detail_stack = QStackedWidget(scroll_content)
+        self.api_detail_stack.setObjectName("settingsApiDetailStack")
+        self.api_detail_stack.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Minimum,
         )
-        cards_layout = QGridLayout(cards_column)
-        cards_layout.setContentsMargins(0, 0, 0, 0)
-        cards_layout.setHorizontalSpacing(12)
-        cards_layout.setVerticalSpacing(12)
-        for column in range(3):
-            cards_layout.setColumnStretch(column, 1)
-        cards_layout.setRowStretch(0, 1)
-        cards_layout.setRowStretch(1, 1)
-        scroll_layout.addWidget(cards_column)
+        scroll_layout.addWidget(self.api_detail_stack)
         scroll_layout.addStretch(1)
 
         fdc_card = QFrame()
@@ -1528,7 +1542,7 @@ class SettingsPage(QWidget):
         self.fdc_info_label.setWordWrap(True)
         fdc_layout.addWidget(self.fdc_info_label)
         self._finalize_api_card(fdc_card, 248)
-        cards_layout.addWidget(fdc_card, 0, 0)
+        self.api_detail_stack.addWidget(fdc_card)
 
         fat_card = QFrame()
         fat_card.setObjectName("card")
@@ -1582,7 +1596,7 @@ class SettingsPage(QWidget):
         fat_info.setWordWrap(True)
         fat_layout.addWidget(fat_info)
         self._finalize_api_card(fat_card, 304)
-        cards_layout.addWidget(fat_card, 0, 1)
+        self.api_detail_stack.addWidget(fat_card)
 
         openai_card = QFrame()
         openai_card.setObjectName("card")
@@ -1625,7 +1639,7 @@ class SettingsPage(QWidget):
         openai_info.setWordWrap(True)
         openai_layout.addWidget(openai_info)
         self._finalize_api_card(openai_card, 270)
-        cards_layout.addWidget(openai_card, 0, 2)
+        self.api_detail_stack.addWidget(openai_card)
 
         local_ai_card = QFrame()
         local_ai_card.setObjectName("card")
@@ -1703,9 +1717,18 @@ class SettingsPage(QWidget):
         local_ai_info.setWordWrap(True)
         local_ai_layout.addWidget(local_ai_info)
         self._finalize_api_card(local_ai_card, 350)
-        cards_layout.addWidget(local_ai_card, 1, 0)
+        self.api_detail_stack.addWidget(local_ai_card)
+
+        self.api_list.currentRowChanged.connect(self._select_api_detail)
+        self.api_list.setCurrentRow(0)
 
         return panel
+
+    def _select_api_detail(self, index: int) -> None:
+        if index < 0 or index >= self.api_detail_stack.count():
+            return
+        self.api_detail_stack.setCurrentIndex(index)
+        self.api_scroll_area.verticalScrollBar().setValue(0)
 
     @staticmethod
     def _add_api_field(layout: QVBoxLayout, label_text: str, field: QWidget) -> None:

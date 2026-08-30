@@ -8,9 +8,10 @@ from PySide6.QtWidgets import (
     QApplication,
     QLabel,
     QFrame,
+    QListWidget,
     QMessageBox,
     QScrollArea,
-    QWidget,
+    QStackedWidget,
 )
 
 from app.services.local_ai_settings_service import LocalAISettingsService
@@ -26,7 +27,7 @@ def _application() -> QApplication:
     return _APP
 
 
-def test_api_cards_use_a_three_column_two_row_grid_without_overlaps() -> None:
+def test_api_tab_uses_sidebar_and_selected_detail_card() -> None:
     _application()
     page = SettingsPage()
     page.resize(1280, 900)
@@ -34,20 +35,39 @@ def test_api_cards_use_a_three_column_two_row_grid_without_overlaps() -> None:
     page.show()
     QApplication.processEvents()
 
-    column = page.findChild(QWidget, "settingsApiCards")
+    menu = page.findChild(QFrame, "settingsApiMenu")
+    api_list = page.findChild(QListWidget, "settingsApiList")
+    detail_stack = page.findChild(QStackedWidget, "settingsApiDetailStack")
+    scroll = page.findChild(QScrollArea, "settingsApiScrollArea")
     cards = [card for card in page.findChildren(QFrame, "card") if card.property("apiCard")]
     cards_by_name = {str(card.property("apiCard")): card for card in cards}
 
-    assert column is not None
+    assert menu is not None
+    assert api_list is not None
+    assert detail_stack is not None
+    assert scroll is not None
     assert len(cards) == 4
-    assert cards_by_name["fdc"].geometry().top() == cards_by_name["fatsecret"].geometry().top()
-    assert cards_by_name["fatsecret"].geometry().top() == cards_by_name["openai"].geometry().top()
-    assert cards_by_name["fdc"].geometry().right() < cards_by_name["fatsecret"].geometry().left()
-    assert cards_by_name["fatsecret"].geometry().right() < cards_by_name["openai"].geometry().left()
-    assert cards_by_name["local_ai"].geometry().top() > cards_by_name["fdc"].geometry().bottom()
-    for index, card in enumerate(cards):
-        for other in cards[index + 1 :]:
-            assert not card.geometry().intersects(other.geometry())
+    assert api_list.count() == 4
+    assert [api_list.item(index).text() for index in range(api_list.count())] == [
+        "FoodData Central",
+        "FatSecret",
+        "OpenAI",
+        "IA local",
+    ]
+    assert api_list.currentRow() == 0
+    assert detail_stack.currentWidget() is cards_by_name["fdc"]
+    assert menu.geometry().right() < scroll.geometry().left()
+
+    page.fdc_api_key_input.setText("valor-sin-guardar")
+    card_names = ["fdc", "fatsecret", "openai", "local_ai"]
+    for index, card_name in enumerate(card_names):
+        api_list.setCurrentRow(index)
+        QApplication.processEvents()
+        assert detail_stack.currentWidget() is cards_by_name[card_name]
+        assert cards_by_name[card_name].isVisibleTo(page)
+
+    api_list.setCurrentRow(0)
+    assert page.fdc_api_key_input.text() == "valor-sin-guardar"
 
     for field in (
         page.fdc_api_key_input,
@@ -151,6 +171,7 @@ def test_local_ai_card_stays_accessible_at_reduced_api_tab_height() -> None:
     page = SettingsPage()
     page.resize(1180, 720)
     page.main_tabs.setCurrentIndex(3)
+    page.api_list.setCurrentRow(3)
     page.show()
     QApplication.processEvents()
 
@@ -170,7 +191,7 @@ def test_local_ai_card_stays_accessible_at_reduced_api_tab_height() -> None:
     assert page.local_ai_test_btn.y() == page.local_ai_test_embedding_btn.y()
     assert info.geometry().bottom() <= local_card.contentsRect().bottom()
 
-    scroll.setFixedHeight(420)
+    scroll.setFixedHeight(300)
     QApplication.processEvents()
     assert scroll.verticalScrollBar().maximum() > 0
     scroll.ensureWidgetVisible(info)
