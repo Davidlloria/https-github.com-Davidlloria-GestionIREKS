@@ -11,7 +11,8 @@ from PySide6.QtWidgets import QApplication, QAbstractItemView, QCalendarWidget, 
 
 from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
 from app.services.customer_query_service import CustomerQueryResult
-from app.ui.widgets.customers_page import AgendaCalendarDelegate, CustomersPage
+from app.services.customer_service import CustomerAnnualKgPoint
+from app.ui.widgets.customers_page import AgendaCalendarDelegate, CustomerAnnualKgChart, CustomersPage
 
 _APP: QApplication | None = None
 
@@ -212,6 +213,65 @@ def test_customer_purchases_tab_is_first(monkeypatch) -> None:
 
     page.close()
     page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_purchases_defaults_to_graph_and_detail_enables_period_controls(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    graph_button = page.findChild(QPushButton, "customerSalesGraphButton")
+    detail_button = page.findChild(QPushButton, "customerSalesDetailButton")
+
+    assert graph_button is not None
+    assert graph_button.text() == "Gráfico"
+    assert graph_button.isChecked()
+    assert detail_button is not None
+    assert detail_button.text() == "Detalle"
+    assert page._related_sales_stack.currentIndex() == 0
+    assert not page._related_sales_month_from_filter.isEnabled()
+    assert not page._related_sales_month_to_filter.isEnabled()
+    assert not page._related_sales_compare_btn.isEnabled()
+
+    detail_button.click()
+
+    assert page._related_sales_stack.currentIndex() == 1
+    assert detail_button.isChecked()
+    assert not graph_button.isChecked()
+    assert page._related_sales_month_from_filter.isEnabled()
+    assert page._related_sales_month_to_filter.isEnabled()
+
+    graph_button.click()
+
+    assert page._related_sales_stack.currentIndex() == 0
+    assert not page._related_sales_month_from_filter.isEnabled()
+    assert not page._related_sales_month_to_filter.isEnabled()
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_customer_annual_kg_chart_draws_one_line_with_four_points() -> None:
+    _application()
+    chart = CustomerAnnualKgChart()
+    points = [
+        CustomerAnnualKgPoint(year=2023, kg=2.0),
+        CustomerAnnualKgPoint(year=2024, kg=5.0),
+        CustomerAnnualKgPoint(year=2025, kg=4.0),
+        CustomerAnnualKgPoint(year=2026, kg=8.0),
+    ]
+
+    chart.set_series(points)
+
+    assert chart.empty_label.isHidden()
+    if chart._plot is not None:
+        lines = chart._plot.listDataItems()
+        assert len(lines) == 1
+        assert list(lines[0].xData) == [0, 1, 2, 3]
+        assert list(lines[0].yData) == [2.0, 5.0, 4.0, 8.0]
+    chart.close()
+    chart.deleteLater()
     QApplication.processEvents()
 
 

@@ -69,15 +69,23 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                             │   ├── customerSalesPanel (QWidget, fondo verde #0BF75D)
                             │   ├── fila de acciones (QHBoxLayout)
                             │   │   ├── customerSalesYearFilter (QComboBox, selector de año)
-                            │   │   └── customerSalesCompareButton (QPushButton "Comp.", se habilita si hay cliente, año y filas)
-                            │   ├── customerSalesTable (QTableWidget, 5 columnas ordenables, tableVariant="standard"; columna Kg con sufijo "kg"; columna € con sufijo "€")
-                            │   │   ├── Referencia
-                            │   │   ├── Descripción
-                            │   │   ├── Unid.
-                            │   │   ├── Kg
-                            │   │   └── €
-                            │   ├── customerSalesTotals (QTableWidget, fila fija de totales, columnas sincronizadas con la tabla, columnas 1-2 unificadas visualmente, separadores verticales visibles, fondo pastel #EEF4FF, alto 34 px, Kg con sufijo "kg", € con sufijo "€", resincronización diferida al mostrar la pestaña)
-                            │   ├── customerSalesEmpty (QLabel, permanece oculto; la tabla de ventas se muestra siempre)
+                            │   │   ├── customerSalesMonthFromFilter (QComboBox, mes inicial; deshabilitado en modo Gráfico)
+                            │   │   ├── customerSalesMonthToFilter (QComboBox, mes final; deshabilitado en modo Gráfico)
+                            │   │   ├── customerSalesGraphButton (QPushButton "Gráfico", activa la vista inicial)
+                            │   │   ├── customerSalesDetailButton (QPushButton "Detalle", activa tabla y filtros mensuales)
+                            │   │   └── customerSalesCompareButton (QPushButton "Comparar", solo habilitado en modo Detalle con datos)
+                            │   ├── customerSalesContentStack (QStackedWidget)
+                            │   │   ├── customerSalesAnnualChart (vista inicial, mismo ancho disponible que la tabla)
+                            │   │   │   └── customerSalesAnnualPlot (una línea con cuatro puntos: año seleccionado y tres anteriores, ordenados de menor a mayor)
+                            │   │   └── customerSalesDetailPage
+                            │   │       ├── customerSalesTable (QTableWidget, 5 columnas ordenables, tableVariant="standard"; columna Kg con sufijo "kg"; columna € con sufijo "€")
+                            │   │       │   ├── Referencia
+                            │   │       │   ├── Descripción
+                            │   │       │   ├── Unid.
+                            │   │       │   ├── Kg
+                            │   │       │   └── €
+                            │   │       ├── customerSalesTotals (QTableWidget, fila fija de totales, columnas sincronizadas con la tabla, columnas 1-2 unificadas visualmente, separadores verticales visibles, fondo pastel #EEF4FF, alto 34 px, Kg con sufijo "kg", € con sufijo "€", resincronización diferida al mostrar la pestaña)
+                            │   │       └── customerSalesEmpty (QLabel, permanece oculto; la tabla de ventas se muestra siempre)
                             │   └── QDialog comparativa de ventas (tamaño inicial 1360 × 720 px)
                             │       ├── cabecera con nombre del cliente y contexto de comparación (órden: año anterior vs año actual · Unid. / Kg / €)
                             │       ├── customerSalesComparisonGroupsBar (QWidget con pastillas sincronizadas: año anterior / año actual / Diferencia)
@@ -148,7 +156,9 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 - Al seleccionar un cliente se recargan detalle, compras, contactos, recetas y agenda.
 - `customerSalesYearFilter` carga años disponibles desde `CustomerService.related_sales_years()`.
 - La pestaña visible **Compras** ocupa la primera posición y carga los datos internos de ventas desde `CustomerService.related_sales(cliente_id, year)`.
-- `customerSalesCompareButton` solo se habilita si hay comparativa posible.
+- La vista inicial de Compras es **Gráfico** y representa mediante una única línea los kilos totales del año seleccionado y de los tres años anteriores. La serie la proporciona `CustomerService.related_sales_annual_kg_series(cliente_id, end_year)`.
+- En modo **Gráfico**, los filtros mensuales y `customerSalesCompareButton` permanecen deshabilitados.
+- Al pulsar **Detalle** se muestra la tabla existente, se habilitan los dos filtros mensuales y `customerSalesCompareButton` se habilita cuando hay cliente, año y filas.
 - La comparativa colorea deltas positivos en verde `#067647` y negativos en rojo `#B42318`, también en la fila de totales.
 - El gráfico depende opcionalmente de `pyqtgraph`; si no está instalado, el diálogo informa de ello.
 
@@ -208,6 +218,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 
 ## Últimos ajustes relevantes
 
+- Añadida a Compras la vista inicial de evolución anual en kg, con una línea de cuatro puntos, y los modos `Gráfico` / `Detalle` que controlan la tabla, los filtros mensuales y la comparativa.
 - Renombrada la pestaña visible `Ventas` a `Compras` y movida a la primera posición; el contenido y los servicios internos `customerSales*` se mantienen sin cambios.
 - Restaurada la pestaña ahora denominada Compras desde el placeholder a una tabla funcional con filtro de año.
 - Restaurada la comparativa anual con modal, grafico y exportacion PDF; el titulo muestra solo cliente y anos, y las columnas numericas ordenan por valor real.

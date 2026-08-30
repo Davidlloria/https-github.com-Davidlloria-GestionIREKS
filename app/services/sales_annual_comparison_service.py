@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import re
 import unicodedata
 
+from sqlalchemy import func
 from sqlmodel import Session, col, select
 
 from app.core.database import engine
@@ -222,6 +223,28 @@ class SalesAnnualComparisonService:
         with Session(self._engine) as session:
             months = list(session.exec(stmt))
         return tuple(sorted({int(month or 0) for month in months if 1 <= int(month or 0) <= 12}))
+
+    def annual_kg_series_clientes(self, cliente_id: str, end_year: int) -> list[tuple[int, float]]:
+        clean_cliente_id = str(cliente_id or "").strip()
+        clean_end_year = int(end_year or 0)
+        if not clean_cliente_id or clean_end_year <= 0:
+            return []
+
+        years = list(range(clean_end_year - 3, clean_end_year + 1))
+        with Session(self._engine) as session:
+            resolved_cliente_ids = self._resolve_sales_party_ids(session, clean_cliente_id)
+            stmt = (
+                select(VentaClientesRaw.anio, func.sum(VentaClientesRaw.kg))
+                .where(
+                    col(VentaClientesRaw.cliente_id).in_(sorted(resolved_cliente_ids)),
+                    col(VentaClientesRaw.anio).in_(years),
+                )
+                .group_by(VentaClientesRaw.anio)
+            )
+            rows = list(session.exec(stmt))
+
+        kilos_by_year = {int(year or 0): float(kilos or 0.0) for year, kilos in rows}
+        return [(year, kilos_by_year.get(year, 0.0)) for year in years]
 
     def list_filter_clients(self) -> list[Cliente]:
         with Session(self._engine) as session:

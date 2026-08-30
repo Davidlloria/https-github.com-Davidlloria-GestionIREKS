@@ -10,11 +10,13 @@ from app.ui.widgets.customers_page import _NumericTableWidgetItem, _has_current_
 @dataclass
 class _SalesRow:
     codigo: str = "D123"
+    kg_curr: float = 0.0
 
 
 class _FakeSalesSummaryService:
     def __init__(self) -> None:
         self.calls: list[tuple[int, str, int, int]] = []
+        self.annual_series_calls: list[tuple[str, int]] = []
 
     def list_years_clientes(self) -> list[int]:
         return [2026, 2025]
@@ -22,6 +24,10 @@ class _FakeSalesSummaryService:
     def listar_resumen_anual_clientes(self, *, year: int, cliente_id: str, month_from: int = 1, month_to: int = 12):
         self.calls.append((year, cliente_id, month_from, month_to))
         return [_SalesRow()]
+
+    def annual_kg_series_clientes(self, cliente_id: str, end_year: int) -> list[tuple[int, float]]:
+        self.annual_series_calls.append((cliente_id, end_year))
+        return [(year, float(year - 2020) + 0.5) for year in range(end_year - 3, end_year + 1)]
 
     def listar_ventas_mensuales_cliente_producto(self, **kwargs):
         self.monthly_call = kwargs
@@ -55,6 +61,28 @@ def test_related_sales_rejects_empty_customer_or_invalid_year() -> None:
 
     assert service.related_sales("", 2026) == []
     assert service.related_sales("cliente-1", 0) == []
+    assert fake.calls == []
+
+
+def test_related_sales_annual_kg_series_returns_four_ascending_years() -> None:
+    service, fake = _service_with_fake_sales()
+
+    points = service.related_sales_annual_kg_series(" cliente-1 ", 2026)
+
+    assert [(point.year, point.kg) for point in points] == [
+        (2023, 3.5),
+        (2024, 4.5),
+        (2025, 5.5),
+        (2026, 6.5),
+    ]
+    assert fake.annual_series_calls == [("cliente-1", 2026)]
+
+
+def test_related_sales_annual_kg_series_rejects_missing_context() -> None:
+    service, fake = _service_with_fake_sales()
+
+    assert service.related_sales_annual_kg_series("", 2026) == []
+    assert service.related_sales_annual_kg_series("cliente-1", 0) == []
     assert fake.calls == []
 
 

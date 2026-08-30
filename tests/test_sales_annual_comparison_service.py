@@ -491,3 +491,26 @@ def test_latest_sales_month_clientes_uses_global_imported_period(isolated_engine
     assert service.latest_sales_month_clientes(2024) == 0
     assert service.sales_months_clientes(2026) == (2, 7)
     assert service.sales_months_clientes(2025) == (12,)
+
+
+def test_annual_kg_series_clientes_returns_four_years_with_zero_gaps(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        cliente_id, _fabricante_id, _familia_id, _subfamilia_id = _seed_products(session)
+        session.add_all(
+            [
+                VentaClientesRaw(raw_id="series-1", lote_id="series", cliente_id=cliente_id, anio=2023, mes=2, kg=3.0),
+                VentaClientesRaw(raw_id="series-2", lote_id="series", cliente_id=cliente_id, anio=2025, mes=1, kg=4.0),
+                VentaClientesRaw(raw_id="series-3", lote_id="series", cliente_id=cliente_id, anio=2025, mes=3, kg=1.5),
+                VentaClientesRaw(raw_id="series-other", lote_id="series", cliente_id="other", anio=2026, mes=1, kg=99.0),
+            ]
+        )
+        session.commit()
+
+    service = SalesAnnualComparisonService(db_engine=isolated_engine)
+
+    assert service.annual_kg_series_clientes(cliente_id, 2026) == [
+        (2023, 3.0),
+        (2024, 0.0),
+        (2025, 5.5),
+        (2026, 0.0),
+    ]

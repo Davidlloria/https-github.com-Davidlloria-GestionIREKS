@@ -49,6 +49,12 @@ class CustomerMergeResult(CustomerMergePreview):
     deleted_source: bool
 
 
+@dataclass(frozen=True)
+class CustomerAnnualKgPoint:
+    year: int
+    kg: float
+
+
 class CustomerService:
     def __init__(self) -> None:
         self.vm = CustomerViewModel()
@@ -393,6 +399,17 @@ class CustomerService:
             month_from=month_from,
             month_to=month_to,
         )
+
+    def related_sales_annual_kg_series(self, cliente_id: str, end_year: int) -> list[CustomerAnnualKgPoint]:
+        clean_id = str(cliente_id or "").strip()
+        clean_end_year = int(end_year or 0)
+        if not clean_id or clean_end_year <= 0:
+            return []
+
+        return [
+            CustomerAnnualKgPoint(year=year, kg=kg)
+            for year, kg in self.sales_summary_service.annual_kg_series_clientes(clean_id, clean_end_year)
+        ]
 
     def related_sales_monthly_product(
         self,

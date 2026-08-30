@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSplitter,
+    QStackedWidget,
     QStyle,
     QStyledItemDelegate,
     QTabWidget,
@@ -105,6 +106,74 @@ class _NumericTableWidgetItem(QTableWidgetItem):
         if isinstance(other, _NumericTableWidgetItem):
             return float(self.data(self._SORT_ROLE) or 0.0) < float(other.data(self._SORT_ROLE) or 0.0)
         return super().__lt__(other)
+
+
+class CustomerAnnualKgChart(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("customerSalesAnnualChart")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        self.title_label = QLabel("Evolución anual de compras")
+        self.title_label.setObjectName("customerSalesAnnualChartTitle")
+        self.title_label.setProperty("role", "sectionTitle")
+        layout.addWidget(self.title_label)
+
+        self.empty_label = QLabel("Selecciona un cliente y un año para mostrar su evolución anual.")
+        self.empty_label.setObjectName("customerSalesAnnualChartEmpty")
+        self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_label.setWordWrap(True)
+
+        self._plot = None
+        if pg is None:
+            self.empty_label.setText("No se puede mostrar el gráfico porque pyqtgraph no está instalado.")
+            layout.addWidget(self.empty_label, 1)
+        else:
+            self._plot = pg.PlotWidget(parent=self)
+            self._plot.setObjectName("customerSalesAnnualPlot")
+            self._plot.setBackground("#FFFFFF")
+            self._plot.setMenuEnabled(False)
+            self._plot.setMouseEnabled(x=False, y=False)
+            self._plot.setAntialiasing(True)
+            self._plot.hideButtons()
+            self._plot.showGrid(x=False, y=True, alpha=0.18)
+            plot_item = self._plot.getPlotItem()
+            plot_item.setLabel("left", "Kg")
+            plot_item.setLabel("bottom", "Año")
+            plot_item.hideAxis("top")
+            plot_item.hideAxis("right")
+            layout.addWidget(self._plot, 1)
+            layout.addWidget(self.empty_label, 1)
+            self._plot.setVisible(False)
+
+    def set_series(self, points: list) -> None:
+        has_points = bool(points)
+        if self._plot is None:
+            return
+        self._plot.clear()
+        self._plot.setVisible(has_points)
+        self.empty_label.setVisible(not has_points)
+        if not has_points:
+            return
+
+        years = [int(getattr(point, "year", 0) or 0) for point in points]
+        kilos = [float(getattr(point, "kg", 0.0) or 0.0) for point in points]
+        positions = list(range(len(points)))
+        self._plot.plot(
+            positions,
+            kilos,
+            pen=pg.mkPen(color="#0F766E", width=3),
+            symbol="o",
+            symbolSize=10,
+            symbolBrush=QColor("#3B82F6"),
+            symbolPen=pg.mkPen(color="#1D4ED8", width=2),
+        )
+        self._plot.getAxis("bottom").setTicks([list(zip(positions, [str(year) for year in years]))])
+        self._plot.setXRange(-0.25, max(len(points) - 0.75, 0.25), padding=0)
+        max_kg = max(kilos, default=0.0)
+        self._plot.setYRange(0.0, max(max_kg * 1.12, 1.0), padding=0)
 
 
 class CustomerSalesComparisonChartDialog(QDialog):
@@ -937,7 +1006,12 @@ class CustomersPage(QWidget):
         self._related_sales_year_filter: QComboBox | None = None
         self._related_sales_month_from_filter: QComboBox | None = None
         self._related_sales_month_to_filter: QComboBox | None = None
+        self._related_sales_graph_btn: QPushButton | None = None
+        self._related_sales_detail_btn: QPushButton | None = None
         self._related_sales_compare_btn: QPushButton | None = None
+        self._related_sales_stack: QStackedWidget | None = None
+        self._related_sales_chart: CustomerAnnualKgChart | None = None
+        self._related_sales_view_mode = "graph"
         self._related_sales_rows: list = []
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
@@ -1390,13 +1464,25 @@ class CustomersPage(QWidget):
         self._related_sales_month_from_filter.setObjectName("customerSalesMonthFromFilter")
         self._related_sales_month_from_filter.setFixedWidth(125)
         self._populate_month_filter(self._related_sales_month_from_filter, 1)
-        self._related_sales_month_from_filter.currentIndexChanged.connect(self._refresh_related_sales)
+        self._related_sales_month_from_filter.currentIndexChanged.connect(self._refresh_related_sales_detail)
 
         self._related_sales_month_to_filter = QComboBox()
         self._related_sales_month_to_filter.setObjectName("customerSalesMonthToFilter")
         self._related_sales_month_to_filter.setFixedWidth(125)
         self._populate_month_filter(self._related_sales_month_to_filter, 12)
-        self._related_sales_month_to_filter.currentIndexChanged.connect(self._refresh_related_sales)
+        self._related_sales_month_to_filter.currentIndexChanged.connect(self._refresh_related_sales_detail)
+
+        self._related_sales_graph_btn = QPushButton("Gráfico")
+        self._related_sales_graph_btn.setObjectName("customerSalesGraphButton")
+        self._related_sales_graph_btn.setCheckable(True)
+        self._related_sales_graph_btn.setProperty("btnRole", "primary")
+        self._related_sales_graph_btn.clicked.connect(lambda: self._set_related_sales_view_mode("graph"))
+
+        self._related_sales_detail_btn = QPushButton("Detalle")
+        self._related_sales_detail_btn.setObjectName("customerSalesDetailButton")
+        self._related_sales_detail_btn.setCheckable(True)
+        self._related_sales_detail_btn.setProperty("btnRole", "secondary")
+        self._related_sales_detail_btn.clicked.connect(lambda: self._set_related_sales_view_mode("detail"))
 
         self._related_sales_compare_btn = QPushButton("Comparar")
         self._related_sales_compare_btn.setObjectName("customerSalesCompareButton")
@@ -1409,9 +1495,22 @@ class CustomersPage(QWidget):
         actions.addWidget(self._related_sales_year_filter)
         actions.addWidget(self._related_sales_month_from_filter)
         actions.addWidget(self._related_sales_month_to_filter)
+        actions.addWidget(self._related_sales_graph_btn)
+        actions.addWidget(self._related_sales_detail_btn)
         actions.addWidget(self._related_sales_compare_btn)
         actions.addStretch(1)
         layout.addLayout(actions)
+
+        self._related_sales_stack = QStackedWidget()
+        self._related_sales_stack.setObjectName("customerSalesContentStack")
+        self._related_sales_chart = CustomerAnnualKgChart()
+        self._related_sales_stack.addWidget(self._related_sales_chart)
+
+        detail_page = QWidget()
+        detail_page.setObjectName("customerSalesDetailPage")
+        detail_layout = QVBoxLayout(detail_page)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
+        detail_layout.setSpacing(8)
 
         self.related_sales_table = QTableWidget(0, 5)
         self.related_sales_table.setObjectName("customerSalesTable")
@@ -1437,7 +1536,7 @@ class CustomersPage(QWidget):
         self.related_sales_table.setColumnWidth(3, 108)
         self.related_sales_table.setColumnWidth(4, 118)
         self.related_sales_table.verticalHeader().setDefaultSectionSize(34)
-        layout.addWidget(self.related_sales_table, 1)
+        detail_layout.addWidget(self.related_sales_table, 1)
 
         self.related_sales_totals = QTableWidget(1, 5)
         self.related_sales_totals.setObjectName("customerSalesTotals")
@@ -1459,7 +1558,7 @@ class CustomersPage(QWidget):
         totals_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         self.related_sales_totals.verticalHeader().setDefaultSectionSize(30)
         self.related_sales_totals.setFixedHeight(34)
-        layout.addWidget(self.related_sales_totals)
+        detail_layout.addWidget(self.related_sales_totals)
 
         sales_header.sectionResized.connect(self._sync_related_sales_totals)
         self.related_sales_table.verticalScrollBar().rangeChanged.connect(self._sync_related_sales_totals)
@@ -1469,10 +1568,14 @@ class CustomersPage(QWidget):
         self.related_sales_empty.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
         self.related_sales_empty.setWordWrap(True)
         self.related_sales_empty.setVisible(False)
-        layout.addWidget(self.related_sales_empty)
+        detail_layout.addWidget(self.related_sales_empty)
+        self._related_sales_stack.addWidget(detail_page)
+        layout.addWidget(self._related_sales_stack, 1)
 
         self._reload_related_sales_years()
         self._render_related_sales("")
+        self._render_related_sales_chart("")
+        self._set_related_sales_view_mode("graph")
         return panel
 
     def _reload_related_sales_years(self) -> None:
@@ -1534,7 +1637,49 @@ class CustomersPage(QWidget):
 
     def _refresh_related_sales(self) -> None:
         selected = self._selected_row()
+        cliente_id = str(getattr(selected, "cliente_id", "") or "") if selected else ""
+        self._render_related_sales(cliente_id)
+        self._render_related_sales_chart(cliente_id)
+
+    def _refresh_related_sales_detail(self) -> None:
+        selected = self._selected_row()
         self._render_related_sales(str(getattr(selected, "cliente_id", "") or "") if selected else "")
+
+    def _render_related_sales_chart(self, cliente_id: str) -> None:
+        if self._related_sales_chart is None:
+            return
+        year_filter = self._related_sales_year_filter
+        year = int(year_filter.currentData() or 0) if year_filter is not None else 0
+        points = self.customer_service.related_sales_annual_kg_series(cliente_id, year) if cliente_id and year > 0 else []
+        self._related_sales_chart.set_series(points)
+
+    def _set_related_sales_view_mode(self, mode: str) -> None:
+        self._related_sales_view_mode = "detail" if mode == "detail" else "graph"
+        is_detail = self._related_sales_view_mode == "detail"
+        if self._related_sales_stack is not None:
+            self._related_sales_stack.setCurrentIndex(1 if is_detail else 0)
+        if self._related_sales_graph_btn is not None:
+            self._related_sales_graph_btn.setChecked(not is_detail)
+        if self._related_sales_detail_btn is not None:
+            self._related_sales_detail_btn.setChecked(is_detail)
+        if self._related_sales_month_from_filter is not None:
+            self._related_sales_month_from_filter.setEnabled(is_detail)
+        if self._related_sales_month_to_filter is not None:
+            self._related_sales_month_to_filter.setEnabled(is_detail)
+        self._update_related_sales_compare_state()
+
+    def _update_related_sales_compare_state(self) -> None:
+        if self._related_sales_compare_btn is None:
+            return
+        selected = self._selected_row()
+        year_filter = self._related_sales_year_filter
+        year = int(year_filter.currentData() or 0) if year_filter is not None else 0
+        self._related_sales_compare_btn.setEnabled(
+            self._related_sales_view_mode == "detail"
+            and selected is not None
+            and year > 0
+            and bool(self._related_sales_rows)
+        )
 
     def _render_related_sales(self, cliente_id: str) -> None:
         if not hasattr(self, "related_sales_table"):
@@ -1611,12 +1756,10 @@ class CustomersPage(QWidget):
             self._loading_related_sales = False
             self.related_sales_table.setSortingEnabled(True)
 
-        has_rows = bool(self._related_sales_rows)
         self.related_sales_table.setVisible(True)
         self.related_sales_totals.setVisible(True)
         self.related_sales_empty.setVisible(False)
-        if self._related_sales_compare_btn is not None:
-            self._related_sales_compare_btn.setEnabled(bool(cliente_id) and year > 0 and has_rows)
+        self._update_related_sales_compare_state()
         QTimer.singleShot(0, self._sync_related_sales_totals)
 
     def _handle_customer_tab_changed(self, index: int) -> None:
@@ -3473,6 +3616,7 @@ class CustomersPage(QWidget):
             self.detail_prospeccion_no.setChecked(True)
             self._render_related_contacts("")
             self._render_related_sales("")
+            self._render_related_sales_chart("")
             self._render_related_recipes("")
             self._render_customer_agenda("")
             self._is_loading_details = False
@@ -3515,6 +3659,7 @@ class CustomersPage(QWidget):
             self.detail_prospeccion_no.setChecked(True)
         self._render_related_contacts(str(getattr(row, "cliente_id", "") or ""))
         self._render_related_sales(str(getattr(row, "cliente_id", "") or ""))
+        self._render_related_sales_chart(str(getattr(row, "cliente_id", "") or ""))
         self._render_related_recipes(str(getattr(row, "cliente_id", "") or ""))
         self._render_customer_agenda(str(getattr(row, "cliente_id", "") or ""))
         self._is_loading_details = False
