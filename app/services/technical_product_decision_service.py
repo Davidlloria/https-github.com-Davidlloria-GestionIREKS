@@ -62,8 +62,51 @@ _REQUIREMENT_RULES = (
     ),
     _RequirementRule(
         TechnicalRequirement("softness", "frescura o ternura prolongada"),
-        ("frescura", "ternura", "mantener tierno"),
-        ("frescura", "ternura", "mantener tierno"),
+        (
+            "frescura",
+            "ternura",
+            "mantener tierno",
+            "miga tierna",
+            "miga blanda",
+            "tipo soft",
+            "pan de molde",
+            "hamburguesa",
+        ),
+        (
+            "frescura",
+            "ternura",
+            "mantener tierno",
+            "miga tierna",
+            "miga blanda",
+            "tipo soft",
+            "pan de molde",
+            "hamburguesa",
+        ),
+    ),
+    _RequirementRule(
+        TechnicalRequirement("high_hydration", "alta hidratación"),
+        ("alta hidratacion", "masa muy hidratada", "pan muy hidratado"),
+        ("alta hidratacion",),
+    ),
+    _RequirementRule(
+        TechnicalRequirement("mold_prevention", "control de moho"),
+        ("antimoho", "evitar moho", "contra el moho"),
+        ("antimoho",),
+    ),
+    _RequirementRule(
+        TechnicalRequirement("sugar_free", "producto sin azúcar"),
+        ("sin azucar", "sugar free"),
+        ("sin azucar", "sugar free"),
+    ),
+    _RequirementRule(
+        TechnicalRequirement("vegan", "producto vegano"),
+        ("vegano", "vegana", "vegan"),
+        ("vegano", "vegana", "vegan"),
+    ),
+    _RequirementRule(
+        TechnicalRequirement("lactose_free", "producto sin lactosa"),
+        ("sin lactosa", "lactose free"),
+        ("sin lactosa", "lactose free"),
     ),
 )
 _STATUS_ORDER: dict[DecisionStatus, int] = {

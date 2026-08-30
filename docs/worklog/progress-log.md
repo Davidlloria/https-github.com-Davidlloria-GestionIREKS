@@ -120,12 +120,31 @@ entire migration history first.
 - Validation for the clarification/context cut: 29 focused tests, 336
   document/AI/technical/architecture tests and the complete 838-test Python suite
   passed; the complete suite reported the 151 known non-blocking warnings.
-- Known limitation: temporary context is limited to completing clarification; the
-  consultant does not yet support free-form follow-up questions about a completed
-  recommendation. Requirement coverage also remains intentionally narrow.
-- Next recommendation: add a reproducible bakery consultation evaluation set and
-  use it to expand the controlled requirement vocabulary without weakening the
-  evidence and citation rules.
+- Technical evaluation cut: 126 indexed IREKS technical sheets were inspected and
+  125 yielded an application field. A versioned evaluation fixture now contains
+  30 user-language requirement cases, eight documented-application decision cases
+  and one integrity check, including ambiguous and false-positive controls.
+- Controlled vocabulary expansion is limited to concepts explicitly represented
+  in those application fields: high hydration, mold prevention, sugar-free, vegan
+  and lactose-free products. The existing softness rule now also recognizes soft
+  products, sandwich bread, burger buns and tender/soft crumb expressions.
+- No product names or expected recommendations were added to runtime code. Every
+  candidate is still retrieved from the catalog and classified only by its parsed
+  application evidence; citation and Qwen safety rules are unchanged.
+- Real-corpus smoke: the high-hydration query detected `high_hydration` and
+  recommended `IREKS CIABATTA`; the packaged-bread mold query detected
+  `mold_prevention` and recommended `ANTISCHIM`. Both used hybrid retrieval and
+  matched the literal application field from the cited technical sheet.
+- Validation for the evaluation cut: 58 focused evaluation/decision/orchestration
+  tests, 375 document/AI/technical/architecture tests and the complete 877-test
+  Python suite passed; the complete suite reported the 151 known non-blocking
+  warnings.
+- Known limitation: the versioned set evaluates requirement detection and
+  application classification deterministically, but does not yet assert stable
+  end-to-end retrieval results against a specific real index and embedding model.
+- Next recommendation: add an opt-in real-corpus acceptance evaluator that records
+  expected product/source outcomes separately from runtime code and reports drift
+  after document or embedding-index updates.
 
 ## Historical Snapshot — 2026-06-21
 

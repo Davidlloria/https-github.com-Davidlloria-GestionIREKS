@@ -1,0 +1,213 @@
+{
+  "version": 1,
+  "requirement_cases": [
+    {
+      "id": "precooked-natural-language",
+      "query": "Busco un mejorante para pan precocinado",
+      "expected": ["precooked"]
+    },
+    {
+      "id": "prebaked-accentless",
+      "query": "Necesito un producto para pan prehorneado",
+      "expected": ["precooked"]
+    },
+    {
+      "id": "freezing-process",
+      "query": "La masa se congelará antes de distribuirla",
+      "expected": ["freezing"]
+    },
+    {
+      "id": "deep-freezing",
+      "query": "Producto para bollería ultracongelada",
+      "expected": ["freezing"]
+    },
+    {
+      "id": "controlled-fermentation",
+      "query": "Necesito trabajar con fermentación controlada",
+      "expected": ["controlled_fermentation"]
+    },
+    {
+      "id": "retarded-fermentation",
+      "query": "Mejorante para fermentación retardada",
+      "expected": ["controlled_fermentation"]
+    },
+    {
+      "id": "long-fermentation",
+      "query": "Pan con larga fermentación",
+      "expected": ["long_fermentation"]
+    },
+    {
+      "id": "prolonged-fermentation",
+      "query": "Quiero una fermentación prolongada",
+      "expected": ["long_fermentation"]
+    },
+    {
+      "id": "gluten-free",
+      "query": "Necesito elaborar pan sin gluten",
+      "expected": ["gluten_free"]
+    },
+    {
+      "id": "gluten-free-english",
+      "query": "Mix gluten free para bollería",
+      "expected": ["gluten_free"]
+    },
+    {
+      "id": "soft-crumb",
+      "query": "Quiero mantener una miga tierna",
+      "expected": ["softness"]
+    },
+    {
+      "id": "soft-products",
+      "query": "Mejorante para elaborados tipo soft",
+      "expected": ["softness"]
+    },
+    {
+      "id": "sandwich-bread",
+      "query": "Necesito elaborar pan de molde",
+      "expected": ["softness"]
+    },
+    {
+      "id": "burger-bun",
+      "query": "Producto para pan de hamburguesa",
+      "expected": ["softness"]
+    },
+    {
+      "id": "high-hydration",
+      "query": "Mejorante para pan de alta hidratación",
+      "expected": ["high_hydration"]
+    },
+    {
+      "id": "very-hydrated-dough",
+      "query": "Trabajo con una masa muy hidratada",
+      "expected": ["high_hydration"]
+    },
+    {
+      "id": "mold-prevention",
+      "query": "Necesito un antimoho para pan envasado",
+      "expected": ["mold_prevention"]
+    },
+    {
+      "id": "avoid-mold",
+      "query": "Quiero evitar moho en bollería envasada",
+      "expected": ["mold_prevention"]
+    },
+    {
+      "id": "sugar-free",
+      "query": "Mix para bollería sin azúcar",
+      "expected": ["sugar_free"]
+    },
+    {
+      "id": "sugar-free-english",
+      "query": "Necesito un cake sugar free",
+      "expected": ["sugar_free"]
+    },
+    {
+      "id": "vegan",
+      "query": "Busco un mix vegano para cakes",
+      "expected": ["vegan"]
+    },
+    {
+      "id": "vegan-feminine",
+      "query": "Quiero preparar bollería vegana",
+      "expected": ["vegan"]
+    },
+    {
+      "id": "lactose-free",
+      "query": "Necesito muffins sin lactosa",
+      "expected": ["lactose_free"]
+    },
+    {
+      "id": "precooked-and-frozen",
+      "query": "Pan precocinado y después congelado",
+      "expected": ["precooked", "freezing"]
+    },
+    {
+      "id": "vegan-gluten-lactose",
+      "query": "Muffins veganos sin gluten y sin lactosa",
+      "expected": ["gluten_free", "vegan", "lactose_free"]
+    },
+    {
+      "id": "soft-and-frozen",
+      "query": "Pan de molde que voy a congelar",
+      "expected": ["freezing", "softness"]
+    },
+    {
+      "id": "ambiguous-improvement",
+      "query": "Quiero mejorar mi pan",
+      "expected": []
+    },
+    {
+      "id": "bread-variety-only",
+      "query": "Quiero hacer pan de maíz",
+      "expected": []
+    },
+    {
+      "id": "positive-sugar",
+      "query": "Bollería con azúcar",
+      "expected": []
+    },
+    {
+      "id": "packaging-alone",
+      "query": "Necesito un producto para pan envasado",
+      "expected": []
+    }
+  ],
+  "decision_cases": [
+    {
+      "id": "documented-high-hydration",
+      "query": "pan de alta hidratación",
+      "application": "Mejorante para la elaboración de pan especial de alta hidratación",
+      "expected_status": "recommended",
+      "expected_matched": ["high_hydration"]
+    },
+    {
+      "id": "documented-soft-products",
+      "query": "pan de molde tierno",
+      "application": "Mix para la elaboración de elaborados tipo soft envasados (pan de molde, hamburguesa)",
+      "expected_status": "recommended",
+      "expected_matched": ["softness"]
+    },
+    {
+      "id": "documented-mold-prevention",
+      "query": "evitar moho en pan envasado",
+      "application": "Antimoho para pan envasado y productos de bollería envasados",
+      "expected_status": "recommended",
+      "expected_matched": ["mold_prevention"]
+    },
+    {
+      "id": "documented-sugar-free",
+      "query": "cake sin azúcar",
+      "application": "Mix para la elaboración de cakes y bollería sin azúcar",
+      "expected_status": "recommended",
+      "expected_matched": ["sugar_free"]
+    },
+    {
+      "id": "documented-vegan",
+      "query": "cake vegano",
+      "application": "Mix para la elaboración de cakes y bollería veganos",
+      "expected_status": "recommended",
+      "expected_matched": ["vegan"]
+    },
+    {
+      "id": "documented-multiple-dietary",
+      "query": "muffin vegano sin gluten y sin lactosa",
+      "application": "Mix para la elaboración de muffins y cakes veganos sin gluten y sin lactosa",
+      "expected_status": "recommended",
+      "expected_matched": ["gluten_free", "vegan", "lactose_free"]
+    },
+    {
+      "id": "partial-precooked-freezing",
+      "query": "pan precocinado y congelado",
+      "application": "Mejorante para la elaboración de pan especial precocido y bollería",
+      "expected_status": "complementary",
+      "expected_matched": ["precooked"]
+    },
+    {
+      "id": "unrelated-dietary-profile",
+      "query": "cake sin azúcar",
+      "application": "Mix para la elaboración de cakes y bollería veganos",
+      "expected_status": "not_supported",
+      "expected_matched": []
+    }
+  ]
+}
