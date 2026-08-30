@@ -139,12 +139,28 @@ entire migration history first.
   tests, 375 document/AI/technical/architecture tests and the complete 877-test
   Python suite passed; the complete suite reported the 151 known non-blocking
   warnings.
-- Known limitation: the versioned set evaluates requirement detection and
-  application classification deterministically, but does not yet assert stable
-  end-to-end retrieval results against a specific real index and embedding model.
-- Next recommendation: add an opt-in real-corpus acceptance evaluator that records
-  expected product/source outcomes separately from runtime code and reports drift
-  after document or embedding-index updates.
+- Real-corpus acceptance cut: an opt-in, read-only evaluator now compares a
+  versioned baseline against the configured catalog, FTS5 index, semantic index and
+  embedding model. It is not called by the application during normal operation.
+- The baseline is kept outside runtime code and records four representative
+  queries with expected requirements, hybrid mode, relevant product order,
+  recommended/complementary status and exact technical-sheet source names.
+- Structured drift reporting covers embedding model, requirements, retrieval mode,
+  missing or unexpected products, ranking order, status, sources, warnings and
+  execution errors. Absolute paths are redacted and the baseline is never updated
+  automatically. Optional JSON output is written only when --output is supplied.
+- Real evaluator run with `embeddinggemma`: 4/4 cases passed without drift.
+  High hydration, mold prevention, precooked/frozen and vegan/gluten/lactose-free
+  cases each used hybrid retrieval and took approximately 22 seconds.
+- Validation for the real-corpus acceptance cut: 57 focused tests, 383
+  document/AI/technical/architecture tests and the complete 885-test Python suite
+  passed; the complete suite reported the 151 known non-blocking warnings.
+- Known limitation: the real baseline currently covers four representative
+  scenarios, not every supported requirement. Query embeddings make the complete
+  acceptance run take roughly 90 seconds on the current machine.
+- Next recommendation: perform the final calibration cut by adding real-corpus
+  coverage for the remaining supported requirements and correcting only observed
+  false positives, omissions or unstable rankings before the closing checkpoint.
 
 ## Historical Snapshot — 2026-06-21
 

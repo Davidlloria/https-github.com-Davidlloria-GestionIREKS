@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "expected_embedding_model": "embeddinggemma",
+  "cases": [
+    {
+      "id": "high-hydration",
+      "query": "Necesito un mejorante para pan de alta hidratación",
+      "expected_requirements": ["high_hydration"],
+      "expected_mode": "hybrid",
+      "expected_outcomes": [
+        {
+          "product_name": "IREKS CIABATTA",
+          "status": "recommended",
+          "source_names": [
+            "126112E_es_IREKS CIABATTA_Qualitätszertifikat.pdf"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "packaged-bread-mold",
+      "query": "Necesito un antimoho para pan envasado",
+      "expected_requirements": ["mold_prevention"],
+      "expected_mode": "hybrid",
+      "expected_outcomes": [
+        {
+          "product_name": "ANTISCHIM",
+          "status": "recommended",
+          "source_names": [
+            "106803E_es_ANTISCHIM_Qualitätszertifikat.pdf"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "precooked-frozen",
+      "query": "Necesito elaborar pan precocinado y luego congelado",
+      "expected_requirements": ["precooked", "freezing"],
+      "expected_mode": "hybrid",
+      "expected_outcomes": [
+        {
+          "product_name": "FRISCH UND FROSTIG",
+          "status": "complementary",
+          "source_names": [
+            "101900E_es_FRISCH UND FROSTIG_Qualitätszertifikat.pdf"
+          ]
+        },
+        {
+          "product_name": "PREBACK",
+          "status": "complementary",
+          "source_names": [
+            "123207E_es_PREBACK_Qualitätszertifikat.pdf"
+          ]
+        },
+        {
+          "product_name": "IDEAL FROST",
+          "status": "complementary",
+          "source_names": [
+            "100622E_es_IDEAL FROST_Qualitätszertifikat.pdf"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vegan-gluten-lactose-free",
+      "query": "Quiero preparar muffins veganos sin gluten y sin lactosa",
+      "expected_requirements": ["gluten_free", "vegan", "lactose_free"],
+      "expected_mode": "hybrid",
+      "expected_outcomes": [
+        {
+          "product_name": "VEGAN MUFFIN-MIX GLUTEN-FREE",
+          "status": "recommended",
+          "source_names": [
+            "131129E_es_VEGAN MUFFIN-MIX GLUTEN-FREE_Qualitätszertifikat.pdf"
+          ]
+        },
+        {
+          "product_name": "MUFFIN-MIX GLUTEN-FREE",
+          "status": "complementary",
+          "source_names": [
+            "131118E_es_MUFFIN-MIX GLUTEN-FREE_Qualitätszertifikat.pdf"
+          ]
+        },
+        {
+          "product_name": "SPONGE CAKE-MIX GLUTEN-FREE",
+          "status": "complementary",
+          "source_names": [
+            "114719E_es_SPONGE CAKE-MIX GLUTEN-FREE_Qualitätszertifikat.pdf"
+          ]
+        },
+        {
+          "product_name": "VEGAN CAKE MIX",
+          "status": "complementary",
+          "source_names": [
+            "122834E_es_VEGAN CAKE MIX_Qualitätszertifikat.pdf"
+          ]
+        }
+      ]
+    }
+  ]
+}
