@@ -270,6 +270,8 @@ def test_customer_annual_kg_chart_draws_one_line_with_four_points() -> None:
         assert len(lines) == 1
         assert list(lines[0].xData) == [0, 1, 2, 3]
         assert list(lines[0].yData) == [2.0, 5.0, 4.0, 8.0]
+        assert len(chart._value_labels) == 4
+        assert chart._value_label_texts == ["2,00 kg", "5,00 kg", "4,00 kg", "8,00 kg"]
     chart.close()
     chart.deleteLater()
     QApplication.processEvents()

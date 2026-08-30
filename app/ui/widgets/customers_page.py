@@ -127,6 +127,8 @@ class CustomerAnnualKgChart(QWidget):
         self.empty_label.setWordWrap(True)
 
         self._plot = None
+        self._value_labels: list = []
+        self._value_label_texts: list[str] = []
         if pg is None:
             self.empty_label.setText("No se puede mostrar el gráfico porque pyqtgraph no está instalado.")
             layout.addWidget(self.empty_label, 1)
@@ -153,6 +155,8 @@ class CustomerAnnualKgChart(QWidget):
         if self._plot is None:
             return
         self._plot.clear()
+        self._value_labels = []
+        self._value_label_texts = []
         self._plot.setVisible(has_points)
         self.empty_label.setVisible(not has_points)
         if not has_points:
@@ -170,10 +174,26 @@ class CustomerAnnualKgChart(QWidget):
             symbolBrush=QColor("#3B82F6"),
             symbolPen=pg.mkPen(color="#1D4ED8", width=2),
         )
+        for position, kilos_total in zip(positions, kilos):
+            label_text = self._format_kg(kilos_total)
+            label = pg.TextItem(
+                text=label_text,
+                color="#344054",
+                anchor=(0.5, 1.0),
+            )
+            label.setPos(position, kilos_total)
+            self._plot.addItem(label)
+            self._value_labels.append(label)
+            self._value_label_texts.append(label_text)
         self._plot.getAxis("bottom").setTicks([list(zip(positions, [str(year) for year in years]))])
         self._plot.setXRange(-0.25, max(len(points) - 0.75, 0.25), padding=0)
         max_kg = max(kilos, default=0.0)
-        self._plot.setYRange(0.0, max(max_kg * 1.12, 1.0), padding=0)
+        self._plot.setYRange(0.0, max(max_kg * 1.2, 1.0), padding=0)
+
+    @staticmethod
+    def _format_kg(value: float) -> str:
+        formatted = f"{float(value or 0.0):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+        return f"{formatted} kg"
 
 
 class CustomerSalesComparisonChartDialog(QDialog):

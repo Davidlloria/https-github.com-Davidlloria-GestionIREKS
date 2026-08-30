@@ -76,7 +76,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                             │   │   └── customerSalesCompareButton (QPushButton "Comparar", solo habilitado en modo Detalle con datos)
                             │   ├── customerSalesContentStack (QStackedWidget)
                             │   │   ├── customerSalesAnnualChart (vista inicial, mismo ancho disponible que la tabla)
-                            │   │   │   └── customerSalesAnnualPlot (una línea con cuatro puntos: año seleccionado y tres anteriores, ordenados de menor a mayor)
+                            │   │   │   └── customerSalesAnnualPlot (una línea con cuatro puntos: año seleccionado y tres anteriores, ordenados de menor a mayor; cada punto muestra permanentemente su total en kg)
                             │   │   └── customerSalesDetailPage
                             │   │       ├── customerSalesTable (QTableWidget, 5 columnas ordenables, tableVariant="standard"; columna Kg con sufijo "kg"; columna € con sufijo "€")
                             │   │       │   ├── Referencia
@@ -156,7 +156,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 - Al seleccionar un cliente se recargan detalle, compras, contactos, recetas y agenda.
 - `customerSalesYearFilter` carga años disponibles desde `CustomerService.related_sales_years()`.
 - La pestaña visible **Compras** ocupa la primera posición y carga los datos internos de ventas desde `CustomerService.related_sales(cliente_id, year)`.
-- La vista inicial de Compras es **Gráfico** y representa mediante una única línea los kilos totales del año seleccionado y de los tres años anteriores. La serie la proporciona `CustomerService.related_sales_annual_kg_series(cliente_id, end_year)`.
+- La vista inicial de Compras es **Gráfico** y representa mediante una única línea los kilos totales del año seleccionado y de los tres años anteriores; cada punto muestra su total en kg. La serie la proporciona `CustomerService.related_sales_annual_kg_series(cliente_id, end_year)`.
 - En modo **Gráfico**, los filtros mensuales y `customerSalesCompareButton` permanecen deshabilitados.
 - Al pulsar **Detalle** se muestra la tabla existente, se habilitan los dos filtros mensuales y `customerSalesCompareButton` se habilita cuando hay cliente, año y filas.
 - La comparativa colorea deltas positivos en verde `#067647` y negativos en rojo `#B42318`, también en la fila de totales.
@@ -218,6 +218,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 
 ## Últimos ajustes relevantes
 
+- Añadido el total en kg como etiqueta permanente sobre cada punto del gráfico anual de Compras.
 - Añadida a Compras la vista inicial de evolución anual en kg, con una línea de cuatro puntos, y los modos `Gráfico` / `Detalle` que controlan la tabla, los filtros mensuales y la comparativa.
 - Renombrada la pestaña visible `Ventas` a `Compras` y movida a la primera posición; el contenido y los servicios internos `customerSales*` se mantienen sin cambios.
 - Restaurada la pestaña ahora denominada Compras desde el placeholder a una tabla funcional con filtro de año.
