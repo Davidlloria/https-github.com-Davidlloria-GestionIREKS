@@ -65,18 +65,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                     │           └── prospección Sí / No
                     └── crmCard (QWidget, fondo transparente, sin borde, radio 8 px, alto mínimo 300 px, expansión vertical)
                         └── customerTabs (QTabWidget, panel verde #DCFCE7; pestañas blanco #FFFFFF / gris #F8FAFC; activa azul #3B82F6, x=5, y=5, ancho=crmCard-10 px, alto=crmCard-10 px)
-                            ├── Contactos
-                            │   ├── relatedContactsPanel (QWidget, fondo verde #0BF75D)
-                            │   ├── relatedContactsTable (QTableWidget, 5 columnas, tableVariant="standard")
-                            │   │   ├── Avatar
-                            │   │   ├── Nombre
-                            │   │   ├── Cargo
-                            │   │   ├── Teléfono
-                            │   │   └── Email
-                            │   ├── doble clic: abre el contacto
-                            │   ├── menú contextual: alta / edición relacionada
-                            │   └── relatedContactsEmpty (QLabel, estado vacío)
-                            ├── Ventas
+                            ├── Compras (primera pestaña; datos internos de ventas del cliente)
                             │   ├── customerSalesPanel (QWidget, fondo verde #0BF75D)
                             │   ├── fila de acciones (QHBoxLayout)
                             │   │   ├── customerSalesYearFilter (QComboBox, selector de año)
@@ -114,6 +103,17 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
                             │           ├── customerSalesComparisonPdfButton (QPushButton "Pdf", icono `assets/icons/file-text.svg`, color primary)
                             │           │   └── exporta PDF mediante `ReportExportService.export_customer_sales_comparison_pdf(...)`
                             │           └── customerSalesComparisonCloseButton (QPushButton "Cerrar", color danger)
+                            ├── Contactos (segunda pestaña)
+                            │   ├── relatedContactsPanel (QWidget, fondo verde #0BF75D)
+                            │   ├── relatedContactsTable (QTableWidget, 5 columnas, tableVariant="standard")
+                            │   │   ├── Avatar
+                            │   │   ├── Nombre
+                            │   │   ├── Cargo
+                            │   │   ├── Teléfono
+                            │   │   └── Email
+                            │   ├── doble clic: abre el contacto
+                            │   ├── menú contextual: alta / edición relacionada
+                            │   └── relatedContactsEmpty (QLabel, estado vacío)
                             ├── Recetas
                             │   ├── customerRecipesPanel (QWidget, fondo verde #0BF75D)
                             │   ├── relatedRecipesTable (QTableWidget, 3 columnas)
@@ -145,9 +145,9 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 - `customersListTable` usa selección de fila completa y única.
 - La edición directa en el listado de clientes está deshabilitada.
 - El orden inicial del listado es ascendente por código.
-- Al seleccionar un cliente se recargan detalle, contactos, ventas, recetas y agenda.
+- Al seleccionar un cliente se recargan detalle, compras, contactos, recetas y agenda.
 - `customerSalesYearFilter` carga años disponibles desde `CustomerService.related_sales_years()`.
-- La pestaña Ventas carga datos desde `CustomerService.related_sales(cliente_id, year)`.
+- La pestaña visible **Compras** ocupa la primera posición y carga los datos internos de ventas desde `CustomerService.related_sales(cliente_id, year)`.
 - `customerSalesCompareButton` solo se habilita si hay comparativa posible.
 - La comparativa colorea deltas positivos en verde `#067647` y negativos en rojo `#B42318`, también en la fila de totales.
 - El gráfico depende opcionalmente de `pyqtgraph`; si no está instalado, el diálogo informa de ello.
@@ -181,7 +181,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 - Inputs y combos son blancos, con borde gris, radio de 8 px y foco azul.
 - La fila seleccionada de clientes usa fondo azul `#3A78CF` y texto blanco.
 - Las pestañas tienen fondo blanco/gris claro y la activa se identifica en azul.
-- Contactos, ventas, recetas y agenda usan tablas blancas con bordes suaves.
+- Compras, contactos, recetas y agenda usan tablas blancas con bordes suaves.
 - La Agenda muestra iconos circulares por tipo y estados con color.
 - Los filtros de agenda usan texto a 11 px; las fechas se muestran centradas en los QDateEdit.
 
@@ -192,7 +192,7 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 - Fusionar cliente: acción del menú contextual de `customersListTable`; abre `customerMergeDialog` con cliente origen bloqueado, filtro por ocurrencia para localizar el cliente destino, selector de cliente destino filtrado, resumen de dependencias relacionadas detectadas y confirmación final antes de ejecutar `CustomerService.merge_customers()`.
 - Listados: diálogo asistido mediante `CustomerReportFlowService`.
 - `customerQueriesDialog` (QDialog modal): consultas read-only sobre clientes.
-- La comparativa de ventas abre un QDialog propio desde la pestaña Ventas.
+- La comparativa de ventas abre un QDialog propio desde la pestaña Compras.
 - El gráfico de comparativa usa `CustomerSalesComparisonChartDialog`.
 - El PDF de comparativa usa `ReportExportService`.
 - Agenda: diálogo modal para crear o editar actividad con tipo (una única opción `Visita` sustituye a `Visita prevista` y `Visita realizada`, conservando también `Demo` y los demás tipos), fecha, estado, resumen, detalle y seguimiento. El estado determina si la visita está pendiente o completada. Los selectores de fecha muestran un calendario emergente compacto, con semana iniciada en lunes, cabeceras y números de semana sobre fondo azul, cuadrícula fina y fines de semana destacados en rojo.
@@ -208,7 +208,8 @@ CustomersPage (QWidget, objectName: CustomersPageRoot, fondo gris #EEF3F8, sin b
 
 ## Últimos ajustes relevantes
 
-- Restaurada la pestaña Ventas desde el placeholder a una tabla funcional con filtro de año.
+- Renombrada la pestaña visible `Ventas` a `Compras` y movida a la primera posición; el contenido y los servicios internos `customerSales*` se mantienen sin cambios.
+- Restaurada la pestaña ahora denominada Compras desde el placeholder a una tabla funcional con filtro de año.
 - Restaurada la comparativa anual con modal, grafico y exportacion PDF; el titulo muestra solo cliente y anos, y las columnas numericas ordenan por valor real.
 - Corregida la geometría documentada de `detailLeftCard` y `detailRightCard` para que coincida con el código real.
 - Actualizado el fondo real de `CustomersPageRoot` a `#EEF3F8` y alineada la documentación.
