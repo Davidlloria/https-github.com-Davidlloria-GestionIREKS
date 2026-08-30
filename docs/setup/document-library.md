@@ -170,12 +170,18 @@ problema de índices.
 
 ## Validación operativa del MVP
 
-El checkpoint del 29 de agosto de 2026 catalogó 2.587 documentos admitidos, de los
-que 2.570 eran PDF, sin modificar la biblioteca. El piloto textual procesó 25
-documentos: 24 indexados, 1 sin texto y 0 fallidos; almacenó 83 páginas con texto.
-La búsqueda FTS5, el fallback léxico y el smoke PySide6 fueron correctos.
+El checkpoint final del 30 de agosto de 2026 validó la biblioteca real sin
+modificar los documentos originales. El catálogo contenía 2.587 documentos
+activos: 2.557 con contenido indexado, 16 sin texto extraíble y 14 documentos
+admitidos por el catálogo cuyos formatos no eran candidatos a extracción. El
+índice FTS5 almacenaba 7.019 páginas.
 
-La validación semántica quedó pendiente porque el modelo `embeddinggemma` no
-estaba instalado en Ollama. Es un requisito operativo, no un fallo funcional del
-catálogo o de la búsqueda textual. La suite Python completa terminó con 784 tests
-correctos y 151 warnings conocidos no bloqueantes.
+`embeddinggemma` quedó instalado y validado contra Ollama con vectores de 768
+dimensiones. El índice semántico contenía 2.557 documentos y 9.815 fragmentos,
+todos asociados al modelo configurado. Una consulta real completó recuperación
+híbrida, generación con `qwen3.5:4b` y comprobación de fuentes documentales.
+
+La suite documental y de arquitectura terminó con 198 tests correctos. La suite
+Python completa terminó con 785 tests correctos y 151 warnings conocidos no
+bloqueantes. El MVP documental queda operativo; la selección y comparación de
+productos como consultor técnico especializado pertenece a una fase posterior.

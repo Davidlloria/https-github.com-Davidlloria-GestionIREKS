@@ -13,9 +13,9 @@ entire migration history first.
 
 ## Current Snapshot
 
-- Date: 2026-08-29
+- Date: 2026-08-30
 - Branch: `feat/document-library-foundation`
-- HEAD before documentation commit: `a2b019e039b7957d33f98fbd1a9144bcb4e18892`
+- HEAD before checkpoint documentation commit: `6fa79822248fff19240a87c1246506ad35e2465a`
 - Initial worktree: clean
 - App status: the PySide6 document MVP is complete for catalog, PDF preview,
   FTS5 content search, local semantic indexing, hybrid retrieval and grounded QA.
@@ -30,14 +30,21 @@ entire migration history first.
   - `6410e651e` - hybrid retrieval
   - `5dfb5bc20` - embedding model configuration
   - `a2b019e03` - semantic index management in PySide6
-- Real checkpoint: 2,587 admitted documents cataloged, 25 content candidates
-  processed, 24 indexed, 1 without text, 0 failed and 83 text pages stored in an
-  isolated temporary database. The library metadata fingerprint was unchanged.
-- Validation: 189 document/architecture tests passed; the complete Python suite
-  passed with 784 tests and 151 known non-blocking warnings.
-- Operational blocker: `embeddinggemma` was configured but not installed in
-  Ollama, so semantic indexing and real grounded citations were not executed.
-- Next recommendation: review this branch and decide whether to integrate it.
+- Final operational checkpoint: 2,587 active documents, 2,557 content-indexed
+  documents, 16 without extractable text, 7,019 FTS pages, 2,557 semantic-indexed
+  documents and 9,815 semantic chunks generated with `embeddinggemma` at 768
+  dimensions.
+- Real Ollama validation: `embeddinggemma` generated an embedding and a grounded
+  query completed hybrid retrieval, generation with `qwen3.5:4b` and verified
+  document citations.
+- Validation: 198 document/architecture tests passed; the complete Python suite
+  passed with 785 tests and 151 known non-blocking warnings.
+- Operational blocker: closed. Both configured Ollama models are installed and
+  the real semantic index is available.
+- Known limitation: the document assistant is operational, but specialist product
+  comparison and ranking require the future technical-consultant phase.
+- Next recommendation: integrate this branch after reviewing the documentation-only
+  checkpoint commit.
 
 ## Historical Snapshot — 2026-06-21
 
