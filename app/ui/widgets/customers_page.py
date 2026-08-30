@@ -1247,14 +1247,14 @@ class CustomersPage(QWidget):
 
         self.customer_tabs = QTabWidget()
         self.customer_tabs.setObjectName("customerTabs")
+        self.customer_tabs.addTab(self._build_sales_tab(), "Compras")
         self.customer_tabs.addTab(self._build_contacts_tab(), "Contactos")
-        self.customer_tabs.addTab(self._build_sales_tab(), "Ventas")
         self.customer_tabs.addTab(self._build_recipes_tab(), "Recetas")
         self.customer_tabs.addTab(self._build_agenda_tab(), "Agenda")
-        self._customer_sales_tab_index = 1
+        self._customer_sales_tab_index = 0
         self.customer_tabs.currentChanged.connect(self._handle_customer_tab_changed)
-        self.customer_tabs.setTabIcon(0, QIcon(str(BASE_DIR / "assets" / "icons" / "contact.svg")))
-        self.customer_tabs.setTabIcon(1, QIcon(str(BASE_DIR / "assets" / "icons" / "badge-euro.svg")))
+        self.customer_tabs.setTabIcon(0, QIcon(str(BASE_DIR / "assets" / "icons" / "badge-euro.svg")))
+        self.customer_tabs.setTabIcon(1, QIcon(str(BASE_DIR / "assets" / "icons" / "contact.svg")))
         self.customer_tabs.setTabIcon(2, QIcon(str(BASE_DIR / "assets" / "icons" / "cooking-pot.svg")))
         self.customer_tabs.setTabIcon(3, QIcon(str(BASE_DIR / "assets" / "icons" / "calendar-days.svg")))
         tabs_layout.addWidget(self.customer_tabs)

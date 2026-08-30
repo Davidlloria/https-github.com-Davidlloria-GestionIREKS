@@ -197,6 +197,24 @@ def test_customers_top_ribbon_contains_queries_button(monkeypatch) -> None:
     QApplication.processEvents()
 
 
+def test_customer_purchases_tab_is_first(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
+    page = CustomersPage()
+
+    assert [
+        page.customer_tabs.tabText(index)
+        for index in range(page.customer_tabs.count())
+    ] == ["Compras", "Contactos", "Recetas", "Agenda"]
+    assert page._customer_sales_tab_index == 0
+    assert page.customer_tabs.currentIndex() == 0
+    assert not page.customer_tabs.tabIcon(0).isNull()
+
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
 def test_customers_search_row_has_counter(monkeypatch) -> None:
     _application()
     monkeypatch.setattr(CustomersPage, "reload", lambda self: None)
