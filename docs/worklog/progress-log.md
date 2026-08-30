@@ -78,12 +78,26 @@ entire migration history first.
 - Validation for the decision cut: 230 document/architecture tests and the
   complete 817-test Python suite passed; the complete suite reported the 151 known
   non-blocking warnings.
-- Known limitation: requirement detection is intentionally narrow, there is no
-  conversational clarification yet and the decision output is not connected to
-  Qwen or PySide6.
-- Next recommendation: implement the technical-consultant orchestration service
-  with clarification responses and source-grounded local-AI wording, without
-  changing PySide6 yet.
+- Technical-consultant orchestration cut: ambiguous questions now return three
+  deterministic clarification questions without invoking AI. Recognized needs
+  preserve the verified requirements, product status, dosage and source IDs;
+  Qwen only writes the final Spanish summary under a strict JSON schema.
+- Safety behavior: unsupported products never enter the AI context, citations are
+  validated against the supplied sources and invalid JSON, invalid citations,
+  disabled AI or generation errors fall back to the deterministic answer. The
+  prompt explicitly forbids invented products, doses, processes and combinations.
+- Real orchestration smoke: `Quiero mejorar mi pan` requested process, product type
+  and desired result. The precooked-and-frozen bread query used hybrid retrieval
+  and Qwen, retained `FRISCH UND FROSTIG`, `PREBACK` and `IDEAL FROST` as
+  complementary evidence, cited their verified first pages and clearly stated
+  that no complete documented solution or product combination was established.
+- Validation for the orchestration cut: 249 document/AI/architecture tests and the
+  complete 826-test Python suite passed; the complete suite reported the 151 known
+  non-blocking warnings.
+- Known limitation: requirement detection remains intentionally narrow and there
+  is no PySide6 consultant screen or conversational memory yet.
+- Next recommendation: connect this service to a small PySide6 technical-consultant
+  screen that displays clarification questions, product cards and source links.
 
 ## Historical Snapshot — 2026-06-21
 
