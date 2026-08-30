@@ -66,8 +66,24 @@ entire migration history first.
   non-blocking warnings.
 - Known limitation: comparison preserves retrieval order and does not yet decide
   which products satisfy all requirements or reject weak candidates.
-- Next recommendation: implement a source-grounded technical decision service that
-  ranks, recommends or rejects compared candidates without changing PySide6 yet.
+- Technical-consultant decision cut: explicit process requirements are detected
+  with a controlled vocabulary and compared only against the documented
+  application field. Candidates are classified as recommended, complementary,
+  not supported or insufficient evidence and ranked deterministically.
+- Real decision smoke: the precooked-and-frozen bread query detected both
+  requirements. `PREBACK` covered precooking; `FRISCH UND FROSTIG` and
+  `IDEAL FROST` covered freezing; unrelated candidates were not supported.
+  No single product was presented as a complete solution and no undocumented
+  product combination was inferred.
+- Validation for the decision cut: 230 document/architecture tests and the
+  complete 817-test Python suite passed; the complete suite reported the 151 known
+  non-blocking warnings.
+- Known limitation: requirement detection is intentionally narrow, there is no
+  conversational clarification yet and the decision output is not connected to
+  Qwen or PySide6.
+- Next recommendation: implement the technical-consultant orchestration service
+  with clarification responses and source-grounded local-AI wording, without
+  changing PySide6 yet.
 
 ## Historical Snapshot — 2026-06-21
 
