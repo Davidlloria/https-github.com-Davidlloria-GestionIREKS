@@ -9,6 +9,7 @@ from PySide6.QtPdfWidgets import QPdfView
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
+    QDialog,
     QFrame,
     QHeaderView,
     QHBoxLayout,
@@ -48,9 +49,11 @@ from app.services.technical_product_decision_service import (
 from app.services.technical_product_retrieval_service import (
     TechnicalProductRetrievalService,
 )
+from app.services.whatsapp_share_service import WhatsAppShareService
 from app.ui.widgets.document_content_search_dialog import DocumentContentSearchDialog
 from app.ui.widgets.document_question_answer_dialog import DocumentQuestionAnswerDialog
 from app.ui.widgets.technical_consultant_dialog import TechnicalConsultantDialog
+from app.ui.widgets.whatsapp_share_dialog import WhatsAppShareDialog
 
 
 class DocumentCatalogRefreshWorker(QThread):
@@ -90,6 +93,7 @@ class DocumentLibraryPage(QWidget):
         parent=None,
         semantic_index_service: DocumentSemanticIndexService | None = None,
         technical_consultant_service: TechnicalConsultantService | None = None,
+        whatsapp_share_service: WhatsAppShareService | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("documentLibraryPage")
@@ -112,6 +116,9 @@ class DocumentLibraryPage(QWidget):
         )
         self._question_answer_service = question_answer_service
         self._technical_consultant_service = technical_consultant_service
+        self._whatsapp_share_service = (
+            whatsapp_share_service or WhatsAppShareService()
+        )
         self._worker: DocumentCatalogRefreshWorker | None = None
         self._content_search_dialog: DocumentContentSearchDialog | None = None
         self._question_answer_dialog: DocumentQuestionAnswerDialog | None = None
@@ -262,6 +269,12 @@ class DocumentLibraryPage(QWidget):
         self.open_button.setEnabled(False)
         self.open_button.clicked.connect(self._open_selected_document)
         footer.addWidget(self.open_button)
+        self.whatsapp_button = QPushButton("WhatsApp")
+        self.whatsapp_button.setObjectName("documentLibraryWhatsAppButton")
+        self.whatsapp_button.setProperty("btnRole", "success")
+        self.whatsapp_button.setEnabled(False)
+        self.whatsapp_button.clicked.connect(self._share_selected_document)
+        footer.addWidget(self.whatsapp_button)
         layout.addLayout(footer)
 
     def _build_preview_panel(self) -> QWidget:
@@ -695,6 +708,7 @@ class DocumentLibraryPage(QWidget):
     def _selection_changed(self) -> None:
         document = self._selected_document()
         self.open_button.setEnabled(document is not None)
+        self.whatsapp_button.setEnabled(document is not None)
         if document is None:
             self._clear_preview()
             return
@@ -814,6 +828,50 @@ class DocumentLibraryPage(QWidget):
                 "Documentos",
                 "Windows no pudo abrir el documento con la aplicación predeterminada.",
             )
+
+    def _share_selected_document(self) -> None:
+        document = self._selected_document()
+        if document is None:
+            return
+        try:
+            path = self._service.resolve_document(document.document_id)
+        except (DocumentNotFoundError, UnsafeDocumentPathError) as exc:
+            QMessageBox.warning(self, "WhatsApp", str(exc))
+            return
+
+        dialog = WhatsAppShareDialog(
+            document.name,
+            self._whatsapp_share_service,
+            self,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        chat_url = self._whatsapp_share_service.build_chat_url(
+            dialog.normalized_phone,
+            dialog.message,
+        )
+        file_revealed = self._whatsapp_share_service.reveal_file(path)
+        chat_opened = QDesktopServices.openUrl(QUrl(chat_url))
+        if not chat_opened:
+            QMessageBox.warning(
+                self,
+                "WhatsApp",
+                "Windows no pudo abrir la conversación de WhatsApp.",
+            )
+            return
+        if not file_revealed:
+            QMessageBox.warning(
+                self,
+                "WhatsApp",
+                "La conversación se abrió, pero Windows no pudo mostrar el archivo. "
+                "Adjúntalo manualmente desde WhatsApp.",
+            )
+            return
+        self.status_label.setText(
+            "WhatsApp abierto. Arrastra el documento marcado en el Explorador "
+            "al chat y confirma el envío."
+        )
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self._dispose_pdf_view()

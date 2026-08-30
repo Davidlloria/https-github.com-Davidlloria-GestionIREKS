@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtPdfWidgets import QPdfView
-from PySide6.QtWidgets import QApplication, QHeaderView, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialog, QHeaderView, QMessageBox
 from reportlab.pdfgen import canvas
 
 import app.ui.widgets.document_library_page as page_module
@@ -239,6 +239,70 @@ def test_open_uses_selected_identifier_and_safe_resolved_path(monkeypatch) -> No
     assert opened_urls[0].toLocalFile().replace("\\", "/").endswith(
         "C:/safe/document.pdf"
     )
+
+
+def test_whatsapp_button_prepares_selected_document_without_sending(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _application()
+    document = _sample_documents()[1]
+    library = _FakeDocumentLibraryService([document])
+    library.resolved_path = tmp_path / document.name
+
+    class _FakeWhatsAppService:
+        def __init__(self) -> None:
+            self.revealed: list[Path] = []
+            self.urls: list[tuple[str, str]] = []
+
+        def build_chat_url(self, phone: str, message: str) -> str:
+            self.urls.append((phone, message))
+            return "https://wa.me/34600123456?text=mensaje"
+
+        def reveal_file(self, path: Path) -> bool:
+            self.revealed.append(path)
+            return True
+
+    share_service = _FakeWhatsAppService()
+
+    class _AcceptedDialog:
+        def __init__(self, document_name, service, parent) -> None:
+            assert document_name == document.name
+            assert service is share_service
+            assert parent is page
+            self.normalized_phone = "34600123456"
+            self.message = "Te envío la ficha."
+
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+
+    opened_urls: list[QUrl] = []
+    monkeypatch.setattr(page_module, "WhatsAppShareDialog", _AcceptedDialog)
+    monkeypatch.setattr(
+        page_module.QDesktopServices,
+        "openUrl",
+        lambda url: opened_urls.append(url) or True,
+    )
+    page = DocumentLibraryPage(
+        library,
+        whatsapp_share_service=share_service,  # type: ignore[arg-type]
+    )
+
+    assert page.whatsapp_button.text() == "WhatsApp"
+    assert page.whatsapp_button.isEnabled() is False
+    page.table.selectRow(0)
+    assert page.whatsapp_button.isEnabled() is True
+    page.whatsapp_button.click()
+
+    assert library.resolved_ids == [document.document_id]
+    assert share_service.revealed == [library.resolved_path]
+    assert share_service.urls == [
+        ("34600123456", "Te envío la ficha.")
+    ]
+    assert [url.toString() for url in opened_urls] == [
+        "https://wa.me/34600123456?text=mensaje"
+    ]
+    assert "confirma el envío" in page.status_label.text()
 
 
 def test_missing_document_shows_message_and_does_not_open(monkeypatch) -> None:
