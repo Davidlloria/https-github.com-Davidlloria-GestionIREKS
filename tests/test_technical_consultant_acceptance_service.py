@@ -22,6 +22,7 @@ from app.services.technical_product_comparison_service import (
 from app.services.technical_product_decision_service import (
     TechnicalProductDecision,
     TechnicalProductDecisionOutcome,
+    TechnicalProductDecisionService,
     TechnicalRequirement,
 )
 from scripts.evaluate_technical_consultant_corpus import render_text_report
@@ -153,12 +154,29 @@ def test_versioned_real_baseline_loads_with_unique_cases_and_sources() -> None:
         "packaged-bread-mold",
         "precooked-frozen",
         "vegan-gluten-lactose-free",
+        "controlled-fermentation",
+        "long-fermentation",
+        "soft-sandwich-bread",
+        "sugar-free-cake",
     ]
     assert all(
         outcome.source_names
         for case in baseline.cases
         for outcome in case.expected_outcomes
     )
+    assert [
+        case.case_id for case in baseline.cases if not case.expected_outcomes
+    ] == ["controlled-fermentation", "long-fermentation"]
+    covered_requirements = {
+        requirement
+        for case in baseline.cases
+        for requirement in case.expected_requirements
+    }
+    supported_requirements = {
+        requirement.key
+        for requirement in TechnicalProductDecisionService.supported_requirements()
+    }
+    assert covered_requirements == supported_requirements
 
 
 @pytest.mark.parametrize(
@@ -252,6 +270,40 @@ def test_missing_product_and_unknown_case_selection_are_reported() -> None:
     assert "missing_products" in fields
     with pytest.raises(TechnicalConsultantAcceptanceError, match="desconocidos"):
         service.evaluate(_baseline(), case_ids=("no-existe",))
+
+
+def test_empty_expected_outcomes_pass_when_no_product_is_supported() -> None:
+    baseline = TechnicalAcceptanceBaseline(
+        version=1,
+        expected_embedding_model="embeddinggemma",
+        cases=(
+            TechnicalAcceptanceCase(
+                case_id="no-supported-product",
+                query="fermentación controlada",
+                expected_requirements=("controlled_fermentation",),
+                expected_mode="hybrid",
+                expected_outcomes=(),
+            ),
+        ),
+    )
+    outcome = _outcome(
+        requirements=(
+            TechnicalRequirement(
+                "controlled_fermentation",
+                "fermentación controlada",
+            ),
+        ),
+    )
+    service = TechnicalConsultantAcceptanceService(
+        _FakeDecisionService(outcome),  # type: ignore[arg-type]
+        embedding_model="embeddinggemma",
+    )
+
+    report = service.evaluate(baseline)
+
+    assert report.passed
+    assert report.cases[0].outcomes == ()
+    assert report.cases[0].drifts == ()
 
 
 def test_execution_error_is_redacted_in_report() -> None:

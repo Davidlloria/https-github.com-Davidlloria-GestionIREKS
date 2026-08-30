@@ -155,12 +155,30 @@ entire migration history first.
 - Validation for the real-corpus acceptance cut: 57 focused tests, 383
   document/AI/technical/architecture tests and the complete 885-test Python suite
   passed; the complete suite reported the 151 known non-blocking warnings.
-- Known limitation: the real baseline currently covers four representative
-  scenarios, not every supported requirement. Query embeddings make the complete
-  acceptance run take roughly 90 seconds on the current machine.
-- Next recommendation: perform the final calibration cut by adding real-corpus
-  coverage for the remaining supported requirements and correcting only observed
-  false positives, omissions or unstable rankings before the closing checkpoint.
+- Final calibration cut: the real baseline now contains eight scenarios whose
+  combined expected requirements cover all eleven entries in the controlled
+  taxonomy. An automated integrity assertion fails if a future requirement is
+  added without corresponding real-corpus acceptance coverage.
+- New positive cases fix the verified outcomes for sandwich-bread softness
+  (`IREKS SOFTY PLUS`) and sugar-free cake (`IREKS CAKE SUGAR-FREE`). New
+  negative cases require no relevant products for controlled or long fermentation
+  because none of the 125 extracted application fields documents those uses.
+- Empty expected outcomes are now a valid acceptance contract. This makes safe
+  abstention measurable and reports drift if retrieval or classification later
+  promotes an undocumented product.
+- The 8/8 real-corpus calibration run passed with `embeddinggemma`, hybrid mode,
+  stable product order, statuses and source sheets. Each query took approximately
+  20 to 27 seconds. No vocabulary, ranking or recommendation rule was changed
+  because no false positive, omission or unstable ranking was observed.
+- Validation for the final calibration cut: 67 focused tests, 384
+  document/AI/technical/architecture tests and the complete 886-test Python suite
+  passed; the complete suite reported the 151 known non-blocking warnings.
+- Known limitation: the baseline guarantees at least one real scenario per
+  supported requirement, but it is not an exhaustive linguistic benchmark. The
+  complete eight-case acceptance run takes about three minutes on this machine.
+- Next recommendation: run the final operational checkpoint across PySide6,
+  Qwen wording, citations, clarification, safe fallbacks and the eight-case real
+  acceptance baseline, then decide whether the branch is ready to merge.
 
 ## Historical Snapshot — 2026-06-21
 

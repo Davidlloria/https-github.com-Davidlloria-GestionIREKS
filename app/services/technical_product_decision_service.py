@@ -207,6 +207,10 @@ class TechnicalProductDecisionService:
             if any(term in normalized_query for term in rule.query_terms)
         )
 
+    @staticmethod
+    def supported_requirements() -> tuple[TechnicalRequirement, ...]:
+        return tuple(rule.requirement for rule in _REQUIREMENT_RULES)
+
     @classmethod
     def _classify(
         cls,

@@ -96,6 +96,50 @@
           ]
         }
       ]
+    },
+    {
+      "id": "controlled-fermentation",
+      "query": "Necesito un mejorante para fermentación controlada",
+      "expected_requirements": ["controlled_fermentation"],
+      "expected_mode": "hybrid",
+      "expected_outcomes": []
+    },
+    {
+      "id": "long-fermentation",
+      "query": "Necesito un mejorante para larga fermentación",
+      "expected_requirements": ["long_fermentation"],
+      "expected_mode": "hybrid",
+      "expected_outcomes": []
+    },
+    {
+      "id": "soft-sandwich-bread",
+      "query": "Necesito un mejorante para pan de molde tierno",
+      "expected_requirements": ["softness"],
+      "expected_mode": "hybrid",
+      "expected_outcomes": [
+        {
+          "product_name": "IREKS SOFTY PLUS",
+          "status": "recommended",
+          "source_names": [
+            "127553E_es_IREKS SOFTY PLUS_Qualitätszertifikat.pdf"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sugar-free-cake",
+      "query": "Necesito un producto para cake sin azúcar",
+      "expected_requirements": ["sugar_free"],
+      "expected_mode": "hybrid",
+      "expected_outcomes": [
+        {
+          "product_name": "IREKS CAKE SUGAR-FREE",
+          "status": "recommended",
+          "source_names": [
+            "122809E_es_IREKS CAKE SUGAR-FREE_Qualitätszertifikat.pdf"
+          ]
+        }
+      ]
     }
   ]
 }

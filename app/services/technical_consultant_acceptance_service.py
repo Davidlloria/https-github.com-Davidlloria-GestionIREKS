@@ -158,9 +158,9 @@ def _parse_case(payload: object, position: int) -> TechnicalAcceptanceCase:
             f"{prefix}.expected_mode no es válido."
         )
     raw_outcomes = payload.get("expected_outcomes")
-    if not isinstance(raw_outcomes, list) or not raw_outcomes:
+    if not isinstance(raw_outcomes, list):
         raise TechnicalConsultantAcceptanceError(
-            f"{prefix}.expected_outcomes debe contener resultados."
+            f"{prefix}.expected_outcomes debe ser una lista."
         )
     expected_outcomes = tuple(
         _parse_expected_outcome(item, f"{prefix}.expected_outcomes[{index}]")

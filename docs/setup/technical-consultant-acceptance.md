@@ -18,6 +18,9 @@ evaluation/technical_consultant_real_corpus.json
 
 Cada caso fija los requisitos, el modo de recuperación, el orden de los
 productos relevantes, su clasificación y los nombres de las fichas fuente.
+Una lista vacía de resultados también es una expectativa válida: protege los
+casos en los que el catálogo no contiene evidencia suficiente y el consultor
+debe abstenerse de recomendar.
 
 ## Ejecución parcial
 
