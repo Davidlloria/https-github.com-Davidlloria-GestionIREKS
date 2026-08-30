@@ -645,7 +645,8 @@ Estado del Dashboard
 
 ```text
 Ribbon principal
-├── distribuye los catorce accesos en dos filas equilibradas, sin scroll horizontal
+├── distribuye los catorce accesos en una única fila horizontal
+├── conserva completas las etiquetas mediante anchos mínimos calculados
 ├── no incluye Configuración; su acceso está dentro de Inicio
 ├── usa la etiqueta Productos para la página interna Productos IREKS
 ├── corrige las etiquetas Técnicos, Fórmulas y Almacén

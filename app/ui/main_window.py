@@ -64,17 +64,10 @@ class MainWindow(QMainWindow):
         ribbon = QFrame()
         ribbon.setObjectName("topRibbon")
         ribbon.setFrameShape(QFrame.Shape.StyledPanel)
-        ribbon_layout = QVBoxLayout(ribbon)
-        ribbon_layout.setContentsMargins(12, 6, 12, 6)
-        ribbon_layout.setSpacing(2)
+        ribbon_layout = QHBoxLayout(ribbon)
+        ribbon_layout.setContentsMargins(12, 8, 12, 8)
+        ribbon_layout.setSpacing(3)
         self.ribbon_layout = ribbon_layout
-        self.ribbon_rows: list[QHBoxLayout] = []
-        for _row_index in range(2):
-            row = QHBoxLayout()
-            row.setContentsMargins(0, 0, 0, 0)
-            row.setSpacing(3)
-            ribbon_layout.addLayout(row)
-            self.ribbon_rows.append(row)
         self.ribbon_buttons = QButtonGroup(self)
         self.ribbon_buttons.setExclusive(True)
         return ribbon
@@ -154,33 +147,31 @@ class MainWindow(QMainWindow):
         for group in groups:
             ordered_names.extend(group)
 
-        for position, name in enumerate(ordered_names):
-            target_row = self.ribbon_rows[0 if position < 7 else 1]
+        for name in ordered_names:
             self._add_ribbon_button(
                 ribbon_labels.get(name, name),
                 page_index_by_name[name],
-                target_row,
             )
 
-        for row in self.ribbon_rows:
-            row.addStretch(1)
+        self.ribbon_layout.addStretch(1)
 
     def _add_page(self, name: str, widget: QWidget) -> None:
         self.pages.addWidget(widget)
         self.page_names.append(name)
 
-    def _add_ribbon_button(self, text: str, page_index: int, layout: QHBoxLayout) -> None:
+    def _add_ribbon_button(self, text: str, page_index: int) -> None:
         button = QPushButton(text)
         button.setProperty("navButton", True)
         button.setCheckable(True)
         self._adjust_nav_button_width(button)
         button.clicked.connect(lambda _checked=False, i=page_index: self._set_current_page(i))
         self.ribbon_buttons.addButton(button, page_index)
-        layout.addWidget(button)
+        self.ribbon_layout.addWidget(button)
 
     def _adjust_nav_button_width(self, button: QPushButton) -> None:
+        button.ensurePolished()
         text_width = button.fontMetrics().horizontalAdvance(button.text())
-        button.setFixedWidth(text_width + 20)
+        button.setMinimumWidth(max(text_width + 30, button.sizeHint().width()))
 
     def _set_current_page(self, index: int) -> None:
         current_index = self.pages.currentIndex()

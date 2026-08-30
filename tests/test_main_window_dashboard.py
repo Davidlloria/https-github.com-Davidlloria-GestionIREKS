@@ -65,13 +65,13 @@ def test_main_window_starts_on_inicio_page(monkeypatch) -> None:
     documents_index = window.page_names.index("Documentos")
     assert window.pages.widget(documents_index).objectName() == "documents"
     assert window.ribbon_buttons.button(documents_index).text() == "Documentos"
-    ribbon_labels = [
-        row.itemAt(index).widget().text()
-        for row in window.ribbon_rows
-        for index in range(row.count())
-        if hasattr(row.itemAt(index).widget(), "text")
-        and row.itemAt(index).widget().property("navButton")
+    ribbon_buttons = [
+        window.ribbon_layout.itemAt(index).widget()
+        for index in range(window.ribbon_layout.count())
+        if window.ribbon_layout.itemAt(index).widget() is not None
+        and window.ribbon_layout.itemAt(index).widget().property("navButton")
     ]
+    ribbon_labels = [button.text() for button in ribbon_buttons]
     assert ribbon_labels == [
         "Inicio",
         "Clientes",
@@ -88,15 +88,14 @@ def test_main_window_starts_on_inicio_page(monkeypatch) -> None:
         "Ventas",
         "Documentos",
     ]
-    window.resize(1180, 720)
+    window.resize(2200, 720)
     window.show()
     QApplication.processEvents()
     assert all(
-        row.itemAt(index).widget().geometry().right() <= window.ribbon.contentsRect().right()
-        for row in window.ribbon_rows
-        for index in range(row.count())
-        if row.itemAt(index).widget() is not None
+        button.minimumWidth() >= button.fontMetrics().horizontalAdvance(button.text()) + 30
+        for button in ribbon_buttons
     )
+    assert ribbon_buttons[-1].geometry().right() <= window.ribbon.contentsRect().right()
 
     statuses = []
     window.dashboard_page.set_local_ai_status = lambda code, message: statuses.append((code, message))
