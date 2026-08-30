@@ -173,12 +173,27 @@ entire migration history first.
 - Validation for the final calibration cut: 67 focused tests, 384
   document/AI/technical/architecture tests and the complete 886-test Python suite
   passed; the complete suite reported the 151 known non-blocking warnings.
-- Known limitation: the baseline guarantees at least one real scenario per
-  supported requirement, but it is not an exhaustive linguistic benchmark. The
-  complete eight-case acceptance run takes about three minutes on this machine.
-- Next recommendation: run the final operational checkpoint across PySide6,
-  Qwen wording, citations, clarification, safe fallbacks and the eight-case real
-  acceptance baseline, then decide whether the branch is ready to merge.
+- Final technical-consultant checkpoint: closed on commit `643c90394`. The
+  worktree was clean, the branch was 9 commits ahead and 0 behind `main`, and
+  the complete branch diff contained only the 20 expected service, PySide6,
+  evaluation, test and documentation files.
+- Local runtime: `qwen3.5:4b` and `embeddinggemma` were installed, enabled and
+  matched the application configuration. No model or index mutation was required.
+- Real PySide6 flow: ambiguous clarification completed in 0.031 seconds with no
+  retrieval. The continued precooked/frozen consultation completed in 70.282
+  seconds, used Qwen with validated sources, displayed `IDEAL FROST`,
+  `FRISCH UND FROSTIG` and `PREBACK`, and opened the selected cited PDF.
+- The final real-corpus acceptance run passed 8/8 cases with hybrid retrieval,
+  stable requirements, product order, classifications and source sheets.
+- Final validation: 384 document/AI/technical/architecture tests and the complete
+  886-test Python suite passed. The suite reported the 151 known non-blocking
+  warnings and no new warning category.
+- Operational decision: the technical-consultant branch is ready to merge.
+- Remaining limitations: Qwen consultations can take around 70 seconds, the full
+  acceptance run takes about three minutes and the controlled vocabulary is safe
+  but not an exhaustive linguistic benchmark.
+- Next recommendation: merge `feat/technical-consultant` into `main` only after
+  explicit authorization, then repeat a short post-merge smoke.
 
 ## Historical Snapshot — 2026-06-21
 
