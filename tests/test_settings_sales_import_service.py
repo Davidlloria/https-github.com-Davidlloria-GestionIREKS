@@ -71,25 +71,25 @@ def test_import_services_build_messages_and_logs(tmp_path: Path) -> None:
     assert ires.ok is True
     assert "Registros: 4" in ires.message
     assert "Filas omitidas: 1" in ires.message
-    assert "Importacion IREKS OK" in ires.log_message
+    assert "Importación IREKS OK" in ires.log_message
 
     xlsx_file = tmp_path / "igsa.xlsx"
     xlsx_file.write_text("fake", encoding="utf-8")
     igsa = service.import_igsa_excel(xlsx_file)
     assert igsa.ok is True
     assert "Registros: 3" in igsa.message
-    assert "Importacion IGSA OK" in igsa.log_message
+    assert "Importación IGSA OK" in igsa.log_message
 
     pdf = service.import_igsa_pdf_lines([{"row": 1}])
     assert pdf.ok is False
     assert "Filas omitidas: 2" in pdf.message
-    assert "Importacion PDF IGSA ERROR" in pdf.log_message
+    assert "Importación PDF IGSA ERROR" in pdf.log_message
 
     book = service.import_igsa_workbook_lines([{"row": 1}], force_reimport=True)
     assert book.ok is True
     assert "Registros: 7" in book.message
     assert "Filas omitidas: 3" in book.message
-    assert "Importacion IGSA libro OK" in book.log_message
+    assert "Importación de libro IGSA OK" in book.log_message
 
     rebuild = service.rebuild_igsa_warehouse_movements("2026-04")
     assert rebuild.ok is True
@@ -112,7 +112,7 @@ def test_build_import_view_provides_ireks_dialog_metadata() -> None:
     )
 
     view = service.build_import_view()
-    assert view.section_info_label == "Importacion de ventas IREKS (JSON)"
+    assert view.section_info_label == "Importación de ventas IREKS (JSON)"
     assert view.ireks_json_title == "Seleccionar JSON IREKS"
     assert view.ireks_json_filter == "JSON (*.json)"
     assert view.import_button_label == "Importar IREKS"

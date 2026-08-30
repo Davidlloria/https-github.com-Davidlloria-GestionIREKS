@@ -680,7 +680,7 @@ def test_dashboard_page_can_switch_to_warehouse_mode() -> None:
 
     page._set_dashboard_mode('almacen')
 
-    assert page.title_label.text() == 'Almacen'
+    assert page.title_label.text() == 'Almacén'
     assert page.dashboard_stack.currentWidget().objectName() == 'dashboardWarehouseView'
     assert page.warehouse_risk_table.rowCount() == 1
     assert page.warehouse_stock_table.rowCount() == 1
@@ -688,6 +688,49 @@ def test_dashboard_page_can_switch_to_warehouse_mode() -> None:
     assert page.warehouse_outputs_table.rowCount() == 1
     assert page.warehouse_kpi_labels['total_stock_kg'].text() == '2.450,50 kg'
 
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_dashboard_page_can_show_embedded_settings() -> None:
+    _application()
+
+    class _SettingsPage(QWidget):
+        def __init__(self) -> None:
+            super().__init__()
+            self.setObjectName('settingsPage')
+            self.refresh_calls = 0
+
+        def _refresh_status(self) -> None:
+            self.refresh_calls += 1
+
+    settings_page = _SettingsPage()
+    page = DashboardPage(
+        customer_service=_StubCustomerService(),
+        dashboard_service=_StubDashboardService(),
+        order_dashboard_service=_StubOrderDashboardService(),
+        warehouse_dashboard_service=_StubWarehouseDashboardService(),
+        settings_page=settings_page,
+    )
+
+    page.dashboard_nav_buttons['configuracion'].click()
+
+    assert page.current_dashboard == 'configuracion'
+    assert page.dashboard_stack.currentWidget() is settings_page
+    assert page.title_label.text() == 'Configuración'
+    assert page.date_label.text() == 'Servicios y preferencias de la aplicación'
+    assert page.new_activity_btn.isHidden()
+    assert page.full_agenda_btn.isHidden()
+    assert page.footer_label.isHidden()
+    assert settings_page.refresh_calls == 1
+    assert page.dashboard_nav_buttons['configuracion'].property('active') is True
+
+    page._set_dashboard_mode('agenda', reload=False)
+
+    assert not page.new_activity_btn.isHidden()
+    assert not page.full_agenda_btn.isHidden()
+    assert not page.footer_label.isHidden()
     page.close()
     page.deleteLater()
     QApplication.processEvents()

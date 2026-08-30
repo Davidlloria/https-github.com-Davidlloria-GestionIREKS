@@ -292,3 +292,23 @@ def test_local_ai_save_requires_url_and_both_models(monkeypatch) -> None:
 
     page.close()
     page.deleteLater()
+
+
+def test_settings_page_can_be_embedded_without_duplicate_title(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(SettingsPage, "_refresh_status", lambda self: None)
+
+    page = SettingsPage(embedded=True)
+
+    assert page.findChild(QLabel, "settingsPageTitle") is None
+    assert [page.main_tabs.tabText(index) for index in range(page.main_tabs.count())] == [
+        "Exportación BD",
+        "Importación BD",
+        "Mantenimiento BD",
+        "API",
+        "Correo",
+        "Auxiliares",
+    ]
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()

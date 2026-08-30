@@ -55,7 +55,7 @@ class SettingsMaintenanceUiService:
         counts = status["counts"]
         return SettingsMaintenanceStatusView(
             db_path_label=f"DB activa: {db_path}",
-            db_size_label=f"Tamano: {size_mb:.2f} MB",
+            db_size_label=f"Tamaño: {size_mb:.2f} MB",
             db_rows_label=(
                 "Registros: "
                 f"clientes={counts.get('clientes', 0)} | "
@@ -67,7 +67,7 @@ class SettingsMaintenanceUiService:
                 f"localidades={counts.get('localidades', 0)}"
             ),
             orphans_label=f"Contactos sin cliente vinculado: {status.get('orphan_contact_links', 0)}",
-            legacy_label=f"DB legacy detectada: {'si' if status['legacy_exists'] else 'no'} ({status['legacy_db_path']})",
+            legacy_label=f"DB legacy detectada: {'sí' if status['legacy_exists'] else 'no'} ({status['legacy_db_path']})",
             log_message="Estado de base de datos actualizado.",
         )
 
@@ -95,15 +95,15 @@ class SettingsMaintenanceUiService:
         after = int(result["orphans_after"])
         return SettingsMaintenanceOutcome(
             ok=True,
-            title="Reparacion completada",
+            title="Reparación completada",
             message=(
                 "Enlaces actualizados: "
                 f"{updated}\n"
-                f"Huerfanos antes: {before}\n"
-                f"Huerfanos despues: {after}"
+                f"Huérfanos antes: {before}\n"
+                f"Huérfanos después: {after}"
             ),
             log_message=(
-                "Reparacion de enlaces completada: "
+                "Reparación de enlaces completada: "
                 f"actualizados={updated}, "
                 f"huerfanos_antes={before}, "
                 f"huerfanos_despues={after}"
@@ -115,8 +115,8 @@ class SettingsMaintenanceUiService:
         return SettingsMaintenanceOutcome(
             ok=True,
             title="Optimizar DB",
-            message="Optimizacion completada.",
-            log_message="Optimizacion completada (PRAGMA optimize + ANALYZE + VACUUM).",
+            message="Optimización completada.",
+            log_message="Optimización completada (PRAGMA optimize + ANALYZE + VACUUM).",
         )
 
     def create_missing_clients(self) -> SettingsMaintenanceOutcome:
@@ -125,7 +125,7 @@ class SettingsMaintenanceUiService:
             ok=True,
             title="Clientes faltantes",
             message=f"Clientes creados: {created}",
-            log_message=f"Clientes tecnicos creados: {created}",
+            log_message=f"Clientes técnicos creados: {created}",
         )
 
     def backup_database(self, destination: Path) -> SettingsMaintenanceOutcome:

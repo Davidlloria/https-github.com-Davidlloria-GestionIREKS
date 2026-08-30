@@ -56,14 +56,14 @@ def test_pdf_and_workbook_preview_happy_path(tmp_path: Path) -> None:
     assert view.pdf_preview_error_title == "Vista previa PDF IGSA"
     assert view.pdf_import_button_label == "Importar datos"
     assert view.pdf_close_button_label == "Cerrar"
-    assert view.pdf_import_error_title == "Importacion PDF IGSA"
+    assert view.pdf_import_error_title == "Importación PDF IGSA"
     assert view.workbook_preview_title == "Vista previa - Libro IGSA"
     assert view.workbook_preview_error_title == "Vista previa IGSA libro"
-    assert view.workbook_import_result_title == "Importacion IGSA libro"
+    assert view.workbook_import_result_title == "Importación de libro IGSA"
     assert view.workbook_import_button_label == "Importar datos"
     assert view.workbook_reimport_button_label == "Reimportar"
     assert view.workbook_close_button_label == "Cerrar"
-    assert view.workbook_import_error_title == "Importacion IGSA libro"
+    assert view.workbook_import_error_title == "Importación de libro IGSA"
 
 
 def test_preview_validations_raise_value_error(tmp_path: Path) -> None:

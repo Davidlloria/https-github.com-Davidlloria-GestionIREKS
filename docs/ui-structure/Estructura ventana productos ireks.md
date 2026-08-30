@@ -18,7 +18,7 @@ Implementación principal:
   - `MateriaPrimaValorNutricional`
   - `AlmacenMovimiento`, `PedidoItem`
 
-La sección se registra como `Productos IREKS` en `app/ui/main_window.py` y usa el widget `IngredientsIreksPage`.
+La sección conserva el nombre interno `Productos IREKS` en `app/ui/main_window.py`, se muestra como `Productos` en el ribbon superior y usa el widget `IngredientsIreksPage`.
 
 ## Estructura UI real
 

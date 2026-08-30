@@ -290,14 +290,14 @@ class ProvinciasTab(QWidget):
         self.reload()
         if errors:
             preview = "\n".join(errors[:8])
-            extra = "" if len(errors) <= 8 else f"\n... y {len(errors) - 8} errores mas."
+            extra = "" if len(errors) <= 8 else f"\n... y {len(errors) - 8} errores más."
             QMessageBox.warning(
                 self,
-                "Importacion completada con incidencias",
+                "Importación completada con incidencias",
                 f"Registros importados: {imported}\nErrores: {len(errors)}\n\n{preview}{extra}",
             )
             return
-        QMessageBox.information(self, "Importacion completada", f"Registros importados: {imported}")
+        QMessageBox.information(self, "Importación completada", f"Registros importados: {imported}")
 
     def _validate_required(self, payload: dict) -> None:
         self.catalog_service.validate_provincia(payload)
@@ -583,14 +583,14 @@ class IslasTab(QWidget):
         self.reload()
         if errors:
             preview = "\n".join(errors[:8])
-            extra = "" if len(errors) <= 8 else f"\n... y {len(errors) - 8} errores mas."
+            extra = "" if len(errors) <= 8 else f"\n... y {len(errors) - 8} errores más."
             QMessageBox.warning(
                 self,
-                "Importacion completada con incidencias",
+                "Importación completada con incidencias",
                 f"Registros importados: {imported}\nErrores: {len(errors)}\n\n{preview}{extra}",
             )
             return
-        QMessageBox.information(self, "Importacion completada", f"Registros importados: {imported}")
+        QMessageBox.information(self, "Importación completada", f"Registros importados: {imported}")
 
     def _validate_required(self, payload: dict) -> None:
         self.catalog_service.validate_isla(payload)
@@ -859,14 +859,14 @@ class MunicipiosTab(QWidget):
         self.reload()
         if errors:
             preview = "\n".join(errors[:8])
-            extra = "" if len(errors) <= 8 else f"\n... y {len(errors) - 8} errores mas."
+            extra = "" if len(errors) <= 8 else f"\n... y {len(errors) - 8} errores más."
             QMessageBox.warning(
                 self,
-                "Importacion completada con incidencias",
+                "Importación completada con incidencias",
                 f"Registros importados: {imported}\nErrores: {len(errors)}\n\n{preview}{extra}",
             )
             return
-        QMessageBox.information(self, "Importacion completada", f"Registros importados: {imported}")
+        QMessageBox.information(self, "Importación completada", f"Registros importados: {imported}")
 
     def _validate_required(self, payload: dict) -> None:
         self.catalog_service.validate_municipio(payload)
@@ -1017,7 +1017,7 @@ class CodigosPostalesTab(QWidget):
             if status == "unchanged":
                 return
         except Exception as exc:
-            QMessageBox.warning(self, "Codigos postales", f"No se pudo guardar: {exc}")
+            QMessageBox.warning(self, "Códigos postales", f"No se pudo guardar: {exc}")
         self.reload()
 
     def _selected_row(self) -> CodigoPostal | None:
@@ -1136,14 +1136,14 @@ class CodigosPostalesTab(QWidget):
         self.reload()
         if errors:
             preview = "\n".join(errors[:8])
-            extra = "" if len(errors) <= 8 else f"\n... y {len(errors) - 8} errores mas."
+            extra = "" if len(errors) <= 8 else f"\n... y {len(errors) - 8} errores más."
             QMessageBox.warning(
                 self,
-                "Importacion completada con incidencias",
+                "Importación completada con incidencias",
                 f"Registros importados: {imported}\nErrores: {len(errors)}\n\n{preview}{extra}",
             )
             return
-        QMessageBox.information(self, "Importacion completada", f"Registros importados: {imported}")
+        QMessageBox.information(self, "Importación completada", f"Registros importados: {imported}")
 
     def _validate_required(self, payload: dict) -> None:
         self.catalog_service.validate_codigo_postal(payload)
@@ -1390,22 +1390,23 @@ class LocalidadesTab(QWidget):
         self.reload()
         if errors:
             preview = "\n".join(errors[:8])
-            extra = "" if len(errors) <= 8 else f"\n... y {len(errors) - 8} errores mas."
+            extra = "" if len(errors) <= 8 else f"\n... y {len(errors) - 8} errores más."
             QMessageBox.warning(
                 self,
-                "Importacion completada con incidencias",
+                "Importación completada con incidencias",
                 f"Registros importados: {imported}\nErrores: {len(errors)}\n\n{preview}{extra}",
             )
             return
-        QMessageBox.information(self, "Importacion completada", f"Registros importados: {imported}")
+        QMessageBox.information(self, "Importación completada", f"Registros importados: {imported}")
 
     def _validate_required(self, payload: dict) -> None:
         self.catalog_service.validate_localidad(payload)
 
 
 class SettingsPage(QWidget):
-    def __init__(self) -> None:
+    def __init__(self, *, embedded: bool = False) -> None:
         super().__init__()
+        self._embedded = bool(embedded)
         self.settings_provider_service = SettingsProviderService()
         self.settings_import_service = SettingsImportService()
         self.settings_orders_import_service = SettingsOrdersImportService(self.settings_import_service)
@@ -1423,16 +1424,18 @@ class SettingsPage(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        header = QLabel("Configuracion")
-        header.setProperty("role", "pageTitle")
-        layout.addWidget(header)
+        if not self._embedded:
+            header = QLabel("Configuración")
+            header.setObjectName("settingsPageTitle")
+            header.setProperty("role", "pageTitle")
+            layout.addWidget(header)
 
         self.main_tabs = QTabWidget()
-        self.main_tabs.addTab(self._build_db_export_tab(), "Exportacion BD")
-        self.main_tabs.addTab(self._build_db_import_tab(), "Importacion BD")
+        self.main_tabs.addTab(self._build_db_export_tab(), "Exportación BD")
+        self.main_tabs.addTab(self._build_db_import_tab(), "Importación BD")
         self.main_tabs.addTab(self._build_db_maintenance_tab(), "Mantenimiento BD")
         self.main_tabs.addTab(self._build_api_tab(), "API")
-        self.main_tabs.addTab(self._build_mail_tab(), "Corro")
+        self.main_tabs.addTab(self._build_mail_tab(), "Correo")
         self.main_tabs.addTab(self._build_auxiliares_tab(), "Auxiliares")
         layout.addWidget(self.main_tabs, 1)
 
@@ -1803,7 +1806,7 @@ class SettingsPage(QWidget):
         tabs.addTab(ProvinciasTab(), "Provincias")
         tabs.addTab(IslasTab(), "Islas")
         tabs.addTab(MunicipiosTab(), "Municipios")
-        tabs.addTab(CodigosPostalesTab(), "Codigos postales")
+        tabs.addTab(CodigosPostalesTab(), "Códigos postales")
         tabs.addTab(LocalidadesTab(), "Localidades")
         layout.addWidget(tabs, 1)
         return panel
@@ -1847,7 +1850,7 @@ class SettingsPage(QWidget):
         historico_row.addWidget(self.orders_historico_dir_btn)
         historico_row_widget = QWidget()
         historico_row_widget.setLayout(historico_row)
-        orders_form.addRow("Ruta historico", historico_row_widget)
+        orders_form.addRow("Ruta histórica", historico_row_widget)
         orders_mail_layout.addLayout(orders_form)
 
         orders_actions = QHBoxLayout()
@@ -1869,22 +1872,22 @@ class SettingsPage(QWidget):
         panel = QWidget()
         layout = QVBoxLayout(panel)
         tabs = QTabWidget()
-        for name in (
-            "Clientes",
-            "Contactos",
-            "Tecnicos",
-            "Distribuidores",
-            "Colaboradores",
-            "Cursos",
-            "Formulas",
-            "Almacen",
-            "Productos IREKS",
-            "Materias primas",
-            "Pedidos",
-            "Ventas",
-            "Configuracion",
+        for name, label in (
+            ("Clientes", "Clientes"),
+            ("Contactos", "Contactos"),
+            ("Tecnicos", "Técnicos"),
+            ("Distribuidores", "Distribuidores"),
+            ("Colaboradores", "Colaboradores"),
+            ("Cursos", "Cursos"),
+            ("Formulas", "Fórmulas"),
+            ("Almacen", "Almacén"),
+            ("Productos IREKS", "Productos"),
+            ("Materias primas", "Materias primas"),
+            ("Pedidos", "Pedidos"),
+            ("Ventas", "Ventas"),
+            ("Configuracion", "Configuración"),
         ):
-            tabs.addTab(self._build_import_section_tab(name), name)
+            tabs.addTab(self._build_import_section_tab(name), label)
         layout.addWidget(tabs, 1)
         return panel
 
@@ -1892,22 +1895,22 @@ class SettingsPage(QWidget):
         panel = QWidget()
         layout = QVBoxLayout(panel)
         tabs = QTabWidget()
-        for name in (
-            "Clientes",
-            "Contactos",
-            "Tecnicos",
-            "Distribuidores",
-            "Colaboradores",
-            "Cursos",
-            "Formulas",
-            "Almacen",
-            "Productos IREKS",
-            "Materias primas",
-            "Pedidos",
-            "Ventas",
-            "Configuracion",
+        for name, label in (
+            ("Clientes", "Clientes"),
+            ("Contactos", "Contactos"),
+            ("Tecnicos", "Técnicos"),
+            ("Distribuidores", "Distribuidores"),
+            ("Colaboradores", "Colaboradores"),
+            ("Cursos", "Cursos"),
+            ("Formulas", "Fórmulas"),
+            ("Almacen", "Almacén"),
+            ("Productos IREKS", "Productos"),
+            ("Materias primas", "Materias primas"),
+            ("Pedidos", "Pedidos"),
+            ("Ventas", "Ventas"),
+            ("Configuracion", "Configuración"),
         ):
-            tabs.addTab(self._build_export_section_tab(name), name)
+            tabs.addTab(self._build_export_section_tab(name), label)
         layout.addWidget(tabs, 1)
         return panel
 
@@ -1964,8 +1967,8 @@ class SettingsPage(QWidget):
             card_igsa_layout.setContentsMargins(10, 10, 10, 10)
             card_igsa_layout.setSpacing(8)
             info_igsa = QLabel(
-                "Importacion de ventas IGSA centralizada. "
-                "Usa uno de los dos botones para cargar datos y, desde la vista previa, confirmar la importacion."
+                "Importación de ventas IGSA centralizada. "
+                "Usa uno de los dos botones para cargar datos y, desde la vista previa, confirmar la importación."
             )
             info_igsa.setWordWrap(True)
             preview_igsa_book_btn = QPushButton("Cargar libro")
@@ -1981,7 +1984,7 @@ class SettingsPage(QWidget):
 
         else:
             note = QLabel(
-                f"Esta seccion no tiene importadores de mantenimiento especificos en esta version ({section_name})."
+                f"Esta sección no tiene importadores de mantenimiento específicos en esta versión ({self._section_display_name(section_name)})."
             )
             note.setWordWrap(True)
             layout.addWidget(note)
@@ -1992,7 +1995,7 @@ class SettingsPage(QWidget):
                 DbImportConsoleTab(
                     on_import_completed=self._refresh_status,
                     allowed_profile_keys=allowed_profiles,
-                    title=f"Importacion de {section_name}",
+                    title=f"Importación de {self._section_display_name(section_name)}",
                 ),
                 1,
             )
@@ -2001,6 +2004,16 @@ class SettingsPage(QWidget):
         else:
             layout.addStretch(1)
         return panel
+
+    @staticmethod
+    def _section_display_name(section_name: str) -> str:
+        return {
+            "Tecnicos": "Técnicos",
+            "Formulas": "Fórmulas",
+            "Almacen": "Almacén",
+            "Productos IREKS": "Productos",
+            "Configuracion": "Configuración",
+        }.get(section_name, section_name)
 
     def _build_export_section_tab(self, section_name: str) -> QWidget:
         panel = QWidget()
@@ -2112,7 +2125,7 @@ class SettingsPage(QWidget):
             self,
             "Crear clientes faltantes",
             (
-                "Se crearan clientes tecnicos para cada Cliente_ID de contactos sin correspondencia.\n"
+                "Se crearán clientes técnicos para cada Cliente_ID de contactos sin correspondencia.\n"
                 "Esto permite mantener la relacion y mostrar empresa en Contactos.\n\n"
                 "Continuar?"
             ),
@@ -2172,10 +2185,10 @@ class SettingsPage(QWidget):
         try:
             outcome = self.settings_orders_import_service.import_orders_json(source, almacen_id)
         except Exception as exc:
-            QMessageBox.warning(self, "Importacion pedidos", str(exc))
+            QMessageBox.warning(self, "Importación de pedidos", str(exc))
             return
         self._append_log(outcome.log_message)
-        QMessageBox.information(self, "Importacion pedidos", "\n".join(outcome.summary_lines))
+        QMessageBox.information(self, "Importación de pedidos", "\n".join(outcome.summary_lines))
 
     def _preview_igsa_sales_pdf(self) -> None:
         preview_view = self.settings_sales_preview_service.build_preview_view()
@@ -2214,7 +2227,7 @@ class SettingsPage(QWidget):
                 "Albaran Nº",
                 "Tipo",
                 "Cod.Art.",
-                "Descripcion",
+                "Descripción",
                 "Kilos",
                 "Env.",
                 "Emb.",
@@ -2309,7 +2322,7 @@ class SettingsPage(QWidget):
         try:
             outcome = self.settings_sales_import_service.import_ireks_json(Path(file_path))
         except Exception as exc:
-            QMessageBox.warning(self, "Importacion ventas IREKS", str(exc))
+            QMessageBox.warning(self, "Importación de ventas IREKS", str(exc))
             return
         if outcome.ok:
             QMessageBox.information(self, outcome.title, outcome.message)
@@ -2358,7 +2371,7 @@ class SettingsPage(QWidget):
                 "Periodo",
                 "Ref. Dist.",
                 "Cod. Fab.",
-                "Descripcion",
+                "Descripción",
                 "Peso/Env",
                 "Nº Envases",
                 "Tot. Kg",
@@ -2474,7 +2487,7 @@ class SettingsPage(QWidget):
             else:
                 QMessageBox.warning(self, "FoodData Central", result.message)
         except Exception as exc:
-            QMessageBox.warning(self, "FoodData Central", f"Error de conexion.\n{exc}")
+            QMessageBox.warning(self, "FoodData Central", f"Error de conexión.\n{exc}")
 
     def _save_fatsecret_settings(self) -> None:
         client_id = self.fatsecret_client_id_input.text().strip() if hasattr(self, "fatsecret_client_id_input") else ""
@@ -2498,7 +2511,7 @@ class SettingsPage(QWidget):
             result = self.settings_provider_service.test_fatsecret(client_id, client_secret, scope)
             QMessageBox.information(self, "FatSecret", result.message)
         except Exception as exc:
-            QMessageBox.warning(self, "FatSecret", f"Error de conexion.\n{exc}")
+            QMessageBox.warning(self, "FatSecret", f"Error de conexión.\n{exc}")
 
     def _save_openai_settings(self) -> None:
         api_key = self.openai_api_key_input.text().strip() if hasattr(self, "openai_api_key_input") else ""
@@ -2517,9 +2530,9 @@ class SettingsPage(QWidget):
             if result.ok:
                 QMessageBox.information(self, "OpenAI", result.message)
             else:
-                QMessageBox.warning(self, "OpenAI", result.message or "No se obtuvo respuesta valida.")
+                QMessageBox.warning(self, "OpenAI", result.message or "No se obtuvo respuesta válida.")
         except Exception as exc:
-            QMessageBox.warning(self, "OpenAI", f"Error de conexion.\n{exc}")
+            QMessageBox.warning(self, "OpenAI", f"Error de conexión.\n{exc}")
 
     def _save_local_ai_settings(self) -> None:
         enabled = self.local_ai_enabled_check.isChecked() if hasattr(self, "local_ai_enabled_check") else False
@@ -2563,9 +2576,9 @@ class SettingsPage(QWidget):
             if result.ok:
                 QMessageBox.information(self, "IA local", result.message)
             else:
-                QMessageBox.warning(self, "IA local", result.message or "No se obtuvo respuesta valida.")
+                QMessageBox.warning(self, "IA local", result.message or "No se obtuvo respuesta válida.")
         except Exception as exc:
-            QMessageBox.warning(self, "IA local", f"Error de conexion.\n{exc}")
+            QMessageBox.warning(self, "IA local", f"Error de conexión.\n{exc}")
 
     def _test_local_embedding_connection(self) -> None:
         base_url = (
@@ -2598,7 +2611,7 @@ class SettingsPage(QWidget):
         current = self.orders_historico_dir_input.text().strip() if hasattr(self, "orders_historico_dir_input") else ""
         selected = QFileDialog.getExistingDirectory(
             self,
-            "Seleccionar ruta de historico de pedidos",
+            "Seleccionar ruta del histórico de pedidos",
             current or str(DATA_DIR),
         )
         if selected and hasattr(self, "orders_historico_dir_input"):

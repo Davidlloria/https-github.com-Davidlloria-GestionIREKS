@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -26,8 +27,16 @@ def _stub_page(name: str) -> QWidget:
 
 
 def test_main_window_starts_on_inicio_page(monkeypatch) -> None:
-    _application()
-    monkeypatch.setattr(main_window_module, "DashboardPage", lambda: _stub_page("dashboard"))
+    application = _application()
+    application.setStyleSheet(
+        (Path(__file__).resolve().parents[1] / "assets" / "styles.qss").read_text(encoding="utf-8")
+    )
+    def _dashboard_stub(*, settings_page=None):
+        widget = _stub_page("dashboard")
+        widget.settings_page = settings_page
+        return widget
+
+    monkeypatch.setattr(main_window_module, "DashboardPage", _dashboard_stub)
     monkeypatch.setattr(main_window_module.MainWindow, "_build_customers_page", lambda self: _stub_page("customers"))
     monkeypatch.setattr(main_window_module, "ContactsPage", lambda: _stub_page("contacts"))
     monkeypatch.setattr(main_window_module, "CoursesPage", lambda: _stub_page("courses"))
@@ -39,20 +48,55 @@ def test_main_window_starts_on_inicio_page(monkeypatch) -> None:
     monkeypatch.setattr(main_window_module, "PlaceholderPage", lambda *_args, **_kwargs: _stub_page("placeholder"))
     monkeypatch.setattr(main_window_module, "RecipesPage", lambda: _stub_page("recipes"))
     monkeypatch.setattr(main_window_module, "SalesPage", lambda: _stub_page("sales"))
-    monkeypatch.setattr(main_window_module, "SettingsPage", lambda: _stub_page("settings"))
+    monkeypatch.setattr(main_window_module, "SettingsPage", lambda **_kwargs: _stub_page("settings"))
     monkeypatch.setattr(main_window_module, "TechniciansPage", lambda: _stub_page("technicians"))
     monkeypatch.setattr(main_window_module, "WarehousePage", lambda: _stub_page("warehouse"))
 
     window = main_window_module.MainWindow()
 
+    assert window.windowTitle() == "Gestión IREKS"
     assert window.page_names[0] == "Inicio"
     assert window.pages.currentIndex() == 0
     assert window.pages.widget(0).objectName() == "dashboard"
+    assert window.dashboard_page.settings_page is window.settings_page
+    assert window.settings_page.objectName() == "settings"
+    assert "Configuracion" not in window.page_names
     assert window.ribbon_buttons.button(0).text() == "Inicio"
     documents_index = window.page_names.index("Documentos")
-    assert window.page_names[documents_index - 1] == "Formulas"
     assert window.pages.widget(documents_index).objectName() == "documents"
     assert window.ribbon_buttons.button(documents_index).text() == "Documentos"
+    ribbon_labels = [
+        row.itemAt(index).widget().text()
+        for row in window.ribbon_rows
+        for index in range(row.count())
+        if hasattr(row.itemAt(index).widget(), "text")
+        and row.itemAt(index).widget().property("navButton")
+    ]
+    assert ribbon_labels == [
+        "Inicio",
+        "Clientes",
+        "Contactos",
+        "Técnicos",
+        "Distribuidores",
+        "Colaboradores",
+        "Cursos",
+        "Fórmulas",
+        "Almacén",
+        "Productos",
+        "Materias primas",
+        "Pedidos",
+        "Ventas",
+        "Documentos",
+    ]
+    window.resize(1180, 720)
+    window.show()
+    QApplication.processEvents()
+    assert all(
+        row.itemAt(index).widget().geometry().right() <= window.ribbon.contentsRect().right()
+        for row in window.ribbon_rows
+        for index in range(row.count())
+        if row.itemAt(index).widget() is not None
+    )
 
     statuses = []
     window.dashboard_page.set_local_ai_status = lambda code, message: statuses.append((code, message))
@@ -66,3 +110,7 @@ def test_main_window_starts_on_inicio_page(monkeypatch) -> None:
     window._sync_local_ai_status()
     assert statuses[-1] == ("ready", "IA local disponible")
     window._local_ai_status_timer.stop()
+    window.close()
+    window.deleteLater()
+    QApplication.processEvents()
+    application.setStyleSheet("")

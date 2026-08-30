@@ -195,19 +195,19 @@ def test_load_operations_delegate_to_underlying_settings_services() -> None:
     view = service.load_orders_mail_view()
     assert view.destino_email == "destino@empresa.com"
     assert view.historico_dir == "data/historico"
-    assert view.title == "Configuracion envio pedidos por Outlook"
+    assert view.title == "Configuración de envío de pedidos por Outlook"
     assert view.destino_placeholder == "destino@empresa.com"
     assert view.historico_placeholder == r"E:\...\pedidos_historico"
     assert view.selector_button_label == "Examinar"
     assert view.save_button_label == "Guardar"
-    assert view.info_label == "Estos parametros se guardan en data/api_config.json."
+    assert view.info_label == "Estos parámetros se guardan en data/api_config.json."
 
     ui_view = service.build_ui_view()
-    assert ui_view.fdc_title == "Configuracion API FoodData Central"
-    assert ui_view.fatsecret_title == "Configuracion API FatSecret"
-    assert ui_view.openai_title == "Configuracion API OpenAI"
+    assert ui_view.fdc_title == "Configuración API FoodData Central"
+    assert ui_view.fatsecret_title == "Configuración API FatSecret"
+    assert ui_view.openai_title == "Configuración API OpenAI"
     assert ui_view.save_button_label == "Guardar"
-    assert ui_view.test_button_label == "Probar conexion"
+    assert ui_view.test_button_label == "Probar conexión"
     assert ui_view.fdc_api_key_label == "API key"
     assert ui_view.fdc_data_type_label == "Tipo de datos"
     assert ui_view.fdc_data_type_options == ("Foundation", "Branded", "Survey (FNDDS)", "SR Legacy")

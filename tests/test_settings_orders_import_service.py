@@ -33,9 +33,9 @@ def test_import_orders_json_builds_summary_and_log(tmp_path: Path) -> None:
     assert outcome.imported_items == 3
     assert outcome.skipped_unknown_count == 3
     assert outcome.skipped_invalid == 1
-    assert "lineas=3" in outcome.log_message
-    assert any("Lineas importadas: 3" in row for row in outcome.summary_lines)
-    assert any("Codigos no encontrados" in row for row in outcome.summary_lines)
+    assert "líneas=3" in outcome.log_message
+    assert any("Líneas importadas: 3" in row for row in outcome.summary_lines)
+    assert any("Códigos no encontrados" in row for row in outcome.summary_lines)
     assert fake.calls == [(source, "alm-1")]
 
 
@@ -50,7 +50,7 @@ def test_build_orders_import_view_provides_warehouse_options() -> None:
     service = SettingsOrdersImportService(settings_import_service=_FakeSettingsImportServiceWithOptions())
     view = service.build_orders_import_view()
 
-    assert view.section_info_label == "Importacion de pedidos (JSON)"
+    assert view.section_info_label == "Importación de pedidos (JSON)"
     assert view.selector_label == "Cliente/Distribuidor"
     assert view.import_button_label == "Importar pedidos"
     assert [option.label for option in view.warehouse_options] == ["Cliente A", "Cliente B"]

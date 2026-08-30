@@ -5,7 +5,6 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QFrame,
     QHBoxLayout,
-    QLabel,
     QMainWindow,
     QPushButton,
     QStackedWidget,
@@ -38,7 +37,7 @@ except Exception:  # noqa: BLE001
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("Gestion IREKS")
+        self.setWindowTitle("Gestión IREKS")
         self.setMinimumSize(1180, 720)
         self.resize(1360, 840)
         self._build_ui()
@@ -65,17 +64,25 @@ class MainWindow(QMainWindow):
         ribbon = QFrame()
         ribbon.setObjectName("topRibbon")
         ribbon.setFrameShape(QFrame.Shape.StyledPanel)
-        ribbon_layout = QHBoxLayout(ribbon)
-        ribbon_layout.setContentsMargins(12, 8, 12, 8)
-        ribbon_layout.setSpacing(3)
+        ribbon_layout = QVBoxLayout(ribbon)
+        ribbon_layout.setContentsMargins(12, 6, 12, 6)
+        ribbon_layout.setSpacing(2)
         self.ribbon_layout = ribbon_layout
+        self.ribbon_rows: list[QHBoxLayout] = []
+        for _row_index in range(2):
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(3)
+            ribbon_layout.addLayout(row)
+            self.ribbon_rows.append(row)
         self.ribbon_buttons = QButtonGroup(self)
         self.ribbon_buttons.setExclusive(True)
         return ribbon
 
     def _build_pages(self) -> None:
         self.page_names: list[str] = []
-        self.dashboard_page = DashboardPage()
+        self.settings_page = SettingsPage(embedded=True)
+        self.dashboard_page = DashboardPage(settings_page=self.settings_page)
         self._add_page("Inicio", self.dashboard_page)
         self._add_page("Clientes", self._build_customers_page())
         self._add_page("Contactos", ContactsPage())
@@ -83,7 +90,7 @@ class MainWindow(QMainWindow):
         self._add_page("Distribuidores", DistributorsPage())
         self._add_page(
             "Colaboradores",
-            PlaceholderPage("Colaboradores", "Gestion de colaboradores internos y externos."),
+            PlaceholderPage("Colaboradores", "Gestión de colaboradores internos y externos."),
         )
         self._add_page("Cursos", CoursesPage())
         self._add_page("Formulas", RecipesPage())
@@ -93,7 +100,6 @@ class MainWindow(QMainWindow):
         self._add_page("Materias primas", IngredientsStdPage())
         self._add_page("Pedidos", OrdersPage())
         self._add_page("Ventas", SalesPage())
-        self._add_page("Configuracion", SettingsPage())
 
     def bind_local_ai_lifecycle(self, lifecycle) -> None:
         self._local_ai_lifecycle = lifecycle
@@ -132,39 +138,49 @@ class MainWindow(QMainWindow):
     def _build_ribbon_groups(self) -> None:
         groups = [
             ["Inicio", "Clientes", "Contactos", "Tecnicos", "Distribuidores", "Colaboradores"],
-            ["Cursos", "Formulas", "Documentos"],
+            ["Cursos", "Formulas"],
             ["Almacen", "Productos IREKS", "Materias primas"],
-            ["Pedidos", "Ventas"],
-            ["Configuracion"],
+            ["Pedidos", "Ventas", "Documentos"],
         ]
+        ribbon_labels = {
+            "Tecnicos": "Técnicos",
+            "Formulas": "Fórmulas",
+            "Almacen": "Almacén",
+            "Productos IREKS": "Productos",
+        }
         page_index_by_name = {name: idx for idx, name in enumerate(self.page_names)}
 
-        for group_index, group in enumerate(groups):
-            for name in group:
-                self._add_ribbon_button(name, page_index_by_name[name])
-            if group_index < len(groups) - 1:
-                separator = QLabel("|")
-                separator.setObjectName("ribbonSeparator")
-                self.ribbon_layout.addWidget(separator)
+        ordered_names: list[str] = []
+        for group in groups:
+            ordered_names.extend(group)
 
-        self.ribbon_layout.addStretch(1)
+        for position, name in enumerate(ordered_names):
+            target_row = self.ribbon_rows[0 if position < 7 else 1]
+            self._add_ribbon_button(
+                ribbon_labels.get(name, name),
+                page_index_by_name[name],
+                target_row,
+            )
+
+        for row in self.ribbon_rows:
+            row.addStretch(1)
 
     def _add_page(self, name: str, widget: QWidget) -> None:
         self.pages.addWidget(widget)
         self.page_names.append(name)
 
-    def _add_ribbon_button(self, text: str, page_index: int) -> None:
+    def _add_ribbon_button(self, text: str, page_index: int, layout: QHBoxLayout) -> None:
         button = QPushButton(text)
         button.setProperty("navButton", True)
         button.setCheckable(True)
         self._adjust_nav_button_width(button)
         button.clicked.connect(lambda _checked=False, i=page_index: self._set_current_page(i))
         self.ribbon_buttons.addButton(button, page_index)
-        self.ribbon_layout.addWidget(button)
+        layout.addWidget(button)
 
     def _adjust_nav_button_width(self, button: QPushButton) -> None:
         text_width = button.fontMetrics().horizontalAdvance(button.text())
-        button.setMinimumWidth(text_width + 30)
+        button.setFixedWidth(text_width + 20)
 
     def _set_current_page(self, index: int) -> None:
         current_index = self.pages.currentIndex()

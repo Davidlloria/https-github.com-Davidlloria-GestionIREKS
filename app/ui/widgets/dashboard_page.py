@@ -806,6 +806,7 @@ class DashboardPage(QWidget):
         sales_dashboard_service: SalesDashboardService | None = None,
         warehouse_dashboard_service: WarehouseDashboardService | None = None,
         report_export_service: ReportExportService | None = None,
+        settings_page: QWidget | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -815,6 +816,7 @@ class DashboardPage(QWidget):
         self.sales_dashboard_service = sales_dashboard_service or SalesDashboardService()
         self.warehouse_dashboard_service = warehouse_dashboard_service or WarehouseDashboardService()
         self.report_export_service = report_export_service or ReportExportService()
+        self.settings_page = settings_page
         self.setObjectName('dashboardPageRoot')
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.agenda_calendar_selected_date = date.today()
@@ -842,7 +844,7 @@ class DashboardPage(QWidget):
         sidebar.setFixedWidth(184)
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(16, 22, 16, 18)
-        sidebar_layout.setSpacing(24)
+        sidebar_layout.setSpacing(14)
 
         brand = QLabel()
         brand.setObjectName('dashboardSidebarBrand')
@@ -866,7 +868,7 @@ class DashboardPage(QWidget):
         sidebar_layout.addWidget(pedidos_btn)
         self.dashboard_nav_buttons['pedidos'] = pedidos_btn
 
-        almacen_btn = QPushButton('Almacen')
+        almacen_btn = QPushButton('Almacén')
         almacen_btn.setObjectName('dashboardSidebarButton')
         almacen_btn.setMinimumHeight(58)
         almacen_btn.clicked.connect(lambda: self._set_dashboard_mode('almacen'))
@@ -886,6 +888,14 @@ class DashboardPage(QWidget):
         self._set_button_icon(objetivos_btn, 'goal.svg', '#475569', 20)
         objetivos_btn.clicked.connect(lambda: self._show_placeholder_dashboard('Objetivos'))
         sidebar_layout.addWidget(objetivos_btn)
+
+        if self.settings_page is not None:
+            settings_btn = QPushButton('Configuración')
+            settings_btn.setObjectName('dashboardSidebarButton')
+            settings_btn.setMinimumHeight(58)
+            settings_btn.clicked.connect(lambda: self._set_dashboard_mode('configuracion'))
+            sidebar_layout.addWidget(settings_btn)
+            self.dashboard_nav_buttons['configuracion'] = settings_btn
 
         sidebar_layout.addStretch(1)
 
@@ -964,6 +974,8 @@ class DashboardPage(QWidget):
         self.dashboard_stack.addWidget(self.orders_dashboard)
         self.dashboard_stack.addWidget(self.sales_dashboard)
         self.dashboard_stack.addWidget(self.warehouse_dashboard)
+        if self.settings_page is not None:
+            self.dashboard_stack.addWidget(self.settings_page)
         self.content_layout.addWidget(self.dashboard_stack, 1)
 
         self.footer_label = QLabel('')
@@ -1530,6 +1542,10 @@ class DashboardPage(QWidget):
             self._reload_warehouse_dashboard()
         elif self.current_dashboard == 'ventas':
             self._reload_sales_dashboard()
+        elif self.current_dashboard == 'configuracion':
+            refresh = getattr(self.settings_page, '_refresh_status', None)
+            if callable(refresh):
+                refresh()
         else:
             self._reload_agenda_dashboard()
     def _reload_agenda_dashboard(self) -> None:
@@ -1791,7 +1807,10 @@ class DashboardPage(QWidget):
             return
         self._open_full_agenda()
     def _set_dashboard_mode(self, mode: str, *, reload: bool = True) -> None:
-        clean_mode = mode if mode in {'agenda', 'pedidos', 'almacen', 'ventas'} else 'agenda'
+        valid_modes = {'agenda', 'pedidos', 'almacen', 'ventas'}
+        if self.settings_page is not None:
+            valid_modes.add('configuracion')
+        clean_mode = mode if mode in valid_modes else 'agenda'
         self.current_dashboard = clean_mode
         for key, button in self.dashboard_nav_buttons.items():
             active = key == clean_mode
@@ -1802,6 +1821,8 @@ class DashboardPage(QWidget):
                 icon_name = 'shopping-cart.svg'
             elif key == 'almacen':
                 icon_name = 'warehouse.svg'
+            elif key == 'configuracion':
+                icon_name = 'settings.svg'
             else:
                 icon_name = 'bar-chart-3.svg'
             self._set_button_icon(button, icon_name, '#FFFFFF' if active else '#475569', 20)
@@ -1814,6 +1835,8 @@ class DashboardPage(QWidget):
             current_widget = self.orders_dashboard
         elif clean_mode == 'almacen':
             current_widget = self.warehouse_dashboard
+        elif clean_mode == 'configuracion':
+            current_widget = self.settings_page
         else:
             current_widget = self.sales_dashboard
         self.dashboard_stack.setCurrentWidget(current_widget)
@@ -1821,6 +1844,10 @@ class DashboardPage(QWidget):
         if reload:
             self.reload()
     def _refresh_header_for_mode(self) -> None:
+        is_configuration = self.current_dashboard == 'configuracion'
+        self.new_activity_btn.setVisible(not is_configuration)
+        self.full_agenda_btn.setVisible(not is_configuration)
+        self.footer_label.setVisible(not is_configuration)
         if self.current_dashboard == 'pedidos':
             self.title_label.setText('Pedidos')
             self.date_label.setText(str(date.today().year))
@@ -1829,9 +1856,9 @@ class DashboardPage(QWidget):
             self._set_button_icon(self.new_activity_btn, 'shopping-cart.svg', '#FFFFFF', 18)
             self._set_button_icon(self.full_agenda_btn, 'clipboard-list.svg', '#2563EB', 18)
         elif self.current_dashboard == 'almacen':
-            self.title_label.setText('Almacen')
+            self.title_label.setText('Almacén')
             self.date_label.setText(self._month_caption(date.today()))
-            self.new_activity_btn.setText('Ver almacen')
+            self.new_activity_btn.setText('Ver almacén')
             self.full_agenda_btn.setText('Actualizar')
             self._set_button_icon(self.new_activity_btn, 'warehouse.svg', '#FFFFFF', 18)
             self._set_button_icon(self.full_agenda_btn, 'package-search.svg', '#2563EB', 18)
@@ -1842,6 +1869,9 @@ class DashboardPage(QWidget):
             self.full_agenda_btn.setText('Actualizar')
             self._set_button_icon(self.new_activity_btn, 'bar-chart-3.svg', '#FFFFFF', 18)
             self._set_button_icon(self.full_agenda_btn, 'clipboard-list.svg', '#2563EB', 18)
+        elif self.current_dashboard == 'configuracion':
+            self.title_label.setText('Configuración')
+            self.date_label.setText('Servicios y preferencias de la aplicación')
         else:
             self.title_label.setText('Agenda')
             self.date_label.setText(self.format_date(date.today(), long=True))
@@ -2085,7 +2115,7 @@ class DashboardPage(QWidget):
         if isinstance(page_names, list) and callable(setter) and 'Pedidos' in page_names:
             setter(page_names.index('Pedidos'))
             return
-        QMessageBox.information(self, 'Pedidos', 'La vista completa de pedidos no est? disponible desde este contexto.')
+        QMessageBox.information(self, 'Pedidos', 'La vista completa de pedidos no está disponible desde este contexto.')
 
     def _open_order_from_dashboard(self, pedido_id: str) -> None:
         clean_pedido_id = str(pedido_id or '').strip()
@@ -2096,7 +2126,7 @@ class DashboardPage(QWidget):
         pages = getattr(window, 'pages', None)
         setter = getattr(window, '_set_current_page', None)
         if not (isinstance(page_names, list) and callable(setter) and 'Pedidos' in page_names):
-            QMessageBox.information(self, 'Pedidos', 'La vista completa de pedidos no est? disponible desde este contexto.')
+            QMessageBox.information(self, 'Pedidos', 'La vista completa de pedidos no está disponible desde este contexto.')
             return
 
         page_index = page_names.index('Pedidos')

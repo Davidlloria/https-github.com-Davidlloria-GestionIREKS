@@ -32,17 +32,17 @@ class OrdersMailSettingsView:
     historico_placeholder: str = r"E:\...\pedidos_historico"
     selector_button_label: str = "Examinar"
     save_button_label: str = "Guardar"
-    info_label: str = "Estos parametros se guardan en data/api_config.json."
+    info_label: str = "Estos parámetros se guardan en data/api_config.json."
 
 
 @dataclass(frozen=True)
 class SettingsProviderView:
-    fdc_title: str = "Configuracion API FoodData Central"
-    fatsecret_title: str = "Configuracion API FatSecret"
-    openai_title: str = "Configuracion API OpenAI"
+    fdc_title: str = "Configuración API FoodData Central"
+    fatsecret_title: str = "Configuración API FatSecret"
+    openai_title: str = "Configuración API OpenAI"
     secret_info_label: str = "Las claves se guardan en data/api_config.json (secretos cifrados)"
     save_button_label: str = "Guardar"
-    test_button_label: str = "Probar conexion"
+    test_button_label: str = "Probar conexión"
     fdc_placeholder: str = "Introduce API key de USDA/Data.gov"
     fdc_api_key_label: str = "API key"
     fdc_data_type_label: str = "Tipo de datos"
@@ -55,7 +55,7 @@ class SettingsProviderView:
     fatsecret_scope_label: str = "Scope"
     openai_placeholder: str = "OPENAI_API_KEY"
     openai_api_key_label: str = "API key"
-    openai_ai_translation_label: str = "Usar traduccion IA (ES->EN) en busquedas FDC"
+    openai_ai_translation_label: str = "Usar traducción IA (ES→EN) en búsquedas FDC"
     local_ai_title: str = "Configuración IA local"
     local_ai_enabled_label: str = "Usar IA local en asistentes y búsqueda documental"
     local_ai_base_url_label: str = "URL local"
@@ -121,7 +121,7 @@ class SettingsProviderService:
     def load_orders_mail_view(self) -> OrdersMailSettingsView:
         data = self.load_orders_mail()
         return OrdersMailSettingsView(
-            title="Configuracion envio pedidos por Outlook",
+            title="Configuración de envío de pedidos por Outlook",
             destino_email=str(data.get("destino_email") or ""),
             historico_dir=str(data.get("historico_dir") or ""),
         )
@@ -131,31 +131,31 @@ class SettingsProviderService:
 
     def save_fdc(self, api_key: str, data_type: str) -> SettingsProviderResult:
         path = self.fdc_settings.save(api_key, data_type=data_type)
-        return SettingsProviderResult(ok=True, message="Configuracion de FoodData Central guardada.", path=path)
+        return SettingsProviderResult(ok=True, message="Configuración de FoodData Central guardada.", path=path)
 
     def test_fdc(self, api_key: str, data_type: str) -> SettingsProviderResult:
         self.fdc_settings.save(api_key, data_type=data_type)
         service = self.fdc_nutrition_factory(api_key=api_key)
         result = service.fetch_for_query("olive oil")
         if result.ok:
-            return SettingsProviderResult(ok=True, message="Conexion OK y respuesta valida.")
-        return SettingsProviderResult(ok=False, message=str(result.message or "No se obtuvo respuesta valida."))
+            return SettingsProviderResult(ok=True, message="Conexión OK y respuesta válida.")
+        return SettingsProviderResult(ok=False, message=str(result.message or "No se obtuvo respuesta válida."))
 
     def save_fatsecret(self, client_id: str, client_secret: str, scope: str) -> SettingsProviderResult:
         path = self.fatsecret_settings.save(client_id, client_secret, scope=scope)
-        return SettingsProviderResult(ok=True, message="Configuracion de FatSecret guardada.", path=path)
+        return SettingsProviderResult(ok=True, message="Configuración de FatSecret guardada.", path=path)
 
     def test_fatsecret(self, client_id: str, client_secret: str, scope: str) -> SettingsProviderResult:
         self.fatsecret_settings.save(client_id, client_secret, scope=scope)
         client = self.fatsecret_client_factory(client_id=client_id, client_secret=client_secret, scope=scope)
         rows = client.search_food("olive oil", page=0, max_results=1, region="ES")
         if isinstance(rows, list):
-            return SettingsProviderResult(ok=True, message="Conexion OK y respuesta valida.")
-        return SettingsProviderResult(ok=True, message="Conexion OK.")
+            return SettingsProviderResult(ok=True, message="Conexión OK y respuesta válida.")
+        return SettingsProviderResult(ok=True, message="Conexión OK.")
 
     def save_openai(self, api_key: str, use_ai_translation: bool) -> SettingsProviderResult:
         path = self.openai_settings.save(api_key=api_key, use_ai_translation=use_ai_translation)
-        return SettingsProviderResult(ok=True, message="Configuracion de OpenAI guardada.", path=path)
+        return SettingsProviderResult(ok=True, message="Configuración de OpenAI guardada.", path=path)
 
     def save_local_ai(
         self,
@@ -194,8 +194,8 @@ class SettingsProviderService:
         service = self.openai_translation_factory(api_key=api_key)
         result = service.translate_es_to_en("aceite de oliva")
         if result.ok:
-            return SettingsProviderResult(ok=True, message="Conexion OK y respuesta valida.")
-        return SettingsProviderResult(ok=False, message=str(result.message or "No se obtuvo respuesta valida."))
+            return SettingsProviderResult(ok=True, message="Conexión OK y respuesta válida.")
+        return SettingsProviderResult(ok=False, message=str(result.message or "No se obtuvo respuesta válida."))
 
     def test_local_ai(self, *, base_url: str, model: str) -> SettingsProviderResult:
         service = self.local_ai_factory(enabled=True, base_url=base_url, model=model)
@@ -236,4 +236,4 @@ class SettingsProviderService:
         if historico:
             Path(historico).mkdir(parents=True, exist_ok=True)
         path = self.orders_mail_settings.save(destino_email=destino, historico_dir=historico)
-        return SettingsProviderResult(ok=True, message="Configuracion de pedidos Outlook guardada.", path=path)
+        return SettingsProviderResult(ok=True, message="Configuración de pedidos de Outlook guardada.", path=path)

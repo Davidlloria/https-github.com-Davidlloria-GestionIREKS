@@ -51,7 +51,7 @@ def test_build_status_view_and_outcomes(tmp_path: Path) -> None:
 
     status = service.build_status_view()
     assert "DB activa: data/gestion_ireks.db" == status.db_path_label
-    assert "Tamano: 2.00 MB" == status.db_size_label
+    assert "Tamaño: 2.00 MB" == status.db_size_label
     assert "clientes=2" in status.db_rows_label
     assert "Contactos sin cliente vinculado: 1" == status.orphans_label
     assert "DB legacy detectada: no" in status.legacy_label
@@ -69,7 +69,7 @@ def test_build_status_view_and_outcomes(tmp_path: Path) -> None:
 
     optimize = service.optimize_database()
     assert optimize.ok is True
-    assert "Optimizacion completada" in optimize.message
+    assert "Optimización completada" in optimize.message
 
     create = service.create_missing_clients()
     assert create.ok is True

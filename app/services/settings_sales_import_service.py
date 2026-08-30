@@ -11,7 +11,7 @@ from app.services.settings_import_service import SettingsImportService
 
 @dataclass(frozen=True)
 class SettingsSalesImportView:
-    section_info_label: str = "Importacion de ventas IREKS (JSON)"
+    section_info_label: str = "Importación de ventas IREKS (JSON)"
     ireks_json_title: str = "Seleccionar JSON IREKS"
     ireks_json_filter: str = "JSON (*.json)"
     import_button_label: str = "Importar IREKS"
@@ -48,8 +48,8 @@ class SettingsSalesImportService:
             incidencias_label="Filas omitidas",
         )
         return self._build_outcome(
-            title="Importacion ventas IREKS",
-            log_prefix="Importacion IREKS",
+            title="Importación de ventas IREKS",
+            log_prefix="Importación IREKS",
             ok=bool(getattr(result, "ok", False)),
             text=text,
             imported=imported,
@@ -65,8 +65,8 @@ class SettingsSalesImportService:
             incidencias_label="Filas omitidas",
         )
         return self._build_outcome(
-            title="Importacion ventas IGSA",
-            log_prefix="Importacion IGSA",
+            title="Importación de ventas IGSA",
+            log_prefix="Importación IGSA",
             ok=bool(getattr(result, "ok", False)),
             text=text,
             imported=imported,
@@ -83,8 +83,8 @@ class SettingsSalesImportService:
             incidencias_label="Filas omitidas",
         )
         return self._build_outcome(
-            title="Importacion PDF IGSA",
-            log_prefix="Importacion PDF IGSA",
+            title="Importación PDF IGSA",
+            log_prefix="Importación PDF IGSA",
             ok=bool(getattr(result, "ok", False)),
             text=text,
             imported=imported,
@@ -110,8 +110,8 @@ class SettingsSalesImportService:
             incidencias_label="Filas omitidas",
         )
         return self._build_outcome(
-            title="Importacion IGSA libro",
-            log_prefix="Importacion IGSA libro",
+            title="Importación de libro IGSA",
+            log_prefix="Importación de libro IGSA",
             ok=bool(getattr(result, "ok", False)),
             text=text,
             imported=imported,
@@ -121,7 +121,7 @@ class SettingsSalesImportService:
     def rebuild_igsa_warehouse_movements(self, periodo: str) -> SettingsSalesImportOutcome:
         clean_periodo = str(periodo or "").strip()
         if clean_periodo and not re.fullmatch(r"\d{4}-\d{2}", clean_periodo):
-            raise ValueError("El periodo debe tener formato AAAA-MM.")
+            raise ValueError("El período debe tener formato AAAA-MM.")
         result = self.sales_service.rebuild_igsa_warehouse_movements(clean_periodo)
         text, imported, incidencias = self._build_message(
             result=result,
@@ -143,7 +143,7 @@ class SettingsSalesImportService:
             raise ValueError("El archivo seleccionado no existe.")
         if clean_source.suffix.lower() not in allowed_suffixes:
             allowed = ", ".join(sorted(allowed_suffixes))
-            raise ValueError(f"El archivo seleccionado debe tener extension {allowed}.")
+            raise ValueError(f"El archivo seleccionado debe tener extensión {allowed}.")
         return clean_source
 
     def _validate_lines(self, lines: list[object]) -> list[object]:
@@ -155,7 +155,7 @@ class SettingsSalesImportService:
     def _resolve_igsa_cliente_id(self) -> str:
         clean_cliente_id = str(self.settings_import_service.resolve_igsa_cliente_id() or "").strip()
         if not clean_cliente_id:
-            raise ValueError("No se encontro el cliente/distribuidor IGSA.")
+            raise ValueError("No se encontró el cliente/distribuidor IGSA.")
         return clean_cliente_id
 
     def _build_message(

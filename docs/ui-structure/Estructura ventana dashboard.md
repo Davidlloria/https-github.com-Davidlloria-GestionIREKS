@@ -15,8 +15,10 @@ Dashboard
 │   │   └── Alta y edición de actividades
 │   ├── DashboardAgendaPdfPreviewDialog
 │   │   └── Vista completa en tarjetas, guardado y cancelación del PDF de Agenda
-│   └── DashboardAgendaOverviewDialog
-│       └── Listado completo de la agenda
+│   ├── DashboardAgendaOverviewDialog
+│   │   └── Listado completo de la agenda
+│   └── SettingsPage
+│       └── Configuración completa integrada como modo de Inicio
 └── Servicios
     ├── app/services/customer_dashboard_service.py
     ├── app/services/customer_service.py
@@ -35,9 +37,10 @@ DashboardPage (QWidget, dashboardPageRoot)
     │   ├── dashboardSidebarBrand (QLabel, logo IREKS)
     │   ├── Agenda (dashboardSidebarButton)
     │   ├── Pedidos (dashboardSidebarButton)
-    │   ├── Almacen (dashboardSidebarButton)
+    │   ├── Almacén (dashboardSidebarButton)
     │   ├── Ventas (dashboardSidebarButton)
     │   ├── Objetivos (dashboardSidebarButton, placeholder)
+    │   ├── Configuración (dashboardSidebarButton)
     │   └── stretch
     └── dashboardContentHost (QWidget)
         └── dashboardContent (QWidget)
@@ -54,7 +57,8 @@ DashboardPage (QWidget, dashboardPageRoot)
             │   ├── dashboardAgendaView
             │   ├── dashboardOrdersView
             │   ├── dashboardSalesView
-            │   └── dashboardWarehouseView
+            │   ├── dashboardWarehouseView
+            │   └── SettingsPage integrado (todas las pestañas y servicios de configuración)
             └── dashboardFooterLabel
 ```
 
@@ -73,7 +77,7 @@ dashboardPageRoot
 │   ├── ancho fijo: 184 px
 │   ├── layout: QVBoxLayout
 │   ├── márgenes: 16 / 22 / 16 / 18 px
-│   ├── separación: 24 px
+│   ├── separación: 14 px
 │   ├── fondo: #F8FAFC
 │   ├── borde derecho: #E2E8F0
 │   ├── logo IREKS: 144 px de ancho
@@ -81,15 +85,17 @@ dashboardPageRoot
 ├── Orden de navegación
 │   ├── Agenda
 │   ├── Pedidos
-│   ├── Almacen
+│   ├── Almacén
 │   ├── Ventas
-│   └── Objetivos
+│   ├── Objetivos
+│   └── Configuración
 ├── Iconos laterales
 │   ├── Agenda: calendar-days.svg
 │   ├── Pedidos: shopping-cart.svg
-│   ├── Almacen: warehouse.svg
+│   ├── Almacén: warehouse.svg
 │   ├── Ventas: bar-chart-3.svg
-│   └── Objetivos: goal.svg
+│   ├── Objetivos: goal.svg
+│   └── Configuración: settings.svg
 ├── Estado activo
 │   ├── fondo: #2563EB
 │   └── texto e icono: blanco
@@ -601,6 +607,10 @@ Flujo del Dashboard
 │   ├── KPI de stock
 │   ├── riesgos
 │   └── movimientos mensuales
+├── SettingsPage
+│   ├── se integra dentro de Inicio, sin página independiente en el ribbon superior
+│   ├── conserva Exportación BD, Importación BD, Mantenimiento BD, API, Correo y Auxiliares
+│   └── refresca el estado de mantenimiento al activar el modo Configuración
 ├── dashboardFooterLabel
 │   └── hora de generación y contexto del snapshot
 └── Plataforma
@@ -617,7 +627,8 @@ Estado del Dashboard
 │   ├── Agenda
 │   ├── Pedidos
 │   ├── Ventas
-│   └── Almacen
+│   ├── Almacén
+│   └── Configuración
 ├── Modo pendiente
 │   └── Objetivos
 │       ├── no existe en dashboardContentStack
@@ -628,4 +639,15 @@ Estado del Dashboard
 └── Mutaciones
     ├── vistas agregadas: consulta
     └── diálogos de agenda: alta, edición y borrado
+```
+
+## Navegación general superior
+
+```text
+Ribbon principal
+├── distribuye los catorce accesos en dos filas equilibradas, sin scroll horizontal
+├── no incluye Configuración; su acceso está dentro de Inicio
+├── usa la etiqueta Productos para la página interna Productos IREKS
+├── corrige las etiquetas Técnicos, Fórmulas y Almacén
+└── sitúa Documentos como último botón
 ```
