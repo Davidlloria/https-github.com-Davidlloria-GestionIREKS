@@ -129,8 +129,13 @@ class TechnicalProductDecisionService:
         clean_query = str(query or "").strip()
         if not clean_query or limit <= 0:
             return TechnicalProductDecisionOutcome()
-        comparison = self.comparison_service.compare(clean_query, limit=limit)
         requirements = self.detect_requirements(clean_query)
+        if not requirements:
+            return TechnicalProductDecisionOutcome(
+                query=clean_query,
+                message=self._outcome_message((), ()),
+            )
+        comparison = self.comparison_service.compare(clean_query, limit=limit)
         decisions = tuple(
             self._classify(profile, requirements)
             for profile in comparison.profiles

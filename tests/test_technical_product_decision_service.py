@@ -178,14 +178,17 @@ def test_missing_application_is_insufficient_evidence_not_rejection() -> None:
 
 def test_unknown_requirement_requests_more_detail_without_recommending() -> None:
     profile = _profile("PRODUCTO", "Mejorante para pan especial")
-    service = TechnicalProductDecisionService(_FakeComparison([profile]))
+    comparison = _FakeComparison([profile])
+    service = TechnicalProductDecisionService(comparison)
 
     outcome = service.decide("Quiero mejorar mi producto")
 
     assert outcome.requirements == ()
-    assert outcome.decisions[0].status == "insufficient_evidence"
+    assert outcome.decisions == ()
     assert outcome.recommended == ()
     assert "Concreta el proceso" in outcome.message
+    assert outcome.mode == "none"
+    assert comparison.calls == []
 
 
 def test_detection_is_accent_insensitive_and_supports_controlled_terms() -> None:

@@ -107,12 +107,25 @@ entire migration history first.
 - Validation for the PySide6 consultant cut: 45 focused UI/service tests, 334
   document/AI/technical/architecture tests and the complete 836-test Python suite
   passed; the complete suite reported the 151 known non-blocking warnings.
-- Known limitation: the dialog does not retain conversational context. An ambiguous
-  consultation still performs retrieval before returning clarification questions,
-  so that safe response can take several seconds on the real local index.
-- Next recommendation: add a deterministic fast clarification step and a small
-  in-dialog consultation context so the user's answers complete the original need
-  without requiring it to be rewritten.
+- Fast clarification/context cut: requirement detection now happens before product
+  comparison. Queries without a recognized process return clarification directly,
+  with no lexical search, embedding call, Qwen generation or product candidates.
+- The consultant dialog retains the initial question and any clarification answers
+  only for the active consultation. It displays that context, changes the action to
+  `Continuar consulta`, composes the technical need deterministically and discards
+  the temporary context after a final answer or an explicit clear action.
+- Real PySide6 smoke: `Quiero mejorar mi pan` returned three clarification
+  questions in 0.031 seconds, retained the initial question and reported
+  `Sin recuperación`; the previous integrated smoke required about 20 seconds.
+- Validation for the clarification/context cut: 29 focused tests, 336
+  document/AI/technical/architecture tests and the complete 838-test Python suite
+  passed; the complete suite reported the 151 known non-blocking warnings.
+- Known limitation: temporary context is limited to completing clarification; the
+  consultant does not yet support free-form follow-up questions about a completed
+  recommendation. Requirement coverage also remains intentionally narrow.
+- Next recommendation: add a reproducible bakery consultation evaluation set and
+  use it to expand the controlled requirement vocabulary without weakening the
+  evidence and citation rules.
 
 ## Historical Snapshot — 2026-06-21
 

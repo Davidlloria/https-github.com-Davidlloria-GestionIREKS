@@ -73,6 +73,8 @@ class TechnicalConsultantDialog(QDialog):
         super().__init__(parent)
         self._consultant_service = consultant_service
         self._worker: TechnicalConsultantWorker | None = None
+        self._consultation_parts: list[str] = []
+        self._submitted_parts: tuple[str, ...] = ()
         self.setWindowTitle("Consultor técnico de panadería")
         self.setObjectName("technicalConsultantDialog")
         self.setModal(True)
@@ -95,6 +97,12 @@ class TechnicalConsultantDialog(QDialog):
         description.setObjectName("technicalConsultantDescription")
         description.setWordWrap(True)
         layout.addWidget(description)
+
+        self.context_label = QLabel("")
+        self.context_label.setObjectName("technicalConsultantContext")
+        self.context_label.setWordWrap(True)
+        self.context_label.setVisible(False)
+        layout.addWidget(self.context_label)
 
         self.question_input = QPlainTextEdit()
         self.question_input.setObjectName("technicalConsultantQuestion")
@@ -245,6 +253,15 @@ class TechnicalConsultantDialog(QDialog):
                 f"{MAX_TECHNICAL_QUESTION_CHARS} caracteres."
             )
             return
+        submitted_parts = (*self._consultation_parts, question)
+        composed_question = self._compose_question(submitted_parts)
+        if len(composed_question) > MAX_TECHNICAL_QUESTION_CHARS:
+            self.status_label.setText(
+                "La consulta acumulada no puede superar "
+                f"{MAX_TECHNICAL_QUESTION_CHARS} caracteres."
+            )
+            return
+        self._submitted_parts = submitted_parts
         self._clear_result()
         self._set_querying(True)
         self.status_label.setText(
@@ -252,7 +269,7 @@ class TechnicalConsultantDialog(QDialog):
         )
         worker = TechnicalConsultantWorker(
             self._consultant_service,
-            question,
+            composed_question,
             self,
         )
         self._worker = worker
@@ -289,12 +306,15 @@ class TechnicalConsultantDialog(QDialog):
         self._render_products(result)
         self._render_sources(result)
         if result.needs_clarification:
+            self._continue_consultation()
             self.ai_indicator_label.setText("Pendiente de aclaración")
             self.ai_indicator_label.setProperty("status", "neutral")
         elif result.used_ai:
+            self._finish_consultation_context()
             self.ai_indicator_label.setText("IA local · datos verificados")
             self.ai_indicator_label.setProperty("status", "ready")
         else:
+            self._finish_consultation_context()
             self.ai_indicator_label.setText("Respuesta determinista")
             self.ai_indicator_label.setProperty("status", "neutral")
         status = f"{result.message} · {mode_label}"
@@ -309,6 +329,43 @@ class TechnicalConsultantDialog(QDialog):
         visible = bool(result.clarification_questions)
         self.clarification_title.setVisible(visible)
         self.clarification_list.setVisible(visible)
+
+    def _continue_consultation(self) -> None:
+        self._consultation_parts = list(self._submitted_parts)
+        if not self._consultation_parts:
+            return
+        original = self._consultation_parts[0]
+        additions = max(0, len(self._consultation_parts) - 1)
+        suffix = (
+            f" · {additions} aclaración aportada"
+            if additions == 1
+            else f" · {additions} aclaraciones aportadas"
+            if additions > 1
+            else ""
+        )
+        self.context_label.setText(f"Consulta inicial: {original}{suffix}")
+        self.context_label.setVisible(True)
+        self.question_input.clear()
+        self.question_input.setPlaceholderText(
+            "Responde aquí a las preguntas de aclaración..."
+        )
+        self.ask_button.setText("Continuar consulta")
+
+    def _finish_consultation_context(self) -> None:
+        self._consultation_parts.clear()
+        self._submitted_parts = ()
+        self.context_label.clear()
+        self.context_label.setVisible(False)
+        self.question_input.setPlaceholderText(
+            "Ejemplo: necesito un producto para elaborar pan precocinado y después congelado."
+        )
+        self.ask_button.setText("Consultar")
+
+    @staticmethod
+    def _compose_question(parts: tuple[str, ...]) -> str:
+        if not parts:
+            return ""
+        return "\nInformación adicional: ".join(parts)
 
     def _render_products(self, result: TechnicalConsultantResult) -> None:
         self.products_table.setRowCount(len(result.products))
@@ -373,6 +430,7 @@ class TechnicalConsultantDialog(QDialog):
 
     def _clear(self) -> None:
         self.question_input.clear()
+        self._finish_consultation_context()
         self._clear_result()
         self.status_label.setText("Escribe una necesidad técnica para comenzar.")
 

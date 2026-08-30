@@ -193,6 +193,56 @@ def test_clarification_result_is_separate_from_answer_and_uses_no_ai() -> None:
     assert dialog.ai_indicator_label.text() == "Pendiente de aclaración"
 
 
+def test_clarification_answer_completes_original_question_without_rewriting() -> None:
+    clarification = TechnicalConsultantResult(
+        ok=True,
+        answer="Faltan requisitos técnicos reconocibles.",
+        message="Se necesita información adicional antes de recomendar productos.",
+        needs_clarification=True,
+        clarification_questions=("¿Qué proceso debe soportar?",),
+    )
+    dialog, service = _dialog(clarification)
+    dialog.question_input.setPlainText("Quiero mejorar mi pan")
+
+    dialog.ask_button.click()
+    _wait_until(lambda: dialog._worker is None)
+
+    assert dialog.context_label.isVisibleTo(dialog)
+    assert "Quiero mejorar mi pan" in dialog.context_label.text()
+    assert dialog.question_input.toPlainText() == ""
+    assert dialog.ask_button.text() == "Continuar consulta"
+
+    service.result = _technical_result()
+    dialog.question_input.setPlainText("Debe ser precocido y después congelado")
+    dialog.ask_button.click()
+    _wait_until(lambda: dialog._worker is None)
+
+    assert service.calls == [
+        "Quiero mejorar mi pan",
+        (
+            "Quiero mejorar mi pan\nInformación adicional: "
+            "Debe ser precocido y después congelado"
+        ),
+    ]
+    assert not dialog.context_label.isVisibleTo(dialog)
+    assert dialog.ask_button.text() == "Consultar"
+    assert dialog.products_table.item(0, 1).text() == "PREBACK"
+
+
+def test_clear_discards_pending_consultation_context() -> None:
+    dialog, _service = _dialog()
+    dialog._consultation_parts = ["Consulta inicial"]
+    dialog.context_label.setText("Consulta inicial: Consulta inicial")
+    dialog.context_label.setVisible(True)
+    dialog.ask_button.setText("Continuar consulta")
+
+    dialog.clear_button.click()
+
+    assert dialog._consultation_parts == []
+    assert not dialog.context_label.isVisibleTo(dialog)
+    assert dialog.ask_button.text() == "Consultar"
+
+
 def test_source_selection_emits_identifier_and_page_only() -> None:
     dialog, _service = _dialog()
     emitted: list[tuple[str, int]] = []
