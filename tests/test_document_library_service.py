@@ -32,12 +32,12 @@ def _service(
 
 def test_default_configuration_uses_portable_sibling_and_separate_database() -> None:
     if not config._DOCUMENTS_DIR_ENV:
-        assert config.DOCUMENTS_DIR == config.BASE_DIR.parent / "IREKS-Servidor"
+        assert config.DOCUMENTS_DIR == config.BASE_DIR.parent / "Documentos"
     assert config.DOCUMENT_LIBRARY_DB_PATH == config.DATA_DIR / "document_library.sqlite"
 
 
 def test_first_catalog_records_supported_metadata_recursively(tmp_path: Path) -> None:
-    library = tmp_path / "IREKS-Servidor"
+    library = tmp_path / "Documentos"
     database = tmp_path / "data" / "document_library.sqlite"
     paths = [
         "Calidad/Fichas/ficha.PDF",

@@ -310,17 +310,26 @@ def test_status_model_change_is_incompatible(tmp_path: Path) -> None:
 
 
 def test_status_excludes_inactive_documents(tmp_path: Path) -> None:
-    library, _, catalog, _, _, semantic = _prepare(
+    library, database, catalog, content, _, semantic = _prepare(
         tmp_path, {"Notas/a.md": "texto"}
     )
     semantic.update_index()
     (library / "Notas/a.md").unlink()
     catalog.refresh_catalog()
+    content.update_index()
+    semantic.update_index()
 
     status = semantic.get_status()
 
     assert status.indexed_documents == status.available_chunks == 0
     assert not status.available
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM document_semantic_status"
+        ).fetchone()[0] == 0
+        assert connection.execute(
+            "SELECT COUNT(*) FROM document_semantic_chunks"
+        ).fetchone()[0] == 0
 
 
 def test_status_handles_database_not_initialized_without_creating_it(tmp_path: Path) -> None:

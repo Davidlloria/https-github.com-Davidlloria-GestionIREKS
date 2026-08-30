@@ -199,8 +199,8 @@ def test_invalid_markdown_encoding_is_failed(tmp_path: Path) -> None:
     assert _status(database, document.document_id)["status"] == "failed"
 
 
-def test_inactive_document_is_excluded_from_search(tmp_path: Path) -> None:
-    library, _, catalog, content = _build_services(tmp_path)
+def test_inactive_document_is_excluded_and_purged_from_index(tmp_path: Path) -> None:
+    library, database, catalog, content = _build_services(tmp_path)
     path = _write_markdown(library / "Notas/retirado.md", "termino retirado")
     catalog.refresh_catalog()
     content.update_index()
@@ -208,8 +208,16 @@ def test_inactive_document_is_excluded_from_search(tmp_path: Path) -> None:
 
     path.unlink()
     catalog.refresh_catalog()
+    content.update_index()
 
     assert content.search("retirado") == []
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM document_content_status"
+        ).fetchone()[0] == 0
+        assert connection.execute(
+            "SELECT COUNT(*) FROM document_pages_fts"
+        ).fetchone()[0] == 0
 
 
 def test_unavailable_library_preserves_existing_index(tmp_path: Path) -> None:

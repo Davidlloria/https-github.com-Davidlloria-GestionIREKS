@@ -9,7 +9,7 @@ _DOCUMENTS_DIR_ENV = os.environ.get("GESTION_IREKS_DOCUMENTS_DIR")
 DOCUMENTS_DIR = (
     Path(_DOCUMENTS_DIR_ENV)
     if _DOCUMENTS_DIR_ENV
-    else BASE_DIR.parent / "IREKS-Servidor"
+    else BASE_DIR.parent / "Documentos"
 )
 LEGACY_DB_PATH = DATA_DIR / "gestion_formulas.db"
 DB_PATH = DATA_DIR / "gestion_ireks.db"

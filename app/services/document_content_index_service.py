@@ -108,6 +108,7 @@ class DocumentContentIndexService:
             )
 
         self._initialize_schema()
+        self._prune_inactive_documents()
         candidates = self._load_candidates()
         existing_versions = self._load_existing_versions()
         indexed = unchanged = no_text = failed = cancelled = 0
@@ -349,6 +350,22 @@ class DocumentContentIndexService:
             )
             for row in rows
         ]
+
+    def _prune_inactive_documents(self) -> None:
+        with closing(sqlite3.connect(self.database_path)) as connection:
+            with connection:
+                connection.execute(
+                    """DELETE FROM document_pages_fts
+                       WHERE document_id IN (
+                           SELECT document_id FROM documents WHERE active = 0
+                       )"""
+                )
+                connection.execute(
+                    """DELETE FROM document_content_status
+                       WHERE document_id IN (
+                           SELECT document_id FROM documents WHERE active = 0
+                       )"""
+                )
 
     def _load_existing_versions(self) -> dict[str, int]:
         with closing(sqlite3.connect(self.database_path)) as connection:

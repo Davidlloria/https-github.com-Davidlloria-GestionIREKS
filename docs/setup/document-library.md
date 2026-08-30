@@ -7,7 +7,7 @@ documentos originales no se copian a la base de datos ni se modifican. Los
 catálogos e índices son datos derivados que pueden reconstruirse.
 
 ```text
-IREKS-Servidor
+Documentos
     ↓
 Catálogo SQLite local
     ↓
@@ -25,12 +25,12 @@ La extracción, la indexación y las consultas a la IA se ejecutan localmente.
 ## 2. Ubicación
 
 La variable `GESTION_IREKS_DOCUMENTS_DIR` tiene prioridad. Si no se define, la
-aplicación busca `IREKS-Servidor` como carpeta hermana del repositorio.
+aplicación busca `Documentos` como carpeta hermana del repositorio.
 
 Ejemplo genérico para una sesión de PowerShell:
 
 ```powershell
-$env:GESTION_IREKS_DOCUMENTS_DIR = "C:\ruta\IREKS-Servidor"
+$env:GESTION_IREKS_DOCUMENTS_DIR = "C:\ruta\Documentos"
 python run.py
 ```
 
@@ -136,6 +136,8 @@ necesario actualizar el índice semántico cuando cambie el modelo de embeddings
 La cancelación es cooperativa: no fuerza la terminación del hilo, conserva los
 documentos ya completados y permite continuar posteriormente. Los índices son
 incrementales, por lo que una segunda ejecución omite documentos sin cambios.
+Al actualizar los índices se purgan el texto, los estados y los vectores
+derivados de documentos que el catálogo haya marcado como inactivos.
 
 ## 11. Solución de problemas
 
@@ -185,3 +187,10 @@ La suite documental y de arquitectura terminó con 198 tests correctos. La suite
 Python completa terminó con 785 tests correctos y 151 warnings conocidos no
 bloqueantes. El MVP documental queda operativo; la selección y comparación de
 productos como consultor técnico especializado pertenece a una fase posterior.
+
+Tras la reorganización de la biblioteca en la carpeta `Documentos`, se retiraron
+178 registros del catálogo activo y se actualizaron los tres niveles derivados.
+El estado operativo resultante contiene 2.409 PDF activos: 2.408 con contenido
+indexado y uno sin texto extraíble. El índice FTS5 contiene 6.270 páginas y el
+índice semántico 2.408 documentos con 8.571 fragmentos de `embeddinggemma`.
+No permanecen páginas, estados ni vectores asociados a documentos inactivos.

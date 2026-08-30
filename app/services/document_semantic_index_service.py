@@ -271,6 +271,7 @@ class DocumentSemanticIndexService:
                 errors=("La biblioteca documental no está disponible.",)
             )
         self._initialize_schema()
+        self._prune_inactive_documents()
         candidates = self._load_candidates()
         statuses = self._load_statuses()
         indexed = unchanged = failed = chunks_generated = processed = 0
@@ -432,6 +433,21 @@ class DocumentSemanticIndexService:
                    ORDER BY d.relative_path COLLATE NOCASE, d.document_id"""
             ).fetchall()
         return [_Candidate(str(row[0]), int(row[1])) for row in rows]
+
+    def _prune_inactive_documents(self) -> None:
+        with closing(sqlite3.connect(self.database_path)) as connection, connection:
+            connection.execute(
+                """DELETE FROM document_semantic_chunks
+                   WHERE document_id IN (
+                       SELECT document_id FROM documents WHERE active = 0
+                   )"""
+            )
+            connection.execute(
+                """DELETE FROM document_semantic_status
+                   WHERE document_id IN (
+                       SELECT document_id FROM documents WHERE active = 0
+                   )"""
+            )
 
     def _load_statuses(self) -> dict[str, tuple[int, str, str]]:
         with closing(sqlite3.connect(self.database_path)) as connection:
