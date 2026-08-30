@@ -88,11 +88,16 @@ def test_main_window_starts_on_inicio_page(monkeypatch) -> None:
         "Ventas",
         "Documentos",
     ]
+    assert all(not button.icon().isNull() for button in ribbon_buttons)
+    assert all(button.iconSize().width() == 19 for button in ribbon_buttons)
+    separators = window.ribbon.findChildren(QWidget, "mainRibbonSeparator")
+    assert len(separators) == 3
     window.resize(2200, 720)
     window.show()
     QApplication.processEvents()
     assert all(
-        button.minimumWidth() >= button.fontMetrics().horizontalAdvance(button.text()) + 30
+        button.minimumWidth() == button.maximumWidth()
+        and button.width() >= button.fontMetrics().horizontalAdvance(button.text()) + 30
         for button in ribbon_buttons
     )
     assert ribbon_buttons[-1].geometry().right() <= window.ribbon.contentsRect().right()

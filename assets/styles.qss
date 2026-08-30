@@ -639,8 +639,16 @@ QToolTip {
 #topRibbon {
     background-color: #FFFFFF;
     border: none;
-    border-bottom: 1px solid #D7DEE8;
+    border-bottom: 1px solid #D8E1EC;
     border-radius: 0;
+}
+
+QFrame#mainRibbonSeparator {
+    background-color: #D8E1EC;
+    border: none;
+    min-width: 1px;
+    max-width: 1px;
+    margin: 0 6px;
 }
 
 QLabel#ribbonSeparator {
@@ -651,22 +659,24 @@ QLabel#ribbonSeparator {
 #topRibbon QPushButton[navButton="true"] {
     background-color: transparent;
     border: 1px solid transparent;
-    border-radius: 6px;
-    color: #51627A;
-    min-height: 30px;
-    padding: 5px 11px;
+    border-radius: 9px;
+    color: #31465F;
+    min-height: 36px;
+    padding: 4px 6px;
+    font-size: 12px;
+    font-weight: 600;
 }
 
 #topRibbon QPushButton[navButton="true"]:hover {
-    background-color: #F3F6FA;
-    border-color: #E2E8F1;
-    color: #24324A;
+    background-color: #F1F5FA;
+    border-color: #E4EAF2;
+    color: #19324D;
 }
 
 #topRibbon QPushButton[navButton="true"]:checked {
-    background-color: #EAF2FF;
-    border-color: #BFD7FF;
-    color: #1D5FBF;
+    background-color: #1769C2;
+    border-color: #1769C2;
+    color: #FFFFFF;
 }
 
 QFrame#topRibbon[pageType="contacts"] {

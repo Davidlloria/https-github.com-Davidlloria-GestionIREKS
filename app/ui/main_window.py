@@ -1,6 +1,8 @@
 import os
+from pathlib import Path
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFrame,
@@ -34,6 +36,26 @@ except Exception:  # noqa: BLE001
     CustomersQmlPage = None  # type: ignore[assignment]
 
 
+MAIN_NAVIGATION_ICON_DIR = Path(__file__).resolve().parents[2] / "assets" / "icons" / "main_navigation"
+MAIN_NAVIGATION_ICON_SIZE = QSize(19, 19)
+MAIN_NAVIGATION_ICONS = {
+    "Inicio": "inicio.svg",
+    "Clientes": "clientes.svg",
+    "Contactos": "contactos.svg",
+    "Tecnicos": "tecnicos.svg",
+    "Distribuidores": "distribuidores.svg",
+    "Colaboradores": "colaboradores.svg",
+    "Cursos": "cursos.svg",
+    "Formulas": "formulas.svg",
+    "Almacen": "almacen.svg",
+    "Productos IREKS": "productos.svg",
+    "Materias primas": "materias-primas.svg",
+    "Pedidos": "pedidos.svg",
+    "Ventas": "ventas.svg",
+    "Documentos": "documentos.svg",
+}
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -65,8 +87,8 @@ class MainWindow(QMainWindow):
         ribbon.setObjectName("topRibbon")
         ribbon.setFrameShape(QFrame.Shape.StyledPanel)
         ribbon_layout = QHBoxLayout(ribbon)
-        ribbon_layout.setContentsMargins(12, 8, 12, 8)
-        ribbon_layout.setSpacing(3)
+        ribbon_layout.setContentsMargins(12, 9, 12, 9)
+        ribbon_layout.setSpacing(2)
         self.ribbon_layout = ribbon_layout
         self.ribbon_buttons = QButtonGroup(self)
         self.ribbon_buttons.setExclusive(True)
@@ -130,9 +152,9 @@ class MainWindow(QMainWindow):
 
     def _build_ribbon_groups(self) -> None:
         groups = [
-            ["Inicio", "Clientes", "Contactos", "Tecnicos", "Distribuidores", "Colaboradores"],
-            ["Cursos", "Formulas"],
-            ["Almacen", "Productos IREKS", "Materias primas"],
+            ["Inicio"],
+            ["Clientes", "Contactos", "Tecnicos", "Distribuidores", "Colaboradores"],
+            ["Cursos", "Formulas", "Almacen", "Productos IREKS", "Materias primas"],
             ["Pedidos", "Ventas", "Documentos"],
         ]
         ribbon_labels = {
@@ -143,15 +165,15 @@ class MainWindow(QMainWindow):
         }
         page_index_by_name = {name: idx for idx, name in enumerate(self.page_names)}
 
-        ordered_names: list[str] = []
-        for group in groups:
-            ordered_names.extend(group)
-
-        for name in ordered_names:
-            self._add_ribbon_button(
-                ribbon_labels.get(name, name),
-                page_index_by_name[name],
-            )
+        for group_index, group in enumerate(groups):
+            if group_index:
+                self._add_ribbon_separator()
+            for name in group:
+                self._add_ribbon_button(
+                    ribbon_labels.get(name, name),
+                    page_index_by_name[name],
+                    icon_name=MAIN_NAVIGATION_ICONS[name],
+                )
 
         self.ribbon_layout.addStretch(1)
 
@@ -159,19 +181,45 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(widget)
         self.page_names.append(name)
 
-    def _add_ribbon_button(self, text: str, page_index: int) -> None:
+    def _add_ribbon_button(self, text: str, page_index: int, *, icon_name: str) -> None:
         button = QPushButton(text)
         button.setProperty("navButton", True)
         button.setCheckable(True)
+        button.setIcon(self._navigation_icon(icon_name))
+        button.setIconSize(MAIN_NAVIGATION_ICON_SIZE)
         self._adjust_nav_button_width(button)
         button.clicked.connect(lambda _checked=False, i=page_index: self._set_current_page(i))
         self.ribbon_buttons.addButton(button, page_index)
         self.ribbon_layout.addWidget(button)
 
+    def _add_ribbon_separator(self) -> None:
+        separator = QFrame()
+        separator.setObjectName("mainRibbonSeparator")
+        separator.setFrameShape(QFrame.Shape.VLine)
+        separator.setFrameShadow(QFrame.Shadow.Plain)
+        separator.setFixedHeight(28)
+        self.ribbon_layout.addWidget(separator, 0, Qt.AlignmentFlag.AlignVCenter)
+
+    def _navigation_icon(self, icon_name: str) -> QIcon:
+        source = QPixmap(str(MAIN_NAVIGATION_ICON_DIR / icon_name))
+        icon = QIcon()
+        icon.addPixmap(self._tinted_icon(source, QColor("#36506B")), QIcon.Mode.Normal, QIcon.State.Off)
+        icon.addPixmap(self._tinted_icon(source, QColor("#FFFFFF")), QIcon.Mode.Normal, QIcon.State.On)
+        return icon
+
+    @staticmethod
+    def _tinted_icon(source: QPixmap, color: QColor) -> QPixmap:
+        tinted = source.copy()
+        painter = QPainter(tinted)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+        painter.fillRect(tinted.rect(), color)
+        painter.end()
+        return tinted
+
     def _adjust_nav_button_width(self, button: QPushButton) -> None:
         button.ensurePolished()
         text_width = button.fontMetrics().horizontalAdvance(button.text())
-        button.setMinimumWidth(max(text_width + 30, button.sizeHint().width()))
+        button.setFixedWidth(text_width + MAIN_NAVIGATION_ICON_SIZE.width() + 16)
 
     def _set_current_page(self, index: int) -> None:
         current_index = self.pages.currentIndex()
