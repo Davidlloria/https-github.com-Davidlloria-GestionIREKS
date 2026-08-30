@@ -53,8 +53,21 @@ entire migration history first.
 - Validation for the new retrieval service: 212 document/architecture tests and
   the complete 799-test Python suite passed; the complete suite reported the 151
   known non-blocking warnings.
-- Next recommendation: implement structured extraction and comparison of the
-  retrieved technical-product candidates without changing the PySide6 UI yet.
+- Technical-consultant comparison cut: the first page of each selected certificate
+  is parsed deterministically into application, dosage, minimum shelf life, storage
+  conditions and ingredients. Missing fields remain explicit and every profile
+  retains its document and page source.
+- Real comparison smoke: `FRISCH UND FROSTIG` and `IDEAL FROST` exposed their
+  long-freezing application and literal dosages; `PREBACK` exposed its precooked
+  bread application and literal dosage. `IREKS MAIZ CL` remained a comparable
+  candidate but was not promoted to a recommendation.
+- Validation for the comparison cut: 220 document/architecture tests and the
+  complete 807-test Python suite passed; the complete suite reported the 151 known
+  non-blocking warnings.
+- Known limitation: comparison preserves retrieval order and does not yet decide
+  which products satisfy all requirements or reject weak candidates.
+- Next recommendation: implement a source-grounded technical decision service that
+  ranks, recommends or rejects compared candidates without changing PySide6 yet.
 
 ## Historical Snapshot — 2026-06-21
 
