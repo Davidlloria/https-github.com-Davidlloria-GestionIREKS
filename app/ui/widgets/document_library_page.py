@@ -38,8 +38,19 @@ from app.services.document_library_service import (
 from app.services.document_question_answer_service import DocumentQuestionAnswerService
 from app.services.document_semantic_index_service import DocumentSemanticIndexService
 from app.services.local_embedding_service import LocalEmbeddingService
+from app.services.technical_consultant_service import TechnicalConsultantService
+from app.services.technical_product_comparison_service import (
+    TechnicalProductComparisonService,
+)
+from app.services.technical_product_decision_service import (
+    TechnicalProductDecisionService,
+)
+from app.services.technical_product_retrieval_service import (
+    TechnicalProductRetrievalService,
+)
 from app.ui.widgets.document_content_search_dialog import DocumentContentSearchDialog
 from app.ui.widgets.document_question_answer_dialog import DocumentQuestionAnswerDialog
+from app.ui.widgets.technical_consultant_dialog import TechnicalConsultantDialog
 
 
 class DocumentCatalogRefreshWorker(QThread):
@@ -78,6 +89,7 @@ class DocumentLibraryPage(QWidget):
         question_answer_service: DocumentQuestionAnswerService | None = None,
         parent=None,
         semantic_index_service: DocumentSemanticIndexService | None = None,
+        technical_consultant_service: TechnicalConsultantService | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("documentLibraryPage")
@@ -99,9 +111,11 @@ class DocumentLibraryPage(QWidget):
             None,
         )
         self._question_answer_service = question_answer_service
+        self._technical_consultant_service = technical_consultant_service
         self._worker: DocumentCatalogRefreshWorker | None = None
         self._content_search_dialog: DocumentContentSearchDialog | None = None
         self._question_answer_dialog: DocumentQuestionAnswerDialog | None = None
+        self._technical_consultant_dialog: TechnicalConsultantDialog | None = None
         self._documents_by_id: dict[str, DocumentLibraryItem] = {}
         self._loaded_document_id: str | None = None
         self._minimum_zoom = 0.25
@@ -172,6 +186,16 @@ class DocumentLibraryPage(QWidget):
         self.question_answer_button.setProperty("btnRole", "secondary")
         self.question_answer_button.clicked.connect(self._open_question_answer)
         filters_layout.addWidget(self.question_answer_button)
+
+        self.technical_consultant_button = QPushButton("Consultor técnico")
+        self.technical_consultant_button.setObjectName(
+            "documentLibraryTechnicalConsultant"
+        )
+        self.technical_consultant_button.setProperty("btnRole", "secondary")
+        self.technical_consultant_button.clicked.connect(
+            self._open_technical_consultant
+        )
+        filters_layout.addWidget(self.technical_consultant_button)
 
         self.refresh_button = QPushButton("Actualizar catálogo")
         self.refresh_button.setObjectName("documentLibraryRefreshButton")
@@ -539,6 +563,45 @@ class DocumentLibraryPage(QWidget):
 
     def _question_answer_dialog_closed(self) -> None:
         self._question_answer_dialog = None
+
+    def _open_technical_consultant(self) -> None:
+        if self._technical_consultant_dialog is not None:
+            self._technical_consultant_dialog.raise_()
+            self._technical_consultant_dialog.activateWindow()
+            return
+        if self._technical_consultant_service is None:
+            if self._content_index_service is None:
+                self._content_index_service = DocumentContentIndexService(self._service)
+            if self._semantic_index_service is None:
+                self._semantic_index_service = DocumentSemanticIndexService(
+                    self._content_index_service,
+                    LocalEmbeddingService(),
+                )
+            hybrid_service = DocumentHybridRetrievalService(
+                self._content_index_service,
+                self._semantic_index_service,
+            )
+            retrieval_service = TechnicalProductRetrievalService(hybrid_service)
+            comparison_service = TechnicalProductComparisonService(
+                retrieval_service,
+                self._content_index_service,
+            )
+            decision_service = TechnicalProductDecisionService(comparison_service)
+            self._technical_consultant_service = TechnicalConsultantService(
+                decision_service
+            )
+        dialog = TechnicalConsultantDialog(
+            self._technical_consultant_service,
+            self,
+        )
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.source_requested.connect(self._show_content_search_result)
+        dialog.destroyed.connect(self._technical_consultant_dialog_closed)
+        self._technical_consultant_dialog = dialog
+        dialog.open()
+
+    def _technical_consultant_dialog_closed(self) -> None:
+        self._technical_consultant_dialog = None
 
     def _show_content_search_result(self, document_id: str, page_number: int) -> None:
         self._clear_filters()

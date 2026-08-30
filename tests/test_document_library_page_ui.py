@@ -715,3 +715,57 @@ def test_question_source_signal_reuses_pdf_navigation(tmp_path: Path) -> None:
     assert page._loaded_document_id == document.document_id
     assert page.pdf_view.pageNavigator().currentPage() == 1
     dialog.close()
+
+
+def test_technical_consultant_button_opens_single_dialog() -> None:
+    _application()
+    service = type(
+        "Consultant",
+        (),
+        {"consult": lambda self, _question: None},
+    )()
+    page = DocumentLibraryPage(
+        _FakeDocumentLibraryService(),
+        technical_consultant_service=service,  # type: ignore[arg-type]
+    )
+
+    assert page.technical_consultant_button.text() == "Consultor técnico"
+    page.technical_consultant_button.click()
+    _application().processEvents()
+    first_dialog = page._technical_consultant_dialog
+    assert first_dialog is not None
+
+    page.technical_consultant_button.click()
+    _application().processEvents()
+    assert page._technical_consultant_dialog is first_dialog
+    first_dialog.close()
+    _application().processEvents()
+    assert page._technical_consultant_dialog is None
+
+
+def test_technical_consultant_source_reuses_pdf_navigation(tmp_path: Path) -> None:
+    _application()
+    document = _sample_documents()[0]
+    library = _FakeDocumentLibraryService([document])
+    library.resolved_path = _write_pdf(tmp_path / "technical-source.pdf", pages=2)
+    service = type(
+        "Consultant",
+        (),
+        {"consult": lambda self, _question: None},
+    )()
+    page = DocumentLibraryPage(
+        library,
+        technical_consultant_service=service,  # type: ignore[arg-type]
+    )
+    page.technical_consultant_button.click()
+    _application().processEvents()
+    dialog = page._technical_consultant_dialog
+    assert dialog is not None
+
+    dialog.source_requested.emit(document.document_id, 2)
+    _application().processEvents()
+
+    assert page._selected_document_id() == document.document_id
+    assert page._loaded_document_id == document.document_id
+    assert page.pdf_view.pageNavigator().currentPage() == 1
+    dialog.close()

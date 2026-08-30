@@ -94,10 +94,25 @@ entire migration history first.
 - Validation for the orchestration cut: 249 document/AI/architecture tests and the
   complete 826-test Python suite passed; the complete suite reported the 151 known
   non-blocking warnings.
-- Known limitation: requirement detection remains intentionally narrow and there
-  is no PySide6 consultant screen or conversational memory yet.
-- Next recommendation: connect this service to a small PySide6 technical-consultant
-  screen that displays clarification questions, product cards and source links.
+- PySide6 consultant cut: the Documentos page now exposes a `Consultor técnico`
+  action. Its modal runs consultation in a worker thread and separately displays
+  the technical answer, clarification questions, verified product status,
+  documented application, dosage, decision reason and source list.
+- Source navigation reuses the protected document identifier and page signal from
+  the existing documentary assistant. Selecting a source closes the consultant,
+  selects the catalog entry, loads the PDF and navigates to its cited page.
+- Integrated PySide6 smoke with the real configured service chain: `Quiero mejorar
+  mi pan` opened the consultant, completed outside the UI thread, showed three
+  clarification questions and did not use Qwen for wording.
+- Validation for the PySide6 consultant cut: 45 focused UI/service tests, 334
+  document/AI/technical/architecture tests and the complete 836-test Python suite
+  passed; the complete suite reported the 151 known non-blocking warnings.
+- Known limitation: the dialog does not retain conversational context. An ambiguous
+  consultation still performs retrieval before returning clarification questions,
+  so that safe response can take several seconds on the real local index.
+- Next recommendation: add a deterministic fast clarification step and a small
+  in-dialog consultation context so the user's answers complete the original need
+  without requiring it to be rewritten.
 
 ## Historical Snapshot — 2026-06-21
 
