@@ -5,10 +5,12 @@ from datetime import date
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QTabWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QTableWidgetItem, QTabWidget
 
 from app.models import PedidoIncidencia, PedidoIncidenciaImagen
 from app.services.order_incident_service import OrderIncidentRow, ReceivedArticleOption
+from app.ui.widgets import orders_page as orders_page_module
 from app.ui.widgets.orders_page import OrderIncidentDialog, OrdersPage
 
 
@@ -42,6 +44,41 @@ def test_pedido_delta_header_and_zero_value_behavior(monkeypatch) -> None:
 
     assert page.pedido_items_table.horizontalHeaderItem(6).text() == "Δ"
 
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_pedido_quantity_edit_defers_reload_until_editor_commit_finishes(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(OrdersPage, "reload", lambda self: None)
+    page = OrdersPage()
+    saved: list[tuple[str, float]] = []
+    scheduled: list[tuple[int, object]] = []
+    monkeypatch.setattr(
+        page.order_service,
+        "update_order_line_quantity",
+        lambda item_id, quantity: saved.append((item_id, quantity)),
+    )
+    monkeypatch.setattr(
+        orders_page_module.QTimer,
+        "singleShot",
+        lambda delay, callback: scheduled.append((delay, callback)),
+    )
+    page._loading_pedido_items_table = True
+    page.pedido_items_table.setRowCount(1)
+    id_item = QTableWidgetItem("5100")
+    id_item.setData(Qt.ItemDataRole.UserRole, "line-1")
+    quantity_item = QTableWidgetItem("3,5")
+    page.pedido_items_table.setItem(0, 0, id_item)
+    page.pedido_items_table.setItem(0, 2, quantity_item)
+    page._loading_pedido_items_table = False
+
+    page._on_pedido_item_cell_changed(quantity_item)
+
+    assert saved == [("line-1", 3.5)]
+    assert len(scheduled) == 1
+    assert scheduled[0][0] == 0
     page.close()
     page.deleteLater()
     QApplication.processEvents()

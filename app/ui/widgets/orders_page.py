@@ -2215,10 +2215,10 @@ class OrdersPage(QWidget):
         qty = self._parse_float(qty_text, default=-1.0)
         if qty < 0:
             QMessageBox.warning(self, "Pedidos", "Cantidad no válida.")
-            self.reload()
+            QTimer.singleShot(0, self.reload)
             return
         self.order_service.update_order_line_quantity(item_id, qty)
-        self.reload()
+        QTimer.singleShot(0, self.reload)
 
     def _add_order_line(self) -> None:
         selected = self._selected_row()
