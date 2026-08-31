@@ -2633,6 +2633,14 @@ class SalesPage(QWidget):
         self.sales_table_igsa.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.sales_table_igsa.verticalHeader().setVisible(False)
         self.sales_table_igsa.setSortingEnabled(True)
+        self.sales_table_igsa.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.sales_table_igsa.customContextMenuRequested.connect(
+            lambda pos: self._open_sales_product_consumers_context_menu(
+                self.sales_table_igsa,
+                self._current_year_igsa(),
+                pos,
+            )
+        )
         self.sales_table_igsa.setHorizontalHeaderLabels(
             [
                 "Cod.",
@@ -3104,7 +3112,13 @@ class SalesPage(QWidget):
         self.sales_table_clientes.verticalHeader().setVisible(False)
         self.sales_table_clientes.setSortingEnabled(True)
         self.sales_table_clientes.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.sales_table_clientes.customContextMenuRequested.connect(self._open_clientes_sales_context_menu)
+        self.sales_table_clientes.customContextMenuRequested.connect(
+            lambda pos: self._open_sales_product_consumers_context_menu(
+                self.sales_table_clientes,
+                self._current_year_clientes(),
+                pos,
+            )
+        )
         self.sales_table_clientes.setHorizontalHeaderLabels(
             [
                 "Cod.",
@@ -3529,6 +3543,14 @@ class SalesPage(QWidget):
         self.sales_table.verticalHeader().setVisible(False)
         self.sales_table.setSortingEnabled(True)
         self.sales_table.itemSelectionChanged.connect(self._update_sales_chart_button_state)
+        self.sales_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.sales_table.customContextMenuRequested.connect(
+            lambda pos: self._open_sales_product_consumers_context_menu(
+                self.sales_table,
+                self._current_year(),
+                pos,
+            )
+        )
         self.sales_table.setHorizontalHeaderLabels(
             [
                 "Cod.",
@@ -5208,6 +5230,7 @@ class SalesPage(QWidget):
                 else:
                     if col == 0:
                         item = CodeTableWidgetItem(str(value or ""))
+                        item.setData(Qt.ItemDataRole.UserRole, row.articulo_id)
                     else:
                         item = QTableWidgetItem(str(value or ""))
                     item.setToolTip(str(value or ""))
@@ -5672,31 +5695,44 @@ class SalesPage(QWidget):
             item.setFont(font)
             self.totals_table_clientes.setItem(0, col, item)
 
-    def _open_clientes_sales_context_menu(self, pos) -> None:
-        table = self.sales_table_clientes
-        item = table.itemAt(pos)
-        if item is None:
-            return
-        row = item.row()
+    @staticmethod
+    def _sales_product_reference_from_row(table: QTableWidget, row: int) -> tuple[str, str, str] | None:
         product_id_item = table.item(row, 0)
         product_name_item = table.item(row, 1)
         if product_id_item is None:
-            return
+            return None
         product_id = str(product_id_item.data(Qt.ItemDataRole.UserRole) or "").strip()
         product_code = str(product_id_item.text() or "").strip()
         product_name = str(product_name_item.text() if product_name_item is not None else "").strip()
         if not product_id and not product_code:
+            return None
+        return product_id, product_code, product_name
+
+    def _open_sales_product_consumers_context_menu(self, table: QTableWidget, year: int, pos) -> None:
+        item = table.itemAt(pos)
+        if item is None:
             return
+        row = item.row()
+        product_reference = self._sales_product_reference_from_row(table, row)
+        if product_reference is None:
+            return
+        product_id, product_code, product_name = product_reference
+        table.selectRow(row)
 
         menu = QMenu(self)
-        action = menu.addAction("Ver clientes que consumen este producto")
+        action = menu.addAction("Ver clientes que compran este producto")
         selected = menu.exec(table.viewport().mapToGlobal(pos))
         if selected != action:
             return
-        self._show_clientes_product_consumers_dialog(product_id, product_code, product_name)
+        self._show_product_consumers_dialog(year, product_id, product_code, product_name)
 
-    def _show_clientes_product_consumers_dialog(self, articulo_id: str, articulo_codigo: str, articulo_nombre: str) -> None:
-        year = self._current_year_clientes()
+    def _show_product_consumers_dialog(
+        self,
+        year: int,
+        articulo_id: str,
+        articulo_codigo: str,
+        articulo_nombre: str,
+    ) -> None:
         rows = self.sales_summary_service.listar_clientes_consumidores_producto(
             year,
             articulo_id,
@@ -5704,7 +5740,7 @@ class SalesPage(QWidget):
             articulo_nombre,
         )
         dialog = QDialog(self)
-        dialog.setWindowTitle("Clientes que consumen el producto")
+        dialog.setWindowTitle("Clientes que compran el producto")
         dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
         dialog.setFixedSize(1240, 740)
 
@@ -5712,7 +5748,7 @@ class SalesPage(QWidget):
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
 
-        title = QLabel("Clientes que consumen el producto")
+        title = QLabel("Clientes que compran el producto")
         title.setStyleSheet("font-size: 20px; font-weight: 700; color: #14213D;")
         layout.addWidget(title)
 
