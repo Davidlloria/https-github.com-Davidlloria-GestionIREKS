@@ -78,7 +78,7 @@ Fermentar 60 minutos.
 
     assert draft.recipe_name == "Pan de espelta"
     assert draft.number_of_pieces == 20
-    assert draft.process_text == "Mezclar los ingredientes.\nFermentar 60 minutos."
+    assert draft.process_text == "1. Mezclar los ingredientes.\n2. Fermentar 60 minutos."
     assert draft.document_id == "doc-1"
     assert [(line.source_name, line.quantity_g, line.process_name) for line in draft.lines] == [
         ("REX ESPELTA MIEL", 10_000.0, "Masa final"),
@@ -130,4 +130,46 @@ def test_process_marker_tolerates_replacement_characters_from_pdf_fonts() -> Non
         page_number=1,
     )
 
-    assert draft.process_text == "Amasar cinco minutos."
+    assert draft.process_text == "1. Amasar cinco minutos."
+
+
+def test_process_bullets_join_wrapped_lines_and_number_each_step() -> None:
+    service = RecipeDocumentImportService()
+
+    draft = service.parse_page(
+        "Formula\nHarina\n1,000 kg\nProceso de elaboración\n•\nAmasar hasta conseguir\nuna masa fina.\n•\nFermentar 60 minutos.",
+        document_id="doc-process",
+        document_name="formula.pdf",
+        relative_path="TECNICO/RECETAS/formula.pdf",
+        page_number=1,
+    )
+
+    assert draft.process_text == (
+        "1. Amasar hasta conseguir una masa fina.\n"
+        "2. Fermentar 60 minutos."
+    )
+
+
+def test_raw_material_search_and_manual_match_only_use_standard_ingredients() -> None:
+    raw_material = _ingredient("Levadura fresca")
+    ireks_product = _ingredient("AROMA LEVADURA", source="ireks")
+    service = RecipeDocumentImportService(
+        ingredient_search=lambda _term: [ireks_product, raw_material]
+    )
+    draft = service.parse_page(
+        "Formula\nLevadura\n0,300 kg",
+        document_id="doc-raw",
+        document_name="formula.pdf",
+        relative_path="TECNICO/RECETAS/formula.pdf",
+        page_number=1,
+    )
+
+    assert service.search_raw_materials("levadura") == [raw_material]
+    assert draft.unresolved_count == 1
+
+    resolved = service.apply_raw_material_match(draft, 0, raw_material)
+
+    assert resolved.unresolved_count == 0
+    assert resolved.lines[0].matched_ingredient == raw_material
+    assert "Revisar asociación" not in resolved.lines[0].notes
+    assert not any("revisión manual" in warning for warning in resolved.warnings)

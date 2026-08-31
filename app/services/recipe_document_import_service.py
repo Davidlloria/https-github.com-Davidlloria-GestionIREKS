@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Callable
 
@@ -72,6 +72,7 @@ class RecipeDocumentImportService:
         "poolish",
         "remojo",
     )
+    _REVIEW_ASSOCIATION_NOTE = "Revisar asociación con el catálogo de ingredientes"
 
     def __init__(
         self,
@@ -91,6 +92,45 @@ class RecipeDocumentImportService:
             category_prefix="RECETAS",
             limit=limit,
         )
+
+    def search_raw_materials(self, query: str) -> list[IngredientChoice]:
+        return [
+            ingredient
+            for ingredient in self.ingredient_search(str(query or "").strip())
+            if ingredient.tipo_origen == "std"
+        ]
+
+    def apply_raw_material_match(
+        self,
+        draft: RecipeDocumentDraft,
+        line_index: int,
+        ingredient: IngredientChoice,
+    ) -> RecipeDocumentDraft:
+        if ingredient.tipo_origen != "std":
+            raise ValueError("La selección debe proceder de Materias primas.")
+        if line_index < 0 or line_index >= len(draft.lines):
+            raise IndexError("La línea seleccionada no existe.")
+        lines = list(draft.lines)
+        source_line = lines[line_index]
+        notes = "; ".join(
+            note.strip()
+            for note in source_line.notes.split(";")
+            if note.strip() and note.strip() != self._REVIEW_ASSOCIATION_NOTE
+        )
+        lines[line_index] = replace(
+            source_line,
+            matched_ingredient=ingredient,
+            notes=notes,
+        )
+        warnings = [
+            warning
+            for warning in draft.warnings
+            if not re.fullmatch(r"\d+ ingrediente\(s\) necesitan revisión manual\.", warning)
+        ]
+        unresolved = sum(line.matched_ingredient is None for line in lines)
+        if unresolved:
+            warnings.append(f"{unresolved} ingrediente(s) necesitan revisión manual.")
+        return replace(draft, lines=tuple(lines), warnings=tuple(warnings))
 
     def build_draft(
         self,
@@ -130,7 +170,7 @@ class RecipeDocumentImportService:
         )
         ingredient_rows = rows[:process_start]
         process_rows = rows[process_start + 1 :] if process_start < len(rows) else []
-        process_text = "\n".join(line for line in process_rows if not self._is_bullet(line)).strip()
+        process_text = self._format_process_steps(process_rows)
 
         lines: list[RecipeDocumentLineDraft] = []
         warnings: list[str] = []
@@ -152,7 +192,7 @@ class RecipeDocumentImportService:
             matched = self._match_ingredient(source_name)
             notes = quantity_note
             if matched is None:
-                notes = self._join_notes(notes, "Revisar asociación con el catálogo de ingredientes")
+                notes = self._join_notes(notes, self._REVIEW_ASSOCIATION_NOTE)
             lines.append(
                 RecipeDocumentLineDraft(
                     source_name=source_name,
@@ -273,6 +313,30 @@ class RecipeDocumentImportService:
     @staticmethod
     def _is_bullet(value: str) -> bool:
         return not any(character.isalnum() for character in value)
+
+    @classmethod
+    def _format_process_steps(cls, rows: list[str]) -> str:
+        steps: list[str] = []
+        current_parts: list[str] = []
+        saw_bullet = False
+        for row in rows:
+            if cls._is_bullet(row):
+                saw_bullet = True
+                if current_parts:
+                    steps.append(" ".join(current_parts))
+                    current_parts = []
+                continue
+            if saw_bullet:
+                current_parts.append(row)
+            else:
+                steps.append(row)
+        if current_parts:
+            steps.append(" ".join(current_parts))
+        return "\n".join(
+            f"{index}. {step.strip()}"
+            for index, step in enumerate(steps, start=1)
+            if step.strip()
+        )
 
     @staticmethod
     def _join_notes(first: str, second: str) -> str:

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QInputDialog,
     QMessageBox,
     QPushButton,
     QSpinBox,
@@ -96,6 +97,14 @@ class RecipeDocumentImportDialog(QDialog):
 
         review_header = QHBoxLayout()
         review_header.addWidget(QLabel("Revisión de la fórmula"))
+        self.raw_material_button = QPushButton("Buscar materia prima")
+        self.raw_material_button.setObjectName("recipeDocumentRawMaterialSearch")
+        self.raw_material_button.setToolTip(
+            "Asociar la línea seleccionada con un ingrediente de Materias primas"
+        )
+        self.raw_material_button.setEnabled(False)
+        self.raw_material_button.clicked.connect(self._search_raw_material)
+        review_header.addWidget(self.raw_material_button)
         review_header.addStretch(1)
         self.page_label = QLabel("Página")
         review_header.addWidget(self.page_label)
@@ -119,6 +128,8 @@ class RecipeDocumentImportDialog(QDialog):
         self.review_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.review_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.review_table.verticalHeader().setVisible(False)
+        self.review_table.itemSelectionChanged.connect(self._review_selection_changed)
+        self.review_table.itemDoubleClicked.connect(lambda _item: self._search_raw_material())
         review_header_widget = self.review_table.horizontalHeader()
         review_header_widget.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         review_header_widget.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -261,6 +272,7 @@ class RecipeDocumentImportDialog(QDialog):
             self.draft_name_label.setText("Selecciona un resultado.")
             self.warning_label.clear()
             self.load_button.setEnabled(False)
+            self.raw_material_button.setEnabled(False)
             return
         self.draft_name_label.setText(
             f"{draft.recipe_name} · página {draft.page_number} · {len(draft.lines)} líneas"
@@ -283,6 +295,60 @@ class RecipeDocumentImportDialog(QDialog):
                 self.review_table.setItem(row, column, item)
         self.warning_label.setText("\n".join(f"• {warning}" for warning in draft.warnings))
         self.load_button.setEnabled(bool(draft.recipe_name and draft.lines))
+        self._review_selection_changed()
+
+    def _review_selection_changed(self) -> None:
+        selected = self.review_table.selectionModel().selectedRows()
+        self.raw_material_button.setEnabled(bool(self._draft is not None and selected))
+
+    def _search_raw_material(self) -> None:
+        if self._draft is None:
+            return
+        selected_rows = self.review_table.selectionModel().selectedRows()
+        if not selected_rows:
+            QMessageBox.information(self, "Materias primas", "Selecciona primero una línea.")
+            return
+        line_index = selected_rows[0].row()
+        source_line = self._draft.lines[line_index]
+        query, accepted = QInputDialog.getText(
+            self,
+            "Buscar materia prima",
+            "Nombre o parte del nombre:",
+            QLineEdit.EchoMode.Normal,
+            source_line.source_name,
+        )
+        if not accepted or not query.strip():
+            return
+        candidates = self.service.search_raw_materials(query.strip())
+        if not candidates:
+            QMessageBox.information(
+                self,
+                "Materias primas",
+                "No se encontraron materias primas para ese texto.",
+            )
+            return
+        labels = [
+            f"{ingredient.nombre} ({ingredient.codigo})" if ingredient.codigo else ingredient.nombre
+            for ingredient in candidates
+        ]
+        selected_label, accepted = QInputDialog.getItem(
+            self,
+            "Seleccionar materia prima",
+            "Coincidencias:",
+            labels,
+            0,
+            False,
+        )
+        if not accepted:
+            return
+        selected_index = labels.index(selected_label)
+        self._draft = self.service.apply_raw_material_match(
+            self._draft,
+            line_index,
+            candidates[selected_index],
+        )
+        self._render_draft(self._draft)
+        self.review_table.selectRow(line_index)
 
     def _accept_draft(self) -> None:
         if self._draft is None or not self._draft.lines:

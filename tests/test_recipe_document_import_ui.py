@@ -52,6 +52,11 @@ def test_dialog_renders_review_and_only_enables_valid_draft() -> None:
     assert dialog.review_table.item(0, 4).text() == "Revisar"
     assert dialog.load_button.isEnabled()
     assert "revisión" in dialog.warning_label.text()
+    assert not dialog.raw_material_button.isEnabled()
+
+    dialog.review_table.selectRow(0)
+
+    assert dialog.raw_material_button.isEnabled()
     dialog.close()
 
 
