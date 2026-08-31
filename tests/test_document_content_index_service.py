@@ -258,6 +258,19 @@ def test_search_is_case_and_accent_insensitive_and_supports_filters(tmp_path: Pa
     assert matches[0].category == "Procesos"
 
 
+def test_search_supports_a_safe_category_prefix(tmp_path: Path) -> None:
+    library, _, catalog, content = _build_services(tmp_path)
+    _write_markdown(library / "Tecnico/Recetas/Pan/pan.md", "Formula con centeno")
+    _write_markdown(library / "Tecnico/Recetarios/Curso/curso.md", "Formula con centeno")
+    _write_markdown(library / "Tecnico/Fichas/Pan/ficha.md", "Formula con centeno")
+    catalog.refresh_catalog()
+    content.update_index()
+
+    matches = content.search("centeno", area="Tecnico", category_prefix="Receta")
+
+    assert {match.name for match in matches} == {"pan.md", "curso.md"}
+
+
 def test_special_characters_are_text_not_fts_syntax(tmp_path: Path) -> None:
     library, _, catalog, content = _build_services(tmp_path)
     _write_markdown(library / "Notas/especial.md", "Panadería segura y local")

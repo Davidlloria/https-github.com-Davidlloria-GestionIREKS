@@ -53,9 +53,11 @@ from app.models import Receta, RecetaLinea
 from app.services.openai_process_service import OpenAIProcessService
 from app.services import PdfService
 from app.services.recipe_active_flow_service import RecipeActiveFlowService, RecipeActivePayload
+from app.services.recipe_document_import_service import RecipeDocumentDraft, RecipeDocumentImportService
 from app.services.recipe_service import RecipeService
 from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
 from app.ui.widgets.nutrition_card import NutritionCard, NutritionRowData
+from app.ui.widgets.recipe_document_import_dialog import RecipeDocumentImportDialog
 from app.viewmodels import IngredientChoice
 
 
@@ -2057,6 +2059,7 @@ class RecipesPage(QWidget):
         self._proceso_rich_html: str = ""
         self.recipe_process_names: list[str] = ["Masa final"]
         self._is_loading_recipe = False
+        self._document_import_pending = False
         self._autosave_timer = QTimer(self)
         self._autosave_timer.setSingleShot(True)
         self._autosave_timer.setInterval(450)
@@ -2129,10 +2132,20 @@ class RecipesPage(QWidget):
         ireks_tab.setObjectName("recipeTabPage")
         ireks_tab.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         ireks_layout = QVBoxLayout(ireks_tab)
+        ireks_search_row = QHBoxLayout()
+        ireks_search_row.setContentsMargins(0, 0, 0, 0)
+        ireks_search_row.setSpacing(6)
         self.ireks_recipe_search = QLineEdit()
         self.ireks_recipe_search.setPlaceholderText("Buscar por ocurrencia, receta, producto IREKS...")
         self.ireks_recipe_search.textChanged.connect(self._reload_recipe_list)
-        ireks_layout.addWidget(self.ireks_recipe_search)
+        ireks_search_row.addWidget(self.ireks_recipe_search, 1)
+        self.document_recipe_search_btn = QPushButton("Documentación")
+        self.document_recipe_search_btn.setObjectName("recipeDocumentSearchOpenButton")
+        self.document_recipe_search_btn.setProperty("btnRole", "primary")
+        self.document_recipe_search_btn.setToolTip("Buscar e importar una fórmula desde la biblioteca documental")
+        self.document_recipe_search_btn.clicked.connect(self._open_document_recipe_search)
+        ireks_search_row.addWidget(self.document_recipe_search_btn)
+        ireks_layout.addLayout(ireks_search_row)
         self.ireks_recipe_table = self._create_recipe_table()
         ireks_layout.addWidget(self.ireks_recipe_table, 1)
         self.recipe_tabs.addTab(ireks_tab, "IREKS")
@@ -3474,8 +3487,86 @@ class RecipesPage(QWidget):
             return
         self._new_recipe(cliente_id=dialog.selected_customer_id)
 
+    def _open_document_recipe_search(self) -> None:
+        if self.recipe_tabs.currentIndex() != 0:
+            self.recipe_tabs.setCurrentIndex(0)
+        service = RecipeDocumentImportService(
+            ingredient_search=self.recipe_service.search_ingredients,
+        )
+        dialog = RecipeDocumentImportDialog(service, self)
+        if not dialog.exec() or dialog.selected_draft is None:
+            return
+        self._load_document_recipe_draft(dialog.selected_draft)
+
+    def _load_document_recipe_draft(self, draft: RecipeDocumentDraft) -> None:
+        self._new_recipe()
+        self._is_loading_recipe = True
+        try:
+            self.current_recipe_is_ireks = True
+            self.nombre_input.setText(draft.recipe_name)
+            self.codigo_input.clear()
+            self.version_input.setText("1.0")
+            self.estado_input.setText("borrador")
+            self.piezas_spin.setValue(max(1, int(draft.number_of_pieces or 1)))
+            self.proceso_input.setPlainText(draft.process_text)
+            self.observaciones_input.setPlainText(
+                "Importada desde documentación IREKS: "
+                f"{draft.relative_path} (página {draft.page_number}).\n"
+                "Revisar ingredientes, cantidades y procesos antes de guardar."
+            )
+            self.recipe_elaboracion_data = {
+                "document_source_id": draft.document_id,
+                "document_source_path": draft.relative_path,
+                "document_source_page": str(draft.page_number),
+            }
+            lines: list[RecetaLinea] = []
+            for index, source_line in enumerate(draft.lines, start=1):
+                matched = source_line.matched_ingredient
+                line = RecetaLinea(
+                    receta_id=0,
+                    orden=index,
+                    tipo_origen=matched.tipo_origen if matched is not None else "std",
+                    ingrediente_id=matched.ingrediente_id if matched is not None else None,
+                    nombre_mostrado=matched.nombre if matched is not None else source_line.source_name,
+                    codigo_ingrediente=matched.codigo if matched is not None else "",
+                    familia=matched.familia if matched is not None else "",
+                    subfamilia=matched.subfamilia if matched is not None else "",
+                    es_harina=matched.es_harina if matched is not None else False,
+                    es_liquido=matched.es_liquido if matched is not None else False,
+                    cantidad_base_g=float(source_line.quantity_g or 0.0),
+                    cantidad_calculada_g=float(source_line.quantity_g or 0.0),
+                    precio_kg_snapshot=float(matched.precio_kg or 0.0) if matched is not None else 0.0,
+                    proceso_nombre=_normalize_process_name(source_line.process_name),
+                    notas=source_line.notes,
+                )
+                lines.append(line)
+            self._refresh_process_controls(
+                [line.proceso_nombre for line in lines] or ["Masa final"],
+                preserve_active=False,
+            )
+            self._render_lines(lines)
+            calculated = self.recipe_service.calculate(
+                self._build_recipe_model(),
+                lines,
+                sync_categories=True,
+            )
+            self._render_lines(calculated.lineas)
+            self._update_summary(calculated.receta, calculated.lineas)
+            self.current_issues = [f"[{issue.level.upper()}] {issue.message}" for issue in calculated.issues]
+            self._set_issues_text("\n".join(self.current_issues))
+        finally:
+            self._is_loading_recipe = False
+        self._document_import_pending = True
+        QMessageBox.information(
+            self,
+            "Fórmula cargada",
+            "La fórmula se ha cargado como borrador sin guardar. "
+            "Revisa las líneas marcadas y pulsa «Guardar» cuando esté correcta.",
+        )
+
     def _new_recipe(self, cliente_id: str = "") -> None:
         self._autosave_timer.stop()
+        self._document_import_pending = False
         self._is_loading_recipe = True
         try:
             self.current_recipe_id = None
@@ -3530,6 +3621,7 @@ class RecipesPage(QWidget):
         if not aggregate:
             return
         self._is_loading_recipe = True
+        self._document_import_pending = False
         try:
             receta = aggregate.receta
             self.current_recipe_id = receta.id
@@ -4234,7 +4326,7 @@ class RecipesPage(QWidget):
             self.lines_table.blockSignals(False)
 
     def _schedule_autosave(self) -> None:
-        if self._is_loading_recipe:
+        if self._is_loading_recipe or self._document_import_pending:
             return
         self._autosave_timer.start()
 
@@ -4249,13 +4341,13 @@ class RecipesPage(QWidget):
         super().hideEvent(event)
 
     def _flush_autosave(self) -> None:
-        if self._is_loading_recipe:
+        if self._is_loading_recipe or self._document_import_pending:
             return
         self._autosave_timer.stop()
         self._perform_autosave()
 
     def _perform_autosave(self) -> None:
-        if self._is_loading_recipe:
+        if self._is_loading_recipe or self._document_import_pending:
             return
         try:
             result = self.recipe_active_flow_service.autosave_recipe(
@@ -4490,6 +4582,7 @@ class RecipesPage(QWidget):
         self.current_issues = [f"[{i.level.upper()}] {i.message}" for i in result.issues]
         self._set_issues_text("\n".join(self.current_issues))
         self.current_recipe_id = result.saved_recipe_id
+        self._document_import_pending = False
         self._reload_recipe_list()
         QMessageBox.information(self, "Recetas", "Receta guardada.")
 

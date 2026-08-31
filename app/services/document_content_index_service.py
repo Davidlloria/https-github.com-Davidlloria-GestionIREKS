@@ -176,6 +176,7 @@ class DocumentContentIndexService:
         *,
         area: str | None = None,
         category: str | None = None,
+        category_prefix: str | None = None,
         limit: int = 20,
     ) -> list[DocumentContentSearchResult]:
         match_expression = self._safe_match_expression(query)
@@ -196,6 +197,15 @@ class DocumentContentIndexService:
         if category:
             conditions.append("documents.category = ? COLLATE NOCASE")
             parameters.append(category)
+        if category_prefix:
+            conditions.append("documents.category LIKE ? ESCAPE '\\' COLLATE NOCASE")
+            escaped_prefix = (
+                str(category_prefix)
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+            )
+            parameters.append(f"{escaped_prefix}%")
         parameters.append(safe_limit)
 
         with closing(sqlite3.connect(self.database_path)) as connection:
