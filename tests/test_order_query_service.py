@@ -134,6 +134,76 @@ def test_order_dialog_catalogs_uses_previous_order_and_excludes_current_order(is
     assert prev_qty_by_articulo == {articulo_id: 2.5}
 
 
+def test_list_article_order_history_orders_limits_aggregates_and_excludes_current_order(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        articulo_id = _seed_catalog(session)
+        for day in range(1, 8):
+            pedido_id = f"pedido-{day}"
+            session.add(
+                Pedido(
+                    pedido_id=pedido_id,
+                    almacen_id="alm-1",
+                    pedido_fecha=date(2026, 6, day),
+                    pedido_numero=f"A-{day:03d}",
+                )
+            )
+            session.add(
+                PedidoItem(
+                    item_id=f"item-{day}",
+                    pedido_id=pedido_id,
+                    pedido_numero=f"A-{day:03d}",
+                    pedido_item_fecha=date(2026, 6, day),
+                    articulo_id=articulo_id,
+                    articulo_cantidad=float(day),
+                )
+            )
+        session.add(
+            PedidoItem(
+                item_id="item-7-extra",
+                pedido_id="pedido-7",
+                pedido_numero="A-007",
+                pedido_item_fecha=date(2026, 6, 7),
+                articulo_id=articulo_id,
+                articulo_cantidad=0.5,
+            )
+        )
+        for pedido_id, almacen_id, day, quantity in (
+            ("pedido-actual", "alm-1", 8, 80.0),
+            ("pedido-futuro", "alm-1", 9, 90.0),
+            ("pedido-otro-almacen", "alm-2", 7, 70.0),
+        ):
+            session.add(
+                Pedido(
+                    pedido_id=pedido_id,
+                    almacen_id=almacen_id,
+                    pedido_fecha=date(2026, 6, day),
+                    pedido_numero=pedido_id,
+                )
+            )
+            session.add(
+                PedidoItem(
+                    item_id=f"item-{pedido_id}",
+                    pedido_id=pedido_id,
+                    pedido_numero=pedido_id,
+                    pedido_item_fecha=date(2026, 6, day),
+                    articulo_id=articulo_id,
+                    articulo_cantidad=quantity,
+                )
+            )
+        session.commit()
+
+    history = OrderQueryService().list_article_order_history(
+        "alm-1",
+        articulo_id,
+        reference_date=date(2026, 6, 8),
+        exclude_pedido_id="pedido-actual",
+        limit=5,
+    )
+
+    assert [row.pedido_id for row in history] == ["pedido-7", "pedido-6", "pedido-5", "pedido-4", "pedido-3"]
+    assert [row.unidades for row in history] == [7.5, 6.0, 5.0, 4.0, 3.0]
+
+
 def test_order_dialog_catalogs_can_disable_history(isolated_engine) -> None:
     with Session(isolated_engine) as session:
         articulo_id = _seed_catalog(session)

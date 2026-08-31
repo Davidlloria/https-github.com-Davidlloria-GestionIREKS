@@ -74,7 +74,7 @@ from app.services.orders_documents_import_ui_service import (
     OrdersDocumentImportFlowError,
     OrdersDocumentsImportUiService,
 )
-from app.services.order_query_service import OrderQueryService
+from app.services.order_query_service import ArticleOrderHistoryRow, OrderQueryService
 from app.services.order_service import OrderLineInput, OrderService
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
 from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
@@ -95,6 +95,7 @@ MONTHS = [
     (11, "Noviembre"),
     (12, "Diciembre"),
 ]
+ARTICLE_ID_ROLE = int(Qt.ItemDataRole.UserRole) + 1
 
 @dataclass
 class PedidoListRow:
@@ -122,6 +123,29 @@ class NumericTableWidgetItem(QTableWidgetItem):
         if isinstance(left, (int, float)) and isinstance(right, (int, float)):
             return float(left) < float(right)
         return super().__lt__(other)
+
+
+def _add_article_order_history_menu(menu: QMenu, rows: list[ArticleOrderHistoryRow]) -> QMenu:
+    history_menu = QMenu("Últimos pedidos del artículo", menu)
+    menu.addMenu(history_menu)
+    menu._article_order_history_menu = history_menu
+    if not rows:
+        empty_action = history_menu.addAction("Sin pedidos anteriores")
+        empty_action.setEnabled(False)
+        return history_menu
+
+    for row in rows:
+        units_text = f"{float(row.unidades):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+        order_number = str(row.pedido_numero or "").strip() or "Sin número"
+        action = history_menu.addAction(
+            f"{row.pedido_fecha.strftime('%d/%m/%Y')} · Pedido {order_number} · {units_text} uds."
+        )
+        action.setEnabled(False)
+    return history_menu
+
+
+def _exec_context_menu(menu: QMenu, global_pos):
+    return menu.exec(global_pos)
 
 
 class AlbaranPreviewDialog(QDialog):
@@ -920,6 +944,7 @@ class NewPedidoDialog(QDialog):
         self._confirm_label = str(confirm_label or "Consignar").strip() or "Consignar"
         self._allow_pending = bool(allow_pending)
         self._submit_mode = "consignar"
+        self.order_query_service = OrderQueryService()
         self.setWindowTitle(title)
         self.setFixedSize(980, 620)
         self._all_rows: list[IngredienteIreks] = []
@@ -986,6 +1011,8 @@ class NewPedidoDialog(QDialog):
         self.table.verticalHeader().setVisible(False)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.setStyleSheet("QTableWidget::item:focus { border: none; outline: 0; }")
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_article_history_context_menu)
         header = self.table.horizontalHeader()
         header.setSectionsClickable(True)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
@@ -1062,7 +1089,7 @@ class NewPedidoDialog(QDialog):
             subfamilias,
             self._prev_qty_by_articulo,
             self._pending_qty_by_articulo,
-        ) = OrderQueryService().order_dialog_catalogs(
+        ) = self.order_query_service.order_dialog_catalogs(
             self.almacen_id,
             self._preload_history,
             reference_date=self._history_reference_date,
@@ -1113,7 +1140,7 @@ class NewPedidoDialog(QDialog):
             return
 
         _rows, _fabricantes, _familias, _subfamilias, prev_qty_by_articulo, pending_qty_by_articulo = (
-            OrderQueryService().order_dialog_catalogs(
+            self.order_query_service.order_dialog_catalogs(
                 self.almacen_id,
                 True,
                 reference_date=self._history_reference_date,
@@ -1217,6 +1244,28 @@ class NewPedidoDialog(QDialog):
             self.table.setItem(i, 6, pending_item)
         self._loading_table = False
         self._update_totals_label()
+
+    def _show_article_history_context_menu(self, pos) -> None:
+        item = self.table.itemAt(pos)
+        if item is None:
+            return
+        row_idx = item.row()
+        self.table.selectRow(row_idx)
+        ref_item = self.table.item(row_idx, 0)
+        articulo_id = str(ref_item.data(Qt.ItemDataRole.UserRole) or "").strip() if ref_item else ""
+        if not articulo_id:
+            return
+
+        history = self.order_query_service.list_article_order_history(
+            self.almacen_id,
+            articulo_id,
+            reference_date=self._history_reference_date,
+            exclude_pedido_id=self._history_exclude_pedido_id,
+            limit=5,
+        )
+        menu = QMenu(self)
+        _add_article_order_history_menu(menu, history)
+        _exec_context_menu(menu, self.table.viewport().mapToGlobal(pos))
 
     def _update_totals_label(self) -> None:
         total_uds = 0.0
@@ -2184,6 +2233,7 @@ class OrdersPage(QWidget):
                     cell = QTableWidgetItem(value)
                 if col_idx == 0 and not isinstance(cell, NumericTableWidgetItem):
                     cell.setData(Qt.ItemDataRole.UserRole, str(getattr(item, "item_id", "") or "").strip())
+                    cell.setData(ARTICLE_ID_ROLE, articulo_id)
                 if col_idx in (2, 3, 4, 5, 6):
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 if has_difference:
@@ -2315,8 +2365,23 @@ class OrdersPage(QWidget):
         delete_action = menu.addAction("Eliminar")
         edit_action.setEnabled(has_line)
         delete_action.setEnabled(has_line)
+        if item is not None:
+            id_cell = self.pedido_items_table.item(item.row(), 0)
+            articulo_id = str(id_cell.data(ARTICLE_ID_ROLE) or "").strip() if id_cell else ""
+            selected_order = self._selected_row()
+            history: list[ArticleOrderHistoryRow] = []
+            if articulo_id and selected_order is not None:
+                history = self.order_query_service.list_article_order_history(
+                    selected_order.almacen_id,
+                    articulo_id,
+                    reference_date=selected_order.pedido_fecha,
+                    exclude_pedido_id=selected_order.pedido_id,
+                    limit=5,
+                )
+            menu.addSeparator()
+            _add_article_order_history_menu(menu, history)
 
-        chosen = menu.exec(self.pedido_items_table.viewport().mapToGlobal(pos))
+        chosen = _exec_context_menu(menu, self.pedido_items_table.viewport().mapToGlobal(pos))
         if chosen == add_action:
             self._add_order_line()
         elif chosen == edit_action:

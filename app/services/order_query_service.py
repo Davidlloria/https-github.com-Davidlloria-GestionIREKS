@@ -48,6 +48,14 @@ class OrderListRow:
 
 
 @dataclass
+class ArticleOrderHistoryRow:
+    pedido_id: str
+    pedido_fecha: date
+    pedido_numero: str
+    unidades: float
+
+
+@dataclass
 class PendingAggregateRow:
     pedido_id: str
     articulo_id: str
@@ -149,6 +157,65 @@ class OrderQueryService:
                     if qty > 0:
                         pending_qty_by_articulo[articulo_id] = pending_qty_by_articulo.get(articulo_id, 0.0) + qty
         return rows, fabricantes, familias, subfamilias, prev_qty_by_articulo, pending_qty_by_articulo
+
+    def list_article_order_history(
+        self,
+        almacen_id: str,
+        articulo_id: str,
+        *,
+        reference_date: date | None = None,
+        exclude_pedido_id: str = "",
+        limit: int = 5,
+    ) -> list[ArticleOrderHistoryRow]:
+        clean_almacen_id = str(almacen_id or "").strip()
+        clean_articulo_id = str(articulo_id or "").strip()
+        clean_exclude_pedido_id = str(exclude_pedido_id or "").strip()
+        clean_limit = max(0, int(limit or 0))
+        if not clean_almacen_id or not clean_articulo_id or clean_limit == 0:
+            return []
+
+        query = (
+            select(PedidoItem, Pedido)
+            .join(Pedido, Pedido.pedido_id == PedidoItem.pedido_id)
+            .where(
+                Pedido.almacen_id == clean_almacen_id,
+                PedidoItem.articulo_id == clean_articulo_id,
+            )
+        )
+        if reference_date is not None:
+            query = query.where(Pedido.pedido_fecha <= reference_date)
+        if clean_exclude_pedido_id:
+            query = query.where(Pedido.pedido_id != clean_exclude_pedido_id)
+        query = query.order_by(
+            Pedido.pedido_fecha.desc(),
+            Pedido.pedido_numero.desc(),
+            Pedido.pedido_id.desc(),
+            PedidoItem.item_id,
+        )
+
+        history: list[ArticleOrderHistoryRow] = []
+        by_pedido_id: dict[str, ArticleOrderHistoryRow] = {}
+        with Session(engine) as session:
+            for item, pedido in session.exec(query):
+                pedido_id = str(getattr(pedido, "pedido_id", "") or "").strip()
+                if not pedido_id:
+                    continue
+                existing = by_pedido_id.get(pedido_id)
+                units = float(getattr(item, "articulo_cantidad", 0.0) or 0.0)
+                if existing is not None:
+                    existing.unidades += units
+                    continue
+                if len(history) >= clean_limit:
+                    break
+                row = ArticleOrderHistoryRow(
+                    pedido_id=pedido_id,
+                    pedido_fecha=pedido.pedido_fecha,
+                    pedido_numero=str(getattr(pedido, "pedido_numero", "") or "").strip(),
+                    unidades=units,
+                )
+                history.append(row)
+                by_pedido_id[pedido_id] = row
+        return history
 
     def resolve_warehouse_id(self, raw_value: str) -> str:
         candidate = str(raw_value or "").strip()

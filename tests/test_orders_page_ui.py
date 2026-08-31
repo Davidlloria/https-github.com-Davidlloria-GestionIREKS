@@ -10,8 +10,9 @@ from PySide6.QtWidgets import QApplication, QTableWidgetItem, QTabWidget
 
 from app.models import PedidoIncidencia, PedidoIncidenciaImagen
 from app.services.order_incident_service import OrderIncidentRow, ReceivedArticleOption
+from app.services.order_query_service import ArticleOrderHistoryRow
 from app.ui.widgets import orders_page as orders_page_module
-from app.ui.widgets.orders_page import OrderIncidentDialog, OrdersPage
+from app.ui.widgets.orders_page import NewPedidoDialog, OrderIncidentDialog, OrdersPage, PedidoListRow
 
 
 _APP: QApplication | None = None
@@ -21,6 +22,25 @@ def _application() -> QApplication:
     global _APP
     _APP = QApplication.instance() or QApplication([])
     return _APP
+
+
+class _ArticleHistoryQueryService:
+    def __init__(self, rows: list[ArticleOrderHistoryRow]) -> None:
+        self.rows = rows
+        self.calls: list[dict[str, object]] = []
+
+    def list_article_order_history(
+        self,
+        almacen_id: str,
+        articulo_id: str,
+        **kwargs,
+    ) -> list[ArticleOrderHistoryRow]:
+        self.calls.append({"almacen_id": almacen_id, "articulo_id": articulo_id, **kwargs})
+        return self.rows
+
+
+def _history_submenu(menu):
+    return next(action.menu() for action in menu.actions() if action.text() == "Últimos pedidos del artículo")
 
 
 def test_pedido_tab_uses_split_order_and_received_columns(monkeypatch) -> None:
@@ -79,6 +99,118 @@ def test_pedido_quantity_edit_defers_reload_until_editor_commit_finishes(monkeyp
     assert saved == [("line-1", 3.5)]
     assert len(scheduled) == 1
     assert scheduled[0][0] == 0
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_new_and_edit_order_table_context_menu_shows_article_history(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(NewPedidoDialog, "_load_rows", lambda self: None)
+    dialog = NewPedidoDialog(
+        "alm-1",
+        title="Editar pedido",
+        history_reference_date=date(2026, 6, 10),
+        history_exclude_pedido_id="pedido-actual",
+    )
+    history_service = _ArticleHistoryQueryService(
+        [
+            ArticleOrderHistoryRow("pedido-2", date(2026, 6, 9), "A-002", 4.0),
+            ArticleOrderHistoryRow("pedido-1", date(2026, 6, 1), "", 2.5),
+        ]
+    )
+    dialog.order_query_service = history_service
+    dialog.table.setRowCount(1)
+    ref_item = QTableWidgetItem("R1")
+    ref_item.setData(Qt.ItemDataRole.UserRole, "art-1")
+    dialog.table.setItem(0, 0, ref_item)
+    captured: dict[str, object] = {}
+
+    def capture_menu(menu, _pos):
+        history_menu = _history_submenu(menu)
+        captured["texts"] = [action.text() for action in history_menu.actions()]
+        captured["enabled"] = [action.isEnabled() for action in history_menu.actions()]
+
+    monkeypatch.setattr(
+        orders_page_module,
+        "_exec_context_menu",
+        capture_menu,
+    )
+
+    dialog._show_article_history_context_menu(dialog.table.visualItemRect(ref_item).center())
+
+    assert dialog.table.selectionModel().selectedRows()[0].row() == 0
+    assert history_service.calls == [
+        {
+            "almacen_id": "alm-1",
+            "articulo_id": "art-1",
+            "reference_date": date(2026, 6, 10),
+            "exclude_pedido_id": "pedido-actual",
+            "limit": 5,
+        }
+    ]
+    assert captured["texts"] == [
+        "09/06/2026 · Pedido A-002 · 4,00 uds.",
+        "01/06/2026 · Pedido Sin número · 2,50 uds.",
+    ]
+    assert captured["enabled"] == [False, False]
+    dialog.close()
+    dialog.deleteLater()
+    QApplication.processEvents()
+
+
+def test_pedido_tab_context_menu_shows_empty_article_history(monkeypatch) -> None:
+    _application()
+    monkeypatch.setattr(OrdersPage, "reload", lambda self: None)
+    page = OrdersPage()
+    selected_order = PedidoListRow(
+        pedido_id="pedido-actual",
+        almacen_id="alm-1",
+        almacen_nombre="Almacén",
+        pedido_fecha=date(2026, 6, 10),
+        pedido_numero="A-003",
+        pedido_albaran_numero="",
+        pedido_factura_numero="",
+        pedido_ref="",
+        pedido_estado="P",
+        semana=24,
+        total_kg=12.5,
+    )
+    monkeypatch.setattr(page, "_selected_row", lambda: selected_order)
+    history_service = _ArticleHistoryQueryService([])
+    page.order_query_service = history_service
+    page.pedido_items_table.setRowCount(1)
+    id_item = QTableWidgetItem("R1")
+    id_item.setData(Qt.ItemDataRole.UserRole, "line-1")
+    id_item.setData(orders_page_module.ARTICLE_ID_ROLE, "art-1")
+    page.pedido_items_table.setItem(0, 0, id_item)
+    captured: dict[str, object] = {}
+
+    def capture_menu(menu, _pos):
+        history_menu = _history_submenu(menu)
+        captured["texts"] = [action.text() for action in history_menu.actions()]
+        captured["enabled"] = [action.isEnabled() for action in history_menu.actions()]
+
+    monkeypatch.setattr(
+        orders_page_module,
+        "_exec_context_menu",
+        capture_menu,
+    )
+
+    page._show_pedido_items_context_menu(page.pedido_items_table.visualItemRect(id_item).center())
+
+    assert page.pedido_items_table.selectionModel().selectedRows()[0].row() == 0
+    assert history_service.calls == [
+        {
+            "almacen_id": "alm-1",
+            "articulo_id": "art-1",
+            "reference_date": date(2026, 6, 10),
+            "exclude_pedido_id": "pedido-actual",
+            "limit": 5,
+        }
+    ]
+    assert captured["texts"] == ["Sin pedidos anteriores"]
+    assert captured["enabled"] == [False]
     page.close()
     page.deleteLater()
     QApplication.processEvents()
