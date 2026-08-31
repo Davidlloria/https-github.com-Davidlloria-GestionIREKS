@@ -390,16 +390,19 @@ export function OrdersPage() {
 
   const articleDisplayQuery = useAsyncResource(loadIreksArticleCatalog, {} as Record<string, ArticleDisplayInfo>, [loadIreksArticleCatalog])
 
-  const getArticleDisplay = (articleId: string) =>
-    articleDisplayQuery.data[articleId] || { code: articleId, name: articleId, unitKg: 0 }
+  const getArticleDisplay = useCallback(
+    (articleId: string) =>
+      articleDisplayQuery.data[articleId] || { code: articleId, name: articleId, unitKg: 0 },
+    [articleDisplayQuery.data],
+  )
 
-  function resolveLineKg(row: OrderItemRead) {
+  const resolveLineKg = useCallback((row: OrderItemRead) => {
     const display = getArticleDisplay(row.articulo_id)
     const quantity = safeNumber(row.articulo_cantidad)
     const unitKg = safeNumber(display.unitKg)
     const lineKg = quantity * unitKg
     return lineKg > 0 ? lineKg : quantity
-  }
+  }, [getArticleDisplay])
 
   const listTotalKg = orderRows.reduce((acc, row) => acc + safeNumber(row.total_kg), 0)
   const detailLineQty = detailQuery.data.items.reduce((acc, row) => acc + safeNumber(row.articulo_cantidad), 0)
@@ -437,7 +440,7 @@ export function OrdersPage() {
     })
 
     return rows
-  }, [detailQuery.data.items, detailSortDirection, detailSortKey, articleDisplayQuery.data])
+  }, [detailQuery.data.items, detailSortDirection, detailSortKey, getArticleDisplay, resolveLineKg])
 
   const sortedPendingRows = useMemo(() => {
     const rows = [...detailQuery.data.pending]
@@ -473,7 +476,7 @@ export function OrdersPage() {
     })
 
     return rows
-  }, [detailQuery.data.pending, pendingSortDirection, pendingSortKey, articleDisplayQuery.data])
+  }, [detailQuery.data.pending, pendingSortDirection, pendingSortKey, getArticleDisplay])
 
   const sortAriaValue = (key: OrderSortKey) => {
     if (sortKey !== key) {

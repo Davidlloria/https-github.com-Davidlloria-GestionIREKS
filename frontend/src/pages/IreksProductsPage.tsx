@@ -235,7 +235,7 @@ export function IreksProductsPage() {
     const sorted = [...filteredRows]
 
     sorted.sort((left, right) => {
-      let comparison = 0
+      let comparison: number
 
       if (sortKey === 'ref') {
         comparison = (left.articulo_referencia_corta || left.articulo_referencia || left.articulo_id).localeCompare(

@@ -106,41 +106,7 @@ const TABS: Array<{ key: CustomerTab; label: string }> = [
   { key: 'agenda', label: 'Agenda' },
 ]
 
-const LISTING_PRESETS = [
-  {
-    label: 'Clientes activos de Tenerife',
-    prompt: 'Clientes activos de Tenerife con contactos principales',
-    tone: 'green',
-  },
-  {
-    label: 'Clientes con actividad panadería',
-    prompt: 'Clientes con actividad panadería y ventas del último mes',
-    tone: 'amber',
-  },
-  {
-    label: 'Clientes con contactos y ventas',
-    prompt: 'Clientes con contactos, ventas y recetas relacionadas',
-    tone: 'blue',
-  },
-] as const
-
-const LISTING_TIPS = [
-  {
-    title: 'Sé específico',
-    text: 'Indica filtros, condiciones y valores concretos para obtener mejores resultados.',
-    tone: 'blue',
-  },
-  {
-    title: 'Elige columnas clave',
-    text: 'Selecciona los campos que realmente necesitas ver en el listado.',
-    tone: 'violet',
-  },
-  {
-    title: 'Usa rangos de fechas',
-    text: 'Especifica periodos para analizar datos relevantes en el tiempo.',
-    tone: 'green',
-  },
-] as const
+type ListingIconTone = 'green' | 'amber' | 'blue' | 'violet' | 'chatgpt' | 'close' | 'preview' | 'check' | 'info'
 
 function escapeCsvValue(value: string) {
   return `"${value.replace(/"/g, '""')}"`
@@ -370,7 +336,7 @@ function ListingIcon({
   tone,
   className,
 }: {
-  tone: (typeof LISTING_PRESETS)[number]['tone'] | (typeof LISTING_TIPS)[number]['tone'] | 'chatgpt' | 'close' | 'preview' | 'check' | 'info'
+  tone: ListingIconTone
   className?: string
 }) {
   const common = { className, 'aria-hidden': true, viewBox: '0 0 24 24', fill: 'none' as const }
@@ -606,6 +572,7 @@ export function CustomersPage() {
   const [editorMode, setEditorMode] = useState<CustomerEditorMode>(null)
   const [draft, setDraft] = useState<CustomerDraft>(emptyCustomerDraft())
   const [syncedDraft, setSyncedDraft] = useState<CustomerDraft>(emptyCustomerDraft())
+  const [draftSource, setDraftSource] = useState<CustomerDetail | null>(null)
   const [refreshTick, setRefreshTick] = useState(0)
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -730,17 +697,13 @@ export function CustomersPage() {
     [customerCatalogs.codigos_postales, selectedAddressMunicipalityId],
   )
 
-  useEffect(() => {
-    if (isCreating || !selectedDetail) {
-      return
-    }
-
+  if (!isCreating && selectedDetail && selectedDetail !== draftSource) {
     const nextDraft = draftFromDetail(selectedDetail)
+    setDraftSource(selectedDetail)
     setDraft(nextDraft)
     setSyncedDraft(nextDraft)
     setFormError('')
-    invalidSignatureRef.current = ''
-  }, [isCreating, selectedDetail, selectedCustomerId])
+  }
 
   useEffect(() => {
     if (isCreating || !selectedDetail || !selectedCustomerId) {
@@ -759,7 +722,6 @@ export function CustomersPage() {
 
     if (nextSignature === baselineSignature) {
       invalidSignatureRef.current = ''
-      setFormError('')
       return
     }
 
@@ -799,6 +761,7 @@ export function CustomersPage() {
   }, [draft, isCreating, selectedDetail, selectedCustomerId, syncedDraft])
 
   const setDraftField = <K extends keyof CustomerDraft>(key: K, value: CustomerDraft[K]) => {
+    setFormError('')
     setDraft((current) => ({ ...current, [key]: value }))
   }
 

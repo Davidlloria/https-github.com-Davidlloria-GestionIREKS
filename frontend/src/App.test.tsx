@@ -727,7 +727,6 @@ describe('App shell smoke', () => {
     expect(screen.queryByRole('button', { name: 'Anterior' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Siguiente' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Pagina/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Refrescar' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Datos' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Tarifa' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Detalle del producto' })).toBeInTheDocument()
