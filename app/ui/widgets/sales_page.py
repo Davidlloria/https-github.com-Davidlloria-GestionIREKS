@@ -150,6 +150,9 @@ class CodeTableWidgetItem(QTableWidgetItem):
         return super().__lt__(other)
 
 
+SALES_PRODUCT_ID_ROLE = int(Qt.ItemDataRole.UserRole) + 10
+
+
 class MonthlySalesChartWidget(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -5230,7 +5233,7 @@ class SalesPage(QWidget):
                 else:
                     if col == 0:
                         item = CodeTableWidgetItem(str(value or ""))
-                        item.setData(Qt.ItemDataRole.UserRole, row.articulo_id)
+                        item.setData(SALES_PRODUCT_ID_ROLE, row.articulo_id)
                     else:
                         item = QTableWidgetItem(str(value or ""))
                     item.setToolTip(str(value or ""))
@@ -5614,6 +5617,7 @@ class SalesPage(QWidget):
                     item.setToolTip(str(value or ""))
                     if col == 0:
                         item.setData(Qt.ItemDataRole.UserRole, row.articulo_id)
+                        item.setData(SALES_PRODUCT_ID_ROLE, row.articulo_id)
                     elif col == 1:
                         item.setData(Qt.ItemDataRole.UserRole, row.nombre)
                 self.sales_table_clientes.setItem(idx, col, item)
@@ -5701,7 +5705,11 @@ class SalesPage(QWidget):
         product_name_item = table.item(row, 1)
         if product_id_item is None:
             return None
-        product_id = str(product_id_item.data(Qt.ItemDataRole.UserRole) or "").strip()
+        product_id = str(product_id_item.data(SALES_PRODUCT_ID_ROLE) or "").strip()
+        if not product_id:
+            legacy_product_id = product_id_item.data(Qt.ItemDataRole.UserRole)
+            if isinstance(legacy_product_id, str):
+                product_id = legacy_product_id.strip()
         product_code = str(product_id_item.text() or "").strip()
         product_name = str(product_name_item.text() if product_name_item is not None else "").strip()
         if not product_id and not product_code:
@@ -6086,6 +6094,7 @@ class SalesPage(QWidget):
                     item.setToolTip(str(value or ""))
                     if col == 0:
                         item.setData(Qt.ItemDataRole.UserRole, row.articulo_id)
+                        item.setData(SALES_PRODUCT_ID_ROLE, row.articulo_id)
                     elif col == 1:
                         item.setData(Qt.ItemDataRole.UserRole, row.nombre)
                 self.sales_table.setItem(idx, col, item)

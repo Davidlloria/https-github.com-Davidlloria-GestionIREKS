@@ -4,10 +4,10 @@ from types import SimpleNamespace
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QTableWidgetItem
+from PySide6.QtWidgets import QApplication
 
 from app.ui.widgets import sales_page as sales_page_module
-from app.ui.widgets.sales_page import SalesAnalysisDialog, SalesPage
+from app.ui.widgets.sales_page import SALES_PRODUCT_ID_ROLE, SalesAnalysisDialog, SalesPage
 
 
 def _app() -> QApplication:
@@ -104,12 +104,32 @@ def test_sales_product_tables_offer_consumers_context_menu(monkeypatch) -> None:
     for table in (page.sales_table, page.sales_table_igsa, page.sales_table_clientes):
         assert table.contextMenuPolicy() == Qt.ContextMenuPolicy.CustomContextMenu
 
-    page.sales_table_igsa.setRowCount(1)
-    code_item = QTableWidgetItem("IG-001")
-    code_item.setData(Qt.ItemDataRole.UserRole, "art-igsa-1")
-    name_item = QTableWidgetItem("Producto IGSA")
-    page.sales_table_igsa.setItem(0, 0, code_item)
-    page.sales_table_igsa.setItem(0, 1, name_item)
+    def igsa_row(product_id: str, code: str, name: str):
+        return SimpleNamespace(
+            articulo_id=product_id,
+            codigo=code,
+            nombre=name,
+            kilos_prev=1.0,
+            sc_prev=0.0,
+            ventas_prev=2.0,
+            kilos_curr=3.0,
+            sc_curr=0.0,
+            ventas_curr=4.0,
+            delta_kg=2.0,
+            delta_kg_pct=200.0,
+            delta_ventas=2.0,
+            delta_ventas_pct=100.0,
+        )
+
+    page._fill_sales_igsa(
+        [
+            igsa_row("art-igsa-2", "IG-002", "Producto IGSA 2"),
+            igsa_row("art-igsa-1", "IG-001", "Producto IGSA"),
+        ],
+        2026,
+    )
+    code_item = page.sales_table_igsa.findItems("IG-001", Qt.MatchFlag.MatchExactly)[0]
+    assert code_item.data(SALES_PRODUCT_ID_ROLE) == "art-igsa-1"
     captured: list[tuple[int, str, str, str]] = []
 
     class _Menu:
@@ -137,7 +157,7 @@ def test_sales_product_tables_offer_consumers_context_menu(monkeypatch) -> None:
         page.sales_table_igsa.visualItemRect(code_item).center(),
     )
 
-    assert page.sales_table_igsa.selectionModel().selectedRows()[0].row() == 0
+    assert page.sales_table_igsa.selectionModel().selectedRows()[0].row() == code_item.row()
     assert captured == [(2026, "art-igsa-1", "IG-001", "Producto IGSA")]
     page.close()
     page.deleteLater()
