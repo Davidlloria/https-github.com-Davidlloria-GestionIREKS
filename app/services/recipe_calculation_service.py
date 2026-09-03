@@ -104,48 +104,39 @@ class RecipeCalculationService:
             self._compute_process_stats(process_name, lineas, stats_by_process, set())
         return stats_by_process
 
-    def resolve_process_ingredients(
+    def build_process_cost_sheet(
         self,
         lineas: list[RecetaLinea],
         process_name: str = "Masa final",
     ) -> list[RecetaLinea]:
-        """Devuelve las materias primas efectivas que componen un proceso."""
-        lines_by_process: dict[str, list[RecetaLinea]] = {}
-        for line in lineas:
-            name = self._normalize_process_name(getattr(line, "proceso_nombre", ""))
-            lines_by_process.setdefault(name, []).append(line)
-
-        def resolve(name: str, factor: float, resolving: set[str]) -> list[RecetaLinea]:
-            if name in resolving:
-                return []
-            next_resolving = {*resolving, name}
-            resolved: list[RecetaLinea] = []
-            for line in lines_by_process.get(name, []):
-                qty = max(float(getattr(line, "cantidad_base_g", 0.0) or 0.0), 0.0)
-                if self._line_type(line) != "proceso":
-                    clone = RecetaLinea(**line.model_dump())
-                    clone.cantidad_base_g = qty * factor
-                    clone.cantidad_calculada_g = clone.cantidad_base_g
-                    resolved.append(clone)
-                    continue
-                source = self._normalize_process_name(getattr(line, "proceso_origen_nombre", ""))
-                source_mass = sum(
-                    max(float(getattr(source_line, "cantidad_base_g", 0.0) or 0.0), 0.0)
-                    for source_line in lines_by_process.get(source, [])
-                )
-                if source_mass > 0:
-                    resolved.extend(resolve(source, factor * qty / source_mass, next_resolving))
-            return resolved
-
+        """Devuelve las líneas directas del proceso con subprocesos valorizados."""
         target = self._normalize_process_name(process_name)
-        resolved = resolve(target, 1.0, set())
-        total_flour = sum(float(line.cantidad_base_g or 0.0) for line in resolved if line.es_harina)
-        for line in resolved:
-            qty = float(line.cantidad_base_g or 0.0)
-            line.porcentaje_panadero = (qty / total_flour * 100.0) if total_flour > 0 else 0.0
+        stats_by_process = self.process_stats(lineas)
+        target_stats = stats_by_process.get(target, _ProcessStats())
+        total_flour = float(target_stats.harina_g or 0.0)
+        cost_sheet: list[RecetaLinea] = []
+        for source_line in lineas:
+            if self._normalize_process_name(getattr(source_line, "proceso_nombre", "")) != target:
+                continue
+            line = RecetaLinea(**source_line.model_dump())
+            qty = max(float(getattr(line, "cantidad_base_g", 0.0) or 0.0), 0.0)
+            if self._line_type(line) == "proceso":
+                source = self._normalize_process_name(getattr(line, "proceso_origen_nombre", ""))
+                source_stats = stats_by_process.get(source, _ProcessStats())
+                source_mass = float(source_stats.masa_g or 0.0)
+                price_kg = (float(source_stats.coste or 0.0) / source_mass * 1000.0) if source_mass > 0 else 0.0
+                flour_equivalent = (
+                    float(source_stats.harina_g or 0.0) * qty / source_mass if source_mass > 0 else 0.0
+                )
+                line.precio_kg_snapshot = price_kg
+                line.precio_kg_efectivo_snapshot = price_kg
+                line.porcentaje_panadero = flour_equivalent / total_flour * 100.0 if total_flour > 0 else 0.0
+            else:
+                line.porcentaje_panadero = qty / total_flour * 100.0 if total_flour > 0 else 0.0
             effective_price = self._effective_price(line)
             line.coste_linea = qty * effective_price / 1000.0
-        return resolved
+            cost_sheet.append(line)
+        return cost_sheet
 
     def calculate(self, receta: Receta, lineas: list[RecetaLinea]) -> CalculationResult:
         issues: list[ValidationIssue] = []

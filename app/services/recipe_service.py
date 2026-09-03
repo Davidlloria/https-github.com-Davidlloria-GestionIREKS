@@ -52,12 +52,12 @@ class RecipeService:
         lineas = self.promotion_service.apply_to_lines(receta.cliente_id, lineas)
         return self.vm.calculate(receta, lineas)
 
-    def resolve_process_ingredients(
+    def build_process_cost_sheet(
         self,
         lineas: list[RecetaLinea],
         process_name: str = "Masa final",
     ) -> list[RecetaLinea]:
-        return self.vm.calc_service.resolve_process_ingredients(lineas, process_name)
+        return self.vm.calc_service.build_process_cost_sheet(lineas, process_name)
 
     def scale_recipe(
         self,

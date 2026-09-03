@@ -23,11 +23,12 @@ def test_parse_decimal_accepts_the_unit_suffixes_shown_in_recipe_totals() -> Non
     assert RecipesPage._parse_decimal("12 Uds") == 12.0
 
 
-def test_technical_escandallo_value_prefers_the_active_process_value() -> None:
+def test_technical_escandallo_value_prefers_the_filtered_process_value() -> None:
     page = RecipesPage.__new__(RecipesPage)
+    page.escandallo_process_combo = SimpleNamespace(currentText=lambda: "Primera Masa")
     page.recipe_escandallo_data = {
         "costes_fijos": "2,00",
-        "proceso::Masa final::costes_fijos": "3,50",
+        "proceso::Primera Masa::costes_fijos": "3,50",
     }
 
     assert page._technical_escandallo_value("costes_fijos") == "3,50"

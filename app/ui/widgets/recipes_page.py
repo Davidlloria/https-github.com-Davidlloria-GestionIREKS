@@ -1059,8 +1059,8 @@ class RecipeTechnicalDialog(QDialog):
         self.lines = []
         self._display_indices = []
         source_lines = [line for line, _cantidad_text, _unidad_text in self.all_lines]
-        resolved_lines = self.recipe_service.resolve_process_ingredients(source_lines, self.current_process)
-        for line in resolved_lines:
+        cost_sheet = self.recipe_service.build_process_cost_sheet(source_lines, self.current_process)
+        for line in cost_sheet:
             source_idx = next(
                 (
                     idx
@@ -1515,7 +1515,10 @@ class RecipeTechnicalDialog(QDialog):
             ]
             for col, value in enumerate(values):
                 cell = QTableWidgetItem(value)
-                if col in {self.COL_INGREDIENTE, self.COL_CANTIDAD, self.COL_PCT, self.COL_EUR_LINEA}:
+                is_process = str(getattr(line, "tipo_linea", "") or "").strip().lower() == "proceso"
+                if col in {self.COL_INGREDIENTE, self.COL_CANTIDAD, self.COL_PCT, self.COL_EUR_LINEA} or (
+                    col == self.COL_EUR_KG and is_process
+                ):
                     cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 if col in {self.COL_CANTIDAD, self.COL_PCT, self.COL_EUR_KG, self.COL_EUR_LINEA}:
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -2599,6 +2602,17 @@ class RecipesPage(QWidget):
         escandallo_layout.setContentsMargins(0, 0, 0, 0)
         escandallo_layout.setSpacing(4)
 
+        escandallo_filter_row = QHBoxLayout()
+        escandallo_filter_row.setContentsMargins(0, 0, 0, 4)
+        escandallo_filter_row.addWidget(QLabel("Escandallo del proceso"))
+        self.escandallo_process_combo = QComboBox()
+        self.escandallo_process_combo.setMinimumWidth(180)
+        self.escandallo_process_combo.addItems(self.recipe_process_names)
+        self.escandallo_process_combo.currentTextChanged.connect(self._on_escandallo_process_changed)
+        escandallo_filter_row.addWidget(self.escandallo_process_combo)
+        escandallo_filter_row.addStretch(1)
+        escandallo_layout.addLayout(escandallo_filter_row)
+
         escandallo_group = QGroupBox()
         escandallo_group.setObjectName("escandalloGroup")
         escandallo_group_layout = QVBoxLayout(escandallo_group)
@@ -3412,6 +3426,11 @@ class RecipesPage(QWidget):
     def _current_active_process(self) -> str:
         return _normalize_process_name(self.active_process_combo.currentText() if hasattr(self, "active_process_combo") else "")
 
+    def _current_escandallo_process(self) -> str:
+        if hasattr(self, "escandallo_process_combo"):
+            return _normalize_process_name(self.escandallo_process_combo.currentText())
+        return self._current_active_process()
+
     def _refresh_process_controls(self, process_names: list[str] | None = None, preserve_active: bool = True) -> None:
         if process_names is None:
             process_names = self.recipe_process_names
@@ -3426,10 +3445,21 @@ class RecipesPage(QWidget):
         idx = self.active_process_combo.findText(current)
         self.active_process_combo.setCurrentIndex(idx if idx >= 0 else 0)
         self.active_process_combo.blockSignals(False)
+        if hasattr(self, "escandallo_process_combo"):
+            escandallo_current = self._current_escandallo_process() if preserve_active else "Masa final"
+            self.escandallo_process_combo.blockSignals(True)
+            self.escandallo_process_combo.clear()
+            self.escandallo_process_combo.addItems(self.recipe_process_names)
+            escandallo_idx = self.escandallo_process_combo.findText(escandallo_current)
+            self.escandallo_process_combo.setCurrentIndex(escandallo_idx if escandallo_idx >= 0 else 0)
+            self.escandallo_process_combo.blockSignals(False)
         self._apply_process_filter()
 
     def _on_active_process_changed(self) -> None:
         self._apply_process_filter()
+
+    def _on_escandallo_process_changed(self) -> None:
+        self._refresh_escandallo_table()
 
     def _apply_process_filter(self) -> None:
         if not hasattr(self, "lines_table"):
@@ -4155,10 +4185,8 @@ class RecipesPage(QWidget):
         table = self.escandallo_table
         table.blockSignals(True)
         recipe_lines = self._build_lines()
-        process_names = {_normalize_process_name(line.proceso_nombre) for line in recipe_lines}
-        principal = "Masa final" if "Masa final" in process_names else self._current_active_process()
-        resolved_lines = self.recipe_service.resolve_process_ingredients(recipe_lines, principal)
-        rows = [(max(int(line.orden or 1) - 1, 0), line) for line in resolved_lines]
+        cost_sheet = self.recipe_service.build_process_cost_sheet(recipe_lines, self._current_escandallo_process())
+        rows = [(max(int(line.orden or 1) - 1, 0), line) for line in cost_sheet]
         table.setRowCount(len(rows))
         total_qty_g = 0.0
         total_pct = 0.0
@@ -4187,7 +4215,8 @@ class RecipesPage(QWidget):
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
                 item.setData(Qt.ItemDataRole.UserRole, source_row)
-                if column != self.ESC_COL_EUR_KG:
+                is_process = str(getattr(line, "tipo_linea", "") or "").strip().lower() == "proceso"
+                if column != self.ESC_COL_EUR_KG or is_process:
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 if column in {
                     self.ESC_COL_CANTIDAD,
@@ -4266,7 +4295,7 @@ class RecipesPage(QWidget):
         self.peso_spin.setValue(peso_pieza)
         peso_pieza_text = self._format_number(peso_pieza, 2) if peso_pieza > 0 else ""
         self.recipe_escandallo_data["peso_pieza"] = peso_pieza_text
-        self.recipe_escandallo_data[f"proceso::{self._current_active_process()}::peso_pieza"] = peso_pieza_text
+        self.recipe_escandallo_data[f"proceso::{self._current_escandallo_process()}::peso_pieza"] = peso_pieza_text
         self._refresh_escandallo_table()
         self._schedule_autosave()
 
@@ -4308,7 +4337,7 @@ class RecipesPage(QWidget):
         return peso_pieza if peso_pieza > 0 else fallback
 
     def _technical_escandallo_value(self, key: str) -> str:
-        process_key = f"proceso::{self._current_active_process()}::{key}"
+        process_key = f"proceso::{self._current_escandallo_process()}::{key}"
         return self.recipe_escandallo_data.get(process_key) or self.recipe_escandallo_data.get(key, "")
 
     def _on_line_item_changed(self, item: QTableWidgetItem) -> None:

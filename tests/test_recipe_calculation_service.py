@@ -1,3 +1,5 @@
+import pytest
+
 from app.models import Receta, RecetaLinea
 from app.services import RecipeCalculationService
 
@@ -67,7 +69,7 @@ def test_calculation_resolves_source_process_even_when_final_mass_is_first() -> 
     assert result.receta.coste_total == 0.385
 
 
-def test_resolve_process_ingredients_returns_final_mass_cost_sheet() -> None:
+def test_process_cost_sheet_keeps_source_process_as_valued_line() -> None:
     lineas = [
         RecetaLinea(
             receta_id=1,
@@ -106,12 +108,83 @@ def test_resolve_process_ingredients_returns_final_mass_cost_sheet() -> None:
         ),
     ]
 
-    resolved = RecipeCalculationService().resolve_process_ingredients(lineas)
+    cost_sheet = RecipeCalculationService().build_process_cost_sheet(lineas)
 
-    assert [(line.nombre_mostrado, line.cantidad_base_g) for line in resolved] == [
-        ("Harina", 150),
-        ("Agua", 150),
+    assert [(line.nombre_mostrado, line.cantidad_base_g) for line in cost_sheet] == [
+        ("Proceso: Poolish", 300),
         ("Sal", 10),
     ]
-    assert sum(line.coste_linea for line in resolved) == 0.385
+    assert cost_sheet[0].precio_kg_efectivo_snapshot == 1.25
+    assert cost_sheet[0].coste_linea == 0.375
+    assert sum(line.coste_linea for line in cost_sheet) == 0.385
+
+
+def test_process_cost_sheet_filters_each_process() -> None:
+    lineas = [
+        RecetaLinea(
+            receta_id=1,
+            orden=1,
+            nombre_mostrado="Harina",
+            es_harina=True,
+            proceso_nombre="Primera Masa",
+            cantidad_base_g=2175,
+            precio_kg_snapshot=4.8,
+        ),
+        RecetaLinea(
+            receta_id=1,
+            orden=2,
+            nombre_mostrado="Yema",
+            proceso_nombre="Primera Masa",
+            cantidad_base_g=370,
+        ),
+        RecetaLinea(
+            receta_id=1,
+            orden=3,
+            nombre_mostrado="Levadura",
+            proceso_nombre="Primera Masa",
+            cantidad_base_g=25,
+        ),
+        RecetaLinea(
+            receta_id=1,
+            orden=4,
+            nombre_mostrado="Mantequilla",
+            proceso_nombre="Primera Masa",
+            cantidad_base_g=540,
+        ),
+        RecetaLinea(
+            receta_id=1,
+            orden=5,
+            nombre_mostrado="Agua",
+            es_liquido=True,
+            proceso_nombre="Primera Masa",
+            cantidad_base_g=1000,
+            precio_kg_snapshot=1,
+        ),
+        RecetaLinea(
+            receta_id=1,
+            orden=6,
+            nombre_mostrado="Proceso: Primera Masa",
+            tipo_linea="proceso",
+            proceso_nombre="Masa final",
+            proceso_origen_nombre="Primera Masa",
+            cantidad_base_g=4110,
+        ),
+    ]
+    service = RecipeCalculationService()
+
+    first_mass = service.build_process_cost_sheet(lineas, "Primera Masa")
+    final_mass = service.build_process_cost_sheet(lineas, "Masa final")
+
+    assert [line.nombre_mostrado for line in first_mass] == [
+        "Harina",
+        "Yema",
+        "Levadura",
+        "Mantequilla",
+        "Agua",
+    ]
+    assert [line.nombre_mostrado for line in final_mass] == ["Proceso: Primera Masa"]
+    assert final_mass[0].precio_kg_efectivo_snapshot == pytest.approx(
+        sum(line.coste_linea for line in first_mass) * 1000 / 4110
+    )
+    assert final_mass[0].coste_linea == pytest.approx(sum(line.coste_linea for line in first_mass))
 
