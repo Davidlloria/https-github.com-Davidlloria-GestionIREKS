@@ -68,3 +68,31 @@ def test_scale_by_pieces_keeps_piece_weight_relation() -> None:
     assert round(result.factor, 4) == 1.25
     assert result.receta.numero_piezas == 10
     assert round(result.receta.masa_final_deseada_g, 2) == 2500.00
+
+
+def test_scale_updates_process_source_quantity() -> None:
+    receta = Receta(
+        cliente_id="cliente-test",
+        nombre="Test procesos",
+        codigo_receta="T-4",
+        numero_piezas=1,
+        masa_final_deseada_g=600,
+    )
+    lineas = [
+        RecetaLinea(
+            receta_id=1,
+            orden=1,
+            tipo_linea="proceso",
+            nombre_mostrado="Proceso: Primera Masa",
+            cantidad_base_g=300,
+            cantidad_origen_g=300,
+            proceso_nombre="Masa final",
+            proceso_origen_nombre="Primera Masa",
+        ),
+        RecetaLinea(receta_id=1, orden=2, nombre_mostrado="Mantequilla", cantidad_base_g=300),
+    ]
+
+    result = RecipeScalingService().scale(receta, lineas, "dough", 1200)
+
+    assert result.lineas[0].cantidad_base_g == 600
+    assert result.lineas[0].cantidad_origen_g == 600

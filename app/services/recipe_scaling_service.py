@@ -48,6 +48,8 @@ class RecipeScalingService:
 
         for linea in scaled_lineas:
             linea.cantidad_base_g = float(linea.cantidad_base_g or 0.0) * factor
+            if str(getattr(linea, "tipo_linea", "") or "").strip().lower() == "proceso":
+                linea.cantidad_origen_g = linea.cantidad_base_g
 
         scaled_total_g = sum(float(linea.cantidad_base_g or 0.0) for linea in scaled_lineas)
         scaled_receta.masa_final_deseada_g = scaled_total_g

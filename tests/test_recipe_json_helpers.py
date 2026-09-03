@@ -77,6 +77,34 @@ def test_recipe_totals_only_include_selected_process_ingredients() -> None:
     assert _recipe_process_totals(lines, "Masa final") == (8470, 209.12)
 
 
+def test_process_line_uses_visible_scaled_quantity_as_source_quantity() -> None:
+    stored_line = RecetaLinea(
+        receta_id=1,
+        orden=1,
+        tipo_linea="proceso",
+        nombre_mostrado="Proceso: Primera Masa",
+        cantidad_base_g=4110,
+        cantidad_origen_g=4110,
+        proceso_nombre="Masa final",
+        proceso_origen_nombre="Primera Masa",
+    ).model_dump()
+    ingredient_item = SimpleNamespace(data=lambda _role: stored_line)
+    page = RecipesPage.__new__(RecipesPage)
+    page.lines_table = SimpleNamespace(item=lambda _row, _column: ingredient_item)
+    page._cell_text = lambda _row, column: {
+        page.COL_INGREDIENTE: "Proceso: Primera Masa",
+        page.COL_NOTA: "Usado desde proceso",
+        page.COL_PROCESO: "Masa final",
+    }.get(column, "")
+    page._quantity_as_grams = lambda _row: 15100.0
+    page._current_active_process = lambda: "Masa final"
+
+    line = page._line_from_row(0)
+
+    assert line.cantidad_base_g == 15100.0
+    assert line.cantidad_origen_g == 15100.0
+
+
 def test_technical_escandallo_value_prefers_the_filtered_process_value() -> None:
     page = RecipesPage.__new__(RecipesPage)
     page.escandallo_process_combo = SimpleNamespace(currentText=lambda: "Primera Masa")

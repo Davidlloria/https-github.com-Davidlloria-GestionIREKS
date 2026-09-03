@@ -4144,11 +4144,7 @@ class RecipesPage(QWidget):
         linea.proceso_nombre = _normalize_process_name(self._cell_text(row, self.COL_PROCESO) or self._current_active_process())
         linea.proceso_origen_nombre = str(getattr(linea, "proceso_origen_nombre", "") or "").strip()
         if linea.tipo_linea == "proceso":
-            qty_origin = float(getattr(linea, "cantidad_origen_g", 0.0) or 0.0)
-            if qty_origin <= 0:
-                qty_origin = float(linea.cantidad_base_g or 0.0)
-            linea.cantidad_origen_g = qty_origin
-            linea.cantidad_base_g = qty_origin
+            linea.cantidad_origen_g = float(linea.cantidad_base_g or 0.0)
         else:
             linea.proceso_origen_nombre = ""
             linea.cantidad_origen_g = 0.0
