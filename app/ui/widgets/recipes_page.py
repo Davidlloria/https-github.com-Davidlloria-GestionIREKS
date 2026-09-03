@@ -957,10 +957,10 @@ class RecipeTechnicalDialog(QDialog):
         self.table.setHorizontalHeaderLabels(
             [
                 "Ingrediente",
-                "Cantidad",
-                "% panadero",
+                "Cant.",
+                "%",
                 "€/kg",
-                "€/ingrediente",
+                "Importe",
             ]
         )
         header = self.table.horizontalHeader()
@@ -969,10 +969,10 @@ class RecipeTechnicalDialog(QDialog):
         header.setSectionResizeMode(self.COL_PCT, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(self.COL_EUR_KG, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(self.COL_EUR_LINEA, QHeaderView.ResizeMode.Fixed)
-        self.table.setColumnWidth(self.COL_CANTIDAD, 96)
-        self.table.setColumnWidth(self.COL_PCT, 92)
-        self.table.setColumnWidth(self.COL_EUR_KG, 72)
-        self.table.setColumnWidth(self.COL_EUR_LINEA, 108)
+        self.table.setColumnWidth(self.COL_CANTIDAD, 76)
+        self.table.setColumnWidth(self.COL_PCT, 58)
+        self.table.setColumnWidth(self.COL_EUR_KG, 68)
+        self.table.setColumnWidth(self.COL_EUR_LINEA, 78)
         left_layout.addWidget(self.table, 1)
 
         self.totals_table = QTableWidget(1, 6)
@@ -2622,17 +2622,17 @@ class RecipesPage(QWidget):
         self.escandallo_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.escandallo_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.escandallo_table.setHorizontalHeaderLabels(
-            ["Ingrediente", "Cantidad", "% panadero", "€/kg base", "Promoción", "€/kg efectivo", "€/ingrediente"]
+            ["Ingrediente", "Cant.", "%", "€/kg", "Promo", "€/kg neto", "Importe"]
         )
         escandallo_header = self.escandallo_table.horizontalHeader()
         escandallo_header.setSectionResizeMode(self.ESC_COL_INGREDIENTE, QHeaderView.ResizeMode.Stretch)
         for column, width in (
-            (self.ESC_COL_CANTIDAD, 96),
-            (self.ESC_COL_PCT, 92),
-            (self.ESC_COL_EUR_KG, 84),
-            (self.ESC_COL_PROMOCION, 94),
-            (self.ESC_COL_EUR_KG_EFECTIVO, 96),
-            (self.ESC_COL_EUR_LINEA, 108),
+            (self.ESC_COL_CANTIDAD, 76),
+            (self.ESC_COL_PCT, 58),
+            (self.ESC_COL_EUR_KG, 68),
+            (self.ESC_COL_PROMOCION, 78),
+            (self.ESC_COL_EUR_KG_EFECTIVO, 78),
+            (self.ESC_COL_EUR_LINEA, 78),
         ):
             escandallo_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
             self.escandallo_table.setColumnWidth(column, width)
