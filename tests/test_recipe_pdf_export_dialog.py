@@ -33,12 +33,15 @@ def test_minimal_export_options_are_exclusive_and_only_visible_for_minimal() -> 
     assert dialog.include_escandallo() is False
     assert dialog.include_nutrition() is False
     assert dialog.include_baker_percentage() is True
+    assert dialog.include_images() is False
 
     dialog.escandallo_si.setChecked(True)
     dialog.nutrition_si.setChecked(True)
+    dialog.images_si.setChecked(True)
 
     assert dialog.include_escandallo() is True
     assert dialog.include_nutrition() is True
+    assert dialog.include_images() is True
 
     dialog.baker_percentage_no.setChecked(True)
 

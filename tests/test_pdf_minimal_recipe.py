@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from PIL import Image
 from pypdf import PdfReader
 
 from app.models import Cliente, Receta, RecetaLinea
@@ -100,6 +101,87 @@ def test_minimal_recipe_pdf_can_hide_baker_percentage(tmp_path) -> None:
     assert "100,00 %" not in text
 
 
+def test_minimal_escandallo_uses_only_final_process_and_calculates_pieces(tmp_path) -> None:
+    recipe = Receta(
+        cliente_id="cliente-1",
+        nombre="Panettone",
+        codigo_receta="PANETTONE",
+        peso_pieza_g=590,
+        numero_piezas=1,
+        escandallo_detalle_json=json.dumps({"peso_pieza": "590,00"}),
+    )
+    lines = [
+        RecetaLinea(
+            receta_id=1,
+            orden=1,
+            nombre_mostrado="Harina primera masa",
+            cantidad_base_g=4110,
+            precio_kg_snapshot=2,
+            proceso_nombre="Primera Masa",
+        ),
+        RecetaLinea(
+            receta_id=1,
+            orden=2,
+            nombre_mostrado="Proceso: Primera Masa",
+            cantidad_base_g=4110,
+            tipo_linea="proceso",
+            proceso_nombre="Masa final",
+            proceso_origen_nombre="Primera Masa",
+        ),
+        RecetaLinea(
+            receta_id=1,
+            orden=3,
+            nombre_mostrado="Resto masa final",
+            cantidad_base_g=4360,
+            precio_kg_snapshot=1,
+            proceso_nombre="Masa final",
+        ),
+    ]
+    output_path = tmp_path / "panettone-final.pdf"
+
+    PdfService()._export_minimal_recipe_to_pdf(
+        recipe,
+        None,
+        lines,
+        output_path,
+        include_escandallo=True,
+    )
+
+    text = "\n".join(page.extract_text() or "" for page in PdfReader(str(output_path)).pages)
+    assert text.count("Harina primera masa") == 1
+    assert text.count("Proceso: Primera Masa") == 2
+    assert "8.470,00 g" in text
+    assert "14 Uds" in text
+
+
+def test_minimal_recipe_pdf_can_include_gallery_images(tmp_path) -> None:
+    image_path = tmp_path / "proceso.png"
+    Image.new("RGB", (320, 180), color=(37, 99, 235)).save(image_path)
+    recipe = Receta(
+        cliente_id="cliente-1",
+        nombre="Pan con imagen",
+        codigo_receta="IMG-1",
+        parametros_elaboracion_json=json.dumps(
+            {"images_gallery": [{"path": str(image_path), "is_main": True, "order": 0}]}
+        ),
+    )
+    output_path = tmp_path / "minimo-con-imagen.pdf"
+
+    PdfService()._export_minimal_recipe_to_pdf(
+        recipe,
+        None,
+        [],
+        output_path,
+        include_escandallo=False,
+        include_images=True,
+    )
+
+    reader = PdfReader(str(output_path))
+    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    assert "IMÁGENES" in text
+    assert sum(len(page.images) for page in reader.pages) == 1
+
+
 @pytest.mark.parametrize("layout_mode", ["minimal", "extended"])
 def test_recipe_pdf_preserves_base_formula_for_cost_and_unit_price(
     tmp_path,
@@ -161,4 +243,4 @@ def test_recipe_pdf_preserves_base_formula_for_cost_and_unit_price(
     assert "1.670,00 g" in text
     assert "2.000,00 g" not in text
     assert "1,15" in text
-    assert "0,14" in text
+    assert ("0,21" if layout_mode == "minimal" else "0,14") in text

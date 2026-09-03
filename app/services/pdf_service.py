@@ -10,6 +10,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.graphics.shapes import Circle, Drawing, String
 from reportlab.platypus import Image as RLImage
 from reportlab.platypus import KeepInFrame, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -336,6 +337,7 @@ class PdfService:
         include_escandallo: bool = False,
         include_nutrition: bool = False,
         include_baker_percentage: bool = True,
+        include_images: bool = False,
     ) -> None:
         receta, cliente, lineas = self._load_recipe_data(recipe_id)
         if not receta:
@@ -371,6 +373,7 @@ class PdfService:
                 include_escandallo=include_escandallo,
                 include_nutrition=include_nutrition,
                 include_baker_percentage=include_baker_percentage,
+                include_images=include_images,
             )
             return
 
@@ -606,6 +609,7 @@ class PdfService:
         include_escandallo: bool,
         include_nutrition: bool = False,
         include_baker_percentage: bool = True,
+        include_images: bool = False,
     ) -> None:
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
@@ -694,11 +698,24 @@ class PdfService:
         if process_text:
             story.append(Paragraph("PROCESO", section_style))
             story.append(Paragraph(escape(process_text).replace("\n", "<br/>"), body_style))
+        if include_images:
+            image_flowables = self._build_minimal_recipe_images(receta)
+            if image_flowables:
+                story.append(Paragraph("IMÁGENES", section_style))
+                story.extend(image_flowables)
         if include_escandallo:
+            grouped_processes = self._group_lines_by_process(lineas)
+            process_names = [name for name, process_lines in grouped_processes if process_lines]
+            final_process = (
+                "Masa final"
+                if "Masa final" in process_names
+                else (process_names[0] if process_names else "Masa final")
+            )
+            escandallo_lines = RecipeCalculationService().build_process_cost_sheet(lineas, final_process)
             story.append(Paragraph("ESCANDALLO", section_style))
-            story.append(self._build_minimal_escandallo_table(lineas, body_style, body_right, header_style))
+            story.append(self._build_minimal_escandallo_table(escandallo_lines, body_style, body_right, header_style))
             story.append(Spacer(1, 3 * mm))
-            story.append(self._build_minimal_escandallo_pills(receta, lineas, body_style, body_right))
+            story.append(self._build_minimal_escandallo_pills(receta, escandallo_lines, body_style, body_right))
         if include_nutrition:
             story.append(Paragraph("VALORES NUTRICIONALES", section_style))
             story.append(self._build_minimal_nutrition_table(receta, lineas, body_style, body_right, header_style))
@@ -714,6 +731,53 @@ class PdfService:
             author="Gestion IREKS",
         )
         doc.build(story)
+
+    def _build_minimal_recipe_images(self, receta: Receta) -> list[Table]:
+        payload = self._json_to_obj(receta.parametros_elaboracion_json)
+        gallery = payload.get("images_gallery")
+        if not isinstance(gallery, list):
+            return []
+        ordered_gallery = sorted(
+            [row for row in gallery if isinstance(row, dict)],
+            key=lambda row: (not bool(row.get("is_main", False)), int(row.get("order", 0) or 0)),
+        )
+        images: list[RLImage] = []
+        max_width = 88 * mm
+        max_height = 62 * mm
+        for row in ordered_gallery:
+            path = Path(str(row.get("path") or "").strip())
+            if not path.is_file():
+                continue
+            try:
+                width, height = ImageReader(str(path)).getSize()
+            except Exception:
+                continue
+            if width <= 0 or height <= 0:
+                continue
+            scale = min(max_width / width, max_height / height)
+            images.append(RLImage(str(path), width=width * scale, height=height * scale))
+        rows: list[list[object]] = []
+        for index in range(0, len(images), 2):
+            row: list[object] = images[index : index + 2]
+            if len(row) == 1:
+                row.append(Spacer(1, 1))
+            rows.append(row)
+        if not rows:
+            return []
+        table = Table(rows, colWidths=[93 * mm, 93 * mm], hAlign="CENTER")
+        table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 2 * mm),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 2 * mm),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2 * mm),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2 * mm),
+                ]
+            )
+        )
+        return [table]
 
     def _build_minimal_nutrition_table(
         self,
@@ -892,9 +956,7 @@ class PdfService:
         if total_masa <= 0:
             total_masa = float(receta.masa_total_g or 0.0)
         peso_pieza = self._to_float(esc.get("peso_pieza")) or float(receta.peso_pieza_g or 0.0)
-        total_piezas = float(receta.numero_piezas or 0.0)
-        if total_piezas <= 0 and peso_pieza > 0:
-            total_piezas = total_masa / peso_pieza
+        total_piezas = total_masa / peso_pieza if peso_pieza > 0 else 0.0
         coste_ingredientes = sum(self._pdf_line_cost(line) for line in lineas)
         costes_adicionales = sum(
             self._to_float(esc.get(key)) for key in ("costes_fijos", "costes_variables", "otros_costes")

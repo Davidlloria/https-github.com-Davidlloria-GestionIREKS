@@ -784,6 +784,15 @@ class RecipePdfExportDialog(QDialog):
         self.baker_percentage_group.addButton(self.baker_percentage_no)
         options_layout.addWidget(self.baker_percentage_si, 2, 1)
         options_layout.addWidget(self.baker_percentage_no, 2, 2)
+        options_layout.addWidget(QLabel("Incluir imágenes:"), 3, 0)
+        self.images_si = QRadioButton("Sí")
+        self.images_no = QRadioButton("No")
+        self.images_no.setChecked(True)
+        self.images_group = QButtonGroup(self)
+        self.images_group.addButton(self.images_si)
+        self.images_group.addButton(self.images_no)
+        options_layout.addWidget(self.images_si, 3, 1)
+        options_layout.addWidget(self.images_no, 3, 2)
         layout.addWidget(self.minimal_options_group)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -812,6 +821,9 @@ class RecipePdfExportDialog(QDialog):
     def include_baker_percentage(self) -> bool:
         return self.baker_percentage_si.isChecked()
 
+    def include_images(self) -> bool:
+        return self.images_si.isChecked()
+
 
 class MinimalRecipePdfPreviewDialog(QDialog):
     def __init__(
@@ -821,6 +833,7 @@ class MinimalRecipePdfPreviewDialog(QDialog):
         include_escandallo: bool,
         include_nutrition: bool,
         include_baker_percentage: bool,
+        include_images: bool,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -853,6 +866,7 @@ class MinimalRecipePdfPreviewDialog(QDialog):
                 include_escandallo=include_escandallo,
                 include_nutrition=include_nutrition,
                 include_baker_percentage=include_baker_percentage,
+                include_images=include_images,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Vista previa PDF", f"No se pudo generar la vista previa:\n{exc}")
@@ -4716,6 +4730,7 @@ class RecipesPage(QWidget):
         include_escandallo = layout_mode == "minimal" and export_dialog.include_escandallo()
         include_nutrition = layout_mode == "minimal" and export_dialog.include_nutrition()
         include_baker_percentage = layout_mode == "minimal" and export_dialog.include_baker_percentage()
+        include_images = layout_mode == "minimal" and export_dialog.include_images()
         if layout_mode == "minimal":
             preview_dialog = MinimalRecipePdfPreviewDialog(
                 self.pdf_service,
@@ -4723,6 +4738,7 @@ class RecipesPage(QWidget):
                 include_escandallo,
                 include_nutrition,
                 include_baker_percentage,
+                include_images,
                 self,
             )
             try:
@@ -4752,6 +4768,7 @@ class RecipesPage(QWidget):
                 include_escandallo=include_escandallo,
                 include_nutrition=include_nutrition,
                 include_baker_percentage=include_baker_percentage,
+                include_images=include_images,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Recetas", f"No se pudo exportar el PDF:\n{exc}")
