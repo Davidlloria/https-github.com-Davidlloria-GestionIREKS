@@ -835,14 +835,15 @@ class PdfService:
         if include_baker_percentage:
             headers.append(Paragraph("%", header_style))
         data: list[list[Paragraph]] = []
-        total_qty = 0.0
-        total_pct = 0.0
         process_rows: list[int] = []
         header_rows: list[int] = []
+        total_rows: list[int] = []
         for process_name, process_lines in self._group_lines_by_process(lineas):
             named_lines = [line for line in process_lines if line.nombre_mostrado or line.notas or self._pdf_quantity_g(line)]
             if not named_lines:
                 continue
+            process_total_qty = 0.0
+            process_total_pct = 0.0
             process_rows.append(len(data))
             data.append([
                 Paragraph(f"<b>{escape(process_name.upper())}</b>", body_style),
@@ -852,8 +853,8 @@ class PdfService:
             data.append(headers)
             for line in named_lines:
                 quantity_g = self._pdf_quantity_g(line)
-                total_qty += quantity_g
-                total_pct += float(line.porcentaje_panadero or 0.0)
+                process_total_qty += quantity_g
+                process_total_pct += float(line.porcentaje_panadero or 0.0)
                 row = [
                     Paragraph(escape((line.nombre_mostrado or "").strip()), body_style),
                     Paragraph(escape((line.notas or "").strip()), body_style),
@@ -862,16 +863,20 @@ class PdfService:
                 if include_baker_percentage:
                     row.append(Paragraph(f"{self._fmt(line.porcentaje_panadero, 2)} %", body_right))
                 data.append(row)
-        total_row = [
-            Paragraph("<b>TOTAL</b>", body_style),
-            Paragraph("", body_style),
-            Paragraph(f"<b>{self._fmt(total_qty, 2)} g</b>", body_right),
-        ]
-        if include_baker_percentage:
-            total_row.append(Paragraph(f"<b>{self._fmt(total_pct, 2)} %</b>", body_right))
-        data.append(total_row)
+            total_rows.append(len(data))
+            total_row = [
+                Paragraph(f"<b>TOTAL {escape(process_name.upper())}</b>", body_style),
+                Paragraph("", body_style),
+                Paragraph(f"<b>{self._fmt(process_total_qty, 2)} g</b>", body_right),
+            ]
+            if include_baker_percentage:
+                total_row.append(Paragraph(f"<b>{self._fmt(process_total_pct, 2)} %</b>", body_right))
+            data.append(total_row)
+        if not data:
+            header_rows.append(0)
+            data.append(headers)
         col_widths = [78 * mm, 42 * mm, 38 * mm, 28 * mm] if include_baker_percentage else [92 * mm, 50 * mm, 44 * mm]
-        table = Table(data, colWidths=col_widths, repeatRows=2 if header_rows else 0, hAlign="CENTER")
+        table = Table(data, colWidths=col_widths, repeatRows=2 if process_rows else 1, hAlign="CENTER")
         table.setStyle(
             TableStyle(
                 [
@@ -881,7 +886,6 @@ class PdfService:
                     ("RIGHTPADDING", (0, 0), (-1, -1), 4),
                     ("TOPPADDING", (0, 0), (-1, -1), 4),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                    ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#EFF6FF")),
                 ]
             )
         )
@@ -901,6 +905,14 @@ class PdfService:
                     [
                         ("BACKGROUND", (0, row), (-1, row), colors.HexColor("#2563EB")),
                         ("TEXTCOLOR", (0, row), (-1, row), colors.white),
+                    ]
+                )
+            )
+        for row in total_rows:
+            table.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, row), (-1, row), colors.HexColor("#EFF6FF")),
                     ]
                 )
             )

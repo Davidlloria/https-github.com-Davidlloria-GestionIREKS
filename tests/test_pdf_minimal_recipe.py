@@ -60,6 +60,9 @@ def test_minimal_recipe_pdf_includes_recipe_and_optional_escandallo(tmp_path) ->
     assert "RECETA" in text
     assert "MASA FINAL" in text
     assert "POOLISH" in text
+    assert "TOTAL MASA FINAL" in text
+    assert "TOTAL POOLISH" in text
+    assert "1.200,00 g" not in text
     assert "PROCESO" in text
     assert "Amasar durante 10 minutos." in text
     assert "ESCANDALLO" in text
