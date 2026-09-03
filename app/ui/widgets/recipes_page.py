@@ -1058,12 +1058,21 @@ class RecipeTechnicalDialog(QDialog):
     def _apply_process_filter(self) -> None:
         self.lines = []
         self._display_indices = []
-        for idx, (line, cantidad_text, unidad_text) in enumerate(self.all_lines):
-            proc = _normalize_process_name(getattr(line, "proceso_nombre", ""))
-            if proc != self.current_process:
+        source_lines = [line for line, _cantidad_text, _unidad_text in self.all_lines]
+        resolved_lines = self.recipe_service.resolve_process_ingredients(source_lines, self.current_process)
+        for line in resolved_lines:
+            source_idx = next(
+                (
+                    idx
+                    for idx, (source_line, _cantidad_text, _unidad_text) in enumerate(self.all_lines)
+                    if int(source_line.orden or 0) == int(line.orden or 0)
+                ),
+                -1,
+            )
+            if source_idx < 0:
                 continue
-            self._display_indices.append(idx)
-            self.lines.append((line, cantidad_text, unidad_text))
+            self._display_indices.append(source_idx)
+            self.lines.append((line, self._fmt_number(line.cantidad_base_g, 2), "g"))
         if hasattr(self, "process_hint_lbl"):
             self.process_hint_lbl.setText(f"Mostrando: {self.current_process}")
         self._populate()
@@ -3753,9 +3762,10 @@ class RecipesPage(QWidget):
         self._set_ingredient_row(row, dialog.selected)
         self._apply_process_filter()
 
-    def _insert_process_line(self, source_name: str, qty_g: float) -> None:
+    def _insert_process_line(self, source_name: str, qty_g: float, row: int | None = None) -> None:
         target_process = self._current_active_process()
-        row = self._first_empty_line_row()
+        if row is None:
+            row = self._first_empty_line_row()
         linea = self._line_from_row(row)
         linea.tipo_linea = "proceso"
         linea.tipo_origen = "process"
@@ -3922,8 +3932,15 @@ class RecipesPage(QWidget):
             QMessageBox.warning(self, "Atencion", "Selecciona una linea.")
             return
         row = selected[0].row()
-        dialog = IngredientSearchDialog(self.recipe_service, parent=self)
-        if not dialog.exec() or not dialog.selected:
+        target_process = self._current_active_process()
+        source_processes = [name for name in self._available_process_names() if name != target_process]
+        dialog = IngredientSearchDialog(self.recipe_service, source_processes=source_processes, parent=self)
+        if not dialog.exec():
+            return
+        if dialog.selected_process_name and dialog.selected_process_qty > 0:
+            self._insert_process_line(dialog.selected_process_name, dialog.selected_process_qty, row=row)
+            return
+        if not dialog.selected:
             return
         self._set_ingredient_row(row, dialog.selected)
 
@@ -4137,11 +4154,11 @@ class RecipesPage(QWidget):
         price_by_code = self.recipe_service.std_prices_by_code()
         table = self.escandallo_table
         table.blockSignals(True)
-        rows: list[tuple[int, RecetaLinea]] = []
-        for source_row in range(self.lines_table.rowCount()):
-            line = self._line_from_row(source_row)
-            if line.nombre_mostrado or line.notas or line.cantidad_base_g:
-                rows.append((source_row, line))
+        recipe_lines = self._build_lines()
+        process_names = {_normalize_process_name(line.proceso_nombre) for line in recipe_lines}
+        principal = "Masa final" if "Masa final" in process_names else self._current_active_process()
+        resolved_lines = self.recipe_service.resolve_process_ingredients(recipe_lines, principal)
+        rows = [(max(int(line.orden or 1) - 1, 0), line) for line in resolved_lines]
         table.setRowCount(len(rows))
         total_qty_g = 0.0
         total_pct = 0.0

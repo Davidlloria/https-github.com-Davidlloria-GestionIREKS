@@ -48,7 +48,19 @@ class RecipeCalculationService:
             names.append("Masa final")
         return names
 
-    def _compute_process_stats(self, process_name: str, lineas: list[RecetaLinea], stats_by_process: dict[str, _ProcessStats]) -> _ProcessStats:
+    def _compute_process_stats(
+        self,
+        process_name: str,
+        lineas: list[RecetaLinea],
+        stats_by_process: dict[str, _ProcessStats],
+        resolving: set[str],
+    ) -> _ProcessStats:
+        cached = stats_by_process.get(process_name)
+        if cached is not None:
+            return cached
+        if process_name in resolving:
+            return _ProcessStats()
+        resolving.add(process_name)
         stats = _ProcessStats()
         process_lines = [
             line
@@ -61,7 +73,7 @@ class RecipeCalculationService:
                 qty = 0.0
             if self._line_type(linea) == "proceso":
                 source = self._normalize_process_name(getattr(linea, "proceso_origen_nombre", ""))
-                source_stats = stats_by_process.get(source)
+                source_stats = self._compute_process_stats(source, lineas, stats_by_process, resolving)
                 source_masa = float(getattr(source_stats, "masa_g", 0.0) or 0.0) if source_stats else 0.0
                 if source_stats and source_masa > 0:
                     ratio = qty / source_masa
@@ -81,17 +93,68 @@ class RecipeCalculationService:
             if eur_kg > 0:
                 stats.coste += (qty * eur_kg) / 1000.0
             stats.masa_g += qty
+        resolving.remove(process_name)
+        stats_by_process[process_name] = stats
         return stats
+
+    def process_stats(self, lineas: list[RecetaLinea]) -> dict[str, _ProcessStats]:
+        """Calcula cada proceso resolviendo antes todos sus procesos origen."""
+        stats_by_process: dict[str, _ProcessStats] = {}
+        for process_name in self._ordered_processes(lineas):
+            self._compute_process_stats(process_name, lineas, stats_by_process, set())
+        return stats_by_process
+
+    def resolve_process_ingredients(
+        self,
+        lineas: list[RecetaLinea],
+        process_name: str = "Masa final",
+    ) -> list[RecetaLinea]:
+        """Devuelve las materias primas efectivas que componen un proceso."""
+        lines_by_process: dict[str, list[RecetaLinea]] = {}
+        for line in lineas:
+            name = self._normalize_process_name(getattr(line, "proceso_nombre", ""))
+            lines_by_process.setdefault(name, []).append(line)
+
+        def resolve(name: str, factor: float, resolving: set[str]) -> list[RecetaLinea]:
+            if name in resolving:
+                return []
+            next_resolving = {*resolving, name}
+            resolved: list[RecetaLinea] = []
+            for line in lines_by_process.get(name, []):
+                qty = max(float(getattr(line, "cantidad_base_g", 0.0) or 0.0), 0.0)
+                if self._line_type(line) != "proceso":
+                    clone = RecetaLinea(**line.model_dump())
+                    clone.cantidad_base_g = qty * factor
+                    clone.cantidad_calculada_g = clone.cantidad_base_g
+                    resolved.append(clone)
+                    continue
+                source = self._normalize_process_name(getattr(line, "proceso_origen_nombre", ""))
+                source_mass = sum(
+                    max(float(getattr(source_line, "cantidad_base_g", 0.0) or 0.0), 0.0)
+                    for source_line in lines_by_process.get(source, [])
+                )
+                if source_mass > 0:
+                    resolved.extend(resolve(source, factor * qty / source_mass, next_resolving))
+            return resolved
+
+        target = self._normalize_process_name(process_name)
+        resolved = resolve(target, 1.0, set())
+        total_flour = sum(float(line.cantidad_base_g or 0.0) for line in resolved if line.es_harina)
+        for line in resolved:
+            qty = float(line.cantidad_base_g or 0.0)
+            line.porcentaje_panadero = (qty / total_flour * 100.0) if total_flour > 0 else 0.0
+            effective_price = self._effective_price(line)
+            line.coste_linea = qty * effective_price / 1000.0
+        return resolved
 
     def calculate(self, receta: Receta, lineas: list[RecetaLinea]) -> CalculationResult:
         issues: list[ValidationIssue] = []
         process_order = self._ordered_processes(lineas)
-        stats_by_process: dict[str, _ProcessStats] = {}
-        for proc in process_order:
-            stats_by_process[proc] = self._compute_process_stats(proc, lineas, stats_by_process)
-
-        total_harinas = sum(float(x.harina_g or 0.0) for x in stats_by_process.values())
-        total_liquidos = sum(float(x.liquido_g or 0.0) for x in stats_by_process.values())
+        stats_by_process = self.process_stats(lineas)
+        principal = "Masa final" if "Masa final" in stats_by_process else process_order[0]
+        principal_stats = stats_by_process.get(principal, _ProcessStats())
+        total_harinas = float(principal_stats.harina_g or 0.0)
+        total_liquidos = float(principal_stats.liquido_g or 0.0)
 
         if total_harinas <= 0:
             issues.append(ValidationIssue(level="error", message="La receta debe tener al menos una harina."))
@@ -125,10 +188,12 @@ class RecipeCalculationService:
                     )
                 source_stats = stats_by_process.get(source)
                 source_masa = float(getattr(source_stats, "masa_g", 0.0) or 0.0) if source_stats else 0.0
+                target_stats = stats_by_process.get(linea.proceso_nombre)
+                target_flour = float(getattr(target_stats, "harina_g", 0.0) or 0.0)
                 harina_equiv = 0.0
                 if source_stats and source_masa > 0:
                     harina_equiv = float(source_stats.harina_g or 0.0) * (linea.cantidad_base_g / source_masa)
-                linea.porcentaje_panadero = ((harina_equiv / total_harinas) * 100) if total_harinas > 0 else 0.0
+                linea.porcentaje_panadero = ((harina_equiv / target_flour) * 100) if target_flour > 0 else 0.0
                 continue
 
             if linea.ingrediente_id is None and not linea.nombre_mostrado:
@@ -139,15 +204,16 @@ class RecipeCalculationService:
 
             # % panadero: cada ingrediente se expresa sobre el total de harinas.
             qty = float(linea.cantidad_base_g or 0.0)
-            linea.porcentaje_panadero = ((qty / total_harinas) * 100) if total_harinas > 0 else 0.0
+            target_stats = stats_by_process.get(linea.proceso_nombre)
+            target_flour = float(getattr(target_stats, "harina_g", 0.0) or 0.0)
+            linea.porcentaje_panadero = ((qty / target_flour) * 100) if target_flour > 0 else 0.0
 
         total_panadero = sum(linea.porcentaje_panadero for linea in lineas)
         if total_panadero <= 0:
             issues.append(ValidationIssue(level="error", message="El total de porcentaje panadero no puede ser 0."))
 
-        masa_objetivo = receta.masa_final_deseada_g if receta.masa_final_deseada_g > 0 else sum(
-            linea.cantidad_base_g for linea in lineas
-        )
+        principal_mass = float(principal_stats.masa_g or 0.0)
+        masa_objetivo = receta.masa_final_deseada_g if receta.masa_final_deseada_g > 0 else principal_mass
 
         for linea in lineas:
             linea.cantidad_calculada_g = (
@@ -167,8 +233,9 @@ class RecipeCalculationService:
                 linea.coste_linea = (linea.cantidad_calculada_g * effective_price) / 1000
                 linea.ahorro_promocion = max(linea.coste_sin_promocion - linea.coste_linea, 0.0)
 
-        coste_total = sum(linea.coste_linea for linea in lineas)
-        masa_total = sum(linea.cantidad_calculada_g for linea in lineas)
+        scale = (float(masa_objetivo or 0.0) / principal_mass) if principal_mass > 0 else 0.0
+        coste_total = float(principal_stats.coste or 0.0) * scale
+        masa_total = principal_mass * scale
         hidratacion = (total_liquidos / total_harinas * 100) if total_harinas > 0 else 0
 
         if hidratacion < 45 or hidratacion > 95:
