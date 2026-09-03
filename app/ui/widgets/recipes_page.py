@@ -66,6 +66,12 @@ def _normalize_process_name(value: str | None) -> str:
     return text if text else "Masa final"
 
 
+def _piece_count_from_mass(final_mass_g: float, piece_weight_g: float) -> float:
+    mass = max(float(final_mass_g or 0.0), 0.0)
+    piece_weight = max(float(piece_weight_g or 0.0), 0.0)
+    return mass / piece_weight if piece_weight > 0 else 0.0
+
+
 def _default_recipe_pdf_filename(recipe_name: str, customer_name: str, saved_at: datetime | None = None) -> str:
     timestamp = saved_at or datetime.now()
     recipe_label = str(recipe_name or "").strip() or "receta"
@@ -4237,11 +4243,26 @@ class RecipesPage(QWidget):
             total_qty_g += float(line.cantidad_base_g or 0.0)
             total_pct += float(line.porcentaje_panadero or 0.0)
             total_cost += cost
+        process_names = {_normalize_process_name(line.proceso_nombre) for line in recipe_lines}
+        final_process = "Masa final" if "Masa final" in process_names else self._current_escandallo_process()
+        if final_process == self._current_escandallo_process():
+            final_mass_g = total_qty_g
+        else:
+            final_mass_g = sum(
+                float(line.cantidad_base_g or 0.0)
+                for line in self.recipe_service.build_process_cost_sheet(recipe_lines, final_process)
+            )
         table.blockSignals(False)
         self._refresh_recipe_lines_totals(total_qty_g, total_pct)
-        self._refresh_escandallo_totals(total_qty_g, total_pct, total_cost)
+        self._refresh_escandallo_totals(total_qty_g, total_pct, total_cost, final_mass_g)
 
-    def _refresh_escandallo_totals(self, total_qty_g: float, total_pct: float, total_cost: float) -> None:
+    def _refresh_escandallo_totals(
+        self,
+        total_qty_g: float,
+        total_pct: float,
+        total_cost: float,
+        final_mass_g: float,
+    ) -> None:
         if not hasattr(self, "escandallo_totals_table"):
             return
         values = [
@@ -4267,16 +4288,16 @@ class RecipesPage(QWidget):
             )
         if hasattr(self, "escandallo_summary_group"):
             peso_pieza = float(self.peso_spin.value() or 0.0)
-            total_piezas = int(self.piezas_spin.value() or 0)
+            total_piezas = _piece_count_from_mass(final_mass_g, peso_pieza)
             coste_unitario = total_cost / total_piezas if total_piezas > 0 else 0.0
             self.escandallo_total_masa_lbl.setText(f"{self._format_number(total_qty_g)} g")
             self.escandallo_peso_pieza_lbl.setText(f"{self._format_number(peso_pieza)} g")
-            self.escandallo_total_piezas_lbl.setText(str(total_piezas))
+            self.escandallo_total_piezas_lbl.setText(self._format_number(total_piezas, 0))
             self.escandallo_coste_unitario_lbl.setText(f"{self._format_number(coste_unitario, 2)} €")
         if hasattr(self, "total_panel"):
             peso_pieza = float(self.peso_spin.value() or 0.0)
             merma_pct = float(self.merma_spin.value() or 0.0)
-            total_piezas = int(self.piezas_spin.value() or 0)
+            total_piezas = _piece_count_from_mass(final_mass_g, peso_pieza)
             peso_terminado = peso_pieza * (1 - (merma_pct / 100.0))
             costes_adicionales = sum(
                 self._parse_decimal(self._technical_escandallo_value(key))

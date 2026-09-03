@@ -3,7 +3,13 @@ from __future__ import annotations
 from datetime import datetime
 from types import SimpleNamespace
 
-from app.ui.widgets.recipes_page import RecipesPage, _customer_display_name, _default_recipe_pdf_filename, _json_to_string_dict
+from app.ui.widgets.recipes_page import (
+    RecipesPage,
+    _customer_display_name,
+    _default_recipe_pdf_filename,
+    _json_to_string_dict,
+    _piece_count_from_mass,
+)
 
 
 def test_json_to_string_dict_returns_empty_for_blank_and_invalid_payloads() -> None:
@@ -21,6 +27,11 @@ def test_json_to_string_dict_stringifies_keys_and_values() -> None:
 def test_parse_decimal_accepts_the_unit_suffixes_shown_in_recipe_totals() -> None:
     assert RecipesPage._parse_decimal("260,00 g") == 260.0
     assert RecipesPage._parse_decimal("12 Uds") == 12.0
+
+
+def test_piece_count_uses_final_mass_instead_of_stored_piece_count() -> None:
+    assert _piece_count_from_mass(8470, 590) == 847 / 59
+    assert _piece_count_from_mass(8470, 0) == 0
 
 
 def test_technical_escandallo_value_prefers_the_filtered_process_value() -> None:
