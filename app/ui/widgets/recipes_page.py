@@ -973,6 +973,7 @@ class RecipeTechnicalDialog(QDialog):
         self.table.setColumnWidth(self.COL_PCT, 58)
         self.table.setColumnWidth(self.COL_EUR_KG, 68)
         self.table.setColumnWidth(self.COL_EUR_LINEA, 78)
+        self.table.setColumnHidden(self.COL_PCT, True)
         left_layout.addWidget(self.table, 1)
 
         self.totals_table = QTableWidget(1, 6)
@@ -985,6 +986,7 @@ class RecipeTechnicalDialog(QDialog):
         self.totals_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.totals_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.totals_table.setFixedHeight(34)
+        self.totals_table.setColumnHidden(self.COL_PCT + self.TOTALS_OFFSET, True)
         self.totals_table.setShowGrid(False)
         self.totals_table.setFrameShape(QFrame.Shape.NoFrame)
         self.totals_table.setFrameShadow(QFrame.Shadow.Plain)
@@ -2636,6 +2638,7 @@ class RecipesPage(QWidget):
         ):
             escandallo_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
             self.escandallo_table.setColumnWidth(column, width)
+        self.escandallo_table.setColumnHidden(self.ESC_COL_PCT, True)
         self.escandallo_table.itemChanged.connect(self._on_escandallo_item_changed)
         escandallo_header.sectionResized.connect(lambda *_args: self._refresh_escandallo_table())
         escandallo_header.geometriesChanged.connect(self._refresh_escandallo_table)
@@ -2653,6 +2656,7 @@ class RecipesPage(QWidget):
         self.escandallo_totals_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.escandallo_totals_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.escandallo_totals_table.setFixedHeight(34)
+        self.escandallo_totals_table.setColumnHidden(self.ESC_COL_PCT + self.ESC_TOTALS_OFFSET, True)
         self.escandallo_totals_table.setShowGrid(False)
         self.escandallo_totals_table.setFrameShape(QFrame.Shape.NoFrame)
         self.escandallo_totals_table.setStyleSheet(
