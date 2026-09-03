@@ -969,7 +969,7 @@ class RecipeTechnicalDialog(QDialog):
         header.setSectionResizeMode(self.COL_PCT, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(self.COL_EUR_KG, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(self.COL_EUR_LINEA, QHeaderView.ResizeMode.Fixed)
-        self.table.setColumnWidth(self.COL_CANTIDAD, 76)
+        self.table.setColumnWidth(self.COL_CANTIDAD, 92)
         self.table.setColumnWidth(self.COL_PCT, 58)
         self.table.setColumnWidth(self.COL_EUR_KG, 68)
         self.table.setColumnWidth(self.COL_EUR_LINEA, 78)
@@ -2629,7 +2629,7 @@ class RecipesPage(QWidget):
         escandallo_header = self.escandallo_table.horizontalHeader()
         escandallo_header.setSectionResizeMode(self.ESC_COL_INGREDIENTE, QHeaderView.ResizeMode.Stretch)
         for column, width in (
-            (self.ESC_COL_CANTIDAD, 76),
+            (self.ESC_COL_CANTIDAD, 92),
             (self.ESC_COL_PCT, 58),
             (self.ESC_COL_EUR_KG, 68),
             (self.ESC_COL_PROMOCION, 78),
@@ -4276,7 +4276,7 @@ class RecipesPage(QWidget):
         if hasattr(self, "total_panel"):
             peso_pieza = float(self.peso_spin.value() or 0.0)
             merma_pct = float(self.merma_spin.value() or 0.0)
-            total_piezas = total_qty_g / peso_pieza if peso_pieza > 0 else 0.0
+            total_piezas = int(self.piezas_spin.value() or 0)
             peso_terminado = peso_pieza * (1 - (merma_pct / 100.0))
             costes_adicionales = sum(
                 self._parse_decimal(self._technical_escandallo_value(key))
