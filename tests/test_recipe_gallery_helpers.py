@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+from types import SimpleNamespace
 
+from app.ui.widgets import recipes_page as recipes_page_module
 from app.ui.widgets.recipes_page import (
+    RecipesPage,
     _collect_recipe_image_gallery,
     _json_to_string_dict,
     _load_recipe_image_gallery,
@@ -53,3 +57,23 @@ def test_recipe_image_gallery_supports_legacy_payload_key() -> None:
     assert _recipe_image_gallery_from_payload(payload) == [
         {"path": "/img/legacy.png", "is_main": False},
     ]
+
+
+def test_load_images_gallery_migrates_legacy_absolute_path(tmp_path: Path, monkeypatch) -> None:
+    source = (tmp_path / "legacy.jpg").resolve()
+    added_paths: list[str] = []
+    images_list = SimpleNamespace(clear=lambda: None, count=lambda: 0)
+    page = SimpleNamespace(images_list=images_list, _add_recipe_image_item=added_paths.append)
+    monkeypatch.setattr(
+        recipes_page_module,
+        "store_recipe_image",
+        lambda path: "recetas_imagenes/id/legacy.jpg" if path == source else "",
+    )
+    payload = {
+        "images_gallery": json.dumps([{"path": str(source), "is_main": False, "order": 0}]),
+    }
+
+    migrated = RecipesPage._load_images_gallery(page, payload)
+
+    assert migrated is True
+    assert added_paths == ["recetas_imagenes/id/legacy.jpg"]

@@ -54,6 +54,7 @@ from app.services.openai_process_service import OpenAIProcessService
 from app.services import PdfService
 from app.services.recipe_active_flow_service import RecipeActiveFlowService, RecipeActivePayload
 from app.services.recipe_document_import_service import RecipeDocumentDraft, RecipeDocumentImportService
+from app.services.recipe_image_storage_service import resolve_recipe_image_path, store_recipe_image
 from app.services.recipe_service import RecipeService
 from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
 from app.ui.widgets.nutrition_card import NutritionCard, NutritionRowData
@@ -2949,7 +2950,15 @@ class RecipesPage(QWidget):
         )
         if not file_path:
             return
-        self._add_recipe_image_item(file_path)
+        if QPixmap(file_path).isNull():
+            QMessageBox.warning(self, "Imágenes", "No se pudo cargar la imagen seleccionada.")
+            return
+        try:
+            stored_path = store_recipe_image(Path(file_path))
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Imágenes", str(exc))
+            return
+        self._add_recipe_image_item(stored_path)
         self._schedule_autosave()
 
     def _remove_recipe_images(self) -> None:
@@ -2981,7 +2990,8 @@ class RecipesPage(QWidget):
         path = str(file_path or "").strip()
         if not path:
             return
-        pix = QPixmap(path)
+        resolved_path = resolve_recipe_image_path(path)
+        pix = QPixmap(str(resolved_path))
         if pix.isNull():
             QMessageBox.warning(self, "Imágenes", "No se pudo cargar la imagen seleccionada.")
             return
@@ -2989,7 +2999,7 @@ class RecipesPage(QWidget):
         item = QListWidgetItem()
         item.setIcon(QIcon(thumb))
         item.setText(Path(path).name)
-        item.setToolTip(path)
+        item.setToolTip(str(resolved_path))
         item.setData(Qt.ItemDataRole.UserRole, path)
         item.setData(Qt.ItemDataRole.UserRole + 1, False)
         self.images_list.addItem(item)
@@ -2998,7 +3008,7 @@ class RecipesPage(QWidget):
         path = str(item.data(Qt.ItemDataRole.UserRole) or "").strip()
         if not path:
             return
-        pix = QPixmap(path)
+        pix = QPixmap(str(resolve_recipe_image_path(path)))
         if pix.isNull():
             QMessageBox.warning(self, "Imágenes", "No se pudo abrir la imagen.")
             return
@@ -3043,21 +3053,27 @@ class RecipesPage(QWidget):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Reemplazar imagen",
-            str(Path(old_path).parent) if old_path else "",
+            str(resolve_recipe_image_path(old_path).parent) if old_path else "",
             "Imágenes (*.png *.jpg *.jpeg *.webp *.bmp)",
         )
         if not file_path:
             return
-        pix = QPixmap(file_path)
-        if pix.isNull():
+        source_pix = QPixmap(file_path)
+        if source_pix.isNull():
             QMessageBox.warning(self, "Imágenes", "No se pudo cargar la imagen seleccionada.")
             return
-        thumb = pix.scaled(132, 98, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        try:
+            stored_path = store_recipe_image(Path(file_path))
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Imágenes", str(exc))
+            return
+        resolved_path = resolve_recipe_image_path(stored_path)
+        thumb = source_pix.scaled(132, 98, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         was_main = bool(item.data(Qt.ItemDataRole.UserRole + 1))
         item.setIcon(QIcon(thumb))
-        item.setText(Path(file_path).name)
-        item.setToolTip(file_path)
-        item.setData(Qt.ItemDataRole.UserRole, file_path)
+        item.setText(Path(stored_path).name)
+        item.setToolTip(str(resolved_path))
+        item.setData(Qt.ItemDataRole.UserRole, stored_path)
         item.setData(Qt.ItemDataRole.UserRole + 1, was_main)
         if was_main:
             item.setBackground(QBrush(QColor("#D6F5DD")))
@@ -3077,13 +3093,21 @@ class RecipesPage(QWidget):
             payload.append((path, bool(item.data(Qt.ItemDataRole.UserRole + 1))))
         return _collect_recipe_image_gallery(payload)
 
-    def _load_images_gallery(self, payload: dict[str, str]) -> None:
+    def _load_images_gallery(self, payload: dict[str, str]) -> bool:
         if not hasattr(self, "images_list"):
-            return
+            return False
         self.images_list.clear()
+        migrated = False
         rows = _recipe_image_gallery_from_payload(payload)
         for row in rows:
             path = str(row.get("path") or "").strip()
+            if Path(path).is_absolute():
+                try:
+                    managed_path = store_recipe_image(Path(path))
+                except (OSError, ValueError):
+                    managed_path = path
+                migrated = migrated or managed_path != path
+                path = managed_path
             self._add_recipe_image_item(path)
             if self.images_list.count() > 0:
                 item = self.images_list.item(self.images_list.count() - 1)
@@ -3091,6 +3115,7 @@ class RecipesPage(QWidget):
                 item.setData(Qt.ItemDataRole.UserRole + 1, is_main)
                 if is_main:
                     item.setBackground(QBrush(QColor("#D6F5DD")))
+        return migrated
 
     def _open_process_editor_dialog(self) -> None:
         dialog = QDialog(self)
@@ -3700,6 +3725,7 @@ class RecipesPage(QWidget):
             return
         self._is_loading_recipe = True
         self._document_import_pending = False
+        images_migrated = False
         try:
             receta = aggregate.receta
             self.current_recipe_id = receta.id
@@ -3717,7 +3743,7 @@ class RecipesPage(QWidget):
             self.proceso_input.setPlainText(receta.proceso)
             self.recipe_escandallo_data = _json_to_string_dict(receta.escandallo_detalle_json)
             self.recipe_elaboracion_data = _json_to_string_dict(receta.parametros_elaboracion_json)
-            self._load_images_gallery(self.recipe_elaboracion_data)
+            images_migrated = self._load_images_gallery(self.recipe_elaboracion_data)
             self._proceso_rich_html = str(self.recipe_elaboracion_data.get(self.PROCESO_RICH_HTML_KEY, "") or "").strip()
             line_processes = [_normalize_process_name(getattr(line, "proceso_nombre", "") or "Masa final") for line in aggregate.lineas]
             self._refresh_process_controls(line_processes or ["Masa final"], preserve_active=False)
@@ -3728,6 +3754,8 @@ class RecipesPage(QWidget):
             self._update_inline_customer_name()
         finally:
             self._is_loading_recipe = False
+        if images_migrated:
+            self._schedule_autosave()
 
     def _set_combo_by_data(self, combo: QComboBox, value: str) -> bool:
         idx = combo.findData(str(value or ""))

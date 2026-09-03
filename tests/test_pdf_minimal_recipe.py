@@ -8,6 +8,7 @@ from pypdf import PdfReader
 
 from app.models import Cliente, Receta, RecetaLinea
 from app.services import pdf_service as pdf_service_module
+from app.services import recipe_image_storage_service
 from app.services.pdf_service import PdfService
 from app.services.recipe_calculation_service import RecipeCalculationService
 
@@ -157,15 +158,17 @@ def test_minimal_escandallo_uses_only_final_process_and_calculates_pieces(tmp_pa
     assert "14 Uds" in text
 
 
-def test_minimal_recipe_pdf_can_include_gallery_images(tmp_path) -> None:
-    image_path = tmp_path / "proceso.png"
+def test_minimal_recipe_pdf_can_include_gallery_images(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(recipe_image_storage_service, "DATA_DIR", tmp_path)
+    image_path = tmp_path / "recetas_imagenes" / "proceso.png"
+    image_path.parent.mkdir()
     Image.new("RGB", (320, 180), color=(37, 99, 235)).save(image_path)
     recipe = Receta(
         cliente_id="cliente-1",
         nombre="Pan con imagen",
         codigo_receta="IMG-1",
         parametros_elaboracion_json=json.dumps(
-            {"images_gallery": [{"path": str(image_path), "is_main": True, "order": 0}]}
+            {"images_gallery": [{"path": "recetas_imagenes/proceso.png", "is_main": True, "order": 0}]}
         ),
     )
     output_path = tmp_path / "minimo-con-imagen.pdf"

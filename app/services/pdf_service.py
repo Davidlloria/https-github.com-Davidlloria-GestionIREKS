@@ -20,6 +20,7 @@ from sqlmodel import Session, col, select
 from app.core.database import engine
 from app.models import Cliente, IngredienteIreks, IngredienteStd, MateriaPrimaValorNutricional, Receta, RecetaLinea
 from app.services.recipe_calculation_service import RecipeCalculationService
+from app.services.recipe_image_storage_service import resolve_recipe_image_path
 from app.services.recipe_service import RecipeService
 
 
@@ -745,7 +746,7 @@ class PdfService:
         max_width = 88 * mm
         max_height = 62 * mm
         for row in ordered_gallery:
-            path = Path(str(row.get("path") or "").strip())
+            path = resolve_recipe_image_path(str(row.get("path") or "").strip())
             if not path.is_file():
                 continue
             try:
