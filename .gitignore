@@ -43,6 +43,7 @@ data/*.json
 data/backups/
 data/exports/
 data/incidencias_pedidos/
+data/recetas_imagenes/
 runtime/
 
 # Build artifacts

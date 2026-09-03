@@ -73,6 +73,20 @@ def _piece_count_from_mass(final_mass_g: float, piece_weight_g: float) -> float:
     return mass / piece_weight if piece_weight > 0 else 0.0
 
 
+def _recipe_process_totals(lineas: list[RecetaLinea], process_name: str) -> tuple[float, float]:
+    target_process = _normalize_process_name(process_name)
+    total_qty_g = 0.0
+    total_pct = 0.0
+    for line in lineas:
+        if _normalize_process_name(line.proceso_nombre) != target_process:
+            continue
+        if not (line.nombre_mostrado or line.notas or line.cantidad_base_g):
+            continue
+        total_qty_g += float(line.cantidad_base_g or 0.0)
+        total_pct += float(line.porcentaje_panadero or 0.0)
+    return total_qty_g, total_pct
+
+
 def _default_recipe_pdf_filename(recipe_name: str, customer_name: str, saved_at: datetime | None = None) -> str:
     timestamp = saved_at or datetime.now()
     recipe_label = str(recipe_name or "").strip() or "receta"
@@ -3537,6 +3551,7 @@ class RecipesPage(QWidget):
                 continue
             proc = _normalize_process_name(getattr(line, "proceso_nombre", ""))
             self.lines_table.setRowHidden(row, proc != active)
+        self._refresh_recipe_lines_totals()
 
     def _add_process(self) -> None:
         raw, ok = QInputDialog.getText(self, "Nuevo proceso", "Nombre del proceso")
@@ -4209,22 +4224,11 @@ class RecipesPage(QWidget):
         self._refresh_escandallo_table()
         self._schedule_autosave()
 
-    def _refresh_recipe_lines_totals(
-        self,
-        total_qty_g: float | None = None,
-        total_pct: float | None = None,
-    ) -> None:
+    def _refresh_recipe_lines_totals(self) -> None:
         if not hasattr(self, "lines_totals_table"):
             return
-        if total_qty_g is None or total_pct is None:
-            total_qty_g = 0.0
-            total_pct = 0.0
-            for row in range(self.lines_table.rowCount()):
-                line = self._line_from_row(row)
-                if not (line.nombre_mostrado or line.notas or line.cantidad_base_g):
-                    continue
-                total_qty_g += float(line.cantidad_base_g or 0.0)
-                total_pct += float(line.porcentaje_panadero or 0.0)
+        lineas = [self._line_from_row(row) for row in range(self.lines_table.rowCount())]
+        total_qty_g, total_pct = _recipe_process_totals(lineas, self._current_active_process())
         values = [
             "",
             "",
@@ -4310,7 +4314,7 @@ class RecipesPage(QWidget):
                 for line in self.recipe_service.build_process_cost_sheet(recipe_lines, final_process)
             )
         table.blockSignals(False)
-        self._refresh_recipe_lines_totals(total_qty_g, total_pct)
+        self._refresh_recipe_lines_totals()
         self._refresh_escandallo_totals(total_qty_g, total_pct, total_cost, final_mass_g)
 
     def _refresh_escandallo_totals(

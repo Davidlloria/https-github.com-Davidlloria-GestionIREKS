@@ -3,12 +3,14 @@ from __future__ import annotations
 from datetime import datetime
 from types import SimpleNamespace
 
+from app.models import RecetaLinea
 from app.ui.widgets.recipes_page import (
     RecipesPage,
     _customer_display_name,
     _default_recipe_pdf_filename,
     _json_to_string_dict,
     _piece_count_from_mass,
+    _recipe_process_totals,
 )
 
 
@@ -32,6 +34,47 @@ def test_parse_decimal_accepts_the_unit_suffixes_shown_in_recipe_totals() -> Non
 def test_piece_count_uses_final_mass_instead_of_stored_piece_count() -> None:
     assert _piece_count_from_mass(8470, 590) == 847 / 59
     assert _piece_count_from_mass(8470, 0) == 0
+
+
+def test_recipe_totals_only_include_selected_process_ingredients() -> None:
+    lines = [
+        RecetaLinea(
+            receta_id=1,
+            orden=1,
+            nombre_mostrado="Harina primera masa",
+            cantidad_base_g=2175,
+            porcentaje_panadero=100,
+            proceso_nombre="Primera Masa",
+        ),
+        RecetaLinea(
+            receta_id=1,
+            orden=2,
+            nombre_mostrado="Otros primera masa",
+            cantidad_base_g=1935,
+            porcentaje_panadero=88.97,
+            proceso_nombre="Primera Masa",
+        ),
+        RecetaLinea(
+            receta_id=1,
+            orden=3,
+            nombre_mostrado="Proceso: Primera Masa",
+            cantidad_base_g=4110,
+            porcentaje_panadero=69.60,
+            proceso_nombre="Masa final",
+            tipo_linea="proceso",
+        ),
+        RecetaLinea(
+            receta_id=1,
+            orden=4,
+            nombre_mostrado="Ingredientes masa final",
+            cantidad_base_g=4360,
+            porcentaje_panadero=139.52,
+            proceso_nombre="Masa final",
+        ),
+    ]
+
+    assert _recipe_process_totals(lines, "Primera Masa") == (4110, 188.97)
+    assert _recipe_process_totals(lines, "Masa final") == (8470, 209.12)
 
 
 def test_technical_escandallo_value_prefers_the_filtered_process_value() -> None:
