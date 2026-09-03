@@ -124,14 +124,17 @@ def _collect_recipe_image_gallery(items: list[tuple[str, bool]]) -> list[dict[st
     return rows
 
 
-def _load_recipe_image_gallery(raw_value: str) -> list[dict[str, object]]:
-    text = (raw_value or "").strip()
-    if not text:
-        return []
-    try:
-        data = json.loads(text)
-    except Exception:
-        return []
+def _load_recipe_image_gallery(raw_value: object) -> list[dict[str, object]]:
+    if isinstance(raw_value, list):
+        data = raw_value
+    else:
+        text = str(raw_value or "").strip()
+        if not text:
+            return []
+        try:
+            data = json.loads(text)
+        except Exception:
+            return []
     if not isinstance(data, list):
         return []
     ordered_rows = sorted(
@@ -147,6 +150,12 @@ def _load_recipe_image_gallery(raw_value: str) -> list[dict[str, object]]:
     return result
 
 
+def _recipe_image_gallery_from_payload(payload: dict[str, object]) -> list[dict[str, object]]:
+    if "images_gallery" in payload:
+        return _load_recipe_image_gallery(payload.get("images_gallery"))
+    return _load_recipe_image_gallery(payload.get("__images_gallery_json"))
+
+
 def _json_to_string_dict(raw_value: str) -> dict[str, str]:
     text = (raw_value or "").strip()
     if not text:
@@ -157,7 +166,14 @@ def _json_to_string_dict(raw_value: str) -> dict[str, str]:
         return {}
     if not isinstance(payload, dict):
         return {}
-    return {str(k): str(v) for k, v in payload.items()}
+    return {
+        str(key): (
+            json.dumps(value, ensure_ascii=False)
+            if str(key) == "images_gallery" and isinstance(value, list)
+            else str(value)
+        )
+        for key, value in payload.items()
+    }
 
 
 class IngredientSearchDialog(QDialog):
@@ -2075,7 +2091,6 @@ class RecipesPage(QWidget):
     LINES_TOTALS_OFFSET = 1
     MIN_LINE_ROWS = 10
     PROCESO_RICH_HTML_KEY = "__proceso_rich_html"
-    IMAGES_GALLERY_KEY = "__images_gallery_json"
 
     def __init__(self) -> None:
         super().__init__()
@@ -3066,7 +3081,7 @@ class RecipesPage(QWidget):
         if not hasattr(self, "images_list"):
             return
         self.images_list.clear()
-        rows = _load_recipe_image_gallery(str(payload.get(self.IMAGES_GALLERY_KEY, "") or ""))
+        rows = _recipe_image_gallery_from_payload(payload)
         for row in rows:
             path = str(row.get("path") or "").strip()
             self._add_recipe_image_item(path)
