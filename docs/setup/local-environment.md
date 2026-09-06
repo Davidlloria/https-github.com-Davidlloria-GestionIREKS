@@ -39,6 +39,38 @@ bloqueadas. Usar `npm install` solo cuando se vaya a modificar dependencias.
 
 ## Configuracion local
 
+### Datos externos para PySide6
+
+La instalacion local utiliza dos carpetas hermanas:
+
+```text
+Proyectos/
+    GestionIREKS/        # codigo, recursos y entorno Python
+    GestionIREKS-Datos/  # bases, configuracion, imagenes, exports y backups
+```
+
+`GESTION_IREKS_DATA_DIR` apunta a la carpeta de datos. La variable de usuario
+se aplica a las nuevas terminales; reinicia las terminales abiertas antes de
+ejecutar `python run.py`. `run-desktop.bat` tambien selecciona la carpeta
+hermana cuando contiene `gestion_ireks.db` y no hay un override explicito.
+
+La migracion local del 2026-09-06 copio y verifico 168 archivos, comprobo la
+integridad y los recuentos de las dos bases SQLite, y ajusto la preferencia
+de exportacion que apuntaba al antiguo `data`. El original `GestionIREKS/data`
+se conserva como copia anterior a la migracion; no se sincroniza con los datos
+activos. No volver a usarlo como base activa sin revisar los cambios posteriores.
+
+Las rutas relativas de imagenes se resuelven desde la carpeta externa. Los
+logos, estilos y plantillas distribuidos con el programa siguen en `assets`.
+La biblioteca de documentos fuente mantiene su ubicacion independiente;
+su indice `document_library.sqlite` se copia con los datos.
+
+Si cambia la ubicacion, actualizar la variable y revisar las rutas absolutas
+de configuracion. Con la app cerrada, una vuelta atras requiere primero
+conservar los datos externos actuales y elegir explicitamente la carpeta
+que contiene la base que se desea utilizar. Las copias en el mismo disco no
+sustituyen un backup en otra unidad.
+
 Los datos y secretos locales no se versionan:
 
 - `data/*.db`
