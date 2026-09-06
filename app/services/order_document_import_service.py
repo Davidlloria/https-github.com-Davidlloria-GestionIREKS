@@ -300,7 +300,15 @@ class OrderDocumentImportService:
                     )
                     session.add(albaran_header)
                     if pedido_numero_raw and pedido_numero_raw not in {"0", "0.0"}:
+                        cadelsa_provisional = (
+                            str(pedido.pedido_numero or "").startswith("CAD-")
+                            and str(getattr(pedido, "pedido_ref", "") or "").startswith("CADELSA-PDF:")
+                        )
                         pedido.pedido_numero = pedido_numero_raw
+                        if cadelsa_provisional:
+                            for item in session.exec(select(PedidoItem).where(PedidoItem.pedido_id == pedido.pedido_id)):
+                                item.pedido_numero = pedido_numero_raw
+                                session.add(item)
                     if not str(pedido.pedido_albaran_numero or "").strip():
                         pedido.pedido_albaran_numero = albaran_numero
                     session.add(pedido)

@@ -57,9 +57,14 @@ class OrderService:
         pedido_numero: str,
         lines: list[OrderLineInput],
         is_pending: bool = False,
+        pedido_ref: str = "",
     ) -> str:
         pedido_id = str(uuid4())
         with Session(engine) as session:
+            if pedido_ref and session.exec(
+                select(Pedido).where(Pedido.almacen_id == almacen_id, Pedido.pedido_ref == pedido_ref)
+            ).first():
+                raise ValueError("Este documento ya se ha importado para el cliente.")
             session.add(
                 Pedido(
                     pedido_id=pedido_id,
@@ -68,7 +73,7 @@ class OrderService:
                     pedido_numero=pedido_numero,
                     pedido_albaran_numero="",
                     pedido_factura_numero="",
-                    pedido_ref="",
+                    pedido_ref=pedido_ref,
                     pedido_estado="P" if is_pending else "",
                 )
             )

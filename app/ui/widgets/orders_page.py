@@ -76,6 +76,8 @@ from app.services.orders_documents_import_ui_service import (
 )
 from app.services.order_query_service import ArticleOrderHistoryRow, OrderQueryService
 from app.services.order_service import OrderLineInput, OrderService
+from app.services.cadelsa_order_import_service import CadelsaOrderImportService
+from app.ui.widgets.cadelsa_order_preview_dialog import CadelsaOrderPreviewDialog
 from app.services.orders_mail_settings_service import OrdersMailSettingsService
 from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
 
@@ -1481,6 +1483,11 @@ class OrdersPage(QWidget):
         left_layout.addLayout(almacen_row)
 
         self.new_btn = create_standard_ribbon_button("Nuevo", role="success", icon_name="order.svg")
+        self.cadelsa_btn = create_standard_ribbon_button("Imp CADELSA", role="secondary", icon_name="order.svg")
+        self.cadelsa_btn.setFixedWidth(140)
+        self.cadelsa_btn.setEnabled(False)
+        self.cadelsa_btn.clicked.connect(self._import_cadelsa_order)
+        self.almacen_filter.currentTextChanged.connect(self._update_cadelsa_button)
         self.edit_btn = create_standard_ribbon_button("Editar", role="warning", icon_name="file-pen.svg")
         self.del_btn = create_standard_ribbon_button("Eliminar", role="danger", icon_name="trash.svg")
         self.export_btn = create_standard_ribbon_button("Exportar", role="secondary", icon_name="sheet.svg")
@@ -1502,6 +1509,7 @@ class OrdersPage(QWidget):
 
         left_ribbon, left_ribbon_layout = create_standard_top_ribbon()
         left_ribbon_layout.addWidget(self.new_btn)
+        left_ribbon_layout.addWidget(self.cadelsa_btn)
         left_ribbon_layout.addWidget(self.edit_btn)
         left_ribbon_layout.addWidget(self.del_btn)
         left_ribbon_layout.addWidget(self.export_btn)
@@ -2095,6 +2103,7 @@ class OrdersPage(QWidget):
             if current_text and current_text.casefold() != "todos":
                 self.almacen_filter.setEditText(current_text)
         self.almacen_filter.blockSignals(False)
+        self._update_cadelsa_button()
 
     def _selected_almacen_id(self) -> str:
         current = str(self.almacen_filter.currentData() or "").strip()
@@ -3289,6 +3298,36 @@ class OrdersPage(QWidget):
             QMessageBox.warning(self, "Pedidos", f"No se pudo guardar.\n{result.message}")
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Pedidos", f"No se pudo guardar.\n{exc}")
+
+    def _update_cadelsa_button(self, _text: str = "") -> None:
+        index = self.almacen_filter.currentIndex()
+        selected = self.almacen_filter.itemText(index).strip().upper()
+        typed = self.almacen_filter.currentText().strip().upper()
+        self.cadelsa_btn.setEnabled(
+            bool(self.almacen_filter.itemData(index))
+            and selected == typed == "CADELSA LZA (CLIENTE DIRECTO)"
+        )
+
+    def _import_cadelsa_order(self) -> None:
+        self._update_cadelsa_button()
+        if not self.cadelsa_btn.isEnabled():
+            return
+        client_id = str(self.almacen_filter.currentData() or "")
+        filename, _ = QFileDialog.getOpenFileName(self, "Importar pedido CADELSA", "", "PDF (*.pdf)")
+        if not filename:
+            return
+        try:
+            service = CadelsaOrderImportService()
+            preview = service.preview(Path(filename), client_id)
+            dialog = CadelsaOrderPreviewDialog(preview, self)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+            pedido_id = service.save(preview, dialog.order_date.date().toPython())
+            self.reload()
+            self._select_by_id(pedido_id)
+            QMessageBox.information(self, "Pedidos", "Pedido CADELSA guardado con número interno.")
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Importar pedido CADELSA", str(exc))
 
     def _new_order(self) -> None:
         almacen_id = self._selected_almacen_id()
