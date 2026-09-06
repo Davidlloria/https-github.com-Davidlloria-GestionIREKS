@@ -3451,9 +3451,31 @@ class OrdersPage(QWidget):
             return
         if not file_path.lower().endswith(".xlsx"):
             file_path = f"{file_path}.xlsx"
-        wb.save(file_path)
-        history_path = self.order_export_service.save_order_excel_history(pedido_id, wb, default_base_name)
-        self.order_export_service.mark_order_exported(pedido_id)
+        try:
+            wb.save(file_path)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Pedidos", f"No se pudo guardar el Excel.\n{file_path}\n\n{exc}")
+            return
+        try:
+            history_path = self.order_export_service.save_order_excel_history(pedido_id, wb, default_base_name)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(
+                self, "Pedidos",
+                f"El Excel se ha guardado en:\n{file_path}\n\n"
+                "No se pudo guardar la copia del histórico. El pedido no se ha marcado como exportado.\n"
+                "Revisa la carpeta del histórico en Configuración > API > Pedidos por Outlook.\n\n"
+                f"{exc}",
+            )
+            return
+        try:
+            self.order_export_service.mark_order_exported(pedido_id)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(
+                self, "Pedidos",
+                f"Excel guardado:\n{file_path}\n\nHistórico guardado:\n{history_path}\n\n"
+                f"No se pudo actualizar el estado del pedido.\n{exc}",
+            )
+            return
         self.reload()
         self._select_by_id(pedido_id)
         QMessageBox.information(self, "Pedidos", f"Pedido exportado.\n{file_path}\n\nHistórico:\n{history_path}")

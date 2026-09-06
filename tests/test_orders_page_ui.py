@@ -409,3 +409,49 @@ def test_pendientes_tab_uses_accumulated_pending_columns(monkeypatch) -> None:
     page.close()
     page.deleteLater()
     QApplication.processEvents()
+
+
+def test_excel_export_reports_primary_history_and_status_failures(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    for failing_stage in ("excel", "history", "status", "none"):
+        calls = []
+        warnings = []
+        information = []
+
+        def step(name, result=None):
+            calls.append(name)
+            if failing_stage == name:
+                raise OSError("Destino no disponible")
+            return result
+
+        workbook = SimpleNamespace(save=lambda path: step("excel"))
+        service = SimpleNamespace(
+            build_order_workbook=lambda order_id: (workbook, "pedido"),
+            save_order_excel_history=lambda *args: step("history", "historico/pedido.xlsx"),
+            mark_order_exported=lambda order_id: step("status"),
+        )
+        page = SimpleNamespace(
+            order_export_service=service,
+            reload=lambda: step("reload"),
+            _select_by_id=lambda order_id: step("select"),
+        )
+        monkeypatch.setattr(orders_page_module.QFileDialog, "getSaveFileName", lambda *args: ("pedido.xlsx", ""))
+        monkeypatch.setattr(orders_page_module.QMessageBox, "warning", lambda *args: warnings.append(args[-1]))
+        monkeypatch.setattr(orders_page_module.QMessageBox, "information", lambda *args: information.append(args[-1]))
+        OrdersPage._export_order_to_excel(page, "order-1")
+        if failing_stage == "excel":
+            assert calls == ["excel"]
+            assert "No se pudo guardar el Excel" in warnings[0]
+        elif failing_stage == "history":
+            assert calls == ["excel", "history"]
+            assert "El Excel se ha guardado" in warnings[0]
+            assert "no se ha marcado como exportado" in warnings[0]
+        elif failing_stage == "status":
+            assert calls == ["excel", "history", "status"]
+            assert "historico/pedido.xlsx" in warnings[0]
+            assert "No se pudo actualizar el estado" in warnings[0]
+        else:
+            assert calls == ["excel", "history", "status", "reload", "select"]
+            assert not warnings
+            assert information
