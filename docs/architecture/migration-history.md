@@ -1,14 +1,14 @@
 # Roadmap de migracion UI / servicios / API
 
-> Para retomar trabajo rapido, leer primero `docs/worklog/worklog/progress-log.md`.
-> Usa `docs/architecture/architecture/migration-roadmap.md` para la direccion general y este archivo
+> Para retomar trabajo rapido, leer primero `docs/worklog/progress-log.md`.
+> Usa `docs/architecture/migration-roadmap.md` para la direccion general y este archivo
 > para el historial detallado de checkpoints y decisiones.
 
-## Estado verificado
+## Estado historico verificado
 
 Revision local: 2026-06-14.
 
-### Checkpoint provisional actual
+### Checkpoint provisional de 2026-06-14
 
 - HEAD validado: `5451a0e5`.
 - Worktree limpio.

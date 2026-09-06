@@ -13,6 +13,23 @@ entire migration history first.
 
 ## Current Snapshot
 
+- Date: 2026-09-06
+- Branch: `main`
+- Integrated code HEAD: `64fd6746fc96a485fa2fb213177938c5ddeb24ff` (before this documentation correction).
+- Worktree at integration: clean.
+- Integration: fast-forward of the 12 commits from `fix-formulas-procesos-escandallo`.
+- Scope: recipe process calculations, scaling quantities, cost sheets/PDFs and recipe image management.
+- Visual validation: confirmed correct by the user before integration.
+- Automated validation: 37 focused recipe/PDF/image/scaling and architecture tests passed.
+- Warnings: 25 known ReportLab and `datetime.utcnow()` deprecation warnings.
+- Environment: initial pytest temporary-directory permission errors were resolved by running with elevated sandbox permissions; the final run passed.
+- Validation limit: the full test suite was not rerun for this integration.
+- Git publication: local integration only; no push. At integration, `main` was 19 commits ahead of the locally recorded `origin/main`; remote references were not refreshed.
+- Next step: select the next small task explicitly; use the roadmap for migration context.
+- Historical entries below describe their original checkpoints, not the current branch or pending work.
+
+## Historical Snapshot - 2026-08-30
+
 - Date: 2026-08-30
 - Branch: `feat/technical-consultant`
 - HEAD before technical-consultant retrieval cut: `6eae28e92fccd2881138a7626e4a7823a16affa3`
@@ -206,16 +223,16 @@ entire migration history first.
 - Current UI note: standard action buttons use Lucide icons; customer activity icons remain custom SVG.
 - Last published commit: `c0ad0a81` (`fix: align customer header chip`).
 
-## What Was Completed Recently
+### Completed Work
 
 - Shared UI primitives were added for buttons, cards, chips, state boxes, section headers and data tables.
 - Customer listing PDF export now comes from the backend and produces a real PDF.
 - Customer listing Excel export now comes from the backend and produces a real `.xlsx`.
 - Customer action buttons and modal actions now use standard Lucide icons.
 - A local `listados/` folder exists in the repo for test artifacts, with `.gitkeep` tracked.
-- The repo now has a dedicated handoff file at `docs/worklog/worklog/progress-log.md`.
+- The repo now has a dedicated handoff file at `docs/worklog/progress-log.md`.
 
-## Recent Commits
+### Commits at This Checkpoint
 
 - `c0ad0a81` - `fix: align customer header chip`
 - `d6c477b4` - `fix: align shared section headers`
@@ -223,23 +240,23 @@ entire migration history first.
 - `9b01c08e` - `feat: add standard icon set for customer actions`
 - `64c09c45` - `feat: add shared data table component`
 
-## Important Files
+### Reference Files
 
-- [docs/architecture/architecture/migration-history.md](./architecture/migration-history.md)
-- [docs/architecture/architecture/migration-roadmap.md](./architecture/migration-roadmap.md)
-- [docs/architecture/architecture/debt-residual-report.md](./architecture/debt-residual-report.md)
-- [docs/setup/release-checklist.md](./release-checklist.md)
-- [docs/setup/local-environment.md](./local-environment.md)
+- [docs/architecture/migration-history.md](../architecture/migration-history.md)
+- [docs/architecture/migration-roadmap.md](../architecture/migration-roadmap.md)
+- [docs/architecture/debt-residual-report.md](../architecture/debt-residual-report.md)
+- [docs/setup/release-checklist.md](../setup/release-checklist.md)
+- [docs/setup/local-environment.md](../setup/local-environment.md)
 
-## Next Useful Checks
+### Recommendations at This Checkpoint
 
 - Verify the customers screen on the React UI after icon and header alignment changes.
 - Keep the `listados/` folder clean of generated artifacts before commits.
 - If a new chat resumes work, start from this snapshot and then consult the roadmap.
-- If the next task is functional, start from `docs/architecture/architecture/migration-roadmap.md` and
-  `docs/architecture/architecture/migration-history.md` after reading this log.
+- If the next task is functional, start from `docs/architecture/migration-roadmap.md` and
+  `docs/architecture/migration-history.md` after reading this log.
 
-## Handoff Block
+### Historical Handoff Block
 
 ```text
 Branch: feature/frontend-ui-system
@@ -248,5 +265,5 @@ Worktree: clean
 Focus: customer/listings flow, shared UI primitives, and remaining migration tasks.
 Recent changes: shared UI primitives added, standard button icons in place, header alignment fixed.
 Pending: keep listados/ clean, review next functional block from roadmap/history.
-Reference: docs/worklog/worklog/progress-log.md, docs/architecture/architecture/migration-roadmap.md, docs/architecture/architecture/migration-history.md
+Reference: docs/worklog/progress-log.md, docs/architecture/migration-roadmap.md, docs/architecture/migration-history.md
 ```
