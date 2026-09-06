@@ -34,6 +34,9 @@ def make_page(monkeypatch):
 def test_button_requires_exact_selected_client_and_rejects_stale_text(monkeypatch):
     page = make_page(monkeypatch)
     assert page.cadelsa_btn.text() == "Imp CADELSA"
+    ribbon_layout = page.cadelsa_btn.parentWidget().layout()
+    assert ribbon_layout.itemAt(ribbon_layout.count() - 1).widget() is page.cadelsa_btn
+    assert ribbon_layout.indexOf(page.edit_order_btn) >= 0
     assert not page.cadelsa_btn.isEnabled()
     page.almacen_filter.setCurrentIndex(1)
     assert page.cadelsa_btn.isEnabled()

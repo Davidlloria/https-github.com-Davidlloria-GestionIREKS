@@ -1509,7 +1509,6 @@ class OrdersPage(QWidget):
 
         left_ribbon, left_ribbon_layout = create_standard_top_ribbon()
         left_ribbon_layout.addWidget(self.new_btn)
-        left_ribbon_layout.addWidget(self.cadelsa_btn)
         left_ribbon_layout.addWidget(self.edit_btn)
         left_ribbon_layout.addWidget(self.del_btn)
         left_ribbon_layout.addWidget(self.export_btn)
@@ -1720,6 +1719,7 @@ class OrdersPage(QWidget):
         pedido_actions_layout.addWidget(self.del_line_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         pedido_actions_layout.addWidget(self.edit_order_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         pedido_actions_layout.addStretch(1)
+        pedido_actions_layout.addWidget(self.cadelsa_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         pedido_tab_layout.addWidget(pedido_actions_ribbon)
         self.pedido_items_table = QTableWidget(0, 7)
         self.pedido_items_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)

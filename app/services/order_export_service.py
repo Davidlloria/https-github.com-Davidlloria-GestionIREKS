@@ -86,7 +86,11 @@ class OrderExportService:
         ws["A1"].font = Font(name="Aptos Narrow", size=13, bold=True, color="FF71253E")
         ws["A1"].alignment = Alignment(horizontal="left")
         ws["C4"] = "Nº de pedido: "
-        ws["D4"] = pedido_numero
+        is_internal_cadelsa_number = (
+            pedido_numero.startswith("CAD-")
+            and str(getattr(pedido, "pedido_ref", "") or "").startswith("CADELSA-PDF:")
+        )
+        ws["D4"] = None if is_internal_cadelsa_number else pedido_numero
         ws.merge_cells("D4:E4")
         ws["C5"] = "Cliente / Distribuidor: "
         ws["D5"] = cliente_nombre

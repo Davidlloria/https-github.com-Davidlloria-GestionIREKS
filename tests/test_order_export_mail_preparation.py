@@ -2,13 +2,39 @@
 
 from datetime import date
 from pathlib import Path
+from io import BytesIO
 
-from openpyxl import Workbook
+import pytest
+from openpyxl import Workbook, load_workbook
 from sqlmodel import SQLModel, Session, create_engine
 
 import app.services.order_export_service as order_export_service_module
 from app.models import Pedido
 from app.services.order_export_service import OrderExportService, OrderMailPreparation
+
+
+@pytest.mark.parametrize("number,reference,expected", [
+    ("CAD-INTERNAL", "CADELSA-PDF:hash", None),
+    ("12345", "CADELSA-PDF:hash", "12345"),
+    ("PED-1", "", "PED-1"),
+])
+def test_excel_hides_only_internal_cadelsa_number(tmp_path, monkeypatch, number, reference, expected):
+    service = _make_service_with_isolated_engine(tmp_path, monkeypatch)
+    monkeypatch.setattr(service, "insert_order_logos", lambda sheet: None)
+    with Session(order_export_service_module.engine) as session:
+        session.add(Pedido(pedido_id="cad-export", almacen_id="CADELSA LZA", pedido_fecha=date(2026, 9, 7), pedido_numero=number, pedido_ref=reference))
+        session.commit()
+    workbook, _ = service.build_order_workbook("cad-export")
+    buffer = BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    saved = load_workbook(buffer)
+    assert saved.active["D4"].value == expected
+    assert saved.active["D5"].value == "CADELSA LZA"
+    assert saved.active["D6"].value.date() == date(2026, 9, 7)
+    with Session(order_export_service_module.engine) as session:
+        assert session.get(Pedido, "cad-export").pedido_numero == number
+    saved.close()
 
 
 def _make_service_with_isolated_engine(tmp_path: Path, monkeypatch) -> OrderExportService:
