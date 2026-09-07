@@ -501,9 +501,15 @@ class OrderQueryService:
             pedido, stats, pedido_by_id = self._build_operational_assignment(session, clean_pedido_id)
             if pedido is None:
                 return [], []
+            orders_with_delivery = set(session.exec(
+                select(Albaran.pedido_id)
+                .where(cast(Any, Albaran.pedido_id).in_(list(pedido_by_id)))
+            ))
             rows: list[tuple[PendingAggregateRow, Pedido]] = []
             article_ids: set[str] = set()
             for (row_pedido_id, articulo_id), values in stats.items():
+                if row_pedido_id not in orders_with_delivery:
+                    continue
                 ordered = float(values.get("ordered", 0.0) or 0.0)
                 received = float(values.get("received", 0.0) or 0.0)
                 pending = ordered - received

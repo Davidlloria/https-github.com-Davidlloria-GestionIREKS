@@ -216,6 +216,10 @@ def test_list_pendientes_acumulados_uses_selected_order_almacen_context(isolated
             articulo_codigo="REF-1",
             cantidad=7.0,
         )
+        session.add(Albaran(
+            albaran_id="alb-1", pedido_id="pedido-1", almacen_id="alm-1",
+            albaran_numero="A-1", albaran_fecha=date(2026, 6, 1),
+        ))
         session.commit()
 
         OrderDocumentImportService().rebuild_order_pendientes(session, "pedido-2", "alb-2")
@@ -228,3 +232,24 @@ def test_list_pendientes_acumulados_uses_selected_order_almacen_context(isolated
     assert resumen == [("P-1", 8.0)]
     assert len(articles) == 1
     assert articles[0].articulo_id == articulo_id
+
+
+@pytest.mark.parametrize("received", [None, 0.0, 4.0, 10.0])
+def test_pending_tab_only_includes_orders_with_imported_delivery(isolated_engine, received) -> None:
+    with Session(isolated_engine) as session:
+        article_id = _seed_catalog(session)
+        _seed_order(session, "delivered", date(2026, 6, 1), "P-1", article_id, 10.0)
+        _seed_order(session, "new", date(2026, 6, 2), "P-2", article_id, 5.0)
+        if received is not None:
+            _seed_albaran(
+                session, pedido_id="delivered", albaran_id="alb-1",
+                albaran_numero="A-1", albaran_fecha=date(2026, 6, 1),
+                articulo_id=article_id, articulo_codigo="REF-1", cantidad=received,
+            )
+        session.commit()
+
+    for selected_id in ("new", "delivered"):
+        rows, articles = OrderQueryService().list_pendientes_acumulados(selected_id)
+        expected = [] if received is None or received == 10 else [("delivered", 10 - received)]
+        assert [(row.pedido_id, row.cantidad_pendiente) for row, _ in rows] == expected
+        assert [article.articulo_id for article in articles] == ([article_id] if expected else [])
