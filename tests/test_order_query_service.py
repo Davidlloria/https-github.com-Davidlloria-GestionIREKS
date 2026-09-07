@@ -317,3 +317,25 @@ def test_list_order_items_uses_documented_received_quantity_for_same_order(isola
     assert len(rows) == 1
     assert pending_article_ids == set()
     assert received_by_article == {articulo_id: 7.0}
+
+
+def test_order_dialog_history_limit_sums_received_units(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        article_id = _seed_catalog(session)
+        for order_id, day, warehouse, quantity in [
+            ("old", 1, "alm-1", 2), ("recent", 2, "alm-1", 3),
+            ("current", 3, "alm-1", 50), ("future", 4, "alm-1", 100),
+            ("other", 2, "alm-2", 200),
+        ]:
+            session.add(Pedido(pedido_id=order_id, almacen_id=warehouse,
+                               pedido_fecha=date(2026, 6, day), pedido_numero=order_id))
+            session.add(AlbaranItem(item_id=order_id, pedido_id=order_id,
+                                   articulo_id=article_id, articulo_cantidad=quantity))
+        session.commit()
+    service = OrderQueryService()
+    for limit, expected in [(1, 3), (2, 5), (100, 5)]:
+        result = service.order_dialog_catalogs(
+            "alm-1", True, reference_date=date(2026, 6, 3),
+            exclude_pedido_id="current", history_limit=limit,
+        )
+        assert result[4] == {article_id: expected}

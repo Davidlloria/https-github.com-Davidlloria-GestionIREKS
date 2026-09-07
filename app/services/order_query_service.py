@@ -91,6 +91,7 @@ class OrderQueryService:
         *,
         reference_date: date | None = None,
         exclude_pedido_id: str = "",
+        history_limit: int = 1,
     ) -> tuple[list[IngredienteIreks], list[Fabricante], list[Familia], list[Subfamilia], dict[str, float], dict[str, float]]:
         clean_exclude_pedido_id = str(exclude_pedido_id or "").strip()
         clean_reference_date = reference_date or date.today()
@@ -114,19 +115,19 @@ class OrderQueryService:
                 )
                 if clean_exclude_pedido_id:
                     prev_order_query = prev_order_query.where(Pedido.pedido_id != clean_exclude_pedido_id)
-                prev_order = session.exec(
+                prev_orders = list(session.exec(
                     prev_order_query.order_by(
                         Pedido.pedido_fecha.desc(),
                         Pedido.pedido_numero.desc(),
                         Pedido.pedido_id.desc(),
-                    )
-                ).first()
-                if prev_order is not None:
-                    prev_order_id = str(getattr(prev_order, "pedido_id", "") or "").strip()
+                    ).limit(max(1, int(history_limit)))
+                ))
+                if prev_orders:
+                    prev_order_ids = [order.pedido_id for order in prev_orders]
                     prev_received_rows = list(
                         session.exec(
                             select(AlbaranItem)
-                            .where(AlbaranItem.pedido_id == prev_order_id)
+                            .where(AlbaranItem.pedido_id.in_(prev_order_ids))
                             .order_by(AlbaranItem.albaran_fecha, AlbaranItem.albaran_numero, AlbaranItem.item_id)
                         )
                     )

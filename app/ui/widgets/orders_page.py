@@ -976,6 +976,16 @@ class NewPedidoDialog(QDialog):
         self.numero_edit.setMaximumWidth(180)
         self.numero_edit.setText(self._pedido_numero)
         top_row.addWidget(self.numero_edit)
+        top_row.addWidget(QLabel("Pedidos anteriores"))
+        self.history_limit_spin = QSpinBox()
+        self.history_limit_spin.setRange(1, 100)
+        self.history_limit_spin.setValue(1)
+        self.history_limit_spin.setToolTip(
+            "Suma de unidades recibidas de los últimos N pedidos del almacén, hasta la fecha del pedido."
+        )
+        self.history_limit_spin.setEnabled(self._preload_history)
+        self.history_limit_spin.valueChanged.connect(self._reload_history)
+        top_row.addWidget(self.history_limit_spin)
         top_row.addStretch(1)
         layout.addLayout(top_row)
 
@@ -1096,6 +1106,7 @@ class NewPedidoDialog(QDialog):
             self._preload_history,
             reference_date=self._history_reference_date,
             exclude_pedido_id=self._history_exclude_pedido_id,
+            history_limit=self.history_limit_spin.value(),
         )
         self._row_by_articulo = {
             str(getattr(row, "articulo_id", "") or "").strip(): row for row in self._all_rows if str(getattr(row, "articulo_id", "") or "").strip()
@@ -1147,6 +1158,7 @@ class NewPedidoDialog(QDialog):
                 True,
                 reference_date=self._history_reference_date,
                 exclude_pedido_id=self._history_exclude_pedido_id,
+                history_limit=self.history_limit_spin.value(),
             )
         )
         self._prev_qty_by_articulo = prev_qty_by_articulo

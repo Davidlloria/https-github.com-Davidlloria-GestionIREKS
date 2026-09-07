@@ -455,3 +455,32 @@ def test_excel_export_reports_primary_history_and_status_failures(monkeypatch) -
             assert calls == ["excel", "history", "status", "reload", "select"]
             assert not warnings
             assert information
+
+
+def test_history_selector_refreshes_sum_without_changing_entered_units(monkeypatch) -> None:
+    from app.models import IngredienteIreks
+    _application()
+    calls = []
+    article = IngredienteIreks(articulo_id="art-1", articulo_descripcion="Harina")
+
+    def catalogs(self, almacen_id, preload_history, **kwargs):
+        calls.append(kwargs)
+        return [article], [], [], [], {"art-1": kwargs["history_limit"] * 3.0}, {}
+
+    monkeypatch.setattr(orders_page_module.OrderQueryService, "order_dialog_catalogs", catalogs)
+    for excluded_id in ("", "current"):
+        dialog = NewPedidoDialog(
+            "alm-1", initial_qty_by_articulo={"art-1": 7},
+            history_exclude_pedido_id=excluded_id,
+        )
+        assert dialog.table.item(0, 5).text() == "3.00"
+        dialog.history_limit_spin.setValue(2)
+        assert dialog.table.item(0, 5).text() == "6.00"
+        assert dialog.table.item(0, 3).text() == "7.00"
+        assert calls[-1]["exclude_pedido_id"] == excluded_id
+        dialog.fecha_edit.setDate(dialog.fecha_edit.date().addDays(-1))
+        assert calls[-1]["history_limit"] == 2
+        assert calls[-1]["reference_date"] == dialog.fecha_edit.date().toPython()
+        dialog.close()
+        dialog.deleteLater()
+    QApplication.processEvents()
