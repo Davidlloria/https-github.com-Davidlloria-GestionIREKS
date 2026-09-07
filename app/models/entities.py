@@ -642,6 +642,30 @@ class PedidoRecepcionAsignacion(SQLModel, table=True):
     pedido_id: str = Field(foreign_key="pedidos.pedido_id", ondelete="CASCADE", max_length=36, index=True)
 
 
+class PedidoRecepcionRevision(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "pedidos_recepciones_revisiones"
+    albaran_item_id: str = Field(foreign_key="albaranes_items.item_id", ondelete="CASCADE", primary_key=True)
+    estado: str = Field(default="pendiente")
+    huella: str = Field(default="")
+    excedente: float = Field(default=0.0)
+    version: int = Field(default=0)
+
+
+class PedidoRecepcionReparto(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "pedidos_recepciones_repartos"
+    albaran_item_id: str = Field(foreign_key="albaranes_items.item_id", ondelete="CASCADE", primary_key=True)
+    pedido_id: str = Field(foreign_key="pedidos.pedido_id", ondelete="CASCADE", primary_key=True)
+    cantidad: float
+
+
+class PedidoRecepcionCambio(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "pedidos_recepciones_cambios"
+    cambio_id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    albaran_item_id: str = Field(index=True)
+    fecha: datetime = Field(default_factory=datetime.now)
+    detalle: str
+
+
 class PedidoIncidencia(SQLModel, table=True):
     __tablename__: ClassVar[str] = "pedidos_incidencias"
 

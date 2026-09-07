@@ -20,6 +20,8 @@ from app.models import (
     PedidoItem,
     PedidoPendiente,
     PedidoRecepcionAsignacion,
+    PedidoRecepcionRevision,
+    PedidoRecepcionReparto,
     Subfamilia,
 )
 from app.schemas.orders import (
@@ -339,10 +341,26 @@ class OrderQueryService:
             row.albaran_item_id: row.pedido_id
             for row in session.exec(select(PedidoRecepcionAsignacion))
         }
+        from app.services.order_receipt_assignment_service import receipt_fingerprint
+        reviews = {row.albaran_item_id: row for row in session.exec(select(PedidoRecepcionRevision))}
+        splits: dict[str, list[PedidoRecepcionReparto]] = {}
+        for split in session.exec(select(PedidoRecepcionReparto)):
+            splits.setdefault(split.albaran_item_id, []).append(split)
         # Reserve explicit destinations before automatic chronological allocation.
-        albaran_rows.sort(key=lambda pair: pair[0].item_id not in assignments)
+        albaran_rows.sort(key=lambda pair: pair[0].item_id not in assignments and pair[0].item_id not in reviews)
         for albaran_item, _albaran in albaran_rows:
             articulo_id = str(getattr(albaran_item, "articulo_id", "") or "").strip()
+            review = reviews.get(albaran_item.item_id)
+            if review is not None:
+                if review.estado != "pendiente" and review.huella == receipt_fingerprint(albaran_item):
+                    for split in splits.get(albaran_item.item_id, []):
+                        for target in open_by_article.get(articulo_id, []):
+                            if target["pedido_id"] == split.pedido_id:
+                                applied = min(float(target["remaining"]), split.cantidad)
+                                stats[(split.pedido_id, articulo_id)]["received"] += applied
+                                target["remaining"] = float(target["remaining"]) - applied
+                                break
+                continue  # Deferred units and excess must never fall through to FIFO.
             source_pedido_id = str(getattr(albaran_item, "pedido_id", "") or "").strip()
             source_pedido_id = assignments.get(albaran_item.item_id, source_pedido_id)
             cantidad = float(getattr(albaran_item, "articulo_cantidad", 0.0) or 0.0)

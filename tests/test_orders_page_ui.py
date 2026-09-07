@@ -507,3 +507,61 @@ def test_warehouse_filter_defaults_to_igsa_and_preserves_selection(monkeypatch) 
     page.close()
     page.deleteLater()
     QApplication.processEvents()
+
+
+def test_receipt_dialog_defers_without_writes_and_confirms_explicit_split():
+    from app.services.order_receipt_assignment_service import ReceiptCandidate, ReceiptReview
+    from app.ui.widgets.receipt_assignment_dialog import ReceiptAssignmentDialog
+    _application()
+
+    class Service:
+        def __init__(self):
+            self.saved = []
+        def list_reviews(self, *args, **kwargs):
+            if self.saved:
+                return []
+            return [ReceiptReview("receipt", "2026090119", "PASTA BAYA DE SAUCO", 6, True, "hash", 0,
+                [ReceiptCandidate("old", "1482", date(2026, 5, 25), 1),
+                 ReceiptCandidate("target", "2393", date(2026, 8, 24), 6)], {}, 0, [])]
+        def confirm(self, review, allocations, excess):
+            self.saved.append((review.item_id, allocations, excess))
+
+    service = Service()
+    dialog = ReceiptAssignmentDialog(service)
+    assert not dialog.confirm.isEnabled()
+    assert dialog.table.cellWidget(0, 3).value() == 0
+    assert dialog.table.cellWidget(1, 3).value() == 0
+    dialog.later.click()
+    assert not service.saved
+    dialog.deleteLater()
+    dialog = ReceiptAssignmentDialog(service)
+    dialog.table.cellWidget(1, 3).setValue(6)
+    assert dialog.confirm.isEnabled()
+    dialog.confirm.click()
+    assert service.saved == [("receipt", {"old": 0, "target": 6}, 0)]
+    assert dialog.selector.count() == 0
+    dialog.close()
+    dialog.deleteLater()
+    QApplication.processEvents()
+
+
+
+def test_albaran_import_opens_pending_receipt_confirmation(monkeypatch):
+    from types import SimpleNamespace
+    _application()
+    monkeypatch.setattr(OrdersPage, "reload", lambda self: None)
+    page = OrdersPage()
+    monkeypatch.setattr(page, "_selected_row", lambda: SimpleNamespace(pedido_id="source"))
+    monkeypatch.setattr(orders_page_module.QFileDialog, "getOpenFileName", lambda *args: ("delivery.csv", ""))
+    monkeypatch.setattr(page.orders_documents_import_ui_service, "run_import_document_flow", lambda *args, **kwargs:
+                        SimpleNamespace(ok=True, title="Albaran", message="Imported"))
+    monkeypatch.setattr(page.receipt_assignment_service, "pending_count", lambda **kwargs: 1)
+    opened = []
+    monkeypatch.setattr(page, "_review_receipts", lambda pedido_id: opened.append(pedido_id))
+    monkeypatch.setattr(orders_page_module.QMessageBox, "information", lambda *args: None)
+    page._import_document_for_selected_order(dialog_title="Import", warning_prefix="albaran",
+        preview_loader=lambda *args: None, importer=lambda *args: None, confirm_preview=lambda *args: True)
+    assert opened == ["source"]
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()

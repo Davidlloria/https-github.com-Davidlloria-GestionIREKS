@@ -292,3 +292,199 @@ def test_explicit_receipt_closes_target_without_consuming_older_pending(isolated
         with pytest.raises(ValueError, match="same warehouse"):
             assign_order_receipt(session, "item-delivery", "target")
         session.rollback()
+
+
+@pytest.fixture()
+def receipt_engine(isolated_engine, monkeypatch):
+    import app.services.order_receipt_assignment_service as module
+    monkeypatch.setattr(module, "engine", isolated_engine)
+    return isolated_engine
+
+
+def _receipt_scenario(engine, quantities=(6, 1)):
+    from app.services.order_receipt_assignment_service import track_receipt
+    with Session(engine) as session:
+        article_id = _seed_catalog(session)
+        for index, quantity in enumerate(quantities):
+            _seed_order(session, f"p{index}", date(2026, 8, index + 1), f"P{index}", article_id, quantity)
+            session.add(Albaran(albaran_id=f"header{index}", pedido_id=f"p{index}", almacen_id="alm-1"))
+        _seed_albaran(session, pedido_id="p0", albaran_id="new-delivery", albaran_numero="NEW",
+                      albaran_fecha=date(2026, 9, 1), articulo_id=article_id, articulo_codigo="REF-1", cantidad=6)
+        session.flush()
+        track_receipt(session, session.get(AlbaranItem, "item-new-delivery"))
+        session.commit()
+    return article_id
+
+
+def test_ambiguous_receipt_is_deferred_then_split_and_can_be_corrected(receipt_engine):
+    from app.services.order_receipt_assignment_service import ReceiptAssignmentService, automate_receipts
+    article = _receipt_scenario(receipt_engine)
+    service = ReceiptAssignmentService()
+    with Session(receipt_engine) as session:
+        automate_receipts(session, "p0")
+        session.commit()
+    assert service.pending_count("alm-1") == 1
+    assert service.pending_count("other") == 0
+    assert OrderQueryService().list_order_items("p0")[2] == {}
+    review = service.list_reviews()[0]
+    assert review.allocations == {} and len(review.candidates) == 2
+    with pytest.raises(ValueError):
+        service.confirm(review, {"p0": 6, "p1": 1}, 0)
+    with pytest.raises(ValueError):
+        service.confirm(review, {"p1": 6}, 0)
+    with pytest.raises(ValueError):
+        service.confirm(review, {"p0": float("nan")}, 0)
+    service.confirm(review, {"p0": 5, "p1": 1}, 0)
+    assert service.pending_count() == 0
+    assert OrderQueryService().list_order_items("p0")[2] == {article: 5}
+    assert OrderQueryService().list_order_items("p1")[2] == {article: 1}
+    with pytest.raises(ValueError, match="cambiado"):
+        service.confirm(review, {"p0": 6}, 0)
+    updated = service.list_reviews(pending_only=False)[0]
+    service.confirm(updated, {"p0": 6}, 0)
+    assert OrderQueryService().list_order_items("p0")[2] == {article: 6}
+    assert OrderQueryService().list_order_items("p1")[2] == {}
+    assert len(service.list_reviews(pending_only=False)[0].history) == 2
+
+
+def test_unique_receipt_is_automatic_but_excess_requires_confirmation(receipt_engine):
+    from app.services.order_receipt_assignment_service import ReceiptAssignmentService, automate_receipts
+    article = _receipt_scenario(receipt_engine, (6,))
+    with Session(receipt_engine) as session:
+        automate_receipts(session, "p0")
+        session.commit()
+    service = ReceiptAssignmentService()
+    assert service.pending_count() == 0
+    assert OrderQueryService().list_order_items("p0")[2] == {article: 6}
+    previous = service.list_reviews(pending_only=False)[0]
+    with Session(receipt_engine) as session:
+        item = session.get(AlbaranItem, "item-new-delivery")
+        item.articulo_cantidad = 8
+        session.add(item)
+        session.commit()
+        automate_receipts(session, "p0")
+        session.commit()
+    assert service.pending_count() == 1
+    assert OrderQueryService().list_order_items("p0")[2] == {}
+    with pytest.raises(ValueError, match="cambiado"):
+        service.confirm(previous, {"p0": 6}, 0)
+    revised = service.list_reviews()[0]
+    assert revised.allocations == {}
+    service.confirm(revised, {"p0": 6}, 2)
+    assert service.list_reviews(pending_only=False)[0].excess == 2
+    assert OrderQueryService().list_order_items("p0")[2] == {article: 6}
+
+
+def test_duplicate_import_preserves_confirmed_split(receipt_engine):
+    from app.services.order_receipt_assignment_service import ReceiptAssignmentService
+    with Session(receipt_engine) as session:
+        article = _seed_catalog(session)
+        _seed_order(session, "p0", date(2026, 8, 1), "P0", article, 6)
+        _seed_order(session, "p1", date(2026, 8, 2), "P1", article, 1)
+        session.add(Albaran(albaran_id="old", pedido_id="p1", almacen_id="alm-1"))
+        session.commit()
+    payload = {"albaran_numero": "NEW", "albaran_fecha": "2026-09-01",
+               "articulo_codigo": "REF-1", "articulo_cantidad": "6"}
+    importer = OrderDocumentImportService()
+    result = importer.import_albaran("p0", payload, [payload])
+    assert result.imported == 1 and not result.errors
+    service = ReceiptAssignmentService()
+    review = service.list_reviews()[0]
+    service.confirm(review, {"p0": 5, "p1": 1}, 0)
+    result = importer.import_albaran("p0", payload, [payload])
+    assert result.already_imported
+    reviews = service.list_reviews(pending_only=False)
+    assert len(reviews) == 1 and reviews[0].allocations == {"p0": 5, "p1": 1}
+
+
+
+def test_reimport_quantity_change_only_reopens_affected_receipt(receipt_engine):
+    from app.services.order_receipt_assignment_service import ReceiptAssignmentService
+    with Session(receipt_engine) as session:
+        article = _seed_catalog(session)
+        _seed_order(session, "p0", date(2026, 8, 1), "P0", article, 6)
+        session.commit()
+    payload = {"albaran_numero": "NEW", "albaran_fecha": "2026-09-01",
+               "articulo_codigo": "REF-1", "articulo_cantidad": "6"}
+    importer = OrderDocumentImportService()
+    assert importer.import_albaran("p0", payload, [payload]).imported == 1
+    service = ReceiptAssignmentService()
+    before = service.list_reviews(pending_only=False)[0]
+    assert before.allocations == {"p0": 6}
+    changed = {**payload, "articulo_cantidad": "5"}
+    assert importer.import_albaran("p0", changed, [changed]).already_imported
+    review = service.list_reviews()[0]
+    assert review.item_id == before.item_id
+    assert review.cantidad == 5 and review.allocations == {}
+    assert OrderQueryService().list_order_items("p0")[2] == {}
+    service.confirm(review, {"p0": 5}, 0)
+    assert OrderQueryService().list_order_items("p0")[2] == {article: 5}
+    rows, _ = OrderQueryService().list_pendientes("p0")
+    assert len(rows) == 1 and rows[0].cantidad_pendiente == 1
+
+
+
+def test_two_receipts_cannot_consume_the_same_pending_units(receipt_engine):
+    from app.services.order_receipt_assignment_service import ReceiptAssignmentService, track_receipt
+    article = _receipt_scenario(receipt_engine, (6,))
+    with Session(receipt_engine) as session:
+        _seed_albaran(session, pedido_id="p0", albaran_id="second", albaran_numero="SECOND",
+                      albaran_fecha=date(2026, 9, 1), articulo_id=article, articulo_codigo="REF-1", cantidad=6)
+        session.flush()
+        track_receipt(session, session.get(AlbaranItem, "item-second"))
+        session.commit()
+    service = ReceiptAssignmentService()
+    first, second = service.list_reviews()
+    service.confirm(first, {"p0": 6}, 0)
+    with pytest.raises(ValueError, match="pendiente disponible"):
+        service.confirm(second, {"p0": 6}, 0)
+    assert service.pending_count() == 1
+    assert OrderQueryService().list_order_items("p0")[2] == {article: 6}
+
+
+def test_reimport_changed_article_invalidates_assignment_and_preserves_other_lines(receipt_engine):
+    from app.services.order_receipt_assignment_service import ReceiptAssignmentService
+    from app.models import AlmacenMovimiento
+    with Session(receipt_engine) as session:
+        article = _seed_catalog(session)
+        session.add(IngredienteIreks(articulo_id="art-2", articulo_referencia="REF-2", articulo_descripcion="Otro"))
+        session.add(IngredienteIreks(articulo_id="art-3", articulo_referencia="REF-3", articulo_descripcion="Nuevo"))
+        _seed_order(session, "p0", date(2026, 8, 1), "P0", article, 6)
+        session.add(PedidoItem(pedido_id="p0", articulo_id="art-2", articulo_cantidad=2))
+        session.commit()
+    first = {"albaran_numero": "NEW", "albaran_fecha": "2026-09-01", "articulo_codigo": "REF-1", "articulo_cantidad": "6"}
+    second = {**first, "articulo_codigo": "REF-2", "articulo_cantidad": "2"}
+    importer = OrderDocumentImportService()
+    assert importer.import_albaran("p0", first, [first, second]).imported == 2
+    service = ReceiptAssignmentService()
+    before = {r.articulo: r for r in service.list_reviews(pending_only=False)}
+    changed = {**first, "articulo_codigo": "REF-3"}
+    assert importer.import_albaran("p0", first, [second, changed]).already_imported
+    reviews = service.list_reviews()
+    assert len(reviews) == 1 and reviews[0].articulo == "Nuevo"
+    unchanged = next(r for r in service.list_reviews(pending_only=False) if r.articulo == "Otro")
+    assert unchanged.item_id == before["Otro"].item_id
+    assert unchanged.allocations == {"p0": 2} and unchanged.version == before["Otro"].version
+    with Session(receipt_engine) as session:
+        movement = session.exec(select(AlmacenMovimiento).where(AlmacenMovimiento.albaran_item_id == reviews[0].item_id)).one()
+        assert movement.articulo_id == "art-3" and movement.cantidad == 6
+
+
+
+def test_reimport_resolved_article_creates_missing_stock_movement(receipt_engine):
+    from app.models import AlmacenMovimiento
+    with Session(receipt_engine) as session:
+        article = _seed_catalog(session)
+        _seed_order(session, "p0", date(2026, 8, 1), "P0", article, 6)
+        session.commit()
+    payload = {"albaran_numero": "NEW", "albaran_fecha": "2026-09-01", "articulo_codigo": "UNKNOWN", "articulo_cantidad": "6"}
+    importer = OrderDocumentImportService()
+    assert importer.import_albaran("p0", payload, [payload]).imported == 1
+    with Session(receipt_engine) as session:
+        assert not list(session.exec(select(AlmacenMovimiento)))
+        session.add(IngredienteIreks(articulo_id="resolved", articulo_referencia="UNKNOWN", articulo_descripcion="Resolved"))
+        session.commit()
+    assert importer.import_albaran("p0", payload, [payload]).already_imported
+    with Session(receipt_engine) as session:
+        movement = session.exec(select(AlmacenMovimiento)).one()
+        assert movement.articulo_id == "resolved" and movement.cantidad == 6

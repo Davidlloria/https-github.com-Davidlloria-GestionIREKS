@@ -32,7 +32,8 @@ class OrderDocumentImportFlowService:
             repair_existing_document=repair_existing_albaran,
             duplicate_message=lambda number: (
                 f"El albaran {number} ya estaba importado para este pedido.\n"
-                "No se han creado lineas duplicadas. Se han revisado las equivalencias y entradas de almacen existentes."
+                "No se han creado líneas duplicadas. Se han revisado los datos y las entradas de almacén. "
+                "Las recepciones modificadas requieren revisar su asignación."
             ),
         )
 

@@ -258,10 +258,11 @@ class OrderDocumentImportService:
                         Albaran.albaran_numero == albaran_numero,
                     )
                 ).first(),
-                repair_existing_albaran=lambda existing_albaran_id: self.repair_albaran_item_mappings(
+                repair_existing_albaran=lambda existing_albaran_id: self._reimport_albaran(
                     session,
                     clean_pedido_id,
                     existing_albaran_id,
+                    mapped_rows,
                 ),
             )
             if gate.already_imported:
@@ -345,6 +346,8 @@ class OrderDocumentImportService:
                 )
                 session.add(albaran_item)
                 session.flush()
+                from app.services.order_receipt_assignment_service import track_receipt
+                track_receipt(session, albaran_item)
                 if article is not None and articulo_id:
                     session.add(
                         AlmacenMovimiento(
@@ -373,12 +376,103 @@ class OrderDocumentImportService:
                 session.delete(albaran_header)
                 session.commit()
             if imported_rows > 0 and albaran_header is not None:
+                from app.services.order_receipt_assignment_service import automate_receipts
+                automate_receipts(session, clean_pedido_id)
+                session.commit()
                 self.rebuild_order_pendientes(
                     session,
                     str(pedido.pedido_id or "").strip(),
                     str(albaran_header.albaran_id or "").strip(),
                 )
         return result
+
+    def _reimport_albaran(self, session: Session, pedido_id: str, albaran_id: str,
+                         mapped_rows: list[dict[str, Any]]) -> None:
+        """Keep line identities and decisions when refreshing an existing delivery."""
+        from app.models import PedidoRecepcionRevision, PedidoRecepcionCambio
+        from app.services.order_receipt_assignment_service import track_receipt
+        import json
+
+        header = session.get(Albaran, albaran_id)
+        existing = list(session.exec(select(AlbaranItem).where(AlbaranItem.albaran_id == albaran_id)
+                                     .order_by(AlbaranItem.item_id)))
+        if header is None or len(existing) != len(mapped_rows):
+            raise ValueError("El albarán ya existe y ha cambiado su número de líneas. Revisa el documento antes de sustituirlo.")
+        remaining = list(existing)
+        pairs = []
+        unmatched = []
+        for payload in mapped_rows:
+            code = str(payload.get("articulo_codigo") or "").strip()
+            lot = str(payload.get("articulo_lote") or "").strip()
+            matches = [row for row in remaining if row.articulo_codigo == code and row.articulo_lote == lot]
+            if len(matches) > 1:
+                raise ValueError("Hay líneas repetidas sin una identificación única. Revisa el albarán antes de sustituirlo.")
+            if matches:
+                item = matches[0]
+                remaining.remove(item)
+                pairs.append((item, payload))
+            else:
+                unmatched.append(payload)
+        if len(unmatched) > 1:
+            raise ValueError("Han cambiado varias referencias sin correspondencia única. Revisa el albarán antes de sustituirlo.")
+        pairs.extend(zip(remaining, unmatched))
+        changes = []
+        for item, payload in pairs:
+            self.validate_required_fields(payload, ["albaran_numero", "albaran_fecha", "articulo_codigo"])
+            if str(payload["albaran_numero"]).strip() != header.albaran_numero:
+                raise ValueError("El archivo contiene más de un albarán.")
+            code = str(payload["articulo_codigo"]).strip()
+            article = self.find_article_by_code(session, code)
+            quantity = self.parse_float(payload.get("articulo_cantidad"), 0)
+            weight = float(getattr(article, "articulo_envase_peso_total", 0) or 0)
+            if quantity <= 0 and weight > 0:
+                quantity = self.parse_float(payload.get("articulo_kilos"), 0) / weight
+            from math import isfinite
+            if not isfinite(quantity) or quantity <= 0:
+                raise ValueError("La reimportación requiere una cantidad recibida válida en cada línea.")
+            values = dict(articulo_codigo=code, articulo_id=article.articulo_id if article else "",
+                articulo_cantidad=quantity, albaran_fecha=self.parse_required_date(payload["albaran_fecha"], "albaran_fecha"),
+                articulo_lote=str(payload.get("articulo_lote") or "").strip(),
+                articulo_caducidad=self.parse_optional_date(payload.get("articulo_caducidad")))
+            if any(getattr(item, key) != value for key, value in values.items()):
+                changes.append((item, values))
+        if len({self.parse_required_date(p["albaran_fecha"], "albaran_fecha") for p in mapped_rows}) > 1:
+            raise ValueError("El archivo contiene más de una fecha de albarán.")
+        for item, values in changes:
+            track_receipt(session, item)
+            review = session.get(PedidoRecepcionRevision, item.item_id)
+            review.version += 1
+            review.estado = "pendiente"
+            session.add(review)
+            for key, value in values.items():
+                setattr(item, key, value)
+            session.add(item)
+            movements = list(session.exec(select(AlmacenMovimiento).where(AlmacenMovimiento.albaran_item_id == item.item_id)))
+            if item.articulo_id and not movements:
+                order = session.get(Pedido, pedido_id)
+                movements.append(AlmacenMovimiento(almacen_id=header.almacen_id,
+                    pedido_numero=order.pedido_numero, pedido_albaran_numero=header.albaran_numero,
+                    albaran_item_id=item.item_id))
+            for movement in movements:
+                if not item.articulo_id:
+                    session.delete(movement)
+                    continue
+                movement.articulo_id = item.articulo_id
+                movement.cantidad = item.articulo_cantidad
+                movement.articulo_lote = item.articulo_lote
+                movement.articulo_caducidad = item.articulo_caducidad
+                movement.fecha_pedido = item.albaran_fecha
+                session.add(movement)
+            session.add(PedidoRecepcionCambio(albaran_item_id=item.item_id, detalle=json.dumps({
+                "tipo": "Datos actualizados: requiere revisión", "despues": [], "excedente": 0,
+            })))
+        if changes:
+            header.albaran_fecha = changes[0][1]["albaran_fecha"]
+            session.add(header)
+            from app.services.order_receipt_assignment_service import sync_receipt_pending
+            sync_receipt_pending(session, pedido_id)
+            session.commit()
+        self.repair_albaran_item_mappings(session, pedido_id, albaran_id)
 
     def import_factura(
         self,
@@ -668,6 +762,18 @@ class OrderDocumentImportService:
 
     def rebuild_order_pendientes(self, session: Session, pedido_id: str, albaran_id: str) -> None:
         if not pedido_id or not albaran_id:
+            return
+        from app.models import PedidoRecepcionRevision
+        from app.services.order_receipt_assignment_service import sync_receipt_pending
+        selected = session.get(Pedido, pedido_id)
+        if selected is not None and session.exec(
+            select(PedidoRecepcionRevision)
+            .join(AlbaranItem, AlbaranItem.item_id == PedidoRecepcionRevision.albaran_item_id)
+            .join(Pedido, Pedido.pedido_id == AlbaranItem.pedido_id)
+            .where(Pedido.almacen_id == selected.almacen_id)
+        ).first() is not None:
+            sync_receipt_pending(session, pedido_id)
+            session.commit()
             return
         pedido = session.get(Pedido, pedido_id)
         if pedido is None:

@@ -75,6 +75,8 @@ from app.services.orders_documents_import_ui_service import (
     OrdersDocumentsImportUiService,
 )
 from app.services.order_query_service import ArticleOrderHistoryRow, OrderQueryService
+from app.services.order_receipt_assignment_service import ReceiptAssignmentService
+from app.ui.widgets.receipt_assignment_dialog import ReceiptAssignmentDialog
 from app.services.order_service import OrderLineInput, OrderService
 from app.services.cadelsa_order_import_service import CadelsaOrderImportService
 from app.ui.widgets.cadelsa_order_preview_dialog import CadelsaOrderPreviewDialog
@@ -1406,6 +1408,7 @@ class OrdersPage(QWidget):
         self.order_query_service = OrderQueryService()
         self.order_service = OrderService()
         self.order_incident_service = OrderIncidentService()
+        self.receipt_assignment_service = ReceiptAssignmentService()
         self.order_edit_flow_service = OrderEditFlowService(
             order_query_service=self.order_query_service,
             order_service=self.order_service,
@@ -1493,6 +1496,10 @@ class OrdersPage(QWidget):
         almacen_row.addWidget(QLabel("Cliente/Distribuidor"))
         almacen_row.addWidget(self.almacen_filter, 1)
         left_layout.addLayout(almacen_row)
+        self.receipts_btn = QPushButton("Recepciones por asignar: 0")
+        self.receipts_btn.setToolTip("Resolver recepciones pendientes o revisar asignaciones confirmadas")
+        self.receipts_btn.clicked.connect(lambda: self._review_receipts())
+        left_layout.addWidget(self.receipts_btn)
 
         self.new_btn = create_standard_ribbon_button("Nuevo", role="success", icon_name="order.svg")
         self.cadelsa_btn = create_standard_ribbon_button("Imp CADELSA", role="secondary", icon_name="order.svg")
@@ -3047,6 +3054,8 @@ class OrdersPage(QWidget):
         month_from = int(self.month_from_filter.currentData() or 0)
         month_to = int(self.month_to_filter.currentData() or 0)
         almacen_filter = str(self.almacen_filter.currentData() or "").strip() or selected_almacen_id
+        count = self.receipt_assignment_service.pending_count(almacen_filter)
+        self.receipts_btn.setText(f"Recepciones por asignar: {count}")
         self.rows = [
                 PedidoListRow(
                     pedido_id=row.pedido_id,
@@ -3769,6 +3778,15 @@ class OrdersPage(QWidget):
                 return True
         return False
 
+    def _review_receipts(self, pedido_id: str = "") -> None:
+        try:
+            dialog = ReceiptAssignmentDialog(self.receipt_assignment_service, self,
+                almacen_id=self._selected_almacen_id(), pedido_id=pedido_id)
+            dialog.exec()
+        except Exception as exc:
+            QMessageBox.warning(self, "Recepciones", f"No se pudieron cargar las recepciones: {exc}")
+        self.reload()
+
     def _import_albaran_for_selected_order(self) -> None:
         self._import_document_for_selected_order(
             dialog_title="Seleccionar albaran",
@@ -3841,6 +3859,8 @@ class OrdersPage(QWidget):
         if outcome is None:
             return
         self.reload()
+        if warning_prefix == "albaran" and self.receipt_assignment_service.pending_count(pedido_id=row.pedido_id):
+            self._review_receipts(row.pedido_id)
         if outcome.ok:
             QMessageBox.information(self, outcome.title, outcome.message)
             return

@@ -34,6 +34,9 @@ from app.models.entities import (
     PedidoItem,
     PedidoPendiente,
     PedidoRecepcionAsignacion,
+    PedidoRecepcionRevision,
+    PedidoRecepcionReparto,
+    PedidoRecepcionCambio,
     Provincia,
     PromocionClienteProducto,
     Proveedor,
@@ -52,6 +55,9 @@ from app.models.entities import (
 
 __all__ = [
     "PedidoRecepcionAsignacion",
+    "PedidoRecepcionRevision",
+    "PedidoRecepcionReparto",
+    "PedidoRecepcionCambio",
     "AlmacenMovimiento",
     "AlmacenStock",
     "Albaran",
