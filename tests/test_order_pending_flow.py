@@ -269,7 +269,7 @@ def test_explicit_receipt_closes_target_without_consuming_older_pending(isolated
         _seed_albaran(session, pedido_id="source", albaran_id="delivery", albaran_numero="2026090119",
                       albaran_fecha=date(2026, 9, 1), articulo_id=article_id, articulo_codigo="REF-1", cantidad=6)
         session.commit()
-        assert OrderQueryService().list_order_items("target")[2] == {article_id: 5.0}
+        assert OrderQueryService().list_order_items("target")[2] == {}
         assign_order_receipt(session, "item-delivery", "target")
         assign_order_receipt(session, "item-delivery", "target")  # Idempotent.
         session.commit()
@@ -488,3 +488,60 @@ def test_reimport_resolved_article_creates_missing_stock_movement(receipt_engine
     with Session(receipt_engine) as session:
         movement = session.exec(select(AlmacenMovimiento)).one()
         assert movement.articulo_id == "resolved" and movement.cantidad == 6
+
+
+
+def test_historical_surplus_never_funds_future_or_undocumented_orders(receipt_engine):
+    from app.services.order_receipt_assignment_service import reconcile_historical_receipts, ReceiptAssignmentService
+    with Session(receipt_engine) as session:
+        article = _seed_catalog(session)
+        _seed_order(session, "source", date(2026, 1, 19), "141", article, 98)
+        _seed_order(session, "future", date(2026, 8, 31), "2447", article, 100)
+        _seed_order(session, "new", date(2026, 9, 7), "", article, 100)
+        _seed_order(session, "undocumented", date(2026, 1, 1), "early", article, 100)
+        session.add(Albaran(albaran_id="future-doc", pedido_id="future", almacen_id="alm-1",
+                            albaran_fecha=date(2026, 9, 1)))
+        _seed_albaran(session, pedido_id="source", albaran_id="old-doc", albaran_numero="2026090005",
+                      albaran_fecha=date(2026, 1, 19), articulo_id=article, articulo_codigo="REF-1", cantidad=198)
+        session.commit()
+        assert reconcile_historical_receipts(session, "source") == 1
+        session.commit()
+        assert reconcile_historical_receipts(session, "source") == 0
+        session.commit()
+    query = OrderQueryService()
+    assert query.list_order_items("source")[2] == {article: 98}
+    for pid in ("future", "new", "undocumented"):
+        assert query.list_order_items(pid)[2] == {}
+    service = ReceiptAssignmentService()
+    review = service.list_reviews()[0]
+    assert review.allocations == {"source": 98}
+    assert {r.pedido_id for r in review.candidates} == {"source"}
+    service.confirm(review, {"source": 98}, 100)
+    assert service.pending_count() == 0
+    assert query.list_order_items("future")[2] == {}
+
+
+def test_historical_ambiguity_preserves_documented_units_until_confirmation(receipt_engine):
+    from app.services.order_receipt_assignment_service import reconcile_historical_receipts, ReceiptAssignmentService
+    with Session(receipt_engine) as session:
+        article = _seed_catalog(session)
+        for pid, day, qty in [("older", 1, 5), ("old", 2, 5), ("source", 3, 4)]:
+            _seed_order(session, pid, date(2026, 6, day), pid, article, qty)
+            session.add(Albaran(albaran_id=pid, pedido_id=pid, almacen_id="alm-1", albaran_fecha=date(2026, 6, day)))
+        _seed_albaran(session, pedido_id="source", albaran_id="delivery", albaran_numero="D1",
+                      albaran_fecha=date(2026, 6, 4), articulo_id=article, articulo_codigo="REF-1", cantidad=7)
+        session.commit()
+        assert reconcile_historical_receipts(session, "source") == 1
+        session.commit()
+    query = OrderQueryService()
+    assert query.list_order_items("source")[2] == {article: 4}
+    assert query.list_order_items("older")[2] == {}
+    assert query.list_order_items("old")[2] == {}
+    service = ReceiptAssignmentService()
+    assert service.pending_count() == 1
+    review = service.list_reviews()[0]
+    assert review.allocations == {"source": 4}
+    service.confirm(review, {"source": 4, "old": 3}, 0)
+    assert query.list_order_items("source")[2] == {article: 4}
+    assert query.list_order_items("old")[2] == {article: 3}
+    assert query.list_order_items("older")[2] == {}

@@ -303,6 +303,8 @@ def test_list_order_items_returns_received_quantity_by_article(isolated_engine) 
 def test_list_order_items_uses_assigned_units_without_double_counting(isolated_engine) -> None:
     with Session(isolated_engine) as session:
         articulo_id = _seed_catalog(session)
+        session.add(Albaran(albaran_id="alb-1", almacen_id="alm-1", pedido_id="pedido-1",
+                            albaran_numero="ALB-1", albaran_fecha=date(2026, 6, 1)))
         session.add(Pedido(pedido_id="pedido-1", almacen_id="alm-1", pedido_fecha=date(2026, 6, 1), pedido_numero="P-1"))
         session.add(PedidoItem(pedido_id="pedido-1", pedido_numero="P-1", pedido_item_fecha=date(2026, 6, 1), articulo_id=articulo_id, articulo_cantidad=10.0))
         session.add(Pedido(pedido_id="pedido-2", almacen_id="alm-1", pedido_fecha=date(2026, 6, 2), pedido_numero="P-2"))

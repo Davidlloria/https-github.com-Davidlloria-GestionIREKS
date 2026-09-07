@@ -279,6 +279,8 @@ class OrderQueryService:
         self,
         session: Session,
         pedido_id: str,
+        *,
+        unassigned_receipts: dict[str, dict[str, float]] | None = None,
     ) -> tuple[Pedido | None, dict[tuple[str, str], dict[str, float]], dict[str, Pedido]]:
         clean_pedido_id = str(pedido_id or "").strip()
         if not clean_pedido_id:
@@ -305,6 +307,8 @@ class OrderQueryService:
         pedido_ids = list(pedido_by_id.keys())
         if not pedido_ids:
             return pedido, {}, pedido_by_id
+        delivered_orders = set(session.exec(select(Albaran.pedido_id).where(
+            Albaran.pedido_id.in_(pedido_ids))))
 
         ordered_rows = list(
             session.exec(select(PedidoItem).where(cast(Any, PedidoItem.pedido_id).in_(pedido_ids)))
@@ -355,7 +359,8 @@ class OrderQueryService:
                 if review.estado != "pendiente" and review.huella == receipt_fingerprint(albaran_item):
                     for split in splits.get(albaran_item.item_id, []):
                         for target in open_by_article.get(articulo_id, []):
-                            if target["pedido_id"] == split.pedido_id:
+                            if (target["pedido_id"] == split.pedido_id
+                                    and pedido_by_id[split.pedido_id].pedido_fecha <= albaran_item.albaran_fecha):
                                 applied = min(float(target["remaining"]), split.cantidad)
                                 stats[(split.pedido_id, articulo_id)]["received"] += applied
                                 target["remaining"] = float(target["remaining"]) - applied
@@ -368,7 +373,9 @@ class OrderQueryService:
                 continue
             pending_queue = open_by_article.get(articulo_id, [])
             remaining = cantidad
-            if source_pedido_id and pending_queue:
+            allocated: dict[str, float] = {}
+            if (source_pedido_id in pedido_by_id and pending_queue
+                    and pedido_by_id[source_pedido_id].pedido_fecha <= albaran_item.albaran_fecha):
                 own_index = next(
                     (
                         idx
@@ -383,23 +390,29 @@ class OrderQueryService:
                     if target_remaining > 1e-9:
                         applied = min(target_remaining, remaining)
                         stats[(source_pedido_id, articulo_id)]["received"] += applied
+                        allocated[source_pedido_id] = applied
                         target["remaining"] = target_remaining - applied
                         remaining -= applied
                     if float(target.get("remaining", 0.0) or 0.0) <= 1e-9:
                         pending_queue.pop(own_index)
-            while remaining > 1e-9 and pending_queue:
-                target = pending_queue[0]
+            eligible = [target for target in pending_queue
+                        if float(target["remaining"]) > 1e-9
+                        and str(target["pedido_id"]) in delivered_orders
+                        and pedido_by_id[str(target["pedido_id"])].pedido_fecha <= albaran_item.albaran_fecha]
+            # Historical surplus cannot fund future orders or choose among several destinations.
+            if remaining > 1e-9 and len(eligible) == 1 and albaran_item.item_id not in assignments:
+                target = eligible[0]
                 target_pedido_id = str(target.get("pedido_id") or "").strip()
                 target_remaining = float(target.get("remaining", 0.0) or 0.0)
-                if target_remaining <= 1e-9:
-                    pending_queue.pop(0)
-                    continue
                 applied = min(target_remaining, remaining)
                 stats[(target_pedido_id, articulo_id)]["received"] += applied
+                allocated[target_pedido_id] = allocated.get(target_pedido_id, 0.0) + applied
                 target["remaining"] = target_remaining - applied
                 remaining -= applied
                 if float(target["remaining"] or 0.0) <= 1e-9:
-                    pending_queue.pop(0)
+                    pending_queue.remove(target)
+            if remaining > 1e-9 and unassigned_receipts is not None:
+                unassigned_receipts[albaran_item.item_id] = allocated
 
         return pedido, stats, pedido_by_id
 

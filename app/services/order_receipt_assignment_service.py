@@ -150,6 +150,36 @@ def sync_receipt_pending(session: Session, pedido_id: str) -> None:
     session.flush()
 
 
+def reconcile_historical_receipts(session: Session, pedido_id: str) -> int:
+    """Queue unresolved historical surplus without changing the source documents."""
+    from app.services.order_query_service import OrderQueryService
+    unresolved: dict[str, dict[str, float]] = {}
+    query = OrderQueryService()
+    _, before, orders = query._build_operational_assignment(session, pedido_id, unassigned_receipts=unresolved)
+    for item_id, allocations in unresolved.items():
+        item = session.get(AlbaranItem, item_id)
+        track_receipt(session, item)
+        review = session.get(PedidoRecepcionRevision, item_id)
+        review.estado = "parcial" if allocations else "pendiente"
+        session.add(review)
+        legacy = session.get(PedidoRecepcionAsignacion, item_id)
+        if legacy is not None:
+            session.delete(legacy)
+        for pid, amount in allocations.items():
+            session.add(PedidoRecepcionReparto(albaran_item_id=item_id, pedido_id=pid, cantidad=amount))
+        session.add(PedidoRecepcionCambio(albaran_item_id=item_id, detalle=json.dumps({
+            "tipo": "Sobrante histórico pendiente de revisión",
+            "despues": [(orders[pid].pedido_numero or "Sin número", qty) for pid, qty in allocations.items()],
+            "excedente": 0,
+        }, ensure_ascii=False)))
+    session.flush()
+    _, after, _ = query._build_operational_assignment(session, pedido_id)
+    if before != after:
+        raise ValueError("La revisión histórica alteraría asignaciones válidas; se cancela la operación.")
+    sync_receipt_pending(session, pedido_id)
+    return len(unresolved)
+
+
 class ReceiptAssignmentService:
     def pending_count(self, almacen_id: str = "", pedido_id: str = "") -> int:
         with Session(engine) as session:
@@ -160,7 +190,7 @@ class ReceiptAssignmentService:
                 query = query.where(Pedido.almacen_id == almacen_id)
             if pedido_id:
                 query = query.where(Pedido.pedido_id == pedido_id)
-            return sum(review.estado == "pendiente" or review.huella != receipt_fingerprint(item)
+            return sum(review.estado in {"pendiente", "parcial"} or review.huella != receipt_fingerprint(item)
                        for item, review in session.exec(query))
 
     def list_reviews(self, almacen_id: str = "", pedido_id: str = "", pending_only: bool = True) -> list[ReceiptReview]:
@@ -176,13 +206,14 @@ class ReceiptAssignmentService:
                 legacy = session.get(PedidoRecepcionAsignacion, item.item_id)
                 if not review and not legacy:
                     continue
-                pending = bool(review and (review.estado == "pendiente" or review.huella != receipt_fingerprint(item)))
+                pending = bool(review and (review.estado in {"pendiente", "parcial"} or review.huella != receipt_fingerprint(item)))
                 if pending_only and not pending:
                     continue
                 article = session.exec(select(IngredienteIreks).where(
                     IngredienteIreks.articulo_id == item.articulo_id)).first()
                 allocations = {r.pedido_id: r.cantidad for r in session.exec(select(PedidoRecepcionReparto).where(
-                    PedidoRecepcionReparto.albaran_item_id == item.item_id))} if not pending else {}
+                    PedidoRecepcionReparto.albaran_item_id == item.item_id))} if (
+                        review and review.estado != "pendiente" and review.huella == receipt_fingerprint(item)) else {}
                 if legacy and not review:
                     allocations = {legacy.pedido_id: item.articulo_cantidad}
                 history = []
