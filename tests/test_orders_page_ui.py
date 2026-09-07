@@ -484,3 +484,26 @@ def test_history_selector_refreshes_sum_without_changing_entered_units(monkeypat
         dialog.close()
         dialog.deleteLater()
     QApplication.processEvents()
+
+
+def test_warehouse_filter_defaults_to_igsa_and_preserves_selection(monkeypatch) -> None:
+    from app.services.order_query_service import WarehouseFilterOption
+    _application()
+    monkeypatch.setattr(OrdersPage, "reload", lambda self: None)
+    page = OrdersPage()
+    options = [WarehouseFilterOption("Todos", ""), WarehouseFilterOption("Otro", "other"),
+               WarehouseFilterOption("IGSA", "igsa")]
+    monkeypatch.setattr(page.order_query_service, "warehouse_filter_options", lambda: options)
+    page._load_almacen_filter()
+    assert page.almacen_filter.currentData() == "igsa"
+    for selected in ("other", "", "igsa"):
+        page.almacen_filter.setCurrentIndex(page.almacen_filter.findData(selected))
+        page._load_almacen_filter()
+        assert page.almacen_filter.currentData() == selected
+    page.almacen_filter.clear()
+    options.pop()
+    page._load_almacen_filter()
+    assert page.almacen_filter.currentData() == ""
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()

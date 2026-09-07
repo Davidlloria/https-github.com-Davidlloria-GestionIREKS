@@ -2094,6 +2094,7 @@ class OrdersPage(QWidget):
         return date.today()
 
     def _load_almacen_filter(self, _session: Any | None = None) -> None:
+        initial_load = self.almacen_filter.count() == 0
         current = str(self.almacen_filter.currentData() or "")
         current_index_text = str(self.almacen_filter.currentText() or "").strip()
         line_edit = self.almacen_filter.lineEdit()
@@ -2105,7 +2106,7 @@ class OrdersPage(QWidget):
         self.almacen_filter.clear()
         for option in options:
             self.almacen_filter.addItem(option.label, option.value)
-        idx = self.almacen_filter.findData(current)
+        idx = self._resolve_almacen_filter_index("IGSA") if initial_load else self.almacen_filter.findData(current)
         if idx < 0 and current_text:
             idx = self._resolve_almacen_filter_index(current_text)
         if idx >= 0:
