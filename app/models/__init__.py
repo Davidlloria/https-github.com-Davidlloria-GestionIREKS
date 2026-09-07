@@ -33,6 +33,7 @@ from app.models.entities import (
     PedidoIncidenciaImagen,
     PedidoItem,
     PedidoPendiente,
+    PedidoRecepcionAsignacion,
     Provincia,
     PromocionClienteProducto,
     Proveedor,
@@ -50,6 +51,7 @@ from app.models.entities import (
 )
 
 __all__ = [
+    "PedidoRecepcionAsignacion",
     "AlmacenMovimiento",
     "AlmacenStock",
     "Albaran",

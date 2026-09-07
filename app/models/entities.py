@@ -631,6 +631,17 @@ class AlbaranItem(SQLModel, table=True):
     articulo_caducidad: Optional[date] = Field(default=None, nullable=True, index=True)
 
 
+class PedidoRecepcionAsignacion(SQLModel, table=True):
+    """Explicit destination of a delivery line; the original document stays intact."""
+
+    __tablename__: ClassVar[str] = "pedidos_recepciones_asignaciones"
+
+    albaran_item_id: str = Field(
+        foreign_key="albaranes_items.item_id", ondelete="CASCADE", primary_key=True, max_length=36
+    )
+    pedido_id: str = Field(foreign_key="pedidos.pedido_id", ondelete="CASCADE", max_length=36, index=True)
+
+
 class PedidoIncidencia(SQLModel, table=True):
     __tablename__: ClassVar[str] = "pedidos_incidencias"
 

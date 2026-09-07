@@ -300,7 +300,7 @@ def test_list_order_items_returns_received_quantity_by_article(isolated_engine) 
 
 
 
-def test_list_order_items_uses_documented_received_quantity_for_same_order(isolated_engine) -> None:
+def test_list_order_items_uses_assigned_units_without_double_counting(isolated_engine) -> None:
     with Session(isolated_engine) as session:
         articulo_id = _seed_catalog(session)
         session.add(Pedido(pedido_id="pedido-1", almacen_id="alm-1", pedido_fecha=date(2026, 6, 1), pedido_numero="P-1"))
@@ -316,7 +316,8 @@ def test_list_order_items_uses_documented_received_quantity_for_same_order(isola
 
     assert len(rows) == 1
     assert pending_article_ids == set()
-    assert received_by_article == {articulo_id: 7.0}
+    assert received_by_article == {articulo_id: 5.0}
+    assert service.list_order_items("pedido-1")[2] == {articulo_id: 2.0}
 
 
 def test_order_dialog_history_limit_sums_received_units(isolated_engine) -> None:

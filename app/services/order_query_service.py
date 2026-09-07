@@ -19,6 +19,7 @@ from app.models import (
     Pedido,
     PedidoItem,
     PedidoPendiente,
+    PedidoRecepcionAsignacion,
     Subfamilia,
 )
 from app.schemas.orders import (
@@ -334,9 +335,16 @@ class OrderQueryService:
                 .order_by(cast(Any, Albaran.albaran_fecha), Albaran.albaran_numero, AlbaranItem.item_id)
             )
         )
+        assignments = {
+            row.albaran_item_id: row.pedido_id
+            for row in session.exec(select(PedidoRecepcionAsignacion))
+        }
+        # Reserve explicit destinations before automatic chronological allocation.
+        albaran_rows.sort(key=lambda pair: pair[0].item_id not in assignments)
         for albaran_item, _albaran in albaran_rows:
             articulo_id = str(getattr(albaran_item, "articulo_id", "") or "").strip()
             source_pedido_id = str(getattr(albaran_item, "pedido_id", "") or "").strip()
+            source_pedido_id = assignments.get(albaran_item.item_id, source_pedido_id)
             cantidad = float(getattr(albaran_item, "articulo_cantidad", 0.0) or 0.0)
             if not articulo_id or cantidad <= 1e-9:
                 continue
@@ -393,25 +401,17 @@ class OrderQueryService:
                     .order_by(PedidoItem.item_id)
                 )
             )
-            albaran_rows = list(
-                session.exec(
-                    select(AlbaranItem)
-                    .where(AlbaranItem.pedido_id == clean_pedido_id)
-                    .order_by(AlbaranItem.item_id)
-                )
-            )
             _pedido, stats, _pedido_by_id = self._build_operational_assignment(session, clean_pedido_id)
         pending_article_ids = {
             articulo_id
             for (row_pedido_id, articulo_id), values in stats.items()
             if row_pedido_id == clean_pedido_id and float((values.get("ordered", 0.0) or 0.0) - (values.get("received", 0.0) or 0.0)) > 1e-9
         }
-        received_by_article: dict[str, float] = {}
-        for row in albaran_rows:
-            articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
-            if not articulo_id:
-                continue
-            received_by_article[articulo_id] = received_by_article.get(articulo_id, 0.0) + float(getattr(row, "articulo_cantidad", 0.0) or 0.0)
+        received_by_article = {
+            articulo_id: float(values.get("received", 0.0) or 0.0)
+            for (row_pedido_id, articulo_id), values in stats.items()
+            if row_pedido_id == clean_pedido_id and values.get("received", 0.0)
+        }
         return rows, pending_article_ids, received_by_article
 
     def list_order_items_payload(

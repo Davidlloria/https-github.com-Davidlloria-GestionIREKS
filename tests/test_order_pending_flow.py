@@ -253,3 +253,42 @@ def test_pending_tab_only_includes_orders_with_imported_delivery(isolated_engine
         expected = [] if received is None or received == 10 else [("delivered", 10 - received)]
         assert [(row.pedido_id, row.cantidad_pendiente) for row, _ in rows] == expected
         assert [article.articulo_id for article in articles] == ([article_id] if expected else [])
+
+
+def test_explicit_receipt_closes_target_without_consuming_older_pending(isolated_engine) -> None:
+    from app.models import PedidoRecepcionAsignacion
+    from app.services.order_receipt_assignment_service import assign_order_receipt
+
+    with Session(isolated_engine) as session:
+        article_id = _seed_catalog(session)
+        _seed_order(session, "old", date(2026, 5, 25), "1482", article_id, 1)
+        _seed_order(session, "target", date(2026, 8, 24), "2393", article_id, 6)
+        _seed_order(session, "source", date(2026, 8, 31), "2447", article_id, 0)
+        for order_id in ("old", "target"):
+            session.add(Albaran(albaran_id=order_id, pedido_id=order_id, almacen_id="alm-1"))
+        _seed_albaran(session, pedido_id="source", albaran_id="delivery", albaran_numero="2026090119",
+                      albaran_fecha=date(2026, 9, 1), articulo_id=article_id, articulo_codigo="REF-1", cantidad=6)
+        session.commit()
+        assert OrderQueryService().list_order_items("target")[2] == {article_id: 5.0}
+        assign_order_receipt(session, "item-delivery", "target")
+        assign_order_receipt(session, "item-delivery", "target")  # Idempotent.
+        session.commit()
+
+    service = OrderQueryService()
+    assert service.list_order_items("target")[1:] == (set(), {article_id: 6.0})
+    assert service.list_order_items("source")[2] == {}
+    rows, _ = service.list_pendientes_acumulados("target")
+    assert [(row.pedido_id, row.cantidad_pendiente) for row, _ in rows] == [("old", 1.0)]
+    with Session(isolated_engine) as session:
+        item = session.get(AlbaranItem, "item-delivery")
+        assert (item.pedido_id, item.albaran_numero, item.articulo_cantidad) == ("source", "2026090119", 6)
+        assert len(list(session.exec(select(PedidoRecepcionAsignacion)))) == 1
+        for target_id in ("missing", "old"):
+            with pytest.raises(ValueError):
+                assign_order_receipt(session, "item-delivery", target_id)
+        target = session.get(Pedido, "target")
+        target.almacen_id = "other"
+        session.flush()
+        with pytest.raises(ValueError, match="same warehouse"):
+            assign_order_receipt(session, "item-delivery", "target")
+        session.rollback()
