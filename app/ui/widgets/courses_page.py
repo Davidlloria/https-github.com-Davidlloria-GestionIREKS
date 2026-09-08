@@ -8,12 +8,14 @@ from typing import Any, cast
 from openpyxl import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 from PySide6.QtCore import QDate, QSize, QTimer, Qt, QMarginsF
-from PySide6.QtGui import QPageLayout, QPageSize, QPagedPaintDevice, QPainter, QPdfWriter, QTextDocument, QPixmap
+from PySide6.QtGui import QIcon, QPageLayout, QPageSize, QPagedPaintDevice, QPainter, QPdfWriter, QTextDocument, QPixmap
 from PySide6.QtPdf import QPdfDocument
 from PySide6.QtPdfWidgets import QPdfView
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QButtonGroup,
+    QRadioButton,
     QCheckBox,
     QComboBox,
     QDateEdit,
@@ -238,28 +240,45 @@ class ConsentimientosDialog(QDialog):
 
         row_template = QHBoxLayout()
         row_template.addWidget(QLabel("Documento"))
-        self.template_combo = QComboBox()
-        self.template_combo.addItem("Imágenes", "imagenes")
-        self.template_combo.addItem("Datos", "datos")
-        row_template.addWidget(self.template_combo, 1)
+        self.template_buttons = {}
+        self.template_group = QButtonGroup(self)
+        self.template_group.setExclusive(False)
+        for key, label in (("imagenes", "Imágenes"), ("datos", "Datos")):
+            button = QRadioButton(label)
+            button.setAutoExclusive(False)
+            self.template_group.addButton(button)
+            self.template_buttons[key] = button
+            row_template.addWidget(button)
+        self.template_buttons["imagenes"].setChecked(True)
+        row_template.addStretch(1)
         layout.addLayout(row_template)
 
         row_scope = QHBoxLayout()
         row_scope.addWidget(QLabel("Alcance"))
-        self.scope_combo = QComboBox()
-        self.scope_combo.addItem("Todos", "all")
-        self.scope_combo.addItem("Solo confirmados", "confirmed")
-        self.scope_combo.addItem("Hoja seleccionada", "selected")
-        row_scope.addWidget(self.scope_combo, 1)
+        self.scope_group = QButtonGroup(self)
+        self.scope_group.setExclusive(True)
+        self.scope_buttons = {}
+        for key, label in (("all", "Todos"), ("confirmed", "Solo confirmados"), ("selected", "Hoja seleccionada")):
+            button = QRadioButton(label)
+            self.scope_group.addButton(button)
+            self.scope_buttons[key] = button
+            row_scope.addWidget(button)
+        self.scope_buttons["all"].setChecked(True)
         layout.addLayout(row_scope)
 
         actions = QHBoxLayout()
         self.preview_btn = QPushButton("Previsualizar")
-        self.preview_btn.setProperty("btnRole", "secondary")
+        self.preview_btn.setProperty("btnRole", "primary")
         self.print_btn = QPushButton("Imprimir")
-        self.print_btn.setProperty("btnRole", "secondary")
+        self.print_btn.setProperty("btnRole", "success")
         self.close_btn = QPushButton("Cerrar")
-        self.close_btn.setProperty("btnRole", "secondary")
+        self.close_btn.setProperty("btnRole", "danger")
+        icons = Path(__file__).resolve().parents[3] / "assets" / "icons"
+        for button, icon in ((self.preview_btn, "file-text.svg"), (self.print_btn, "printer.svg"), (self.close_btn, "close-white.svg")):
+            button.setIcon(QIcon(str(icons / icon)))
+            button.setIconSize(QSize(18, 18))
+        for button in self.template_buttons.values():
+            button.toggled.connect(self._update_document_actions)
         self.close_btn.clicked.connect(self.accept)
         actions.addWidget(self.preview_btn)
         actions.addWidget(self.print_btn)
@@ -267,11 +286,16 @@ class ConsentimientosDialog(QDialog):
         actions.addWidget(self.close_btn)
         layout.addLayout(actions)
 
-    def selected_template(self) -> str:
-        return str(self.template_combo.currentData() or "imagenes")
+    def selected_templates(self) -> list[str]:
+        return [key for key, button in self.template_buttons.items() if button.isChecked()]
+
+    def _update_document_actions(self) -> None:
+        enabled = bool(self.selected_templates())
+        self.preview_btn.setEnabled(enabled)
+        self.print_btn.setEnabled(enabled)
 
     def selected_scope(self) -> str:
-        return str(self.scope_combo.currentData() or "all")
+        return next(key for key, button in self.scope_buttons.items() if button.isChecked())
 
 
 class CertificadosDialog(QDialog):
@@ -1165,12 +1189,14 @@ class CoursesPage(QWidget):
 
     def _open_consentimientos_manager(self) -> None:
         dialog = ConsentimientosDialog(self)
-        dialog.preview_btn.clicked.connect(
-            lambda: self._preview_signature_sheets(dialog.selected_scope(), dialog.selected_template())
-        )
-        dialog.print_btn.clicked.connect(
-            lambda: self._print_signature_sheets(dialog.selected_scope(), dialog.selected_template())
-        )
+
+        def process_documents(action) -> None:
+            scope = dialog.selected_scope()
+            for template in dialog.selected_templates():
+                action(scope, template)
+
+        dialog.preview_btn.clicked.connect(lambda: process_documents(self._preview_signature_sheets))
+        dialog.print_btn.clicked.connect(lambda: process_documents(self._print_signature_sheets))
         dialog.exec()
 
     def _generate_certificates_pdf(self, scope: str) -> Path:

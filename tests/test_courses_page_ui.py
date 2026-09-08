@@ -81,3 +81,50 @@ def test_attendee_context_actions_use_clicked_row_and_show_island(monkeypatch) -
         page.close()
         page.deleteLater()
         app.processEvents()
+
+
+def test_consent_document_selection_scope_and_actions(monkeypatch) -> None:
+    from app.ui.widgets import courses_page
+    from app.ui.widgets.courses_page import ConsentimientosDialog
+
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setattr(CoursesPage, "reload", lambda self: None)
+    page = CoursesPage()
+    calls = []
+    monkeypatch.setattr(page, "_preview_signature_sheets", lambda scope, template: calls.append(("preview", scope, template)))
+    monkeypatch.setattr(page, "_print_signature_sheets", lambda scope, template: calls.append(("print", scope, template)))
+
+    class TestDialog(ConsentimientosDialog):
+        def exec(self):
+            assert self.selected_templates() == ["imagenes"]
+            assert self.selected_scope() == "all"
+            self.template_buttons["datos"].click()
+            assert self.selected_templates() == ["imagenes", "datos"]
+            self.scope_buttons["confirmed"].click()
+            self.scope_buttons["selected"].click()
+            assert self.selected_scope() == "selected"
+            assert sum(button.isChecked() for button in self.scope_buttons.values()) == 1
+            assert self.selected_templates() == ["imagenes", "datos"]
+            self.preview_btn.click()
+            self.print_btn.click()
+            for button, role in ((self.preview_btn, "primary"), (self.print_btn, "success"), (self.close_btn, "danger")):
+                assert button.property("btnRole") == role
+                assert not button.icon().isNull()
+            self.template_buttons["imagenes"].click()
+            self.template_buttons["datos"].click()
+            assert not self.preview_btn.isEnabled()
+            assert not self.print_btn.isEnabled()
+            self.preview_btn.click()
+            self.template_buttons["datos"].click()
+            assert self.print_btn.isEnabled()
+            self.close_btn.click()
+            return self.result()
+
+    monkeypatch.setattr(courses_page, "ConsentimientosDialog", TestDialog)
+    try:
+        page._open_consentimientos_manager()
+        assert calls == [(action, "selected", template) for action in ("preview", "print") for template in ("imagenes", "datos")]
+    finally:
+        page.close()
+        page.deleteLater()
+        app.processEvents()
