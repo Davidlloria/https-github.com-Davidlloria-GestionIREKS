@@ -651,3 +651,57 @@ def test_order_context_menu_mirrors_ribbon_and_uses_clicked_sorted_row(monkeypat
     page.close()
     page.deleteLater()
     QApplication.processEvents()
+
+
+
+def test_receipt_integer_editors_fit_styled_rows_and_arrow_clicks_work():
+    from pathlib import Path
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QSpinBox, QStyle, QStyleOptionSpinBox
+    from app.services.order_receipt_assignment_service import ReceiptCandidate, ReceiptReview
+    from app.ui.widgets.receipt_assignment_dialog import ReceiptAssignmentDialog
+    app = _application()
+    previous_style = app.styleSheet()
+    dialog = None
+
+    class Service:
+        def list_reviews(self, *args, **kwargs):
+            return [ReceiptReview("r", "2026090119", "FRUTAS DEL BOSQUE", 2, True, "hash", 0,
+                [ReceiptCandidate("a", "2057", date(2026, 7, 20), 1),
+                 ReceiptCandidate("b", "2199", date(2026, 8, 3), 4)], {}, 0, [])]
+
+    try:
+        app.setStyleSheet((Path(__file__).resolve().parents[1] / "assets/styles.qss").read_text(encoding="utf-8"))
+        dialog = ReceiptAssignmentDialog(Service())
+        dialog.show()
+        QApplication.processEvents()
+        for row in range(2):
+            editor = dialog.table.cellWidget(row, 3)
+            assert isinstance(editor, QSpinBox)
+            assert editor.text() == "0" and editor.singleStep() == 1
+            cell = dialog.table.visualRect(dialog.table.model().index(row, 3))
+            assert cell.contains(editor.geometry())
+            option = QStyleOptionSpinBox()
+            editor.initStyleOption(option)
+            up = editor.style().subControlRect(QStyle.ComplexControl.CC_SpinBox, option, QStyle.SubControl.SC_SpinBoxUp, editor)
+            down = editor.style().subControlRect(QStyle.ComplexControl.CC_SpinBox, option, QStyle.SubControl.SC_SpinBoxDown, editor)
+            assert not up.intersects(down)
+            QTest.mouseClick(editor, Qt.MouseButton.LeftButton, pos=up.center())
+            assert editor.value() == 1
+            QTest.mouseClick(editor, Qt.MouseButton.LeftButton, pos=down.center())
+            assert editor.value() == 0
+            for _ in range(3):
+                QTest.mouseClick(editor, Qt.MouseButton.LeftButton, pos=up.center())
+            assert editor.value() == (1 if row == 0 else 2)
+            editor.setValue(0)
+        assert isinstance(dialog.excess, QSpinBox) and dialog.excess.maximum() == 2
+        dialog.table.cellWidget(0, 3).setValue(1)
+        dialog.excess.setValue(1)
+        assert dialog.confirm.isEnabled()
+        assert dialog._allocations() == {"a": 1, "b": 0}
+    finally:
+        if dialog:
+            dialog.close()
+            dialog.deleteLater()
+        app.setStyleSheet(previous_style)
+        QApplication.processEvents()

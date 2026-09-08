@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QHBoxLayout, QLabel,
+    QCheckBox, QComboBox, QDialog, QSpinBox, QHBoxLayout, QLabel, QSizePolicy,
     QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QHeaderView,
 )
 
@@ -32,12 +34,11 @@ class ReceiptAssignmentDialog(QDialog):
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Pedido", "Fecha", "Pendiente disponible", "Unidades a asignar"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self.table, 1)
         row = QHBoxLayout()
         row.addWidget(QLabel("Unidades recibidas como excedente"))
-        self.excess = QDoubleSpinBox()
-        self.excess.setDecimals(4)
-        self.excess.setRange(0, 1e9)
+        self.excess = self._quantity_spin()
         self.excess.valueChanged.connect(self._update_total)
         row.addWidget(self.excess)
         layout.addLayout(row)
@@ -58,6 +59,29 @@ class ReceiptAssignmentDialog(QDialog):
         layout.addLayout(actions)
         self._load()
 
+    def _quantity_spin(self):
+        icons = Path(__file__).resolve().parents[3] / "assets" / "icons"
+        amount = QSpinBox()
+        amount.setSingleStep(1)
+        amount.setAlignment(Qt.AlignmentFlag.AlignRight)
+        amount.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        # Override the global input padding/min-height, including the embedded line edit.
+        amount.setStyleSheet("""
+            QSpinBox { min-height: 0; padding: 3px 28px 3px 6px; border-radius: 4px; }
+            QSpinBox QLineEdit { min-height: 0; padding: 0; border: none; background: transparent; }
+            QSpinBox::up-button { subcontrol-origin: border; subcontrol-position: top right;
+                width: 24px; border-left: 1px solid #C8D2DF; border-bottom: 1px solid #C8D2DF; }
+            QSpinBox::down-button { subcontrol-origin: border; subcontrol-position: bottom right;
+                width: 24px; border-left: 1px solid #C8D2DF; }
+            QSpinBox::up-arrow { image: url("__UP__"); width: 10px; height: 10px; }
+            QSpinBox::down-arrow { image: url("__DOWN__"); width: 10px; height: 10px; }
+            QSpinBox::up-button:disabled, QSpinBox::down-button:disabled { background: #F4F6F9; }
+        """.replace("__UP__", (icons / "arrow-up.svg").as_posix())
+           .replace("__DOWN__", (icons / "arrow-down.svg").as_posix()))
+        amount.ensurePolished()
+        amount.setMinimumHeight(max(30, amount.fontMetrics().height() + 10))
+        return amount
+
     def _current(self):
         index = self.selector.currentIndex()
         return self.reviews[index] if 0 <= index < len(self.reviews) else None
@@ -77,7 +101,8 @@ class ReceiptAssignmentDialog(QDialog):
         review = self._current()
         self.table.setRowCount(0)
         self.excess.blockSignals(True)
-        self.excess.setValue(review.excess if review else 0)
+        self.excess.setRange(0, int(review.cantidad) if review else 0)
+        self.excess.setValue(int(review.excess) if review else 0)
         self.excess.blockSignals(False)
         self.confirm.setEnabled(review is not None)
         self.excess.setEnabled(review is not None)
@@ -94,12 +119,12 @@ class ReceiptAssignmentDialog(QDialog):
                 cell = QTableWidgetItem(text)
                 cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.table.setItem(index, col, cell)
-            amount = QDoubleSpinBox()
-            amount.setDecimals(4)
-            amount.setRange(0, min(candidate.pendiente, review.cantidad))
-            amount.setValue(review.allocations.get(candidate.pedido_id, 0))
+            amount = self._quantity_spin()
+            amount.setRange(0, int(min(candidate.pendiente, review.cantidad)))
+            amount.setValue(int(review.allocations.get(candidate.pedido_id, 0)))
             amount.valueChanged.connect(self._update_total)
             self.table.setCellWidget(index, 3, amount)
+        self.table.resizeRowsToContents()
         self.history.setPlainText("\n".join(review.history))
         self._update_total()
 
