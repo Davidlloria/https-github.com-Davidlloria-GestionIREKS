@@ -1560,7 +1560,7 @@ class OrdersPage(QWidget):
         self.table.setColumnWidth(2, 108)
         self.table.setColumnWidth(3, 60)
         self.table.setColumnWidth(4, 100)
-        self.table.setColumnWidth(5, 100)
+        self.table.setColumnWidth(5, 60)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.table.setSortingEnabled(True)
         self.table.itemSelectionChanged.connect(self._show_selected_details)
@@ -3102,7 +3102,7 @@ class OrdersPage(QWidget):
                 row.pedido_fecha.strftime("%d/%m/%Y"),
                 str(row.semana),
                 self._format_number_es(row.total_kg, 2),
-                f"Asignar ({receipt_count})" if receipt_count else "",
+                f"A ({receipt_count})" if receipt_count else "",
             ]
             for col_idx, value in enumerate(values):
                 if col_idx == 3:

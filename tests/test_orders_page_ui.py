@@ -588,7 +588,7 @@ def test_order_status_marks_receipts_and_refreshes_after_resolution(monkeypatch)
     assert page.table.contextMenuPolicy() == Qt.ContextMenuPolicy.CustomContextMenu
     page._select_by_id("pending")
     row = page.table.currentRow()
-    assert page.table.item(row, 5).text() == "Asignar (3)"
+    assert page.table.item(row, 5).text() == "A (3)"
     assert "Clic derecho" in page.table.item(row, 5).toolTip()
     page._select_by_id("clear")
     assert page.table.item(page.table.currentRow(), 5).text() == ""
