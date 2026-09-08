@@ -151,3 +151,56 @@ def test_certificate_scope_is_exclusive_and_icons_are_white() -> None:
     finally:
         dialog.deleteLater()
         app.processEvents()
+
+
+def test_pdf_printing_stops_on_cancellation_or_failed_page_and_closes_pdf(monkeypatch) -> None:
+    from app.ui.widgets import courses_page
+    from PySide6.QtCore import QSizeF
+    from PySide6.QtWidgets import QDialog
+
+    for accepted, active, next_page, expected_pages, expected_end in (
+        (False, True, True, 0, 0),
+        (True, False, True, 0, 0),
+        (True, True, False, 1, 1),
+        (True, True, True, 3, 1),
+    ):
+        calls = []
+        pdf = SimpleNamespace(
+            load=lambda path: courses_page.QPdfDocument.Error.None_,
+            pageCount=lambda: 3,
+            render=lambda index, size: calls.append(("render", index)),
+            close=lambda: calls.append(("close",)),
+        )
+        printer = SimpleNamespace(
+            pageRect=lambda unit: SimpleNamespace(size=lambda: QSizeF(100, 200)),
+            newPage=lambda: calls.append(("newPage",)) or next_page,
+        )
+        painter = SimpleNamespace(
+            isActive=lambda: active,
+            drawImage=lambda *args: calls.append(("draw",)),
+            end=lambda: calls.append(("end",)),
+        )
+        pdf_error = courses_page.QPdfDocument.Error
+        printer_mode = courses_page.QPrinter.PrinterMode
+        printer_unit = courses_page.QPrinter.Unit
+        # Factory classes keep the Qt enum attributes used by the printing helper.
+        class PdfFactory:
+            Error = pdf_error
+            def __new__(cls):
+                return pdf
+        class PrinterFactory:
+            PrinterMode = printer_mode
+            Unit = printer_unit
+            def __new__(cls, mode):
+                return printer
+        monkeypatch.setattr(courses_page, "QPdfDocument", PdfFactory)
+        monkeypatch.setattr(courses_page, "QPrinter", PrinterFactory)
+        monkeypatch.setattr(courses_page, "QPrintDialog", lambda *args: SimpleNamespace(exec=lambda: QDialog.DialogCode.Accepted if accepted else QDialog.DialogCode.Rejected))
+        monkeypatch.setattr(courses_page, "QPainter", lambda device: calls.append(("begin",)) or painter)
+        CoursesPage._print_pdf_file(SimpleNamespace(), "test.pdf")
+        assert sum(call[0] == "render" for call in calls) == expected_pages
+        assert sum(call[0] == "draw" for call in calls) == expected_pages
+        assert sum(call[0] == "end" for call in calls) == expected_end
+        assert sum(call[0] == "begin" for call in calls) == int(accepted)
+        assert sum(call[0] == "newPage" for call in calls) == (0 if expected_pages == 0 else min(expected_pages, 2))
+        assert calls[-1] == ("close",)

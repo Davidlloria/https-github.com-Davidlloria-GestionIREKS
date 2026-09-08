@@ -1350,13 +1350,16 @@ class CoursesPage(QWidget):
             page_count = pdf.pageCount()
             painter = QPainter(printer)
             try:
+                if not painter.isActive():
+                    return
                 target_size_f = printer.pageRect(QPrinter.Unit.DevicePixel).size()
                 target_size = QSize(max(1, int(target_size_f.width())), max(1, int(target_size_f.height())))
                 for page_idx in range(page_count):
                     image = pdf.render(page_idx, target_size)
                     painter.drawImage(0, 0, image)
                     if page_idx < page_count - 1:
-                        printer.newPage()
+                        if not printer.newPage():
+                            return
             finally:
                 if painter.isActive():
                     painter.end()
