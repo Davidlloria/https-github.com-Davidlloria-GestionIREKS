@@ -8,7 +8,7 @@ from typing import Any, cast
 from openpyxl import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 from PySide6.QtCore import QDate, QSize, QTimer, Qt, QMarginsF
-from PySide6.QtGui import QIcon, QPageLayout, QPageSize, QPagedPaintDevice, QPainter, QPdfWriter, QTextDocument, QPixmap
+from PySide6.QtGui import QColor, QIcon, QPageLayout, QPageSize, QPagedPaintDevice, QPainter, QPdfWriter, QTextDocument, QPixmap
 from PySide6.QtPdf import QPdfDocument
 from PySide6.QtPdfWidgets import QPdfView
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
@@ -302,25 +302,71 @@ class CertificadosDialog(QDialog):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Certificados")
-        self.resize(520, 220)
+        self.resize(560, 360)
+        self.setObjectName("certificatesDialog")
+        self.setStyleSheet("""
+            QDialog#certificatesDialog { background: #F4F6FA; }
+            QLabel#certificateTitle { font-size: 22px; font-weight: 600; color: #172B4D; background: transparent; }
+            QLabel#certificateSubtitle { color: #64748B; background: transparent; }
+            QFrame#certificateScope { background: white; border: 1px solid #DEE5EF; border-radius: 12px; }
+            QFrame#certificateScope QLabel { border: none; background: transparent; color: #334155; font-weight: 600; }
+            QFrame#certificateScope QRadioButton { padding: 6px 0; spacing: 10px; color: #334155; background: transparent; }
+            QFrame#certificateScope QRadioButton::indicator { width: 16px; height: 16px; border-radius: 8px; border: 1px solid #94A3B8; background: white; }
+            QFrame#certificateScope QRadioButton::indicator:checked { background: #2563EB; border-color: #2563EB; }
+            QDialog#certificatesDialog QPushButton { min-height: 24px; padding: 8px 14px; border: none; border-radius: 8px; color: white; font-weight: 600; }
+            QDialog#certificatesDialog QPushButton[btnRole="primary"] { background: #2563EB; }
+            QDialog#certificatesDialog QPushButton[btnRole="primary"]:hover { background: #1D4ED8; }
+            QDialog#certificatesDialog QPushButton[btnRole="success"] { background: #15803D; }
+            QDialog#certificatesDialog QPushButton[btnRole="success"]:hover { background: #166534; }
+            QDialog#certificatesDialog QPushButton[btnRole="danger"] { background: #B94A48; }
+            QDialog#certificatesDialog QPushButton[btnRole="danger"]:hover { background: #A13F3D; }
+            QDialog#certificatesDialog QPushButton:focus { border: 2px solid #93C5FD; }
+        """)
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        title = QLabel("Certificados del curso")
+        title.setObjectName("certificateTitle")
+        layout.addWidget(title)
+        subtitle = QLabel("Elige para quién quieres generar los certificados.")
+        subtitle.setObjectName("certificateSubtitle")
+        subtitle.setWordWrap(True)
+        layout.addWidget(subtitle)
 
-        row_scope = QHBoxLayout()
+        scope_card = QFrame()
+        scope_card.setObjectName("certificateScope")
+        row_scope = QVBoxLayout(scope_card)
+        row_scope.setContentsMargins(18, 14, 18, 14)
+        row_scope.setSpacing(4)
         row_scope.addWidget(QLabel("Alcance"))
-        self.scope_combo = QComboBox()
-        self.scope_combo.addItem("Todos", "all")
-        self.scope_combo.addItem("Solo confirmados", "confirmed")
-        self.scope_combo.addItem("Hoja seleccionada", "selected")
-        row_scope.addWidget(self.scope_combo, 1)
-        layout.addLayout(row_scope)
+        self.scope_group = QButtonGroup(self)
+        self.scope_group.setExclusive(True)
+        self.scope_buttons = {}
+        for key, label in (("all", "Todos"), ("confirmed", "Solo confirmados"), ("selected", "Hoja seleccionada")):
+            button = QRadioButton(label)
+            self.scope_group.addButton(button)
+            self.scope_buttons[key] = button
+            row_scope.addWidget(button)
+        self.scope_buttons["all"].setChecked(True)
+        layout.addWidget(scope_card)
+        layout.addStretch(1)
 
         actions = QHBoxLayout()
         self.preview_btn = QPushButton("Previsualizar")
-        self.preview_btn.setProperty("btnRole", "secondary")
+        self.preview_btn.setProperty("btnRole", "primary")
         self.print_btn = QPushButton("Imprimir")
-        self.print_btn.setProperty("btnRole", "secondary")
+        self.print_btn.setProperty("btnRole", "success")
         self.close_btn = QPushButton("Cerrar")
-        self.close_btn.setProperty("btnRole", "secondary")
+        self.close_btn.setProperty("btnRole", "danger")
+        icons = Path(__file__).resolve().parents[3] / "assets" / "icons"
+        for button, filename in ((self.preview_btn, "file-text.svg"), (self.print_btn, "printer.svg"), (self.close_btn, "close-white.svg")):
+            pixmap = QIcon(str(icons / filename)).pixmap(36, 36)
+            painter = QPainter(pixmap)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+            painter.fillRect(pixmap.rect(), QColor("#FFFFFF"))
+            painter.end()
+            button.setIcon(QIcon(pixmap))
+            button.setIconSize(QSize(18, 18))
         self.close_btn.clicked.connect(self.accept)
         actions.addWidget(self.preview_btn)
         actions.addWidget(self.print_btn)
@@ -329,7 +375,7 @@ class CertificadosDialog(QDialog):
         layout.addLayout(actions)
 
     def selected_scope(self) -> str:
-        return str(self.scope_combo.currentData() or "all")
+        return next(key for key, button in self.scope_buttons.items() if button.isChecked())
 
 
 class CoursesPage(QWidget):

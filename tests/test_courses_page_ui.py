@@ -128,3 +128,26 @@ def test_consent_document_selection_scope_and_actions(monkeypatch) -> None:
         page.close()
         page.deleteLater()
         app.processEvents()
+
+
+def test_certificate_scope_is_exclusive_and_icons_are_white() -> None:
+    from app.ui.widgets.courses_page import CertificadosDialog
+
+    app = QApplication.instance() or QApplication([])
+    dialog = CertificadosDialog()
+    try:
+        assert dialog.selected_scope() == "all"
+        for scope in ("confirmed", "selected", "all"):
+            dialog.scope_buttons[scope].click()
+            assert dialog.selected_scope() == scope
+            assert sum(button.isChecked() for button in dialog.scope_buttons.values()) == 1
+        for button in (dialog.preview_btn, dialog.print_btn, dialog.close_btn):
+            pixels = button.icon().pixmap(18, 18).toImage()
+            colors = [pixels.pixelColor(x, y) for x in range(pixels.width()) for y in range(pixels.height()) if pixels.pixelColor(x, y).alpha() > 0]
+            assert colors
+            assert all(color.red() == color.green() == color.blue() == 255 for color in colors)
+        dialog.close_btn.click()
+        assert dialog.result() == dialog.DialogCode.Accepted
+    finally:
+        dialog.deleteLater()
+        app.processEvents()
