@@ -2,6 +2,7 @@
 
 from datetime import date
 import html
+import shutil
 from pathlib import Path
 from typing import Any, cast
 
@@ -312,10 +313,12 @@ class ConsentimientosDialog(QDialog):
         self.preview_btn.setProperty("btnRole", "primary")
         self.print_btn = QPushButton("Imprimir")
         self.print_btn.setProperty("btnRole", "success")
+        self.export_btn = QPushButton("Exportar PDF")
+        self.export_btn.setProperty("btnRole", "primary")
         self.close_btn = QPushButton("Cerrar")
         self.close_btn.setProperty("btnRole", "danger")
         icons = Path(__file__).resolve().parents[3] / "assets" / "icons"
-        for button, icon in ((self.preview_btn, "file-text.svg"), (self.print_btn, "printer.svg"), (self.close_btn, "close-white.svg")):
+        for button, icon in ((self.preview_btn, "file-text.svg"), (self.print_btn, "printer.svg"), (self.export_btn, "download.svg"), (self.close_btn, "close-white.svg")):
             pixmap = QIcon(str(icons / icon)).pixmap(36, 36)
             painter = QPainter(pixmap)
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
@@ -328,6 +331,7 @@ class ConsentimientosDialog(QDialog):
         self.close_btn.clicked.connect(self.accept)
         actions.addWidget(self.preview_btn)
         actions.addWidget(self.print_btn)
+        actions.addWidget(self.export_btn)
         actions.addStretch(1)
         actions.addWidget(self.close_btn)
         layout.addLayout(actions)
@@ -339,6 +343,7 @@ class ConsentimientosDialog(QDialog):
         enabled = bool(self.selected_templates())
         self.preview_btn.setEnabled(enabled)
         self.print_btn.setEnabled(enabled)
+        self.export_btn.setEnabled(enabled)
 
     def selected_scope(self) -> str:
         return next(key for key, button in self.scope_buttons.items() if button.isChecked())
@@ -348,7 +353,7 @@ class CertificadosDialog(QDialog):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Certificados")
-        self.resize(560, 360)
+        self.resize(660, 360)
         self.setObjectName("certificatesDialog")
         self.setStyleSheet("""
             QDialog#certificatesDialog { background: #F4F6FA; }
@@ -402,10 +407,12 @@ class CertificadosDialog(QDialog):
         self.preview_btn.setProperty("btnRole", "primary")
         self.print_btn = QPushButton("Imprimir")
         self.print_btn.setProperty("btnRole", "success")
+        self.export_btn = QPushButton("Exportar PDF")
+        self.export_btn.setProperty("btnRole", "primary")
         self.close_btn = QPushButton("Cerrar")
         self.close_btn.setProperty("btnRole", "danger")
         icons = Path(__file__).resolve().parents[3] / "assets" / "icons"
-        for button, filename in ((self.preview_btn, "file-text.svg"), (self.print_btn, "printer.svg"), (self.close_btn, "close-white.svg")):
+        for button, filename in ((self.preview_btn, "file-text.svg"), (self.print_btn, "printer.svg"), (self.export_btn, "download.svg"), (self.close_btn, "close-white.svg")):
             pixmap = QIcon(str(icons / filename)).pixmap(36, 36)
             painter = QPainter(pixmap)
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
@@ -416,6 +423,7 @@ class CertificadosDialog(QDialog):
         self.close_btn.clicked.connect(self.accept)
         actions.addWidget(self.preview_btn)
         actions.addWidget(self.print_btn)
+        actions.addWidget(self.export_btn)
         actions.addStretch(1)
         actions.addWidget(self.close_btn)
         layout.addLayout(actions)
@@ -1279,6 +1287,34 @@ class CoursesPage(QWidget):
         except Exception as exc:
             QMessageBox.warning(self, "Firmas", f"No se pudo imprimir: {exc}")
 
+    def _export_course_pdf(self, generate, filename: str) -> None:
+        dialog = QFileDialog(self, "Exportar PDF")
+        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        dialog.setNameFilter("Documentos PDF (*.pdf)")
+        dialog.setDefaultSuffix("pdf")
+        dialog.selectFile(filename)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        destination = Path(dialog.selectedFiles()[0])
+        try:
+            source = Path(generate())
+            if source.resolve() != destination.resolve():
+                shutil.copyfile(source, destination)
+            QMessageBox.information(self, "Exportar PDF", f"Documento guardado en:\n{destination}")
+        except Exception as exc:
+            QMessageBox.warning(self, "Exportar PDF", f"No se pudo exportar el PDF: {exc}")
+
+    def _export_signature_sheets(self, scope: str, template_key: str) -> None:
+        self._export_course_pdf(
+            lambda: self._generate_signature_pdf(scope, template_key),
+            f"consentimiento_{template_key}_{scope}.pdf",
+        )
+
+    def _export_certificates(self, scope: str) -> None:
+        self._export_course_pdf(
+            lambda: self._generate_certificates_pdf(scope), f"certificados_{scope}.pdf",
+        )
+
     def _open_consentimientos_manager(self) -> None:
         dialog = ConsentimientosDialog(self)
 
@@ -1289,6 +1325,7 @@ class CoursesPage(QWidget):
 
         dialog.preview_btn.clicked.connect(lambda: process_documents(self._preview_signature_sheets))
         dialog.print_btn.clicked.connect(lambda: process_documents(self._print_signature_sheets))
+        dialog.export_btn.clicked.connect(lambda: process_documents(self._export_signature_sheets))
         dialog.exec()
 
     def _generate_certificates_pdf(self, scope: str) -> Path:
@@ -1322,6 +1359,7 @@ class CoursesPage(QWidget):
         dialog = CertificadosDialog(self)
         dialog.preview_btn.clicked.connect(lambda: self._preview_certificates(dialog.selected_scope()))
         dialog.print_btn.clicked.connect(lambda: self._print_certificates(dialog.selected_scope()))
+        dialog.export_btn.clicked.connect(lambda: self._export_certificates(dialog.selected_scope()))
         dialog.exec()
 
     def _attach_document(self, field_name: str) -> None:

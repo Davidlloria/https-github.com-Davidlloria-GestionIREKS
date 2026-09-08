@@ -94,6 +94,8 @@ def test_consent_document_selection_scope_and_actions(monkeypatch) -> None:
     monkeypatch.setattr(page, "_preview_signature_sheets", lambda scope, template: calls.append(("preview", scope, template)))
     monkeypatch.setattr(page, "_print_signature_sheets", lambda scope, template: calls.append(("print", scope, template)))
 
+    monkeypatch.setattr(page, "_export_signature_sheets", lambda scope, template: calls.append(("export", scope, template)))
+
     class TestDialog(ConsentimientosDialog):
         def exec(self):
             assert self.selected_templates() == ["imagenes"]
@@ -107,6 +109,7 @@ def test_consent_document_selection_scope_and_actions(monkeypatch) -> None:
             assert self.selected_templates() == ["imagenes", "datos"]
             self.preview_btn.click()
             self.print_btn.click()
+            self.export_btn.click()
             for button, role in ((self.preview_btn, "primary"), (self.print_btn, "success"), (self.close_btn, "danger")):
                 assert button.property("btnRole") == role
                 assert not button.icon().isNull()
@@ -114,6 +117,7 @@ def test_consent_document_selection_scope_and_actions(monkeypatch) -> None:
             self.template_buttons["datos"].click()
             assert not self.preview_btn.isEnabled()
             assert not self.print_btn.isEnabled()
+            assert not self.export_btn.isEnabled()
             self.preview_btn.click()
             self.template_buttons["datos"].click()
             assert self.print_btn.isEnabled()
@@ -123,7 +127,7 @@ def test_consent_document_selection_scope_and_actions(monkeypatch) -> None:
     monkeypatch.setattr(courses_page, "ConsentimientosDialog", TestDialog)
     try:
         page._open_consentimientos_manager()
-        assert calls == [(action, "selected", template) for action in ("preview", "print") for template in ("imagenes", "datos")]
+        assert calls == [(action, "selected", template) for action in ("preview", "print", "export") for template in ("imagenes", "datos")]
     finally:
         page.close()
         page.deleteLater()
@@ -141,7 +145,7 @@ def test_certificate_scope_is_exclusive_and_icons_are_white() -> None:
             dialog.scope_buttons[scope].click()
             assert dialog.selected_scope() == scope
             assert sum(button.isChecked() for button in dialog.scope_buttons.values()) == 1
-        for button in (dialog.preview_btn, dialog.print_btn, dialog.close_btn):
+        for button in (dialog.preview_btn, dialog.print_btn, dialog.export_btn, dialog.close_btn):
             pixels = button.icon().pixmap(18, 18).toImage()
             colors = [pixels.pixelColor(x, y) for x in range(pixels.width()) for y in range(pixels.height()) if pixels.pixelColor(x, y).alpha() > 0]
             assert colors
@@ -261,3 +265,71 @@ def test_certificate_actions_use_assigned_technicians_and_actual_size() -> None:
     page._print_pdf_file = lambda path, **kwargs: payloads.append(kwargs)
     CoursesPage._print_certificates(page, "all")
     assert payloads[-1] == {"dialog_title": "Certificados", "actual_size": True}
+
+
+def test_pdf_export_saves_selected_file_and_cancel_does_not_generate(monkeypatch, tmp_path) -> None:
+    from app.ui.widgets import courses_page
+    from PySide6.QtWidgets import QDialog
+
+    source = tmp_path / "generated.pdf"
+    source.write_bytes(b"%PDF-1.4\nexample")
+    destination = tmp_path / "chosen.pdf"
+    calls = []
+    accepted = False
+    class SaveDialog:
+        AcceptMode = courses_page.QFileDialog.AcceptMode
+        def __init__(self, *args):
+            pass
+        def setAcceptMode(self, mode):
+            assert mode == self.AcceptMode.AcceptSave
+        def setNameFilter(self, value):
+            assert "*.pdf" in value
+        def setDefaultSuffix(self, value):
+            assert value == "pdf"
+        def selectFile(self, value):
+            assert value == "suggested.pdf"
+        def exec(self):
+            return QDialog.DialogCode.Accepted if accepted else QDialog.DialogCode.Rejected
+        def selectedFiles(self):
+            return [str(destination)]
+    monkeypatch.setattr(courses_page, "QFileDialog", SaveDialog)
+    monkeypatch.setattr(courses_page.QMessageBox, "information", lambda *args: calls.append("saved"))
+    monkeypatch.setattr(courses_page.QMessageBox, "warning", lambda *args: calls.append("error"))
+    def generate():
+        calls.append("generated")
+        return source
+    CoursesPage._export_course_pdf(SimpleNamespace(), generate, "suggested.pdf")
+    assert calls == []
+    assert not destination.exists()
+    accepted = True
+    CoursesPage._export_course_pdf(SimpleNamespace(), generate, "suggested.pdf")
+    assert destination.read_bytes() == source.read_bytes()
+    assert calls == ["generated", "saved"]
+    destination = source
+    CoursesPage._export_course_pdf(SimpleNamespace(), generate, "suggested.pdf")
+    assert calls[-1] == "saved"
+    def fail():
+        raise ValueError("No hay asistentes")
+    CoursesPage._export_course_pdf(SimpleNamespace(), fail, "suggested.pdf")
+    assert calls[-1] == "error"
+
+
+def test_certificate_export_button_uses_selected_scope(monkeypatch) -> None:
+    from app.ui.widgets import courses_page
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setattr(CoursesPage, "reload", lambda self: None)
+    page = CoursesPage()
+    calls = []
+    monkeypatch.setattr(page, "_export_certificates", lambda scope: calls.append(scope))
+    class TestDialog(courses_page.CertificadosDialog):
+        def exec(self):
+            self.scope_buttons["confirmed"].click()
+            self.export_btn.click()
+            return self.DialogCode.Accepted
+    monkeypatch.setattr(courses_page, "CertificadosDialog", TestDialog)
+    try:
+        page._open_certificados_manager()
+        assert calls == ["confirmed"]
+    finally:
+        page.deleteLater()
+        app.processEvents()
