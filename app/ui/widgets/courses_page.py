@@ -46,6 +46,17 @@ from app.ui.widgets.entity_dialog import EntityDialog
 PENCIL_ICON_PATH = Path(__file__).resolve().parents[3] / "assets" / "icons" / "pencil_white.svg"
 
 
+class _CourseDateItem(QTableWidgetItem):
+    def __init__(self, value: date) -> None:
+        super().__init__(value.strftime("%d/%m/%Y"))
+        self._ordinal = value.toordinal()
+
+    def __lt__(self, other: QTableWidgetItem) -> bool:
+        if isinstance(other, _CourseDateItem):
+            return self._ordinal < other._ordinal
+        return super().__lt__(other)
+
+
 class AttendeePickerDialog(QDialog):
     def __init__(self, service: CourseService, parent=None) -> None:
         super().__init__(parent)
@@ -652,7 +663,7 @@ class CoursesPage(QWidget):
         self.table.setSortingEnabled(False)
         self.table.setRowCount(len(self.rows))
         for i, row in enumerate(self.rows):
-            date_cell = QTableWidgetItem(row.curso_fecha.strftime("%d/%m/%Y"))
+            date_cell = _CourseDateItem(row.curso_fecha)
             date_cell.setData(Qt.ItemDataRole.UserRole, row.curso_id)
             self.table.setItem(i, 0, date_cell)
             self.table.setItem(i, 1, QTableWidgetItem(str(row.curso_nombre or "")))
