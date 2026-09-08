@@ -65,3 +65,30 @@ def test_certificate_long_text_is_complete_or_reports_overflow(certificate_setup
     with pytest.raises(ValueError, match="sin recortarlo"):
         service.generate([row], tmp_path / "overflow.pdf", config)
     assert not (tmp_path / "overflow.pdf").exists()
+
+
+def test_course_marker_with_overlapping_font_bounds_preserves_fixed_line(certificate_setup, tmp_path):
+    service, config_path = certificate_setup
+    template_path = tmp_path / "close-lines.pdf"
+    with fitz.open() as template:
+        page = template.new_page(width=595.32, height=842.04)
+        for text, baseline in (("Nombre del asistente", 210), ("Curso teórico-práctico", 312),
+                               ("Nombre del curso", 335), ("Jordi Ampurdanès", 422),
+                               ("David Lloria", 441), ("Arinaga, 15 de abril de 2026", 500)):
+            page.insert_text((190, baseline), text, fontsize=20)
+        fixed_rect = page.search_for("Curso teórico-práctico")[0]
+        marker_rect = page.search_for("Nombre del curso")[0]
+        assert fixed_rect.intersects(marker_rect)
+        template.save(template_path)
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config["template_path"] = str(template_path)
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    row = {"asistente": "Antonio Bruno Acosta Guerra", "curso": "PANES ESPECIALES",
+           "tecnicos": "Alejandro Montes Garcia\nDavid Lloria Abascal\nKevin Keith Gómez Flores",
+           "fecha": "Arinaga, 10 de septiembre de 2026"}
+    output = service.generate([row], tmp_path / "corrected.pdf", config_path)
+    with fitz.open(output) as doc:
+        text = doc[0].get_text()
+        assert "Curso teórico-práctico" in text
+        assert "Nombre del curso" not in text
+        assert "PANES ESPECIALES" in text

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from datetime import date, datetime
 from pathlib import Path
+import unicodedata
 from typing import Any
 
 from app.services.certificate_service import CertificateService
@@ -94,10 +95,17 @@ class CourseDocumentGenerationFlowService:
         course_name = str(self._get(course, "curso_nombre") or "").strip()
         fecha_larga = self.format_course_date_long(self._get(course, "curso_fecha"))
         selected_rows = self._scope_attendees(attendees, scope=scope, selected_attendee=selected_attendee)
-        technician_names = "\n".join(
+        names = [
             name for technician in technicians
             if (name := str(self._get(technician, "nombre_completo") or "").strip())
-        )
+        ]
+        technician_names = "\n".join(sorted(
+            names,
+            key=lambda name: "".join(
+                char for char in unicodedata.normalize("NFD", name.casefold())
+                if not unicodedata.combining(char)
+            ),
+        ))
         payload = [
             {
                 "asistente": str(self._get(item, "asistente") or ""),

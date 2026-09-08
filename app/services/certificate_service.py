@@ -148,6 +148,22 @@ class CertificateService:
                     if doc.page_count < 1:
                         raise ValueError("La plantilla PDF no contiene paginas.")
                     page = doc[0]
+                    # Delete marker characters through a narrow strip at their centre.
+                    # Full font bounding boxes can overlap adjacent fixed lines.
+                    for field_name in ("asistente", "curso", "tecnicos", "fecha"):
+                        target = targets.get(field_name) or {}
+                        found = False
+                        for placeholder in target.get("placeholders", []):
+                            rects = page.search_for(str(placeholder).strip())
+                            for rect in rects:
+                                middle = (rect.y0 + rect.y1) / 2
+                                page.add_redact_annot(fitz.Rect(rect.x0, middle - 0.5, rect.x1, middle + 0.5), fill=False)
+                                found = True
+                            if rects and not target.get("replace_all", False):
+                                break
+                        if not found:
+                            raise ValueError(f"No se encuentra el campo en la plantilla: {target.get('placeholders')}")
+                    page.apply_redactions()
                     for field_name in ("asistente", "curso", "tecnicos", "fecha"):
                         target_cfg = targets.get(field_name) or {}
                         self._replace_text_target(
@@ -187,10 +203,6 @@ class CertificateService:
         max_lines: int,
     ) -> None:
         page_obj = cast(Any, page)
-        placeholder_rect = self._find_placeholder_rect(page, target_cfg)
-        if placeholder_rect is None:
-            raise ValueError(f"No se encuentra el campo en la plantilla: {target_cfg.get('placeholders')}")
-
         margin = float(target_cfg.get("center_margin", 70))
         baseline = float(target_cfg["baseline"])
         bottom = float(target_cfg["bottom"])
@@ -209,26 +221,12 @@ class CertificateService:
         else:
             raise ValueError("El texto del certificado no cabe en su espacio sin recortarlo.")
 
-        page_obj.add_redact_annot(placeholder_rect, fill=(1, 1, 1))
-        page_obj.apply_redactions()
         for index, line in enumerate(lines):
             line_width = font.text_length(line, fontsize=draw_size)
             page_obj.insert_text(
                 ((page.rect.width - line_width) / 2, baseline + index * draw_size * 1.2),
                 line, fontname=font_name, fontsize=draw_size, color=(0, 0, 0),
             )
-
-    def _find_placeholder_rect(self, page: fitz.Page, target_cfg: dict) -> fitz.Rect | None:
-        result = None
-        for raw in target_cfg.get("placeholders", []):
-            if not str(raw).strip():
-                continue
-            rects = page.search_for(str(raw).strip())
-            for rect in rects:
-                result = fitz.Rect(rect) if result is None else result | rect
-            if rects and not target_cfg.get("replace_all", False):
-                break
-        return result
 
     @staticmethod
     def _wrap_lines(text: str, width: float, font_name: str, font_size: float) -> list[str]:

@@ -146,3 +146,15 @@ def test_generate_certificates_pdf_calls_certificate_service() -> None:
     assert certificate.calls[0]["certificates"] == [
         {"asistente": "Luis", "curso": "Curso & Especial", "tecnicos": "Ana Pérez\nLuis Gómez", "fecha": "Arinaga, 15 de abril de 2026"}
     ]
+
+
+def test_certificate_technicians_are_alphabetical_ignoring_case_and_accents() -> None:
+    service = CourseDocumentGenerationFlowService(_FakeSignatureService(), _FakeCertificateService())
+    names = ["Kevin Keith Gómez Flores", "David Lloria Abascal", "Alejandro Montes Garcia", "álvaro Pérez"]
+    payload = service.build_certificate_payload(
+        _course(), _attendees(), scope="all",
+        technicians=[{"nombre_completo": name} for name in names],
+    )
+    assert payload[0]["tecnicos"].splitlines() == [
+        "Alejandro Montes Garcia", "álvaro Pérez", "David Lloria Abascal", "Kevin Keith Gómez Flores",
+    ]
