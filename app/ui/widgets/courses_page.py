@@ -8,7 +8,7 @@ from typing import Any, cast
 from openpyxl import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 from PySide6.QtCore import QDate, QSize, QTimer, Qt, QMarginsF
-from PySide6.QtGui import QIcon, QPageLayout, QPageSize, QPagedPaintDevice, QPainter, QPdfWriter, QTextDocument, QPixmap
+from PySide6.QtGui import QPageLayout, QPageSize, QPagedPaintDevice, QPainter, QPdfWriter, QTextDocument, QPixmap
 from PySide6.QtPdf import QPdfDocument
 from PySide6.QtPdfWidgets import QPdfView
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QMenu,
     QPlainTextEdit,
     QPushButton,
     QDialogButtonBox,
@@ -42,8 +43,6 @@ from app.services.certificate_service import CertificateService
 from app.services.course_service import CourseService
 from app.services.signature_sheet_service import SignatureSheetService
 from app.ui.widgets.entity_dialog import EntityDialog
-
-PENCIL_ICON_PATH = Path(__file__).resolve().parents[3] / "assets" / "icons" / "pencil_white.svg"
 
 
 class _CourseDateItem(QTableWidgetItem):
@@ -532,7 +531,7 @@ class CoursesPage(QWidget):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        self.attendees_table.setHorizontalHeaderLabels(["Asiste", "Asistente", "NIF", "Empresa", ""])
+        self.attendees_table.setHorizontalHeaderLabels(["Asiste", "Asistente", "NIF", "Empresa", "Isla"])
         self.attendees_table.setColumnWidth(1, 300)
         self.attendees_table.setColumnWidth(4, 52)
         self.attendees_table.setSortingEnabled(False)
@@ -541,6 +540,8 @@ class CoursesPage(QWidget):
         header.setSortIndicator(self._attendee_sort_col, self._attendee_sort_order)
         self.attendees_table.itemChanged.connect(self._on_attendee_item_changed)
         self.attendees_table.cellDoubleClicked.connect(self._open_attendee_contact)
+        self.attendees_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.attendees_table.customContextMenuRequested.connect(self._show_attendees_context_menu)
         layout.addWidget(self.attendees_table, 1)
         return panel
 
@@ -713,7 +714,9 @@ class CoursesPage(QWidget):
             self.attendees_table.setItem(i, 1, name_cell)
             self.attendees_table.setItem(i, 2, QTableWidgetItem(row.nif))
             self.attendees_table.setItem(i, 3, QTableWidgetItem(row.empresa))
-            self.attendees_table.setItem(i, 4, QTableWidgetItem(""))
+            island_cell = QTableWidgetItem(row.isla_iniciales)
+            island_cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.attendees_table.setItem(i, 4, island_cell)
 
             box = QCheckBox()
             box.setChecked(bool(row.status_confirmacion))
@@ -733,32 +736,6 @@ class CoursesPage(QWidget):
             holder_layout.addStretch(1)
             self.attendees_table.setCellWidget(i, 0, holder)
             self.attendees_table.setRowHeight(i, 35)
-
-            edit_btn = QPushButton("")
-            edit_btn.setProperty("btnRole", "success")
-            edit_btn.setToolTip("Editar observaciones")
-            edit_btn.setIcon(QIcon(str(PENCIL_ICON_PATH)))
-            edit_btn.setIconSize(QSize(11, 11))
-            edit_btn.setFlat(True)
-            edit_btn.setStyleSheet(
-                "QPushButton { min-height: 20px; max-height: 20px; padding: 0px 2px; "
-                "background-color: #5BBE6A; border: none; border-radius: 4px; }"
-                "QPushButton:hover { background-color: #49A85A; border: none; }"
-                "QPushButton:pressed { background-color: #49A85A; border: none; }"
-            )
-            edit_btn.setFixedSize(22, 20)
-            edit_btn.clicked.connect(
-                lambda _checked=False, contacto_id=row.contacto_id: self._edit_attendee_observaciones(contacto_id)
-            )
-            btn_holder = QWidget()
-            btn_holder.setStyleSheet("background: transparent; border: none;")
-            btn_layout = QHBoxLayout(btn_holder)
-            btn_layout.setContentsMargins(0, 0, 0, 0)
-            btn_layout.setSpacing(0)
-            btn_layout.addStretch(1)
-            btn_layout.addWidget(edit_btn)
-            btn_layout.addStretch(1)
-            self.attendees_table.setCellWidget(i, 4, btn_holder)
 
         self.attendees_table.horizontalHeader().setSortIndicator(self._attendee_sort_col, self._attendee_sort_order)
         self.attendees_table.blockSignals(False)
@@ -812,6 +789,26 @@ class CoursesPage(QWidget):
                 row.status_confirmacion = status
                 break
         self._update_attendees_counter()
+
+    def _show_attendees_context_menu(self, pos) -> None:
+        item = self.attendees_table.itemAt(pos)
+        if item is None:
+            return
+        self.attendees_table.selectRow(item.row())
+        attendee = self._selected_attendee()
+        if attendee is None:
+            return
+        menu = QMenu(self)
+        delete_action = menu.addAction("Eliminar")
+        edit_action = menu.addAction("Editar")
+        notes_action = menu.addAction("Observaciones")
+        chosen = menu.exec(self.attendees_table.viewport().mapToGlobal(pos))
+        if chosen == delete_action:
+            self._delete_attendee()
+        elif chosen == edit_action:
+            self._open_attendee_contact(item.row(), 1)
+        elif chosen == notes_action:
+            self._edit_attendee_observaciones(attendee.contacto_id)
 
     def _open_attendee_contact(self, row: int, _column: int) -> None:
         cell = self.attendees_table.item(row, 1)

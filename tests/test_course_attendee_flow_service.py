@@ -189,3 +189,24 @@ def test_add_attendee_invalid_data_propagates_viewmodel_error() -> None:
 
     with pytest.raises(ValueError, match="Curso no encontrado"):
         service.add_attendee("missing-course", "contact-1", "customer-1")
+
+
+def test_attendee_island_comes_from_company_and_missing_island_keeps_row() -> None:
+    from sqlmodel import SQLModel, Session
+    from app.models import Asistente, Cliente, Contacto, Curso, Isla
+    from app.viewmodels.course_viewmodel import CourseViewModel
+
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.add(Curso(curso_id="course", curso_nombre="Curso"))
+        session.add(Isla(isla_id="island", provincia_id="province", isla_iniciales=" gc "))
+        for index, island in enumerate(("island", "", "missing"), 1):
+            key = str(index)
+            session.add(Cliente(cliente_id=key, cliente_codigo=index, cliente_direccion_isla_id=island))
+            session.add(Contacto(contacto_id=key, contacto_codigo=index, cliente_id=key, nombre=key))
+            session.add(Asistente(curso_id="course", contacto_id=key, cliente_id=key))
+        session.commit()
+        rows = CourseViewModel().list_attendees(session, "course")
+        assert {row.contacto_id: row.isla_iniciales for row in rows} == {"1": "GC", "2": "", "3": ""}
+    engine.dispose()

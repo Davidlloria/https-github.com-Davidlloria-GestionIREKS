@@ -8,7 +8,7 @@ from uuid import uuid4
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from app.models import Asistente, Cliente, Contacto, Curso, CursoDocumento, CursoTecnico, Tecnico
+from app.models import Asistente, Cliente, Contacto, Curso, CursoDocumento, CursoTecnico, Tecnico, Isla
 
 
 def _col(expr: object) -> Any:
@@ -34,6 +34,7 @@ class AsistenteListadoItem:
     nif: str
     empresa: str
     status_confirmacion: bool
+    isla_iniciales: str = ""
 
 
 @dataclass
@@ -274,15 +275,16 @@ class CourseViewModel:
 
     def list_attendees(self, session: Session, curso_id: str) -> list[AsistenteListadoItem]:
         stmt = (
-            select(Asistente, Contacto, Cliente)
+            select(Asistente, Contacto, Cliente, Isla)
             .join(Contacto, _col(Contacto.contacto_id) == _col(Asistente.contacto_id))
             .join(Cliente, _col(Cliente.cliente_id) == _col(Asistente.cliente_id))
+            .outerjoin(Isla, _col(Isla.isla_id) == _col(Cliente.cliente_direccion_isla_id))
             .where(Asistente.curso_id == curso_id)
             .order_by(_col(Contacto.apellidos), _col(Contacto.nombre))
         )
         rows = session.exec(stmt).all()
         items: list[AsistenteListadoItem] = []
-        for asistente, contacto, cliente in rows:
+        for asistente, contacto, cliente, isla in rows:
             nombre_completo = f"{(contacto.nombre or '').strip()} {(contacto.apellidos or '').strip()}".strip()
             items.append(
                 AsistenteListadoItem(
@@ -294,6 +296,7 @@ class CourseViewModel:
                     nif=str(contacto.nif or ""),
                     empresa=str(cliente.cliente_nombre_comercial or cliente.cliente_nombre_fiscal or ""),
                     status_confirmacion=bool(getattr(asistente, "status_confirmacion", False)),
+                    isla_iniciales=str(isla.isla_iniciales or "").strip().upper() if isla else "",
                 )
             )
         return items
