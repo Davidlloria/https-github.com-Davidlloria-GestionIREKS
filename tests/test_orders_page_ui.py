@@ -565,3 +565,89 @@ def test_albaran_import_opens_pending_receipt_confirmation(monkeypatch):
     page.close()
     page.deleteLater()
     QApplication.processEvents()
+
+
+
+def _orders_context_page(monkeypatch):
+    _application()
+    monkeypatch.setattr(OrdersPage, "reload", lambda self: None)
+    monkeypatch.setattr(OrdersPage, "_show_selected_details", lambda self: None)
+    page = OrdersPage()
+    page.rows = [PedidoListRow(pid, "igsa", "IGSA", date(2026, 9, 7), number, "", "", "", state, 37, 100)
+                 for pid, number, state in [("pending", "2447", "E"), ("clear", "2393", "P")]]
+    page._receipt_counts = {"pending": 3, "clear": 0}
+    page._render_table()
+    page.table.sortItems(1, Qt.SortOrder.AscendingOrder)
+    return page
+
+
+def test_order_status_marks_receipts_and_refreshes_after_resolution(monkeypatch):
+    reload_page = OrdersPage.reload
+    page = _orders_context_page(monkeypatch)
+    assert not hasattr(page, "receipts_btn")
+    assert page.table.contextMenuPolicy() == Qt.ContextMenuPolicy.CustomContextMenu
+    page._select_by_id("pending")
+    row = page.table.currentRow()
+    assert page.table.item(row, 5).text() == "Asignar (3)"
+    assert "Clic derecho" in page.table.item(row, 5).toolTip()
+    page._select_by_id("clear")
+    assert page.table.item(page.table.currentRow(), 5).text() == ""
+    assert [r.pedido_estado for r in page.rows] == ["E", "P"]
+    monkeypatch.setattr(page.order_query_service, "list_raw_orders", lambda: [])
+    monkeypatch.setattr(page.order_query_service, "list_order_rows", lambda **kwargs: page.rows[:])
+    monkeypatch.setattr(page, "_load_almacen_filter", lambda: None)
+    monkeypatch.setattr(page, "_load_period_filters", lambda rows: None)
+    monkeypatch.setattr(page.receipt_assignment_service, "pending_count", lambda **kwargs: 0)
+    reload_page(page)
+    assert all(page.table.item(row, 5).text() == "" for row in range(page.table.rowCount()))
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
+def test_order_context_menu_mirrors_ribbon_and_uses_clicked_sorted_row(monkeypatch):
+    page = _orders_context_page(monkeypatch)
+    buttons = (page.new_btn, page.edit_btn, page.del_btn, page.export_btn,
+               page.send_mail_btn, page.print_btn, page.help_btn)
+    clicked = []
+    for button in buttons:
+        button.clicked.disconnect()
+        button.clicked.connect(lambda checked=False, name=button.text(): clicked.append((name, page._selected_id())))
+    page.export_btn.setEnabled(False)
+    monkeypatch.setattr(page.receipt_assignment_service, "pending_count", lambda *, pedido_id: 3 if pedido_id == "pending" else 0)
+    opened = []
+    monkeypatch.setattr(page, "_review_receipts", lambda pid: opened.append(pid))
+    page._select_by_id("pending")
+    pending_cell = page.table.item(page.table.currentRow(), 0)
+    pending_pos = page.table.visualItemRect(pending_cell).center()
+    labels = [b.text() for b in buttons] + ["Asignar recepciones"]
+    for chosen_label in labels:
+        page._select_by_id("clear")
+        def capture(menu, pos):
+            actions = [a for a in menu.actions() if not a.isSeparator()]
+            assert [a.text() for a in actions] == labels
+            assert [a.isEnabled() for a in actions[:-1]] == [b.isEnabled() for b in buttons]
+            assert actions[-1].isEnabled()
+            assert page._selected_id() == "pending"
+            return next(a for a in actions if a.text() == chosen_label)
+        monkeypatch.setattr(orders_page_module, "_exec_context_menu", capture)
+        page._show_orders_context_menu(pending_pos)
+    assert clicked == [(b.text(), "pending") for b in buttons if b.isEnabled()]
+    assert opened == ["pending"]
+    page._select_by_id("clear")
+    clear_pos = page.table.visualItemRect(page.table.item(page.table.currentRow(), 0)).center()
+    page._select_by_id("pending")
+    def disabled(menu, pos):
+        action = menu.actions()[-1]
+        assert action.text() == "Asignar recepciones" and not action.isEnabled()
+        assert page._selected_id() == "clear"
+        return action
+    monkeypatch.setattr(orders_page_module, "_exec_context_menu", disabled)
+    page._show_orders_context_menu(clear_pos)
+    assert opened == ["pending"]
+    from PySide6.QtCore import QPoint
+    monkeypatch.setattr(orders_page_module, "_exec_context_menu", lambda *args: (_ for _ in ()).throw(AssertionError("Empty area")))
+    page._show_orders_context_menu(QPoint(-1, -1))
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()

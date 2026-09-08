@@ -1422,6 +1422,7 @@ class OrdersPage(QWidget):
         )
         self.orders_mail_settings = OrdersMailSettingsService()
         self.rows: list[PedidoListRow] = []
+        self._receipt_counts: dict[str, int] = {}
         self._is_loading_details = False
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
@@ -1496,10 +1497,6 @@ class OrdersPage(QWidget):
         almacen_row.addWidget(QLabel("Cliente/Distribuidor"))
         almacen_row.addWidget(self.almacen_filter, 1)
         left_layout.addLayout(almacen_row)
-        self.receipts_btn = QPushButton("Recepciones por asignar: 0")
-        self.receipts_btn.setToolTip("Resolver recepciones pendientes o revisar asignaciones confirmadas")
-        self.receipts_btn.clicked.connect(lambda: self._review_receipts())
-        left_layout.addWidget(self.receipts_btn)
 
         self.new_btn = create_standard_ribbon_button("Nuevo", role="success", icon_name="order.svg")
         self.cadelsa_btn = create_standard_ribbon_button("Imp CADELSA", role="secondary", icon_name="order.svg")
@@ -1545,11 +1542,14 @@ class OrdersPage(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.setStyleSheet("QTableWidget::item:focus { border: none; outline: 0; }")
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_orders_context_menu)
         header_widget = self.table.horizontalHeader()
         header_widget.setSectionsClickable(True)
         header_widget.setMinimumSectionSize(40)
         header_widget.setStretchLastSection(False)
         header_widget.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        header_widget.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header_widget.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.setHorizontalHeaderLabels(["Almacen", "Nº", "Fecha", "Semana", "Total Kg", "Estado"])
         estado_header_item = self.table.horizontalHeaderItem(5)
@@ -1560,7 +1560,7 @@ class OrdersPage(QWidget):
         self.table.setColumnWidth(2, 108)
         self.table.setColumnWidth(3, 60)
         self.table.setColumnWidth(4, 100)
-        self.table.setColumnWidth(5, 55)
+        self.table.setColumnWidth(5, 100)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.table.setSortingEnabled(True)
         self.table.itemSelectionChanged.connect(self._show_selected_details)
@@ -3054,8 +3054,6 @@ class OrdersPage(QWidget):
         month_from = int(self.month_from_filter.currentData() or 0)
         month_to = int(self.month_to_filter.currentData() or 0)
         almacen_filter = str(self.almacen_filter.currentData() or "").strip() or selected_almacen_id
-        count = self.receipt_assignment_service.pending_count(almacen_filter)
-        self.receipts_btn.setText(f"Recepciones por asignar: {count}")
         self.rows = [
                 PedidoListRow(
                     pedido_id=row.pedido_id,
@@ -3077,6 +3075,10 @@ class OrdersPage(QWidget):
                     almacen_filter=almacen_filter,
                 )
         ]
+        self._receipt_counts = {
+            row.pedido_id: self.receipt_assignment_service.pending_count(pedido_id=row.pedido_id)
+            for row in self.rows
+        }
         self._render_table()
         self._select_by_id(selected_id)
         if self.table.rowCount() > 0 and not self.table.selectionModel().selectedRows():
@@ -3093,13 +3095,14 @@ class OrdersPage(QWidget):
         self.table.setSortingEnabled(False)
         self.table.setRowCount(len(self.rows))
         for row_idx, row in enumerate(self.rows):
+            receipt_count = self._receipt_counts.get(row.pedido_id, 0)
             values = [
                 row.almacen_nombre,
                 row.pedido_numero,
                 row.pedido_fecha.strftime("%d/%m/%Y"),
                 str(row.semana),
                 self._format_number_es(row.total_kg, 2),
-                row.pedido_estado,
+                f"Asignar ({receipt_count})" if receipt_count else "",
             ]
             for col_idx, value in enumerate(values):
                 if col_idx == 3:
@@ -3112,13 +3115,9 @@ class OrdersPage(QWidget):
                     item.setData(Qt.ItemDataRole.UserRole, row.pedido_id)
                 if col_idx == 5:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                    state = str(value or "").strip().upper()
-                    if state == "E":
-                        item.setForeground(QBrush(QColor("#1565C0")))
-                    elif state == "P":
+                    if receipt_count:
                         item.setForeground(QBrush(QColor("#EF6C00")))
-                    elif state == "M":
-                        item.setForeground(QBrush(QColor("#C62828")))
+                        item.setToolTip(f"{receipt_count} recepciones por asignar. Clic derecho → Asignar recepciones.")
                 elif col_idx == 3:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 elif col_idx == 4:
@@ -3777,6 +3776,31 @@ class OrdersPage(QWidget):
             if not str(getattr(article, field_name, "") or "").strip():
                 return True
         return False
+
+    def _show_orders_context_menu(self, pos) -> None:
+        item = self.table.itemAt(pos)
+        if item is None:
+            return
+        self.table.selectRow(item.row())
+        selected = self._selected_row()
+        if selected is None:
+            return
+        menu = QMenu(self)
+        buttons = (self.new_btn, self.edit_btn, self.del_btn, self.export_btn,
+                   self.send_mail_btn, self.print_btn, self.help_btn)
+        actions = {}
+        for button in buttons:
+            action = menu.addAction(button.icon(), button.text())
+            action.setEnabled(button.isEnabled())
+            actions[action] = button
+        menu.addSeparator()
+        assign_action = menu.addAction("Asignar recepciones")
+        assign_action.setEnabled(self.receipt_assignment_service.pending_count(pedido_id=selected.pedido_id) > 0)
+        chosen = _exec_context_menu(menu, self.table.viewport().mapToGlobal(pos))
+        if chosen == assign_action and assign_action.isEnabled():
+            self._review_receipts(selected.pedido_id)
+        elif chosen in actions:
+            actions[chosen].click()
 
     def _review_receipts(self, pedido_id: str = "") -> None:
         try:
