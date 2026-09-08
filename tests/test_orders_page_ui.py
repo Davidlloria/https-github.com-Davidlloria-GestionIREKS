@@ -18,6 +18,36 @@ from app.ui.widgets.orders_page import NewPedidoDialog, OrderIncidentDialog, Ord
 _APP: QApplication | None = None
 
 
+def test_factura_items_load_with_and_without_price_discrepancy(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    _application()
+    monkeypatch.setattr(OrdersPage, "reload", lambda self: None)
+    page = OrdersPage()
+    rows = [
+        (SimpleNamespace(item_id=item_id, articulo_codigo=item_id,
+                         articulo_cantidad=2, articulo_kilos=10,
+                         precio_unitario=5, total_linea=50), None)
+        for item_id in ("different", "equal", "unknown")
+    ]
+    monkeypatch.setattr(
+        page.order_document_import_service, "list_factura_items",
+        lambda pedido_id, factura_id: (rows, {"different": True, "equal": False}),
+    )
+    try:
+        page._reload_factura_items_table("order", "invoice")
+        assert page.factura_items_table.rowCount() == 3
+        for row in range(3):
+            item_id = page.factura_items_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+            price = page.factura_items_table.item(row, 4)
+            assert price.text() == "5,00"
+            assert (price.foreground().color().name() == "#c62828") == (item_id == "different")
+    finally:
+        page.close()
+        page.deleteLater()
+        QApplication.processEvents()
+
+
 def _application() -> QApplication:
     global _APP
     _APP = QApplication.instance() or QApplication([])
