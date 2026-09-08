@@ -235,10 +235,45 @@ class ConsentimientosDialog(QDialog):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Consentimientos")
-        self.resize(520, 220)
+        self.resize(660, 360)
+        self.setObjectName("consentsDialog")
+        self.setStyleSheet("""
+            QDialog#consentsDialog { background: #F4F6FA; }
+            QLabel#consentTitle { font-size: 22px; font-weight: 600; color: #172B4D; background: transparent; }
+            QLabel#consentSubtitle { color: #64748B; background: transparent; }
+            QFrame[consentCard="true"] { background: white; border: 1px solid #DEE5EF; border-radius: 12px; }
+            QFrame[consentCard="true"] QLabel { border: none; background: transparent; color: #334155; font-weight: 600; }
+            QFrame[consentCard="true"] QRadioButton { padding: 6px 0; spacing: 10px; color: #334155; background: transparent; }
+            QFrame[consentCard="true"] QRadioButton::indicator { width: 16px; height: 16px; border-radius: 8px; border: 1px solid #94A3B8; background: white; }
+            QFrame[consentCard="true"] QRadioButton::indicator:checked { background: #2563EB; border-color: #2563EB; }
+            QDialog#consentsDialog QPushButton { min-height: 24px; padding: 8px 14px; border: none; border-radius: 8px; color: white; font-weight: 600; }
+            QDialog#consentsDialog QPushButton[btnRole="primary"] { background: #2563EB; }
+            QDialog#consentsDialog QPushButton[btnRole="primary"]:hover { background: #1D4ED8; }
+            QDialog#consentsDialog QPushButton[btnRole="success"] { background: #15803D; }
+            QDialog#consentsDialog QPushButton[btnRole="success"]:hover { background: #166534; }
+            QDialog#consentsDialog QPushButton[btnRole="danger"] { background: #B94A48; }
+            QDialog#consentsDialog QPushButton[btnRole="danger"]:hover { background: #A13F3D; }
+            QDialog#consentsDialog QPushButton:focus { border: 2px solid #93C5FD; }
+            QDialog#consentsDialog QPushButton:disabled { background: #CBD5E1; color: #64748B; }
+        """)
         layout = QVBoxLayout(self)
 
-        row_template = QHBoxLayout()
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        title = QLabel("Consentimientos del curso")
+        title.setObjectName("consentTitle")
+        layout.addWidget(title)
+        subtitle = QLabel("Elige los documentos y los asistentes para quienes generarlos.")
+        subtitle.setObjectName("consentSubtitle")
+        subtitle.setWordWrap(True)
+        layout.addWidget(subtitle)
+        cards = QHBoxLayout()
+        cards.setSpacing(16)
+        template_card = QFrame()
+        template_card.setProperty("consentCard", True)
+        row_template = QVBoxLayout(template_card)
+        row_template.setContentsMargins(18, 14, 18, 14)
+        row_template.setSpacing(4)
         row_template.addWidget(QLabel("Documento"))
         self.template_buttons = {}
         self.template_group = QButtonGroup(self)
@@ -251,9 +286,13 @@ class ConsentimientosDialog(QDialog):
             row_template.addWidget(button)
         self.template_buttons["imagenes"].setChecked(True)
         row_template.addStretch(1)
-        layout.addLayout(row_template)
+        cards.addWidget(template_card, 1)
 
-        row_scope = QHBoxLayout()
+        scope_card = QFrame()
+        scope_card.setProperty("consentCard", True)
+        row_scope = QVBoxLayout(scope_card)
+        row_scope.setContentsMargins(18, 14, 18, 14)
+        row_scope.setSpacing(4)
         row_scope.addWidget(QLabel("Alcance"))
         self.scope_group = QButtonGroup(self)
         self.scope_group.setExclusive(True)
@@ -264,7 +303,9 @@ class ConsentimientosDialog(QDialog):
             self.scope_buttons[key] = button
             row_scope.addWidget(button)
         self.scope_buttons["all"].setChecked(True)
-        layout.addLayout(row_scope)
+        cards.addWidget(scope_card, 1)
+        layout.addLayout(cards)
+        layout.addStretch(1)
 
         actions = QHBoxLayout()
         self.preview_btn = QPushButton("Previsualizar")
@@ -275,7 +316,12 @@ class ConsentimientosDialog(QDialog):
         self.close_btn.setProperty("btnRole", "danger")
         icons = Path(__file__).resolve().parents[3] / "assets" / "icons"
         for button, icon in ((self.preview_btn, "file-text.svg"), (self.print_btn, "printer.svg"), (self.close_btn, "close-white.svg")):
-            button.setIcon(QIcon(str(icons / icon)))
+            pixmap = QIcon(str(icons / icon)).pixmap(36, 36)
+            painter = QPainter(pixmap)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+            painter.fillRect(pixmap.rect(), QColor("#FFFFFF"))
+            painter.end()
+            button.setIcon(QIcon(pixmap))
             button.setIconSize(QSize(18, 18))
         for button in self.template_buttons.values():
             button.toggled.connect(self._update_document_actions)
