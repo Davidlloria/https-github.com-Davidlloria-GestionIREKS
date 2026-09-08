@@ -204,3 +204,60 @@ def test_pdf_printing_stops_on_cancellation_or_failed_page_and_closes_pdf(monkey
         assert sum(call[0] == "begin" for call in calls) == int(accepted)
         assert sum(call[0] == "newPage" for call in calls) == (0 if expected_pages == 0 else min(expected_pages, 2))
         assert calls[-1] == ("close",)
+
+
+def test_certificate_print_uses_actual_pdf_dimensions(monkeypatch) -> None:
+    from app.ui.widgets import courses_page
+    from PySide6.QtCore import QSizeF
+    from PySide6.QtWidgets import QDialog
+
+    calls = []
+    pdf = SimpleNamespace(
+        load=lambda path: 0, pageCount=lambda: 1,
+        pagePointSize=lambda index: QSizeF(595.32, 842.04),
+        render=lambda index, size: calls.append(("render", size.width(), size.height())),
+        close=lambda: calls.append(("close",)),
+    )
+    printer = SimpleNamespace(
+        setPageSize=lambda size: calls.append(("paper", size.id())),
+        setFullPage=lambda full: calls.append(("full", full)),
+        resolution=lambda: 300,
+        pageRect=lambda unit: SimpleNamespace(size=lambda: QSizeF(2200, 3200)),
+    )
+    painter = SimpleNamespace(isActive=lambda: True, drawImage=lambda *args: None, end=lambda: None)
+    class PdfFactory:
+        Error = SimpleNamespace(None_=0)
+        def __new__(cls):
+            return pdf
+    class PrinterFactory:
+        PrinterMode = courses_page.QPrinter.PrinterMode
+        Unit = courses_page.QPrinter.Unit
+        def __new__(cls, mode):
+            return printer
+    monkeypatch.setattr(courses_page, "QPdfDocument", PdfFactory)
+    monkeypatch.setattr(courses_page, "QPrinter", PrinterFactory)
+    monkeypatch.setattr(courses_page, "QPainter", lambda device: painter)
+    monkeypatch.setattr(courses_page, "QPrintDialog", lambda *args: SimpleNamespace(exec=lambda: QDialog.DialogCode.Accepted))
+    CoursesPage._print_pdf_file(SimpleNamespace(), "certificate.pdf", actual_size=True)
+    assert ("full", True) in calls
+    assert ("paper", courses_page.QPageSize.PageSizeId.A4) in calls
+    assert ("render", 2481, 3508) in calls
+    assert calls[-1] == ("close",)
+
+
+def test_certificate_actions_use_assigned_technicians_and_actual_size() -> None:
+    technicians = [SimpleNamespace(nombre_completo="Ana Pérez")]
+    payloads = []
+    page = SimpleNamespace(
+        _selected_course=lambda: SimpleNamespace(curso_id="course"),
+        _sorted_attendee_rows=lambda: [], _selected_attendee=lambda: None,
+        service=SimpleNamespace(list_course_technicians=lambda course_id: technicians),
+        course_document_generation_service=SimpleNamespace(
+            generate_certificates_pdf=lambda *args, **kwargs: payloads.append(kwargs) or "certificate.pdf"),
+    )
+    assert CoursesPage._generate_certificates_pdf(page, "all") == "certificate.pdf"
+    assert payloads[0]["technicians"] == technicians
+    page._generate_certificates_pdf = lambda scope: "certificate.pdf"
+    page._print_pdf_file = lambda path, **kwargs: payloads.append(kwargs)
+    CoursesPage._print_certificates(page, "all")
+    assert payloads[-1] == {"dialog_title": "Certificados", "actual_size": True}

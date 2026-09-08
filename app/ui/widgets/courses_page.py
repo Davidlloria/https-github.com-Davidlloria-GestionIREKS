@@ -1299,6 +1299,7 @@ class CoursesPage(QWidget):
             course,
             self._sorted_attendee_rows(),
             scope=scope,
+            technicians=self.service.list_course_technicians(course.curso_id),
             selected_attendee=self._selected_attendee(),
         )
 
@@ -1313,7 +1314,7 @@ class CoursesPage(QWidget):
     def _print_certificates(self, scope: str) -> None:
         try:
             output_path = self._generate_certificates_pdf(scope)
-            self._print_pdf_file(str(output_path), dialog_title="Certificados")
+            self._print_pdf_file(str(output_path), dialog_title="Certificados", actual_size=True)
         except Exception as exc:
             QMessageBox.warning(self, "Certificados", f"No se pudo imprimir: {exc}")
 
@@ -1381,7 +1382,7 @@ class CoursesPage(QWidget):
             return
         QMessageBox.information(self, "Documentos", "Impresion no soportada para este formato.")
 
-    def _print_pdf_file(self, path: str, dialog_title: str = "Firmas") -> None:
+    def _print_pdf_file(self, path: str, dialog_title: str = "Firmas", *, actual_size: bool = False) -> None:
         # Use a short-lived document object and always close it to avoid file locking on Windows.
         pdf = QPdfDocument()
         try:
@@ -1390,6 +1391,9 @@ class CoursesPage(QWidget):
                 QMessageBox.warning(self, dialog_title, "No se pudo cargar el PDF para imprimir.")
                 return
             printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+            if actual_size:
+                printer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
+                printer.setFullPage(True)
             dialog = QPrintDialog(printer, self)
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 return
@@ -1401,6 +1405,10 @@ class CoursesPage(QWidget):
                 target_size_f = printer.pageRect(QPrinter.Unit.DevicePixel).size()
                 target_size = QSize(max(1, int(target_size_f.width())), max(1, int(target_size_f.height())))
                 for page_idx in range(page_count):
+                    if actual_size:
+                        page_size = pdf.pagePointSize(page_idx)
+                        scale = printer.resolution() / 72.0
+                        target_size = QSize(round(page_size.width() * scale), round(page_size.height() * scale))
                     image = pdf.render(page_idx, target_size)
                     painter.drawImage(0, 0, image)
                     if page_idx < page_count - 1:

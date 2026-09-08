@@ -116,8 +116,8 @@ def test_build_certificate_payload_and_output_path() -> None:
     path = service.build_certificate_output_path(_course(), scope="all")
 
     assert payload == [
-        {"asistente": "Ana &", "curso": "Curso & Especial", "fecha": "Arinaga, 15 de abril de 2026"},
-        {"asistente": "Luis", "curso": "Curso & Especial", "fecha": "Arinaga, 15 de abril de 2026"},
+        {"asistente": "Ana &", "curso": "Curso & Especial", "tecnicos": "", "fecha": "Arinaga, 15 de abril de 2026"},
+        {"asistente": "Luis", "curso": "Curso & Especial", "tecnicos": "", "fecha": "Arinaga, 15 de abril de 2026"},
     ]
     assert path == Path("cert_out") / "certificado_Curso___Especial_todos.pdf"
 
@@ -137,9 +137,12 @@ def test_generate_certificates_pdf_calls_certificate_service() -> None:
     certificate = _FakeCertificateService()
     service = CourseDocumentGenerationFlowService(_FakeSignatureService(), certificate)
 
-    out = service.generate_certificates_pdf(_course(), _attendees(), scope="selected", selected_attendee=_attendees()[1])
+    out = service.generate_certificates_pdf(
+        _course(), _attendees(), scope="selected", selected_attendee=_attendees()[1],
+        technicians=[{"nombre_completo": "Ana Pérez"}, {"nombre_completo": "Luis Gómez"}],
+    )
 
     assert out == Path("cert_out") / "certificado_Curso___Especial_seleccionado.pdf"
     assert certificate.calls[0]["certificates"] == [
-        {"asistente": "Luis", "curso": "Curso & Especial", "fecha": "Arinaga, 15 de abril de 2026"}
+        {"asistente": "Luis", "curso": "Curso & Especial", "tecnicos": "Ana Pérez\nLuis Gómez", "fecha": "Arinaga, 15 de abril de 2026"}
     ]

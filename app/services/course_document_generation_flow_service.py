@@ -42,12 +42,14 @@ class CourseDocumentGenerationFlowService:
         attendees: Iterable[object | Mapping[str, Any]],
         *,
         scope: str,
+        technicians: Iterable[object | Mapping[str, Any]] = (),
         selected_attendee: object | Mapping[str, Any] | None = None,
     ) -> Path:
         payload = self.build_certificate_payload(
             course=course,
             attendees=attendees,
             scope=scope,
+            technicians=technicians,
             selected_attendee=selected_attendee,
         )
         output_path = self.build_certificate_output_path(course, scope=scope)
@@ -86,15 +88,21 @@ class CourseDocumentGenerationFlowService:
         attendees: Iterable[object | Mapping[str, Any]],
         *,
         scope: str,
+        technicians: Iterable[object | Mapping[str, Any]] = (),
         selected_attendee: object | Mapping[str, Any] | None = None,
     ) -> list[dict[str, str]]:
         course_name = str(self._get(course, "curso_nombre") or "").strip()
         fecha_larga = self.format_course_date_long(self._get(course, "curso_fecha"))
         selected_rows = self._scope_attendees(attendees, scope=scope, selected_attendee=selected_attendee)
+        technician_names = "\n".join(
+            name for technician in technicians
+            if (name := str(self._get(technician, "nombre_completo") or "").strip())
+        )
         payload = [
             {
                 "asistente": str(self._get(item, "asistente") or ""),
                 "curso": course_name,
+                "tecnicos": technician_names,
                 "fecha": f"Arinaga, {fecha_larga}" if fecha_larga else "",
             }
             for item in selected_rows

@@ -27,6 +27,8 @@ class CertificateService:
             "targets": {
                 "asistente": {
                     "placeholders": ["Nombre del asistente"],
+                    "baseline": 210.12,
+                    "bottom": 240,
                     "center_margin": 70,
                     "box_height": 44,
                     "max_lines": 1,
@@ -34,14 +36,28 @@ class CertificateService:
                 },
                 "curso": {
                     "placeholders": ["Nombre del curso"],
+                    "baseline": 335.29,
+                    "bottom": 378,
                     "center_margin": 70,
                     "box_height": 90,
                     "max_lines": 2,
                     "v_align": "top",
                     "y_offset": 2,
                 },
+                "tecnicos": {
+                    "placeholders": ["Jordi Ampurdan\u00e8s", "David Lloria"],
+                    "replace_all": True,
+                    "center_margin": 70,
+                    "font_size": 16,
+                    "baseline": 421.91,
+                    "bottom": 477,
+                    "max_lines": 5,
+                },
                 "fecha": {
                     "placeholders": ["Arinaga, 15 de abril de 2026"],
+                    "font_size": 14,
+                    "baseline": 499.56,
+                    "bottom": 525,
                     "center_margin": 70,
                     "box_height": 40,
                     "max_lines": 1,
@@ -126,43 +142,26 @@ class CertificateService:
         targets = config.get("targets") or {}
 
         template_bytes = template_path.read_bytes()
-        final_doc = fitz.open()
-        for item in certificates:
-            doc = fitz.open(stream=template_bytes, filetype="pdf")
-            if doc.page_count < 1:
-                doc.close()
-                raise ValueError("La plantilla PDF no contiene paginas.")
-            page = doc[0]
-            self._replace_text_target(
-                page=page,
-                target_cfg=targets.get("asistente") or {},
-                new_text=str(item.get("asistente") or ""),
-                font_name=font_name,
-                font_size=font_size,
-                max_lines=1,
-            )
-            self._replace_text_target(
-                page=page,
-                target_cfg=targets.get("curso") or {},
-                new_text=str(item.get("curso") or ""),
-                font_name=font_name,
-                font_size=font_size,
-                max_lines=2,
-            )
-            self._replace_text_target(
-                page=page,
-                target_cfg=targets.get("fecha") or {},
-                new_text=str(item.get("fecha") or ""),
-                font_name=font_name,
-                font_size=font_size,
-                max_lines=1,
-            )
-            final_doc.insert_pdf(doc, from_page=0, to_page=0)
-            doc.close()
+        with fitz.open() as final_doc:
+            for item in certificates:
+                with fitz.open(stream=template_bytes, filetype="pdf") as doc:
+                    if doc.page_count < 1:
+                        raise ValueError("La plantilla PDF no contiene paginas.")
+                    page = doc[0]
+                    for field_name in ("asistente", "curso", "tecnicos", "fecha"):
+                        target_cfg = targets.get(field_name) or {}
+                        self._replace_text_target(
+                            page=page,
+                            target_cfg=target_cfg,
+                            new_text=str(item.get(field_name) or ""),
+                            font_name=font_name,
+                            font_size=float(target_cfg.get("font_size", font_size)),
+                            max_lines=int(target_cfg.get("max_lines", 1)),
+                        )
+                    final_doc.insert_pdf(doc, from_page=0, to_page=0)
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        final_doc.save(str(output_path))
-        final_doc.close()
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            final_doc.save(str(output_path))
         return output_path
 
     def _resolve_template_path(self, value: str) -> Path:
@@ -190,109 +189,60 @@ class CertificateService:
         page_obj = cast(Any, page)
         placeholder_rect = self._find_placeholder_rect(page, target_cfg)
         if placeholder_rect is None:
-            return
+            raise ValueError(f"No se encuentra el campo en la plantilla: {target_cfg.get('placeholders')}")
+
+        margin = float(target_cfg.get("center_margin", 70))
+        baseline = float(target_cfg["baseline"])
+        bottom = float(target_cfg["bottom"])
+        width = page.rect.width - 2 * margin
+        text = (new_text or "").strip()
+        font = fitz.Font(font_name)
+        draw_size = float(font_size)
+        lines: list[str] = []
+        while draw_size >= 10:
+            lines = self._wrap_lines(text, width, font_name, draw_size)
+            if (len(lines) <= max_lines
+                    and all(font.text_length(line, fontsize=draw_size) <= width for line in lines)
+                    and baseline + max(0, len(lines) - 1) * draw_size * 1.2 + draw_size * 0.3 <= bottom):
+                break
+            draw_size -= 0.5
+        else:
+            raise ValueError("El texto del certificado no cabe en su espacio sin recortarlo.")
 
         page_obj.add_redact_annot(placeholder_rect, fill=(1, 1, 1))
         page_obj.apply_redactions()
-
-        margin = float(target_cfg.get("center_margin", 70) or 70)
-        box_height = float(target_cfg.get("box_height", 32) or 32)
-        y_offset = float(target_cfg.get("y_offset", 0) or 0)
-        v_align = str(target_cfg.get("v_align") or "middle").strip().lower()
-        if v_align == "top":
-            box_top = placeholder_rect.y0 + y_offset
-        elif v_align == "bottom":
-            box_top = placeholder_rect.y1 - box_height + y_offset
-        else:
-            center_y = (placeholder_rect.y0 + placeholder_rect.y1) / 2.0
-            box_top = center_y - box_height / 2.0 + y_offset
-        insert_rect = fitz.Rect(
-            margin,
-            box_top,
-            page_obj.rect.width - margin,
-            box_top + box_height,
-        )
-
-        text = (new_text or "").strip()
-        if max_lines > 1:
-            text = self._wrap_text(
-                text=text,
-                max_width=insert_rect.width,
-                font_name=font_name,
-                font_size=font_size,
-                max_lines=max_lines,
+        for index, line in enumerate(lines):
+            line_width = font.text_length(line, fontsize=draw_size)
+            page_obj.insert_text(
+                ((page.rect.width - line_width) / 2, baseline + index * draw_size * 1.2),
+                line, fontname=font_name, fontsize=draw_size, color=(0, 0, 0),
             )
-        draw_font_size = max(10.0, float(font_size))
-        result = -1.0
-        while draw_font_size >= 10.0:
-            result = page_obj.insert_textbox(
-                insert_rect,
-                text,
-                fontname=font_name,
-                fontsize=draw_font_size,
-                align=fitz.TEXT_ALIGN_CENTER,
-                color=(0, 0, 0),
-            )
-            if result >= 0:
-                break
-            draw_font_size -= 1.0
 
     def _find_placeholder_rect(self, page: fitz.Page, target_cfg: dict) -> fitz.Rect | None:
-        page_obj = cast(Any, page)
-        placeholders = target_cfg.get("placeholders") or []
-        for raw in placeholders:
-            text = str(raw or "").strip()
-            if not text:
+        result = None
+        for raw in target_cfg.get("placeholders", []):
+            if not str(raw).strip():
                 continue
-            rects = page_obj.search_for(text)
-            if rects:
-                rect = rects[0]
-                for extra in rects[1:]:
-                    rect |= extra
-                return rect
-        return None
+            rects = page.search_for(str(raw).strip())
+            for rect in rects:
+                result = fitz.Rect(rect) if result is None else result | rect
+            if rects and not target_cfg.get("replace_all", False):
+                break
+        return result
 
-    def _wrap_text(
-        self,
-        text: str,
-        max_width: float,
-        font_name: str,
-        font_size: float,
-        max_lines: int,
-    ) -> str:
-        value = (text or "").strip()
-        if not value:
-            return ""
-        if fitz.get_text_length(value, fontname=font_name, fontsize=font_size) <= max_width:
-            return value
-
-        def truncate_to_width(line: str) -> str:
-            txt = line.strip()
-            while txt and fitz.get_text_length(txt, fontname=font_name, fontsize=font_size) > max_width:
-                txt = txt[:-1].rstrip()
-            return txt
-
-        if max_lines <= 1:
-            return truncate_to_width(value)
-
-        words = value.split()
-        if not words:
-            return ""
-
-        first_line = ""
-        split_index = 0
-        for idx, word in enumerate(words):
-            candidate = word if not first_line else f"{first_line} {word}"
-            if fitz.get_text_length(candidate, fontname=font_name, fontsize=font_size) <= max_width or not first_line:
-                first_line = candidate
-                split_index = idx + 1
-                continue
-            break
-
-        second_line = " ".join(words[split_index:]).strip()
-        if not second_line and split_index < len(words):
-            second_line = words[split_index]
-
-        first_line = truncate_to_width(first_line)
-        second_line = truncate_to_width(second_line)
-        return f"{first_line}\n{second_line}".strip()
+    @staticmethod
+    def _wrap_lines(text: str, width: float, font_name: str, font_size: float) -> list[str]:
+        lines = []
+        font = fitz.Font(font_name)
+        for paragraph in text.splitlines():
+            line = ""
+            for word in paragraph.split():
+                candidate = f"{line} {word}".strip()
+                if line and font.text_length(candidate, fontsize=font_size) > width:
+                    lines.append(line)
+                    line = word
+                else:
+                    line = candidate
+            if line:
+                lines.append(line)
+        return lines
