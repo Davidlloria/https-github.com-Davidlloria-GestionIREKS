@@ -2229,6 +2229,11 @@ class OrdersPage(QWidget):
             self._loading_pedido_items_table = False
             return
         rows, pending_article_ids, received_by_article = self.order_query_service.list_order_items(pedido_id)
+        incident_line_ids = {row.incidencia.albaran_item_id for row in self.order_incident_service.list_incidents(pedido_id)}
+        incident_article_ids = set()
+        if incident_line_ids:
+            delivery_rows, _ = self.order_query_service.list_albaran_items(pedido_id)
+            incident_article_ids = {line.articulo_id for line, _ in delivery_rows if line.item_id in incident_line_ids}
         self.pedido_items_table.setRowCount(len(rows))
         total_cantidad = 0.0
         total_pedido_kg = 0.0
@@ -2286,6 +2291,9 @@ class OrdersPage(QWidget):
                     cell.setBackground(QBrush(QColor("#FFF7ED")))
                     if col_idx in (4, 5, 6):
                         cell.setForeground(QBrush(QColor("#C2410C")))
+                if articulo_id in incident_article_ids:
+                    cell.setForeground(QBrush(QColor("#7E22CE")))
+                    cell.setToolTip("Artículo con incidencias registradas. Consulta la pestaña Incidencias.")
                 if col_idx == 2:
                     cell.setFlags(cell.flags() | Qt.ItemFlag.ItemIsEditable)
                 else:
@@ -2468,6 +2476,7 @@ class OrdersPage(QWidget):
         clean_albaran_id = str(albaran_id or "").strip()
         self.order_document_import_service.repair_albaran_item_mappings_for_order(pedido_id, clean_albaran_id)
         rows, excess_article_ids = self.order_query_service.list_albaran_items(pedido_id, clean_albaran_id)
+        incident_line_ids = {row.incidencia.albaran_item_id for row in self.order_incident_service.list_incidents(pedido_id)}
         self.albaran_items_table.setRowCount(len(rows))
         total_cantidad = 0.0
         total_kg = 0.0
@@ -2511,6 +2520,9 @@ class OrdersPage(QWidget):
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 if col_idx == 2:
                     cell.setToolTip(nombre)
+                if item.item_id in incident_line_ids:
+                    cell.setForeground(QBrush(QColor("#7E22CE")))
+                    cell.setToolTip(f"{nombre}\nLote con incidencias registradas. Consulta la pestaña Incidencias.")
                 self.albaran_items_table.setItem(row_idx, col_idx, cell)
         self.albaran_items_table.setSortingEnabled(was_sorting)
         if was_sorting:
@@ -2633,6 +2645,7 @@ class OrdersPage(QWidget):
                 self.order_incident_service.add_image(incident_id, path)
         except Exception as exc:
             QMessageBox.warning(self, "Incidencias", str(exc))
+        self._show_selected_details()
         self._reload_incidents(selected.pedido_id, incident_id)
 
     def _edit_incident(self) -> None:
@@ -2678,6 +2691,7 @@ class OrdersPage(QWidget):
                 self.order_incident_service.add_image(incident_id, path)
         except Exception as exc:
             QMessageBox.warning(self, "Incidencias", str(exc))
+        self._show_selected_details()
         self._reload_incidents(selected.pedido_id, incident_id)
 
     def _delete_incident(self) -> None:
@@ -2697,6 +2711,7 @@ class OrdersPage(QWidget):
             QMessageBox.warning(self, "Incidencias", str(exc))
             return
         selected = self._selected_row()
+        self._show_selected_details()
         self._reload_incidents(selected.pedido_id if selected else None)
 
     def _show_incidents_context_menu(self, pos) -> None:
