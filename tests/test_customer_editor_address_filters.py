@@ -117,5 +117,15 @@ def test_customer_detail_opens_all_cp_municipalities_on_focus() -> None:
     assert page.detail_municipio_completer.completionCount() == 2
     assert list(page.detail_municipio_options) == ["Municipio A", "Municipio B"]
     assert page.detail_selected_municipio_id == "mun-a"
+    # A selected name must not reduce the popup to one municipality.
+    page.detail_municipio_completer.setCompletionPrefix("Municipio A")
+    assert page.detail_municipio_completer.popup().model().rowCount() == 2
     page.detail_municipio_completer.popup().hide()
+    # Closing the popup returns focus to the editor; it must not reopen it.
+    from PySide6.QtCore import Qt
+    QApplication.sendEvent(page.detail_municipio, QFocusEvent(
+        QEvent.Type.FocusIn, Qt.FocusReason.PopupFocusReason))
+    app.processEvents()
+    app.processEvents()
+    assert not page.detail_municipio_completer.popup().isVisible()
     page.close()

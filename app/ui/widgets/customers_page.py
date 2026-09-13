@@ -3250,7 +3250,9 @@ class CustomersPage(QWidget):
         combo.blockSignals(False)
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if watched is getattr(self, "detail_municipio", None) and event.type() == QEvent.Type.FocusIn:
+        if (watched is getattr(self, "detail_municipio", None)
+                and event.type() == QEvent.Type.FocusIn
+                and event.reason() != Qt.FocusReason.PopupFocusReason):
             QTimer.singleShot(0, self._show_detail_municipios_for_cp)
         return super().eventFilter(watched, event)
 
@@ -3263,6 +3265,9 @@ class CustomersPage(QWidget):
             self.detail_selected_municipio_id, self.detail_selected_cp,
         )
         if self.detail_municipio_options:
+            self.detail_municipio_completer.setCompletionMode(
+                QCompleter.CompletionMode.UnfilteredPopupCompletion
+            )
             self.detail_municipio_completer.setCompletionPrefix("")
             self.detail_municipio_completer.complete()
 
