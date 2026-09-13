@@ -74,3 +74,48 @@ def test_customer_address_filters_cp_and_municipio_bidirectionally() -> None:
     assert dialog._cp_options == {"35001", "35003"}
     assert dialog._selected_cp == ""
     assert dialog.localidad_combo.count() == 1
+
+
+def test_customer_detail_opens_all_cp_municipalities_on_focus() -> None:
+    from PySide6.QtCore import QEvent
+    from PySide6.QtGui import QFocusEvent
+    from PySide6.QtWidgets import QWidget, QComboBox
+    from app.ui.widgets.customers_page import CustomersPage
+
+    class DetailHarness(CustomersPage):
+        def __init__(self):
+            QWidget.__init__(self)
+            self._is_loading_details = False
+            self.detail_municipio = QLineEdit(self)
+            self.detail_municipio.installEventFilter(self)
+            self.detail_municipio_completer = self._build_detail_lookup_completer(self.detail_municipio)
+            self.detail_isla = QComboBox(self)
+            self.detail_isla.addItem("Isla", "isla")
+            self.detail_selected_cp = "35001"
+            self.detail_selected_municipio_id = "mun-a"
+            self.municipios = [
+                Municipio(municipio_id="mun-a", isla_id="isla", municipio_nombre="Municipio A"),
+                Municipio(municipio_id="mun-b", isla_id="isla", municipio_nombre="Municipio B"),
+                Municipio(municipio_id="mun-c", isla_id="isla", municipio_nombre="Municipio C"),
+            ]
+            self.codigos_postales = [
+                CodigoPostal(municipio_id="mun-a", codigo_postal="35001"),
+                CodigoPostal(municipio_id="mun-b", codigo_postal="35001"),
+                CodigoPostal(municipio_id="mun-c", codigo_postal="35002"),
+            ]
+
+    app = _application()
+    page = DetailHarness()
+    page.show()
+    page.activateWindow()
+    app.processEvents()
+    page.detail_municipio.setFocus()
+    QApplication.sendEvent(page.detail_municipio, QFocusEvent(QEvent.Type.FocusIn))
+    app.processEvents()
+    app.processEvents()
+    assert page.detail_municipio_completer.popup().isVisible()
+    assert page.detail_municipio_completer.completionCount() == 2
+    assert list(page.detail_municipio_options) == ["Municipio A", "Municipio B"]
+    assert page.detail_selected_municipio_id == "mun-a"
+    page.detail_municipio_completer.popup().hide()
+    page.close()

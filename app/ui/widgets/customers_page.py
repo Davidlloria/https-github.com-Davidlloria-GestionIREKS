@@ -4,7 +4,7 @@ import threading
 import unicodedata
 from uuid import uuid4
 
-from PySide6.QtCore import QObject, QSize, QTimer, Qt, Signal, QStringListModel
+from PySide6.QtCore import QEvent, QObject, QSize, QTimer, Qt, Signal, QStringListModel
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap, QTextCharFormat, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
@@ -2997,6 +2997,7 @@ class CustomersPage(QWidget):
         self.lbl_municipio = QLabel("Municipio", panel)
         self.detail_municipio = QLineEdit(panel)
         self.detail_municipio.setPlaceholderText("Escribe o selecciona un municipio")
+        self.detail_municipio.installEventFilter(self)
         self.lbl_calle = QLabel("Calle", panel)
         self.detail_direccion = QLineEdit(panel)
         self.lbl_cp = QLabel("C.P.", panel)
@@ -3247,6 +3248,23 @@ class CustomersPage(QWidget):
         else:
             combo.setCurrentIndex(0)
         combo.blockSignals(False)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if watched is getattr(self, "detail_municipio", None) and event.type() == QEvent.Type.FocusIn:
+            QTimer.singleShot(0, self._show_detail_municipios_for_cp)
+        return super().eventFilter(watched, event)
+
+    def _show_detail_municipios_for_cp(self) -> None:
+        if (self._is_loading_details or not self.detail_municipio.hasFocus()
+                or self.detail_municipio.isReadOnly() or not self.detail_selected_cp):
+            return
+        self._populate_municipios(
+            str(self.detail_isla.currentData() or ""),
+            self.detail_selected_municipio_id, self.detail_selected_cp,
+        )
+        if self.detail_municipio_options:
+            self.detail_municipio_completer.setCompletionPrefix("")
+            self.detail_municipio_completer.complete()
 
     def _build_detail_lookup_completer(self, field: QLineEdit) -> QCompleter:
         model = QStringListModel(self)
