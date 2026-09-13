@@ -115,6 +115,17 @@ class OrderService:
             entity = session.get(Pedido, pedido_id)
             if entity is None:
                 raise ValueError("Pedido no encontrado.")
+            if entity.pedido_fecha != pedido_fecha:
+                self._guard_shortage_history(session, pedido_id)
+            previous: dict[str, float] = {}
+            proposed: dict[str, float] = {}
+            for line in session.exec(select(PedidoItem).where(PedidoItem.pedido_id == pedido_id)):
+                previous[line.articulo_id] = previous.get(line.articulo_id, 0) + line.articulo_cantidad
+            for line in lines:
+                proposed[line.articulo_id] = proposed.get(line.articulo_id, 0) + float(line.uds)
+            for article_id in previous.keys() | proposed.keys():
+                if abs(previous.get(article_id, 0) - proposed.get(article_id, 0)) > 1e-6:
+                    self._guard_shortage_history(session, pedido_id, article_id)
             estado_actual = str(getattr(entity, "pedido_estado", "") or "").strip().upper()
             entity.pedido_fecha = pedido_fecha
             entity.pedido_numero = pedido_numero
@@ -158,6 +169,8 @@ class OrderService:
             entity = session.get(Pedido, pedido_id)
             if entity is None:
                 return
+            if entity.pedido_fecha != pedido_fecha:
+                self._guard_shortage_history(session, pedido_id)
             entity.pedido_fecha = pedido_fecha
             entity.pedido_numero = pedido_numero
             session.add(entity)
@@ -165,6 +178,7 @@ class OrderService:
 
     def add_order_line(self, pedido_id: str, articulo_id: str, cantidad: float = 1.0) -> PedidoItem:
         with Session(engine) as session:
+            self._guard_shortage_history(session, pedido_id, articulo_id)
             pedido = session.get(Pedido, pedido_id)
             if pedido is None:
                 raise ValueError("Pedido no encontrado.")
@@ -205,6 +219,8 @@ class OrderService:
             entity = session.get(PedidoItem, item_id)
             if entity is None:
                 raise ValueError("La línea ya no existe.")
+            self._guard_shortage_history(session, entity.pedido_id, entity.articulo_id)
+            self._guard_shortage_history(session, entity.pedido_id, articulo_id)
             entity.articulo_id = articulo_id
             entity.articulo_cantidad = float(cantidad)
             session.add(entity)
@@ -226,6 +242,7 @@ class OrderService:
             entity = session.get(PedidoItem, item_id)
             if entity is None:
                 return
+            self._guard_shortage_history(session, entity.pedido_id, entity.articulo_id)
             entity.articulo_cantidad = float(cantidad)
             session.add(entity)
             session.commit()
@@ -234,6 +251,7 @@ class OrderService:
         with Session(engine) as session:
             entity = session.get(PedidoItem, item_id)
             if entity is not None:
+                self._guard_shortage_history(session, entity.pedido_id, entity.articulo_id)
                 session.delete(entity)
                 session.commit()
 
@@ -253,6 +271,7 @@ class OrderService:
             )
             if not rows:
                 return
+            self._guard_shortage_history(session, clean_pedido_id, clean_articulo_id)
             if target_qty <= 1e-9:
                 for row in rows:
                     session.delete(row)
@@ -264,6 +283,19 @@ class OrderService:
             for row in rows[1:]:
                 session.delete(row)
             session.commit()
+
+    @staticmethod
+    def _guard_shortage_history(session: Session, pedido_id: str, article_id: str = "") -> None:
+        from app.models import PedidoFaltante
+        query = (select(PedidoFaltante)
+            .join(AlbaranItem, (AlbaranItem.item_id == PedidoFaltante.albaran_item_id) |
+                (AlbaranItem.item_id == PedidoFaltante.reposicion_item_id))
+            .join(PedidoIncidencia, PedidoIncidencia.incidencia_id == PedidoFaltante.incidencia_id)
+            .where((PedidoIncidencia.pedido_id == pedido_id) | (AlbaranItem.pedido_id == pedido_id)))
+        if article_id:
+            query = query.where(AlbaranItem.articulo_id == article_id)
+        if session.exec(query).first():
+            raise ValueError("Se conserva la fecha y la cantidad pedida de artículos con faltantes o reposiciones vinculadas. Usa el seguimiento de la incidencia.")
 
     def delete_order_line_if_exists(self, item_id: str) -> bool:
         with Session(engine) as session:
@@ -305,6 +337,10 @@ class OrderService:
             )
             albaran_item_ids = [str(getattr(x, "item_id", "") or "").strip() for x in albaran_items_rows]
             albaran_item_ids = [x for x in albaran_item_ids if x]
+            from app.models import PedidoFaltante
+            if albaran_item_ids and session.exec(select(PedidoFaltante).where(
+                    PedidoFaltante.reposicion_item_id.in_(albaran_item_ids))).first():
+                raise ValueError("El pedido contiene recepciones vinculadas a reposiciones de faltantes.")
 
             if albaran_item_ids:
                 movimientos = list(

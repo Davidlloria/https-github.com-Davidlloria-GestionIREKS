@@ -1408,6 +1408,8 @@ class OrdersPage(QWidget):
         self.order_query_service = OrderQueryService()
         self.order_service = OrderService()
         self.order_incident_service = OrderIncidentService()
+        from app.services.order_shortage_service import OrderShortageService
+        self.order_shortage_service = OrderShortageService()
         self.receipt_assignment_service = ReceiptAssignmentService()
         self.order_edit_flow_service = OrderEditFlowService(
             order_query_service=self.order_query_service,
@@ -1815,7 +1817,7 @@ class OrdersPage(QWidget):
         albaran_filter_row.addWidget(self.albaran_selector, 1)
         albaran_tab_layout.addLayout(albaran_filter_row)
 
-        self.albaran_items_table = QTableWidget(0, 5)
+        self.albaran_items_table = QTableWidget(0, 7)
         self.albaran_items_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.albaran_items_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.albaran_items_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -1831,14 +1833,17 @@ class OrdersPage(QWidget):
         albaran_items_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         albaran_items_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         albaran_items_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        self.albaran_items_table.setHorizontalHeaderLabels(["Cod.", "Nº albarán", "Nombre", "Cantidad", "Kg"])
+        self.albaran_items_table.setHorizontalHeaderLabels(["Cod.", "Nº albarán", "Nombre", "Uds. albarán", "Kg albarán", "Lote", "Recibidas"])
+        for column, width in ((5, 110), (6, 90)):
+            albaran_items_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+            self.albaran_items_table.setColumnWidth(column, width)
         self.albaran_items_table.setColumnWidth(0, 95)
         self.albaran_items_table.setColumnWidth(1, 120)
         self.albaran_items_table.setColumnWidth(3, 90)
         self.albaran_items_table.setColumnWidth(4, 100)
         self.albaran_items_table.setSortingEnabled(True)
         albaran_tab_layout.addWidget(self.albaran_items_table, 1)
-        self.albaran_items_totals_table = QTableWidget(1, 5)
+        self.albaran_items_totals_table = QTableWidget(1, 7)
         self.albaran_items_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.albaran_items_totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.albaran_items_totals_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -1857,6 +1862,9 @@ class OrdersPage(QWidget):
         self.albaran_items_totals_table.setColumnWidth(1, 120)
         self.albaran_items_totals_table.setColumnWidth(3, 90)
         self.albaran_items_totals_table.setColumnWidth(4, 100)
+        for column, width in ((5, 110), (6, 90)):
+            albaran_totals_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+            self.albaran_items_totals_table.setColumnWidth(column, width)
         albaran_tab_layout.addWidget(self.albaran_items_totals_table)
         tabs.addTab(albaran_tab, "Albarán")
 
@@ -1874,6 +1882,8 @@ class OrdersPage(QWidget):
         self.new_incident_btn = QPushButton("Nueva")
         self.new_incident_btn.setProperty("btnRole", "success")
         self.new_incident_btn.clicked.connect(self._new_incident)
+        self.new_shortage_btn = QPushButton("Registrar faltante")
+        self.new_shortage_btn.clicked.connect(lambda: self._new_shortage())
         self.edit_incident_btn = QPushButton("Editar")
         self.edit_incident_btn.setProperty("btnRole", "warning")
         self.edit_incident_btn.clicked.connect(self._edit_incident)
@@ -1882,6 +1892,7 @@ class OrdersPage(QWidget):
         self.delete_incident_btn.clicked.connect(self._delete_incident)
         for button in (
             self.new_incident_btn,
+            self.new_shortage_btn,
             self.edit_incident_btn,
             self.delete_incident_btn,
         ):
@@ -1890,25 +1901,28 @@ class OrdersPage(QWidget):
         incidencias_actions.addStretch(1)
         incidencias_layout.addWidget(incidencias_ribbon)
 
-        self.incidents_table = QTableWidget(0, 5)
+        self.incidents_table = QTableWidget(0, 7)
         self.incidents_table.setObjectName("ordersIncidentsTable")
         self.incidents_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.incidents_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.incidents_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.incidents_table.verticalHeader().setVisible(False)
         self.incidents_table.setHorizontalHeaderLabels(
-            ["Fecha incidencia", "Código", "Descripción", "Lote", "Albarán"]
+            ["Fecha incidencia", "Código", "Descripción", "Lote", "Albarán", "Uds. afectadas", "Estado"]
         )
         incident_header = self.incidents_table.horizontalHeader()
         incident_header.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         incident_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        for column, width in {0: 105, 1: 85, 3: 105, 4: 115}.items():
+        for column, width in {0: 105, 1: 85, 3: 105, 4: 115, 5: 100, 6: 180}.items():
             self.incidents_table.setColumnWidth(column, width)
         self.incidents_table.itemSelectionChanged.connect(self._update_incident_action_states)
         self.incidents_table.itemDoubleClicked.connect(lambda _item: self._edit_incident())
         self.incidents_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.incidents_table.customContextMenuRequested.connect(self._show_incidents_context_menu)
         incidencias_layout.addWidget(self.incidents_table, 1)
+        self.incidents_summary = QLabel()
+        self.incidents_summary.setWordWrap(True)
+        incidencias_layout.addWidget(self.incidents_summary)
         tabs.addTab(incidencias_tab, "Incidencias")
 
         factura_tab = QWidget()
@@ -2474,6 +2488,8 @@ class OrdersPage(QWidget):
                 nombre,
                 self._format_number_es(cantidad, 2),
                 self._format_number_es(kg, 2, " kg"),
+                str(item.articulo_lote or ""),
+                self._format_number_es(item.cantidad_operativa, 2),
             ]
             for col_idx, value in enumerate(values):
                 if col_idx == 3:
@@ -2497,7 +2513,7 @@ class OrdersPage(QWidget):
                 sort_col if sort_col >= 0 else 1,
                 sort_order if sort_col >= 0 else Qt.SortOrder.DescendingOrder,
             )
-        self._set_albaran_items_totals(total_cantidad, total_kg)
+        self._set_albaran_items_totals(total_cantidad, total_kg, sum(item.cantidad_operativa for item, _ in rows))
 
     def _on_albaran_selector_changed(self, _index: int) -> None:
         selected = self._selected_row()
@@ -2506,6 +2522,8 @@ class OrdersPage(QWidget):
         self._reload_albaran_items_table(pedido_id, albaran_id)
 
     def _reload_incidents(self, pedido_id: str | None, selected_incident_id: str = "") -> None:
+        from app.services.order_shortage_service import SHORTAGE_STATES
+        self._shortages = self.order_shortage_service.list_for_order(pedido_id) if pedido_id else {}
         self.incidents_table.blockSignals(True)
         self.incidents_table.setRowCount(0)
         rows: list[OrderIncidentRow] = []
@@ -2522,6 +2540,8 @@ class OrdersPage(QWidget):
                 article.descripcion,
                 article.lote,
                 article.albaran_numero,
+                str(incidence.unidades_afectadas),
+                SHORTAGE_STATES[self._shortages[incidence.incidencia_id].estado] if incidence.incidencia_id in self._shortages else "Observación",
             ]
             for column, value in enumerate(values):
                 cell = QTableWidgetItem(value)
@@ -2537,12 +2557,45 @@ class OrdersPage(QWidget):
             self.incidents_table.selectRow(0)
         self._update_incident_action_states()
 
+        open_count = sum(s.estado != "resuelta" for s in self._shortages.values())
+        self.incidents_summary.setText(f"Faltantes abiertos: {open_count}. Abre una incidencia para consultar el recuento, los justificantes y su seguimiento.")
+        tabs = self.findChild(QTabWidget, "ordersTabs")
+        if tabs:
+            tabs.setTabText(2, f"Incidencias ({open_count})" if open_count else "Incidencias")
+
     def _selected_incident_id(self) -> str:
         selected_rows = self.incidents_table.selectionModel().selectedRows()
         if not selected_rows:
             return ""
         item = self.incidents_table.item(selected_rows[0].row(), 0)
         return str(item.data(Qt.ItemDataRole.UserRole) or "").strip() if item else ""
+
+    def _new_shortage(self, item_id: str = "") -> None:
+        from app.ui.widgets.order_shortage_dialog import NewOrderShortageDialog
+        selected = self._selected_row()
+        if selected is None:
+            return
+        articles = self.order_incident_service.list_received_articles(selected.pedido_id)
+        if not articles:
+            QMessageBox.warning(self, "Faltante", "Este pedido no tiene líneas de albarán.")
+            return
+        dialog = NewOrderShortageDialog(articles, item_id, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        incident_id = ""
+        try:
+            incident_id = self.order_shortage_service.create(pedido_id=selected.pedido_id,
+                item_id=str(dialog.article.currentData()), received=dialog.received.value(),
+                observations=dialog.observations.toPlainText(), incident_date=dialog.incident_date.date().toPython())
+            for path in dialog.paths:
+                self.order_incident_service.add_attachment(incident_id, path)
+        except Exception as exc:
+            prefix = "El faltante se ha guardado pendiente, pero falta adjuntar un justificante.\n" if incident_id else ""
+            QMessageBox.warning(self, "Faltante", prefix + str(exc))
+        self._show_selected_details()
+        self._reload_incidents(selected.pedido_id, incident_id)
+        if incident_id:
+            self._edit_incident()
 
     def _new_incident(self) -> None:
         selected = self._selected_row()
@@ -2587,6 +2640,16 @@ class OrdersPage(QWidget):
         incident_row = next((row for row in rows if row.incidencia.incidencia_id == incident_id), None)
         if incident_row is None:
             QMessageBox.warning(self, "Incidencias", "Incidencia no encontrada.")
+            return
+        shortage = self.order_shortage_service.list_for_order(selected.pedido_id).get(incident_id)
+        if shortage:
+            from app.ui.widgets.order_shortage_dialog import OrderShortageFollowupDialog
+            dialog = OrderShortageFollowupDialog(shortage=shortage, article=incident_row.articulo,
+                observations=incident_row.incidencia.observaciones, service=self.order_shortage_service,
+                attachments=self.order_incident_service, parent=self)
+            dialog.exec()
+            self._show_selected_details()
+            self._reload_incidents(selected.pedido_id, incident_id)
             return
         dialog = OrderIncidentDialog(
             service=self.order_incident_service,
@@ -2651,8 +2714,11 @@ class OrdersPage(QWidget):
         has_order = self._selected_row() is not None
         has_incident = bool(self._selected_incident_id())
         self.new_incident_btn.setEnabled(has_order)
+        self.new_shortage_btn.setEnabled(has_order)
         self.edit_incident_btn.setEnabled(has_incident)
-        self.delete_incident_btn.setEnabled(has_incident)
+        is_shortage = self._selected_incident_id() in getattr(self, "_shortages", {})
+        self.edit_incident_btn.setText("Seguimiento" if is_shortage else "Editar")
+        self.delete_incident_btn.setEnabled(has_incident and not is_shortage)
 
     def _load_factura_selector(self, pedido_id: str | None) -> None:
         header = self.facturas_table.horizontalHeader()
@@ -2839,12 +2905,15 @@ class OrdersPage(QWidget):
         menu = QMenu(self)
         refresh_action = menu.addAction("Refrescar")
         refresh_action.setEnabled(self.order_document_import_service.is_albaran_item_pending(albaran_item_id))
+        shortage_action = menu.addAction("Registrar faltante de recepción")
         delete_action = menu.addAction("Eliminar")
         chosen = menu.exec(self.albaran_items_table.viewport().mapToGlobal(pos))
         if chosen == refresh_action:
             self._refresh_albaran_item_mapping(albaran_item_id)
         elif chosen == delete_action:
             self._delete_albaran_line(albaran_item_id)
+        elif chosen == shortage_action:
+            self._new_shortage(albaran_item_id)
 
     def _refresh_albaran_item_mapping(self, albaran_item_id: str) -> None:
         try:
@@ -3174,13 +3243,15 @@ class OrdersPage(QWidget):
             cell.setFont(font)
             self.pedido_items_totals_table.setItem(0, col_idx, cell)
 
-    def _set_albaran_items_totals(self, total_cantidad: float, total_kg: float) -> None:
+    def _set_albaran_items_totals(self, total_cantidad: float, total_kg: float, total_recibida: float = 0.0) -> None:
         values = [
             "TOTAL",
             "",
             "",
             self._format_number_es(total_cantidad, 2),
             self._format_number_es(total_kg, 2, " kg"),
+            "",
+            self._format_number_es(total_recibida, 2),
         ]
         for col_idx, value in enumerate(values):
             if col_idx == 3:

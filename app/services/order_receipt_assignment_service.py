@@ -17,6 +17,8 @@ from app.core.database import engine
 def receipt_fingerprint(item: AlbaranItem) -> str:
     values = [item.pedido_id, item.albaran_id, item.articulo_id, item.articulo_codigo,
               item.articulo_cantidad, str(item.albaran_fecha), item.articulo_lote, str(item.articulo_caducidad)]
+    if item.cantidad_recibida_confirmada is not None:
+        values.append(item.cantidad_recibida_confirmada)
     return hashlib.sha256(json.dumps(values, ensure_ascii=True).encode()).hexdigest()
 
 
@@ -54,12 +56,12 @@ def receipt_candidates(session: Session, item: AlbaranItem) -> list[ReceiptCandi
     elif review is None:
         legacy = session.get(PedidoRecepcionAsignacion, item.item_id)
         if legacy:
-            own = {legacy.pedido_id: item.articulo_cantidad}
+            own = {legacy.pedido_id: item.cantidad_operativa}
     delivered = set(session.exec(select(Albaran.pedido_id)))
     result = []
     for (pid, article_id), values in stats.items():
         order = orders[pid]
-        remaining = min(values["ordered"], values["ordered"] - values["received"] + own.get(pid, 0))
+        remaining = min(values["ordered"], values["ordered"] - values["received"] - values.get("cancelled", 0.0) + own.get(pid, 0))
         if (article_id == item.articulo_id and remaining > 1e-9
                 and order.pedido_fecha <= item.albaran_fecha
                 and (pid in delivered or pid == item.pedido_id)):
@@ -81,8 +83,16 @@ def save_receipt_split(session: Session, item: AlbaranItem, allocations: dict[st
     values = [*allocations.values(), excess]
     if any(not isfinite(v) or v < 0 for v in values):
         raise ValueError("Las cantidades deben ser positivas o cero.")
-    if abs(sum(values) - item.articulo_cantidad) > 1e-6:
+    if abs(sum(values) - item.cantidad_operativa) > 1e-6:
         raise ValueError("Reparte todas las unidades recibidas o indica el excedente.")
+    from app.models import PedidoFaltante, PedidoIncidencia
+    reserved: dict[str, float] = {}
+    for shortage, incident in session.exec(select(PedidoFaltante, PedidoIncidencia)
+            .join(PedidoIncidencia, PedidoIncidencia.incidencia_id == PedidoFaltante.incidencia_id)
+            .where(PedidoFaltante.reposicion_item_id == item.item_id)):
+        reserved[incident.pedido_id] = reserved.get(incident.pedido_id, 0) + shortage.cantidad_documentada - shortage.cantidad_recibida
+    if any(allocations.get(pid, 0) < amount - 1e-6 for pid, amount in reserved.items()):
+        raise ValueError("Conserva las unidades vinculadas a la reposición de un faltante.")
     capacities = {row.pedido_id: row.pendiente for row in receipt_candidates(session, item)}
     for pid, amount in allocations.items():
         if amount > capacities.get(pid, 0) + 1e-6:
@@ -94,7 +104,7 @@ def save_receipt_split(session: Session, item: AlbaranItem, allocations: dict[st
         session.delete(row)
     legacy = session.get(PedidoRecepcionAsignacion, item.item_id)
     if legacy:
-        before.append((legacy.pedido_id, item.articulo_cantidad))
+        before.append((legacy.pedido_id, item.cantidad_operativa))
         session.delete(legacy)
     session.flush()
     for pid, quantity in allocations.items():
@@ -126,8 +136,8 @@ def automate_receipts(session: Session, pedido_id: str) -> None:
         if review.estado != "pendiente":
             continue
         candidates = receipt_candidates(session, item)
-        if len(candidates) == 1 and 0 < item.articulo_cantidad <= candidates[0].pendiente + 1e-6:
-            save_receipt_split(session, item, {candidates[0].pedido_id: item.articulo_cantidad}, 0,
+        if len(candidates) == 1 and 0 < item.cantidad_operativa <= candidates[0].pendiente + 1e-6:
+            save_receipt_split(session, item, {candidates[0].pedido_id: item.cantidad_operativa}, 0,
                                fingerprint=receipt_fingerprint(item), version=review.version, automatic=True)
 
 
@@ -142,7 +152,7 @@ def sync_receipt_pending(session: Session, pedido_id: str) -> None:
     delivered = {row.pedido_id: row.albaran_id for row in session.exec(select(Albaran).where(
         Albaran.pedido_id.in_(list(orders))))}
     for (pid, article_id), values in stats.items():
-        pending = values["ordered"] - values["received"]
+        pending = values["ordered"] - values["received"] - values.get("cancelled", 0.0)
         if pid in delivered and pending > 1e-9:
             session.add(PedidoPendiente(pedido_id=pid, albaran_id=delivered[pid], articulo_id=article_id,
                 cantidad_pedida=values["ordered"], cantidad_recibida=values["received"],
@@ -215,7 +225,7 @@ class ReceiptAssignmentService:
                     PedidoRecepcionReparto.albaran_item_id == item.item_id))} if (
                         review and review.estado != "pendiente" and review.huella == receipt_fingerprint(item)) else {}
                 if legacy and not review:
-                    allocations = {legacy.pedido_id: item.articulo_cantidad}
+                    allocations = {legacy.pedido_id: item.cantidad_operativa}
                 history = []
                 for r in session.exec(
                     select(PedidoRecepcionCambio).where(PedidoRecepcionCambio.albaran_item_id == item.item_id)
@@ -225,7 +235,7 @@ class ReceiptAssignmentService:
                     history.append(f"{r.fecha:%d/%m/%Y %H:%M} · {detail['tipo']} · {destination} · Excedente: {detail['excedente']:g}")
                 result.append(ReceiptReview(item.item_id, item.albaran_numero,
                     article.articulo_descripcion if article else item.articulo_codigo or "Artículo sin identificar",
-                    item.articulo_cantidad, pending, receipt_fingerprint(item), review.version if review else 0,
+                    item.cantidad_operativa, pending, receipt_fingerprint(item), review.version if review else 0,
                     receipt_candidates(session, item), allocations, review.excedente if review and not pending else 0, history))
         return result
 
@@ -249,9 +259,15 @@ def assign_order_receipt(session: Session, albaran_item_id: str, pedido_id: str)
     delivery = session.get(Albaran, item.albaran_id) if item else None
     if not item or not target or not source or not delivery:
         raise ValueError("Delivery line, document and orders must exist")
+    from app.models import PedidoFaltante, PedidoIncidencia
+    linked = list(session.exec(select(PedidoIncidencia.pedido_id).join(
+        PedidoFaltante, PedidoFaltante.incidencia_id == PedidoIncidencia.incidencia_id)
+        .where(PedidoFaltante.reposicion_item_id == item.item_id)))
+    if any(pid != pedido_id for pid in linked):
+        raise ValueError("Conserva el pedido de la reposición vinculada al faltante.")
     review = session.get(PedidoRecepcionRevision, albaran_item_id)
     if review:
-        save_receipt_split(session, item, {pedido_id: item.articulo_cantidad}, 0,
+        save_receipt_split(session, item, {pedido_id: item.cantidad_operativa}, 0,
                            fingerprint=receipt_fingerprint(item), version=review.version)
         sync_receipt_pending(session, item.pedido_id)
         return
@@ -259,11 +275,11 @@ def assign_order_receipt(session: Session, albaran_item_id: str, pedido_id: str)
         raise ValueError("Orders must belong to the same warehouse")
     if target.pedido_fecha > delivery.albaran_fecha:
         raise ValueError("The destination order cannot be later than the delivery")
-    quantity = float(item.articulo_cantidad)
+    quantity = float(item.cantidad_operativa)
     ordered = sum(float(row.articulo_cantidad) for row in session.exec(
         select(PedidoItem).where(PedidoItem.pedido_id == pedido_id, PedidoItem.articulo_id == item.articulo_id)
     ))
-    reserved = sum(float(row.articulo_cantidad) for row in session.exec(
+    reserved = sum(float(row.cantidad_operativa) for row in session.exec(
         select(AlbaranItem)
         .join(PedidoRecepcionAsignacion, PedidoRecepcionAsignacion.albaran_item_id == AlbaranItem.item_id)
         .where(PedidoRecepcionAsignacion.pedido_id == pedido_id,

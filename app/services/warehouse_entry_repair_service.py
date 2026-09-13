@@ -97,23 +97,23 @@ class WarehouseEntryRepairService:
             ),
             valid_items_missing_entry=self._scalar(
                 conn,
-                """SELECT COUNT(*) FROM albaranes_items ai JOIN pedidos p ON p.pedido_id=ai.pedido_id JOIN albaranes a ON a.albaran_id=ai.albaran_id JOIN productos_ireks pr ON pr.articulo_id=ai.articulo_id LEFT JOIN almacen_movimientos m ON m.albaran_item_id=ai.item_id AND m.cantidad>0 WHERE ai.articulo_cantidad>0 AND m.id IS NULL""",
+                """SELECT COUNT(*) FROM albaranes_items ai JOIN pedidos p ON p.pedido_id=ai.pedido_id JOIN albaranes a ON a.albaran_id=ai.albaran_id JOIN productos_ireks pr ON pr.articulo_id=ai.articulo_id LEFT JOIN almacen_movimientos m ON m.albaran_item_id=ai.item_id AND m.cantidad>0 AND m.id NOT IN (SELECT movimiento_id FROM pedidos_faltantes_movimientos) WHERE ai.articulo_cantidad>0 AND m.id IS NULL""",
             ),
             entry_links_without_item=self._scalar(
                 conn,
-                """SELECT COUNT(*) FROM almacen_movimientos m LEFT JOIN albaranes_items ai ON ai.item_id=m.albaran_item_id WHERE m.cantidad>0 AND TRIM(COALESCE(m.albaran_item_id,''))<>'' AND ai.item_id IS NULL""",
+                """SELECT COUNT(*) FROM almacen_movimientos m LEFT JOIN albaranes_items ai ON ai.item_id=m.albaran_item_id WHERE m.cantidad>0 AND m.id NOT IN (SELECT movimiento_id FROM pedidos_faltantes_movimientos) AND TRIM(COALESCE(m.albaran_item_id,''))<>'' AND ai.item_id IS NULL""",
             ),
             unlinked_positive_entries=self._scalar(
                 conn,
-                "SELECT COUNT(*) FROM almacen_movimientos WHERE cantidad>0 AND TRIM(COALESCE(albaran_item_id,''))=''",
+                "SELECT COUNT(*) FROM almacen_movimientos WHERE cantidad>0 AND id NOT IN (SELECT movimiento_id FROM pedidos_faltantes_movimientos) AND TRIM(COALESCE(albaran_item_id,''))=''",
             ),
             duplicate_entry_groups=self._scalar(
                 conn,
-                """SELECT COUNT(*) FROM (SELECT albaran_item_id FROM almacen_movimientos WHERE cantidad>0 AND TRIM(COALESCE(albaran_item_id,''))<>'' GROUP BY albaran_item_id HAVING COUNT(*)>1) duplicates""",
+                """SELECT COUNT(*) FROM (SELECT albaran_item_id FROM almacen_movimientos WHERE cantidad>0 AND id NOT IN (SELECT movimiento_id FROM pedidos_faltantes_movimientos) AND TRIM(COALESCE(albaran_item_id,''))<>'' GROUP BY albaran_item_id HAVING COUNT(*)>1) duplicates""",
             ),
             mismatched_entries=self._scalar(
                 conn,
-                """SELECT COUNT(*) FROM almacen_movimientos m JOIN albaranes_items ai ON ai.item_id=m.albaran_item_id JOIN albaranes a ON a.albaran_id=ai.albaran_id JOIN pedidos p ON p.pedido_id=ai.pedido_id WHERE m.cantidad>0 AND (m.articulo_id<>ai.articulo_id OR ABS(m.cantidad-ai.articulo_cantidad)>0.000001 OR COALESCE(m.articulo_lote,'')<>COALESCE(ai.articulo_lote,'') OR COALESCE(m.articulo_caducidad,'')<>COALESCE(ai.articulo_caducidad,'') OR COALESCE(m.fecha_pedido,'')<>COALESCE(ai.albaran_fecha,'') OR COALESCE(m.pedido_albaran_numero,'')<>COALESCE(a.albaran_numero,'') OR COALESCE(m.pedido_numero,'')<>COALESCE(p.pedido_numero,'') OR COALESCE(m.almacen_id,'')<>COALESCE(p.almacen_id,''))""",
+                """SELECT COUNT(*) FROM almacen_movimientos m JOIN albaranes_items ai ON ai.item_id=m.albaran_item_id JOIN albaranes a ON a.albaran_id=ai.albaran_id JOIN pedidos p ON p.pedido_id=ai.pedido_id WHERE m.cantidad>0 AND m.id NOT IN (SELECT movimiento_id FROM pedidos_faltantes_movimientos) AND (m.articulo_id<>ai.articulo_id OR ABS(m.cantidad-ai.articulo_cantidad)>0.000001 OR COALESCE(m.articulo_lote,'')<>COALESCE(ai.articulo_lote,'') OR COALESCE(m.articulo_caducidad,'')<>COALESCE(ai.articulo_caducidad,'') OR COALESCE(m.fecha_pedido,'')<>COALESCE(ai.albaran_fecha,'') OR COALESCE(m.pedido_albaran_numero,'')<>COALESCE(a.albaran_numero,'') OR COALESCE(m.pedido_numero,'')<>COALESCE(p.pedido_numero,'') OR COALESCE(m.almacen_id,'')<>COALESCE(p.almacen_id,''))""",
             ),
             stock_mismatches=self._scalar(
                 conn,
@@ -202,7 +202,7 @@ class WarehouseEntryRepairService:
     @staticmethod
     def _create_missing_entries(conn: Connection) -> int:
         rows = conn.exec_driver_sql(
-            """SELECT ai.item_id,p.almacen_id,ai.articulo_id,p.pedido_numero,a.albaran_numero,ai.articulo_cantidad,ai.articulo_lote,ai.articulo_caducidad,ai.albaran_fecha FROM albaranes_items ai JOIN pedidos p ON p.pedido_id=ai.pedido_id JOIN albaranes a ON a.albaran_id=ai.albaran_id JOIN productos_ireks pr ON pr.articulo_id=ai.articulo_id LEFT JOIN almacen_movimientos m ON m.albaran_item_id=ai.item_id AND m.cantidad>0 WHERE ai.articulo_cantidad>0 AND m.id IS NULL"""
+            """SELECT ai.item_id,p.almacen_id,ai.articulo_id,p.pedido_numero,a.albaran_numero,ai.articulo_cantidad,ai.articulo_lote,ai.articulo_caducidad,ai.albaran_fecha FROM albaranes_items ai JOIN pedidos p ON p.pedido_id=ai.pedido_id JOIN albaranes a ON a.albaran_id=ai.albaran_id JOIN productos_ireks pr ON pr.articulo_id=ai.articulo_id LEFT JOIN almacen_movimientos m ON m.albaran_item_id=ai.item_id AND m.cantidad>0 AND m.id NOT IN (SELECT movimiento_id FROM pedidos_faltantes_movimientos) WHERE ai.articulo_cantidad>0 AND m.id IS NULL"""
         ).fetchall()
         for row in rows:
             conn.exec_driver_sql(
@@ -224,14 +224,14 @@ class WarehouseEntryRepairService:
     @staticmethod
     def _delete_duplicate_entries(conn: Connection) -> int:
         groups = conn.exec_driver_sql(
-            """SELECT albaran_item_id FROM almacen_movimientos WHERE cantidad>0 AND TRIM(COALESCE(albaran_item_id,''))<>'' GROUP BY albaran_item_id HAVING COUNT(*)>1"""
+            """SELECT albaran_item_id FROM almacen_movimientos WHERE cantidad>0 AND id NOT IN (SELECT movimiento_id FROM pedidos_faltantes_movimientos) AND TRIM(COALESCE(albaran_item_id,''))<>'' GROUP BY albaran_item_id HAVING COUNT(*)>1"""
         ).fetchall()
         deleted = 0
         for group in groups:
             ids = [
                 int(row[0])
                 for row in conn.exec_driver_sql(
-                    "SELECT id FROM almacen_movimientos WHERE cantidad>0 AND albaran_item_id=? ORDER BY id",
+                    "SELECT id FROM almacen_movimientos WHERE cantidad>0 AND id NOT IN (SELECT movimiento_id FROM pedidos_faltantes_movimientos) AND albaran_item_id=? ORDER BY id",
                     (group[0],),
                 ).fetchall()
             ]
@@ -245,7 +245,7 @@ class WarehouseEntryRepairService:
     @staticmethod
     def _synchronize_linked_entries(conn: Connection) -> int:
         rows = conn.exec_driver_sql(
-            """SELECT m.id,m.almacen_id,p.almacen_id,m.articulo_id,ai.articulo_id,m.pedido_numero,p.pedido_numero,m.pedido_albaran_numero,a.albaran_numero,m.cantidad,ai.articulo_cantidad,m.articulo_lote,ai.articulo_lote,m.articulo_caducidad,ai.articulo_caducidad,m.fecha_pedido,ai.albaran_fecha FROM almacen_movimientos m JOIN albaranes_items ai ON ai.item_id=m.albaran_item_id JOIN albaranes a ON a.albaran_id=ai.albaran_id JOIN pedidos p ON p.pedido_id=ai.pedido_id WHERE m.cantidad>0"""
+            """SELECT m.id,m.almacen_id,p.almacen_id,m.articulo_id,ai.articulo_id,m.pedido_numero,p.pedido_numero,m.pedido_albaran_numero,a.albaran_numero,m.cantidad,ai.articulo_cantidad,m.articulo_lote,ai.articulo_lote,m.articulo_caducidad,ai.articulo_caducidad,m.fecha_pedido,ai.albaran_fecha FROM almacen_movimientos m JOIN albaranes_items ai ON ai.item_id=m.albaran_item_id JOIN albaranes a ON a.albaran_id=ai.albaran_id JOIN pedidos p ON p.pedido_id=ai.pedido_id WHERE m.cantidad>0 AND m.id NOT IN (SELECT movimiento_id FROM pedidos_faltantes_movimientos)"""
         ).fetchall()
         updated = 0
         for row in rows:

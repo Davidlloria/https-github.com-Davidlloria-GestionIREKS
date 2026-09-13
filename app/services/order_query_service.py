@@ -138,9 +138,7 @@ class OrderQueryService:
                         articulo_id = str(getattr(item, "articulo_id", "") or "").strip()
                         if not articulo_id:
                             continue
-                        prev_qty_by_articulo[articulo_id] = prev_qty_by_articulo.get(articulo_id, 0.0) + float(
-                            getattr(item, "articulo_cantidad", 0.0) or 0.0
-                        )
+                        prev_qty_by_articulo[articulo_id] = prev_qty_by_articulo.get(articulo_id, 0.0) + item.cantidad_operativa
                 pendientes_rows = list(
                     session.exec(
                         select(PedidoPendiente, Pedido)
@@ -281,6 +279,7 @@ class OrderQueryService:
         pedido_id: str,
         *,
         unassigned_receipts: dict[str, dict[str, float]] | None = None,
+        receipt_allocations: dict[str, dict[str, float]] | None = None,
     ) -> tuple[Pedido | None, dict[tuple[str, str], dict[str, float]], dict[str, Pedido]]:
         clean_pedido_id = str(pedido_id or "").strip()
         if not clean_pedido_id:
@@ -322,6 +321,16 @@ class OrderQueryService:
             by_pedido = ordered_by_article_pedido.setdefault(articulo_id, {})
             by_pedido[row_pedido_id] = by_pedido.get(row_pedido_id, 0.0) + float(getattr(row, "articulo_cantidad", 0.0) or 0.0)
 
+        from app.models import PedidoFaltante, PedidoIncidencia
+        cancelled: dict[tuple[str, str], float] = {}
+        for shortage, incident, line in session.exec(
+            select(PedidoFaltante, PedidoIncidencia, AlbaranItem)
+            .join(PedidoIncidencia, PedidoIncidencia.incidencia_id == PedidoFaltante.incidencia_id)
+            .join(AlbaranItem, AlbaranItem.item_id == PedidoFaltante.albaran_item_id)
+            .where(PedidoFaltante.resolucion == "abono", PedidoIncidencia.pedido_id.in_(pedido_ids))
+        ):
+            key = (incident.pedido_id, line.articulo_id)
+            cancelled[key] = cancelled.get(key, 0.0) + shortage.cantidad_documentada - shortage.cantidad_recibida
         stats: dict[tuple[str, str], dict[str, float]] = {}
         open_by_article: dict[str, list[dict[str, float | str]]] = {}
         pedido_order = {pid: idx for idx, pid in enumerate(pedido_ids)}
@@ -331,7 +340,10 @@ class OrderQueryService:
                 if ordered_qty <= 1e-9:
                     continue
                 stats[(row_pedido_id, articulo_id)] = {"ordered": ordered_qty, "received": 0.0}
-                open_by_article.setdefault(articulo_id, []).append({"pedido_id": row_pedido_id, "remaining": ordered_qty})
+                cancelled_qty = cancelled.get((row_pedido_id, articulo_id), 0.0)
+                if cancelled_qty:
+                    stats[(row_pedido_id, articulo_id)]["cancelled"] = cancelled_qty
+                open_by_article.setdefault(articulo_id, []).append({"pedido_id": row_pedido_id, "remaining": max(0.0, ordered_qty - cancelled_qty)})
 
         albaran_rows = list(
             session.exec(
@@ -354,6 +366,9 @@ class OrderQueryService:
         albaran_rows.sort(key=lambda pair: pair[0].item_id not in assignments and pair[0].item_id not in reviews)
         for albaran_item, _albaran in albaran_rows:
             articulo_id = str(getattr(albaran_item, "articulo_id", "") or "").strip()
+            allocated: dict[str, float] = {}
+            if receipt_allocations is not None:
+                receipt_allocations[albaran_item.item_id] = allocated
             review = reviews.get(albaran_item.item_id)
             if review is not None:
                 if review.estado != "pendiente" and review.huella == receipt_fingerprint(albaran_item):
@@ -363,17 +378,17 @@ class OrderQueryService:
                                     and pedido_by_id[split.pedido_id].pedido_fecha <= albaran_item.albaran_fecha):
                                 applied = min(float(target["remaining"]), split.cantidad)
                                 stats[(split.pedido_id, articulo_id)]["received"] += applied
+                                allocated[split.pedido_id] = applied
                                 target["remaining"] = float(target["remaining"]) - applied
                                 break
                 continue  # Deferred units and excess must never fall through to FIFO.
             source_pedido_id = str(getattr(albaran_item, "pedido_id", "") or "").strip()
             source_pedido_id = assignments.get(albaran_item.item_id, source_pedido_id)
-            cantidad = float(getattr(albaran_item, "articulo_cantidad", 0.0) or 0.0)
+            cantidad = albaran_item.cantidad_operativa
             if not articulo_id or cantidad <= 1e-9:
                 continue
             pending_queue = open_by_article.get(articulo_id, [])
             remaining = cantidad
-            allocated: dict[str, float] = {}
             if (source_pedido_id in pedido_by_id and pending_queue
                     and pedido_by_id[source_pedido_id].pedido_fecha <= albaran_item.albaran_fecha):
                 own_index = next(
@@ -436,7 +451,7 @@ class OrderQueryService:
         pending_article_ids = {
             articulo_id
             for (row_pedido_id, articulo_id), values in stats.items()
-            if row_pedido_id == clean_pedido_id and float((values.get("ordered", 0.0) or 0.0) - (values.get("received", 0.0) or 0.0)) > 1e-9
+            if row_pedido_id == clean_pedido_id and float((values.get("ordered", 0.0) or 0.0) - (values.get("received", 0.0) or 0.0) - values.get("cancelled", 0.0)) > 1e-9
         }
         received_by_article = {
             articulo_id: float(values.get("received", 0.0) or 0.0)
@@ -543,7 +558,7 @@ class OrderQueryService:
                     continue
                 ordered = float(values.get("ordered", 0.0) or 0.0)
                 received = float(values.get("received", 0.0) or 0.0)
-                pending = ordered - received
+                pending = ordered - received - values.get("cancelled", 0.0)
                 if pending <= 1e-9:
                     continue
                 pedido_row = pedido_by_id.get(row_pedido_id)

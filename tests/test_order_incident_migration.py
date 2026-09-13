@@ -62,3 +62,19 @@ def test_migration_normalizes_previous_fractional_affected_units(tmp_path: Path,
             "SELECT incidencia_id, unidades_afectadas FROM pedidos_incidencias ORDER BY incidencia_id"
         ).fetchall()
     assert rows == [("i-1", 1.0), ("i-2", 3.0)]
+
+
+def test_shortage_schema_upgrade_preserves_original_quantities(tmp_path, monkeypatch):
+    from app.models import PedidoFaltante, PedidoFaltanteMovimiento
+    test_engine = create_engine(f"sqlite:///{tmp_path / 'legacy-delivery.db'}")
+    with test_engine.begin() as connection:
+        connection.exec_driver_sql("CREATE TABLE albaranes_items (item_id TEXT PRIMARY KEY, articulo_id TEXT, articulo_codigo TEXT, articulo_cantidad REAL)")
+        connection.exec_driver_sql("INSERT INTO albaranes_items VALUES ('line', 'product', 'D1203041', 24)")
+        connection.exec_driver_sql("CREATE TABLE productos_ireks (articulo_id TEXT, articulo_referencia TEXT, articulo_referencia_corta TEXT)")
+    monkeypatch.setattr(database, "engine", test_engine)
+    database._migrate_albaranes_items_schema()
+    database._migrate_albaranes_items_schema()
+    PedidoFaltante.__table__.create(test_engine)
+    PedidoFaltanteMovimiento.__table__.create(test_engine)
+    with test_engine.connect() as connection:
+        assert connection.exec_driver_sql("SELECT articulo_cantidad, cantidad_recibida_confirmada FROM albaranes_items").one() == (24, None)

@@ -627,8 +627,13 @@ class AlbaranItem(SQLModel, table=True):
     articulo_codigo: str = Field(default="", nullable=False, max_length=100, index=True)
     articulo_id: str = Field(default="", nullable=False, max_length=36, index=True)
     articulo_cantidad: float = Field(default=0.0, nullable=False)
+    cantidad_recibida_confirmada: Optional[float] = Field(default=None, nullable=True)
     articulo_lote: str = Field(default="", max_length=100, index=True)
     articulo_caducidad: Optional[date] = Field(default=None, nullable=True, index=True)
+
+    @property
+    def cantidad_operativa(self) -> float:
+        return self.articulo_cantidad if self.cantidad_recibida_confirmada is None else self.cantidad_recibida_confirmada
 
 
 class PedidoRecepcionAsignacion(SQLModel, table=True):
@@ -679,6 +684,30 @@ class PedidoIncidencia(SQLModel, table=True):
     fecha_incidencia: date = Field(default_factory=date.today, nullable=False, index=True)
     creado_en: datetime = Field(default_factory=datetime.utcnow, nullable=False, index=True)
     actualizado_en: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+
+
+class PedidoFaltante(SQLModel, table=True):
+    """Receipt shortage evidence and lifecycle; source delivery quantities stay intact."""
+
+    __tablename__: ClassVar[str] = "pedidos_faltantes"
+
+    incidencia_id: str = Field(foreign_key="pedidos_incidencias.incidencia_id", primary_key=True)
+    albaran_item_id: str = Field(foreign_key="albaranes_items.item_id", unique=True, index=True)
+    cantidad_documentada: float
+    cantidad_recibida: float
+    huella: str
+    estado: str = Field(default="pendiente")
+    confirmado: bool = Field(default=False)
+    resolucion: str = Field(default="")
+    referencia: str = Field(default="")
+    reposicion_item_id: str = Field(default="")
+    historial: str = Field(default="[]")
+
+
+class PedidoFaltanteMovimiento(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "pedidos_faltantes_movimientos"
+    movimiento_id: int = Field(foreign_key="almacen_movimientos.id", primary_key=True)
+    incidencia_id: str = Field(foreign_key="pedidos_faltantes.incidencia_id", index=True)
 
 
 class PedidoIncidenciaImagen(SQLModel, table=True):

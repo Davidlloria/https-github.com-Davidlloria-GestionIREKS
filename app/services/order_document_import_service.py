@@ -439,6 +439,11 @@ class OrderDocumentImportService:
         if len({self.parse_required_date(p["albaran_fecha"], "albaran_fecha") for p in mapped_rows}) > 1:
             raise ValueError("El archivo contiene más de una fecha de albarán.")
         for item, values in changes:
+            from app.models import PedidoFaltante
+            if session.exec(select(PedidoFaltante).where(
+                    (PedidoFaltante.albaran_item_id == item.item_id) |
+                    (PedidoFaltante.reposicion_item_id == item.item_id))).first():
+                raise ValueError("La línea tiene un faltante o una reposición vinculada. Se conserva el documento original.")
             track_receipt(session, item)
             review = session.get(PedidoRecepcionRevision, item.item_id)
             review.version += 1
@@ -987,6 +992,9 @@ class OrderDocumentImportService:
         return OrderDocumentParser.parse_decimal_es(value, default)
 
     def _delete_albaran_item_movements(self, session: Session, item: AlbaranItem) -> None:
+        from app.models import PedidoFaltante
+        if session.exec(select(PedidoFaltante).where(PedidoFaltante.reposicion_item_id == item.item_id)).first():
+            raise ValueError("La recepción está vinculada a la reposición de un faltante y debe conservarse.")
         item_id = str(getattr(item, "item_id", "") or "").strip()
         seen_ids: set[int] = set()
         if item_id:

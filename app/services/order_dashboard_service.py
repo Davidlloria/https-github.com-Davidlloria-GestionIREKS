@@ -105,6 +105,11 @@ class OrderDashboardService:
             )
 
         with Session(engine) as session:
+            from app.models import PedidoFaltante, PedidoIncidencia
+            shortages = list(session.exec(select(PedidoFaltante, PedidoIncidencia, AlbaranItem)
+                .join(PedidoIncidencia, PedidoIncidencia.incidencia_id == PedidoFaltante.incidencia_id)
+                .join(AlbaranItem, AlbaranItem.item_id == PedidoFaltante.albaran_item_id)
+                .where(PedidoIncidencia.pedido_id.in_(pedido_ids))))
             clients = list(session.exec(select(Cliente)))
             distributors = list(session.exec(select(Distribuidor)))
             albaran_items = list(
@@ -170,7 +175,7 @@ class OrderDashboardService:
         for row in albaran_items:
             pedido_id = str(getattr(row, "pedido_id", "") or "").strip()
             articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
-            qty = float(getattr(row, "articulo_cantidad", 0.0) or 0.0)
+            qty = row.cantidad_operativa
             received_by_id[pedido_id] += qty * weights.get(articulo_id, 0.0)
             received_date = self.order_query_service.parse_date(getattr(row, "albaran_fecha", None))
             current = last_receipt_by_id.get(pedido_id)
@@ -202,6 +207,15 @@ class OrderDashboardService:
             if estado == "exceso" or qty_pending < -1e-9:
                 incident_by_id[pedido_id] += abs(qty_pending) * weight if weight > 0 else abs(qty_pending)
 
+        cancelled_by_id: dict[str, float] = defaultdict(float)
+        open_shortage_orders = set()
+        for shortage, incident, line in shortages:
+            kg = (shortage.cantidad_documentada - shortage.cantidad_recibida) * weights.get(line.articulo_id, 0.0)
+            if shortage.resolucion == "abono":
+                cancelled_by_id[incident.pedido_id] += kg
+            if shortage.estado != "resuelta":
+                open_shortage_orders.add(incident.pedido_id)
+                incident_by_id[incident.pedido_id] += kg
         rows: list[DashboardOrderRow] = []
         for pedido in pedidos:
             pedido_id = str(getattr(pedido, "pedido_id", "") or "").strip()
@@ -211,8 +225,8 @@ class OrderDashboardService:
             pending_kg = float(pending_by_id.get(pedido_id, 0.0))
             incident_kg = float(incident_by_id.get(pedido_id, 0.0))
             if pending_kg <= 1e-9 and ordered_kg > received_kg and received_kg > 0:
-                pending_kg = max(ordered_kg - received_kg, 0.0)
-            if incident_kg > 1e-9:
+                pending_kg = max(ordered_kg - received_kg - cancelled_by_id[pedido_id], 0.0)
+            if incident_kg > 1e-9 or pedido_id in open_shortage_orders:
                 status = "incidencia"
             elif pending_kg <= 1e-9 and received_kg > 1e-9:
                 status = "completado"

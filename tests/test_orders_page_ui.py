@@ -300,11 +300,14 @@ def test_incidencias_tab_exposes_received_article_fields_and_actions(monkeypatch
         "Descripción",
         "Lote",
         "Albarán",
+        "Uds. afectadas",
+        "Estado",
     ]
     assert not hasattr(page, "incident_article_filter")
     assert not hasattr(page, "incident_observations")
     assert not hasattr(page, "incident_images_list")
     assert page.new_incident_btn.text() == "Nueva"
+    assert page.new_shortage_btn.text() == "Registrar faltante"
     assert page.edit_incident_btn.text() == "Editar"
     assert page.delete_incident_btn.text() == "Eliminar"
     assert page.incidents_table.contextMenuPolicy().name == "CustomContextMenu"

@@ -1819,6 +1819,8 @@ def _migrate_albaranes_items_schema() -> None:
             conn.exec_driver_sql("ALTER TABLE albaranes_items ADD COLUMN articulo_codigo TEXT NOT NULL DEFAULT ''")
         if "articulo_cantidad" not in columns:
             conn.exec_driver_sql("ALTER TABLE albaranes_items ADD COLUMN articulo_cantidad REAL NOT NULL DEFAULT 0")
+        if "cantidad_recibida_confirmada" not in columns:
+            conn.exec_driver_sql("ALTER TABLE albaranes_items ADD COLUMN cantidad_recibida_confirmada REAL")
         conn.exec_driver_sql(
             """
             UPDATE albaranes_items

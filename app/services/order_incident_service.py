@@ -11,7 +11,7 @@ from sqlmodel import Session, select
 
 from app.core.config import DATA_DIR, PEDIDO_INCIDENCIAS_DIR
 from app.core.database import engine
-from app.models import AlbaranItem, IngredienteIreks, PedidoIncidencia, PedidoIncidenciaImagen
+from app.models import AlbaranItem, IngredienteIreks, PedidoIncidencia, PedidoIncidenciaImagen, PedidoFaltante
 
 
 ALLOWED_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
@@ -148,6 +148,8 @@ class OrderIncidentService:
     ) -> None:
         with Session(engine) as session:
             row = self._get_incident(session, incidencia_id)
+            if session.get(PedidoFaltante, incidencia_id) and int(unidades_afectadas) != row.unidades_afectadas:
+                raise ValueError("Las cantidades de un faltante se conservan. Usa su seguimiento para resolver un error de recuento.")
             item = session.get(AlbaranItem, row.albaran_item_id)
             if item is None:
                 raise ValueError("El artículo recibido de la incidencia ya no existe.")
@@ -171,6 +173,8 @@ class OrderIncidentService:
         clean_id = str(incidencia_id or "").strip()
         with Session(engine) as session:
             row = self._get_incident(session, clean_id)
+            if session.get(PedidoFaltante, clean_id):
+                raise ValueError("Los faltantes conservan su historial. Resuelve la incidencia en lugar de eliminarla.")
             images = list(
                 session.exec(select(PedidoIncidenciaImagen).where(PedidoIncidenciaImagen.incidencia_id == clean_id))
             )
@@ -199,12 +203,18 @@ class OrderIncidentService:
             )
 
     def add_image(self, incidencia_id: str, source_path: Path) -> PedidoIncidenciaImagen:
+        return self._add_attachment(incidencia_id, source_path, allow_pdf=False)
+
+    def add_attachment(self, incidencia_id: str, source_path: Path) -> PedidoIncidenciaImagen:
+        return self._add_attachment(incidencia_id, source_path, allow_pdf=True)
+
+    def _add_attachment(self, incidencia_id: str, source_path: Path, *, allow_pdf: bool) -> PedidoIncidenciaImagen:
         source = Path(source_path).resolve()
         if not source.is_file():
             raise ValueError("La imagen seleccionada no existe.")
         suffix = source.suffix.lower()
-        if suffix not in ALLOWED_IMAGE_SUFFIXES:
-            raise ValueError("Formato no admitido. Usa JPG, PNG o WEBP.")
+        if suffix not in ALLOWED_IMAGE_SUFFIXES and not (allow_pdf and suffix == ".pdf"):
+            raise ValueError("Formato no admitido. Usa JPG, PNG, WEBP o un adjunto PDF.")
         size = source.stat().st_size
         if size > MAX_IMAGE_BYTES:
             raise ValueError("La imagen supera el límite de 10 MB.")
@@ -239,6 +249,9 @@ class OrderIncidentService:
             row = session.get(PedidoIncidenciaImagen, clean_id)
             if row is None:
                 raise ValueError("Imagen no encontrada.")
+            shortage = session.get(PedidoFaltante, row.incidencia_id)
+            if shortage and (shortage.confirmado or shortage.estado == "resuelta"):
+                raise ValueError("Los justificantes de un faltante confirmado o resuelto se conservan.")
             path = self.resolve_image_path(row.ruta_relativa)
             session.delete(row)
             session.commit()

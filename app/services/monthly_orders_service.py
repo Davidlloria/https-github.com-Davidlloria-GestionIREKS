@@ -5,7 +5,7 @@ from typing import Any
 from sqlmodel import Session, select
 
 from app.core.database import engine
-from app.models import AlmacenMovimiento, IngredienteIreks, Pedido, PedidoItem
+from app.models import AlmacenMovimiento, IngredienteIreks, Pedido, PedidoItem, PedidoFaltanteMovimiento
 
 
 @dataclass
@@ -318,7 +318,8 @@ class MonthlyOrdersService:
         date_from: date | None = None,
         date_to: date | None = None,
     ) -> list[AlmacenMovimiento]:
-        stmt = select(AlmacenMovimiento).where(AlmacenMovimiento.cantidad > 0)
+        stmt = select(AlmacenMovimiento).where((AlmacenMovimiento.cantidad > 0) |
+            AlmacenMovimiento.id.in_(select(PedidoFaltanteMovimiento.movimiento_id)))
         target_articulo_id = str(articulo_id or "").strip()
         target_almacen_id = str(almacen_id or "").strip()
         if target_articulo_id:
