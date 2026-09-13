@@ -1886,6 +1886,7 @@ class OrdersPage(QWidget):
         self.new_incident_btn.setProperty("btnRole", "success")
         self.new_incident_btn.clicked.connect(self._new_incident)
         self.new_shortage_btn = QPushButton("Registrar faltante")
+        self.new_shortage_btn.setProperty("btnRole", "primary")
         self.new_shortage_btn.clicked.connect(lambda: self._new_shortage())
         self.edit_incident_btn = QPushButton("Editar")
         self.edit_incident_btn.setProperty("btnRole", "warning")
