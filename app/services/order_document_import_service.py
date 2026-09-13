@@ -289,7 +289,7 @@ class OrderDocumentImportService:
                 qty_from_file = self.parse_float(qty_raw, default=0.0) if str(qty_raw or "").strip() else 0.0
                 kilos_from_file = self.parse_float(kilos_raw, default=0.0) if str(kilos_raw or "").strip() else 0.0
 
-                article = self.find_article_by_code(session, articulo_codigo)
+                article = self.find_article_by_code(session, articulo_codigo, pedido_id=pedido_id)
                 articulo_id = str(getattr(article, "articulo_id", "") or "").strip() if article else ""
 
                 if albaran_header is None:
@@ -422,7 +422,7 @@ class OrderDocumentImportService:
             if str(payload["albaran_numero"]).strip() != header.albaran_numero:
                 raise ValueError("El archivo contiene más de un albarán.")
             code = str(payload["articulo_codigo"]).strip()
-            article = self.find_article_by_code(session, code)
+            article = self.find_article_by_code(session, code, pedido_id=pedido_id)
             quantity = self.parse_float(payload.get("articulo_cantidad"), 0)
             weight = float(getattr(article, "articulo_envase_peso_total", 0) or 0)
             if quantity <= 0 and weight > 0:
@@ -522,7 +522,7 @@ class OrderDocumentImportService:
                 factura_fecha = self.parse_required_date(payload.get("factura_fecha"), "factura_fecha")
                 albaran_numero = str(payload.get("albaran_numero") or "").strip()
                 factura_referencia = str(payload.get("factura_referencia") or "").strip()
-                article = self.find_article_by_code(session, articulo_codigo)
+                article = self.find_article_by_code(session, articulo_codigo, pedido_id=pedido_id)
                 articulo_id = str(getattr(article, "articulo_id", "") or "").strip() if article else ""
 
                 if factura_header is None:
@@ -671,7 +671,7 @@ class OrderDocumentImportService:
             article = session.get(IngredienteIreks, current_articulo_id) if current_articulo_id else None
             if article is None:
                 codigo = str(getattr(albaran_item, "articulo_codigo", "") or "").strip()
-                article = self.find_article_by_code(session, codigo)
+                article = self.find_article_by_code(session, codigo, pedido_id=pedido_id)
                 current_articulo_id = str(getattr(article, "articulo_id", "") or "").strip() if article else ""
                 if not current_articulo_id:
                     continue
@@ -721,7 +721,7 @@ class OrderDocumentImportService:
             codigo = str(getattr(albaran_item, "articulo_codigo", "") or "").strip()
             if not codigo:
                 raise ValueError("El item no tiene codigo de articulo para refrescar.")
-            article = self.find_article_by_code(session, codigo)
+            article = self.find_article_by_code(session, codigo, pedido_id=albaran_item.pedido_id)
             if article is None:
                 raise ValueError(f"El codigo sigue sin existir en productos: {codigo}")
             articulo_id = str(getattr(article, "articulo_id", "") or "").strip()
@@ -912,16 +912,32 @@ class OrderDocumentImportService:
             )
         session.commit()
 
-    def find_article_by_code(self, session: Session, codigo: str) -> IngredienteIreks | None:
+    def find_article_by_code(self, session: Session, codigo: str, *,
+                             pedido_id: str = "") -> IngredienteIreks | None:
         candidates = OrderDocumentParser.article_code_candidates(codigo)
         if not candidates:
             return None
-        return session.exec(
+        matches = list(session.exec(
             select(IngredienteIreks).where(
                 cast(Any, IngredienteIreks.articulo_referencia).in_(candidates)
                 | cast(Any, IngredienteIreks.articulo_referencia_corta).in_(candidates)
             )
-        ).first()
+        ))
+        if not matches:
+            return None
+        if pedido_id:
+            ordered_ids = set(session.exec(select(PedidoItem.articulo_id).where(
+                PedidoItem.pedido_id == pedido_id)))
+            ordered = [row for row in matches if row.articulo_id in ordered_ids]
+            if len(ordered) == 1:
+                return ordered[0]
+            if ordered:
+                raise ValueError(f"El codigo {codigo} corresponde a varios productos del pedido. Revisa sus fichas.")
+        active = [row for row in matches if row.articulo_status_activo]
+        eligible = active or matches
+        if len(eligible) == 1:
+            return eligible[0]
+        raise ValueError(f"El codigo {codigo} corresponde a varios productos. Revisa sus fichas antes de importar.")
 
     def resolve_factura_price(
         self,
