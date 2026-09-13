@@ -3603,6 +3603,7 @@ class RecipesPage(QWidget):
         dialog = CustomerRecipeSelectionDialog(self.recipe_service, self)
         if not dialog.exec() or not dialog.selected_customer_id:
             return
+        self._load_customers()
         self._new_recipe(cliente_id=dialog.selected_customer_id)
 
     def _open_document_recipe_search(self) -> None:
