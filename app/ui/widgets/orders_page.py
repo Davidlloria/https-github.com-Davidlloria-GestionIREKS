@@ -1833,14 +1833,17 @@ class OrdersPage(QWidget):
         albaran_items_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         albaran_items_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         albaran_items_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        self.albaran_items_table.setHorizontalHeaderLabels(["Cod.", "Nº albarán", "Nombre", "Uds. albarán", "Kg albarán", "Lote", "Recibidas"])
-        for column, width in ((5, 110), (6, 90)):
+        self.albaran_items_table.setHorizontalHeaderLabels(["Cod.", "Nº albarán", "Nombre", "Uds.", "Kg", "Lote", "Recib."])
+        for column, width in ((5, 90), (6, 75)):
             albaran_items_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
             self.albaran_items_table.setColumnWidth(column, width)
-        self.albaran_items_table.setColumnWidth(0, 95)
-        self.albaran_items_table.setColumnWidth(1, 120)
-        self.albaran_items_table.setColumnWidth(3, 90)
-        self.albaran_items_table.setColumnWidth(4, 100)
+        self.albaran_items_table.setColumnWidth(0, 85)
+        self.albaran_items_table.setColumnWidth(1, 105)
+        self.albaran_items_table.setColumnWidth(3, 65)
+        self.albaran_items_table.setColumnWidth(4, 85)
+        self.albaran_items_table.horizontalHeaderItem(6).setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.albaran_items_table.setWordWrap(False)
+        self.albaran_items_table.setTextElideMode(Qt.TextElideMode.ElideRight)
         self.albaran_items_table.setSortingEnabled(True)
         albaran_tab_layout.addWidget(self.albaran_items_table, 1)
         self.albaran_items_totals_table = QTableWidget(1, 7)
@@ -1858,11 +1861,11 @@ class OrdersPage(QWidget):
         albaran_totals_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         albaran_totals_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         self.albaran_items_totals_table.setFixedHeight(30)
-        self.albaran_items_totals_table.setColumnWidth(0, 95)
-        self.albaran_items_totals_table.setColumnWidth(1, 120)
-        self.albaran_items_totals_table.setColumnWidth(3, 90)
-        self.albaran_items_totals_table.setColumnWidth(4, 100)
-        for column, width in ((5, 110), (6, 90)):
+        self.albaran_items_totals_table.setColumnWidth(0, 85)
+        self.albaran_items_totals_table.setColumnWidth(1, 105)
+        self.albaran_items_totals_table.setColumnWidth(3, 65)
+        self.albaran_items_totals_table.setColumnWidth(4, 85)
+        for column, width in ((5, 90), (6, 75)):
             albaran_totals_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
             self.albaran_items_totals_table.setColumnWidth(column, width)
         albaran_tab_layout.addWidget(self.albaran_items_totals_table)
@@ -2504,8 +2507,10 @@ class OrdersPage(QWidget):
                     cell.setForeground(QBrush(QColor("#c62828")))
                 if str(getattr(item, "articulo_id", "") or "").strip() in excess_article_ids:
                     cell.setForeground(QBrush(QColor("#2e7d32")))
-                if col_idx in (3, 4):
+                if col_idx in (3, 4, 6):
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if col_idx == 2:
+                    cell.setToolTip(nombre)
                 self.albaran_items_table.setItem(row_idx, col_idx, cell)
         self.albaran_items_table.setSortingEnabled(was_sorting)
         if was_sorting:
@@ -3261,7 +3266,7 @@ class OrdersPage(QWidget):
             else:
                 cell = QTableWidgetItem(value)
             cell.setFlags(Qt.ItemFlag.ItemIsEnabled)
-            if col_idx in (3, 4):
+            if col_idx in (3, 4, 6):
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             font = cell.font()
             font.setBold(True)
