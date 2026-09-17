@@ -670,14 +670,14 @@ def test_order_context_menu_mirrors_ribbon_and_uses_clicked_sorted_row(monkeypat
     page._select_by_id("clear")
     clear_pos = page.table.visualItemRect(page.table.item(page.table.currentRow(), 0)).center()
     page._select_by_id("pending")
-    def disabled(menu, pos):
+    def confirmed(menu, pos):
         action = menu.actions()[-1]
-        assert action.text() == "Asignar recepciones" and not action.isEnabled()
+        assert action.text() == "Asignar recepciones" and action.isEnabled()
         assert page._selected_id() == "clear"
         return action
-    monkeypatch.setattr(orders_page_module, "_exec_context_menu", disabled)
+    monkeypatch.setattr(orders_page_module, "_exec_context_menu", confirmed)
     page._show_orders_context_menu(clear_pos)
-    assert opened == ["pending"]
+    assert opened == ["pending", "clear"]
     from PySide6.QtCore import QPoint
     monkeypatch.setattr(orders_page_module, "_exec_context_menu", lambda *args: (_ for _ in ()).throw(AssertionError("Empty area")))
     page._show_orders_context_menu(QPoint(-1, -1))

@@ -112,9 +112,18 @@ class OrderDashboardService:
                 .where(PedidoIncidencia.pedido_id.in_(pedido_ids))))
             clients = list(session.exec(select(Cliente)))
             distributors = list(session.exec(select(Distribuidor)))
+            receipt_allocations: dict[str, dict[str, float]] = {}
+            visited_warehouses: set[str] = set()
+            for order in pedidos:
+                if order.almacen_id in visited_warehouses:
+                    continue
+                visited_warehouses.add(order.almacen_id)
+                self.order_query_service._build_operational_assignment(
+                    session, order.pedido_id, receipt_allocations=receipt_allocations,
+                )
             albaran_items = list(
                 session.exec(
-                    select(AlbaranItem).where(cast(Any, AlbaranItem.pedido_id).in_(pedido_ids))
+                    select(AlbaranItem).where(cast(Any, AlbaranItem.item_id).in_(list(receipt_allocations)))
                 )
             )
             pedido_items = list(
@@ -173,14 +182,15 @@ class OrderDashboardService:
                 ordered_by_article[articulo_id] += ordered_kg
 
         for row in albaran_items:
-            pedido_id = str(getattr(row, "pedido_id", "") or "").strip()
             articulo_id = str(getattr(row, "articulo_id", "") or "").strip()
-            qty = row.cantidad_operativa
-            received_by_id[pedido_id] += qty * weights.get(articulo_id, 0.0)
             received_date = self.order_query_service.parse_date(getattr(row, "albaran_fecha", None))
-            current = last_receipt_by_id.get(pedido_id)
-            if current is None or received_date > current:
-                last_receipt_by_id[pedido_id] = received_date
+            for pedido_id, qty in receipt_allocations.get(row.item_id, {}).items():
+                if pedido_id not in pedidos_by_id or qty <= 1e-9:
+                    continue
+                received_by_id[pedido_id] += qty * weights.get(articulo_id, 0.0)
+                current = last_receipt_by_id.get(pedido_id)
+                if current is None or received_date > current:
+                    last_receipt_by_id[pedido_id] = received_date
 
         for row in pendientes:
             pedido_id = str(getattr(row, "pedido_id", "") or "").strip()

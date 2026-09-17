@@ -347,6 +347,39 @@ def test_ambiguous_receipt_is_deferred_then_split_and_can_be_corrected(receipt_e
     assert len(service.list_reviews(pending_only=False)[0].history) == 2
 
 
+@pytest.mark.parametrize("source_year", [2025, 2026])
+def test_dashboard_uses_confirmed_destinations_and_receipt_dates(receipt_engine, monkeypatch, source_year):
+    import app.services.order_dashboard_service as dashboard_module
+    from app.services.order_receipt_assignment_service import ReceiptAssignmentService
+    monkeypatch.setattr(dashboard_module, "engine", receipt_engine)
+    _receipt_scenario(receipt_engine, (6, 6))
+    with Session(receipt_engine) as session:
+        source = session.get(Pedido, "p0")
+        source.pedido_fecha = date(source_year, 8, 1)
+        session.add(source)
+        session.commit()
+    dashboard = dashboard_module.OrderDashboardService()
+    pending = {r.pedido_id: r for r in dashboard.load_snapshot(year=2026).recent_orders}
+    assert all(r.received_kg == 0 and r.last_receipt is None for r in pending.values())
+    service = ReceiptAssignmentService()
+    service.confirm(service.list_reviews()[0], {"p1": 6}, 0)
+    rows = {r.pedido_id: r for r in dashboard.load_snapshot(year=2026).recent_orders}
+    assert rows["p1"].received_kg == 60
+    assert rows["p1"].pending_kg == 0
+    assert rows["p1"].status == "completado"
+    assert rows["p1"].last_receipt == date(2026, 9, 1)
+    if source_year == 2026:
+        assert rows["p0"].received_kg == 0
+        assert rows["p0"].last_receipt is None
+    service.confirm(service.list_reviews(pending_only=False)[0], {"p0": 2, "p1": 3}, 1)
+    snapshot = dashboard.load_snapshot(year=2026)
+    rows = {r.pedido_id: r for r in snapshot.recent_orders}
+    assert rows["p1"].received_kg == 30
+    assert rows["p1"].pending_kg == 30
+    assert rows["p1"].status == "parcial"
+    assert snapshot.received_kg == (50 if source_year == 2026 else 30)
+
+
 def test_unique_receipt_is_automatic_but_excess_requires_confirmation(receipt_engine):
     from app.services.order_receipt_assignment_service import ReceiptAssignmentService, automate_receipts
     article = _receipt_scenario(receipt_engine, (6,))

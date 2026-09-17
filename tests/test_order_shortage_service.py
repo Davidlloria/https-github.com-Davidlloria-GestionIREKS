@@ -214,6 +214,65 @@ def test_replacement_links_existing_receipt_without_double_stock(context):
         save_receipt_split(session, item, {}, 6, fingerprint=receipt_fingerprint(item), version=0)
 
 
+def test_shared_replacement_resolves_each_orders_shortage(context):
+    from app.services.order_receipt_assignment_service import track_receipt, sync_receipt_pending
+    db, service, attachments, source = context
+    first = create(context)
+    service.confirm(first)
+    with Session(db) as session:
+        session.add(Pedido(pedido_id="q", pedido_numero="Q", almacen_id="w", pedido_fecha=date(2026, 8, 24)))
+        session.commit()
+        session.add(PedidoItem(pedido_id="q", articulo_id="lemon", articulo_cantidad=6))
+        session.add(Albaran(albaran_id="qa", pedido_id="q", almacen_id="w", albaran_numero="QA", albaran_fecha=date(2026, 8, 27)))
+        session.add(AlbaranItem(item_id="qi", pedido_id="q", albaran_id="qa", albaran_numero="QA",
+            articulo_id="lemon", articulo_cantidad=6, articulo_lote="q", albaran_fecha=date(2026, 8, 27)))
+        session.add(AlmacenMovimiento(almacen_id="w", articulo_id="lemon", pedido_numero="Q",
+            pedido_albaran_numero="QA", cantidad=6, articulo_lote="q", albaran_item_id="qi", fecha_pedido=date(2026, 8, 27)))
+        session.commit()
+    second = service.create(pedido_id="q", item_id="qi", received=0,
+        observations="Recuento", incident_date=date(2026, 9, 9))
+    attachments.add_attachment(second, source)
+    service.confirm(second)
+    with Session(db) as session:
+        session.add(Albaran(albaran_id="ra", pedido_id="p", almacen_id="w", albaran_numero="RA", albaran_fecha=date(2026, 9, 12)))
+        item = AlbaranItem(item_id="ri", pedido_id="p", albaran_id="ra", albaran_numero="RA",
+            articulo_id="lemon", articulo_cantidad=12.0, albaran_fecha=date(2026, 9, 12))
+        session.add(item)
+        session.add(AlmacenMovimiento(almacen_id="w", articulo_id="lemon", cantidad=12,
+            albaran_item_id="ri", fecha_pedido=date(2026, 9, 12)))
+        session.flush()
+        track_receipt(session, item)
+        save_receipt_split(session, item, {"p": 6, "q": 6}, 0, fingerprint=receipt_fingerprint(item), version=0)
+        sync_receipt_pending(session, "p")
+        session.commit()
+        stock_before = sum(m.cantidad for m in session.exec(select(AlmacenMovimiento)))
+    service.resolve(first, "reposicion", "Reposición P", "ri")
+    service.resolve(second, "reposicion", "Reposición Q", "ri")
+    for pid, key in (("p", first), ("q", second)):
+        shortage = service.list_for_order(pid)[key]
+        assert shortage.estado == "resuelta" and shortage.reposicion_item_id == "ri"
+    with Session(db) as session:
+        assert sum(m.cantidad for m in session.exec(select(AlmacenMovimiento))) == stock_before
+        assert not list(session.exec(select(PedidoPendiente)))
+    with pytest.raises(ValueError, match="resuelta"):
+        service.resolve(second, "reposicion", "Duplicada", "ri")
+
+
+def test_replacement_units_cannot_resolve_two_shortages_in_same_order(context):
+    _, service, attachments, source = context
+    first = create(context)
+    service.confirm(first)
+    second = service.create(pedido_id="p", item_id="first", received=0,
+        observations="Falta el otro lote", incident_date=date(2026, 9, 9))
+    attachments.add_attachment(second, source)
+    service.confirm(second)
+    add_replacement(context[0])
+    service.resolve(first, "reposicion", "Reposición", "replacement")
+    with pytest.raises(ValueError, match="suficientes unidades"):
+        service.resolve(second, "reposicion", "Mismas unidades", "replacement")
+    assert service.list_for_order("p")[second].estado == "confirmado"
+
+
 def test_credit_rejected_if_replacement_already_received(context):
     db, service, _, _ = context
     key = create(context)

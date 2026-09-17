@@ -3883,7 +3883,6 @@ class OrdersPage(QWidget):
             actions[action] = button
         menu.addSeparator()
         assign_action = menu.addAction("Asignar recepciones")
-        assign_action.setEnabled(self.receipt_assignment_service.pending_count(pedido_id=selected.pedido_id) > 0)
         chosen = _exec_context_menu(menu, self.table.viewport().mapToGlobal(pos))
         if chosen == assign_action and assign_action.isEnabled():
             self._review_receipts(selected.pedido_id)

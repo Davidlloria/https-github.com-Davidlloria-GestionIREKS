@@ -226,7 +226,9 @@ class OrderShortageService:
                         or replacement.albaran_fecha < incident.fecha_incidencia):
                     raise ValueError("Selecciona una recepción posterior del mismo producto y almacén.")
                 already_linked = sum(s.cantidad_documentada - s.cantidad_recibida for s in session.exec(
-                    select(PedidoFaltante).where(PedidoFaltante.reposicion_item_id == replacement_id)))
+                    select(PedidoFaltante).join(PedidoIncidencia)
+                    .where(PedidoFaltante.reposicion_item_id == replacement_id,
+                           PedidoIncidencia.pedido_id == incident.pedido_id)))
                 allocated = self._allocations(session, replacement).get(incident.pedido_id, 0)
                 if allocated - already_linked < missing - 1e-6:
                     raise ValueError("La reposición no tiene suficientes unidades asignadas a este pedido y disponibles para vincular.")
