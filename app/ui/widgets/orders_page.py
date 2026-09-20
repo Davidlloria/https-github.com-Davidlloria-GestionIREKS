@@ -2615,7 +2615,7 @@ class OrdersPage(QWidget):
         if incident_id:
             self._edit_incident()
 
-    def _new_incident(self) -> None:
+    def _new_incident(self, item_id: str = "") -> None:
         selected = self._selected_row()
         if selected is None:
             QMessageBox.warning(self, "Incidencias", "Selecciona un pedido.")
@@ -2629,6 +2629,10 @@ class OrdersPage(QWidget):
             articles=articles,
             parent=self,
         )
+        if isinstance(item_id, str) and item_id:
+            target_index = dialog.article_selector.findData(item_id)
+            if target_index >= 0:
+                dialog.article_selector.setCurrentIndex(target_index)
         if dialog.exec() != int(QDialog.DialogCode.Accepted):
             return
         incident_date, affected_units, observations = dialog.incident_values()
@@ -2927,14 +2931,17 @@ class OrdersPage(QWidget):
         refresh_action = menu.addAction("Refrescar")
         refresh_action.setEnabled(self.order_document_import_service.is_albaran_item_pending(albaran_item_id))
         shortage_action = menu.addAction("Registrar faltante de recepción")
+        incident_action = menu.addAction("Registrar otra incidencia")
         delete_action = menu.addAction("Eliminar")
-        chosen = menu.exec(self.albaran_items_table.viewport().mapToGlobal(pos))
+        chosen = _exec_context_menu(menu, self.albaran_items_table.viewport().mapToGlobal(pos))
         if chosen == refresh_action:
             self._refresh_albaran_item_mapping(albaran_item_id)
         elif chosen == delete_action:
             self._delete_albaran_line(albaran_item_id)
         elif chosen == shortage_action:
             self._new_shortage(albaran_item_id)
+        elif chosen == incident_action:
+            self._new_incident(albaran_item_id)
 
     def _refresh_albaran_item_mapping(self, albaran_item_id: str) -> None:
         try:

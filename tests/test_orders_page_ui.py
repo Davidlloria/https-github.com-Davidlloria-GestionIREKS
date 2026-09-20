@@ -342,6 +342,42 @@ def _received_article() -> ReceivedArticleOption:
     )
 
 
+def test_albaran_context_opens_other_incident_with_clicked_article(monkeypatch):
+    from types import SimpleNamespace
+    from PySide6.QtWidgets import QDialog
+
+    _application()
+    monkeypatch.setattr(OrdersPage, "reload", lambda self: None)
+    page = OrdersPage()
+    monkeypatch.setattr(page, "_selected_row", lambda: SimpleNamespace(pedido_id="order"))
+    monkeypatch.setattr(page.order_incident_service, "list_received_articles", lambda _: [_received_article()])
+    monkeypatch.setattr(page.order_document_import_service, "is_albaran_item_pending", lambda _: False)
+    widget = page.albaran_items_table
+    widget.setRowCount(1)
+    cell = QTableWidgetItem("5100")
+    cell.setData(Qt.ItemDataRole.UserRole, "line-1")
+    widget.setItem(0, 0, cell)
+    opened = []
+
+    def choose(menu, pos):
+        actions = {action.text(): action for action in menu.actions()}
+        assert "Registrar faltante de recepción" in actions
+        return actions["Registrar otra incidencia"]
+
+    def inspect(dialog):
+        opened.append(dialog.article_item_id())
+        assert dialog.units_affected.isEnabled()
+        return int(QDialog.DialogCode.Rejected)
+
+    monkeypatch.setattr(orders_page_module, "_exec_context_menu", choose)
+    monkeypatch.setattr(OrderIncidentDialog, "exec", inspect)
+    page._show_albaran_items_context_menu(widget.visualItemRect(cell).center())
+    assert opened == ["line-1"]
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
+
+
 def test_incident_modal_contains_form_image_grid_and_actions() -> None:
     _application()
     dialog = OrderIncidentDialog(service=_IncidentDialogService(), articles=[_received_article()])
