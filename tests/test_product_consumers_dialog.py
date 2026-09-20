@@ -127,3 +127,30 @@ def test_export_action_handles_cancel_success_and_failure(monkeypatch, tmp_path)
     dialog._export("xlsx")
     assert notices == ["ok", "error"]
     dialog.close()
+
+
+def test_selected_row_preserves_contrast_with_application_stylesheet():
+    from pathlib import Path
+    app, dialog = make_dialog()
+    previous_style = app.styleSheet()
+    try:
+        app.setStyleSheet((Path(__file__).resolve().parents[1] / "assets/styles.qss").read_text(encoding="utf-8"))
+        dialog.show()
+        dialog.table.sortItems(0, Qt.SortOrder.DescendingOrder)
+        dialog.table.selectRow(0)
+        app.processEvents()
+        for col, expected in ((1, "#173653"), (6, "#c32939")):
+            rect = dialog.table.visualItemRect(dialog.table.item(0, col))
+            image = dialog.table.viewport().grab(rect).toImage()
+            colours = {image.pixelColor(x, y).name() for x in range(image.width()) for y in range(image.height())}
+            assert expected in colours
+            assert "#dbf3f2" in colours
+        dialog.table.sortItems(6, Qt.SortOrder.DescendingOrder)
+        dialog.table.selectRow(0)
+        app.processEvents()
+        rect = dialog.table.visualItemRect(dialog.table.item(0, 6))
+        image = dialog.table.viewport().grab(rect).toImage()
+        assert "#07804b" in {image.pixelColor(x, y).name() for x in range(image.width()) for y in range(image.height())}
+    finally:
+        dialog.close()
+        app.setStyleSheet(previous_style)

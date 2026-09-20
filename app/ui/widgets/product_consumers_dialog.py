@@ -3,11 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer
-from PySide6.QtGui import QColor, QIcon, QPainter, QPalette, QPolygon
+from PySide6.QtGui import QBrush, QColor, QIcon, QPainter, QPalette, QPolygon
 from PySide6.QtWidgets import (
     QAbstractItemView, QDialog, QFileDialog, QHBoxLayout, QHeaderView,
     QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget, QStyledItemDelegate,
+    QVBoxLayout, QWidget, QStyledItemDelegate, QStyle, QStyleOptionViewItem,
 )
 
 from app.services.product_consumers_export import export_excel, export_pdf, format_value
@@ -21,6 +21,13 @@ class _SelectionDelegate(QStyledItemDelegate):
         super().initStyleOption(option, index)
         brush = index.data(Qt.ItemDataRole.ForegroundRole)
         option.palette.setColor(QPalette.ColorRole.HighlightedText, brush.color() if brush else QColor(NAVY))
+        if option.state & QStyle.StateFlag.State_Selected:
+            # The application stylesheet forces selected text to white. Paint the
+            # selection background here, keeping each cell's normal text colour.
+            option.state &= ~QStyle.StateFlag.State_Selected
+            option.features &= ~QStyleOptionViewItem.ViewItemFeature.Alternate
+            option.backgroundBrush = QBrush(QColor("#DBF3F2"))
+            option.palette.setColor(QPalette.ColorRole.Highlight, QColor("#DBF3F2"))
 
 
 class _SortableItem(QTableWidgetItem):
@@ -96,7 +103,8 @@ class ProductConsumersDialog(QDialog):
             QWidget#hero { background: #173653; border-bottom: 4px solid #1DB8B1; }
             QLabel { background: transparent; }
             QTableWidget { background: white; alternate-background-color: #F3F6F9;
-                color: #173653; border: none; font-size: 13px; }
+                color: #173653; border: none; font-size: 13px;
+                selection-background-color: #DBF3F2; selection-color: #173653; }
             QTableWidget::item { padding: 6px; border: none; }
             QTableWidget::item:selected { background: #DBF3F2; }
             QPushButton { padding: 9px 18px; border-radius: 5px; font-weight: 600;
