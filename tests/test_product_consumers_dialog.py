@@ -78,6 +78,18 @@ def test_export_contains_all_sorted_rows_numeric_values_and_totals(tmp_path):
     assert text.count("Zeta") == 30
     assert "Totales generales" in text
     assert all("2025" in page.get_text() for page in document)
+    for page in document:
+        words = page.get_text("words")
+        kilos = [word for word in words if word[4] == "Kilos"]
+        assert len(kilos) == 3
+        years = [word for word in words if word[4] == "2025" and word[1] < kilos[0][1]]
+        year = max(years, key=lambda word: word[1])
+        width = page.rect.width - 44
+        # ReportLab's frame starts 6 points inside the document margin.
+        assert abs((year[0] + year[2]) / 2 - (28 + width * (.33 + .225 / 2))) < 1
+        assert abs((kilos[0][0] + kilos[0][2]) / 2 - (28 + width * (.33 + .105 / 2))) < 1
+        vertical_lines = [item for drawing in page.get_drawings() for item in drawing["items"] if item[0] == "l" and abs(item[1].x - item[2].x) < .1]
+        assert len(vertical_lines) >= 7
     document.close()
     dialog.close()
 

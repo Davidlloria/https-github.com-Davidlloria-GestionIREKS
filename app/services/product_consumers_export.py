@@ -5,6 +5,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -69,28 +70,45 @@ def export_pdf(path, subtitle, headers, rows, totals):
     title = ParagraphStyle("ConsumersTitle", parent=styles["Heading1"], textColor=colors.HexColor("#" + NAVY), fontSize=17)
     text = ParagraphStyle("ConsumersCell", parent=styles["Normal"], fontSize=7, leading=9)
     heading = ParagraphStyle("ConsumersHeader", parent=text, textColor=colors.white, fontName="Helvetica-Bold")
+    centered_heading = ParagraphStyle("ConsumersNumericHeader", parent=heading, alignment=TA_CENTER)
     # Paragraphs wrap long customer names instead of drawing into numeric cells.
-    data = [[Paragraph(escape(h), heading) for h in headers]]
+    previous_year = headers[2].split("·", 1)[0].strip()
+    current_year = headers[4].split("·", 1)[0].strip()
+    group_labels = [headers[0], headers[1], previous_year, "", current_year, "", "Diferencias", ""]
+    data = [
+        [Paragraph(escape(label), heading if col < 2 else centered_heading) for col, label in enumerate(group_labels)],
+        ["", "", *[Paragraph(label, centered_heading) for label in ("Kilos", "€", "Kilos", "€", "Δ Kilos", "Δ €")]],
+    ]
     for values in rows:
         data.append([Paragraph(escape(str(value)), text) if col < 2 else format_value(value, col) for col, value in enumerate(values)])
     data.append(["Totales generales", "", *[format_value(value, col) for col, value in enumerate(totals, 2)]])
     widths = [doc.width * factor for factor in (.055, .275, .105, .12, .105, .12, .10, .12)]
-    table = Table(data, colWidths=widths, repeatRows=1, hAlign="LEFT")
+    table = Table(data, colWidths=widths, repeatRows=2, hAlign="LEFT")
     commands = [
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#" + NAVY)),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#F3F6F9")]),
-        ("TEXTCOLOR", (0, 1), (-1, -2), colors.HexColor("#" + NAVY)),
+        ("SPAN", (0, 0), (0, 1)),
+        ("SPAN", (1, 0), (1, 1)),
+        ("SPAN", (2, 0), (3, 0)),
+        ("SPAN", (4, 0), (5, 0)),
+        ("SPAN", (6, 0), (7, 0)),
+        ("BACKGROUND", (0, 0), (-1, 1), colors.HexColor("#" + NAVY)),
+        ("ROWBACKGROUNDS", (0, 2), (-1, -2), [colors.white, colors.HexColor("#F3F6F9")]),
+        ("TEXTCOLOR", (0, 2), (-1, -2), colors.HexColor("#" + NAVY)),
         ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
         ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#" + NAVY)),
         ("TEXTCOLOR", (0, -1), (-1, -1), colors.white),
         ("SPAN", (0, -1), (1, -1)),
-        ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+        ("ALIGN", (2, 2), (-1, -1), "RIGHT"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("FONTSIZE", (0, 0), (-1, -1), 7),
         ("TOPPADDING", (0, 0), (-1, -1), 7),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("LINEBELOW", (2, 0), (-1, 0), 0.5, colors.HexColor("#70879A")),
     ]
-    for row_idx, values in enumerate([*rows, ["", "", *totals]], 1):
+    for col in range(1, 8):
+        # Pair dividers start below the merged year labels; the total label spans
+        # the first two columns and must not have a line through its text.
+        commands.append(("LINEBEFORE", (col, 1 if col in (3, 5, 7) else 0), (col, -2 if col == 1 else -1), 0.4, colors.HexColor("#A9B9C8")))
+    for row_idx, values in enumerate([*rows, ["", "", *totals]], 2):
         for col in (6, 7):
             if values[col]:
                 palette = ("#76E2B6", "#FF8585") if row_idx == len(data) - 1 else ("#07804B", "#C32939")
