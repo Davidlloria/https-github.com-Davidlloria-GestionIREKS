@@ -727,6 +727,10 @@ class SalesQueryAssistantService:
             intent.query_type = "comparativa"
         if "top 10" in normalized or "top10" in normalized:
             intent.limit = 10
+        else:
+            limit_match = re.search(r"\blos\s+([1-9]\d*)\s+(?:articulos|productos)\b", normalized)
+            if limit_match:
+                intent.limit = int(limit_match.group(1))
         return intent
 
     def _intent_from_mapping(self, payload: dict[str, Any], fallback: SalesQueryIntent) -> SalesQueryIntent:
@@ -789,7 +793,14 @@ class SalesQueryAssistantService:
             match = re.search(pattern, text, flags=re.IGNORECASE)
             if match:
                 candidate = str(match.group(1) or "").strip()
-                candidate = re.split(r"\b(?:de|del|para|en|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|enero|febrero|marzo|abril|mayo|junio)\b", candidate, maxsplit=1, flags=re.IGNORECASE)[0].strip(" ,.;:")
+                candidate = re.split(
+                    r"\b(?:or(?:e)?denad[oa]s?(?=\s+de\s+(?:mayor|menor)\b)|"
+                    r"de|del|para|en|julio|agosto|septiembre|setiembre|octubre|noviembre|"
+                    r"diciembre|enero|febrero|marzo|abril|mayo|junio)\b",
+                    candidate,
+                    maxsplit=1,
+                    flags=re.IGNORECASE,
+                )[0].strip(" ,.;:")
                 if candidate:
                     return candidate
         return ""

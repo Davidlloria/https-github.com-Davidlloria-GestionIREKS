@@ -457,6 +457,43 @@ def test_sales_assistant_fallback_marks_comparative_queries(isolated_engine) -> 
     assert intent_result.intent.month == 7
 
 
+@pytest.mark.parametrize(
+    ("client_phrase", "expected"),
+    [
+        ("igsa, ordenados de mayor a menor", "igsa"),
+        ("hermanos rodriguez ordenadas de menor a mayor", "hermanos rodriguez"),
+        ("igsa, oredenado de mayor a menor", "igsa"),
+        ("igsa oredenados de mayor a menos", "igsa"),
+        ("panes ordenados", "panes ordenados"),
+    ],
+)
+def test_sales_assistant_keeps_sort_instructions_out_of_client(client_phrase, expected) -> None:
+    assistant = SalesQueryAssistantService(sales_service=SalesAnnualComparisonService(), api_key="")
+    assistant.api_key = ""
+    result = assistant.interpret(f"ranking de ventas del cliente {client_phrase}", defaults={"year": 2026})
+
+    assert result.ok is True
+    assert result.intent.cliente_texto == expected
+
+
+@pytest.mark.parametrize(
+    ("question", "expected"),
+    [
+        ("dame los 20 articulos con diferencias negativas", 20),
+        ("dame los 5 productos con mayores ventas en 2026", 5),
+        ("ventas del cliente igsa en 2026", 200),
+        ("top 10 de ventas del cliente igsa", 10),
+    ],
+)
+def test_sales_assistant_reads_requested_result_count(question, expected) -> None:
+    assistant = SalesQueryAssistantService(sales_service=SalesAnnualComparisonService(), api_key="")
+    assistant.api_key = ""
+    result = assistant.interpret(question, defaults={})
+
+    assert result.ok is True
+    assert result.intent.limit == expected
+
+
 def test_sales_assistant_fallback_detects_acumulado_typo(isolated_engine) -> None:
     with Session(isolated_engine) as session:
         _seed_sales(session)
