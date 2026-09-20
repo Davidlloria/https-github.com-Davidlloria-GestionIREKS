@@ -19,6 +19,8 @@ from app.models import (
     Pedido,
     PedidoItem,
     PedidoPendiente,
+    PedidoFaltante,
+    PedidoIncidencia,
     PedidoRecepcionAsignacion,
     PedidoRecepcionRevision,
     PedidoRecepcionReparto,
@@ -553,12 +555,26 @@ class OrderQueryService:
             ))
             rows: list[tuple[PendingAggregateRow, Pedido]] = []
             article_ids: set[str] = set()
+            # Confirmed missing deliveries are followed in Incidencias, not in
+            # this list. Keep operational allocations intact for replacements.
+            shortages: dict[tuple[str, str], float] = {}
+            for shortage, incident, item in session.exec(
+                select(PedidoFaltante, PedidoIncidencia, AlbaranItem)
+                .join(PedidoIncidencia, PedidoIncidencia.incidencia_id == PedidoFaltante.incidencia_id)
+                .join(AlbaranItem, AlbaranItem.item_id == PedidoFaltante.albaran_item_id)
+                .where(PedidoIncidencia.pedido_id.in_(list(pedido_by_id)),
+                       PedidoFaltante.confirmado == True,
+                       PedidoFaltante.estado.in_(["confirmado", "reclamada"]))
+            ):
+                key = (incident.pedido_id, item.articulo_id)
+                shortages[key] = shortages.get(key, 0.0) + max(
+                    0.0, shortage.cantidad_documentada - shortage.cantidad_recibida)
             for (row_pedido_id, articulo_id), values in stats.items():
                 if row_pedido_id not in orders_with_delivery:
                     continue
                 ordered = float(values.get("ordered", 0.0) or 0.0)
                 received = float(values.get("received", 0.0) or 0.0)
-                pending = ordered - received - values.get("cancelled", 0.0)
+                pending = ordered - received - values.get("cancelled", 0.0) - shortages.get((row_pedido_id, articulo_id), 0.0)
                 if pending <= 1e-9:
                     continue
                 pedido_row = pedido_by_id.get(row_pedido_id)

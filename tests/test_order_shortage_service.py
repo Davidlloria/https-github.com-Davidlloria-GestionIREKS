@@ -114,6 +114,39 @@ def test_credit_closes_pending_without_inventing_stock(context):
         service.resolve(key, "error_recuento", "Otra solución")
 
 
+def test_confirmed_shortage_is_only_followed_in_incidents(context):
+    db, service, _, _ = context
+    key = create(context)
+    service.confirm(key)
+    assert OrderQueryService().list_pendientes_acumulados("p")[0] == []
+    service.mark_claimed(key, "Reclamación al proveedor")
+    assert OrderQueryService().list_pendientes_acumulados("p")[0] == []
+    assert service.list_for_order("p")[key].cantidad_documentada == 24
+    assert_quantities(db, 24, 6, 24)
+
+
+@pytest.mark.parametrize("resolution", ["abono", "error_recuento"])
+def test_pending_list_preserves_undelivered_units_of_same_article(context, resolution):
+    db, service, _, _ = context
+    with Session(db) as session:
+        order_item = session.exec(select(PedidoItem)).one()
+        order_item.articulo_cantidad = 34
+        session.add(order_item)
+        session.commit()
+    key = create(context)
+    # The initial count has not changed the documented receipt yet.
+    rows, _ = OrderQueryService().list_pendientes_acumulados("p")
+    assert rows[0][0].cantidad_pendiente == 4
+    service.confirm(key)
+    rows, _ = OrderQueryService().list_pendientes_acumulados("p")
+    assert len(rows) == 1
+    assert rows[0][0].cantidad_pendiente == 4
+    assert rows[0][0].cantidad_recibida == 24
+    service.resolve(key, resolution, "Justificante")
+    rows, _ = OrderQueryService().list_pendientes_acumulados("p")
+    assert rows[0][0].cantidad_pendiente == 4
+
+
 def test_count_error_reverses_once_and_repair_preserves_adjustments(context):
     db, service, _, _ = context
     key = create(context)
