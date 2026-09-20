@@ -886,8 +886,9 @@ class DashboardPage(QWidget):
         objetivos_btn.setObjectName('dashboardSidebarButton')
         objetivos_btn.setMinimumHeight(58)
         self._set_button_icon(objetivos_btn, 'goal.svg', '#475569', 20)
-        objetivos_btn.clicked.connect(lambda: self._show_placeholder_dashboard('Objetivos'))
+        objetivos_btn.clicked.connect(lambda: self._set_dashboard_mode('objetivos'))
         sidebar_layout.addWidget(objetivos_btn)
+        self.dashboard_nav_buttons['objetivos'] = objetivos_btn
 
         if self.settings_page is not None:
             settings_btn = QPushButton('Configuración')
@@ -974,6 +975,7 @@ class DashboardPage(QWidget):
         self.dashboard_stack.addWidget(self.orders_dashboard)
         self.dashboard_stack.addWidget(self.sales_dashboard)
         self.dashboard_stack.addWidget(self.warehouse_dashboard)
+        self.objectives_dashboard = None
         if self.settings_page is not None:
             self.dashboard_stack.addWidget(self.settings_page)
         self.content_layout.addWidget(self.dashboard_stack, 1)
@@ -1536,7 +1538,9 @@ class DashboardPage(QWidget):
         return widget
 
     def reload(self) -> None:
-        if self.current_dashboard == 'pedidos':
+        if self.current_dashboard == 'objetivos':
+            self.objectives_dashboard.reload()
+        elif self.current_dashboard == 'pedidos':
             self._reload_orders_dashboard()
         elif self.current_dashboard == 'almacen':
             self._reload_warehouse_dashboard()
@@ -1807,7 +1811,7 @@ class DashboardPage(QWidget):
             return
         self._open_full_agenda()
     def _set_dashboard_mode(self, mode: str, *, reload: bool = True) -> None:
-        valid_modes = {'agenda', 'pedidos', 'almacen', 'ventas'}
+        valid_modes = {'agenda', 'pedidos', 'almacen', 'ventas', 'objetivos'}
         if self.settings_page is not None:
             valid_modes.add('configuracion')
         clean_mode = mode if mode in valid_modes else 'agenda'
@@ -1823,6 +1827,8 @@ class DashboardPage(QWidget):
                 icon_name = 'warehouse.svg'
             elif key == 'configuracion':
                 icon_name = 'settings.svg'
+            elif key == 'objetivos':
+                icon_name = 'goal.svg'
             else:
                 icon_name = 'bar-chart-3.svg'
             self._set_button_icon(button, icon_name, '#FFFFFF' if active else '#475569', 20)
@@ -1837,6 +1843,12 @@ class DashboardPage(QWidget):
             current_widget = self.warehouse_dashboard
         elif clean_mode == 'configuracion':
             current_widget = self.settings_page
+        elif clean_mode == 'objetivos':
+            if self.objectives_dashboard is None:
+                from app.ui.widgets.objectives_page import ObjectivesPage
+                self.objectives_dashboard = ObjectivesPage(self)
+                self.dashboard_stack.addWidget(self.objectives_dashboard)
+            current_widget = self.objectives_dashboard
         else:
             current_widget = self.sales_dashboard
         self.dashboard_stack.setCurrentWidget(current_widget)
@@ -1844,7 +1856,7 @@ class DashboardPage(QWidget):
         if reload:
             self.reload()
     def _refresh_header_for_mode(self) -> None:
-        is_configuration = self.current_dashboard == 'configuracion'
+        is_configuration = self.current_dashboard in {'configuracion', 'objetivos'}
         self.new_activity_btn.setVisible(not is_configuration)
         self.full_agenda_btn.setVisible(not is_configuration)
         self.footer_label.setVisible(not is_configuration)
@@ -1872,6 +1884,9 @@ class DashboardPage(QWidget):
         elif self.current_dashboard == 'configuracion':
             self.title_label.setText('Configuración')
             self.date_label.setText('Servicios y preferencias de la aplicación')
+        elif self.current_dashboard == 'objetivos':
+            self.title_label.setText('Objetivos')
+            self.date_label.setText('Canarias · Seguimiento anual con ventas de IREKS')
         else:
             self.title_label.setText('Agenda')
             self.date_label.setText(self.format_date(date.today(), long=True))

@@ -862,3 +862,36 @@ def test_dashboard_activity_card_right_click_opens_edit_dialog(monkeypatch) -> N
     QApplication.processEvents()
 
 
+
+
+def test_dashboard_objectives_button_opens_and_reuses_page(monkeypatch) -> None:
+    _application()
+    from app.ui.widgets import objectives_page
+
+    class ObjectivesStub(QWidget):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.loads = 0
+
+        def reload(self):
+            self.loads += 1
+
+    monkeypatch.setattr(objectives_page, "ObjectivesPage", ObjectivesStub)
+    page = DashboardPage(
+        customer_service=_StubCustomerService(),
+        dashboard_service=_StubDashboardService(),
+        order_dashboard_service=_StubOrderDashboardService(),
+        warehouse_dashboard_service=_StubWarehouseDashboardService(),
+    )
+    assert page.objectives_dashboard is None
+    page.dashboard_nav_buttons['objetivos'].click()
+    objectives = page.objectives_dashboard
+    assert objectives.loads == 1
+    assert page.dashboard_stack.currentWidget() is objectives
+    assert page.title_label.text() == 'Objetivos'
+    assert page.new_activity_btn.isHidden()
+    page._set_dashboard_mode('agenda')
+    page.dashboard_nav_buttons['objetivos'].click()
+    assert page.objectives_dashboard is objectives
+    assert objectives.loads == 2
+    page.close()
