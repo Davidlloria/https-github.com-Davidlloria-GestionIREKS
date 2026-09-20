@@ -5,23 +5,63 @@ from dataclasses import asdict
 from pathlib import Path
 from uuid import uuid4
 
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QEvent
 from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
     QFileDialog, QFormLayout, QFrame, QHBoxLayout, QHeaderView, QInputDialog,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QProgressBar,
     QPushButton, QScrollArea, QTableWidget, QTableWidgetItem, QTabWidget,
-    QVBoxLayout, QWidget,
+    QVBoxLayout, QWidget, QStyledItemDelegate, QStyle, QStyleOptionViewItem,
 )
 
 from app.services.objectives_service import BLOCKS, MONTHS, Objective, ObjectivesService, fmt, number
-from app.ui.widgets.product_consumers_dialog import _SelectionDelegate
 
 
 STATUS = {"active": "Activo", "pending": "Pendiente todo el año", "unmarketed": "No comercializado"}
 DIMENSIONS = {"all": "Todos los productos", "family": "Familias", "subfamily": "Subfamilias", "manufacturer": "Fabricantes", "products": "Productos concretos"}
 RULES = {"growth": "Enteros · regla del informe", "quarter": "Cuartos de punto · volumen", "no_charge": "Reducir género sin cargo", "manual": "Valoración manual"}
+
+
+class SelectionDelegate(QStyledItemDelegate):
+    """Keep selected text legible even when the global style forces white text."""
+
+    def paint(self, painter, option, index):
+        if not option.state & QStyle.StateFlag.State_Selected:
+            super().paint(painter, option, index)
+            return
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        brush = index.data(Qt.ItemDataRole.ForegroundRole)
+        painter.save()
+        painter.setClipRect(opt.rect)
+        painter.fillRect(opt.rect, QColor("#DBF3F2"))
+        painter.setPen(brush.color() if brush else QColor("#173653"))
+        painter.setFont(opt.font)
+        rect = opt.rect.adjusted(10, 0, -10, 0)
+        text = opt.fontMetrics.elidedText(opt.text, Qt.TextElideMode.ElideRight, max(0, rect.width()))
+        painter.drawText(rect, opt.displayAlignment | Qt.AlignmentFlag.AlignVCenter, text)
+        painter.restore()
+
+
+class FittedTable(QTableWidget):
+    """Distribute the available viewport width without horizontal scrolling."""
+
+    def __init__(self, columns, weights):
+        super().__init__(0, columns)
+        self.weights = weights
+        self.viewport().installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if watched is self.viewport() and event.type() == QEvent.Type.Resize:
+            width = event.size().width()
+            total = sum(self.weights)
+            allocated = 0
+            for col, weight in enumerate(self.weights):
+                size = width - allocated if col == len(self.weights) - 1 else int(width * weight / total)
+                self.setColumnWidth(col, size)
+                allocated += size
+        return super().eventFilter(watched, event)
 
 
 class SortItem(QTableWidgetItem):
@@ -35,8 +75,8 @@ class SortItem(QTableWidgetItem):
         return str(self.value) < str(other.value)
 
 
-def table(headers):
-    widget = QTableWidget(0, len(headers))
+def table(headers, weights=None):
+    widget = FittedTable(len(headers), weights) if weights else QTableWidget(0, len(headers))
     widget.setHorizontalHeaderLabels(headers)
     widget.verticalHeader().hide()
     widget.verticalHeader().setDefaultSectionSize(38)
@@ -45,8 +85,11 @@ def table(headers):
     widget.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
     widget.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
     widget.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-    widget.setItemDelegate(_SelectionDelegate(widget))
+    widget.setItemDelegate(SelectionDelegate(widget))
     widget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+    if weights:
+        widget.horizontalHeader().setMinimumSectionSize(0)
+        widget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
     return widget
 
 
@@ -233,12 +276,8 @@ class ObjectivesPage(QWidget):
             self.filter.addItem(name, i)
         self.filter.currentIndexChanged.connect(self._fill_detail)
         detail_layout.addWidget(self.filter)
-        self.detail = table(["Objetivo", "Meta anual", "Año anterior", "Año actual", "Δ cantidad", "Δ %", "Puntos", "Estado"])
-        self.detail.setColumnWidth(0, 320)
-        for i in range(1, 8):
-            self.detail.setColumnWidth(i, 125 if i < 5 else 110)
-        self.detail.setColumnWidth(7, 180)
-        self.detail.horizontalHeader().setStretchLastSection(True)
+        self.detail = table(["Objetivo", "Meta anual", "Año anterior", "Año actual", "Δ cantidad", "Δ %", "Puntos", "Estado"],
+                            weights=(25, 12, 12, 12, 11, 7, 9, 12))
         self.detail.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         self.detail.cellDoubleClicked.connect(self._open_detail)
         self.detail.itemSelectionChanged.connect(self._selected_objective)
@@ -474,6 +513,9 @@ class ObjectivesPage(QWidget):
                 cell = SortItem(str(value) if col < 2 else fmt(value), str(value) if col < 2 else float(value))
                 if col >= 2:
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                    if value < 0:
+                        cell.setForeground(QColor("#C62828"))
+                cell.setToolTip(cell.text())
                 t.setItem(row, col, cell)
         t.setSortingEnabled(True)
         layout.addWidget(t)

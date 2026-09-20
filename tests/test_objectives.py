@@ -244,3 +244,75 @@ def test_default_33d_includes_dreidoppel_and_gelatop(service):
     assert objectives["dreidoppel"]["unit"] == "kg"
     assert objectives["gelatop"]["members"] == ["g"]
     assert objectives["gelatop"]["unit"] == "eur"
+
+
+def test_detail_columns_fit_after_resizing(service):
+    from PySide6.QtWidgets import QApplication
+    from app.ui.widgets.objectives_page import ObjectivesPage
+    app = QApplication.instance() or QApplication([])
+    service.save(compact_campaign(service))
+    page = ObjectivesPage(service=service)
+    page.reload()
+    page.tabs.setCurrentIndex(1)
+    page.show()
+    for width in (1450, 1050, 1250):
+        page.resize(width, 800)
+        app.processEvents()
+        app.processEvents()
+        assert page.detail.horizontalScrollBar().maximum() == 0
+        assert sum(page.detail.columnWidth(i) for i in range(8)) == page.detail.viewport().width()
+    page.close()
+
+
+def test_product_dialog_negative_values_are_red(service, monkeypatch):
+    from PySide6.QtWidgets import QApplication, QDialog, QTableWidget
+    from app.ui.widgets.objectives_page import ObjectivesPage
+    app = QApplication.instance() or QApplication([])
+    service.save(compact_campaign(service))
+    add_sales(service, ("igsa", "2025-01", "p", 100, 0, 0, "ireks"),
+              ("igsa", "2026-01", "p", -10, 0, 0, "ireks"))
+    page = ObjectivesPage(service=service)
+    page.reload()
+    seen = []
+    def inspect(dialog):
+        widget = dialog.findChild(QTableWidget)
+        for row in range(widget.rowCount()):
+            for col in (2, 3, 4):
+                cell = widget.item(row, col)
+                if cell.value < 0:
+                    assert cell.foreground().color().name() == "#c62828"
+                    seen.append(cell.value)
+        return 0
+    monkeypatch.setattr(QDialog, "exec", inspect)
+    page._open_detail(0, 0)
+    assert -10 in seen and -110 in seen
+    page.close()
+
+
+def test_selected_cell_preserves_contrast_with_global_white_selection():
+    from PySide6.QtCore import QRect, Qt
+    from PySide6.QtGui import QColor, QImage, QPainter
+    from PySide6.QtWidgets import QApplication, QStyle, QStyleOptionViewItem, QTableWidgetItem
+    from app.ui.widgets.objectives_page import table
+    app = QApplication.instance() or QApplication([])
+    widget = table(["Cantidad"])
+    widget.setStyleSheet("QTableWidget::item:selected { color: white; background: #DBF3F2; }")
+    widget.setRowCount(1)
+    cell = QTableWidgetItem("-123,45")
+    widget.setItem(0, 0, cell)
+    for color in (None, "#c62828"):
+        if color:
+            cell.setForeground(QColor(color))
+        image = QImage(180, 40, QImage.Format.Format_RGB32)
+        image.fill(QColor("white"))
+        painter = QPainter(image)
+        option = QStyleOptionViewItem()
+        option.rect = QRect(0, 0, 180, 40)
+        option.state = QStyle.StateFlag.State_Selected | QStyle.StateFlag.State_Enabled
+        widget.itemDelegate().paint(painter, option, widget.model().index(0, 0))
+        painter.end()
+        expected = QColor(color or "#173653").rgb()
+        pixels = [image.pixel(x, y) for x in range(180) for y in range(40)]
+        assert expected in pixels
+        assert QColor("#DBF3F2").rgb() in pixels
+    widget.close()
