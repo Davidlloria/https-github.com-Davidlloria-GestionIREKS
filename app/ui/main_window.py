@@ -110,11 +110,19 @@ class MainWindow(QMainWindow):
         self._add_page("Cursos", CoursesPage())
         self._add_page("Formulas", RecipesPage())
         self._add_page("Documentos", DocumentLibraryPage())
-        self._add_page("Almacen", WarehousePage())
+        warehouse = WarehousePage()
+        self._add_page("Almacen", warehouse)
+        if hasattr(warehouse, "product_requested"):
+            warehouse.product_requested.connect(self._open_warehouse_product)
         self._add_page("Productos IREKS", IngredientsIreksPage())
         self._add_page("Materias primas", IngredientsStdPage())
         self._add_page("Pedidos", OrdersPage())
         self._add_page("Ventas", SalesPage())
+
+    def _open_warehouse_product(self, articulo_id: str, section: str) -> None:
+        index = self.page_names.index("Productos IREKS")
+        self._set_current_page(index)
+        self.pages.widget(index).focus_article(articulo_id, section)
 
     def bind_local_ai_lifecycle(self, lifecycle) -> None:
         self._local_ai_lifecycle = lifecycle

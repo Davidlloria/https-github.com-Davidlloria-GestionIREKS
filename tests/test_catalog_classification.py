@@ -168,3 +168,59 @@ def test_warehouse_tab_and_product_entry(catalog, monkeypatch):
     assert sections == ["envases", "referencias"]
     products.close()
     warehouse.close()
+
+
+def test_warehouse_double_click_routes_to_existing_products_page(catalog, monkeypatch):
+    from types import SimpleNamespace
+    from PySide6.QtWidgets import QStackedWidget, QWidget, QTableWidgetItem
+    from app.ui.main_window import MainWindow
+    from app.ui.widgets.ingredients_page import IngredientsIreksPage
+    from app.ui.widgets.warehouse_page import WarehousePage
+    monkeypatch.setattr(IngredientsIreksPage, "reload", lambda self: None)
+    monkeypatch.setattr(WarehousePage, "reload", lambda self: None)
+    warehouse = WarehousePage()
+    stack = QStackedWidget()
+    stack.addWidget(warehouse)
+    products = QWidget()
+    calls = []
+    products.focus_article = lambda identity, section: calls.append((identity, section))
+    stack.addWidget(products)
+    window = SimpleNamespace(page_names=["Almacen", "Productos IREKS"], pages=stack,
+                             _set_current_page=stack.setCurrentIndex)
+    warehouse.product_requested.connect(lambda identity, section: MainWindow._open_warehouse_product(window, identity, section))
+    for section, tab in (("Stock", warehouse.stock_tab), ("Entradas", warehouse.entradas_tab), ("Salidas", warehouse.salidas_tab)):
+        stack.setCurrentWidget(warehouse)
+        tab.table.setRowCount(1)
+        cell = QTableWidgetItem("Producto")
+        cell.setData(Qt.ItemDataRole.UserRole, "p")
+        tab.table.setItem(0, 0, cell)
+        if section != "Stock":
+            monkeypatch.setattr(tab, "selected_articulo_id_from_row", lambda row: "p")
+        tab.table.cellDoubleClicked.emit(0, 1)
+        assert stack.currentWidget() is products
+        assert calls[-1] == ("p", section)
+        assert not warehouse.article_dialog.isVisible()
+    assert len(calls) == 3
+    stack.close()
+
+
+def test_product_navigation_clears_filters_hiding_target(catalog, monkeypatch):
+    from app.ui.widgets.ingredients_page import IngredientsIreksPage
+    monkeypatch.setattr(IngredientsIreksPage, "reload", lambda self: None)
+    page = IngredientsIreksPage()
+    page.search_input.setText("Otro producto")
+    page.activity_filter.setCurrentIndex(1)
+    page.external_distributor_filter_id = "other"
+    selected = []
+    def select(identity):
+        if page.search_input.text() or page.external_distributor_filter_id:
+            return False
+        selected.append(identity)
+        return True
+    monkeypatch.setattr(page, "_select_by_articulo_id", select)
+    monkeypatch.setattr(page, "_show_selected_details", lambda: None)
+    page.focus_article("p", "Stock")
+    assert selected == ["p"]
+    assert page.activity_filter.currentData() == "all"
+    assert page.detail_tabs.tabText(page.detail_tabs.currentIndex()) == "Stock"
+    page.close()

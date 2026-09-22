@@ -2743,6 +2743,29 @@ class IngredientsIreksPage(QWidget):
         self.external_distributor_filter_id = str(distribuidor_id or "").strip()
         self.reload()
 
+    def focus_article(self, articulo_id: str, section: str = "Datos") -> None:
+        if not self._select_by_articulo_id(articulo_id):
+            # Navigation from warehouse must also find products hidden by the
+            # previous search, taxonomy, activity or distributor filters.
+            controls = [self.search_input, self.fabricante_filter, self.familia_filter,
+                        self.subfamilia_filter, self.activity_filter]
+            previous = [control.blockSignals(True) for control in controls]
+            self.search_input.clear()
+            for control in controls[1:]:
+                control.setCurrentIndex(0)
+            for control, blocked in zip(controls, previous):
+                control.blockSignals(blocked)
+            self.external_distributor_filter_id = ""
+            self.reload()
+            if not self._select_by_articulo_id(articulo_id):
+                QMessageBox.information(self, "Productos", "No se encuentra este producto en el catálogo.")
+                return
+        self._show_selected_details()
+        for index in range(self.detail_tabs.count()):
+            if self.detail_tabs.tabText(index) == section:
+                self.detail_tabs.setCurrentIndex(index)
+                break
+
     def focus_article_and_open_salidas(self, articulo_id: str) -> None:
         target = str(articulo_id or "").strip()
         if not target:

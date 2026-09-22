@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, cast as tcast
 from uuid import uuid4
 
-from PySide6.QtCore import QDate, QSize, Qt
+from PySide6.QtCore import QDate, QSize, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -3325,6 +3325,8 @@ class AnnualMonthlyOrdersTab(QWidget):
 
 
 class WarehousePage(QWidget):
+    product_requested = Signal(str, str)
+
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("warehousePage")
@@ -3531,11 +3533,10 @@ class WarehousePage(QWidget):
         self.main_tabs.addTab(self.inventarios_tab, "Inventarios")
         self.main_tabs.addTab(self.caducidad_tab, "Caducidades")
         if self.entradas_tab is not None:
-            self.entradas_tab.table.itemDoubleClicked.connect(self._open_article_from_entradas_row)
             self.entradas_tab.table.cellDoubleClicked.connect(self._open_article_from_entradas_cell)
         if self.salidas_tab is not None:
-            self.salidas_tab.table.itemDoubleClicked.connect(self._open_article_from_salidas_row)
             self.salidas_tab.table.cellDoubleClicked.connect(self._open_article_from_salidas_cell)
+        self.stock_tab.table.cellDoubleClicked.connect(self._open_article_from_stock_cell)
         layout.addWidget(self.main_tabs, 1)
 
     def _open_monthly_report(self) -> None:
@@ -3692,10 +3693,7 @@ class WarehousePage(QWidget):
         articulo_id = self.salidas_tab.selected_articulo_id_from_row(item.row())
         if not articulo_id:
             return
-        self._show_article_dialog()
-        focus_fn = getattr(self.articles_tab, "focus_article_and_open_salidas", None)
-        if callable(focus_fn):
-            focus_fn(articulo_id)
+        self.product_requested.emit(articulo_id, "Salidas")
 
     def _open_article_from_salidas_cell(self, row: int, _column: int) -> None:
         if self.salidas_tab is None or self.articles_tab is None:
@@ -3703,10 +3701,7 @@ class WarehousePage(QWidget):
         articulo_id = self.salidas_tab.selected_articulo_id_from_row(row)
         if not articulo_id:
             return
-        self._show_article_dialog()
-        focus_fn = getattr(self.articles_tab, "focus_article_and_open_salidas", None)
-        if callable(focus_fn):
-            focus_fn(articulo_id)
+        self.product_requested.emit(articulo_id, "Salidas")
 
     def _open_article_from_entradas_row(self, item: QTableWidgetItem) -> None:
         if self.entradas_tab is None or self.articles_tab is None:
@@ -3714,10 +3709,7 @@ class WarehousePage(QWidget):
         articulo_id = self.entradas_tab.selected_articulo_id_from_row(item.row())
         if not articulo_id:
             return
-        self._show_article_dialog()
-        focus_fn = getattr(self.articles_tab, "focus_article_and_open_entradas", None)
-        if callable(focus_fn):
-            focus_fn(articulo_id)
+        self.product_requested.emit(articulo_id, "Entradas")
 
     def _open_article_from_entradas_cell(self, row: int, _column: int) -> None:
         if self.entradas_tab is None or self.articles_tab is None:
@@ -3725,10 +3717,13 @@ class WarehousePage(QWidget):
         articulo_id = self.entradas_tab.selected_articulo_id_from_row(row)
         if not articulo_id:
             return
-        self._show_article_dialog()
-        focus_fn = getattr(self.articles_tab, "focus_article_and_open_entradas", None)
-        if callable(focus_fn):
-            focus_fn(articulo_id)
+        self.product_requested.emit(articulo_id, "Entradas")
+
+    def _open_article_from_stock_cell(self, row: int, _column: int) -> None:
+        cell = self.stock_tab.table.item(row, 0)
+        articulo_id = str(cell.data(Qt.ItemDataRole.UserRole) or "").strip() if cell else ""
+        if articulo_id:
+            self.product_requested.emit(articulo_id, "Stock")
 
     def _list_fabricantes(self, term: str) -> list[Fabricante]:
         return self.catalog_service.list_fabricantes(term)
