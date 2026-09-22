@@ -676,6 +676,8 @@ class IngredientsIreksPage(QWidget):
             self.delete_product_btn = create_standard_ribbon_button("Eliminar", role="danger", icon_name="trash.svg")
             self.product_id_btn = create_standard_ribbon_button("ID", role="secondary", icon_name="package.svg")
             self.product_reports_btn = create_standard_ribbon_button("Listados", role="primary", icon_name="list.svg")
+            self.classification_btn = create_standard_ribbon_button("Clasificación", role="secondary", icon_name="list.svg")
+            self.classification_btn.clicked.connect(self._open_classification)
             self.new_product_btn.clicked.connect(self._new_product)
             self.delete_product_btn.clicked.connect(self._delete_product)
             self.product_id_btn.clicked.connect(self._show_product_id_dialog)
@@ -685,6 +687,7 @@ class IngredientsIreksPage(QWidget):
                 self.delete_product_btn,
                 self.product_id_btn,
                 self.product_reports_btn,
+                self.classification_btn,
             ):
                 ribbon_layout.addWidget(button)
             ribbon_layout.addStretch(1)
@@ -2456,6 +2459,11 @@ class IngredientsIreksPage(QWidget):
         if self._loading:
             return
         self._autosave_timer.start(350)
+
+    def _open_classification(self) -> None:
+        from app.ui.widgets.catalog_classification_page import open_classification
+        open_classification(self)
+        self.reload()
 
     def reload(self) -> None:
         selected_id = self._selected_id()

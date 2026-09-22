@@ -3520,10 +3520,12 @@ class WarehousePage(QWidget):
         self.main_tabs.addTab(self.caducidad_tab, "Caducidad")
         separator_idx = self.main_tabs.addTab(QWidget(), "|")
         self.main_tabs.setTabEnabled(separator_idx, False)
-        self.main_tabs.addTab(self._build_fabricantes_tab(), "Fabricantes")
+        from app.ui.widgets.catalog_classification_page import CatalogClassificationPage
+        self.classification_tab = CatalogClassificationPage(self, service=self.catalog_service)
+        self.main_tabs.addTab(self.classification_tab, "Clasificación")
+        self.main_tabs.currentChanged.connect(lambda index: self.classification_tab.reload()
+            if self.main_tabs.widget(index) is self.classification_tab else None)
         self.main_tabs.addTab(OtrasReferenciasTab(), "Otras ref.")
-        self.main_tabs.addTab(self._build_familias_tab(), "Familias")
-        self.main_tabs.addTab(self._build_subfamilias_tab(), "Subfamilias")
         self.main_tabs.addTab(self._build_envases_tab(), "Envases")
         if self.entradas_tab is not None:
             self.entradas_tab.table.itemDoubleClicked.connect(self._open_article_from_entradas_row)

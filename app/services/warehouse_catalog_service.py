@@ -8,7 +8,7 @@ from sqlalchemy import String, cast as sa_cast
 from sqlmodel import Session, or_, select
 
 from app.core.database import engine
-from app.models import Cliente, Envase, Fabricante, Familia, Subfamilia
+from app.models import Cliente, Envase, Fabricante, Familia, Subfamilia, IngredienteIreks, IngredienteStd
 from app.services.import_service import ImportService
 
 
@@ -236,14 +236,43 @@ class WarehouseCatalogService:
             session.add(Subfamilia(**payload))
             session.commit()
 
-    def update_subfamilia(self, subfamilia_id: str, payload: dict) -> None:
+    def update_subfamilia(self, subfamilia_id: str, payload: dict, *, familia_id: str | None = None) -> None:
         with Session(engine) as session:
-            row = session.exec(select(Subfamilia).where(Subfamilia.articulo_subfamilia_id == subfamilia_id)).first()
+            query = select(Subfamilia).where(Subfamilia.articulo_subfamilia_id == subfamilia_id)
+            if familia_id is not None:
+                query = query.where(Subfamilia.articulo_familia_id == familia_id)
+            row = session.exec(query).first()
             if not row:
                 raise ValueError("Subfamilia no encontrada")
             for key, value in payload.items():
                 setattr(row, key, value)
             session.add(row)
+            session.commit()
+
+    def delete_classification(self, kind: str, identity: str, *, familia_id: str | None = None) -> None:
+        models = {"fabricante": (Fabricante, "fabricante_id", Familia),
+                  "familia": (Familia, "articulo_familia_id", Subfamilia),
+                  "subfamilia": (Subfamilia, "articulo_subfamilia_id", None)}
+        model, field, child = models[kind]
+        with Session(engine) as session:
+            session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            query = select(model).where(getattr(model, field) == identity)
+            if kind == "subfamilia":
+                query = query.where(Subfamilia.articulo_familia_id == familia_id)
+            row = session.exec(query).first()
+            if row is None:
+                raise ValueError("El registro ya no existe. Actualiza el catálogo.")
+            if child and session.exec(select(child).where(getattr(child, field) == identity)).first():
+                raise ValueError("No se puede eliminar: tiene familias o subfamilias asociadas.")
+            for product in (IngredienteIreks, IngredienteStd):
+                if not hasattr(product, field):
+                    continue
+                linked = select(product).where(getattr(product, field) == identity)
+                if kind == "subfamilia":
+                    linked = linked.where(product.articulo_familia_id == familia_id)
+                if session.exec(linked).first():
+                    raise ValueError("No se puede eliminar: hay productos asociados.")
+            session.delete(row)
             session.commit()
 
     def delete_subfamilia(self, subfamilia_id: str) -> bool:
