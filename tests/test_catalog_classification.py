@@ -147,13 +147,24 @@ def test_warehouse_tab_and_product_entry(catalog, monkeypatch):
     monkeypatch.setattr(WarehousePage, "reload", lambda self: None)
     warehouse = WarehousePage()
     titles = [warehouse.main_tabs.tabText(i) for i in range(warehouse.main_tabs.count())]
-    assert "Clasificación" in titles
-    assert not {"Fabricantes", "Familias", "Subfamilias"}.intersection(titles)
-    assert warehouse.classification_tab.tables[0].rowCount() == 2
+    assert titles == ["Stock", "Entradas", "Salidas", "Inventarios", "Caducidades"]
+    assert warehouse.main_tabs.currentWidget() is warehouse.stock_tab
+    warehouse.almacen_combo.addItem("IGSA", "igsa")
+    warehouse.almacen_combo.setCurrentIndex(warehouse.almacen_combo.count() - 1)
+    warehouse.monthly_report_action.trigger()
+    assert warehouse.monthly_dialog.isVisible()
+    assert warehouse.monthly_orders_tab._almacen_id == "igsa"
+    warehouse.monthly_dialog.close()
     products = IngredientsIreksPage()
     opened = []
     monkeypatch.setattr(ui, "open_classification", lambda parent: opened.append(parent))
     products.classification_btn.click()
     assert opened == [products]
+    from app.ui.widgets import product_catalog_dialog
+    sections = []
+    monkeypatch.setattr(product_catalog_dialog, "open_catalog_section", lambda parent, section: sections.append(section))
+    products.packaging_btn.click()
+    products.references_btn.click()
+    assert sections == ["envases", "referencias"]
     products.close()
     warehouse.close()

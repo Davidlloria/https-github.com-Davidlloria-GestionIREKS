@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QMenu,
     QPushButton,
     QSizePolicy,
     QTableWidget,
@@ -122,7 +123,7 @@ class OtrasReferenciasTab(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        header = QLabel("Otras referencias")
+        header = QLabel("Referencias de distribuidores")
         header.setProperty("role", "pageTitle")
         layout.addWidget(header)
 
@@ -2875,7 +2876,7 @@ class AnnualMonthlyOrdersTab(QWidget):
         filter_icon.setObjectName("monthlyOrdersFilterIcon")
         filter_icon.setPixmap(QIcon(str(icon_dir / "filtro.svg")).pixmap(18, 18))
         filter_icon.setFixedSize(18, 18)
-        filter_title = QLabel("FILTROS DE PEDIDOS MENSUALES", filter_panel)
+        filter_title = QLabel("RESUMEN MENSUAL DE RECEPCIONES", filter_panel)
         filter_title.setProperty("monthlyPanelTitle", True)
         filter_title_row.addWidget(filter_icon)
         filter_title_row.addWidget(filter_title)
@@ -3366,9 +3367,9 @@ class WarehousePage(QWidget):
         scope_copy = QVBoxLayout()
         scope_copy.setContentsMargins(0, 0, 0, 0)
         scope_copy.setSpacing(0)
-        scope_caption = QLabel("ÁMBITO DE DATOS", scope_bar)
+        scope_caption = QLabel("ALMACÉN", scope_bar)
         scope_caption.setObjectName("warehouseScopeCaption")
-        scope_label = QLabel("Cliente / distribuidor", scope_bar)
+        scope_label = QLabel("Existencias y movimientos", scope_bar)
         scope_label.setObjectName("warehouseScopeLabel")
         scope_copy.addWidget(scope_caption)
         scope_copy.addWidget(scope_label)
@@ -3376,6 +3377,12 @@ class WarehousePage(QWidget):
         self.almacen_combo = QComboBox()
         self.almacen_combo.setObjectName("warehouseScopeCombo")
         row.addWidget(self.almacen_combo, 1)
+        self.reports_button = QPushButton("Informes")
+        reports_menu = QMenu(self.reports_button)
+        self.monthly_report_action = reports_menu.addAction("Resumen mensual de recepciones")
+        self.monthly_report_action.triggered.connect(self._open_monthly_report)
+        self.reports_button.setMenu(reports_menu)
+        row.addWidget(self.reports_button)
         self.almacen_combo.currentIndexChanged.connect(self._on_combo_filter_changed)
         layout.addWidget(scope_bar)
 
@@ -3511,22 +3518,18 @@ class WarehousePage(QWidget):
         self.monthly_orders_tab = AnnualMonthlyOrdersTab()
         self.inventarios_tab = InventariosTab()
         self.caducidad_tab = CaducidadTab()
-        self.main_tabs.addTab(self.articles_tab, "Artículos")
+        self.article_dialog = QDialog(self)
+        self.article_dialog.setWindowTitle("Ficha del producto")
+        self.article_dialog.resize(1450, 900)
+        QVBoxLayout(self.article_dialog).addWidget(self.articles_tab)
+        self.monthly_dialog = QDialog(self)
+        self.monthly_dialog.resize(1350, 850)
+        QVBoxLayout(self.monthly_dialog).addWidget(self.monthly_orders_tab)
+        self.main_tabs.addTab(self.stock_tab, "Stock")
         self.main_tabs.addTab(self.entradas_tab, "Entradas")
         self.main_tabs.addTab(self.salidas_tab, "Salidas")
-        self.main_tabs.addTab(self.stock_tab, "Stock")
-        self.main_tabs.addTab(self.monthly_orders_tab, "Pedidos mensual")
         self.main_tabs.addTab(self.inventarios_tab, "Inventarios")
-        self.main_tabs.addTab(self.caducidad_tab, "Caducidad")
-        separator_idx = self.main_tabs.addTab(QWidget(), "|")
-        self.main_tabs.setTabEnabled(separator_idx, False)
-        from app.ui.widgets.catalog_classification_page import CatalogClassificationPage
-        self.classification_tab = CatalogClassificationPage(self, service=self.catalog_service)
-        self.main_tabs.addTab(self.classification_tab, "Clasificación")
-        self.main_tabs.currentChanged.connect(lambda index: self.classification_tab.reload()
-            if self.main_tabs.widget(index) is self.classification_tab else None)
-        self.main_tabs.addTab(OtrasReferenciasTab(), "Otras ref.")
-        self.main_tabs.addTab(self._build_envases_tab(), "Envases")
+        self.main_tabs.addTab(self.caducidad_tab, "Caducidades")
         if self.entradas_tab is not None:
             self.entradas_tab.table.itemDoubleClicked.connect(self._open_article_from_entradas_row)
             self.entradas_tab.table.cellDoubleClicked.connect(self._open_article_from_entradas_cell)
@@ -3534,6 +3537,16 @@ class WarehousePage(QWidget):
             self.salidas_tab.table.itemDoubleClicked.connect(self._open_article_from_salidas_row)
             self.salidas_tab.table.cellDoubleClicked.connect(self._open_article_from_salidas_cell)
         layout.addWidget(self.main_tabs, 1)
+
+    def _open_monthly_report(self) -> None:
+        self.monthly_orders_tab.set_almacen_filter(str(self.almacen_combo.currentData() or ""))
+        self.monthly_dialog.setWindowTitle("Resumen mensual de recepciones · " + self.almacen_combo.currentText())
+        self.monthly_dialog.show()
+        self.monthly_dialog.raise_()
+
+    def _show_article_dialog(self) -> None:
+        self.article_dialog.show()
+        self.article_dialog.raise_()
 
     def _build_placeholder_tab(self, name: str) -> QWidget:
         tab = QWidget()
@@ -3667,6 +3680,7 @@ class WarehousePage(QWidget):
             self.stock_tab.set_almacen_filter(selected)
         if self.monthly_orders_tab is not None:
             self.monthly_orders_tab.set_almacen_filter(selected)
+            self.monthly_dialog.setWindowTitle("Resumen mensual de recepciones · " + self.almacen_combo.currentText())
         if self.inventarios_tab is not None:
             self.inventarios_tab.set_almacen_filter(selected)
         if self.caducidad_tab is not None:
@@ -3678,7 +3692,7 @@ class WarehousePage(QWidget):
         articulo_id = self.salidas_tab.selected_articulo_id_from_row(item.row())
         if not articulo_id:
             return
-        self.main_tabs.setCurrentWidget(self.articles_tab)
+        self._show_article_dialog()
         focus_fn = getattr(self.articles_tab, "focus_article_and_open_salidas", None)
         if callable(focus_fn):
             focus_fn(articulo_id)
@@ -3689,7 +3703,7 @@ class WarehousePage(QWidget):
         articulo_id = self.salidas_tab.selected_articulo_id_from_row(row)
         if not articulo_id:
             return
-        self.main_tabs.setCurrentWidget(self.articles_tab)
+        self._show_article_dialog()
         focus_fn = getattr(self.articles_tab, "focus_article_and_open_salidas", None)
         if callable(focus_fn):
             focus_fn(articulo_id)
@@ -3700,7 +3714,7 @@ class WarehousePage(QWidget):
         articulo_id = self.entradas_tab.selected_articulo_id_from_row(item.row())
         if not articulo_id:
             return
-        self.main_tabs.setCurrentWidget(self.articles_tab)
+        self._show_article_dialog()
         focus_fn = getattr(self.articles_tab, "focus_article_and_open_entradas", None)
         if callable(focus_fn):
             focus_fn(articulo_id)
@@ -3711,7 +3725,7 @@ class WarehousePage(QWidget):
         articulo_id = self.entradas_tab.selected_articulo_id_from_row(row)
         if not articulo_id:
             return
-        self.main_tabs.setCurrentWidget(self.articles_tab)
+        self._show_article_dialog()
         focus_fn = getattr(self.articles_tab, "focus_article_and_open_entradas", None)
         if callable(focus_fn):
             focus_fn(articulo_id)

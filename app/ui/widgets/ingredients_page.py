@@ -678,6 +678,12 @@ class IngredientsIreksPage(QWidget):
             self.product_reports_btn = create_standard_ribbon_button("Listados", role="primary", icon_name="list.svg")
             self.classification_btn = create_standard_ribbon_button("Clasificación", role="secondary", icon_name="list.svg")
             self.classification_btn.clicked.connect(self._open_classification)
+            self.packaging_btn = create_standard_ribbon_button("Envases", role="secondary", icon_name="package.svg")
+            self.references_btn = create_standard_ribbon_button("Referencias de distribuidores", role="secondary", icon_name="list.svg")
+            for button in (self.classification_btn, self.packaging_btn, self.references_btn):
+                button.setFixedWidth(max(110, button.fontMetrics().horizontalAdvance(button.text()) + 48))
+            self.packaging_btn.clicked.connect(lambda: self._open_catalog_section("envases"))
+            self.references_btn.clicked.connect(lambda: self._open_catalog_section("referencias"))
             self.new_product_btn.clicked.connect(self._new_product)
             self.delete_product_btn.clicked.connect(self._delete_product)
             self.product_id_btn.clicked.connect(self._show_product_id_dialog)
@@ -688,6 +694,8 @@ class IngredientsIreksPage(QWidget):
                 self.product_id_btn,
                 self.product_reports_btn,
                 self.classification_btn,
+                self.packaging_btn,
+                self.references_btn,
             ):
                 ribbon_layout.addWidget(button)
             ribbon_layout.addStretch(1)
@@ -2463,6 +2471,11 @@ class IngredientsIreksPage(QWidget):
     def _open_classification(self) -> None:
         from app.ui.widgets.catalog_classification_page import open_classification
         open_classification(self)
+        self.reload()
+
+    def _open_catalog_section(self, section: str) -> None:
+        from app.ui.widgets.product_catalog_dialog import open_catalog_section
+        open_catalog_section(self, section)
         self.reload()
 
     def reload(self) -> None:

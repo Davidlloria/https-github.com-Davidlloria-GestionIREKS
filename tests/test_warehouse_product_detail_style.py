@@ -12,6 +12,8 @@ def test_warehouse_classification_uses_spaced_labels_and_compact_bottom_margin(m
     page = WarehousePage()
     page.resize(1800, 950)
     page.show()
+    page.article_dialog.resize(1800, 950)
+    page._show_article_dialog()
     app.processEvents()
 
     assert page.articles_tab is not None
@@ -40,6 +42,8 @@ def test_warehouse_presentation_uses_exact_vertical_spacing(monkeypatch) -> None
     page = WarehousePage()
     page.resize(1800, 950)
     page.show()
+    page.article_dialog.resize(1800, 950)
+    page._show_article_dialog()
     app.processEvents()
 
     assert page.articles_tab is not None
@@ -79,6 +83,8 @@ def test_warehouse_palletization_uses_exact_vertical_spacing(monkeypatch) -> Non
     page = WarehousePage()
     page.resize(1800, 950)
     page.show()
+    page.article_dialog.resize(1800, 950)
+    page._show_article_dialog()
     app.processEvents()
 
     assert page.articles_tab is not None
@@ -118,6 +124,8 @@ def test_warehouse_observations_fill_remaining_detail_tab_height(monkeypatch) ->
     page = WarehousePage()
     page.resize(1800, 950)
     page.show()
+    page.article_dialog.resize(1800, 950)
+    page._show_article_dialog()
     app.processEvents()
 
     assert page.articles_tab is not None
