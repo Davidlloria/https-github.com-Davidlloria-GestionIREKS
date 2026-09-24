@@ -2355,6 +2355,10 @@ class InventariosTab(QWidget):
         apply_btn.clicked.connect(self._apply_adjustments)
         top.addWidget(export_btn)
         top.addWidget(import_btn)
+        review_btn = QPushButton("Revisar inventario histórico")
+        review_btn.setProperty("btnRole", "secondary")
+        review_btn.clicked.connect(self._review_historical_inventory)
+        top.addWidget(review_btn)
         top.addWidget(refresh_btn)
         top.addWidget(prepare_btn)
         top.addWidget(apply_btn)
@@ -2808,6 +2812,13 @@ class InventariosTab(QWidget):
             )
         wb.save(file_path)
         QMessageBox.information(self, "Inventarios", f"Plantilla exportada:\n{file_path}")
+
+    def _review_historical_inventory(self) -> None:
+        if not self._almacen_id:
+            QMessageBox.information(self, "Inventario", "Selecciona el almacén IGSA antes de revisar su inventario.")
+            return
+        from app.ui.widgets.inventory_review_dialog import InventoryReviewDialog
+        InventoryReviewDialog(self._almacen_id, self).exec()
 
     def _import_count_template(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(self, "Seleccionar conteo inventario", "", "Excel (*.xlsx *.xlsm)")
