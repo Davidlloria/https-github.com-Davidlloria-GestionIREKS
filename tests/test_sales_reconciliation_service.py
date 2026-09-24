@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 import pytest
 from sqlmodel import SQLModel, Session, create_engine, select
 
 import app.services.sales_reconciliation_service as sales_reconciliation_service_module
-from app.models import AlmacenMovimiento, Distribuidor, IngredienteIreks, VentaMensualRaw
+from app.models import AlmacenMovimiento, AlmacenStock, Distribuidor, IngredienteIreks, VentaMensualRaw
 from app.services.sales_reconciliation_service import ClientesImportPreview, SalesReconciliationService
 
 
@@ -190,6 +190,81 @@ def test_import_igsa_excel_persists_sales_and_warehouse_outputs(isolated_sales_e
     with Session(isolated_sales_engine) as session:
         assert len(list(session.exec(select(VentaMensualRaw)))) == 2
         assert len(list(session.exec(select(AlmacenMovimiento)))) == 2
+
+
+def test_igsa_legacy_headers_use_consolidated_quantity_and_catalog_weight(isolated_sales_engine, tmp_path):
+    path = tmp_path / "legacy.xlsx"
+    _build_igsa_consolidado_workbook(path)
+    book = load_workbook(path)
+    book["consolidado"]["A1"] = "A"
+    book["consolidado"]["B1"] = "B"
+    book["consolidado"]["K2"] = 94
+    book.create_sheet("ventas").append(["incorrecto", 500, 35])
+    book.save(path)
+    with Session(isolated_sales_engine) as session:
+        _seed_igsa_product(session)
+        product = session.exec(select(IngredienteIreks)).one()
+        product.articulo_envase_peso_total = 0.5
+        session.add(product)
+        session.commit()
+    preview = SalesReconciliationService().preview_igsa_excel(path)
+    assert preview.invalid_rows == 0
+    assert [r["kilos"] for r in preview.import_rows] == [47, 1]
+
+
+def test_igsa_invalid_replacement_preserves_existing_month(isolated_sales_engine, tmp_path):
+    path = tmp_path / "month.xlsx"
+    with Session(isolated_sales_engine) as session:
+        _seed_igsa_product(session)
+    _build_igsa_consolidado_workbook(path)
+    service = SalesReconciliationService()
+    assert service.import_igsa_excel(path).ok
+    with Session(isolated_sales_engine) as session:
+        before = {r.raw_id for r in session.exec(select(VentaMensualRaw))}
+    _build_igsa_consolidado_workbook(path, include_invalid=True)
+    assert not service.import_igsa_excel(path).ok
+    with Session(isolated_sales_engine) as session:
+        assert {r.raw_id for r in session.exec(select(VentaMensualRaw))} == before
+
+
+def test_igsa_warehouse_failure_rolls_back_sales(isolated_sales_engine, tmp_path, monkeypatch):
+    path = tmp_path / "month.xlsx"
+    _build_igsa_consolidado_workbook(path)
+    with Session(isolated_sales_engine) as session:
+        _seed_igsa_product(session)
+    service = SalesReconciliationService()
+    assert service.import_igsa_excel(path).ok
+    with Session(isolated_sales_engine) as session:
+        before = {r.raw_id for r in session.exec(select(VentaMensualRaw))}
+    def fail(*args):
+        raise RuntimeError("warehouse failure")
+    monkeypatch.setattr(service, "_sync_igsa_sales_to_warehouse", fail)
+    with pytest.raises(RuntimeError, match="warehouse failure"):
+        service.import_igsa_excel(path)
+    with Session(isolated_sales_engine) as session:
+        assert {r.raw_id for r in session.exec(select(VentaMensualRaw))} == before
+        assert len(list(session.exec(select(AlmacenMovimiento)))) == 2
+
+
+def test_igsa_reimport_preserves_negative_stock_with_legacy_trigger(isolated_sales_engine, tmp_path):
+    path = tmp_path / "month.xlsx"
+    _build_igsa_consolidado_workbook(path)
+    with Session(isolated_sales_engine) as session:
+        _seed_igsa_product(session)
+    service = SalesReconciliationService()
+    assert service.import_igsa_excel(path).ok
+    with Session(isolated_sales_engine) as session:
+        stock = session.get(AlmacenStock, ("dist-igsa", "art-1"))
+        stock.cantidad_total = -100
+        session.add(stock)
+        session.commit()
+    with isolated_sales_engine.begin() as conn:
+        conn.exec_driver_sql("""CREATE TRIGGER legacy_stock_delete AFTER DELETE ON almacen_movimientos
+            BEGIN DELETE FROM almacen_stock WHERE almacen_id=OLD.almacen_id
+            AND articulo_id=OLD.articulo_id AND cantidad_total<=0; END""")
+    assert service.import_igsa_excel(path).ok
+    with Session(isolated_sales_engine) as session:
+        assert session.get(AlmacenStock, ("dist-igsa", "art-1")).cantidad_total == -100
 
 
 def test_import_ireks_json_accepts_structured_payload(tmp_path, monkeypatch) -> None:

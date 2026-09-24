@@ -21,6 +21,7 @@ from app.core.config import BASE_DIR
 from app.core.database import engine
 from app.models import (
     AlmacenMovimiento,
+    AlmacenStock,
     Cliente,
     Distribuidor,
     Fabricante,
@@ -296,6 +297,8 @@ class SalesReconciliationService:
             preview = self.preview_igsa_excel(file_path)
         except ValueError as exc:
             return SalesOpResult(False, str(exc))
+        if preview.invalid_rows:
+            return SalesOpResult(False, "Importación cancelada: corrija las filas inválidas antes de reemplazar el mes.", incidencias=preview.invalid_rows, warnings=list(preview.issues))
         if not preview.import_rows:
             return SalesOpResult(False, "El Excel IGSA no contiene filas válidas en hoja 'consolidado'.", incidencias=preview.invalid_rows)
 
@@ -358,11 +361,12 @@ class SalesReconciliationService:
 
             # Reemplaza periodos ya importados de IGSA para evitar duplicados
             # cuando se vuelven a importar meses/años (mismo cliente y periodo).
-            period_set = {str(r.periodo or "").strip() for r in rows if str(r.periodo or "").strip()}
-            for periodo in period_set:
+            scopes = {(r.cliente_id, r.periodo) for r in rows}
+            for cliente_id, periodo in scopes:
                 stmt = select(VentaMensualRaw).where(
                     col(VentaMensualRaw.fuente) == "igsa",
                     col(VentaMensualRaw.periodo) == periodo,
+                    col(VentaMensualRaw.cliente_id) == cliente_id,
                 )
                 for old_row in session.exec(stmt):
                     session.delete(old_row)
@@ -392,7 +396,7 @@ class SalesReconciliationService:
             for row in rows:
                 row.lote_id = lote.lote_id
                 session.add(row)
-            session.commit()
+            session.flush()
             self._sync_igsa_sales_to_warehouse(session, rows)
             session.commit()
 
@@ -2098,14 +2102,23 @@ class SalesReconciliationService:
                 if prev is None or cad > prev:
                     expiry_by_key[key] = cad
 
-        period_set = {str(r.periodo or "").strip() for r in raw_rows if str(r.periodo or "").strip()}
-        for periodo in period_set:
+        scopes = {(r.cliente_id, r.periodo) for r in raw_rows if r.periodo}
+        stock_delta: dict[tuple[str, str], float] = defaultdict(float)
+        stock_before = {
+            (s.almacen_id, s.articulo_id): float(s.cantidad_total or 0)
+            for s in session.exec(select(AlmacenStock).where(
+                col(AlmacenStock.almacen_id).in_({client for client, _ in scopes})
+            ))
+        }
+        for cliente_id, periodo in scopes:
             pedido_numero = f"IGSA-{periodo}"
             delete_stmt = select(AlmacenMovimiento).where(
-                col(AlmacenMovimiento.pedido_numero) == pedido_numero
+                col(AlmacenMovimiento.pedido_numero) == pedido_numero,
+                col(AlmacenMovimiento.almacen_id) == cliente_id,
             )
             for mov in session.exec(delete_stmt):
                 if str(getattr(mov, "albaran_item_id", "") or "").startswith("igsa:"):
+                    stock_delta[(mov.almacen_id, mov.articulo_id)] -= float(mov.cantidad or 0)
                     session.delete(mov)
 
         for row in raw_rows:
@@ -2145,6 +2158,7 @@ class SalesReconciliationService:
             fecha = date(anio if anio > 0 else date.today().year, mes if 1 <= mes <= 12 else 1, 1)
             unique_key = f"igsa:{periodo}:{almacen_id}:{articulo_id}:{lote}:{tipo}:{cantidad_unidades}"
             ref_id = str(uuid5(NAMESPACE_URL, unique_key))
+            stock_delta[(almacen_id, articulo_id)] -= abs(cantidad_unidades)
 
             session.add(
                 AlmacenMovimiento(
@@ -2159,6 +2173,17 @@ class SalesReconciliationService:
                     albaran_item_id=f"igsa:{ref_id}",
                 )
             )
+
+        # Los triggers históricos eliminan saldos negativos al borrar movimientos.
+        # Una sustitución debe conservar el saldo previo más la variación neta.
+        session.flush()
+        session.expire_all()
+        for key, delta in stock_delta.items():
+            stock = session.get(AlmacenStock, key)
+            if stock is None:
+                stock = AlmacenStock(almacen_id=key[0], articulo_id=key[1])
+            stock.cantidad_total = stock_before.get(key, 0.0) + delta
+            session.add(stock)
 
     def _safe_json_dict(self, text: str) -> dict:
         raw = str(text or "").strip()
@@ -2209,6 +2234,9 @@ class SalesReconciliationService:
         header_cells = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
         headers = [str(cell).strip() if cell is not None else "" for cell in header_cells]
         normalized_headers = [self._normalize_key(header) for header in headers]
+        # Los consolidados históricos rotulaban Empresa y Empresa ID como A y B.
+        if normalized_headers[:2] == ["a", "b"]:
+            normalized_headers[:2] = ["empresa", "empresaid"]
         rows: list[dict[str, object]] = []
         for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             if not any(cell not in (None, "") for cell in row):
