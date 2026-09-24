@@ -267,6 +267,29 @@ def test_igsa_reimport_preserves_negative_stock_with_legacy_trigger(isolated_sal
         assert session.get(AlmacenStock, ("dist-igsa", "art-1")).cantidad_total == -100
 
 
+def test_igsa_unit_articles_allow_empty_lot_but_kg_articles_require_it(isolated_sales_engine, tmp_path):
+    path = tmp_path / "units.xlsx"
+    _build_igsa_consolidado_workbook(path)
+    book = load_workbook(path)
+    book["consolidado"]["L2"] = None
+    book.save(path)
+    with Session(isolated_sales_engine) as session:
+        _seed_igsa_product(session)
+    service = SalesReconciliationService()
+    assert service.preview_igsa_excel(path).invalid_rows == 1
+    with Session(isolated_sales_engine) as session:
+        product = session.exec(select(IngredienteIreks)).one()
+        product.articulo_envase_unidad_medida = "Unidades"
+        session.add(product)
+        session.commit()
+    assert service.preview_igsa_excel(path).invalid_rows == 0
+    assert service.import_igsa_excel(path).ok
+    with Session(isolated_sales_engine) as session:
+        moves = list(session.exec(select(AlmacenMovimiento)))
+        assert len(moves) == 2
+        assert any(m.articulo_lote == "" and m.cantidad == -4 for m in moves)
+
+
 def test_import_ireks_json_accepts_structured_payload(tmp_path, monkeypatch) -> None:
     path = tmp_path / "ireks.json"
     payload = {

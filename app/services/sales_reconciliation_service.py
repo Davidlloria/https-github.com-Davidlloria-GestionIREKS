@@ -463,7 +463,8 @@ class SalesReconciliationService:
                 row_errors.append(f"Producto no existe en productos_ireks: {articulo_id}.")
             if cantidad <= 0:
                 row_errors.append("Cantidad vacía, cero o negativa.")
-            if not lote:
+            unit_measure = str(getattr(product, "articulo_envase_unidad_medida", "") or "").strip().casefold()
+            if not lote and unit_measure not in {"unidad", "unidades", "ud", "uds"}:
                 row_errors.append("Lote vacío.")
 
             peso_envase = 0.0
