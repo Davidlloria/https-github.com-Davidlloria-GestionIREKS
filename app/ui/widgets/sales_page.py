@@ -60,6 +60,7 @@ from app.services.sales_reconciliation_service import SalesReconciliationService
 from app.services.settings_sales_import_service import SettingsSalesImportService
 from app.services.sales_tools_service import SalesToolsHistoryRow, SalesToolsService
 from app.core.config import DATA_DIR
+from app.ui.widgets.igsa_sale_details_dialog import INCIDENT_ROLE, IgsaIncidentDelegate
 
 
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -2631,6 +2632,7 @@ class SalesPage(QWidget):
         igsa_layout.addWidget(self.group_header_igsa)
 
         self.sales_table_igsa = QTableWidget(0, 12)
+        self.sales_table_igsa.setItemDelegate(IgsaIncidentDelegate(self.sales_table_igsa))
         self.sales_table_igsa.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.sales_table_igsa.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.sales_table_igsa.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -5207,6 +5209,7 @@ class SalesPage(QWidget):
         for idx, row in enumerate(rows):
             lines = self._igsa_product_lines(row.articulo_id, row.codigo)
             issues = sorted({issue for line in lines for issue in line["incidencias"]})
+            incident_years = {line["periodo"][:4] for line in lines if line["incidencias"]}
             total_prev_kg += row.kilos_prev
             total_prev_sc += row.sc_prev
             total_curr_kg += row.kilos_curr
@@ -5244,9 +5247,11 @@ class SalesPage(QWidget):
                     else:
                         item = QTableWidgetItem(str(value or ""))
                     item.setToolTip(str(value or ""))
-                if issues and col in {0, 1}:
+                if issues and (col in {0, 1} or (col == 4 and str(year - 1) in incident_years)
+                               or (col == 7 and str(year) in incident_years)):
+                    item.setData(INCIDENT_ROLE, True)
                     item.setForeground(QColor("#854D0E"))
-                    item.setBackground(QBrush(QColor("#FFFBEB")))
+                    item.setBackground(QBrush(QColor("#FEF3C7")))
                     item.setToolTip("Incidencias: " + "\n".join(issues) + "\nClic derecho → Ver incidencia")
                 self.sales_table_igsa.setItem(idx, col, item)
         self.sales_table_igsa.setSortingEnabled(True)

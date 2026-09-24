@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -55,3 +56,38 @@ def test_detail_and_incident_dialogs_show_real_line_data():
     assert 'Importe pendiente' in explanation.findChild(QPlainTextEdit).toPlainText()
     dialog.close()
     explanation.close()
+
+
+def test_incident_selection_and_widths_with_application_theme():
+    from PySide6.QtGui import QFont, QFontDatabase
+    app = QApplication.instance() or QApplication([])
+    previous_style = app.styleSheet()
+    previous_font = app.font()
+    font_path = Path('C:/Windows/Fonts/segoeui.ttf')
+    if font_path.exists():
+        font_id = QFontDatabase.addApplicationFont(str(font_path))
+        app.setFont(QFont(QFontDatabase.applicationFontFamilies(font_id)[0], 10))
+    app.setStyleSheet((Path(__file__).resolve().parents[1] / 'assets/styles.qss').read_text(encoding='utf-8'))
+    rows = [dict(periodo='2026-08', tipo='Promoción', cantidad=1200, peso=12.5, kilos=15000,
+                 precio=15.25, euros=228750, lote='000123456789', caducidad='2027-08-31',
+                 observaciones='', incidencias=['Importe pendiente'])]
+    dialog = IgsaSaleDetailsDialog('P1', 'Producto con incidencia', rows)
+    try:
+        dialog.show()
+        dialog.table.selectRow(0)
+        app.processEvents()
+        table = dialog.table
+        assert table.columnWidth(7) == 120
+        for column in range(9):
+            assert table.columnWidth(column) >= table.fontMetrics().horizontalAdvance(table.horizontalHeaderItem(column).text()) + 16
+        assert table.horizontalScrollBar().maximum() == 0
+        rect = table.visualItemRect(table.item(0, 0))
+        shot = table.viewport().grab().toImage()
+        assert shot.pixelColor(rect.left() + 2, rect.center().y()).name() == '#fde68a'
+        dialog.resize(1050, 620)
+        app.processEvents()
+        assert table.horizontalScrollBar().maximum() == 0
+    finally:
+        dialog.close()
+        app.setStyleSheet(previous_style)
+        app.setFont(previous_font)

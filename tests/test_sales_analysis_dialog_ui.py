@@ -123,7 +123,7 @@ def test_sales_product_tables_offer_consumers_context_menu(monkeypatch) -> None:
 
     from app.services.igsa_sale_details_service import IgsaSaleDetailsService
     monkeypatch.setattr(IgsaSaleDetailsService, "list_lines", lambda *args: [
-        {"articulo_id": "art-igsa-1", "codigo": "IG-001", "incidencias": ["Importe pendiente"]}
+        {"articulo_id": "art-igsa-1", "codigo": "IG-001", "periodo": "2026-08", "incidencias": ["Importe pendiente"]}
     ])
     page._fill_sales_igsa(
         [
@@ -136,6 +136,9 @@ def test_sales_product_tables_offer_consumers_context_menu(monkeypatch) -> None:
     assert code_item.data(SALES_PRODUCT_ID_ROLE) == "art-igsa-1"
     assert code_item.foreground().color().name() == "#854d0e"
     assert "Importe pendiente" in code_item.toolTip()
+    from app.ui.widgets.igsa_sale_details_dialog import INCIDENT_ROLE
+    assert page.sales_table_igsa.item(code_item.row(), 7).data(INCIDENT_ROLE)
+    assert not page.sales_table_igsa.item(code_item.row(), 4).data(INCIDENT_ROLE)
     captured: list[tuple[int, str, str, str]] = []
 
     class _Menu:

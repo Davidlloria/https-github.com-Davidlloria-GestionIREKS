@@ -1,6 +1,32 @@
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QAbstractItemView, QDialog, QDialogButtonBox, QHeaderView, QLabel, QPlainTextEdit, QTableWidget, QTableWidgetItem, QVBoxLayout
+from PySide6.QtWidgets import QStyledItemDelegate, QStyle, QStyleOptionViewItem
+
+
+INCIDENT_ROLE = Qt.ItemDataRole.UserRole + 173
+
+
+class IgsaIncidentDelegate(QStyledItemDelegate):
+    """Keep incident text readable even when the global theme selects a row."""
+
+    def paint(self, painter, option, index):
+        if not index.data(INCIDENT_ROLE):
+            super().paint(painter, option, index)
+            return
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        selected = bool(opt.state & QStyle.StateFlag.State_Selected)
+        painter.save()
+        painter.setClipRect(opt.rect)
+        painter.fillRect(opt.rect, QColor("#FDE68A" if selected else "#FEF3C7"))
+        brush = index.data(Qt.ItemDataRole.ForegroundRole)
+        painter.setPen(brush.color() if brush else QColor("#854D0E"))
+        painter.setFont(opt.font)
+        rect = opt.rect.adjusted(8, 0, -8, 0)
+        text = opt.fontMetrics.elidedText(opt.text, Qt.TextElideMode.ElideRight, max(0, rect.width()))
+        painter.drawText(rect, opt.displayAlignment | Qt.AlignmentFlag.AlignVCenter, text)
+        painter.restore()
 
 
 class IgsaSaleDetailsDialog(QDialog):
@@ -8,6 +34,7 @@ class IgsaSaleDetailsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Explicación de incidencias" if incidents_only else "Detalle de ventas IGSA")
         self.resize(1160, 620)
+        self.setMinimumWidth(1050)
         layout = QVBoxLayout(self)
         title = QLabel(f"{code} · {name}")
         title.setTextFormat(Qt.TextFormat.PlainText)
@@ -30,6 +57,9 @@ class IgsaSaleDetailsDialog(QDialog):
             columns = [("Mes", "periodo"), ("Tipo", "tipo"), ("Envases", "cantidad"), ("Kg/envase", "peso"), ("Kilos", "kilos"), ("€/kg", "precio"), ("Importe €", "euros"), ("Lote", "lote"), ("Caducidad", "caducidad")]
             table = QTableWidget(len(rows), len(columns))
             self.table = table
+            table.setItemDelegate(IgsaIncidentDelegate(table))
+            table.setWordWrap(False)
+            table.verticalHeader().setDefaultSectionSize(38)
             table.setHorizontalHeaderLabels([c[0] for c in columns])
             table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
             table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -47,13 +77,16 @@ class IgsaSaleDetailsDialog(QDialog):
                     if key in {"cantidad", "peso", "kilos", "precio", "euros"}:
                         item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                     if row["incidencias"]:
+                        item.setData(INCIDENT_ROLE, True)
                         item.setForeground(QColor("#854D0E"))
                     if isinstance(value, (int, float)) and value < 0:
                         item.setForeground(QColor("#B42318"))
                     item.setToolTip("\n".join(row["incidencias"]) or text)
                     table.setItem(i, j, item)
-            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-            table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeMode.Stretch)
+            table.horizontalHeader().setMinimumSectionSize(100)
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeMode.Interactive)
+            table.setColumnWidth(7, 120)
             layout.addWidget(table)
             notes = QPlainTextEdit()
             notes.setReadOnly(True)
