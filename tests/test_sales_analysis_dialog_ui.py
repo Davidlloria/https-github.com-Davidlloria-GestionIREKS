@@ -121,6 +121,10 @@ def test_sales_product_tables_offer_consumers_context_menu(monkeypatch) -> None:
             delta_ventas_pct=100.0,
         )
 
+    from app.services.igsa_sale_details_service import IgsaSaleDetailsService
+    monkeypatch.setattr(IgsaSaleDetailsService, "list_lines", lambda *args: [
+        {"articulo_id": "art-igsa-1", "codigo": "IG-001", "incidencias": ["Importe pendiente"]}
+    ])
     page._fill_sales_igsa(
         [
             igsa_row("art-igsa-2", "IG-002", "Producto IGSA 2"),
@@ -130,16 +134,24 @@ def test_sales_product_tables_offer_consumers_context_menu(monkeypatch) -> None:
     )
     code_item = page.sales_table_igsa.findItems("IG-001", Qt.MatchFlag.MatchExactly)[0]
     assert code_item.data(SALES_PRODUCT_ID_ROLE) == "art-igsa-1"
+    assert code_item.foreground().color().name() == "#854d0e"
+    assert "Importe pendiente" in code_item.toolTip()
     captured: list[tuple[int, str, str, str]] = []
 
     class _Menu:
         def __init__(self, _parent) -> None:
             self.action = None
 
-        def addAction(self, text: str):
-            assert text == "Ver clientes que compran este producto"
-            self.action = object()
-            return self.action
+        def addAction(self, *args):
+            text = args[-1]
+            assert text in {"Ver clientes que compran este producto", "Ver incidencia", "Detalle de ventas"}
+            action = SimpleNamespace(setEnabled=lambda enabled: None)
+            if text == "Ver clientes que compran este producto":
+                self.action = action
+            return action
+
+        def addSeparator(self):
+            pass
 
         def exec(self, _pos):
             return self.action

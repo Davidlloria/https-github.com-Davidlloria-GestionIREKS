@@ -5189,6 +5189,11 @@ class SalesPage(QWidget):
         self._set_group_item_igsa(8, "Diferencias", "#111827", 4)
 
     def _fill_sales_igsa(self, rows: list[SalesComparisonRow], year: int) -> None:
+        from app.services.igsa_sale_details_service import IgsaSaleDetailsService
+
+        self._igsa_detail_rows = IgsaSaleDetailsService(self.sales_summary_service._engine).list_lines(
+            year, self._current_month_igsa(), bool(self.acumulado_check_igsa.isChecked())
+        )
         self._fill_group_headers_igsa(year)
         self.sales_table_igsa.setSortingEnabled(False)
         self.sales_table_igsa.setRowCount(len(rows))
@@ -5200,6 +5205,8 @@ class SalesPage(QWidget):
         total_curr_sales = 0.0
 
         for idx, row in enumerate(rows):
+            lines = self._igsa_product_lines(row.articulo_id, row.codigo)
+            issues = sorted({issue for line in lines for issue in line["incidencias"]})
             total_prev_kg += row.kilos_prev
             total_prev_sc += row.sc_prev
             total_curr_kg += row.kilos_curr
@@ -5237,6 +5244,10 @@ class SalesPage(QWidget):
                     else:
                         item = QTableWidgetItem(str(value or ""))
                     item.setToolTip(str(value or ""))
+                if issues and col in {0, 1}:
+                    item.setForeground(QColor("#854D0E"))
+                    item.setBackground(QBrush(QColor("#FFFBEB")))
+                    item.setToolTip("Incidencias: " + "\n".join(issues) + "\nClic derecho → Ver incidencia")
                 self.sales_table_igsa.setItem(idx, col, item)
         self.sales_table_igsa.setSortingEnabled(True)
         self._fill_totals_row_igsa(total_prev_kg, total_prev_sc, total_prev_sales, total_curr_kg, total_curr_sc, total_curr_sales)
@@ -5729,10 +5740,31 @@ class SalesPage(QWidget):
 
         menu = QMenu(self)
         action = menu.addAction("Ver clientes que compran este producto")
+        incident_action = detail_action = None
+        lines = []
+        if table is getattr(self, "sales_table_igsa", None):
+            lines = self._igsa_product_lines(product_id, product_code)
+            menu.addSeparator()
+            incident_action = menu.addAction(QIcon(str(ALERT_ICON_PATH)), "Ver incidencia")
+            incident_action.setEnabled(any(line["incidencias"] for line in lines))
+            detail_action = menu.addAction(QIcon(str(FILE_TEXT_ICON_PATH)), "Detalle de ventas")
         selected = menu.exec(table.viewport().mapToGlobal(pos))
-        if selected != action:
+        if selected is None:
             return
-        self._show_product_consumers_dialog(year, product_id, product_code, product_name)
+        if selected == action:
+            self._show_product_consumers_dialog(year, product_id, product_code, product_name)
+        elif selected in (incident_action, detail_action):
+            from app.ui.widgets.igsa_sale_details_dialog import IgsaSaleDetailsDialog
+
+            IgsaSaleDetailsDialog(
+                product_code, product_name, lines, self,
+                incidents_only=selected == incident_action,
+            ).exec()
+
+    def _igsa_product_lines(self, product_id: str, product_code: str) -> list[dict]:
+        return [line for line in getattr(self, "_igsa_detail_rows", [])
+                if (line["articulo_id"] == product_id if product_id
+                    else str(line["codigo"]) == product_code)]
 
     def _show_product_consumers_dialog(
         self,
