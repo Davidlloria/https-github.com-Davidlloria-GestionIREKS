@@ -467,6 +467,7 @@ class SalesAnnualComparisonService:
             suffix = "curr" if row_year == current_year else "prev"
             bucket[f"kilos_{suffix}"] = float(bucket[f"kilos_{suffix}"] or 0.0) + kilos_venta
             bucket[f"sc_{suffix}"] = float(bucket[f"sc_{suffix}"] or 0.0) + kilos_sc
+            bucket[f"ventas_{suffix}"] = float(bucket[f"ventas_{suffix}"] or 0.0) + float(row.venta_euros or 0.0)
 
         return self._build_rows(totals)
 

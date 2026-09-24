@@ -190,8 +190,12 @@ def test_igsa_filters_and_summary_use_related_family_tree(isolated_engine) -> No
     assert row.kilos_curr == pytest.approx(7.0)
     assert row.sc_prev == pytest.approx(1.0)
     assert row.sc_curr == pytest.approx(2.0)
-    assert row.ventas_prev == pytest.approx(0.0)
-    assert row.ventas_curr == pytest.approx(0.0)
+    assert row.ventas_prev == pytest.approx(6.0)
+    assert row.ventas_curr == pytest.approx(11.0)
+
+    assert row.delta_ventas == pytest.approx(5.0)
+    monthly = service.listar_resumen_anual_igsa(year=2026, month=2, acumulado=False)
+    assert sum(r.ventas_curr for r in monthly) == pytest.approx(11.0)
 
 
 def test_listar_ventas_mensuales_ireks_returns_12_month_series(isolated_engine) -> None:
