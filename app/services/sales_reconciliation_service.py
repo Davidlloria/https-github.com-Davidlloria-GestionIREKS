@@ -313,6 +313,7 @@ class SalesReconciliationService:
             was_reimport = existing is not None
 
             rows: list[VentaMensualRaw] = []
+            price_warnings: set[str] = set()
             first_period = ""
             first_cliente_id = ""
             for item in preview.import_rows:
@@ -339,6 +340,17 @@ class SalesReconciliationService:
                 else:
                     continue
 
+                precio_kg = 0.0
+                if tipo == "venta":
+                    precio_kg = self._resolve_tarifa_precio_kg(
+                        session, articulo_id, year,
+                        envase_peso=self._to_float(item.get("envase_peso")),
+                    )
+                    if precio_kg <= 0:
+                        price_warnings.add(f"{periodo}: producto {code} sin precio en ficha; importe de venta pendiente.")
+                payload = dict(item)
+                payload["precio_kg_snapshot"] = precio_kg
+
                 rows.append(
                     VentaMensualRaw(
                         raw_id=str(uuid4()),
@@ -351,8 +363,8 @@ class SalesReconciliationService:
                         articulo_descripcion_origen=str(item.get("articulo_descripcion") or "").strip(),
                         venta_kilos=venta_kilos,
                         venta_kilos_sc=venta_kilos_sc,
-                        venta_euros=0.0,
-                        payload_json=json.dumps(item, ensure_ascii=False),
+                        venta_euros=venta_kilos * precio_kg,
+                        payload_json=json.dumps(payload, ensure_ascii=False),
                     )
                 )
 
@@ -405,7 +417,10 @@ class SalesReconciliationService:
         msg = "Importación IGSA completada."
         if was_reimport:
             msg = "Reimportación IGSA completada (periodos reemplazados)."
-        return SalesOpResult(True, msg, imported=len(rows), incidencias=preview.invalid_rows, warnings=list(preview.issues))
+        warnings = list(preview.issues) + sorted(price_warnings)
+        if price_warnings:
+            msg += " Hay productos sin precio; revise los importes pendientes."
+        return SalesOpResult(True, msg, imported=len(rows), incidencias=preview.invalid_rows + len(price_warnings), warnings=warnings)
 
     def preview_igsa_excel(self, file_path: Path) -> IgsaConsolidadoPreview:
         data = self._read_igsa_consolidado_rows(file_path)

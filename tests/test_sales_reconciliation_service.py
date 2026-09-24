@@ -6,7 +6,7 @@ import pytest
 from sqlmodel import SQLModel, Session, create_engine, select
 
 import app.services.sales_reconciliation_service as sales_reconciliation_service_module
-from app.models import AlmacenMovimiento, AlmacenStock, Distribuidor, IngredienteIreks, VentaMensualRaw
+from app.models import AlmacenMovimiento, AlmacenStock, Distribuidor, IngredienteIreks, TarifaPrecioIreks, VentaMensualRaw
 from app.services.sales_reconciliation_service import ClientesImportPreview, SalesReconciliationService
 
 
@@ -161,6 +161,9 @@ def test_import_igsa_excel_persists_sales_and_warehouse_outputs(isolated_sales_e
     _build_igsa_consolidado_workbook(workbook_path)
     with Session(isolated_sales_engine) as session:
         _seed_igsa_product(session)
+        session.add(TarifaPrecioIreks(articulo_id="art-1", tarifa_ano=2026, precio_distribuidor=25, precio_fabricante=20))
+        session.add(TarifaPrecioIreks(articulo_id="art-1", tarifa_ano=2027, precio_distribuidor=50))
+        session.commit()
 
     result = SalesReconciliationService().import_igsa_excel(workbook_path)
 
@@ -175,8 +178,11 @@ def test_import_igsa_excel_persists_sales_and_warehouse_outputs(isolated_sales_e
         assert rows[0].periodo == "2026-07"
         assert rows[0].venta_kilos == 10.0
         assert rows[0].venta_kilos_sc == 0.0
+        assert rows[0].venta_euros == 100.0
+        assert json.loads(rows[0].payload_json)["precio_kg_snapshot"] == 10.0
         assert rows[1].venta_kilos == 0.0
         assert rows[1].venta_kilos_sc == 5.0
+        assert rows[1].venta_euros == 0.0
         movements = list(session.exec(select(AlmacenMovimiento).order_by(AlmacenMovimiento.articulo_lote)))
         assert len(movements) == 2
         assert {movement.almacen_id for movement in movements} == {"dist-igsa"}
@@ -189,6 +195,7 @@ def test_import_igsa_excel_persists_sales_and_warehouse_outputs(isolated_sales_e
     assert second.imported == 2
     with Session(isolated_sales_engine) as session:
         assert len(list(session.exec(select(VentaMensualRaw)))) == 2
+        assert sum(r.venta_euros for r in session.exec(select(VentaMensualRaw))) == 100.0
         assert len(list(session.exec(select(AlmacenMovimiento)))) == 2
 
 
@@ -542,3 +549,16 @@ def test_resolve_tarifa_precio_kg_converts_envase_price_to_kg_price(monkeypatch)
     precio_kg = service._resolve_tarifa_precio_kg(_Session(), "product-1", 2025, envase_peso=12.5)
 
     assert round(precio_kg, 2) == 3.36
+
+
+def test_igsa_import_warns_about_missing_price(isolated_sales_engine, tmp_path):
+    path = tmp_path / "sin-precio.xlsx"
+    _build_igsa_consolidado_workbook(path)
+    with Session(isolated_sales_engine) as session:
+        _seed_igsa_product(session)
+    result = SalesReconciliationService().import_igsa_excel(path)
+    assert result.ok
+    assert result.incidencias == 1
+    assert any("D123 sin precio" in warning for warning in result.warnings)
+    with Session(isolated_sales_engine) as session:
+        assert sum(r.venta_euros for r in session.exec(select(VentaMensualRaw))) == 0
