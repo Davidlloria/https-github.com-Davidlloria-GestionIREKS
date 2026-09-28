@@ -3,13 +3,14 @@ from typing import Any
 from pathlib import Path
 import re
 
-from PySide6.QtCore import QDate, QTimer, Qt, QUrl
-from PySide6.QtGui import QBrush, QColor, QDesktopServices, QFont, QIcon, QPainter, QPen, QPixmap, QTextDocument
+from PySide6.QtCore import QDate, QLocale, QTimer, Qt, QUrl
+from PySide6.QtGui import QBrush, QColor, QDesktopServices, QFont, QIcon, QPainter, QPen, QPixmap, QTextCharFormat, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QButtonGroup,
+    QCalendarWidget,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -36,6 +37,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -1311,7 +1313,7 @@ class IngredientsIreksPage(QWidget):
         entradas_filters_row = QHBoxLayout()
         entradas_filters_row.setObjectName("entradasToolbar")
         entradas_filters_row.addWidget(QLabel("Desde"))
-        self.entradas_date_from = QDateEdit()
+        self.entradas_date_from = self._product_date_filter("Desde")
         self.entradas_date_from.setObjectName("entradasDateFrom")
         self.entradas_date_from.setCalendarPopup(True)
         self.entradas_date_from.setDisplayFormat("dd/MM/yyyy")
@@ -1319,7 +1321,7 @@ class IngredientsIreksPage(QWidget):
         self.entradas_date_from.dateChanged.connect(lambda _d: self._reload_entradas_table(self._current_entradas_articulo_id))
         entradas_filters_row.addWidget(self.entradas_date_from)
         entradas_filters_row.addWidget(QLabel("Hasta"))
-        self.entradas_date_to = QDateEdit()
+        self.entradas_date_to = self._product_date_filter("Hasta")
         self.entradas_date_to.setObjectName("entradasDateTo")
         self.entradas_date_to.setCalendarPopup(True)
         self.entradas_date_to.setDisplayFormat("dd/MM/yyyy")
@@ -1401,14 +1403,14 @@ class IngredientsIreksPage(QWidget):
         salidas_body_layout.setSpacing(8)
         salidas_filters_row = QHBoxLayout()
         salidas_filters_row.addWidget(QLabel("Desde"))
-        self.salidas_date_from = QDateEdit()
+        self.salidas_date_from = self._product_date_filter("Desde")
         self.salidas_date_from.setCalendarPopup(True)
         self.salidas_date_from.setDisplayFormat("dd/MM/yyyy")
         self.salidas_date_from.setDate(QDate(2000, 1, 1))
         self.salidas_date_from.dateChanged.connect(lambda _d: self._reload_salidas_table(self._current_entradas_articulo_id))
         salidas_filters_row.addWidget(self.salidas_date_from)
         salidas_filters_row.addWidget(QLabel("Hasta"))
-        self.salidas_date_to = QDateEdit()
+        self.salidas_date_to = self._product_date_filter("Hasta")
         self.salidas_date_to.setCalendarPopup(True)
         self.salidas_date_to.setDisplayFormat("dd/MM/yyyy")
         self.salidas_date_to.setDate(QDate(2100, 12, 31))
@@ -1491,14 +1493,14 @@ class IngredientsIreksPage(QWidget):
         stock_body_layout.setSpacing(8)
         stock_filters_row = QHBoxLayout()
         stock_filters_row.addWidget(QLabel("Desde"))
-        self.stock_date_from = QDateEdit()
+        self.stock_date_from = self._product_date_filter("Desde")
         self.stock_date_from.setCalendarPopup(True)
         self.stock_date_from.setDisplayFormat("dd/MM/yyyy")
         self.stock_date_from.setDate(QDate(2000, 1, 1))
         self.stock_date_from.dateChanged.connect(lambda _d: self._reload_stock_table(self._current_entradas_articulo_id))
         stock_filters_row.addWidget(self.stock_date_from)
         stock_filters_row.addWidget(QLabel("Hasta"))
-        self.stock_date_to = QDateEdit()
+        self.stock_date_to = self._product_date_filter("Hasta")
         self.stock_date_to.setCalendarPopup(True)
         self.stock_date_to.setDisplayFormat("dd/MM/yyyy")
         self.stock_date_to.setDate(QDate(2100, 12, 31))
@@ -1579,7 +1581,7 @@ class IngredientsIreksPage(QWidget):
         mensual_body_layout.setSpacing(8)
         mensual_filters = QHBoxLayout()
         mensual_filters.addWidget(QLabel("Desde"))
-        self.monthly_orders_date_from = QDateEdit()
+        self.monthly_orders_date_from = self._product_date_filter("Desde")
         self.monthly_orders_date_from.setCalendarPopup(True)
         self.monthly_orders_date_from.setDisplayFormat("dd/MM/yyyy")
         self.monthly_orders_date_from.setDate(QDate(2000, 1, 1))
@@ -1588,7 +1590,7 @@ class IngredientsIreksPage(QWidget):
         )
         mensual_filters.addWidget(self.monthly_orders_date_from)
         mensual_filters.addWidget(QLabel("Hasta"))
-        self.monthly_orders_date_to = QDateEdit()
+        self.monthly_orders_date_to = self._product_date_filter("Hasta")
         self.monthly_orders_date_to.setCalendarPopup(True)
         self.monthly_orders_date_to.setDisplayFormat("dd/MM/yyyy")
         self.monthly_orders_date_to.setDate(QDate(2100, 12, 31))
@@ -1643,14 +1645,14 @@ class IngredientsIreksPage(QWidget):
         pedidos_body_layout.setSpacing(8)
         pedidos_filters = QHBoxLayout()
         pedidos_filters.addWidget(QLabel("Desde"))
-        self.pedidos_date_from = QDateEdit()
+        self.pedidos_date_from = self._product_date_filter("Desde")
         self.pedidos_date_from.setCalendarPopup(True)
         self.pedidos_date_from.setDisplayFormat("dd/MM/yyyy")
         self.pedidos_date_from.setDate(QDate(2000, 1, 1))
         self.pedidos_date_from.dateChanged.connect(lambda _d: self._reload_pedidos_table(self._current_entradas_articulo_id))
         pedidos_filters.addWidget(self.pedidos_date_from)
         pedidos_filters.addWidget(QLabel("Hasta"))
-        self.pedidos_date_to = QDateEdit()
+        self.pedidos_date_to = self._product_date_filter("Hasta")
         self.pedidos_date_to.setCalendarPopup(True)
         self.pedidos_date_to.setDisplayFormat("dd/MM/yyyy")
         self.pedidos_date_to.setDate(QDate(2100, 12, 31))
@@ -2103,6 +2105,71 @@ class IngredientsIreksPage(QWidget):
             button = getattr(self, attr, None)
             if button is not None:
                 button.setEnabled(enabled)
+
+    @staticmethod
+    def _product_date_filter(label: str) -> QDateEdit:
+        """Keep the product date fields and their popup readable under the shared theme."""
+        field = QDateEdit()
+        field.setCalendarPopup(True)
+        field.setLocale(QLocale(QLocale.Language.Spanish, QLocale.Country.Spain))
+        field.setAccessibleName(label)
+        field.setToolTip(f"{label}: escribe una fecha o abre el calendario")
+        field.setMinimumWidth(max(190, field.fontMetrics().horizontalAdvance("00/00/0000") + 96))
+        field.setFixedHeight(38)
+        icon = (Path(__file__).resolve().parents[3] / "assets" / "icons" / "calendar.svg").as_posix()
+        field.setStyleSheet("""
+            QDateEdit {
+                background: #FFFFFF; color: #0B2F5B; border: 1px solid #C9D7E8;
+                border-radius: 7px; padding: 0 42px 0 12px; min-height: 0;
+                selection-background-color: #D9F0F2; selection-color: #0B2F5B;
+            }
+            QDateEdit:hover { border-color: #8EBBC6; }
+            QDateEdit:focus { border: 1px solid #087E9C; }
+            QDateEdit::drop-down {
+                subcontrol-origin: border; subcontrol-position: top right;
+                width: 34px; border-left: 1px solid #D6E5EC;
+                border-top-right-radius: 7px; border-bottom-right-radius: 7px;
+                background: #EDF5F8;
+            }
+            QDateEdit::drop-down:hover { background: #D9F0F2; }
+            QDateEdit::down-arrow { image: url("%s"); width: 18px; height: 18px; }
+        """ % icon)
+        calendar = field.calendarWidget()
+        calendar.setMinimumSize(336, 292)
+        calendar.setFirstDayOfWeek(Qt.DayOfWeek.Monday)
+        calendar.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+        calendar.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.ShortDayNames)
+        calendar.setStyleSheet("""
+            QCalendarWidget { background: #FFFFFF; color: #0B2F5B; }
+            QCalendarWidget QWidget#qt_calendar_navigationbar { background: #0B2F5B; }
+            QCalendarWidget QToolButton {
+                color: #FFFFFF; background: transparent; border: none;
+                border-radius: 5px; padding: 5px; min-height: 26px;
+            }
+            QCalendarWidget QToolButton:hover { background: #087E9C; }
+            QCalendarWidget QMenu { background: #FFFFFF; color: #0B2F5B; }
+            QCalendarWidget QMenu::item:selected { background: #D9F0F2; }
+            QCalendarWidget QSpinBox {
+                background: #FFFFFF; color: #0B2F5B; padding: 2px;
+                border: 1px solid #8EBBC6; min-height: 26px;
+            }
+            QCalendarWidget QAbstractItemView {
+                background: #FFFFFF; alternate-background-color: #F1F6FA;
+                color: #0B2F5B; selection-background-color: #087E9C;
+                selection-color: #FFFFFF; border: none; outline: 0;
+            }
+        """)
+        header = QTextCharFormat()
+        header.setForeground(QColor("#0B2F5B"))
+        header.setBackground(QColor("#EDF5F8"))
+        calendar.setHeaderTextFormat(header)
+        for name, text in (("qt_calendar_prevmonth", "‹"), ("qt_calendar_nextmonth", "›")):
+            button = calendar.findChild(QToolButton, name)
+            if button is not None:
+                button.setIcon(QIcon())
+                button.setText(text)
+                button.setStyleSheet("font-size: 22px; font-weight: 600; min-width: 28px;")
+        return field
 
     def _ireks_tab_header(
         self,
