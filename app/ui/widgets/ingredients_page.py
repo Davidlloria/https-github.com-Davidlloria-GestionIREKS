@@ -1248,13 +1248,6 @@ class IngredientsIreksPage(QWidget):
                 color: #5E6C84;
                 font-weight: 500;
             }
-            QDateEdit#entradasDateFrom, QDateEdit#entradasDateTo {
-                min-height: 30px;
-                padding: 2px 8px;
-                border: 1px solid #D5DDEA;
-                border-radius: 6px;
-                background: #FFFFFF;
-            }
             QPushButton#entradasResetBtn {
                 min-height: 30px;
                 padding: 0 10px;
@@ -1317,7 +1310,7 @@ class IngredientsIreksPage(QWidget):
         self.entradas_date_from.setObjectName("entradasDateFrom")
         self.entradas_date_from.setCalendarPopup(True)
         self.entradas_date_from.setDisplayFormat("dd/MM/yyyy")
-        self.entradas_date_from.setDate(QDate(2000, 1, 1))
+        self.entradas_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
         self.entradas_date_from.dateChanged.connect(lambda _d: self._reload_entradas_table(self._current_entradas_articulo_id))
         entradas_filters_row.addWidget(self.entradas_date_from)
         entradas_filters_row.addWidget(QLabel("Hasta"))
@@ -1325,7 +1318,7 @@ class IngredientsIreksPage(QWidget):
         self.entradas_date_to.setObjectName("entradasDateTo")
         self.entradas_date_to.setCalendarPopup(True)
         self.entradas_date_to.setDisplayFormat("dd/MM/yyyy")
-        self.entradas_date_to.setDate(QDate(2100, 12, 31))
+        self.entradas_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.entradas_date_to.dateChanged.connect(lambda _d: self._reload_entradas_table(self._current_entradas_articulo_id))
         entradas_filters_row.addWidget(self.entradas_date_to)
         clear_dates_btn = QPushButton("Todo")
@@ -1406,14 +1399,14 @@ class IngredientsIreksPage(QWidget):
         self.salidas_date_from = self._product_date_filter("Desde")
         self.salidas_date_from.setCalendarPopup(True)
         self.salidas_date_from.setDisplayFormat("dd/MM/yyyy")
-        self.salidas_date_from.setDate(QDate(2000, 1, 1))
+        self.salidas_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
         self.salidas_date_from.dateChanged.connect(lambda _d: self._reload_salidas_table(self._current_entradas_articulo_id))
         salidas_filters_row.addWidget(self.salidas_date_from)
         salidas_filters_row.addWidget(QLabel("Hasta"))
         self.salidas_date_to = self._product_date_filter("Hasta")
         self.salidas_date_to.setCalendarPopup(True)
         self.salidas_date_to.setDisplayFormat("dd/MM/yyyy")
-        self.salidas_date_to.setDate(QDate(2100, 12, 31))
+        self.salidas_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.salidas_date_to.dateChanged.connect(lambda _d: self._reload_salidas_table(self._current_entradas_articulo_id))
         salidas_filters_row.addWidget(self.salidas_date_to)
         salidas_clear_dates_btn = QPushButton("Todo")
@@ -1496,14 +1489,14 @@ class IngredientsIreksPage(QWidget):
         self.stock_date_from = self._product_date_filter("Desde")
         self.stock_date_from.setCalendarPopup(True)
         self.stock_date_from.setDisplayFormat("dd/MM/yyyy")
-        self.stock_date_from.setDate(QDate(2000, 1, 1))
+        self.stock_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
         self.stock_date_from.dateChanged.connect(lambda _d: self._reload_stock_table(self._current_entradas_articulo_id))
         stock_filters_row.addWidget(self.stock_date_from)
         stock_filters_row.addWidget(QLabel("Hasta"))
         self.stock_date_to = self._product_date_filter("Hasta")
         self.stock_date_to.setCalendarPopup(True)
         self.stock_date_to.setDisplayFormat("dd/MM/yyyy")
-        self.stock_date_to.setDate(QDate(2100, 12, 31))
+        self.stock_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.stock_date_to.dateChanged.connect(lambda _d: self._reload_stock_table(self._current_entradas_articulo_id))
         stock_filters_row.addWidget(self.stock_date_to)
         stock_clear_dates_btn = QPushButton("Todo")
@@ -1584,7 +1577,7 @@ class IngredientsIreksPage(QWidget):
         self.monthly_orders_date_from = self._product_date_filter("Desde")
         self.monthly_orders_date_from.setCalendarPopup(True)
         self.monthly_orders_date_from.setDisplayFormat("dd/MM/yyyy")
-        self.monthly_orders_date_from.setDate(QDate(2000, 1, 1))
+        self.monthly_orders_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
         self.monthly_orders_date_from.dateChanged.connect(
             lambda _d: self._reload_monthly_orders_table(self._current_entradas_articulo_id)
         )
@@ -1593,7 +1586,7 @@ class IngredientsIreksPage(QWidget):
         self.monthly_orders_date_to = self._product_date_filter("Hasta")
         self.monthly_orders_date_to.setCalendarPopup(True)
         self.monthly_orders_date_to.setDisplayFormat("dd/MM/yyyy")
-        self.monthly_orders_date_to.setDate(QDate(2100, 12, 31))
+        self.monthly_orders_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.monthly_orders_date_to.dateChanged.connect(
             lambda _d: self._reload_monthly_orders_table(self._current_entradas_articulo_id)
         )
@@ -1648,14 +1641,14 @@ class IngredientsIreksPage(QWidget):
         self.pedidos_date_from = self._product_date_filter("Desde")
         self.pedidos_date_from.setCalendarPopup(True)
         self.pedidos_date_from.setDisplayFormat("dd/MM/yyyy")
-        self.pedidos_date_from.setDate(QDate(2000, 1, 1))
+        self.pedidos_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
         self.pedidos_date_from.dateChanged.connect(lambda _d: self._reload_pedidos_table(self._current_entradas_articulo_id))
         pedidos_filters.addWidget(self.pedidos_date_from)
         pedidos_filters.addWidget(QLabel("Hasta"))
         self.pedidos_date_to = self._product_date_filter("Hasta")
         self.pedidos_date_to.setCalendarPopup(True)
         self.pedidos_date_to.setDisplayFormat("dd/MM/yyyy")
-        self.pedidos_date_to.setDate(QDate(2100, 12, 31))
+        self.pedidos_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.pedidos_date_to.dateChanged.connect(lambda _d: self._reload_pedidos_table(self._current_entradas_articulo_id))
         pedidos_filters.addWidget(self.pedidos_date_to)
         self.pedidos_reset_btn = QPushButton("Limpiar")
@@ -2114,8 +2107,7 @@ class IngredientsIreksPage(QWidget):
         field.setLocale(QLocale(QLocale.Language.Spanish, QLocale.Country.Spain))
         field.setAccessibleName(label)
         field.setToolTip(f"{label}: escribe una fecha o abre el calendario")
-        field.setMinimumWidth(max(190, field.fontMetrics().horizontalAdvance("00/00/0000") + 96))
-        field.setFixedHeight(38)
+        field.setFixedSize(max(190, field.fontMetrics().horizontalAdvance("00/00/0000") + 96), 32)
         icon = (Path(__file__).resolve().parents[3] / "assets" / "icons" / "calendar.svg").as_posix()
         field.setStyleSheet("""
             QDateEdit {
@@ -3390,8 +3382,8 @@ class IngredientsIreksPage(QWidget):
     def _reset_entradas_date_filters(self) -> None:
         self.entradas_date_from.blockSignals(True)
         self.entradas_date_to.blockSignals(True)
-        self.entradas_date_from.setDate(QDate(2000, 1, 1))
-        self.entradas_date_to.setDate(QDate(2100, 12, 31))
+        self.entradas_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
+        self.entradas_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.entradas_date_from.blockSignals(False)
         self.entradas_date_to.blockSignals(False)
         self._reload_entradas_table(self._current_entradas_articulo_id)
@@ -3399,8 +3391,8 @@ class IngredientsIreksPage(QWidget):
     def _reset_salidas_date_filters(self) -> None:
         self.salidas_date_from.blockSignals(True)
         self.salidas_date_to.blockSignals(True)
-        self.salidas_date_from.setDate(QDate(2000, 1, 1))
-        self.salidas_date_to.setDate(QDate(2100, 12, 31))
+        self.salidas_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
+        self.salidas_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.salidas_date_from.blockSignals(False)
         self.salidas_date_to.blockSignals(False)
         self._reload_salidas_table(self._current_entradas_articulo_id)
@@ -3408,8 +3400,8 @@ class IngredientsIreksPage(QWidget):
     def _reset_stock_date_filters(self) -> None:
         self.stock_date_from.blockSignals(True)
         self.stock_date_to.blockSignals(True)
-        self.stock_date_from.setDate(QDate(2000, 1, 1))
-        self.stock_date_to.setDate(QDate(2100, 12, 31))
+        self.stock_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
+        self.stock_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.stock_date_from.blockSignals(False)
         self.stock_date_to.blockSignals(False)
         self._reload_stock_table(self._current_entradas_articulo_id)
@@ -3417,8 +3409,8 @@ class IngredientsIreksPage(QWidget):
     def _reset_pedidos_date_filters(self) -> None:
         self.pedidos_date_from.blockSignals(True)
         self.pedidos_date_to.blockSignals(True)
-        self.pedidos_date_from.setDate(QDate(2000, 1, 1))
-        self.pedidos_date_to.setDate(QDate(2100, 12, 31))
+        self.pedidos_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
+        self.pedidos_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.pedidos_date_from.blockSignals(False)
         self.pedidos_date_to.blockSignals(False)
         self._reload_pedidos_table(self._current_entradas_articulo_id)
@@ -3426,8 +3418,8 @@ class IngredientsIreksPage(QWidget):
     def _reset_monthly_orders_date_filters(self) -> None:
         self.monthly_orders_date_from.blockSignals(True)
         self.monthly_orders_date_to.blockSignals(True)
-        self.monthly_orders_date_from.setDate(QDate(2000, 1, 1))
-        self.monthly_orders_date_to.setDate(QDate(2100, 12, 31))
+        self.monthly_orders_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
+        self.monthly_orders_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.monthly_orders_date_from.blockSignals(False)
         self.monthly_orders_date_to.blockSignals(False)
         self._reload_monthly_orders_table(self._current_entradas_articulo_id)
