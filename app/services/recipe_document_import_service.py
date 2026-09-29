@@ -25,10 +25,11 @@ class RecipeDocumentLineDraft:
     process_name: str
     matched_ingredient: IngredientChoice | None = None
     notes: str = ""
+    source_process: str = ""
 
     @property
     def is_resolved(self) -> bool:
-        return self.matched_ingredient is not None
+        return self.matched_ingredient is not None or bool(self.source_process)
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,7 @@ class RecipeDocumentImportService:
     _PIECES_RE = re.compile(r"\b(?:para\s+)?(\d+)\s+(?:unidades|uds?\.?|piezas)\b", re.IGNORECASE)
     _PROCESS_PREFIXES = (
         "masa",
+        "mezcla",
         "relleno",
         "crema",
         "compota",
@@ -154,7 +156,7 @@ class RecipeDocumentImportService:
             for warning in draft.warnings
             if not re.fullmatch(r"\d+ ingrediente\(s\) necesitan revisión manual\.", warning)
         ]
-        unresolved = sum(line.matched_ingredient is None for line in lines)
+        unresolved = sum(not line.is_resolved for line in lines)
         if unresolved:
             warnings.append(f"{unresolved} ingrediente(s) necesitan revisión manual.")
         return replace(draft, lines=tuple(lines), warnings=tuple(warnings))
@@ -208,6 +210,7 @@ class RecipeDocumentImportService:
         lines: list[RecipeDocumentLineDraft] = []
         warnings: list[str] = []
         current_process = "Masa final"
+        headings_seen: dict[str, str] = {}
         previous_quantity_index = -1
         for index, raw_quantity in enumerate(ingredient_rows):
             parsed_quantity = self._parse_quantity(raw_quantity)
@@ -221,6 +224,7 @@ class RecipeDocumentImportService:
             headings = [line for line in between if self._is_process_heading(line)]
             if headings:
                 current_process = self._process_name(headings[-1])
+                headings_seen[self._normalized(headings[-1])] = current_process
             quantity_g, quantity_note = parsed_quantity
             matched = self._match_ingredient(source_name)
             notes = quantity_note
@@ -238,6 +242,16 @@ class RecipeDocumentImportService:
             )
             previous_quantity_index = index
 
+        # A final assembly can refer to previously prepared mixtures by name.
+        references = {self._normalized(line.source_name) for line in lines} & headings_seen.keys()
+        if "masa" in references:
+            lines = [replace(line, process_name="Masa" if line.process_name == "Masa final" else line.process_name)
+                     for line in lines]
+            headings_seen["masa"] = "Masa"
+        lines = [replace(line, process_name="Masa final", source_process=headings_seen[self._normalized(line.source_name)],
+                         matched_ingredient=None, notes="Preparación incorporada a la masa final")
+                 if self._normalized(line.source_name) in references else line for line in lines]
+
         inline_quantities = [
             line
             for line in ingredient_rows
@@ -249,7 +263,7 @@ class RecipeDocumentImportService:
             )
         if not lines:
             warnings.append("No se detectaron líneas de ingredientes en esta página.")
-        unresolved = sum(line.matched_ingredient is None for line in lines)
+        unresolved = sum(not line.is_resolved for line in lines)
         if unresolved:
             warnings.append(f"{unresolved} ingrediente(s) necesitan revisión manual.")
 

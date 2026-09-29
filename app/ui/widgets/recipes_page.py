@@ -124,8 +124,8 @@ def _unique_process_names(values: list[str]) -> list[str]:
         name = _normalize_process_name(value)
         if name not in names:
             names.append(name)
-    if "Masa final" not in names:
-        names.insert(0, "Masa final")
+    if not names:
+        names.append("Masa final")
     return names
 
 
@@ -2371,9 +2371,9 @@ class RecipesPage(QWidget):
         recipe_process_layout.setSpacing(6)
         recipe_process_layout.addWidget(QLabel("Proceso"))
         self.active_process_combo = QComboBox()
-        self.active_process_combo.setEditable(True)
-        self.active_process_combo.setMinimumWidth(130)
-        self.active_process_combo.setMaximumWidth(170)
+        self.active_process_combo.setEditable(False)
+        self.active_process_combo.setMinimumWidth(240)
+        self.active_process_combo.setMaximumWidth(360)
         self.active_process_combo.setFixedHeight(30)
         self.active_process_combo.setStyleSheet(
             "QComboBox { min-height: 0px; max-height: 30px; padding: 0 8px; }"
@@ -2400,6 +2400,16 @@ class RecipesPage(QWidget):
         self.del_process_btn.clicked.connect(self._remove_process)
         recipe_process_layout.addWidget(self.add_process_btn)
         recipe_process_layout.addWidget(self.del_process_btn)
+        for text, tooltip, callback in (
+            ("Renombrar", "Cambiar el nombre del proceso", self._rename_process),
+            ("↑", "Mover el proceso antes", lambda: self._reorder_process(-1)),
+            ("↓", "Mover el proceso después", lambda: self._reorder_process(1)),
+        ):
+            button = QPushButton(text)
+            button.setToolTip(tooltip)
+            button.setStyleSheet("min-height: 28px; max-height: 28px; padding: 0 8px;")
+            button.clicked.connect(callback)
+            recipe_process_layout.addWidget(button)
         recipe_process_layout.addStretch()
 
         lines_group = QGroupBox()
@@ -2433,7 +2443,7 @@ class RecipesPage(QWidget):
         self.lines_table.setColumnWidth(self.COL_NOTA, 80)
         self.lines_table.setColumnWidth(self.COL_CANTIDAD, 116)
         self.lines_table.setColumnWidth(self.COL_PCT, 96)
-        self.lines_table.setColumnWidth(self.COL_PROCESO, 94)
+        self.lines_table.setColumnWidth(self.COL_PROCESO, 190)
         self.lines_table.setItemDelegateForColumn(
             self.COL_NOTA,
             CompactTextDelegate(self.lines_table),
@@ -3575,10 +3585,69 @@ class RecipesPage(QWidget):
         self.active_process_combo.setCurrentText(name)
         self._schedule_autosave()
 
+    def _rename_process(self) -> None:
+        old = self._current_active_process()
+        name, accepted = QInputDialog.getText(self, "Renombrar proceso", "Nombre", text=old)
+        name = name.strip()
+        if not accepted or not name or name == old:
+            return
+        if name.casefold() in {value.casefold() for value in self.recipe_process_names}:
+            QMessageBox.warning(self, "Procesos", "Ya existe un proceso con ese nombre.")
+            return
+        lines = self._build_lines()
+        if old == self.recipe_elaboracion_data.get("recipe_primary_process", "Masa final"):
+            self.recipe_elaboracion_data["recipe_primary_process"] = name
+        for line in lines:
+            if line.proceso_nombre == old:
+                line.proceso_nombre = name
+            if line.proceso_origen_nombre == old:
+                line.proceso_origen_nombre = name
+                line.nombre_mostrado = f"Proceso: {name}"
+                line.codigo_ingrediente = f"PROC:{name}"
+        for data in (self.recipe_escandallo_data, self.recipe_elaboracion_data):
+            for key in list(data):
+                if key.startswith(f"proceso::{old}::"):
+                    data[f"proceso::{name}::" + key[len(f"proceso::{old}::"):]] = data.pop(key)
+        self.recipe_process_names = [name if value == old else value for value in self.recipe_process_names]
+        self._replace_process_lines(lines, name)
+
+    def _reorder_process(self, offset: int) -> None:
+        active = self._current_active_process()
+        index = self.recipe_process_names.index(active)
+        target = index + offset
+        if 0 <= target < len(self.recipe_process_names):
+            names = list(self.recipe_process_names)
+            names[index], names[target] = names[target], names[index]
+            self._refresh_process_controls(names)
+            self._schedule_autosave()
+
+    def _replace_process_lines(self, lines: list[RecetaLinea], active: str) -> None:
+        previous = self._is_loading_recipe
+        self._is_loading_recipe = True
+        self.lines_table.blockSignals(True)
+        try:
+            self._render_lines(lines)
+            self.active_process_combo.setCurrentText(active)
+        finally:
+            self.lines_table.blockSignals(False)
+            self._is_loading_recipe = previous
+        self._on_lines_changed()
+
+    def _move_ingredient_to_process(self, row: int, target: str) -> None:
+        line = self._line_from_row(row)
+        if line.tipo_linea == "proceso" or not line.nombre_mostrado:
+            return
+        line.proceso_nombre = target
+        previous = self.lines_table.blockSignals(True)
+        self._set_line_row(row, line)
+        self.lines_table.blockSignals(previous)
+        self._apply_process_filter()
+        self._on_lines_changed()
+
     def _remove_process(self) -> None:
         target = self._current_active_process()
-        if target == "Masa final":
-            QMessageBox.information(self, "Recetas", "El proceso 'Masa final' no se puede eliminar.")
+        if target == self.recipe_elaboracion_data.get("recipe_primary_process", "Masa final") or len(self.recipe_process_names) == 1:
+            QMessageBox.information(self, "Recetas", "El proceso principal no se puede eliminar.")
             return
         if target not in self.recipe_process_names:
             return
@@ -3667,6 +3736,14 @@ class RecipesPage(QWidget):
                     proceso_nombre=_normalize_process_name(source_line.process_name),
                     notas=source_line.notes,
                 )
+                if source_line.source_process:
+                    line.tipo_linea = "proceso"
+                    line.tipo_origen = "process"
+                    line.proceso_origen_nombre = source_line.source_process
+                    line.cantidad_origen_g = line.cantidad_base_g
+                    line.nombre_mostrado = f"Proceso: {source_line.source_process}"
+                    line.codigo_ingrediente = f"PROC:{source_line.source_process}"
+                    line.familia = "Proceso"
                 lines.append(line)
             self._refresh_process_controls(
                 [line.proceso_nombre for line in lines] or ["Masa final"],
@@ -3771,7 +3848,14 @@ class RecipesPage(QWidget):
             images_migrated = self._load_images_gallery(self.recipe_elaboracion_data)
             self._proceso_rich_html = str(self.recipe_elaboracion_data.get(self.PROCESO_RICH_HTML_KEY, "") or "").strip()
             line_processes = [_normalize_process_name(getattr(line, "proceso_nombre", "") or "Masa final") for line in aggregate.lineas]
-            self._refresh_process_controls(line_processes or ["Masa final"], preserve_active=False)
+            try:
+                saved_processes = json.loads(self.recipe_elaboracion_data.get("recipe_process_order", "[]"))
+            except (ValueError, TypeError):
+                saved_processes = []
+            if not isinstance(saved_processes, list):
+                saved_processes = []
+            self._refresh_process_controls([name for name in saved_processes if isinstance(name, str)] + line_processes,
+                                           preserve_active=False)
             self.peso_spin.setValue(self._technical_peso_pieza(float(receta.peso_pieza_g or 0.0)))
             self._render_lines(aggregate.lineas)
             self._update_summary(receta, aggregate.lineas)
@@ -3926,7 +4010,19 @@ class RecipesPage(QWidget):
         add_action = menu.addAction("Añadir fila")
         remove_action = menu.addAction("Eliminar fila")
         remove_action.setEnabled(index.isValid())
+        move_actions = {}
+        if index.isValid():
+            line = self._line_from_row(index.row())
+            if line.tipo_linea != "proceso" and line.nombre_mostrado:
+                submenu = menu.addMenu("Traspasar ingrediente a proceso")
+                for name in self._available_process_names():
+                    if name != line.proceso_nombre:
+                        move_actions[submenu.addAction(name)] = name
+                submenu.setEnabled(bool(move_actions))
         action = menu.exec(self.lines_table.viewport().mapToGlobal(position))
+        if action in move_actions:
+            self._move_ingredient_to_process(index.row(), move_actions[action])
+            return
         if action is add_action:
             self._add_ingredient()
         elif action is remove_action:
@@ -4180,6 +4276,7 @@ class RecipesPage(QWidget):
 
     def _build_recipe_payload(self) -> RecipeActivePayload:
         elaboracion_payload = dict(self.recipe_elaboracion_data)
+        elaboracion_payload["recipe_process_order"] = json.dumps(self.recipe_process_names, ensure_ascii=False)
         images_gallery = self._collect_images_gallery()
         return RecipeActivePayload(
             recipe_id=self.current_recipe_id,
@@ -4213,7 +4310,7 @@ class RecipesPage(QWidget):
                 line.proceso_nombre = _normalize_process_name(line.proceso_nombre)
                 lines.append(line)
         line_processes = [line.proceso_nombre for line in lines]
-        self._refresh_process_controls(line_processes or self.recipe_process_names)
+        self._refresh_process_controls(self.recipe_process_names + line_processes)
         return lines
 
     def _recalculate(self) -> None:
@@ -4311,7 +4408,8 @@ class RecipesPage(QWidget):
             total_pct += float(line.porcentaje_panadero or 0.0)
             total_cost += cost
         process_names = {_normalize_process_name(line.proceso_nombre) for line in recipe_lines}
-        final_process = "Masa final" if "Masa final" in process_names else self._current_escandallo_process()
+        primary = self.recipe_elaboracion_data.get("recipe_primary_process", "Masa final")
+        final_process = primary if primary in process_names else self._current_escandallo_process()
         if final_process == self._current_escandallo_process():
             final_mass_g = total_qty_g
         else:
@@ -4507,7 +4605,7 @@ class RecipesPage(QWidget):
 
     def _render_lines(self, lineas: list[RecetaLinea]) -> None:
         line_processes = [_normalize_process_name(getattr(linea, "proceso_nombre", "") or "Masa final") for linea in lineas]
-        self._refresh_process_controls(line_processes or self.recipe_process_names)
+        self._refresh_process_controls(self.recipe_process_names + line_processes)
         self.lines_table.setRowCount(0)
         for idx, linea in enumerate(lineas):
             self.lines_table.insertRow(idx)
@@ -4525,7 +4623,8 @@ class RecipesPage(QWidget):
     def _update_summary(self, receta: Receta, lineas: list[RecetaLinea] | None = None) -> None:
         if lineas:
             process_names = [_normalize_process_name(getattr(linea, "proceso_nombre", "")) for linea in lineas]
-            principal = "Masa final" if "Masa final" in process_names else (process_names[0] if process_names else "Masa final")
+            primary = self.recipe_elaboracion_data.get("recipe_primary_process", "Masa final")
+            principal = primary if primary in process_names else (process_names[0] if process_names else primary)
             principal_lines = [
                 linea for linea in lineas if _normalize_process_name(getattr(linea, "proceso_nombre", "")) == principal
             ]

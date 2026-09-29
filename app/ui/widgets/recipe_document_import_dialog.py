@@ -423,12 +423,12 @@ class RecipeDocumentImportDialog(QDialog):
                 line.process_name,
                 line.source_name,
                 line.source_quantity,
-                matched.nombre if matched is not None else "—",
-                "Coincide" if matched is not None else "Revisar",
+                line.source_process or (matched.nombre if matched is not None else "—"),
+                "Preparación" if line.source_process else "Coincide" if matched is not None else "Revisar",
             )
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
-                if matched is None:
+                if not line.is_resolved:
                     item.setBackground(QColor("#FFF3CD"))
                 if line.notes:
                     item.setToolTip(line.notes)
@@ -439,7 +439,8 @@ class RecipeDocumentImportDialog(QDialog):
 
     def _review_selection_changed(self) -> None:
         selected = self.review_table.selectionModel().selectedRows()
-        self.raw_material_button.setEnabled(bool(self._draft is not None and selected))
+        self.raw_material_button.setEnabled(bool(self._draft is not None and selected
+                                                and not self._draft.lines[selected[0].row()].source_process))
 
     def _search_raw_material(self) -> None:
         if self._draft is None:
@@ -450,6 +451,8 @@ class RecipeDocumentImportDialog(QDialog):
             return
         line_index = selected_rows[0].row()
         source_line = self._draft.lines[line_index]
+        if source_line.source_process:
+            return
         query, accepted = QInputDialog.getText(
             self,
             "Buscar materia prima",

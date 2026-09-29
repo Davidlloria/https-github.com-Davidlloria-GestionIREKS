@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass, field
 
 from app.models import Receta, RecetaLinea
@@ -142,7 +143,12 @@ class RecipeCalculationService:
         issues: list[ValidationIssue] = []
         process_order = self._ordered_processes(lineas)
         stats_by_process = self.process_stats(lineas)
-        principal = "Masa final" if "Masa final" in stats_by_process else process_order[0]
+        try:
+            metadata = json.loads(receta.parametros_elaboracion_json or "{}")
+        except (ValueError, TypeError):
+            metadata = {}
+        primary = metadata.get("recipe_primary_process", "Masa final") if isinstance(metadata, dict) else "Masa final"
+        principal = primary if primary in stats_by_process else process_order[0]
         principal_stats = stats_by_process.get(principal, _ProcessStats())
         total_harinas = float(principal_stats.harina_g or 0.0)
         total_liquidos = float(principal_stats.liquido_g or 0.0)

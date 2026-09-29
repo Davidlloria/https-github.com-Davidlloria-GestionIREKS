@@ -244,3 +244,18 @@ def test_refresh_discovers_new_modified_and_removed_recipe_pdfs(tmp_path, monkey
     service.refresh_documents()
     assert service.browse_documents() == []
     assert service.search("espeltanueva") == []
+
+
+def test_stollen_preparations_and_final_assembly_are_separate():
+    service = RecipeDocumentImportService()
+    draft = service.parse_page(
+        "Stollen\ncon MELLA BRIOCHE y DREIDOPPEL\nMezcla de frutas\nPasas sultanas\n2,000 kg\n"
+        "ORANGEAT\n0,500 kg\nTotal\n2,500 kg\nReposo: de un día para otro.\n"
+        "Masa\nMELLA BRIOCHE\n4,000 kg\nAgua\n1,500 kg\nTotal\n5,500 kg\n"
+        "Amasado: 2 + 10 minutos.\nMasa\n5,500 kg\nMezcla de frutas\n2,500 kg\nTotal\n8,000 kg",
+        document_id="stollen", document_name="Stollen.pdf", relative_path="Stollen.pdf", page_number=1,
+    )
+    assert [line.process_name for line in draft.lines] == ["Mezcla de frutas"] * 2 + ["Masa"] * 2 + ["Masa final"] * 2
+    assert [line.source_process for line in draft.lines[-2:]] == ["Masa", "Mezcla de frutas"]
+    assert all(line.is_resolved for line in draft.lines[-2:])
+    assert draft.unresolved_count == 4
