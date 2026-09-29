@@ -43,6 +43,7 @@ class RecipeDocumentDraft:
     number_of_pieces: int
     lines: tuple[RecipeDocumentLineDraft, ...]
     warnings: tuple[str, ...] = ()
+    primary_process: str = "Masa final"
 
     @property
     def unresolved_count(self) -> int:
@@ -60,6 +61,10 @@ class RecipeDocumentImportService:
     _PROCESS_PREFIXES = (
         "masa",
         "mezcla",
+        "primera masa",
+        "segunda masa",
+        "tercera masa",
+        "glasa",
         "relleno",
         "crema",
         "compota",
@@ -177,17 +182,30 @@ class RecipeDocumentImportService:
             page_number=target_page,
         )
 
-        if draft.lines and not draft.process_text:
-            # Recipe sheets often put the instructions on the following page.
-            # Require the heading at its start to avoid absorbing another recipe.
-            following_text = self.content_service.get_page_text(result.document_id, target_page + 1) or ""
-            following_rows = [self._clean_line(row) for row in following_text.splitlines() if row.strip()]
-            if following_rows and self._is_process_marker(following_rows[0]):
-                instructions = self._format_process_steps(following_rows[1:])
-                if instructions:
-                    draft = replace(draft, process_text=instructions, warnings=draft.warnings + (
-                        f"Proceso de elaboración tomado de la página {target_page + 1} del documento.",
-                    ))
+        if draft.lines:
+            combined_text = page_text
+            process_names = {self._normalized(line.process_name) for line in draft.lines}
+            for following_page in range(target_page + 1, target_page + 21):
+                following_text = self.content_service.get_page_text(result.document_id, following_page) or ""
+                rows = [self._clean_line(row) for row in following_text.splitlines() if row.strip()]
+                if not rows:
+                    break
+                starts_instructions = self._is_process_marker(rows[0])
+                continues_instructions = bool(draft.process_text) and (
+                    self._normalized(rows[0]) in process_names
+                    or self._normalized(rows[0]) in {"proceso final", "coccion", "decoracion", "acabado"}
+                ) and len(rows) > 1 and self._is_bullet(rows[1])
+                # Do not absorb the ingredient list or title of another recipe.
+                if not starts_instructions and not continues_instructions:
+                    break
+                combined_text += "\n" + following_text
+                draft = self.parse_page(
+                    combined_text, document_id=result.document_id, document_name=result.name,
+                    relative_path=result.relative_path, page_number=target_page,
+                )
+                draft = replace(draft, warnings=draft.warnings + (
+                    f"Elaboración completada con las páginas {target_page} a {following_page}; incluye la página {following_page}.",
+                ))
 
         if not page_text.strip():
             draft = replace(draft, warnings=draft.warnings + (
@@ -217,7 +235,26 @@ class RecipeDocumentImportService:
         )
         ingredient_rows = rows[:process_start]
         process_rows = rows[process_start + 1 :] if process_start < len(rows) else []
-        process_text = self._format_process_steps(process_rows)
+        local_instructions: list[str] = []
+        preparation = ""
+        collecting = False
+        for index, row in enumerate(ingredient_rows):
+            next_is_quantity = index + 1 < len(ingredient_rows) and self._parse_quantity(ingredient_rows[index + 1]) is not None
+            if self._is_process_heading(row) and not next_is_quantity:
+                preparation = row
+                collecting = False
+            elif self._is_bullet(row):
+                if not collecting and preparation:
+                    local_instructions.append(preparation)
+                collecting = True
+                local_instructions.append(row)
+            elif collecting:
+                # Stop at the next ingredient block or assembled preparation.
+                if next_is_quantity or self._parse_quantity(row) is not None:
+                    collecting = False
+                else:
+                    local_instructions.append(row)
+        process_text = self._format_process_steps(local_instructions + process_rows)
 
         lines: list[RecipeDocumentLineDraft] = []
         warnings: list[str] = []
@@ -260,9 +297,21 @@ class RecipeDocumentImportService:
             lines = [replace(line, process_name="Masa" if line.process_name == "Masa final" else line.process_name)
                      for line in lines]
             headings_seen["masa"] = "Masa"
-        lines = [replace(line, process_name="Masa final", source_process=headings_seen[self._normalized(line.source_name)],
-                         matched_ingredient=None, notes="Preparación incorporada a la masa final")
-                 if self._normalized(line.source_name) in references else line for line in lines]
+        converted = []
+        assembly_process = None
+        for line in lines:
+            source = headings_seen.get(self._normalized(line.source_name))
+            if source:
+                if line.process_name == source:
+                    assembly_process = line.process_name
+                target = "Masa final" if line.process_name == assembly_process else line.process_name
+                line = replace(line, process_name=target, source_process=source,
+                               matched_ingredient=None, notes="Preparación incorporada a este proceso")
+            converted.append(line)
+        lines = converted
+        assemblies = [line.process_name for line in lines if line.source_process]
+        primary_process = assemblies[-1] if assemblies else next(
+            (line.process_name for line in lines if "opcional" not in self._normalized(line.process_name)), "Masa final")
 
         inline_quantities = [
             line
@@ -289,6 +338,7 @@ class RecipeDocumentImportService:
             number_of_pieces=number_of_pieces,
             lines=tuple(lines),
             warnings=tuple(warnings),
+            primary_process=primary_process,
         )
 
     def _match_ingredient(self, source_name: str) -> IngredientChoice | None:
@@ -379,6 +429,12 @@ class RecipeDocumentImportService:
         current_parts: list[str] = []
         saw_bullet = False
         for row in rows:
+            if cls._is_process_heading(row) or cls._normalized(row) in {"proceso final", "coccion"}:
+                if current_parts:
+                    steps.append(" ".join(current_parts))
+                    current_parts = []
+                steps.append(row)
+                continue
             if cls._is_bullet(row):
                 saw_bullet = True
                 if current_parts:

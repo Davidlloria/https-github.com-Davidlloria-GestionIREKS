@@ -3712,6 +3712,7 @@ class RecipesPage(QWidget):
                 "Revisar ingredientes, cantidades y procesos antes de guardar."
             )
             self.recipe_elaboracion_data = {
+                "recipe_primary_process": draft.primary_process,
                 "document_source_id": draft.document_id,
                 "document_source_path": draft.relative_path,
                 "document_source_page": str(draft.page_number),

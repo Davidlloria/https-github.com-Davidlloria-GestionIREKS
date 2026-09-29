@@ -281,3 +281,26 @@ def test_draft_does_not_take_elaboration_from_a_different_recipe():
     service = RecipeDocumentImportService(content_service=Content())
     result = DocumentContentSearchResult("id", "Recetario.pdf", "Recetario.pdf", "TECNICO", "RECETAS", 1, "", 0)
     assert service.build_draft(result).process_text == ""
+
+
+def test_panettone_numbered_masses_optional_glaze_and_continued_instructions():
+    pages = {
+        1: "Panettone\nPrimera masa\nHarina\n1,200 kg\nAgua\n6,200 kg\nTotal\n7,400 kg\n"
+           "Segunda masa\nPrimera masa\n7,400 kg\nAzúcar\n1,000 kg\nTotal\n8,400 kg\n"
+           "Glasa de decoración (opcional)\nEISAN\n0,100 kg\nTotal\n0,100 kg\n•\nMezclar en batidora con pala.\n"
+           "Proceso de elaboración\nPrimera masa\n•\nAmasar y dejar reposar.",
+        2: "Segunda masa\n•\nAñadir las yemas gradualmente.\nProceso final\n•\nBolear las piezas.\nCocción\n•\nCocer a 180 grados.\n•\nDejar enfriar 8 horas y embolsar.",
+        3: "Otra receta\nHarina\n1,000 kg\nProceso de elaboración\nNo mezclar.",
+    }
+    class Content:
+        def get_page_text(self, document_id, page):
+            return pages.get(page)
+    service = RecipeDocumentImportService(content_service=Content())
+    result = DocumentContentSearchResult("id", "Panettone.pdf", "Panettone.pdf", "TECNICO", "RECETAS", 1, "", 0)
+    draft = service.build_draft(result)
+    assert [line.process_name for line in draft.lines] == ["Primera masa", "Primera masa", "Segunda masa", "Segunda masa", "Glasa de decoración (opcional)"]
+    assert draft.lines[2].source_process == "Primera masa"
+    assert draft.primary_process == "Segunda masa"
+    assert "Añadir las yemas" in draft.process_text and "enfriar 8 horas" in draft.process_text
+    assert "No mezclar" not in draft.process_text
+    assert "Mezclar en batidora con pala" in draft.process_text
