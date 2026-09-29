@@ -2207,6 +2207,15 @@ class RecipesPage(QWidget):
         self.document_recipe_search_btn.setObjectName("recipeDocumentSearchOpenButton")
         self.document_recipe_search_btn.setProperty("btnRole", "primary")
         self.document_recipe_search_btn.setToolTip("Buscar e importar una fórmula desde la biblioteca documental")
+        self.document_recipe_search_btn.setIcon(QIcon(str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "file-text.svg")))
+        self.document_recipe_search_btn.setIconSize(QSize(16, 16))
+        self.document_recipe_search_btn.setStyleSheet(
+            "QPushButton { min-height: 32px; max-height: 32px; padding: 0 8px; "
+            "background: #D9F0F2; color: #0B2F5B; border: 1px solid #8EBBC6; border-radius: 6px; }"
+            "QPushButton:hover { background: #BFE4E8; border-color: #087E9C; }"
+            "QPushButton:pressed { background: #A8D8DF; }"
+        )
+        self.ireks_recipe_search.setStyleSheet("min-height: 32px; max-height: 32px; padding-top: 0; padding-bottom: 0;")
         self.document_recipe_search_btn.clicked.connect(self._open_document_recipe_search)
         ireks_search_row.addWidget(self.document_recipe_search_btn)
         ireks_layout.addLayout(ireks_search_row)

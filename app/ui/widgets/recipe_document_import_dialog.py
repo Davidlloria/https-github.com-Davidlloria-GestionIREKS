@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
-from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QColor
+from PySide6.QtCore import QPointF, QSize, Qt
+from PySide6.QtGui import QColor, QIcon
 from PySide6.QtPdf import QPdfDocument
 from PySide6.QtPdfWidgets import QPdfView
 from PySide6.QtWidgets import (
@@ -154,6 +154,19 @@ class RecipeDocumentImportDialog(QDialog):
         for control in (self.query_input, self.search_button, self.browse_button):
             control.setFixedHeight(36)
             control.setStyleSheet("min-height: 32px; max-height: 32px; padding-top: 0; padding-bottom: 0;")
+        icons = Path(__file__).resolve().parents[3] / "assets" / "icons"
+        for button, icon, background, hover, border in (
+            (self.search_button, "search-navy.svg", "#E4EDFA", "#CFDFF5", "#A6BFDF"),
+            (self.browse_button, "folder-open-navy.svg", "#D9F0F2", "#BFE4E8", "#8EBBC6"),
+        ):
+            button.setIcon(QIcon(str(icons / icon)))
+            button.setIconSize(QSize(16, 16))
+            button.setStyleSheet(
+                "QPushButton { min-height: 32px; max-height: 32px; padding: 0 10px; "
+                f"background: {background}; color: #0B2F5B; border: 1px solid {border}; border-radius: 6px; }}"
+                f"QPushButton:hover {{ background: {hover}; border-color: #087E9C; }}"
+                "QPushButton:pressed { background: #A8D8DF; }"
+            )
         root.addLayout(search_row)
 
         self.status_label = QLabel(
