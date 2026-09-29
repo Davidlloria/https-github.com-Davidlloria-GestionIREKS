@@ -8,6 +8,7 @@ from PySide6.QtPdf import QPdfDocument
 from PySide6.QtPdfWidgets import QPdfView
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QDialog,
     QHBoxLayout,
     QHeaderView,
@@ -276,14 +277,19 @@ class RecipeDocumentImportDialog(QDialog):
         root.addLayout(actions)
 
     def _browse(self) -> None:
+        previous_status = self.status_label.text()
         try:
+            warning = self._refresh_documents()
             documents = self.service.browse_documents()
         except Exception as exc:
             self.status_label.setText(f"No se pudieron consultar las carpetas: {exc}")
             return
+        self.status_label.setText(previous_status)
         browser = RecipeDocumentBrowserDialog(documents, self)
         if browser.exec() == QDialog.DialogCode.Accepted and browser.selected_document is not None:
             self._render_results([browser.selected_document])
+        if warning:
+            self.status_label.setText(self.status_label.text() + "\n" + warning)
 
     def _search(self) -> None:
         query = self.query_input.text().strip()
@@ -292,6 +298,7 @@ class RecipeDocumentImportDialog(QDialog):
             self.status_label.setText("Escribe un término antes de buscar.")
             return
         try:
+            warning = self._refresh_documents()
             results = self.service.search(query)
         except Exception as exc:  # noqa: BLE001
             self._render_results([])
@@ -303,6 +310,18 @@ class RecipeDocumentImportDialog(QDialog):
             if results
             else "No se encontraron fórmulas para la consulta indicada."
         )
+
+        if warning:
+            self.status_label.setText(self.status_label.text() + "\n" + warning)
+
+    def _refresh_documents(self) -> str:
+        self.status_label.setText("Comprobando documentos nuevos y actualizando la búsqueda…")
+        self.status_label.repaint()
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            return self.service.refresh_documents()
+        finally:
+            QApplication.restoreOverrideCursor()
 
     def _render_results(self, results: list[DocumentContentSearchResult]) -> None:
         self._results = list(results)

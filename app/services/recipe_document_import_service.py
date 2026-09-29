@@ -85,6 +85,19 @@ class RecipeDocumentImportService:
         self.content_service = content_service or DocumentContentIndexService(self.library_service)
         self.ingredient_search = ingredient_search or (lambda _term: [])
 
+    def refresh_documents(self) -> str:
+        """Discover new files and incrementally index only recipe PDFs."""
+        scan = self.library_service.refresh_catalog()
+        if not scan.available or not scan.scan_complete:
+            detail = "; ".join(scan.errors) or "La carpeta de documentos no está disponible."
+            raise RuntimeError(detail)
+        documents = self.browse_documents()
+        result = self.content_service.update_index(document_ids={item.document_id for item in documents})
+        warnings = list(scan.errors) + list(result.errors)
+        if result.no_text:
+            warnings.append(f"{result.no_text} PDF sin texto extraíble; están disponibles en Explorar carpetas.")
+        return "\n".join(warnings)
+
     def search(self, query: str, *, limit: int = 50) -> list[DocumentContentSearchResult]:
         return self.content_service.search(
             query,

@@ -100,6 +100,7 @@ class DocumentContentIndexService:
         progress_callback: ProgressCallback | None = None,
         cancellation_callback: CancellationCallback | None = None,
         force: bool = False,
+        document_ids: set[str] | None = None,
     ) -> DocumentContentIndexResult:
         if not self.library_service.is_library_available():
             return DocumentContentIndexResult(
@@ -110,6 +111,8 @@ class DocumentContentIndexService:
         self._initialize_schema()
         self._prune_inactive_documents()
         candidates = self._load_candidates()
+        if document_ids is not None:
+            candidates = [candidate for candidate in candidates if candidate.document_id in document_ids]
         existing_versions = self._load_existing_versions()
         indexed = unchanged = no_text = failed = cancelled = 0
         processed = 0

@@ -101,6 +101,8 @@ def test_browser_cancel_preserves_current_selection(monkeypatch):
     from app.ui.widgets.recipe_document_import_dialog import RecipeDocumentBrowserDialog
     app = _app()
     class Service:
+        def refresh_documents(self):
+            return ""
         def browse_documents(self):
             return []
     dialog = RecipeDocumentImportDialog(Service())
@@ -132,6 +134,8 @@ def test_browser_selection_enters_existing_review_flow(monkeypatch):
     app = _app()
     document = _browser_document("elegido.pdf")
     class Service:
+        def refresh_documents(self):
+            return ""
         def browse_documents(self):
             return [document]
     def choose(browser):
@@ -143,4 +147,22 @@ def test_browser_selection_enters_existing_review_flow(monkeypatch):
     monkeypatch.setattr(dialog, "_render_results", lambda rows: received.extend(rows))
     dialog._browse()
     assert received == [document]
+    dialog.close()
+
+
+def test_search_refreshes_documents_before_query(monkeypatch):
+    app = _app()
+    calls = []
+    class Service:
+        def refresh_documents(self):
+            calls.append("refresh")
+            return ""
+        def search(self, query):
+            calls.append(query)
+            return []
+    dialog = RecipeDocumentImportDialog(Service())
+    dialog.query_input.setText("centeno")
+    dialog._search()
+    assert calls == ["refresh", "centeno"]
+    assert QApplication.overrideCursor() is None
     dialog.close()

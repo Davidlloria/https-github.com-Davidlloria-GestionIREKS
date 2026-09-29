@@ -201,3 +201,46 @@ def test_document_without_indexed_text_has_explanatory_warning():
     draft = service.build_draft(result)
     assert not draft.lines
     assert any("no tiene texto indexado" in warning for warning in draft.warnings)
+
+
+def test_refresh_discovers_new_modified_and_removed_recipe_pdfs(tmp_path, monkeypatch):
+    import fitz
+    import os
+    from app.services.document_library_service import DocumentLibraryService
+    from app.services.document_content_index_service import DocumentContentIndexService
+    root = tmp_path / "documents"
+    folder = root / "TECNICO" / "RECETAS" / "Pan"
+    folder.mkdir(parents=True)
+    library = DocumentLibraryService(root, tmp_path / "catalog.sqlite")
+    content = DocumentContentIndexService(library)
+    service = RecipeDocumentImportService(library_service=library, content_service=content)
+    assert service.refresh_documents() == ""
+    def pdf(path, text):
+        document = fitz.open()
+        document.new_page().insert_text((72, 72), text)
+        document.save(path)
+        document.close()
+    path = folder / "nueva.pdf"
+    pdf(path, "Formula centenoespecial")
+    outside = root / "TECNICO" / "MANUALES"
+    outside.mkdir()
+    pdf(outside / "manual.pdf", "manualfuera")
+    assert service.refresh_documents() == ""
+    assert len(service.search("centenoespecial")) == 1
+    assert [row.name for row in service.browse_documents()] == ["nueva.pdf"]
+    assert content.search("manualfuera") == []
+    original = content._extract_candidate
+    monkeypatch.setattr(content, "_extract_candidate", lambda _: (_ for _ in ()).throw(AssertionError("Unchanged file reindexed")))
+    service.refresh_documents()
+    monkeypatch.setattr(content, "_extract_candidate", original)
+    timestamp = path.stat().st_mtime_ns
+    path.unlink()
+    pdf(path, "Formula espeltanueva")
+    os.utime(path, ns=(timestamp + 2000000000, timestamp + 2000000000))
+    service.refresh_documents()
+    assert service.search("centenoespecial") == []
+    assert len(service.search("espeltanueva")) == 1
+    path.unlink()
+    service.refresh_documents()
+    assert service.browse_documents() == []
+    assert service.search("espeltanueva") == []
