@@ -177,6 +177,18 @@ class RecipeDocumentImportService:
             page_number=target_page,
         )
 
+        if draft.lines and not draft.process_text:
+            # Recipe sheets often put the instructions on the following page.
+            # Require the heading at its start to avoid absorbing another recipe.
+            following_text = self.content_service.get_page_text(result.document_id, target_page + 1) or ""
+            following_rows = [self._clean_line(row) for row in following_text.splitlines() if row.strip()]
+            if following_rows and self._is_process_marker(following_rows[0]):
+                instructions = self._format_process_steps(following_rows[1:])
+                if instructions:
+                    draft = replace(draft, process_text=instructions, warnings=draft.warnings + (
+                        f"Proceso de elaboración tomado de la página {target_page + 1} del documento.",
+                    ))
+
         if not page_text.strip():
             draft = replace(draft, warnings=draft.warnings + (
                 "Esta página no tiene texto indexado disponible. Puedes consultar el PDF, pero no extraer una fórmula de esta página.",

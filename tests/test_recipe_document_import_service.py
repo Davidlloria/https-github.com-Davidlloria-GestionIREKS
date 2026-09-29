@@ -107,8 +107,8 @@ def test_build_draft_uses_selected_page_text() -> None:
 
     class Content:
         def get_page_text(self, document_id, page_number):
-            assert (document_id, page_number) == ("doc-9", 4)
-            return "Formula elegida\nHarina\n1,000 kg"
+            assert document_id == "doc-9" and page_number in (4, 5)
+            return "Formula elegida\nHarina\n1,000 kg" if page_number == 4 else None
 
     service = RecipeDocumentImportService(content_service=Content())  # type: ignore[arg-type]
 
@@ -259,3 +259,25 @@ def test_stollen_preparations_and_final_assembly_are_separate():
     assert [line.source_process for line in draft.lines[-2:]] == ["Masa", "Mezcla de frutas"]
     assert all(line.is_resolved for line in draft.lines[-2:])
     assert draft.unresolved_count == 4
+
+
+def test_draft_includes_elaboration_from_next_page_without_changing_ingredients():
+    class Content:
+        def get_page_text(self, document_id, page):
+            return {1: "Stollen\nMasa\nHarina\n1,000 kg", 2: "Proceso de elaboración\n•\nAmasar todos los ingredientes.\n•\nHornear a 190 grados."}.get(page)
+    service = RecipeDocumentImportService(content_service=Content())
+    result = DocumentContentSearchResult("id", "Stollen.pdf", "Stollen.pdf", "TECNICO", "RECETAS", 1, "", 0)
+    draft = service.build_draft(result)
+    assert len(draft.lines) == 1 and draft.lines[0].quantity_g == 1000
+    assert draft.process_text == "1. Amasar todos los ingredientes.\n2. Hornear a 190 grados."
+    assert draft.page_number == 1
+    assert any("página 2" in warning for warning in draft.warnings)
+
+
+def test_draft_does_not_take_elaboration_from_a_different_recipe():
+    class Content:
+        def get_page_text(self, document_id, page):
+            return {1: "Stollen\nMasa\nHarina\n1,000 kg", 2: "Otra receta\nProceso de elaboración\nAmasar."}.get(page)
+    service = RecipeDocumentImportService(content_service=Content())
+    result = DocumentContentSearchResult("id", "Recetario.pdf", "Recetario.pdf", "TECNICO", "RECETAS", 1, "", 0)
+    assert service.build_draft(result).process_text == ""
