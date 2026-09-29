@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import PurePosixPath
+
 from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QColor
 from PySide6.QtPdf import QPdfDocument
@@ -11,6 +13,10 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QTreeWidget,
+    QTreeWidgetItem,
     QInputDialog,
     QMessageBox,
     QPushButton,
@@ -27,6 +33,84 @@ from app.services.recipe_document_import_service import (
     RecipeDocumentDraft,
     RecipeDocumentImportService,
 )
+
+
+class RecipeDocumentBrowserDialog(QDialog):
+    """Choose a PDF from the existing recipe catalog without importing files."""
+
+    def __init__(self, documents: list[DocumentContentSearchResult], parent=None):
+        super().__init__(parent)
+        self.selected_document = None
+        self.documents = documents
+        self.setWindowTitle("Explorar carpetas de recetas")
+        self.resize(820, 540)
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Documentos / TECNICO / RECETAS"))
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.folders = QTreeWidget()
+        self.folders.setHeaderLabel("Carpetas")
+        self.folders.setStyleSheet("QTreeWidget::item:selected { background: #D9F0F2; color: #0B2F5B; }")
+        root = QTreeWidgetItem(self.folders, ["RECETAS"])
+        root.setData(0, Qt.ItemDataRole.UserRole, "TECNICO/RECETAS")
+        nodes = {"TECNICO/RECETAS": root}
+        for document in documents:
+            parts = PurePosixPath(document.relative_path.replace("\\", "/")).parts
+            parent_node = root
+            for depth in range(3, len(parts)):
+                key = "/".join(parts[:depth])
+                if key not in nodes:
+                    node = QTreeWidgetItem(parent_node, [parts[depth - 1]])
+                    node.setData(0, Qt.ItemDataRole.UserRole, key)
+                    nodes[key] = node
+                parent_node = nodes[key]
+        self.files = QListWidget()
+        self.files.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.files.setStyleSheet("QListWidget::item:selected { background: #D9F0F2; color: #0B2F5B; }")
+        splitter.addWidget(self.folders)
+        splitter.addWidget(self.files)
+        splitter.setSizes([280, 500])
+        layout.addWidget(splitter, 1)
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        layout.addWidget(self.status)
+        actions = QHBoxLayout()
+        actions.addStretch()
+        self.select_button = QPushButton("Seleccionar")
+        self.select_button.setEnabled(False)
+        self.select_button.clicked.connect(self._choose)
+        actions.addWidget(self.select_button)
+        cancel = QPushButton("Cancelar")
+        cancel.clicked.connect(self.reject)
+        actions.addWidget(cancel)
+        layout.addLayout(actions)
+        self.folders.currentItemChanged.connect(self._folder_changed)
+        self.files.itemSelectionChanged.connect(lambda: self.select_button.setEnabled(self.files.currentItem() is not None))
+        self.files.itemDoubleClicked.connect(lambda _item: self._choose())
+        self.folders.sortItems(0, Qt.SortOrder.AscendingOrder)
+        root.setExpanded(True)
+        self.folders.setCurrentItem(root)
+
+    def _folder_changed(self, current, _previous):
+        self.files.clear()
+        self.select_button.setEnabled(False)
+        if current is None:
+            return
+        folder = current.data(0, Qt.ItemDataRole.UserRole)
+        for document in self.documents:
+            path = PurePosixPath(document.relative_path.replace("\\", "/"))
+            if str(path.parent) == folder:
+                item = QListWidgetItem(document.name)
+                item.setData(Qt.ItemDataRole.UserRole, document)
+                item.setToolTip(document.relative_path)
+                self.files.addItem(item)
+        self.status.setText(f"{self.files.count()} documento(s) en esta carpeta." if self.files.count()
+                            else "No hay PDF catalogados en esta carpeta. Selecciona una subcarpeta si está disponible.")
+
+    def _choose(self):
+        item = self.files.currentItem()
+        if item is not None:
+            self.selected_document = item.data(Qt.ItemDataRole.UserRole)
+            self.accept()
 
 
 class RecipeDocumentImportDialog(QDialog):
@@ -62,6 +146,14 @@ class RecipeDocumentImportDialog(QDialog):
         self.search_button.setProperty("btnRole", "primary")
         self.search_button.clicked.connect(self._search)
         search_row.addWidget(self.search_button)
+        self.browse_button = QPushButton("Explorar carpetas")
+        self.browse_button.setObjectName("recipeDocumentBrowseButton")
+        self.browse_button.setProperty("btnRole", "secondary")
+        self.browse_button.clicked.connect(self._browse)
+        search_row.addWidget(self.browse_button)
+        for control in (self.query_input, self.search_button, self.browse_button):
+            control.setFixedHeight(36)
+            control.setStyleSheet("min-height: 32px; max-height: 32px; padding-top: 0; padding-bottom: 0;")
         root.addLayout(search_row)
 
         self.status_label = QLabel(
@@ -170,6 +262,16 @@ class RecipeDocumentImportDialog(QDialog):
         actions.addWidget(close_button)
         root.addLayout(actions)
 
+    def _browse(self) -> None:
+        try:
+            documents = self.service.browse_documents()
+        except Exception as exc:
+            self.status_label.setText(f"No se pudieron consultar las carpetas: {exc}")
+            return
+        browser = RecipeDocumentBrowserDialog(documents, self)
+        if browser.exec() == QDialog.DialogCode.Accepted and browser.selected_document is not None:
+            self._render_results([browser.selected_document])
+
     def _search(self) -> None:
         query = self.query_input.text().strip()
         if not query:
@@ -201,7 +303,9 @@ class RecipeDocumentImportDialog(QDialog):
                 self.results_table.setItem(row, column, item)
         self.results_table.blockSignals(False)
         if results:
+            self.results_table.blockSignals(True)
             self.results_table.selectRow(0)
+            self.results_table.blockSignals(False)
             self._result_selected()
         else:
             self._active_result = None
@@ -216,13 +320,15 @@ class RecipeDocumentImportDialog(QDialog):
         if row < 0 or row >= len(self._results):
             return
         self._active_result = self._results[row]
-        self._load_pdf(self._active_result)
+        self._render_draft(None)
+        if not self._load_pdf(self._active_result):
+            return
         self.page_spin.blockSignals(True)
         self.page_spin.setValue(self._active_result.page_number)
         self.page_spin.blockSignals(False)
         self._load_draft(self._active_result.page_number)
 
-    def _load_pdf(self, result: DocumentContentSearchResult) -> None:
+    def _load_pdf(self, result: DocumentContentSearchResult) -> bool:
         self._close_pdf()
         try:
             path = self.service.resolve_document(result.document_id)
@@ -230,14 +336,16 @@ class RecipeDocumentImportDialog(QDialog):
         except Exception as exc:  # noqa: BLE001
             self.status_label.setText(f"No se pudo abrir el documento: {exc}")
             self.page_spin.setEnabled(False)
-            return
+            return False
         if load_error != QPdfDocument.Error.None_ or self.pdf_document.pageCount() <= 0:
             self.status_label.setText("El PDF seleccionado no se pudo previsualizar.")
             self.page_spin.setEnabled(False)
-            return
+            return False
         self.page_spin.setRange(1, self.pdf_document.pageCount())
         self.page_spin.setEnabled(True)
         self._navigate_pdf(result.page_number)
+        self.status_label.setText(f"Documento: {result.name}. Selecciona la página que contiene la fórmula.")
+        return True
 
     def _page_changed(self, page_number: int) -> None:
         if self._active_result is None:

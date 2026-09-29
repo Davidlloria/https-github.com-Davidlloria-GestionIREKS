@@ -173,3 +173,31 @@ def test_raw_material_search_and_manual_match_only_use_standard_ingredients() ->
     assert resolved.lines[0].matched_ingredient == raw_material
     assert "Revisar asociación" not in resolved.lines[0].notes
     assert not any("revisión manual" in warning for warning in resolved.warnings)
+
+
+def test_browse_documents_limits_paths_to_recipe_pdfs():
+    from types import SimpleNamespace
+    calls = []
+    class Library:
+        def list_documents(self, **kwargs):
+            calls.append(kwargs)
+            return [SimpleNamespace(document_id=str(i), name=path.split("/")[-1], relative_path=path,
+                                    area="TECNICO", category="RECETAS")
+                    for i, path in enumerate(("TECNICO/RECETAS/Pan/pan.pdf", "TECNICO/RECETARIOS/otro.pdf",
+                                              "TECNICO/RECETAS/raiz.pdf"))]
+    service = RecipeDocumentImportService(library_service=Library(), content_service=object())
+    rows = service.browse_documents()
+    assert [row.name for row in rows] == ["pan.pdf", "raiz.pdf"]
+    assert all(row.page_number == 1 for row in rows)
+    assert calls == [dict(area="TECNICO", extension=".pdf", active=True)]
+
+
+def test_document_without_indexed_text_has_explanatory_warning():
+    class Content:
+        def get_page_text(self, *args):
+            return None
+    service = RecipeDocumentImportService(content_service=Content())
+    result = DocumentContentSearchResult("id", "pan.pdf", "TECNICO/RECETAS/pan.pdf", "TECNICO", "RECETAS", 1, "", 0)
+    draft = service.build_draft(result)
+    assert not draft.lines
+    assert any("no tiene texto indexado" in warning for warning in draft.warnings)

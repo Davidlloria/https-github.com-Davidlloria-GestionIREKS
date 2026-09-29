@@ -70,3 +70,77 @@ def test_document_drafts_are_excluded_from_autosave_until_explicit_save() -> Non
     assert "self._document_import_pending" in flush_source
     assert "self._document_import_pending" in perform_source
     assert "self._document_import_pending = False" in save_source
+
+
+def _browser_document(name, folder=""):
+    from app.services.document_content_index_service import DocumentContentSearchResult
+    return DocumentContentSearchResult(name, name, "TECNICO/RECETAS/" + folder + name,
+                                       "TECNICO", "RECETAS", 1, "", 0)
+
+
+def test_browser_navigates_folders_and_selects_document():
+    from app.ui.widgets.recipe_document_import_dialog import RecipeDocumentBrowserDialog
+    app = _app()
+    nested = _browser_document("pan.pdf", "Panaderia/Integral/")
+    dialog = RecipeDocumentBrowserDialog([_browser_document("raiz.pdf"), nested])
+    assert dialog.files.count() == 1
+    root = dialog.folders.topLevelItem(0)
+    dialog.folders.setCurrentItem(root.child(0))
+    assert dialog.files.count() == 0
+    assert not dialog.select_button.isEnabled()
+    dialog.folders.setCurrentItem(root.child(0).child(0))
+    assert dialog.files.item(0).text() == "pan.pdf"
+    dialog.files.setCurrentRow(0)
+    dialog.select_button.click()
+    assert dialog.selected_document == nested
+    assert dialog.result() == dialog.DialogCode.Accepted
+    dialog.close()
+
+
+def test_browser_cancel_preserves_current_selection(monkeypatch):
+    from app.ui.widgets.recipe_document_import_dialog import RecipeDocumentBrowserDialog
+    app = _app()
+    class Service:
+        def browse_documents(self):
+            return []
+    dialog = RecipeDocumentImportDialog(Service())
+    old = _browser_document("anterior.pdf")
+    dialog._active_result = old
+    monkeypatch.setattr(RecipeDocumentBrowserDialog, "exec", lambda self: self.DialogCode.Rejected)
+    dialog._browse()
+    assert dialog._active_result is old
+    dialog.close()
+
+
+def test_missing_document_does_not_extract_or_allow_loading():
+    app = _app()
+    class Service:
+        def resolve_document(self, identity):
+            raise FileNotFoundError("Documento no disponible")
+        def build_draft(self, *args, **kwargs):
+            raise AssertionError("Must not extract a missing document")
+    dialog = RecipeDocumentImportDialog(Service())
+    dialog._render_results([_browser_document("ausente.pdf")])
+    assert not dialog.load_button.isEnabled()
+    assert not dialog.page_spin.isEnabled()
+    assert "no disponible" in dialog.status_label.text()
+    dialog.close()
+
+
+def test_browser_selection_enters_existing_review_flow(monkeypatch):
+    from app.ui.widgets.recipe_document_import_dialog import RecipeDocumentBrowserDialog
+    app = _app()
+    document = _browser_document("elegido.pdf")
+    class Service:
+        def browse_documents(self):
+            return [document]
+    def choose(browser):
+        browser.selected_document = document
+        return browser.DialogCode.Accepted
+    monkeypatch.setattr(RecipeDocumentBrowserDialog, "exec", choose)
+    dialog = RecipeDocumentImportDialog(Service())
+    received = []
+    monkeypatch.setattr(dialog, "_render_results", lambda rows: received.extend(rows))
+    dialog._browse()
+    assert received == [document]
+    dialog.close()

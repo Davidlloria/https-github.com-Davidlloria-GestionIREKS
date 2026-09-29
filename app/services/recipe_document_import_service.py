@@ -93,6 +93,20 @@ class RecipeDocumentImportService:
             limit=limit,
         )
 
+    def browse_documents(self) -> list[DocumentContentSearchResult]:
+        """List catalogued recipe PDFs without requiring indexed text."""
+        results = []
+        for item in self.library_service.list_documents(area="TECNICO", extension=".pdf", active=True):
+            parts = Path(item.relative_path).parts
+            if len(parts) < 3 or tuple(part.casefold() for part in parts[:2]) != ("tecnico", "recetas"):
+                continue
+            results.append(DocumentContentSearchResult(
+                document_id=item.document_id, name=item.name, relative_path=item.relative_path,
+                area=item.area, category=item.category, page_number=1,
+                fragment="Seleccionado por carpetas", score=0.0,
+            ))
+        return sorted(results, key=lambda item: item.relative_path.casefold())
+
     def search_raw_materials(self, query: str) -> list[IngredientChoice]:
         return [
             ingredient
@@ -140,13 +154,19 @@ class RecipeDocumentImportService:
     ) -> RecipeDocumentDraft:
         target_page = max(1, int(page_number or result.page_number))
         page_text = self.content_service.get_page_text(result.document_id, target_page) or ""
-        return self.parse_page(
+        draft = self.parse_page(
             page_text,
             document_id=result.document_id,
             document_name=result.name,
             relative_path=result.relative_path,
             page_number=target_page,
         )
+
+        if not page_text.strip():
+            draft = replace(draft, warnings=draft.warnings + (
+                "Esta página no tiene texto indexado disponible. Puedes consultar el PDF, pero no extraer una fórmula de esta página.",
+            ))
+        return draft
 
     def resolve_document(self, document_id: str) -> Path:
         return self.library_service.resolve_document(document_id)
