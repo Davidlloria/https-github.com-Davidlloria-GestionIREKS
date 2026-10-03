@@ -1,10 +1,38 @@
 from pathlib import Path
 from xml.etree import ElementTree
 
-from PySide6.QtCore import QMargins
-from PySide6.QtWidgets import QApplication, QLabel, QWidget
+import pytest
+
+from PySide6.QtCore import QDate, QMargins
+from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
 
 from app.ui.widgets.ingredients_page import IngredientsIreksPage
+
+
+@pytest.mark.parametrize("section", ["entradas", "salidas", "stock"])
+def test_all_dates_button_restores_history_and_reloads_once(monkeypatch, section) -> None:
+    monkeypatch.setattr(IngredientsIreksPage, "reload", lambda self: None)
+    app = QApplication.instance() or QApplication([])
+    page = IngredientsIreksPage()
+    try:
+        date_from = getattr(page, f"{section}_date_from")
+        date_to = getattr(page, f"{section}_date_to")
+        year = QDate.currentDate().year()
+        assert date_from.date() == QDate(year, 1, 1)
+        assert date_to.date() == QDate(year, 12, 31)
+        calls = []
+        page._current_entradas_articulo_id = "producto-prueba"
+        monkeypatch.setattr(page, f"_reload_{section}_table", calls.append)
+        buttons = [button for button in date_from.parentWidget().findChildren(QPushButton)
+                   if button.text() == "Todo"]
+        assert len(buttons) == 1
+        buttons[0].click()
+        assert date_from.date() == QDate(2000, 1, 1)
+        assert date_to.date() == QDate(2100, 12, 31)
+        assert calls == ["producto-prueba"]
+        assert not date_from.signalsBlocked() and not date_to.signalsBlocked()
+    finally:
+        page.close()
 
 
 def test_ireks_product_detail_uses_enterprise_panel(monkeypatch) -> None:

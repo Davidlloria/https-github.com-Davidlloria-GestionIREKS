@@ -3382,8 +3382,8 @@ class IngredientsIreksPage(QWidget):
     def _reset_entradas_date_filters(self) -> None:
         self.entradas_date_from.blockSignals(True)
         self.entradas_date_to.blockSignals(True)
-        self.entradas_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
-        self.entradas_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
+        self.entradas_date_from.setDate(QDate(2000, 1, 1))
+        self.entradas_date_to.setDate(QDate(2100, 12, 31))
         self.entradas_date_from.blockSignals(False)
         self.entradas_date_to.blockSignals(False)
         self._reload_entradas_table(self._current_entradas_articulo_id)
@@ -3391,8 +3391,8 @@ class IngredientsIreksPage(QWidget):
     def _reset_salidas_date_filters(self) -> None:
         self.salidas_date_from.blockSignals(True)
         self.salidas_date_to.blockSignals(True)
-        self.salidas_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
-        self.salidas_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
+        self.salidas_date_from.setDate(QDate(2000, 1, 1))
+        self.salidas_date_to.setDate(QDate(2100, 12, 31))
         self.salidas_date_from.blockSignals(False)
         self.salidas_date_to.blockSignals(False)
         self._reload_salidas_table(self._current_entradas_articulo_id)
@@ -3400,8 +3400,8 @@ class IngredientsIreksPage(QWidget):
     def _reset_stock_date_filters(self) -> None:
         self.stock_date_from.blockSignals(True)
         self.stock_date_to.blockSignals(True)
-        self.stock_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
-        self.stock_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
+        self.stock_date_from.setDate(QDate(2000, 1, 1))
+        self.stock_date_to.setDate(QDate(2100, 12, 31))
         self.stock_date_from.blockSignals(False)
         self.stock_date_to.blockSignals(False)
         self._reload_stock_table(self._current_entradas_articulo_id)
