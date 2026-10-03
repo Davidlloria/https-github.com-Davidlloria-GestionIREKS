@@ -3,10 +3,42 @@ from xml.etree import ElementTree
 
 import pytest
 
-from PySide6.QtCore import QDate, QMargins
-from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
+from PySide6.QtCore import QDate, QMargins, QPoint, Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QSpinBox, QStyle, QStyleOptionSpinBox, QToolButton, QWidget
 
 from app.ui.widgets.ingredients_page import IngredientsIreksPage
+
+
+def test_calendar_year_arrows_update_displayed_year_immediately() -> None:
+    app = QApplication.instance() or QApplication([])
+    previous_style = app.styleSheet()
+    field = None
+    try:
+        app.setStyleSheet((Path(__file__).resolve().parents[1] / "assets/styles.qss").read_text(encoding="utf-8"))
+        field = IngredientsIreksPage._product_date_filter("Desde")
+        field.setDate(QDate(2024, 6, 15))
+        field.show()
+        app.processEvents()
+        QTest.mouseClick(field, Qt.MouseButton.LeftButton, pos=QPoint(field.width() - 16, 16))
+        calendar = field.calendarWidget()
+        QTest.mouseClick(calendar.findChild(QToolButton, "qt_calendar_yearbutton"), Qt.MouseButton.LeftButton)
+        editor = calendar.findChild(QSpinBox, "qt_calendar_yearedit")
+        assert editor.isVisible()
+        for control, expected in ((QStyle.SubControl.SC_SpinBoxUp, 2025), (QStyle.SubControl.SC_SpinBoxDown, 2024)):
+            option = QStyleOptionSpinBox()
+            editor.initStyleOption(option)
+            rect = editor.style().subControlRect(QStyle.ComplexControl.CC_SpinBox, option, control, editor)
+            QTest.mouseClick(editor, Qt.MouseButton.LeftButton, pos=rect.center())
+            assert editor.value() == expected
+            assert calendar.yearShown() == expected
+            assert calendar.monthShown() == 6
+        assert field.date() == QDate(2024, 6, 15)
+    finally:
+        if field is not None:
+            field.calendarWidget().window().close()
+            field.close()
+        app.setStyleSheet(previous_style)
 
 
 @pytest.mark.parametrize("section", ["entradas", "salidas", "stock"])

@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QToolButton,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -2155,6 +2156,9 @@ class IngredientsIreksPage(QWidget):
         header.setForeground(QColor("#0B2F5B"))
         header.setBackground(QColor("#EDF5F8"))
         calendar.setHeaderTextFormat(header)
+        year_editor = calendar.findChild(QSpinBox, "qt_calendar_yearedit")
+        if year_editor is not None:
+            year_editor.valueChanged.connect(lambda year: calendar.setCurrentPage(year, calendar.monthShown()))
         for name, text in (("qt_calendar_prevmonth", "‹"), ("qt_calendar_nextmonth", "›")):
             button = calendar.findChild(QToolButton, name)
             if button is not None:
