@@ -47,6 +47,33 @@ class InventoryExportPayload:
     items: list[IngredienteIreks]
 
 
+def compute_current_stock_rows(moves: list[AlmacenMovimiento]) -> list[dict[str, Any]]:
+    """Return positive lot balances; callers select the warehouse before grouping."""
+    grouped: dict[tuple[str, str, date | None], dict[str, Any]] = {}
+    for mov in moves:
+        articulo_id = str(getattr(mov, "articulo_id", "") or "").strip()
+        if not articulo_id:
+            continue
+        lote = str(getattr(mov, "articulo_lote", "") or "").strip()
+        cad = getattr(mov, "articulo_caducidad", None)
+        key = (articulo_id, lote, cad)
+        row = grouped.setdefault(
+            key,
+            {
+                "articulo_id": articulo_id,
+                "lote": lote,
+                "caducidad": cad,
+                "cantidad": 0.0,
+                "last_date": None,
+            },
+        )
+        row["cantidad"] = float(row["cantidad"]) + float(getattr(mov, "cantidad", 0.0) or 0.0)
+        mov_date = getattr(mov, "fecha_pedido", None)
+        if mov_date is not None and (row["last_date"] is None or mov_date > row["last_date"]):
+            row["last_date"] = mov_date
+    return [row for row in grouped.values() if float(row.get("cantidad", 0.0) or 0.0) > 0]
+
+
 class WarehouseInventoryService:
     def stock_summary_payload(
         self,

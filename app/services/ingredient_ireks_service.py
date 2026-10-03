@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 
 from sqlmodel import Session, select
 
 from app.core.database import engine
 from app.core.pagination import DEFAULT_PAGE_LIMIT, page_items
-from sqlalchemy import text
+from sqlalchemy import text, func
 
 from app.models import (
     AlmacenMovimiento,
+    AlmacenCatalogo,
+    Cliente,
+    InventarioCabecera,
     Distribuidor,
     Envase,
     Fabricante,
@@ -223,6 +227,21 @@ class IngredientIreksService:
             )
             items = list(session.exec(select(IngredienteIreks).where(IngredienteIreks.articulo_id == clean_articulo_id)))
         return moves, items
+
+    def stock_context(self) -> tuple[dict[str, str], dict[str, date]]:
+        """Read warehouse labels and latest approved inventory dates; never apply adjustments."""
+        with Session(engine) as session:
+            names = {row.almacen_id: row.almacen_nombre for row in session.exec(select(AlmacenCatalogo))}
+            for row in session.exec(select(Distribuidor)):
+                names[row.distribuidor_id] = row.distribuidor_nombre_comercial or row.distribuidor_razon_social
+            for row in session.exec(select(Cliente)):
+                names[row.cliente_id] = row.cliente_nombre_comercial or row.cliente_nombre_fiscal
+            inventories = dict(session.exec(
+                select(InventarioCabecera.almacen_id, func.max(InventarioCabecera.fecha))
+                .where(InventarioCabecera.estado == "aprobado")
+                .group_by(InventarioCabecera.almacen_id)
+            ).all())
+        return names, inventories
 
     def pedido_items(self, articulo_id: str) -> list[PedidoItem]:
         clean_articulo_id = str(articulo_id or "").strip()

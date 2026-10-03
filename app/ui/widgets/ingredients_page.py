@@ -61,6 +61,7 @@ from app.services.ingredient_ireks_autosave_flow_service import (
     IngredientIreksAutosaveRequest,
 )
 from app.services.ingredient_ireks_service import IngredientIreksService
+from app.services.warehouse_inventory_service import compute_current_stock_rows
 from app.services.ingredient_products_import_flow_service import IngredientProductsImportFlowService
 from app.services.ingredient_nutrition_query_service import IngredientNutritionQueryService
 from app.services.ingredient_std_service import IngredientStdService
@@ -1485,6 +1486,33 @@ class IngredientsIreksPage(QWidget):
         stock_body_layout = QVBoxLayout(stock_body)
         stock_body_layout.setContentsMargins(10, 10, 10, 10)
         stock_body_layout.setSpacing(8)
+        warehouse_row = QHBoxLayout()
+        warehouse_row.addWidget(QLabel("Almacén"))
+        self.stock_warehouse_filter = QComboBox()
+        self.stock_warehouse_filter.setMinimumWidth(200)
+        self.stock_warehouse_filter.currentIndexChanged.connect(
+            lambda _index: self._reload_stock_table(self._current_entradas_articulo_id)
+        )
+        warehouse_row.addWidget(self.stock_warehouse_filter)
+        warehouse_row.addStretch()
+        stock_body_layout.addLayout(warehouse_row)
+        self.stock_current_label = QLabel("Selecciona un producto para consultar sus existencias.")
+        self.stock_current_label.setWordWrap(True)
+        stock_body_layout.addWidget(self.stock_current_label)
+        self.stock_inventory_label = QLabel()
+        self.stock_inventory_label.setWordWrap(True)
+        stock_body_layout.addWidget(self.stock_inventory_label)
+        self.stock_current_table = QTableWidget(0, 4)
+        self.stock_current_table.setHorizontalHeaderLabels(["Lote", "Caducidad", "Existencias (uds)", "Existencias (kg)"])
+        self.stock_current_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.stock_current_table.verticalHeader().setVisible(False)
+        self.stock_current_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.stock_current_table.setMaximumHeight(160)
+        self._apply_ireks_table_style(self.stock_current_table)
+        stock_body_layout.addWidget(self.stock_current_table)
+        period_label = QLabel("Movimientos del período · el total neto es la variación, no las existencias actuales")
+        period_label.setWordWrap(True)
+        stock_body_layout.addWidget(period_label)
         stock_filters_row = QHBoxLayout()
         stock_filters_row.addWidget(QLabel("Desde"))
         self.stock_date_from = self._product_date_filter("Desde")
@@ -3611,11 +3639,52 @@ class IngredientsIreksPage(QWidget):
         if not hasattr(self, "stock_table"):
             return
         self.stock_table.setRowCount(0)
+        self.stock_current_table.setRowCount(0)
+        self.stock_current_label.setText("Selecciona un producto para consultar sus existencias.")
+        self.stock_inventory_label.clear()
         articulo_id = str(articulo_id or "").strip()
         if not articulo_id:
+            self.stock_warehouse_filter.blockSignals(True)
+            self.stock_warehouse_filter.clear()
+            self.stock_warehouse_filter.blockSignals(False)
             self._set_stock_totals(0.0, 0.0)
             return
         moves, items = self.ireks_service.movement_payload(articulo_id)
+        names, inventories = self.ireks_service.stock_context()
+        warehouse_ids = {str(mov.almacen_id or "").strip() for mov in moves}
+        warehouse_ids.update(str(item.almacen_id).strip() for item in items if item.almacen_id)
+        previous = self.stock_warehouse_filter.currentData()
+        self.stock_warehouse_filter.blockSignals(True)
+        self.stock_warehouse_filter.clear()
+        for warehouse_id in sorted(warehouse_ids, key=lambda key: (names.get(key) or "", key)):
+            self.stock_warehouse_filter.addItem(names.get(warehouse_id) or ("Almacén sin nombre" if warehouse_id else "Sin almacén asignado"), warehouse_id)
+        index = self.stock_warehouse_filter.findData(previous)
+        self.stock_warehouse_filter.setCurrentIndex(index if index >= 0 else 0)
+        self.stock_warehouse_filter.blockSignals(False)
+        warehouse_id = self.stock_warehouse_filter.currentData()
+        if warehouse_id is None:
+            self.stock_current_label.setText("Sin almacén ni movimientos registrados para este producto.")
+            self._set_stock_totals(0.0, 0.0)
+            return
+        moves = [mov for mov in moves if str(mov.almacen_id or "").strip() == warehouse_id]
+        current_rows = compute_current_stock_rows(moves)
+        weight = float(items[0].articulo_envase_peso_total or 0.0) if items else 0.0
+        current_units = sum(row["cantidad"] for row in current_rows)
+        self.stock_current_label.setText(
+            f"Existencias actuales: {current_units:.2f} uds · {current_units * weight:.2f} kg"
+            + (" · Sin existencias positivas registradas." if not current_rows else "")
+        )
+        inventory_date = inventories.get(warehouse_id)
+        self.stock_inventory_label.setText(
+            (f"Último inventario aprobado del almacén: {inventory_date:%d/%m/%Y}. " if inventory_date else "Sin inventario aprobado registrado para este almacén. ")
+            + "Saldo calculado con todos los movimientos y ajustes, sin aplicar el filtro de fechas."
+        )
+        self.stock_current_table.setRowCount(len(current_rows))
+        for row_index, row in enumerate(current_rows):
+            values = [row["lote"] or "Sin lote", row["caducidad"].strftime("%d/%m/%Y") if row["caducidad"] else "—",
+                      f'{row["cantidad"]:.2f}', f'{row["cantidad"] * weight:.2f}']
+            for column, value in enumerate(values):
+                self.stock_current_table.setItem(row_index, column, QTableWidgetItem(value))
         q_from = self.stock_date_from.date()
         q_to = self.stock_date_to.date()
         from_date: date = date(q_from.year(), q_from.month(), q_from.day())
@@ -3640,7 +3709,7 @@ class IngredientsIreksPage(QWidget):
             total_kg += kg_signed
             caduca = mov.articulo_caducidad.strftime("%d/%m/%Y") if mov.articulo_caducidad else ""
             is_expiring = bool(mov.articulo_caducidad and (mov.articulo_caducidad - today).days <= 30)
-            tipo = "Entrada" if cantidad_signed >= 0 else "Salida"
+            tipo = "Ajuste" if str(mov.pedido_albaran_numero or "").startswith("INV-AJUSTE") else ("Entrada" if cantidad_signed >= 0 else "Salida")
             vals = [
                 fecha,
                 tipo,

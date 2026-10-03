@@ -49,7 +49,7 @@ from app.services.warehouse_history_flow_service import WarehouseHistoryFlowResu
 from app.services.warehouse_count_template_flow_service import WarehouseCountTemplateFlowResult, WarehouseCountTemplateFlowService
 from app.services.warehouse_manual_move_flow_service import WarehouseManualMoveFlowService
 from app.services.warehouse_catalog_service import WarehouseCatalogService
-from app.services.warehouse_inventory_service import WarehouseInventoryService
+from app.services.warehouse_inventory_service import WarehouseInventoryService, compute_current_stock_rows as _compute_current_stock_rows
 from app.services.warehouse_movement_service import WarehouseMovementService
 from app.services.warehouse_reference_service import OtrasRefRow, WarehouseReferenceService
 from app.services.warehouse_settings_service import WarehouseSettingsService
@@ -1580,30 +1580,6 @@ class MovimientosTab(QWidget):
         return result.move
 
 
-def _compute_current_stock_rows(moves: list[AlmacenMovimiento]) -> list[dict[str, Any]]:
-    grouped: dict[tuple[str, str, date | None], dict[str, Any]] = {}
-    for mov in moves:
-        articulo_id = str(getattr(mov, "articulo_id", "") or "").strip()
-        if not articulo_id:
-            continue
-        lote = str(getattr(mov, "articulo_lote", "") or "").strip()
-        cad = getattr(mov, "articulo_caducidad", None)
-        key = (articulo_id, lote, cad)
-        row = grouped.setdefault(
-            key,
-            {
-                "articulo_id": articulo_id,
-                "lote": lote,
-                "caducidad": cad,
-                "cantidad": 0.0,
-                "last_date": None,
-            },
-        )
-        row["cantidad"] = float(row["cantidad"]) + float(getattr(mov, "cantidad", 0.0) or 0.0)
-        mov_date = getattr(mov, "fecha_pedido", None)
-        if mov_date is not None and (row["last_date"] is None or mov_date > row["last_date"]):
-            row["last_date"] = mov_date
-    return [row for row in grouped.values() if float(row.get("cantidad", 0.0) or 0.0) > 0]
 
 
 class ManualMovementDialog(QDialog):
