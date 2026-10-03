@@ -58,6 +58,17 @@ def test_product_stock_matches_warehouse_and_dates_only_filter_history(monkeypat
         page.stock_date_to.setDate(QDate(2025, 12, 31))
         assert page.stock_table.rowCount() == 0
         assert page.stock_current_table.item(0, 2).text() == '75.00'
+        tabs = {page.detail_tabs.tabText(i): page.detail_tabs.widget(i) for i in range(page.detail_tabs.count())}
+        assert tabs['Stock'].isAncestorOf(page.stock_current_table)
+        assert not tabs['Stock'].isAncestorOf(page.stock_table)
+        assert tabs['Movimientos'].isAncestorOf(page.stock_table)
+        assert tabs['Movimientos'].isAncestorOf(page.stock_date_from)
+        page.stock_date_from.setDate(QDate(2024, 1, 1))
+        page.stock_date_to.setDate(QDate(2024, 12, 31))
+        page.movements_warehouse_filter.setCurrentIndex(page.movements_warehouse_filter.findData('b'))
+        assert page.stock_current_table.item(0, 2).text() == '75.00'
+        assert page.stock_table.rowCount() == 1
+        assert page.stock_totals_table.item(0, 4).text() == '7.00'
         page.stock_warehouse_filter.setCurrentIndex(page.stock_warehouse_filter.findData('b'))
         assert page.stock_current_table.item(0, 2).text() == '7.00'
         assert 'Sin inventario aprobado' in page.stock_inventory_label.text()

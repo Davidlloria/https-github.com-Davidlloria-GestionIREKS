@@ -5,7 +5,7 @@ import pytest
 
 from PySide6.QtCore import QDate, QMargins, QPoint, Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QSpinBox, QStyle, QStyleOptionSpinBox, QToolButton, QWidget
+from PySide6.QtWidgets import QAbstractItemView, QApplication, QLabel, QPushButton, QWidget
 
 from app.ui.widgets.ingredients_page import IngredientsIreksPage
 
@@ -22,18 +22,32 @@ def test_calendar_year_arrows_update_displayed_year_immediately() -> None:
         app.processEvents()
         QTest.mouseClick(field, Qt.MouseButton.LeftButton, pos=QPoint(field.width() - 16, 16))
         calendar = field.calendarWidget()
-        QTest.mouseClick(calendar.findChild(QToolButton, "qt_calendar_yearbutton"), Qt.MouseButton.LeftButton)
-        editor = calendar.findChild(QSpinBox, "qt_calendar_yearedit")
+        assert not calendar.isNavigationBarVisible()
+        editor = calendar.year_selector
         assert editor.isVisible()
-        for control, expected in ((QStyle.SubControl.SC_SpinBoxUp, 2025), (QStyle.SubControl.SC_SpinBoxDown, 2024)):
-            option = QStyleOptionSpinBox()
-            editor.initStyleOption(option)
-            rect = editor.style().subControlRect(QStyle.ComplexControl.CC_SpinBox, option, control, editor)
-            QTest.mouseClick(editor, Qt.MouseButton.LeftButton, pos=rect.center())
+        for button, expected in ((calendar.next_year, 2025), (calendar.next_year, 2026),
+                                 (calendar.previous_year, 2025), (calendar.previous_year, 2024)):
+            QTest.mouseClick(button, Qt.MouseButton.LeftButton)
             assert editor.value() == expected
             assert calendar.yearShown() == expected
             assert calendar.monthShown() == 6
+        calendar.month_selector.setFocus()
+        QTest.keyClick(calendar.month_selector, Qt.Key.Key_Down)
+        assert calendar.monthShown() == 7
+        assert calendar.yearShown() == 2024
+        calendar.setCurrentPage(calendar.minimumDate().year(), 1)
+        assert not calendar.previous_year.isEnabled()
+        calendar.setCurrentPage(calendar.maximumDate().year(), 12)
+        assert not calendar.next_year.isEnabled()
         assert field.date() == QDate(2024, 6, 15)
+        calendar.setCurrentPage(2024, 7)
+        view = calendar.findChild(QAbstractItemView)
+        model = view.model()
+        target = next(model.index(row, column)
+                      for row in range(model.rowCount()) for column in range(model.columnCount())
+                      if str(model.index(row, column).data()) == "17")
+        QTest.mouseClick(view.viewport(), Qt.MouseButton.LeftButton, pos=view.visualRect(target).center())
+        assert field.date() == QDate(2024, 7, 17)
     finally:
         if field is not None:
             field.calendarWidget().window().close()
@@ -61,6 +75,8 @@ def test_all_dates_button_uses_from_year_and_reloads_once(monkeypatch, section) 
         buttons = [button for button in date_from.parentWidget().findChildren(QPushButton)
                    if button.text() == "Todo"]
         assert len(buttons) == 1
+        assert buttons[0].height() == date_from.height() == date_to.height() == 32
+        assert not buttons[0].icon().isNull()
         buttons[0].click()
         assert date_from.date() == QDate(year - 2, 1, 1)
         assert date_to.date() == QDate(year - 2, 12, 31)
@@ -129,7 +145,8 @@ def test_ireks_tabs_use_local_enterprise_style_helpers() -> None:
         "Histórico de tarifas",
         "Entradas de almacén",
         "Salidas de almacén",
-        "Stock y movimientos",
+        "Stock disponible",
+        "Movimientos del producto",
         "Resumen mensual",
         "Pedidos relacionados",
         "Información nutricional",
@@ -231,7 +248,7 @@ def test_ireks_detail_tabs_keep_a_four_pixel_outer_margin(monkeypatch) -> None:
     app = QApplication.instance() or QApplication([])
 
     page = IngredientsIreksPage()
-    assert page.detail_tabs.count() == 10
+    assert page.detail_tabs.count() == 11
     for tab_index in range(page.detail_tabs.count()):
         assert page.detail_tabs.widget(tab_index).contentsMargins() == QMargins(4, 4, 4, 4)
 

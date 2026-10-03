@@ -3,7 +3,7 @@ from typing import Any
 from pathlib import Path
 import re
 
-from PySide6.QtCore import QDate, QLocale, QTimer, Qt, QUrl
+from PySide6.QtCore import QDate, QLocale, QSize, QTimer, Qt, QUrl
 from PySide6.QtGui import QBrush, QColor, QDesktopServices, QFont, QIcon, QPainter, QPen, QPixmap, QTextCharFormat, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
@@ -79,6 +79,73 @@ from app.ui.widgets.entity_page import EntityPage
 from app.ui.widgets.ingredient_distributors_tab import IngredientDistributorsTab
 from app.ui.widgets.whatsapp_share_dialog import WhatsAppShareDialog
 from app.viewmodels import IngredientIreksViewModel, IngredientStdViewModel
+
+
+class _ProductCalendar(QCalendarWidget):
+    """Product date picker with explicit month and year controls."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setNavigationBarVisible(False)
+        bar = QFrame(self)
+        bar.setObjectName("productCalendarNavigation")
+        row = QHBoxLayout(bar)
+        row.setContentsMargins(8, 6, 8, 6)
+        row.setSpacing(6)
+        self.month_selector = QComboBox(bar)
+        self.month_selector.setAccessibleName("Mes")
+        locale = QLocale(QLocale.Language.Spanish, QLocale.Country.Spain)
+        for month in range(1, 13):
+            self.month_selector.addItem(locale.standaloneMonthName(month).capitalize(), month)
+        row.addWidget(self.month_selector, 1)
+        self.previous_year = QToolButton(bar)
+        self.previous_year.setText("−")
+        self.previous_year.setToolTip("Año anterior")
+        self.previous_year.setAccessibleName("Año anterior")
+        self.year_selector = QSpinBox(bar)
+        self.year_selector.setAccessibleName("Año")
+        self.year_selector.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        self.year_selector.setKeyboardTracking(False)
+        self.year_selector.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.year_selector.setFixedWidth(78)
+        self.next_year = QToolButton(bar)
+        self.next_year.setText("+")
+        self.next_year.setToolTip("Año siguiente")
+        self.next_year.setAccessibleName("Año siguiente")
+        for button in (self.previous_year, self.next_year):
+            button.setFixedSize(32, 32)
+            button.setAutoRepeat(True)
+        row.addWidget(self.previous_year)
+        row.addWidget(self.year_selector)
+        row.addWidget(self.next_year)
+        bar.setStyleSheet("""
+            QFrame#productCalendarNavigation { background: #EAF3F7; border-radius: 8px; }
+            QComboBox, QSpinBox { background: white; color: #0B2F5B; border: 1px solid #A9C6D2;
+                border-radius: 6px; min-height: 30px; max-height: 30px; padding: 0 6px; }
+            QToolButton { background: #C7E6EE; color: #0B2F5B; border: 1px solid #8EBBC6;
+                border-radius: 6px; padding: 0; min-height: 30px; font-size: 19px; font-weight: 600; }
+            QToolButton:hover { background: #9FD1DF; }
+            QToolButton:pressed { background: #7DBACB; }
+            QToolButton:disabled { color: #8496A0; background: #E4EBEF; }
+        """)
+        self.month_selector.setFixedHeight(32)
+        self.year_selector.setFixedHeight(32)
+        self.layout().insertWidget(0, bar)
+        self.previous_year.clicked.connect(self.year_selector.stepDown)
+        self.next_year.clicked.connect(self.year_selector.stepUp)
+        self.year_selector.valueChanged.connect(lambda year: self.setCurrentPage(year, self.monthShown()))
+        self.month_selector.activated.connect(lambda index: self.setCurrentPage(self.yearShown(), index + 1))
+        self.currentPageChanged.connect(self._sync_navigation)
+        self._sync_navigation(self.yearShown(), self.monthShown())
+
+    def _sync_navigation(self, year: int, month: int) -> None:
+        self.year_selector.blockSignals(True)
+        self.year_selector.setRange(self.minimumDate().year(), self.maximumDate().year())
+        self.year_selector.setValue(year)
+        self.year_selector.blockSignals(False)
+        self.month_selector.setCurrentIndex(month - 1)
+        self.previous_year.setEnabled(year > self.minimumDate().year())
+        self.next_year.setEnabled(year < self.maximumDate().year())
 
 
 class _SortableNumberItem(QTableWidgetItem):
@@ -1250,17 +1317,6 @@ class IngredientsIreksPage(QWidget):
                 color: #5E6C84;
                 font-weight: 500;
             }
-            QPushButton#entradasResetBtn {
-                min-height: 30px;
-                padding: 0 10px;
-                border: 1px solid #D5DDEA;
-                border-radius: 6px;
-                background: #F7F9FC;
-                color: #1B2A42;
-            }
-            QPushButton#entradasResetBtn:hover {
-                background: #EDF2FA;
-            }
             QTableWidget#entradasTable {
                 border: 1px solid #E5EAF1;
                 border-radius: 8px;
@@ -1323,7 +1379,7 @@ class IngredientsIreksPage(QWidget):
         self.entradas_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.entradas_date_to.dateChanged.connect(lambda _d: self._reload_entradas_table(self._current_entradas_articulo_id))
         entradas_filters_row.addWidget(self.entradas_date_to)
-        clear_dates_btn = QPushButton("Todo")
+        clear_dates_btn = self._product_full_year_button()
         clear_dates_btn.setObjectName("entradasResetBtn")
         clear_dates_btn.setProperty("btnRole", "secondary")
         clear_dates_btn.clicked.connect(self._reset_entradas_date_filters)
@@ -1411,7 +1467,7 @@ class IngredientsIreksPage(QWidget):
         self.salidas_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.salidas_date_to.dateChanged.connect(lambda _d: self._reload_salidas_table(self._current_entradas_articulo_id))
         salidas_filters_row.addWidget(self.salidas_date_to)
-        salidas_clear_dates_btn = QPushButton("Todo")
+        salidas_clear_dates_btn = self._product_full_year_button()
         salidas_clear_dates_btn.setProperty("btnRole", "secondary")
         salidas_clear_dates_btn.clicked.connect(self._reset_salidas_date_filters)
         salidas_filters_row.addWidget(salidas_clear_dates_btn)
@@ -1481,7 +1537,7 @@ class IngredientsIreksPage(QWidget):
         stock_layout = QVBoxLayout(stock_tab)
         stock_layout.setContentsMargins(0, 0, 0, 0)
         stock_layout.setSpacing(0)
-        stock_layout.addWidget(self._ireks_tab_header(stock_tab, "Stock y movimientos", "pallet.svg"))
+        stock_layout.addWidget(self._ireks_tab_header(stock_tab, "Stock disponible", "pallet.svg"))
         stock_body = QWidget(stock_tab)
         stock_body_layout = QVBoxLayout(stock_body)
         stock_body_layout.setContentsMargins(10, 10, 10, 10)
@@ -1507,12 +1563,34 @@ class IngredientsIreksPage(QWidget):
         self.stock_current_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.stock_current_table.verticalHeader().setVisible(False)
         self.stock_current_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.stock_current_table.setMaximumHeight(160)
         self._apply_ireks_table_style(self.stock_current_table)
-        stock_body_layout.addWidget(self.stock_current_table)
+        stock_body_layout.addWidget(self.stock_current_table, 1)
+        stock_layout.addWidget(stock_body, 1)
+        tabs.addTab(stock_tab, "Stock")
+
+        movements_tab = QWidget()
+        movements_tab.setObjectName("movementsTab")
+        movements_layout = QVBoxLayout(movements_tab)
+        movements_layout.setContentsMargins(0, 0, 0, 0)
+        movements_layout.setSpacing(0)
+        movements_layout.addWidget(self._ireks_tab_header(movements_tab, "Movimientos del producto", "calendar-range.svg"))
+        movements_body = QWidget(movements_tab)
+        movements_body_layout = QVBoxLayout(movements_body)
+        movements_body_layout.setContentsMargins(10, 10, 10, 10)
+        movements_body_layout.setSpacing(8)
+        movements_warehouse_row = QHBoxLayout()
+        movements_warehouse_row.addWidget(QLabel("Almacén"))
+        self.movements_warehouse_filter = QComboBox()
+        self.movements_warehouse_filter.setMinimumWidth(200)
+        self.movements_warehouse_filter.currentIndexChanged.connect(
+            lambda _index: self._reload_stock_table(self._current_entradas_articulo_id)
+        )
+        movements_warehouse_row.addWidget(self.movements_warehouse_filter)
+        movements_warehouse_row.addStretch()
+        movements_body_layout.addLayout(movements_warehouse_row)
         period_label = QLabel("Movimientos del período · el total neto es la variación, no las existencias actuales")
         period_label.setWordWrap(True)
-        stock_body_layout.addWidget(period_label)
+        movements_body_layout.addWidget(period_label)
         stock_filters_row = QHBoxLayout()
         stock_filters_row.addWidget(QLabel("Desde"))
         self.stock_date_from = self._product_date_filter("Desde")
@@ -1528,12 +1606,12 @@ class IngredientsIreksPage(QWidget):
         self.stock_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.stock_date_to.dateChanged.connect(lambda _d: self._reload_stock_table(self._current_entradas_articulo_id))
         stock_filters_row.addWidget(self.stock_date_to)
-        stock_clear_dates_btn = QPushButton("Todo")
+        stock_clear_dates_btn = self._product_full_year_button()
         stock_clear_dates_btn.setProperty("btnRole", "secondary")
         stock_clear_dates_btn.clicked.connect(self._reset_stock_date_filters)
         stock_filters_row.addWidget(stock_clear_dates_btn)
         stock_filters_row.addStretch(1)
-        stock_body_layout.addLayout(stock_filters_row)
+        movements_body_layout.addLayout(stock_filters_row)
         self.stock_table = QTableWidget(0, 8)
         self.stock_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.stock_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -1560,7 +1638,7 @@ class IngredientsIreksPage(QWidget):
         self.stock_table.setColumnWidth(4, 85)
         self.stock_table.setColumnWidth(5, 105)
         self.stock_table.setColumnWidth(7, 110)
-        stock_body_layout.addWidget(self.stock_table, 1)
+        movements_body_layout.addWidget(self.stock_table, 1)
         self.stock_totals_table = QTableWidget(1, 8)
         self.stock_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.stock_totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -1587,9 +1665,9 @@ class IngredientsIreksPage(QWidget):
         self.stock_totals_table.setColumnWidth(5, 105)
         self.stock_totals_table.setColumnWidth(7, 110)
         self._apply_ireks_table_style(self.stock_totals_table, totals=True)
-        stock_body_layout.addWidget(self.stock_totals_table)
-        stock_layout.addWidget(stock_body, 1)
-        tabs.addTab(stock_tab, "Stock")
+        movements_body_layout.addWidget(self.stock_totals_table)
+        movements_layout.addWidget(movements_body, 1)
+        tabs.addTab(movements_tab, "Movimientos")
 
         mensual_tab = QWidget()
         mensual_tab.setObjectName("mensualTab")
@@ -2129,10 +2207,26 @@ class IngredientsIreksPage(QWidget):
                 button.setEnabled(enabled)
 
     @staticmethod
+    def _product_full_year_button() -> QPushButton:
+        button = QPushButton("Todo")
+        button.setFixedHeight(32)
+        button.setToolTip("Mostrar el año completo de la fecha Desde")
+        button.setIcon(QIcon(str(Path(__file__).resolve().parents[3] / "assets/icons/calendar-range.svg")))
+        button.setIconSize(QSize(18, 18))
+        button.setStyleSheet("""
+            QPushButton { background: #C7E6EE; color: #0B2F5B; border: 1px solid #8EBBC6;
+                border-radius: 6px; padding: 0 12px; min-height: 30px; max-height: 30px; font-weight: 600; }
+            QPushButton:hover { background: #9FD1DF; }
+            QPushButton:pressed { background: #7DBACB; }
+        """)
+        return button
+
+    @staticmethod
     def _product_date_filter(label: str) -> QDateEdit:
         """Keep the product date fields and their popup readable under the shared theme."""
         field = QDateEdit()
         field.setCalendarPopup(True)
+        field.setCalendarWidget(_ProductCalendar(field))
         field.setLocale(QLocale(QLocale.Language.Spanish, QLocale.Country.Spain))
         field.setAccessibleName(label)
         field.setToolTip(f"{label}: escribe una fecha o abre el calendario")
@@ -2141,7 +2235,7 @@ class IngredientsIreksPage(QWidget):
         field.setStyleSheet("""
             QDateEdit {
                 background: #FFFFFF; color: #0B2F5B; border: 1px solid #C9D7E8;
-                border-radius: 7px; padding: 0 42px 0 12px; min-height: 0;
+                border-radius: 7px; padding: 0 42px 0 12px; min-height: 30px; max-height: 30px;
                 selection-background-color: #D9F0F2; selection-color: #0B2F5B;
             }
             QDateEdit:hover { border-color: #8EBBC6; }
@@ -2156,7 +2250,7 @@ class IngredientsIreksPage(QWidget):
             QDateEdit::down-arrow { image: url("%s"); width: 18px; height: 18px; }
         """ % icon)
         calendar = field.calendarWidget()
-        calendar.setMinimumSize(336, 292)
+        calendar.setMinimumSize(380, 306)
         calendar.setFirstDayOfWeek(Qt.DayOfWeek.Monday)
         calendar.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
         calendar.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.ShortDayNames)
@@ -2184,15 +2278,6 @@ class IngredientsIreksPage(QWidget):
         header.setForeground(QColor("#0B2F5B"))
         header.setBackground(QColor("#EDF5F8"))
         calendar.setHeaderTextFormat(header)
-        year_editor = calendar.findChild(QSpinBox, "qt_calendar_yearedit")
-        if year_editor is not None:
-            year_editor.valueChanged.connect(lambda year: calendar.setCurrentPage(year, calendar.monthShown()))
-        for name, text in (("qt_calendar_prevmonth", "‹"), ("qt_calendar_nextmonth", "›")):
-            button = calendar.findChild(QToolButton, name)
-            if button is not None:
-                button.setIcon(QIcon())
-                button.setText(text)
-                button.setStyleSheet("font-size: 22px; font-weight: 600; min-width: 28px;")
         return field
 
     def _ireks_tab_header(
@@ -3644,30 +3729,32 @@ class IngredientsIreksPage(QWidget):
         self.stock_inventory_label.clear()
         articulo_id = str(articulo_id or "").strip()
         if not articulo_id:
-            self.stock_warehouse_filter.blockSignals(True)
-            self.stock_warehouse_filter.clear()
-            self.stock_warehouse_filter.blockSignals(False)
+            for selector in (self.stock_warehouse_filter, self.movements_warehouse_filter):
+                selector.blockSignals(True)
+                selector.clear()
+                selector.blockSignals(False)
             self._set_stock_totals(0.0, 0.0)
             return
         moves, items = self.ireks_service.movement_payload(articulo_id)
         names, inventories = self.ireks_service.stock_context()
         warehouse_ids = {str(mov.almacen_id or "").strip() for mov in moves}
         warehouse_ids.update(str(item.almacen_id).strip() for item in items if item.almacen_id)
-        previous = self.stock_warehouse_filter.currentData()
-        self.stock_warehouse_filter.blockSignals(True)
-        self.stock_warehouse_filter.clear()
-        for warehouse_id in sorted(warehouse_ids, key=lambda key: (names.get(key) or "", key)):
-            self.stock_warehouse_filter.addItem(names.get(warehouse_id) or ("Almacén sin nombre" if warehouse_id else "Sin almacén asignado"), warehouse_id)
-        index = self.stock_warehouse_filter.findData(previous)
-        self.stock_warehouse_filter.setCurrentIndex(index if index >= 0 else 0)
-        self.stock_warehouse_filter.blockSignals(False)
+        for selector in (self.stock_warehouse_filter, self.movements_warehouse_filter):
+            previous = selector.currentData()
+            selector.blockSignals(True)
+            selector.clear()
+            for warehouse_id in sorted(warehouse_ids, key=lambda key: (names.get(key) or "", key)):
+                selector.addItem(names.get(warehouse_id) or ("Almacén sin nombre" if warehouse_id else "Sin almacén asignado"), warehouse_id)
+            index = selector.findData(previous)
+            selector.setCurrentIndex(index if index >= 0 else 0)
+            selector.blockSignals(False)
         warehouse_id = self.stock_warehouse_filter.currentData()
         if warehouse_id is None:
             self.stock_current_label.setText("Sin almacén ni movimientos registrados para este producto.")
             self._set_stock_totals(0.0, 0.0)
             return
-        moves = [mov for mov in moves if str(mov.almacen_id or "").strip() == warehouse_id]
-        current_rows = compute_current_stock_rows(moves)
+        current_moves = [mov for mov in moves if str(mov.almacen_id or "").strip() == warehouse_id]
+        current_rows = compute_current_stock_rows(current_moves)
         weight = float(items[0].articulo_envase_peso_total or 0.0) if items else 0.0
         current_units = sum(row["cantidad"] for row in current_rows)
         self.stock_current_label.setText(
@@ -3694,7 +3781,8 @@ class IngredientsIreksPage(QWidget):
         filtered_moves = [
             mov
             for mov in moves
-            if mov.fecha_pedido is not None and from_date <= mov.fecha_pedido <= to_date
+            if str(mov.almacen_id or "").strip() == self.movements_warehouse_filter.currentData()
+            and mov.fecha_pedido is not None and from_date <= mov.fecha_pedido <= to_date
         ]
         peso_total = float(items[0].articulo_envase_peso_total or 0.0) if items else 0.0
         self.stock_table.setRowCount(len(filtered_moves))
