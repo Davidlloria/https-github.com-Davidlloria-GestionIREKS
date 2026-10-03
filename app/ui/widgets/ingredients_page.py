@@ -2119,11 +2119,11 @@ class IngredientsIreksPage(QWidget):
             QDateEdit:focus { border: 1px solid #087E9C; }
             QDateEdit::drop-down {
                 subcontrol-origin: border; subcontrol-position: top right;
-                width: 34px; border-left: 1px solid #D6E5EC;
+                width: 34px; border-left: 1px solid #D3A843;
                 border-top-right-radius: 7px; border-bottom-right-radius: 7px;
-                background: #EDF5F8;
+                background: #F6D58A;
             }
-            QDateEdit::drop-down:hover { background: #D9F0F2; }
+            QDateEdit::drop-down:hover { background: #EDC05B; }
             QDateEdit::down-arrow { image: url("%s"); width: 18px; height: 18px; }
         """ % icon)
         calendar = field.calendarWidget()
@@ -3380,28 +3380,31 @@ class IngredientsIreksPage(QWidget):
         self._reload_product_documents("")
 
     def _reset_entradas_date_filters(self) -> None:
+        year = self.entradas_date_from.date().year()
         self.entradas_date_from.blockSignals(True)
         self.entradas_date_to.blockSignals(True)
-        self.entradas_date_from.setDate(QDate(2000, 1, 1))
-        self.entradas_date_to.setDate(QDate(2100, 12, 31))
+        self.entradas_date_from.setDate(QDate(year, 1, 1))
+        self.entradas_date_to.setDate(QDate(year, 12, 31))
         self.entradas_date_from.blockSignals(False)
         self.entradas_date_to.blockSignals(False)
         self._reload_entradas_table(self._current_entradas_articulo_id)
 
     def _reset_salidas_date_filters(self) -> None:
+        year = self.salidas_date_from.date().year()
         self.salidas_date_from.blockSignals(True)
         self.salidas_date_to.blockSignals(True)
-        self.salidas_date_from.setDate(QDate(2000, 1, 1))
-        self.salidas_date_to.setDate(QDate(2100, 12, 31))
+        self.salidas_date_from.setDate(QDate(year, 1, 1))
+        self.salidas_date_to.setDate(QDate(year, 12, 31))
         self.salidas_date_from.blockSignals(False)
         self.salidas_date_to.blockSignals(False)
         self._reload_salidas_table(self._current_entradas_articulo_id)
 
     def _reset_stock_date_filters(self) -> None:
+        year = self.stock_date_from.date().year()
         self.stock_date_from.blockSignals(True)
         self.stock_date_to.blockSignals(True)
-        self.stock_date_from.setDate(QDate(2000, 1, 1))
-        self.stock_date_to.setDate(QDate(2100, 12, 31))
+        self.stock_date_from.setDate(QDate(year, 1, 1))
+        self.stock_date_to.setDate(QDate(year, 12, 31))
         self.stock_date_from.blockSignals(False)
         self.stock_date_to.blockSignals(False)
         self._reload_stock_table(self._current_entradas_articulo_id)
