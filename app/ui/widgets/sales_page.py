@@ -2760,7 +2760,9 @@ class SalesPage(QWidget):
         self.igsa_comparison_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.igsa_comparison_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.igsa_comparison_table.setAlternatingRowColors(True)
-        self.igsa_comparison_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.igsa_comparison_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        for column, width in enumerate((90, 90, 230, 120, 100, 100, 110, 180)):
+            self.igsa_comparison_table.setColumnWidth(column, width)
         self.igsa_comparison_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         comparison_layout.addWidget(self.igsa_comparison_table)
         self.igsa_views.addWidget(comparison_view)
@@ -5942,6 +5944,11 @@ class SalesPage(QWidget):
     def _fill_igsa_comparison_view(self):
         rows = getattr(self, "_igsa_comparisons", [])
         message = getattr(self, "_igsa_comparison_error", "")
+        if (getattr(self, "_igsa_rendered_rows", None) is rows
+                and getattr(self, "_igsa_rendered_error", None) == message):
+            return
+        self._igsa_rendered_rows = rows
+        self._igsa_rendered_error = message
         if not message:
             message = "IGSA / IREKS (cliente IGSA) · filtros actuales · diferencia IGSA − IREKS · tolerancia 0,001 kg."
             message += " Amarillo: documento · Naranja: comparación. Vuelve con «Ventas»."
@@ -5949,18 +5956,25 @@ class SalesPage(QWidget):
                 message += " No hay datos para los filtros seleccionados."
         self.igsa_comparison_message.setText(message)
         table = self.igsa_comparison_table
-        table.setRowCount(len(rows))
-        for i, row in enumerate(rows):
-            for j, key in enumerate(("periodo", "codigo", "nombre", "dato", "igsa", "ireks", "diferencia", "estado")):
-                value = row[key]
-                item = QTableWidgetItem("—" if value is None else self._fmt_num3(value) if isinstance(value, (int, float)) else str(value))
-                if isinstance(value, (int, float)):
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                if row["estado"] != "Coincide":
-                    item.setData(COMPARISON_ROLE, True)
-                    item.setForeground(QColor("#9A3412"))
-                    item.setBackground(QBrush(QColor("#FFEDD5")))
-                table.setItem(i, j, item)
+        table.setUpdatesEnabled(False)
+        table.blockSignals(True)
+        try:
+            table.setRowCount(len(rows))
+            for i, row in enumerate(rows):
+                for j, key in enumerate(("periodo", "codigo", "nombre", "dato", "igsa", "ireks", "diferencia", "estado")):
+                    value = row[key]
+                    item = QTableWidgetItem("—" if value is None else self._fmt_num3(value) if isinstance(value, (int, float)) else str(value))
+                    if isinstance(value, (int, float)):
+                        item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                    if row["estado"] != "Coincide":
+                        item.setData(COMPARISON_ROLE, True)
+                        item.setForeground(QColor("#9A3412"))
+                        item.setBackground(QBrush(QColor("#FFEDD5")))
+                    table.setItem(i, j, item)
+        finally:
+            table.blockSignals(False)
+            table.setUpdatesEnabled(True)
+
 
     def _igsa_product_lines(self, product_id: str, product_code: str) -> list[dict]:
         return [line for line in getattr(self, "_igsa_detail_rows", [])

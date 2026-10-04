@@ -236,3 +236,36 @@ def test_igsa_views_switch_without_losing_sales_selection_or_filters(monkeypatch
     assert page.igsa_comparison_table.rowCount() == 0
     assert 'único cliente' in page.igsa_comparison_message.text()
     page.close()
+
+
+def test_igsa_large_comparison_switch_reuses_cells_and_shows_one_table(monkeypatch):
+    app = _app()
+    for method in ("reload", "reload_igsa", "reload_clientes"):
+        monkeypatch.setattr(SalesPage, method, lambda self: None)
+    page = SalesPage()
+    page.sales_tabs.setCurrentIndex(1)
+    page.show()
+    app.processEvents()
+    try:
+        assert page.sales_table_igsa.isVisible()
+        assert not page.igsa_comparison_table.isVisible()
+        page._igsa_comparisons = [dict(periodo='2026-08', codigo=str(i), nombre='Pan', dato='Kg vendidos',
+            igsa=12, ireks=10, diferencia=2, estado='Diferencia') for i in range(3000)]
+        page._fill_igsa_comparison_view()
+        first_item = page.igsa_comparison_table.item(0, 0)
+        for _ in range(2):
+            page.igsa_comparison_view_btn.click()
+            app.processEvents()
+            assert page.igsa_comparison_table.item(0, 0) is first_item
+            assert page.igsa_comparison_table.isVisible()
+            assert not page.sales_table_igsa.isVisible()
+            page.igsa_sales_view_btn.click()
+            app.processEvents()
+            assert page.sales_table_igsa.isVisible()
+            assert not page.igsa_comparison_table.isVisible()
+        assert page.igsa_comparison_table.horizontalHeader().sectionResizeMode(0) != sales_page_module.QHeaderView.ResizeMode.ResizeToContents
+        page._igsa_comparisons = []
+        page._fill_igsa_comparison_view()
+        assert page.igsa_comparison_table.rowCount() == 0
+    finally:
+        page.close()
