@@ -12,6 +12,7 @@ from PySide6.QtCore import QTimer, Qt, QSize
 from PySide6.QtGui import QColor, QCursor, QFont, QIcon, QTextDocument, QBrush
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -544,6 +545,7 @@ class MonthlySalesDialog(QDialog):
         subtitle: str,
         points: list[SalesMonthlyComparisonPoint],
         parent: QWidget | None = None,
+        explicit_modes: bool = False,
     ) -> None:
         super().__init__(parent)
         self._chart_mode = "bar"
@@ -571,6 +573,7 @@ class MonthlySalesDialog(QDialog):
         header.addWidget(title_label)
         if subtitle:
             subtitle_label = QLabel(subtitle)
+            subtitle_label.setWordWrap(True)
             subtitle_font = QFont()
             subtitle_font.setPointSize(9)
             subtitle_label.setFont(subtitle_font)
@@ -602,6 +605,18 @@ class MonthlySalesDialog(QDialog):
         )
         self.chart_mode_btn.clicked.connect(lambda: self._toggle_chart_mode(chart))
         bottom_row.addWidget(self.chart_mode_btn)
+        if explicit_modes:
+            self.chart_mode_btn.hide()
+            self.mode_buttons = QButtonGroup(self)
+            for mode, title, icon in (("bar", "Barras", CHART_COLUMN_ICON_PATH), ("line", "Líneas", CHART_LINE_ICON_PATH)):
+                button = QPushButton(title)
+                button.setCheckable(True)
+                button.setChecked(mode == "bar")
+                button.setIcon(QIcon(str(icon)))
+                button.clicked.connect(lambda _checked, value=mode: chart.set_chart_mode(value))
+                self.mode_buttons.addButton(button)
+                bottom_row.addWidget(button)
+
 
         bottom_row.addStretch(1)
 
@@ -2461,7 +2476,7 @@ class SalesPage(QWidget):
             hover_background="#B0D4F8",
             pressed_background="#8AB8E6",
         )
-        self.sales_chart_btn_igsa.clicked.connect(lambda: self._show_igsa_placeholder_action("Producto"))
+        self.sales_chart_btn_igsa.clicked.connect(lambda: self._open_igsa_monthly_chart(product=True))
 
         self.sales_total_chart_btn_igsa = make_igsa_action_button(
             text="Total",
@@ -2472,7 +2487,7 @@ class SalesPage(QWidget):
             hover_background="#B8E8DA",
             pressed_background="#91D2BE",
         )
-        self.sales_total_chart_btn_igsa.clicked.connect(lambda: self._show_igsa_placeholder_action("Total"))
+        self.sales_total_chart_btn_igsa.clicked.connect(lambda: self._open_igsa_monthly_chart(product=False))
 
         self.sales_analysis_btn_igsa = make_igsa_action_button(
             text="Análisis",
@@ -2632,6 +2647,7 @@ class SalesPage(QWidget):
         igsa_layout.addWidget(self.group_header_igsa)
 
         self.sales_table_igsa = QTableWidget(0, 12)
+        self.sales_table_igsa.itemSelectionChanged.connect(self._update_igsa_chart_buttons)
         self.sales_table_igsa.setItemDelegate(IgsaIncidentDelegate(self.sales_table_igsa))
         self.sales_table_igsa.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.sales_table_igsa.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -3703,6 +3719,54 @@ class SalesPage(QWidget):
 
     def _open_clientes_sales_tools_dialog(self) -> None:
         dialog = SalesToolsDialog(mode="clientes", on_import_completed=self.reload_clientes, parent=self)
+        dialog.exec()
+
+    def _update_igsa_chart_buttons(self) -> None:
+        valid_year = self._current_year_igsa() > 0
+        self.sales_chart_btn_igsa.setEnabled(valid_year and bool(self.sales_table_igsa.selectionModel().selectedRows()))
+        self.sales_total_chart_btn_igsa.setEnabled(valid_year)
+
+    def _open_igsa_monthly_chart(self, *, product: bool) -> None:
+        year = self._current_year_igsa()
+        if year <= 0:
+            return
+        articulo_id = codigo = ""
+        label = "Total de productos filtrados"
+        if product:
+            selected = self.sales_table_igsa.selectionModel().selectedRows()
+            if not selected:
+                return
+            row = selected[0].row()
+            item = self.sales_table_igsa.item(row, 0)
+            if item is None:
+                return
+            articulo_id = str(item.data(SALES_PRODUCT_ID_ROLE) or "").strip()
+            codigo = item.text().strip()
+            if not articulo_id and not codigo:
+                return
+            name = self.sales_table_igsa.item(row, 1)
+            label = f"{codigo} · {name.text() if name else ''}"
+        filters = dict(
+            producto_texto=self._current_product_text_igsa(),
+            fabricante_id=self._current_manufacturer_id_igsa(),
+            familia_id=self._current_family_id_igsa(),
+            subfamilia_id=self._current_subfamily_id_igsa(),
+        )
+        points = self.sales_summary_service.listar_ventas_mensuales_igsa_comparativa(
+            year=year, articulo_id=articulo_id, codigo=codigo, **filters,
+        )
+        descriptions = [label, "Año completo · kg vendidos · sin filtro de mes/acumulado"]
+        if filters["producto_texto"]:
+            descriptions.append(f"Búsqueda: {filters['producto_texto']}")
+        for key, combo in (("fabricante_id", self.manufacturer_filter_igsa),
+                           ("familia_id", self.family_filter_igsa),
+                           ("subfamilia_id", self.subfamily_filter_igsa)):
+            if filters[key]:
+                descriptions.append(combo.currentText())
+        dialog = MonthlySalesDialog(
+            title=f"Ventas IGSA · {year - 1} / {year}", subtitle=" | ".join(descriptions),
+            points=points, parent=self, explicit_modes=True,
+        )
         dialog.exec()
 
     def _show_igsa_placeholder_action(self, action_name: str) -> None:
@@ -5064,6 +5128,7 @@ class SalesPage(QWidget):
             self._fill_sales_igsa(rows, year)
         finally:
             self._building_igsa = False
+            self._update_igsa_chart_buttons()
 
     def _reload_filters_igsa(self) -> None:
         current_year = self._current_year_igsa()

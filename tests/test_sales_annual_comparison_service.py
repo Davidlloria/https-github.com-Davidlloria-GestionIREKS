@@ -72,6 +72,42 @@ def _seed_products(session: Session) -> tuple[str, str, str, str]:
     return cliente_id, fabricante_id, familia_id, subfamilia_id
 
 
+def test_igsa_monthly_chart_matches_summary_and_filters(isolated_engine) -> None:
+    with Session(isolated_engine) as session:
+        _seed_products(session)
+        for index, (source, period, code, product, kilos) in enumerate([
+            ("igsa", "2025-01", "D123", "art-1", 10),
+            ("igsa_pdf", "2026-02", "D123", "art-1", 20),
+            ("igsa_book", "2026-12", "UNKNOWN", None, 5),
+            ("ireks", "2026-02", "D123", "art-1", 999),
+        ]):
+            session.add(VentaMensualRaw(
+                raw_id=f"chart-{index}", lote_id="chart", fuente=source,
+                cliente_id="cli-1", periodo=period, articulo_codigo_origen=code,
+                articulo_id=product, articulo_descripcion_origen=code, venta_kilos=kilos,
+            ))
+        session.commit()
+    service = SalesAnnualComparisonService()
+    points = service.listar_ventas_mensuales_igsa_comparativa(year=2026)
+    assert [p.month for p in points] == list(range(1, 13))
+    assert points[0].kilos_prev == 10
+    assert points[1].kilos_curr == 20
+    assert points[2].kilos_curr == 0
+    assert points[11].kilos_curr == 5
+    annual = service.listar_resumen_anual_igsa(year=2026)
+    assert sum(p.kilos_curr for p in points) == sum(r.kilos_curr for r in annual)
+    filtered = service.listar_ventas_mensuales_igsa_comparativa(
+        year=2026, articulo_id="art-1", producto_texto="D123",
+        fabricante_id="fab-1", familia_id="fam-1", subfamilia_id="sub-1",
+    )
+    assert sum(p.kilos_curr for p in filtered) == 20
+    unknown = service.listar_ventas_mensuales_igsa_comparativa(year=2026, codigo="UNKNOWN")
+    assert sum(p.kilos_curr for p in unknown) == 5
+    assert service.listar_ventas_mensuales_igsa_comparativa(year=0) == []
+    assert all(p.kilos_curr == p.kilos_prev == 0 for p in
+               service.listar_ventas_mensuales_igsa_comparativa(year=2030))
+
+
 def test_ireks_summary_uses_previous_and_current_years(isolated_engine) -> None:
     with Session(isolated_engine) as session:
         cliente_id, fabricante_id, familia_id, subfamilia_id = _seed_products(session)

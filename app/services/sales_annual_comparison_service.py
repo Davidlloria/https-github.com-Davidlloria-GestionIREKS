@@ -471,6 +471,30 @@ class SalesAnnualComparisonService:
 
         return self._build_rows(totals)
 
+    def listar_ventas_mensuales_igsa_comparativa(
+        self, *, year: int, articulo_id: str = "", codigo: str = "",
+        producto_texto: str = "", fabricante_id: str = "",
+        familia_id: str = "", subfamilia_id: str = "",
+    ) -> list[SalesMonthlyComparisonPoint]:
+        """Use the IGSA summary rules for each month, including unresolved product codes."""
+        if year <= 0:
+            return []
+        points = []
+        for month in range(1, 13):
+            rows = self.listar_resumen_anual_igsa(
+                year=year, month=month, acumulado=False, producto_texto=producto_texto,
+                fabricante_id=fabricante_id, familia_id=familia_id, subfamilia_id=subfamilia_id,
+            )
+            if articulo_id:
+                rows = [row for row in rows if row.articulo_id == articulo_id]
+            elif codigo:
+                rows = [row for row in rows if self._normalize_code(row.codigo) == self._normalize_code(codigo)]
+            points.append(SalesMonthlyComparisonPoint(
+                month=month, kilos_prev=sum(row.kilos_prev for row in rows),
+                kilos_curr=sum(row.kilos_curr for row in rows),
+            ))
+        return points
+
     def listar_resumen_anual(
         self,
         year: int,
