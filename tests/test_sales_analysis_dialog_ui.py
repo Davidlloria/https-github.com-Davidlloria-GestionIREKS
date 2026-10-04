@@ -186,8 +186,10 @@ def test_igsa_comparison_marks_only_affected_kg_cell(monkeypatch):
     for method in ("reload", "reload_igsa", "reload_clientes"):
         monkeypatch.setattr(SalesPage, method, lambda self: None)
     monkeypatch.setattr(IgsaSaleDetailsService, "list_lines", lambda *args: [])
+    monkeypatch.setattr(IgsaSaleDetailsService, "igsa_party_id", lambda self: 'igsa')
     monkeypatch.setattr(IgsaSaleDetailsService, "compare", lambda *args, **kwargs: [
-        dict(articulo_id='p', codigo='P1', periodo='2026-08', dato='Kg vendidos', estado='Diferencia')])
+        dict(articulo_id='p', codigo='P1', nombre='Pan', periodo='2026-08', dato='Kg vendidos',
+             estado='Diferencia', igsa=12, ireks=10, diferencia=2)])
     page = SalesPage()
     row = SimpleNamespace(articulo_id='p', codigo='P1', nombre='Pan',
         kilos_prev=10, sc_prev=0, ventas_prev=20, kilos_curr=12, sc_curr=0, ventas_curr=24,
@@ -198,4 +200,39 @@ def test_igsa_comparison_marks_only_affected_kg_cell(monkeypatch):
     assert not page.sales_table_igsa.item(0, 2).data(COMPARISON_ROLE)
     assert not page.sales_table_igsa.item(0, 6).data(COMPARISON_ROLE)
     assert page.sales_table_igsa.item(0, 5).toolTip() == ''
+    page.close()
+
+
+def test_igsa_views_switch_without_losing_sales_selection_or_filters(monkeypatch):
+    _app()
+    for method in ("reload", "reload_igsa", "reload_clientes"):
+        monkeypatch.setattr(SalesPage, method, lambda self: None)
+    page = SalesPage()
+    page.sales_table_igsa.setRowCount(1)
+    page.sales_table_igsa.setItem(0, 0, sales_page_module.QTableWidgetItem('P1'))
+    page.sales_table_igsa.selectRow(0)
+    page.product_filter_igsa.setText('Pan')
+    page._igsa_comparisons = [dict(periodo='2026-08', codigo='P1', nombre='Pan', dato='Kg vendidos',
+                                 igsa=12, ireks=10, diferencia=2, estado='Diferencia')]
+    page.igsa_comparison_view_btn.click()
+    assert page.igsa_views.currentIndex() == 1
+    assert page.igsa_comparison_view_btn.isChecked()
+    assert page.igsa_comparison_table.rowCount() == 1
+    from app.ui.widgets.igsa_sale_details_dialog import COMPARISON_ROLE
+    assert page.igsa_comparison_table.item(0, 0).data(COMPARISON_ROLE)
+    page.igsa_sales_view_btn.click()
+    assert page.igsa_views.currentIndex() == 0
+    assert page.igsa_sales_view_btn.isChecked()
+    assert not page.igsa_comparison_view_btn.isChecked()
+    assert page.sales_table_igsa.selectionModel().selectedRows()[0].row() == 0
+    assert page.product_filter_igsa.text() == 'Pan'
+    assert not hasattr(page, 'igsa_comparison_party')
+    for button in (page.igsa_sales_view_btn, page.igsa_comparison_view_btn, page.igsa_history_btn):
+        assert not button.icon().isNull()
+        assert button.height() == page.sales_chart_btn_igsa.height()
+    page._igsa_comparison_error = 'No se ha identificado un único cliente IGSA'
+    page._igsa_comparisons = []
+    page.igsa_comparison_view_btn.click()
+    assert page.igsa_comparison_table.rowCount() == 0
+    assert 'único cliente' in page.igsa_comparison_message.text()
     page.close()

@@ -1,6 +1,7 @@
 """IGSA detail, audited manual corrections and monthly reconciliation."""
 import json
 import math
+import re
 from datetime import datetime, timezone
 from sqlalchemy import text, inspect, update
 from app.services.sales_annual_comparison_service import SalesAnnualComparisonService
@@ -79,8 +80,16 @@ class IgsaSaleDetailsService:
         with Session(self.engine) as session:
             return list(session.exec(select(IngredienteIreks).order_by(IngredienteIreks.articulo_descripcion)))
 
-    def parties(self):
-        return SalesAnnualComparisonService(self.engine).list_filter_clients()
+    def igsa_party_id(self):
+        """Resolve a unique IGSA client, never fall back to all IREKS clients."""
+        candidates = []
+        for party in SalesAnnualComparisonService(self.engine).list_filter_clients():
+            names = (party.cliente_nombre_comercial, party.cliente_nombre_fiscal, party.cliente_abreviatura)
+            if any("igsa" in re.findall(r"\w+", str(name or "").casefold()) for name in names):
+                candidates.append(party.cliente_id)
+        if len(candidates) != 1:
+            raise ValueError("No se ha identificado un único cliente IGSA en IREKS. Revise su ficha de cliente.")
+        return candidates[0]
 
     def correct(self, raw_id, expected, *, reason, values=None, resolved=False):
         if not reason.strip():
@@ -157,7 +166,7 @@ class IgsaSaleDetailsService:
             return [dict(r._mapping) for r in conn.execute(text(
                 "SELECT * FROM igsa_manual_corrections WHERE (:raw IS NULL OR raw_id=:raw) ORDER BY id"), dict(raw=raw_id))]
 
-    def compare(self, year, month=0, acumulado=False, *, cliente_id):
+    def compare(self, year, month=0, acumulado=False, *, cliente_id, producto_texto="", fabricante_id="", familia_id="", subfamilia_id=""):
         if not cliente_id:
             return []
         service = SalesAnnualComparisonService(self.engine)
@@ -183,9 +192,11 @@ class IgsaSaleDetailsService:
                 code_match = next((igsa_codes[c] for c in service._code_candidates(row.articulo_codigo_origen) if c in igsa_codes), None) if source == "igsa" else by_code.get(service._normalize_code(row.articulo_codigo_origen))
                 product_key = by_id.get(row.articulo_id) or code_match or "code:" + service._normalize_code(row.articulo_codigo_origen)
                 present_keys.add((source, row.periodo, product_key))
+        filters = dict(producto_texto=producto_texto, fabricante_id=fabricante_id,
+                       familia_id=familia_id, subfamilia_id=subfamilia_id)
         for m in months:
-            igsa = service.listar_resumen_anual_igsa(year=year, month=m)
-            ireks = service.listar_resumen_anual(year=year, month=m, cliente_id=cliente_id)
+            igsa = service.listar_resumen_anual_igsa(year=year, month=m, **filters)
+            ireks = service.listar_resumen_anual(year=year, month=m, cliente_id=cliente_id, **filters)
             left = {(r.articulo_id or "code:" + service._normalize_code(r.codigo)): r for r in igsa}
             right = {(r.articulo_id or "code:" + service._normalize_code(r.codigo)): r for r in ireks}
             for key in sorted(left.keys() | right.keys()):

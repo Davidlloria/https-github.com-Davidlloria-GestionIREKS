@@ -153,7 +153,10 @@ def test_comparison_uses_selected_party_month_and_separate_kg(tmp_path):
         session.commit()
     service = IgsaSaleDetailsService(engine)
     assert service.compare(2026, 8, cliente_id='') == []
-    rows = service.compare(2026, 8, cliente_id='igsa')
+    assert service.igsa_party_id() == 'igsa'
+    assert service.compare(2026, 8, cliente_id='igsa', producto_texto='inexistente') == []
+    assert service.compare(2026, 8, cliente_id='igsa', fabricante_id='inexistente') == []
+    rows = service.compare(2026, 8, cliente_id='igsa', producto_texto='Pan')
     current = [r for r in rows if r['periodo'] == '2026-08']
     assert current[0]['diferencia'] == 10
     assert current[0]['estado'] == 'Diferencia'
@@ -188,3 +191,23 @@ def test_correction_dialog_requires_reason_and_saves_review():
     assert calls[0]['values'] is None
     assert calls[0]['resolved'] is True
     assert dialog.result() == dialog.DialogCode.Accepted
+
+
+def test_igsa_party_requires_unique_match(tmp_path):
+    import pytest
+    from app.models import Cliente
+    engine = create_engine(f"sqlite:///{tmp_path / 'parties.db'}")
+    SQLModel.metadata.create_all(engine)
+    service = IgsaSaleDetailsService(engine)
+    with pytest.raises(ValueError, match='único cliente'):
+        service.igsa_party_id()
+    with Session(engine) as session:
+        session.add(Cliente(cliente_id='other', cliente_codigo=1, cliente_nombre_comercial='NOIGSA', cliente_tipo='distribuidor'))
+        session.add(Cliente(cliente_id='igsa', cliente_codigo=2, cliente_nombre_comercial='IGSA S.A.', cliente_tipo='distribuidor'))
+        session.commit()
+    assert service.igsa_party_id() == 'igsa'
+    with Session(engine) as session:
+        session.add(Cliente(cliente_id='duplicate', cliente_codigo=3, cliente_abreviatura='IGSA', cliente_tipo='distribuidor'))
+        session.commit()
+    with pytest.raises(ValueError, match='único cliente'):
+        service.igsa_party_id()
