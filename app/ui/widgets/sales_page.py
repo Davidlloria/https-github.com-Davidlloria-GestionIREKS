@@ -485,6 +485,9 @@ class MonthlySalesChartWidget(QWidget):
         )
 
     def _refresh_hover_tooltip(self) -> None:
+        if not self.isVisible() or not self.underMouse():
+            self._clear_hover_tooltip()
+            return
         if self._plot is None or self._active_bar_key is None:
             return
         if not self._tooltip_text or self._tooltip_global_pos is None:
@@ -503,6 +506,14 @@ class MonthlySalesChartWidget(QWidget):
         self._tooltip_global_pos = None
         self._hover_refresh_timer.stop()
         QToolTip.hideText()
+
+    def leaveEvent(self, event) -> None:
+        self._clear_hover_tooltip()
+        super().leaveEvent(event)
+
+    def hideEvent(self, event) -> None:
+        self._clear_hover_tooltip()
+        super().hideEvent(event)
 
     def set_chart_mode(self, chart_mode: str) -> None:
         normalized = str(chart_mode or "").strip().lower()
@@ -2300,6 +2311,10 @@ class SalesToolsDialog(QDialog):
 
 
 class SalesPage(QWidget):
+    def hideEvent(self, event) -> None:
+        QToolTip.hideText()
+        super().hideEvent(event)
+
     def __init__(self) -> None:
         super().__init__()
         self.sales_service = SalesReconciliationService()
@@ -2329,6 +2344,7 @@ class SalesPage(QWidget):
         root_layout.setSpacing(4)
 
         self.sales_tabs = QTabWidget()
+        self.sales_tabs.currentChanged.connect(lambda _index: QToolTip.hideText())
         root_layout.addWidget(self.sales_tabs)
 
         ireks_tab = QWidget()
@@ -5317,7 +5333,7 @@ class SalesPage(QWidget):
                     item.setData(INCIDENT_ROLE, True)
                     item.setForeground(QColor("#854D0E"))
                     item.setBackground(QBrush(QColor("#FEF3C7")))
-                    item.setToolTip("Incidencias: " + "\n".join(issues) + "\nClic derecho → Ver incidencia")
+                    item.setToolTip("")
                 self.sales_table_igsa.setItem(idx, col, item)
         self.sales_table_igsa.setSortingEnabled(True)
         self._fill_totals_row_igsa(total_prev_kg, total_prev_sc, total_prev_sales, total_curr_kg, total_curr_sc, total_curr_sales)

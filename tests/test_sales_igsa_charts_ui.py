@@ -7,6 +7,41 @@ from PySide6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QPus
 from app.ui.widgets import sales_page as module
 
 
+def test_chart_tooltip_stops_on_leave_hide_and_hidden_refresh(monkeypatch):
+    from PySide6.QtCore import QEvent, QPoint
+    from PySide6.QtGui import QHideEvent
+    app = QApplication.instance() or QApplication([])
+    chart = module.MonthlySalesChartWidget()
+    hidden = []
+    monkeypatch.setattr(module.QToolTip, "hideText", lambda: hidden.append(True))
+    for action in (
+        lambda: chart.leaveEvent(QEvent(QEvent.Type.Leave)),
+        lambda: chart.hideEvent(QHideEvent()),
+        chart._refresh_hover_tooltip,
+    ):
+        chart._active_bar_key = (1, "curr")
+        chart._tooltip_text = "Ventas"
+        chart._tooltip_global_pos = QPoint(10, 10)
+        chart._hover_refresh_timer.start()
+        action()
+        assert not chart._hover_refresh_timer.isActive()
+        assert chart._active_bar_key is None
+        assert chart._tooltip_text == ""
+    assert len(hidden) == 3
+
+
+def test_sales_tab_change_dismisses_tooltip(monkeypatch):
+    app = QApplication.instance() or QApplication([])
+    for method in ("reload", "reload_igsa", "reload_clientes"):
+        monkeypatch.setattr(module.SalesPage, method, lambda self: None)
+    page = module.SalesPage()
+    hidden = []
+    monkeypatch.setattr(module.QToolTip, "hideText", lambda: hidden.append(True))
+    page.sales_tabs.setCurrentIndex(1)
+    assert hidden
+    page.close()
+
+
 def test_chart_visible_modes_switch_same_series():
     app = QApplication.instance() or QApplication([])
     dialog = module.MonthlySalesDialog(

@@ -135,7 +135,7 @@ def test_sales_product_tables_offer_consumers_context_menu(monkeypatch) -> None:
     code_item = page.sales_table_igsa.findItems("IG-001", Qt.MatchFlag.MatchExactly)[0]
     assert code_item.data(SALES_PRODUCT_ID_ROLE) == "art-igsa-1"
     assert code_item.foreground().color().name() == "#854d0e"
-    assert "Importe pendiente" in code_item.toolTip()
+    assert code_item.toolTip() == ""
     from app.ui.widgets.igsa_sale_details_dialog import INCIDENT_ROLE
     assert page.sales_table_igsa.item(code_item.row(), 7).data(INCIDENT_ROLE)
     assert not page.sales_table_igsa.item(code_item.row(), 4).data(INCIDENT_ROLE)
