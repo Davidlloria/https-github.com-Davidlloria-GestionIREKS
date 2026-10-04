@@ -147,7 +147,6 @@ def test_ireks_tabs_use_local_enterprise_style_helpers() -> None:
         "Salidas de almacén",
         "Stock disponible",
         "Movimientos del producto",
-        "Resumen mensual",
         "Pedidos relacionados",
         "Información nutricional",
         "Documentación del producto",
@@ -182,7 +181,6 @@ def test_ireks_tab_headers_use_full_width_cards_with_inner_content_margins() -> 
         "entradas_body",
         "salidas_body",
         "stock_body",
-        "mensual_body",
         "pedidos_body",
         "tarifa_body",
         "nutricion_body",
@@ -248,7 +246,7 @@ def test_ireks_detail_tabs_keep_a_four_pixel_outer_margin(monkeypatch) -> None:
     app = QApplication.instance() or QApplication([])
 
     page = IngredientsIreksPage()
-    assert page.detail_tabs.count() == 11
+    assert page.detail_tabs.count() == 10
     for tab_index in range(page.detail_tabs.count()):
         assert page.detail_tabs.widget(tab_index).contentsMargins() == QMargins(4, 4, 4, 4)
 

@@ -1298,12 +1298,12 @@ class IngredientsIreksPage(QWidget):
                 background: #FFFFFF; color: #087E9C; font-weight: 600;
                 border-bottom: 3px solid #087E9C;
             }
-            QWidget#entradasTab, QWidget#salidasTab, QWidget#stockTab, QWidget#mensualTab,
+            QWidget#entradasTab, QWidget#salidasTab, QWidget#stockTab,
             QWidget#pedidosTab, QWidget#tarifaTab, QWidget#nutricionTab, QWidget#clientesTab {
                 background: #FFFFFF; border: 1px solid #D6E0EA; border-radius: 8px;
             }
             QWidget#entradasTab QDateEdit, QWidget#salidasTab QDateEdit, QWidget#stockTab QDateEdit,
-            QWidget#mensualTab QDateEdit, QWidget#pedidosTab QDateEdit, QWidget#tarifaTab QComboBox,
+            QWidget#pedidosTab QDateEdit, QWidget#tarifaTab QComboBox,
             QWidget#clientesTab QComboBox {
                 background: #FFFFFF; color: #0B2F5B; border: 1px solid #C9D7E8;
                 border-radius: 6px; padding: 3px 8px; min-height: 28px;
@@ -1721,70 +1721,6 @@ class IngredientsIreksPage(QWidget):
         movements_layout.addWidget(movements_body, 1)
         tabs.addTab(movements_tab, "Movimientos")
 
-        mensual_tab = QWidget()
-        mensual_tab.setObjectName("mensualTab")
-        mensual_layout = QVBoxLayout(mensual_tab)
-        mensual_layout.setContentsMargins(0, 0, 0, 0)
-        mensual_layout.setSpacing(0)
-        mensual_layout.addWidget(self._ireks_tab_header(mensual_tab, "Resumen mensual", "calendar-chart.svg"))
-        mensual_body = QWidget(mensual_tab)
-        mensual_body_layout = QVBoxLayout(mensual_body)
-        mensual_body_layout.setContentsMargins(10, 10, 10, 10)
-        mensual_body_layout.setSpacing(8)
-        mensual_filters = QHBoxLayout()
-        mensual_filters.addWidget(QLabel("Desde"))
-        self.monthly_orders_date_from = self._product_date_filter("Desde")
-        self.monthly_orders_date_from.setCalendarPopup(True)
-        self.monthly_orders_date_from.setDisplayFormat("dd/MM/yyyy")
-        self.monthly_orders_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
-        self.monthly_orders_date_from.dateChanged.connect(
-            lambda _d: self._reload_monthly_orders_table(self._current_entradas_articulo_id)
-        )
-        mensual_filters.addWidget(self.monthly_orders_date_from)
-        mensual_filters.addWidget(QLabel("Hasta"))
-        self.monthly_orders_date_to = self._product_date_filter("Hasta")
-        self.monthly_orders_date_to.setCalendarPopup(True)
-        self.monthly_orders_date_to.setDisplayFormat("dd/MM/yyyy")
-        self.monthly_orders_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
-        self.monthly_orders_date_to.dateChanged.connect(
-            lambda _d: self._reload_monthly_orders_table(self._current_entradas_articulo_id)
-        )
-        mensual_filters.addWidget(self.monthly_orders_date_to)
-        monthly_reset_btn = QPushButton("Limpiar")
-        monthly_reset_btn.clicked.connect(self._reset_monthly_orders_date_filters)
-        mensual_filters.addWidget(monthly_reset_btn)
-        mensual_filters.addStretch(1)
-        mensual_body_layout.addLayout(mensual_filters)
-        self.monthly_orders_table = QTableWidget(0, 7)
-        self.monthly_orders_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.monthly_orders_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.monthly_orders_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.monthly_orders_table.verticalHeader().setVisible(False)
-        self.monthly_orders_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.monthly_orders_table.setAlternatingRowColors(True)
-        self._apply_ireks_table_style(self.monthly_orders_table)
-        monthly_header = self.monthly_orders_table.horizontalHeader()
-        monthly_header.setSectionsClickable(True)
-        monthly_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        monthly_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        monthly_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        monthly_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        monthly_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        monthly_header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-        monthly_header.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
-        self.monthly_orders_table.setHorizontalHeaderLabels(
-            ["Mes", "Pedidos", "Cantidad", "Kg", "Media", "Ult. fecha", "Ult. pedido"]
-        )
-        self.monthly_orders_table.setColumnWidth(0, 95)
-        self.monthly_orders_table.setColumnWidth(1, 75)
-        self.monthly_orders_table.setColumnWidth(2, 95)
-        self.monthly_orders_table.setColumnWidth(3, 95)
-        self.monthly_orders_table.setColumnWidth(4, 95)
-        self.monthly_orders_table.setColumnWidth(5, 105)
-        mensual_body_layout.addWidget(self.monthly_orders_table, 1)
-        mensual_layout.addWidget(mensual_body, 1)
-        tabs.addTab(mensual_tab, "Mensual")
-
         pedidos_tab = QWidget()
         pedidos_tab.setObjectName("pedidosTab")
         pedidos_layout = QVBoxLayout(pedidos_tab)
@@ -1836,7 +1772,9 @@ class IngredientsIreksPage(QWidget):
         self.pedidos_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
         self.pedidos_date_to.dateChanged.connect(lambda _d: self._reload_pedidos_table(self._current_entradas_articulo_id))
         pedidos_filters.addWidget(self.pedidos_date_to)
-        self.pedidos_reset_btn = QPushButton("Limpiar")
+        self.pedidos_reset_btn = self._product_full_year_button()
+        self.pedidos_reset_btn.setText("Limpiar")
+        self.pedidos_reset_btn.setToolTip("Restablecer las fechas al año actual")
         self.pedidos_reset_btn.clicked.connect(self._reset_pedidos_date_filters)
         pedidos_filters.addWidget(self.pedidos_reset_btn)
         pedidos_filters.addStretch(1)
@@ -3573,7 +3511,6 @@ class IngredientsIreksPage(QWidget):
         self._reload_entradas_table(selected_articulo_id)
         self._reload_salidas_table(selected_articulo_id)
         self._reload_stock_table(selected_articulo_id)
-        self._reload_monthly_orders_table(selected_articulo_id)
         self._reload_pedidos_table(selected_articulo_id)
         self._reload_tarifas_table(selected_articulo_id)
         self._reload_nutricion_table(selected_articulo_id)
@@ -3620,7 +3557,6 @@ class IngredientsIreksPage(QWidget):
         self._reload_entradas_table("")
         self._reload_salidas_table("")
         self._reload_stock_table("")
-        self._reload_monthly_orders_table("")
         self._reload_pedidos_table("")
         self._reload_tarifas_table("")
         self._reload_nutricion_table("")
@@ -3665,14 +3601,6 @@ class IngredientsIreksPage(QWidget):
         self.pedidos_date_to.blockSignals(False)
         self._reload_pedidos_table(self._current_entradas_articulo_id)
 
-    def _reset_monthly_orders_date_filters(self) -> None:
-        self.monthly_orders_date_from.blockSignals(True)
-        self.monthly_orders_date_to.blockSignals(True)
-        self.monthly_orders_date_from.setDate(QDate(QDate.currentDate().year(), 1, 1))
-        self.monthly_orders_date_to.setDate(QDate(QDate.currentDate().year(), 12, 31))
-        self.monthly_orders_date_from.blockSignals(False)
-        self.monthly_orders_date_to.blockSignals(False)
-        self._reload_monthly_orders_table(self._current_entradas_articulo_id)
 
     def _set_entradas_totals(self, total_unidades: float, total_kg: float) -> None:
         vals = [
@@ -4040,60 +3968,6 @@ class IngredientsIreksPage(QWidget):
                 item.setFont(font)
                 self.orders_comparison_tables[index].setItem(0, column, item)
 
-    def _reload_monthly_orders_table(self, articulo_id: str) -> None:
-        if not hasattr(self, "monthly_orders_table"):
-            return
-        self.monthly_orders_table.setRowCount(0)
-        articulo_id = str(articulo_id or "").strip()
-        if not articulo_id:
-            return
-        q_from = self.monthly_orders_date_from.date()
-        q_to = self.monthly_orders_date_to.date()
-        from_date: date = date(q_from.year(), q_from.month(), q_from.day())
-        to_date: date = date(q_to.year(), q_to.month(), q_to.day())
-        if from_date > to_date:
-            from_date, to_date = to_date, from_date
-        month_names = [
-            "Ene",
-            "Feb",
-            "Mar",
-            "Abr",
-            "May",
-            "Jun",
-            "Jul",
-            "Ago",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dic",
-        ]
-        rows = self.monthly_orders_service.product_monthly_rows_for(
-            articulo_id=articulo_id,
-            almacen_id=self.external_distributor_filter_id,
-            date_from=from_date,
-            date_to=to_date,
-        )
-        self.monthly_orders_table.setRowCount(len(rows))
-        for i, row in enumerate(rows):
-            average = row.quantity / row.order_count if row.order_count > 0 else 0.0
-            values = [
-                f"{month_names[row.month - 1]} {row.year}",
-                str(row.order_count),
-                f"{row.quantity:.2f}",
-                f"{row.kg:.2f} kg",
-                f"{average:.2f}",
-                row.last_order_date.strftime("%d/%m/%Y") if row.last_order_date else "",
-                row.last_order_number,
-            ]
-            for col, value in enumerate(values):
-                item = QTableWidgetItem(value)
-                if col in (1, 2, 3, 4):
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                if col in (2, 3):
-                    font = item.font()
-                    font.setBold(True)
-                    item.setFont(font)
-                self.monthly_orders_table.setItem(i, col, item)
 
     def _reload_nutricion_table(self, articulo_id: str) -> None:
         if not hasattr(self, "nutricion_table"):

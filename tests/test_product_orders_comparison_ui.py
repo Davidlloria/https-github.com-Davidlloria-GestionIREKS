@@ -37,8 +37,10 @@ def test_orders_comparison_keeps_detail_and_aligns_twelve_months(monkeypatch):
         assert current.rowCount() == previous.rowCount() == 1
         tabs = {page.detail_tabs.tabText(i): page.detail_tabs.widget(i) for i in range(page.detail_tabs.count())}
         assert tabs['Pedidos'].isAncestorOf(current)
-        assert not tabs['Mensual'].isAncestorOf(current)
-        assert tabs['Mensual'].isAncestorOf(page.monthly_orders_table)
+        assert 'Mensual' not in tabs
+        assert not hasattr(page, 'monthly_orders_table')
+        assert page.pedidos_reset_btn.height() == page.pedidos_date_from.height() == 32
+        assert not page.pedidos_reset_btn.icon().isNull()
         assert current.item(0, 0).font().bold()
         assert not current.item(0, 1).font().bold()
         assert current.item(0, 0).background() != current.item(0, 1).background()
@@ -50,11 +52,11 @@ def test_orders_comparison_keeps_detail_and_aligns_twelve_months(monkeypatch):
         assert '21.50 uds' in page.orders_comparison_titles[0].text()
         assert '100.00 uds' in page.orders_comparison_titles[1].text()
         assert current.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        original_date = page.monthly_orders_date_from.date()
+        original_date = page.pedidos_date_from.date()
         page.orders_comparison_year.setCurrentIndex(page.orders_comparison_year.findData(2025))
         assert calls[-1]['date_to'] == date(2025, 12, 31)
         assert previous.item(0, 0).text() == '12.50'
-        assert page.monthly_orders_date_from.date() == original_date
+        assert page.pedidos_date_from.date() == original_date
         page._reload_orders_comparison('other')
         assert all(current.item(0, month).text() == '0.00' for month in range(12))
         page._reload_pedidos_table('')
