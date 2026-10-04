@@ -1617,11 +1617,17 @@ class IngredientsIreksPage(QWidget):
             lambda _index: self._reload_stock_table(self._current_entradas_articulo_id)
         )
         movements_warehouse_row.addWidget(self.movements_warehouse_filter)
-        movements_warehouse_row.addStretch()
+        self.movements_message_label = QLabel(
+            "Movimientos del período · el total neto es la variación, no las existencias actuales"
+        )
+        self.movements_message_label.setWordWrap(True)
+        self.movements_message_label.setAccessibleName("Información de movimientos")
+        self.movements_message_label.setStyleSheet(
+            "background: #EDF5F8; color: #45617A; border: 1px solid #D5E3EC; "
+            "border-radius: 6px; padding: 6px 10px;"
+        )
+        movements_warehouse_row.addWidget(self.movements_message_label, 1)
         movements_body_layout.addLayout(movements_warehouse_row)
-        period_label = QLabel("Movimientos del período · el total neto es la variación, no las existencias actuales")
-        period_label.setWordWrap(True)
-        movements_body_layout.addWidget(period_label)
         stock_filters_row = QHBoxLayout()
         stock_filters_row.addWidget(QLabel("Desde"))
         self.stock_date_from = self._product_date_filter("Desde")
