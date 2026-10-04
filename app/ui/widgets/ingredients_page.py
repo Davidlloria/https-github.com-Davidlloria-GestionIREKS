@@ -1567,6 +1567,8 @@ class IngredientsIreksPage(QWidget):
         self.stock_current_table.verticalHeader().setVisible(False)
         self.stock_current_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._apply_ireks_table_style(self.stock_current_table)
+        self.stock_current_table.setSortingEnabled(True)
+        self.stock_current_table.sortItems(0, Qt.SortOrder.AscendingOrder)
         stock_table_layout.addWidget(self.stock_current_table, 1)
         self.stock_current_totals_table = QTableWidget(1, 4)
         self.stock_current_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -3804,17 +3806,22 @@ class IngredientsIreksPage(QWidget):
             + "\n\nSaldo calculado con todos los movimientos y ajustes, sin aplicar el filtro de fechas."
             + ("\n\nSin existencias positivas registradas." if not current_rows else "")
         )
-        self.stock_current_table.setRowCount(len(current_rows))
-        for row_index, row in enumerate(current_rows):
-            values = [row["lote"] or "Sin lote", f'{row["cantidad"]:.2f}', f'{row["cantidad"] * weight:.2f}',
-                      row["caducidad"].strftime("%d/%m/%Y") if row["caducidad"] else "—"]
-            for column, value in enumerate(values):
-                item = QTableWidgetItem(value)
-                if column in (1, 2):
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                elif column == 3:
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.stock_current_table.setItem(row_index, column, item)
+        self.stock_current_table.setSortingEnabled(False)
+        try:
+            self.stock_current_table.setRowCount(len(current_rows))
+            for row_index, row in enumerate(current_rows):
+                values = [row["lote"] or "Sin lote", f'{row["cantidad"]:.2f}', f'{row["cantidad"] * weight:.2f}',
+                          row["caducidad"].strftime("%d/%m/%Y") if row["caducidad"] else "—"]
+                for column, value in enumerate(values):
+                    sort_value = (row["cantidad"] if column == 1 else row["cantidad"] * weight) if column in (1, 2) else (row["caducidad"].toordinal() if row["caducidad"] else 0)
+                    item = QTableWidgetItem(value) if column == 0 else _SortableNumberItem(value, sort_value)
+                    if column in (1, 2):
+                        item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                    elif column == 3:
+                        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    self.stock_current_table.setItem(row_index, column, item)
+        finally:
+            self.stock_current_table.setSortingEnabled(True)
         q_from = self.stock_date_from.date()
         q_to = self.stock_date_to.date()
         from_date: date = date(q_from.year(), q_from.month(), q_from.day())

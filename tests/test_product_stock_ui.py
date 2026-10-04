@@ -99,3 +99,30 @@ def test_product_stock_matches_warehouse_and_dates_only_filter_history(monkeypat
         assert page.stock_table.rowCount() == 0
     finally:
         page.close()
+
+def test_stock_columns_sort_values_and_keep_rows_intact_after_reload(monkeypatch):
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setattr(IngredientsIreksPage, 'reload', lambda self: None)
+    moves = [AlmacenMovimiento(articulo_id='p', almacen_id='a', articulo_lote=lot,
+                               cantidad=qty, articulo_caducidad=expiry, fecha_pedido=date(2024, 1, 1))
+             for lot, qty, expiry in [('B', 100, date(2025, 1, 2)), ('A', 9, date(2024, 12, 31)), ('C', 20, None)]]
+    page = IngredientsIreksPage()
+    try:
+        monkeypatch.setattr(page.ireks_service, 'movement_payload', lambda _: (moves, [IngredienteIreks(articulo_id='p', articulo_envase_peso_total=10)]))
+        monkeypatch.setattr(page.ireks_service, 'stock_context', lambda: ({'a': 'Central'}, {}))
+        page._reload_stock_table('p')
+        table = page.stock_current_table
+        assert table.isSortingEnabled()
+        for column, expected in [(0, ['A', 'B', 'C']), (1, ['A', 'C', 'B']),
+                                 (2, ['A', 'C', 'B']), (3, ['C', 'A', 'B'])]:
+            for order in (Qt.SortOrder.AscendingOrder, Qt.SortOrder.DescendingOrder):
+                table.sortItems(column, order)
+                assert [table.item(row, 0).text() for row in range(3)] == (expected if order == Qt.SortOrder.AscendingOrder else expected[::-1])
+        page._reload_stock_table('p')
+        assert [table.item(row, 0).text() for row in range(3)] == ['B', 'A', 'C']
+        assert [(table.item(row, 0).text(), table.item(row, 1).text(), table.item(row, 2).text())
+                for row in range(3)] == [('B', '100.00', '1000.00'), ('A', '9.00', '90.00'), ('C', '20.00', '200.00')]
+        assert page.stock_current_totals_table.item(0, 1).text() == '129.00'
+        assert page.stock_current_totals_table.item(0, 2).text() == '1290.00'
+    finally:
+        page.close()
