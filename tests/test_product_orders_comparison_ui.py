@@ -20,10 +20,14 @@ def test_orders_comparison_keeps_detail_and_aligns_twelve_months(monkeypatch):
     monkeypatch.setattr(page.monthly_orders_service, 'product_monthly_rows_for', monthly)
     try:
         page.external_distributor_filter_id = 'warehouse'
-        page.orders_comparison_year.setValue(2024)
+        page.orders_comparison_year.setCurrentIndex(page.orders_comparison_year.findData(2024))
         page._current_entradas_articulo_id = 'p'
         page._reload_orders_comparison('p')
         assert calls[-1] == dict(articulo_id='p', almacen_id='warehouse', date_from=date(2023, 1, 1), date_to=date(2024, 12, 31))
+        assert page.orders_view_buttons.button(1).text() == 'Detalle anual'
+        for button in page.orders_view_buttons.buttons():
+            assert not button.icon().isNull()
+            assert button.height() == 30
         assert page.orders_views.currentIndex() == 0
         assert page.orders_views.widget(0).isAncestorOf(page.pedidos_table)
         page.orders_view_buttons.button(1).click()
@@ -47,7 +51,7 @@ def test_orders_comparison_keeps_detail_and_aligns_twelve_months(monkeypatch):
         assert '100.00 uds' in page.orders_comparison_titles[1].text()
         assert current.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         original_date = page.monthly_orders_date_from.date()
-        page.orders_comparison_year.setValue(2025)
+        page.orders_comparison_year.setCurrentIndex(page.orders_comparison_year.findData(2025))
         assert calls[-1]['date_to'] == date(2025, 12, 31)
         assert previous.item(0, 0).text() == '12.50'
         assert page.monthly_orders_date_from.date() == original_date

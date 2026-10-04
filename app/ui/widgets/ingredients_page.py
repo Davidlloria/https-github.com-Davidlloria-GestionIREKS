@@ -1799,13 +1799,18 @@ class IngredientsIreksPage(QWidget):
         self.orders_view_buttons = QButtonGroup(self)
         self.orders_view_buttons.setExclusive(True)
         self.orders_views = QStackedWidget()
-        for index, title in enumerate(("Detalle de pedidos", "Comparativa anual")):
+        for index, title in enumerate(("Detalle de pedidos", "Detalle anual")):
             button = QPushButton(title)
             button.setCheckable(True)
             button.setChecked(index == 0)
+            button.setFixedHeight(30)
+            button.setIcon(QIcon(str(Path(__file__).resolve().parents[3] / "assets/icons" / ("list.svg" if index == 0 else "calendar-chart.svg"))))
+            button.setIconSize(QSize(16, 16))
             button.setStyleSheet(
-                "QPushButton { padding: 6px 12px; border: 1px solid #8EBBC6; border-radius: 6px; }"
-                "QPushButton:checked { background: #D9F0F2; color: #0B2F5B; font-weight: 600; }"
+                "QPushButton { padding: 0 10px; min-height: 28px; max-height: 28px; background: #EAF2FC; "
+                "color: #0B2F5B; border: 1px solid #A7BFDF; border-radius: 6px; }"
+                "QPushButton:hover { background: #D8E7FA; }"
+                "QPushButton:checked { background: #BBD5F5; border-color: #719CCD; font-weight: 600; }"
             )
             self.orders_view_buttons.addButton(button, index)
             orders_modes.addWidget(button)
@@ -1866,11 +1871,16 @@ class IngredientsIreksPage(QWidget):
         comparison_layout.setSpacing(12)
         year_row = QHBoxLayout()
         year_row.addWidget(QLabel("Año"))
-        self.orders_comparison_year = QSpinBox()
-        self.orders_comparison_year.setRange(1901, 9999)
-        self.orders_comparison_year.setValue(QDate.currentDate().year())
-        self.orders_comparison_year.setKeyboardTracking(False)
-        self.orders_comparison_year.setAccessibleName("Año de la comparativa anual de unidades recibidas")
+        self.orders_comparison_year = QComboBox()
+        for year in range(9999, 1900, -1):
+            self.orders_comparison_year.addItem(str(year), year)
+        self.orders_comparison_year.setCurrentIndex(
+            self.orders_comparison_year.findData(QDate.currentDate().year())
+        )
+        self.orders_comparison_year.setMaxVisibleItems(12)
+        self.orders_comparison_year.setFixedWidth(110)
+        self.orders_comparison_year.setStyleSheet("QComboBox { combobox-popup: 0; }")
+        self.orders_comparison_year.setAccessibleName("Año del detalle anual de unidades recibidas")
         year_row.addWidget(self.orders_comparison_year)
         year_row.addWidget(QLabel("Unidades recibidas por mes"))
         year_row.addStretch()
@@ -1879,7 +1889,7 @@ class IngredientsIreksPage(QWidget):
         self.orders_comparison_tables = []
         for _ in range(2):
             title = QLabel()
-            title.setStyleSheet("color: #0B2F5B; font-weight: 600; padding: 6px; background: #E5F7F4;")
+            title.setStyleSheet("color: #0B2F5B; font-weight: 600; padding: 6px; background: #E3EDFA;")
             title.setWordWrap(True)
             comparison_layout.addWidget(title)
             table = QTableWidget(1, 12)
@@ -1894,7 +1904,7 @@ class IngredientsIreksPage(QWidget):
             table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             self._apply_ireks_table_style(table)
-            table.setStyleSheet(table.styleSheet() + "QTableWidget::item { padding: 5px 2px; font-size: 11px; } QHeaderView::section { padding: 7px 2px; }")
+            table.setStyleSheet(table.styleSheet() + "QTableWidget::item { padding: 5px 2px; font-size: 11px; } QHeaderView::section { padding: 7px 2px; background: #BBD5F5; border-color: #A7BFDF; }")
             table.setFixedHeight(82)
             comparison_layout.addWidget(table)
             self.orders_comparison_titles.append(title)
@@ -1902,7 +1912,7 @@ class IngredientsIreksPage(QWidget):
         comparison_layout.addStretch()
         self.orders_views.addWidget(comparison)
         pedidos_body_layout.addWidget(self.orders_views, 1)
-        self.orders_comparison_year.valueChanged.connect(
+        self.orders_comparison_year.currentIndexChanged.connect(
             lambda _year: self._reload_orders_comparison(self._current_entradas_articulo_id)
         )
         self._reload_orders_comparison("")
@@ -4006,7 +4016,7 @@ class IngredientsIreksPage(QWidget):
                 self.pedidos_table.setItem(i, col, item)
 
     def _reload_orders_comparison(self, articulo_id: str) -> None:
-        selected_year = self.orders_comparison_year.value()
+        selected_year = int(self.orders_comparison_year.currentData())
         rows = self.monthly_orders_service.product_monthly_rows_for(
             articulo_id=articulo_id,
             almacen_id=self.external_distributor_filter_id,
@@ -4024,7 +4034,7 @@ class IngredientsIreksPage(QWidget):
                 item = QTableWidgetItem(f"{value:.2f}" if articulo_id else "—")
                 item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 item.setToolTip(item.text())
-                item.setBackground(QColor("#EDF3FA" if column % 2 == 0 else "#E4F4EF"))
+                item.setBackground(QColor("#FFFFFF" if column % 2 == 0 else "#EAF2FC"))
                 font = item.font()
                 font.setBold(bool(articulo_id and value != 0))
                 item.setFont(font)
