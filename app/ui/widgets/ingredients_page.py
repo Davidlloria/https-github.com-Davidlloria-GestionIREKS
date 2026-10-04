@@ -149,6 +149,20 @@ class _ProductCalendar(QCalendarWidget):
         self.next_year.setEnabled(year < self.maximumDate().year())
 
 
+class _AnnualUnitsDelegate(QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        self.initStyleOption(option, index)
+        painter.save()
+        painter.fillRect(option.rect, option.backgroundBrush)
+        font = option.font
+        font.setPixelSize(11)
+        painter.setFont(font)
+        painter.setPen(QColor("#0B2F5B"))
+        painter.drawText(option.rect.adjusted(3, 0, -3, 0),
+                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, option.text)
+        painter.restore()
+
+
 class _SortableNumberItem(QTableWidgetItem):
     def __init__(self, text: str, value: float) -> None:
         super().__init__(text)
@@ -1717,27 +1731,6 @@ class IngredientsIreksPage(QWidget):
         mensual_body_layout = QVBoxLayout(mensual_body)
         mensual_body_layout.setContentsMargins(10, 10, 10, 10)
         mensual_body_layout.setSpacing(8)
-        monthly_modes = QHBoxLayout()
-        self.monthly_view_buttons = QButtonGroup(self)
-        self.monthly_view_buttons.setExclusive(True)
-        self.monthly_views = QStackedWidget()
-        for index, title in enumerate(("Detalle mensual", "Comparativa anual")):
-            button = QPushButton(title)
-            button.setCheckable(True)
-            button.setChecked(index == 0)
-            button.setStyleSheet(
-                "QPushButton { padding: 6px 12px; border: 1px solid #8EBBC6; border-radius: 6px; }"
-                "QPushButton:checked { background: #D9F0F2; color: #0B2F5B; font-weight: 600; }"
-            )
-            self.monthly_view_buttons.addButton(button, index)
-            monthly_modes.addWidget(button)
-        monthly_modes.addStretch()
-        self.monthly_view_buttons.idClicked.connect(self.monthly_views.setCurrentIndex)
-        mensual_body_layout.addLayout(monthly_modes)
-        monthly_detail = QWidget()
-        monthly_detail_layout = QVBoxLayout(monthly_detail)
-        monthly_detail_layout.setContentsMargins(0, 0, 0, 0)
-        monthly_detail_layout.setSpacing(8)
         mensual_filters = QHBoxLayout()
         mensual_filters.addWidget(QLabel("Desde"))
         self.monthly_orders_date_from = self._product_date_filter("Desde")
@@ -1761,7 +1754,7 @@ class IngredientsIreksPage(QWidget):
         monthly_reset_btn.clicked.connect(self._reset_monthly_orders_date_filters)
         mensual_filters.addWidget(monthly_reset_btn)
         mensual_filters.addStretch(1)
-        monthly_detail_layout.addLayout(mensual_filters)
+        mensual_body_layout.addLayout(mensual_filters)
         self.monthly_orders_table = QTableWidget(0, 7)
         self.monthly_orders_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.monthly_orders_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -1788,53 +1781,7 @@ class IngredientsIreksPage(QWidget):
         self.monthly_orders_table.setColumnWidth(3, 95)
         self.monthly_orders_table.setColumnWidth(4, 95)
         self.monthly_orders_table.setColumnWidth(5, 105)
-        monthly_detail_layout.addWidget(self.monthly_orders_table, 1)
-        self.monthly_views.addWidget(monthly_detail)
-        comparison = QWidget()
-        comparison_layout = QVBoxLayout(comparison)
-        comparison_layout.setContentsMargins(0, 0, 0, 0)
-        comparison_layout.setSpacing(12)
-        year_row = QHBoxLayout()
-        year_row.addWidget(QLabel("Año"))
-        self.monthly_comparison_year = QSpinBox()
-        self.monthly_comparison_year.setRange(1901, 9999)
-        self.monthly_comparison_year.setValue(QDate.currentDate().year())
-        self.monthly_comparison_year.setKeyboardTracking(False)
-        self.monthly_comparison_year.setAccessibleName("Año de la comparativa mensual")
-        year_row.addWidget(self.monthly_comparison_year)
-        year_row.addWidget(QLabel("Unidades recibidas por mes"))
-        year_row.addStretch()
-        comparison_layout.addLayout(year_row)
-        self.monthly_comparison_titles = []
-        self.monthly_comparison_tables = []
-        for _ in range(2):
-            title = QLabel()
-            title.setStyleSheet("color: #0B2F5B; font-weight: 600; padding: 6px; background: #E5F7F4;")
-            title.setWordWrap(True)
-            comparison_layout.addWidget(title)
-            table = QTableWidget(1, 12)
-            table.setHorizontalHeaderLabels(["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"])
-            table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-            table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-            table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            table.verticalHeader().setVisible(False)
-            table.horizontalHeader().setMinimumSectionSize(0)
-            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-            table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-            table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-            self._apply_ireks_table_style(table)
-            table.setStyleSheet(table.styleSheet() + "QTableWidget::item { padding: 5px 2px; font-size: 11px; } QHeaderView::section { padding: 7px 2px; }")
-            table.setFixedHeight(82)
-            comparison_layout.addWidget(table)
-            self.monthly_comparison_titles.append(title)
-            self.monthly_comparison_tables.append(table)
-        comparison_layout.addStretch()
-        self.monthly_views.addWidget(comparison)
-        mensual_body_layout.addWidget(self.monthly_views, 1)
-        self.monthly_comparison_year.valueChanged.connect(
-            lambda _year: self._reload_monthly_comparison(self._current_entradas_articulo_id)
-        )
-        self._reload_monthly_comparison("")
+        mensual_body_layout.addWidget(self.monthly_orders_table, 1)
         mensual_layout.addWidget(mensual_body, 1)
         tabs.addTab(mensual_tab, "Mensual")
 
@@ -1848,6 +1795,27 @@ class IngredientsIreksPage(QWidget):
         pedidos_body_layout = QVBoxLayout(pedidos_body)
         pedidos_body_layout.setContentsMargins(10, 10, 10, 10)
         pedidos_body_layout.setSpacing(8)
+        orders_modes = QHBoxLayout()
+        self.orders_view_buttons = QButtonGroup(self)
+        self.orders_view_buttons.setExclusive(True)
+        self.orders_views = QStackedWidget()
+        for index, title in enumerate(("Detalle de pedidos", "Comparativa anual")):
+            button = QPushButton(title)
+            button.setCheckable(True)
+            button.setChecked(index == 0)
+            button.setStyleSheet(
+                "QPushButton { padding: 6px 12px; border: 1px solid #8EBBC6; border-radius: 6px; }"
+                "QPushButton:checked { background: #D9F0F2; color: #0B2F5B; font-weight: 600; }"
+            )
+            self.orders_view_buttons.addButton(button, index)
+            orders_modes.addWidget(button)
+        orders_modes.addStretch()
+        self.orders_view_buttons.idClicked.connect(self.orders_views.setCurrentIndex)
+        pedidos_body_layout.addLayout(orders_modes)
+        orders_detail = QWidget()
+        orders_detail_layout = QVBoxLayout(orders_detail)
+        orders_detail_layout.setContentsMargins(0, 0, 0, 0)
+        orders_detail_layout.setSpacing(8)
         pedidos_filters = QHBoxLayout()
         pedidos_filters.addWidget(QLabel("Desde"))
         self.pedidos_date_from = self._product_date_filter("Desde")
@@ -1867,7 +1835,7 @@ class IngredientsIreksPage(QWidget):
         self.pedidos_reset_btn.clicked.connect(self._reset_pedidos_date_filters)
         pedidos_filters.addWidget(self.pedidos_reset_btn)
         pedidos_filters.addStretch(1)
-        pedidos_body_layout.addLayout(pedidos_filters)
+        orders_detail_layout.addLayout(pedidos_filters)
         self.pedidos_table = QTableWidget(0, 6)
         self.pedidos_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.pedidos_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -1890,7 +1858,54 @@ class IngredientsIreksPage(QWidget):
         self.pedidos_table.setColumnWidth(2, 150)
         self.pedidos_table.setColumnWidth(3, 95)
         self.pedidos_table.setColumnWidth(5, 110)
-        pedidos_body_layout.addWidget(self.pedidos_table, 1)
+        orders_detail_layout.addWidget(self.pedidos_table, 1)
+        self.orders_views.addWidget(orders_detail)
+        comparison = QWidget()
+        comparison_layout = QVBoxLayout(comparison)
+        comparison_layout.setContentsMargins(0, 0, 0, 0)
+        comparison_layout.setSpacing(12)
+        year_row = QHBoxLayout()
+        year_row.addWidget(QLabel("Año"))
+        self.orders_comparison_year = QSpinBox()
+        self.orders_comparison_year.setRange(1901, 9999)
+        self.orders_comparison_year.setValue(QDate.currentDate().year())
+        self.orders_comparison_year.setKeyboardTracking(False)
+        self.orders_comparison_year.setAccessibleName("Año de la comparativa anual de unidades recibidas")
+        year_row.addWidget(self.orders_comparison_year)
+        year_row.addWidget(QLabel("Unidades recibidas por mes"))
+        year_row.addStretch()
+        comparison_layout.addLayout(year_row)
+        self.orders_comparison_titles = []
+        self.orders_comparison_tables = []
+        for _ in range(2):
+            title = QLabel()
+            title.setStyleSheet("color: #0B2F5B; font-weight: 600; padding: 6px; background: #E5F7F4;")
+            title.setWordWrap(True)
+            comparison_layout.addWidget(title)
+            table = QTableWidget(1, 12)
+            table.setItemDelegate(_AnnualUnitsDelegate(table))
+            table.setHorizontalHeaderLabels(["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"])
+            table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+            table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+            table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            table.verticalHeader().setVisible(False)
+            table.horizontalHeader().setMinimumSectionSize(0)
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self._apply_ireks_table_style(table)
+            table.setStyleSheet(table.styleSheet() + "QTableWidget::item { padding: 5px 2px; font-size: 11px; } QHeaderView::section { padding: 7px 2px; }")
+            table.setFixedHeight(82)
+            comparison_layout.addWidget(table)
+            self.orders_comparison_titles.append(title)
+            self.orders_comparison_tables.append(table)
+        comparison_layout.addStretch()
+        self.orders_views.addWidget(comparison)
+        pedidos_body_layout.addWidget(self.orders_views, 1)
+        self.orders_comparison_year.valueChanged.connect(
+            lambda _year: self._reload_orders_comparison(self._current_entradas_articulo_id)
+        )
+        self._reload_orders_comparison("")
         pedidos_layout.addWidget(pedidos_body, 1)
         tabs.addTab(pedidos_tab, "Pedidos")
 
@@ -3958,6 +3973,7 @@ class IngredientsIreksPage(QWidget):
         if not hasattr(self, "pedidos_table"):
             return
         self.pedidos_table.setRowCount(0)
+        self._reload_orders_comparison(str(articulo_id or "").strip())
         articulo_id = str(articulo_id or "").strip()
         if not articulo_id:
             return
@@ -3989,8 +4005,8 @@ class IngredientsIreksPage(QWidget):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.pedidos_table.setItem(i, col, item)
 
-    def _reload_monthly_comparison(self, articulo_id: str) -> None:
-        selected_year = self.monthly_comparison_year.value()
+    def _reload_orders_comparison(self, articulo_id: str) -> None:
+        selected_year = self.orders_comparison_year.value()
         rows = self.monthly_orders_service.product_monthly_rows_for(
             articulo_id=articulo_id,
             almacen_id=self.external_distributor_filter_id,
@@ -4000,7 +4016,7 @@ class IngredientsIreksPage(QWidget):
         quantities = {(row.year, row.month): row.quantity for row in rows}
         for index, year in enumerate((selected_year, selected_year - 1)):
             values = [quantities.get((year, month), 0.0) for month in range(1, 13)]
-            self.monthly_comparison_titles[index].setText(
+            self.orders_comparison_titles[index].setText(
                 f"{year} · Total anual: {sum(values):.2f} uds" if articulo_id
                 else f"{year} · Selecciona un producto"
             )
@@ -4008,13 +4024,16 @@ class IngredientsIreksPage(QWidget):
                 item = QTableWidgetItem(f"{value:.2f}" if articulo_id else "—")
                 item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 item.setToolTip(item.text())
-                self.monthly_comparison_tables[index].setItem(0, column, item)
+                item.setBackground(QColor("#EDF3FA" if column % 2 == 0 else "#E4F4EF"))
+                font = item.font()
+                font.setBold(bool(articulo_id and value != 0))
+                item.setFont(font)
+                self.orders_comparison_tables[index].setItem(0, column, item)
 
     def _reload_monthly_orders_table(self, articulo_id: str) -> None:
         if not hasattr(self, "monthly_orders_table"):
             return
         self.monthly_orders_table.setRowCount(0)
-        self._reload_monthly_comparison(str(articulo_id or "").strip())
         articulo_id = str(articulo_id or "").strip()
         if not articulo_id:
             return
