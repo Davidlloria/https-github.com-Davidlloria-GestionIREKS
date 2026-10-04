@@ -1,7 +1,8 @@
 from datetime import date
 
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import QApplication
+from PySide6.QtTest import QTest
 from sqlmodel import SQLModel, Session, create_engine
 
 from app.models import AlmacenMovimiento, AlmacenCatalogo, IngredienteIreks, InventarioCabecera
@@ -46,10 +47,24 @@ def test_product_stock_matches_warehouse_and_dates_only_filter_history(monkeypat
         page.stock_date_to.setDate(QDate(2024, 12, 31))
         page._current_entradas_articulo_id = 'p'
         page._reload_stock_table('p')
-        assert page.stock_current_table.item(0, 2).text() == '75.00'
+        assert page.stock_current_table.item(0, 1).text() == '75.00'
         expected = sum(row['cantidad'] for row in _compute_current_stock_rows(moves[:3]))
-        assert float(page.stock_current_table.item(0, 2).text()) == expected
-        assert page.stock_current_table.item(0, 3).text() == '750.00'
+        assert float(page.stock_current_table.item(0, 1).text()) == expected
+        assert page.stock_current_table.item(0, 2).text() == '750.00'
+        assert page.stock_current_table.horizontalHeaderItem(3).text() == 'Caducidad'
+        assert page.stock_current_table.item(0, 1).textAlignment() & Qt.AlignmentFlag.AlignRight
+        assert page.stock_current_table.item(0, 2).textAlignment() & Qt.AlignmentFlag.AlignRight
+        assert page.stock_current_table.item(0, 3).textAlignment() == Qt.AlignmentFlag.AlignCenter
+        assert page.stock_current_totals_table.item(0, 1).text() == '75.00'
+        assert page.stock_current_totals_table.item(0, 2).text() == '750.00'
+        page.show()
+        for i in range(page.detail_tabs.count()):
+            if page.detail_tabs.tabText(i) == 'Stock':
+                page.detail_tabs.setCurrentIndex(i)
+        app.processEvents()
+        cell = page.stock_current_table.visualItemRect(page.stock_current_table.item(0, 1))
+        QTest.mouseClick(page.stock_current_table.viewport(), Qt.MouseButton.LeftButton, pos=cell.center())
+        assert len(page.stock_current_table.selectedItems()) == 4
         assert page.stock_table.rowCount() == 2
         assert page.stock_table.item(0, 1).text() == 'Ajuste'
         assert page.stock_totals_table.item(0, 4).text() == '-25.00'
@@ -57,7 +72,7 @@ def test_product_stock_matches_warehouse_and_dates_only_filter_history(monkeypat
         page.stock_date_from.setDate(QDate(2025, 1, 1))
         page.stock_date_to.setDate(QDate(2025, 12, 31))
         assert page.stock_table.rowCount() == 0
-        assert page.stock_current_table.item(0, 2).text() == '75.00'
+        assert page.stock_current_table.item(0, 1).text() == '75.00'
         tabs = {page.detail_tabs.tabText(i): page.detail_tabs.widget(i) for i in range(page.detail_tabs.count())}
         assert tabs['Stock'].isAncestorOf(page.stock_current_table)
         assert not tabs['Stock'].isAncestorOf(page.stock_table)
@@ -66,18 +81,20 @@ def test_product_stock_matches_warehouse_and_dates_only_filter_history(monkeypat
         page.stock_date_from.setDate(QDate(2024, 1, 1))
         page.stock_date_to.setDate(QDate(2024, 12, 31))
         page.movements_warehouse_filter.setCurrentIndex(page.movements_warehouse_filter.findData('b'))
-        assert page.stock_current_table.item(0, 2).text() == '75.00'
+        assert page.stock_current_table.item(0, 1).text() == '75.00'
         assert page.stock_table.rowCount() == 1
         assert page.stock_totals_table.item(0, 4).text() == '7.00'
         page.stock_warehouse_filter.setCurrentIndex(page.stock_warehouse_filter.findData('b'))
-        assert page.stock_current_table.item(0, 2).text() == '7.00'
+        assert page.stock_current_table.item(0, 1).text() == '7.00'
+        assert page.stock_current_totals_table.item(0, 1).text() == '7.00'
         assert 'Sin inventario aprobado' in page.stock_inventory_label.text()
         page._reload_stock_table('')
         assert page.stock_current_table.rowCount() == 0
         assert page.stock_warehouse_filter.count() == 0
+        assert page.stock_current_totals_table.item(0, 1).text() == '0.00'
         monkeypatch.setattr(page.ireks_service, 'movement_payload', lambda _: ([], []))
         page._reload_stock_table('empty')
-        assert 'Sin almacén ni movimientos' in page.stock_current_label.text()
+        assert 'Sin almacén ni movimientos' in page.stock_inventory_label.text()
         assert page.stock_current_table.rowCount() == 0
         assert page.stock_table.rowCount() == 0
     finally:

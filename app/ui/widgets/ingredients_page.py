@@ -1552,19 +1552,48 @@ class IngredientsIreksPage(QWidget):
         warehouse_row.addWidget(self.stock_warehouse_filter)
         warehouse_row.addStretch()
         stock_body_layout.addLayout(warehouse_row)
-        self.stock_current_label = QLabel("Selecciona un producto para consultar sus existencias.")
-        self.stock_current_label.setWordWrap(True)
-        stock_body_layout.addWidget(self.stock_current_label)
-        self.stock_inventory_label = QLabel()
-        self.stock_inventory_label.setWordWrap(True)
-        stock_body_layout.addWidget(self.stock_inventory_label)
+        stock_columns = QHBoxLayout()
+        stock_columns.setSpacing(12)
+        stock_table_panel = QWidget()
+        stock_table_layout = QVBoxLayout(stock_table_panel)
+        stock_table_layout.setContentsMargins(0, 0, 0, 0)
+        stock_table_layout.setSpacing(8)
         self.stock_current_table = QTableWidget(0, 4)
-        self.stock_current_table.setHorizontalHeaderLabels(["Lote", "Caducidad", "Existencias (uds)", "Existencias (kg)"])
+        self.stock_current_table.setHorizontalHeaderLabels(["Lote", "Existencias (uds)", "Existencias (kg)", "Caducidad"])
         self.stock_current_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.stock_current_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.stock_current_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.stock_current_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.stock_current_table.verticalHeader().setVisible(False)
         self.stock_current_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._apply_ireks_table_style(self.stock_current_table)
-        stock_body_layout.addWidget(self.stock_current_table, 1)
+        stock_table_layout.addWidget(self.stock_current_table, 1)
+        self.stock_current_totals_table = QTableWidget(1, 4)
+        self.stock_current_totals_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.stock_current_totals_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.stock_current_totals_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.stock_current_totals_table.verticalHeader().setVisible(False)
+        self.stock_current_totals_table.horizontalHeader().setVisible(False)
+        self.stock_current_totals_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        self.stock_current_totals_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.stock_current_totals_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.stock_current_totals_table.setFixedHeight(30)
+        self._apply_ireks_table_style(self.stock_current_totals_table, totals=True)
+        self.stock_current_table.horizontalHeader().sectionResized.connect(
+            lambda column, _old, width: self.stock_current_totals_table.setColumnWidth(column, width)
+        )
+        stock_table_layout.addWidget(self.stock_current_totals_table)
+        stock_columns.addWidget(stock_table_panel, 3)
+        messages_panel = QGroupBox("Información del stock")
+        messages_panel.setMinimumWidth(190)
+        messages_layout = QVBoxLayout(messages_panel)
+        self.stock_inventory_label = QLabel("Selecciona un producto para consultar su stock.")
+        self.stock_inventory_label.setWordWrap(True)
+        self.stock_inventory_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        messages_layout.addWidget(self.stock_inventory_label)
+        messages_layout.addStretch()
+        stock_columns.addWidget(messages_panel, 1)
+        stock_body_layout.addLayout(stock_columns, 1)
         stock_layout.addWidget(stock_body, 1)
         tabs.addTab(stock_tab, "Stock")
 
@@ -3720,13 +3749,24 @@ class IngredientsIreksPage(QWidget):
                 self.salidas_table.setItem(i, col, item)
         self._set_salidas_totals(total_unidades, total_kg)
 
+    def _set_current_stock_totals(self, units: float, kg: float) -> None:
+        for column, value in enumerate(["TOTAL", f"{units:.2f}", f"{kg:.2f}", ""]):
+            item = QTableWidgetItem(value)
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            if column in (1, 2):
+                item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            self.stock_current_totals_table.setItem(0, column, item)
+
     def _reload_stock_table(self, articulo_id: str) -> None:
         if not hasattr(self, "stock_table"):
             return
         self.stock_table.setRowCount(0)
         self.stock_current_table.setRowCount(0)
-        self.stock_current_label.setText("Selecciona un producto para consultar sus existencias.")
-        self.stock_inventory_label.clear()
+        self._set_current_stock_totals(0.0, 0.0)
+        self.stock_inventory_label.setText("Selecciona un producto para consultar su stock.")
         articulo_id = str(articulo_id or "").strip()
         if not articulo_id:
             for selector in (self.stock_warehouse_filter, self.movements_warehouse_filter):
@@ -3750,28 +3790,31 @@ class IngredientsIreksPage(QWidget):
             selector.blockSignals(False)
         warehouse_id = self.stock_warehouse_filter.currentData()
         if warehouse_id is None:
-            self.stock_current_label.setText("Sin almacén ni movimientos registrados para este producto.")
+            self.stock_inventory_label.setText("Sin almacén ni movimientos registrados para este producto.")
             self._set_stock_totals(0.0, 0.0)
             return
         current_moves = [mov for mov in moves if str(mov.almacen_id or "").strip() == warehouse_id]
         current_rows = compute_current_stock_rows(current_moves)
         weight = float(items[0].articulo_envase_peso_total or 0.0) if items else 0.0
         current_units = sum(row["cantidad"] for row in current_rows)
-        self.stock_current_label.setText(
-            f"Existencias actuales: {current_units:.2f} uds · {current_units * weight:.2f} kg"
-            + (" · Sin existencias positivas registradas." if not current_rows else "")
-        )
+        self._set_current_stock_totals(current_units, current_units * weight)
         inventory_date = inventories.get(warehouse_id)
         self.stock_inventory_label.setText(
             (f"Último inventario aprobado del almacén: {inventory_date:%d/%m/%Y}. " if inventory_date else "Sin inventario aprobado registrado para este almacén. ")
-            + "Saldo calculado con todos los movimientos y ajustes, sin aplicar el filtro de fechas."
+            + "\n\nSaldo calculado con todos los movimientos y ajustes, sin aplicar el filtro de fechas."
+            + ("\n\nSin existencias positivas registradas." if not current_rows else "")
         )
         self.stock_current_table.setRowCount(len(current_rows))
         for row_index, row in enumerate(current_rows):
-            values = [row["lote"] or "Sin lote", row["caducidad"].strftime("%d/%m/%Y") if row["caducidad"] else "—",
-                      f'{row["cantidad"]:.2f}', f'{row["cantidad"] * weight:.2f}']
+            values = [row["lote"] or "Sin lote", f'{row["cantidad"]:.2f}', f'{row["cantidad"] * weight:.2f}',
+                      row["caducidad"].strftime("%d/%m/%Y") if row["caducidad"] else "—"]
             for column, value in enumerate(values):
-                self.stock_current_table.setItem(row_index, column, QTableWidgetItem(value))
+                item = QTableWidgetItem(value)
+                if column in (1, 2):
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                elif column == 3:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.stock_current_table.setItem(row_index, column, item)
         q_from = self.stock_date_from.date()
         q_to = self.stock_date_to.date()
         from_date: date = date(q_from.year(), q_from.month(), q_from.day())
