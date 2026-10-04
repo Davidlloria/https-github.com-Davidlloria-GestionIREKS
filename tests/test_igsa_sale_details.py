@@ -91,3 +91,100 @@ def test_incident_selection_and_widths_with_application_theme():
         dialog.close()
         app.setStyleSheet(previous_style)
         app.setFont(previous_font)
+
+
+def test_manual_correction_audits_validates_and_rejects_stale_data(tmp_path):
+    import pytest
+    from app.models import IngredienteIreks
+    engine = create_engine(f"sqlite:///{tmp_path / 'corrections.db'}")
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.add(IngredienteIreks(articulo_id='p', articulo_referencia='P1', articulo_descripcion='Pan'))
+        session.add(VentaMensualRaw(raw_id='sale', fuente='igsa', periodo='2026-08', articulo_id='p',
+            articulo_codigo_origen='P1', venta_kilos=10, venta_euros=0,
+            payload_json=json.dumps(dict(cantidad=2, envase_peso=5, observaciones='No coincide', lote='001'))))
+        session.commit()
+    service = IgsaSaleDetailsService(engine)
+    row = service.list_lines(2026, 8)[0]
+    values = dict(articulo_id='p', tipo='venta', cantidad=3, peso=5, euros=45)
+    with pytest.raises(ValueError):
+        service.correct('sale', row['snapshot'], reason='', values=values)
+    with pytest.raises(ValueError):
+        service.correct('sale', row['snapshot'], reason='Error', values={**values, 'peso': 0})
+    assert service.history('sale') == []
+    service.correct('sale', row['snapshot'], reason='Verificado con documento', values=values, resolved=True)
+    updated = service.list_lines(2026, 8)[0]
+    assert (updated['kilos'], updated['euros'], updated['precio']) == (15, 45, 3)
+    assert updated['incidencias'] == []
+    assert updated['observaciones'] == 'No coincide'
+    assert updated['lote'] == '001'
+    history = service.history('sale')
+    assert len(history) == 1
+    assert json.loads(history[0]['anterior'])['venta_kilos'] == 10
+    assert json.loads(history[0]['posterior'])['venta_kilos'] == 15
+    with pytest.raises(ValueError, match='ha cambiado'):
+        service.correct('sale', row['snapshot'], reason='Edición obsoleta', values=values)
+    assert len(service.history('sale')) == 1
+    service.correct('sale', updated['snapshot'], reason='Reabrir revisión', resolved=False)
+    assert service.list_lines(2026, 8)[0]['incidencias']
+    with Session(engine) as session:
+        session.delete(session.get(VentaMensualRaw, 'sale'))
+        session.commit()
+    assert len(service.history('sale')) == 2
+
+
+def test_comparison_uses_selected_party_month_and_separate_kg(tmp_path):
+    from app.models import Cliente, IngredienteIreks
+    engine = create_engine(f"sqlite:///{tmp_path / 'comparison.db'}")
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.add(Cliente(cliente_id='igsa', cliente_codigo=1, cliente_nombre_comercial='IGSA', cliente_tipo='distribuidor'))
+        session.add(Cliente(cliente_id='other', cliente_codigo=2, cliente_nombre_comercial='Otro', cliente_tipo='distribuidor'))
+        session.add(IngredienteIreks(articulo_id='p', articulo_referencia='P1', articulo_descripcion='Pan'))
+        for ident, source, party, period, kg, sc in [
+            ('a', 'igsa', 'igsa', '2026-08', 100, 5),
+            ('b', 'ireks', 'igsa', '2026-08', 90, 5),
+            ('c', 'ireks', 'other', '2026-08', 999, 999),
+            ('d', 'igsa', 'igsa', '2025-08', 8, 0),
+            ('e', 'ireks', 'igsa', '2026-07', 12, 0),
+        ]:
+            session.add(VentaMensualRaw(raw_id=ident, fuente=source, cliente_id=party, periodo=period,
+                articulo_id='p', articulo_codigo_origen='P1', venta_kilos=kg, venta_kilos_sc=sc))
+        session.commit()
+    service = IgsaSaleDetailsService(engine)
+    assert service.compare(2026, 8, cliente_id='') == []
+    rows = service.compare(2026, 8, cliente_id='igsa')
+    current = [r for r in rows if r['periodo'] == '2026-08']
+    assert current[0]['diferencia'] == 10
+    assert current[0]['estado'] == 'Diferencia'
+    assert current[1]['estado'] == 'Coincide'
+    previous = [r for r in rows if r['periodo'] == '2025-08']
+    assert previous[0]['ireks'] is None
+    assert previous[0]['estado'] == 'Sin datos para comparar'
+    july = service.compare(2026, 7, cliente_id='igsa')
+    assert july[0]['igsa'] is None
+    assert july[0]['ireks'] == 12
+
+
+def test_correction_dialog_requires_reason_and_saves_review():
+    from types import SimpleNamespace
+    from PySide6.QtWidgets import QDialogButtonBox
+    from app.ui.widgets.igsa_sale_details_dialog import IgsaCorrectionDialog
+    app = QApplication.instance() or QApplication([])
+    calls = []
+    def correct(*args, **kwargs):
+        if not kwargs['reason']:
+            raise ValueError('Motivo obligatorio')
+        calls.append(kwargs)
+    row = dict(raw_id='r', snapshot={}, articulo_id='p', tipo='Venta', cantidad=2, peso=5, euros=30)
+    dialog = IgsaCorrectionDialog(row, SimpleNamespace(products=lambda: [], correct=correct))
+    buttons = dialog.findChild(QDialogButtonBox)
+    buttons.button(QDialogButtonBox.StandardButton.Save).click()
+    assert not calls
+    assert dialog.error.text() == 'Motivo obligatorio'
+    dialog.reason.setText('Documento contrastado')
+    dialog.resolved.setChecked(True)
+    buttons.button(QDialogButtonBox.StandardButton.Save).click()
+    assert calls[0]['values'] is None
+    assert calls[0]['resolved'] is True
+    assert dialog.result() == dialog.DialogCode.Accepted

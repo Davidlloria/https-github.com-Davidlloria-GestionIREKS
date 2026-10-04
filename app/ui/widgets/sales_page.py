@@ -61,7 +61,7 @@ from app.services.sales_reconciliation_service import SalesReconciliationService
 from app.services.settings_sales_import_service import SettingsSalesImportService
 from app.services.sales_tools_service import SalesToolsHistoryRow, SalesToolsService
 from app.core.config import DATA_DIR
-from app.ui.widgets.igsa_sale_details_dialog import INCIDENT_ROLE, IgsaIncidentDelegate
+from app.ui.widgets.igsa_sale_details_dialog import INCIDENT_ROLE, COMPARISON_ROLE, IgsaIncidentDelegate
 
 
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -2434,6 +2434,20 @@ class SalesPage(QWidget):
         self.product_filter_igsa.setMinimumWidth(300)
         igsa_filters_bottom.addWidget(self.product_filter_igsa, 1)
         igsa_layout.addLayout(igsa_filters_bottom)
+        comparison_bar = QHBoxLayout()
+        comparison_bar.addWidget(QLabel("Comparar con cliente IREKS:"))
+        self.igsa_comparison_party = QComboBox()
+        self.igsa_comparison_party.addItem("Selecciona el cliente correspondiente a IGSA", "")
+        self.igsa_comparison_party.currentIndexChanged.connect(self.reload_igsa)
+        comparison_bar.addWidget(self.igsa_comparison_party, 1)
+        comparison_button = QPushButton("Ver comparación mensual")
+        comparison_button.clicked.connect(self._show_igsa_comparison)
+        comparison_bar.addWidget(comparison_button)
+        history_button = QPushButton("Historial de correcciones")
+        history_button.clicked.connect(self._show_igsa_correction_history)
+        comparison_bar.addWidget(history_button)
+        comparison_bar.addWidget(QLabel("Amarillo: documento · Naranja: comparación"))
+        igsa_layout.addLayout(comparison_bar)
 
         igsa_action_button_width = 110
         igsa_action_button_height = 36
@@ -5126,8 +5140,17 @@ class SalesPage(QWidget):
         self._building_igsa = True
         try:
             self._reload_filters_igsa()
+            if self.igsa_comparison_party.count() == 1:
+                from app.services.igsa_sale_details_service import IgsaSaleDetailsService
+                self.igsa_comparison_party.blockSignals(True)
+                for party in IgsaSaleDetailsService(self.sales_summary_service._engine).parties():
+                    label = party.cliente_nombre_comercial or party.cliente_nombre_fiscal
+                    self.igsa_comparison_party.addItem(label, party.cliente_id)
+                self.igsa_comparison_party.blockSignals(False)
             year = self._current_year_igsa()
             if year <= 0:
+                self._igsa_comparisons = []
+                self._igsa_detail_rows = []
                 self.sales_table_igsa.setRowCount(0)
                 self._fill_group_headers_igsa(date.today().year)
                 self._fill_totals_row_igsa(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
@@ -5277,6 +5300,10 @@ class SalesPage(QWidget):
         self._igsa_detail_rows = IgsaSaleDetailsService(self.sales_summary_service._engine).list_lines(
             year, self._current_month_igsa(), bool(self.acumulado_check_igsa.isChecked())
         )
+        self._igsa_comparisons = IgsaSaleDetailsService(self.sales_summary_service._engine).compare(
+            year, self._current_month_igsa(), bool(self.acumulado_check_igsa.isChecked()),
+            cliente_id=str(self.igsa_comparison_party.currentData() or ""),
+        )
         self._fill_group_headers_igsa(year)
         self.sales_table_igsa.setSortingEnabled(False)
         self.sales_table_igsa.setRowCount(len(rows))
@@ -5289,6 +5316,8 @@ class SalesPage(QWidget):
 
         for idx, row in enumerate(rows):
             lines = self._igsa_product_lines(row.articulo_id, row.codigo)
+            differences = [r for r in self._igsa_comparisons if r["estado"] != "Coincide"
+                           and (r["articulo_id"] == row.articulo_id if row.articulo_id else r["codigo"] == row.codigo)]
             issues = sorted({issue for line in lines for issue in line["incidencias"]})
             incident_years = {line["periodo"][:4] for line in lines if line["incidencias"]}
             total_prev_kg += row.kilos_prev
@@ -5333,6 +5362,12 @@ class SalesPage(QWidget):
                     item.setData(INCIDENT_ROLE, True)
                     item.setForeground(QColor("#854D0E"))
                     item.setBackground(QBrush(QColor("#FEF3C7")))
+                    item.setToolTip("")
+                if any((col in {0, 1} or col == ({"Kg vendidos": 2, "Kg sin cargo": 3}[r["dato"]]
+                       + (3 if r["periodo"].startswith(str(year)) else 0))) for r in differences):
+                    item.setData(COMPARISON_ROLE, True)
+                    item.setBackground(QBrush(QColor("#FFEDD5")))
+                    item.setForeground(QColor("#9A3412"))
                     item.setToolTip("")
                 self.sales_table_igsa.setItem(idx, col, item)
         self.sales_table_igsa.setSortingEnabled(True)
@@ -5832,7 +5867,9 @@ class SalesPage(QWidget):
             lines = self._igsa_product_lines(product_id, product_code)
             menu.addSeparator()
             incident_action = menu.addAction(QIcon(str(ALERT_ICON_PATH)), "Ver incidencia")
-            incident_action.setEnabled(any(line["incidencias"] for line in lines))
+            incident_action.setEnabled(any(line["incidencias"] for line in lines) or any(
+                r["estado"] != "Coincide" and (r["articulo_id"] == product_id if product_id else r["codigo"] == product_code)
+                for r in getattr(self, "_igsa_comparisons", [])))
             detail_action = menu.addAction(QIcon(str(FILE_TEXT_ICON_PATH)), "Detalle de ventas")
         selected = menu.exec(table.viewport().mapToGlobal(pos))
         if selected is None:
@@ -5842,10 +5879,47 @@ class SalesPage(QWidget):
         elif selected in (incident_action, detail_action):
             from app.ui.widgets.igsa_sale_details_dialog import IgsaSaleDetailsDialog
 
-            IgsaSaleDetailsDialog(
+            from app.services.igsa_sale_details_service import IgsaSaleDetailsService
+            dialog = IgsaSaleDetailsDialog(
                 product_code, product_name, lines, self,
                 incidents_only=selected == incident_action,
-            ).exec()
+                service=IgsaSaleDetailsService(self.sales_summary_service._engine),
+                comparisons=[r for r in getattr(self, "_igsa_comparisons", [])
+                             if (r["articulo_id"] == product_id if product_id else r["codigo"] == product_code)],
+            )
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self.reload_igsa()
+
+    def _show_igsa_correction_history(self):
+        from app.services.igsa_sale_details_service import IgsaSaleDetailsService
+        from app.ui.widgets.igsa_sale_details_dialog import show_correction_history
+        show_correction_history(IgsaSaleDetailsService(self.sales_summary_service._engine), self)
+
+    def _show_igsa_comparison(self):
+        if not self.igsa_comparison_party.currentData():
+            QMessageBox.information(self, "Comparación", "Selecciona el cliente de IREKS que corresponde a IGSA.")
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("IGSA / IREKS · " + self.igsa_comparison_party.currentText())
+        dialog.resize(1100, 600)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Todos los productos del período · diferencias IGSA − IREKS · tolerancia 0,001 kg.\nSin datos no equivale a cero. Revisar fechas y cobertura de ambas fuentes antes de corregir."))
+        rows = getattr(self, "_igsa_comparisons", [])
+        table = QTableWidget(len(rows), 8)
+        table.setHorizontalHeaderLabels(["Mes", "Código", "Producto", "Dato", "IGSA", "IREKS", "Diferencia", "Estado"])
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        for i, row in enumerate(rows):
+            for j, key in enumerate(("periodo", "codigo", "nombre", "dato", "igsa", "ireks", "diferencia", "estado")):
+                value = row[key]
+                item = QTableWidgetItem("—" if value is None else self._fmt_num3(value) if isinstance(value, (int, float)) else str(value))
+                if row["estado"] != "Coincide":
+                    item.setBackground(QBrush(QColor("#FFEDD5")))
+                table.setItem(i, j, item)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(table)
+        dialog.exec()
 
     def _igsa_product_lines(self, product_id: str, product_code: str) -> list[dict]:
         return [line for line in getattr(self, "_igsa_detail_rows", [])

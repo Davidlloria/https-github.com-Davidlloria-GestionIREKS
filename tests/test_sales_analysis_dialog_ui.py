@@ -177,3 +177,25 @@ def test_sales_product_tables_offer_consumers_context_menu(monkeypatch) -> None:
     page.close()
     page.deleteLater()
     QApplication.processEvents()
+
+
+def test_igsa_comparison_marks_only_affected_kg_cell(monkeypatch):
+    from app.services.igsa_sale_details_service import IgsaSaleDetailsService
+    from app.ui.widgets.igsa_sale_details_dialog import COMPARISON_ROLE
+    _app()
+    for method in ("reload", "reload_igsa", "reload_clientes"):
+        monkeypatch.setattr(SalesPage, method, lambda self: None)
+    monkeypatch.setattr(IgsaSaleDetailsService, "list_lines", lambda *args: [])
+    monkeypatch.setattr(IgsaSaleDetailsService, "compare", lambda *args, **kwargs: [
+        dict(articulo_id='p', codigo='P1', periodo='2026-08', dato='Kg vendidos', estado='Diferencia')])
+    page = SalesPage()
+    row = SimpleNamespace(articulo_id='p', codigo='P1', nombre='Pan',
+        kilos_prev=10, sc_prev=0, ventas_prev=20, kilos_curr=12, sc_curr=0, ventas_curr=24,
+        delta_kg=2, delta_kg_pct=20, delta_ventas=4, delta_ventas_pct=20)
+    page._fill_sales_igsa([row], 2026)
+    assert page.sales_table_igsa.item(0, 5).data(COMPARISON_ROLE)
+    assert page.sales_table_igsa.item(0, 5).background().color().name() == '#ffedd5'
+    assert not page.sales_table_igsa.item(0, 2).data(COMPARISON_ROLE)
+    assert not page.sales_table_igsa.item(0, 6).data(COMPARISON_ROLE)
+    assert page.sales_table_igsa.item(0, 5).toolTip() == ''
+    page.close()
