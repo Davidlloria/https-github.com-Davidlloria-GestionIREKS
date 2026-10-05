@@ -2754,14 +2754,14 @@ class SalesPage(QWidget):
         self.igsa_comparison_message = QLabel()
         self.igsa_comparison_message.setWordWrap(True)
         comparison_layout.addWidget(self.igsa_comparison_message)
-        self.igsa_comparison_table = QTableWidget(0, 8)
+        self.igsa_comparison_table = QTableWidget(0, 10)
         self.igsa_comparison_table.setItemDelegate(IgsaIncidentDelegate(self.igsa_comparison_table))
-        self.igsa_comparison_table.setHorizontalHeaderLabels(["Mes", "Código", "Producto", "Dato", "IGSA", "IREKS", "Diferencia", "Estado"])
+        self.igsa_comparison_table.setHorizontalHeaderLabels(["Mes", "Código", "Producto", "Venta IGSA (kg)", "Venta IREKS (kg)", "Δ venta (kg)", "S/C IGSA (kg)", "S/C IREKS (kg)", "Δ S/C (kg)", "Estado"])
         self.igsa_comparison_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.igsa_comparison_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.igsa_comparison_table.setAlternatingRowColors(True)
         self.igsa_comparison_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        for column, width in enumerate((90, 90, 230, 120, 100, 100, 110, 180)):
+        for column, width in enumerate((80, 70, 210, 115, 120, 100, 110, 115, 100, 180)):
             self.igsa_comparison_table.setColumnWidth(column, width)
         self.igsa_comparison_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         comparison_layout.addWidget(self.igsa_comparison_table)
@@ -5959,14 +5959,30 @@ class SalesPage(QWidget):
         table.setUpdatesEnabled(False)
         table.blockSignals(True)
         try:
-            table.setRowCount(len(rows))
-            for i, row in enumerate(rows):
-                for j, key in enumerate(("periodo", "codigo", "nombre", "dato", "igsa", "ireks", "diferencia", "estado")):
-                    value = row[key]
+            grouped = {}
+            for row in rows:
+                key = (row["periodo"], row.get("articulo_id") or row["codigo"])
+                grouped.setdefault(key, {})[row["dato"]] = row
+            table.setRowCount(len(grouped))
+            for i, concepts in enumerate(grouped.values()):
+                reference = next(iter(concepts.values()))
+                values = [reference["periodo"], reference["codigo"], reference["nombre"]]
+                highlighted = set()
+                states = []
+                for concept, offset in (("Kg vendidos", 3), ("Kg sin cargo", 6)):
+                    row = concepts.get(concept)
+                    values.extend([row[key] if row else None for key in ("igsa", "ireks", "diferencia")])
+                    state = row["estado"] if row else "Sin datos para comparar"
+                    if state not in states:
+                        states.append(state)
+                    if state != "Coincide":
+                        highlighted.update(range(offset, offset + 3))
+                values.append(" · ".join(state for state in states if state != "Coincide") or "Coincide")
+                for j, value in enumerate(values):
                     item = QTableWidgetItem("—" if value is None else self._fmt_num3(value) if isinstance(value, (int, float)) else str(value))
                     if isinstance(value, (int, float)):
                         item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                    if row["estado"] != "Coincide":
+                    if j in highlighted:
                         item.setData(COMPARISON_ROLE, True)
                         item.setForeground(QColor("#9A3412"))
                         item.setBackground(QBrush(QColor("#FFEDD5")))

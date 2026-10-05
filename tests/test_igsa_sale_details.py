@@ -161,7 +161,8 @@ def test_comparison_uses_selected_party_month_and_separate_kg(tmp_path):
     assert current[0]['diferencia'] == 10
     assert current[0]['estado'] == 'Diferencia'
     assert current[1]['estado'] == 'Coincide'
-    previous = [r for r in rows if r['periodo'] == '2025-08']
+    assert {r['periodo'] for r in rows} == {'2026-08'}
+    previous = service.compare(2025, 8, cliente_id='igsa')
     assert previous[0]['ireks'] is None
     assert previous[0]['estado'] == 'Sin datos para comparar'
     july = service.compare(2026, 7, cliente_id='igsa')

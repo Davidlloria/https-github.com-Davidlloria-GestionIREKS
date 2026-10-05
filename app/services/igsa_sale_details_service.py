@@ -172,7 +172,7 @@ class IgsaSaleDetailsService:
         service = SalesAnnualComparisonService(self.engine)
         months = range(1, month + 1) if acumulado and month else [month] if month else range(1, 13)
         result = []
-        periods = {f"{y}-{m:02d}" for y in (year - 1, year) for m in months}
+        periods = {f"{year}-{m:02d}" for m in months}
         with Session(self.engine) as session:
             ids = service._resolve_sales_party_ids(session, cliente_id)
             raw = list(session.exec(select(VentaMensualRaw).where(col(VentaMensualRaw.periodo).in_(periods))))
@@ -202,7 +202,7 @@ class IgsaSaleDetailsService:
             for key in sorted(left.keys() | right.keys()):
                 a, b = left.get(key), right.get(key)
                 product = a or b
-                for y, suffix in ((year - 1, "prev"), (year, "curr")):
+                for y, suffix in ((year, "curr"),):
                     # Existence is checked separately: an absent record is not zero.
                     period = f"{y}-{m:02d}"
                     has_a = ("igsa", period, key) in present_keys

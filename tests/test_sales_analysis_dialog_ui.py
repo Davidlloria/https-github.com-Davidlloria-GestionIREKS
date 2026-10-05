@@ -219,7 +219,7 @@ def test_igsa_views_switch_without_losing_sales_selection_or_filters(monkeypatch
     assert page.igsa_comparison_view_btn.isChecked()
     assert page.igsa_comparison_table.rowCount() == 1
     from app.ui.widgets.igsa_sale_details_dialog import COMPARISON_ROLE
-    assert page.igsa_comparison_table.item(0, 0).data(COMPARISON_ROLE)
+    assert page.igsa_comparison_table.item(0, 3).data(COMPARISON_ROLE)
     page.igsa_sales_view_btn.click()
     assert page.igsa_views.currentIndex() == 0
     assert page.igsa_sales_view_btn.isChecked()
@@ -269,3 +269,29 @@ def test_igsa_large_comparison_switch_reuses_cells_and_shows_one_table(monkeypat
         assert page.igsa_comparison_table.rowCount() == 0
     finally:
         page.close()
+
+
+def test_comparison_pivots_concepts_and_colors_only_differences(monkeypatch):
+    _app()
+    for method in ("reload", "reload_igsa", "reload_clientes"):
+        monkeypatch.setattr(SalesPage, method, lambda self: None)
+    page = SalesPage()
+    from app.ui.widgets.igsa_sale_details_dialog import COMPARISON_ROLE
+    base = dict(periodo='2026-08', articulo_id='p', codigo='P1', nombre='Pan')
+    page._igsa_comparisons = [
+        dict(base, dato='Kg vendidos', igsa=12, ireks=10, diferencia=2, estado='Diferencia'),
+        dict(base, dato='Kg sin cargo', igsa=5, ireks=5, diferencia=0, estado='Coincide'),
+    ]
+    page._fill_igsa_comparison_view()
+    table = page.igsa_comparison_table
+    assert table.rowCount() == 1
+    assert table.columnCount() == 10
+    assert table.item(0, 3).text() == page._fmt_num3(12)
+    assert table.item(0, 6).text() == page._fmt_num3(5)
+    assert all(table.item(0, col).data(COMPARISON_ROLE) for col in (3, 4, 5))
+    assert all(not table.item(0, col).data(COMPARISON_ROLE) for col in (0, 1, 2, 6, 7, 8, 9))
+    page._igsa_comparisons = [dict(base, dato='Kg vendidos', igsa=12, ireks=None, diferencia=None, estado='Sin datos para comparar')]
+    page._fill_igsa_comparison_view()
+    assert table.item(0, 4).text() == '—'
+    assert table.item(0, 5).text() == '—'
+    page.close()
