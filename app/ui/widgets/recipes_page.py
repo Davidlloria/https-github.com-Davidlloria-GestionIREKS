@@ -9,7 +9,7 @@ import tempfile
 import traceback
 from typing import Any, cast
 
-from PySide6.QtCore import QEvent, QSize, QTimer, Qt
+from PySide6.QtCore import QBuffer, QEvent, QIODevice, QSize, QTimer, Qt
 from PySide6.QtGui import QAction, QBrush, QColor, QFont, QIcon, QKeySequence, QPainter, QPen, QPixmap, QShortcut, QTextCharFormat
 from PySide6.QtPdf import QPdfDocument
 from PySide6.QtPdfWidgets import QPdfView
@@ -780,7 +780,7 @@ class ProcessSourceDialog(QDialog):
 
 
 class RecipePdfExportDialog(QDialog):
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, *, images_gallery: list[dict[str, object]] | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Exportar receta a PDF")
         self.setMinimumWidth(390)
@@ -793,9 +793,10 @@ class RecipePdfExportDialog(QDialog):
         self.minimal_radio = QRadioButton("Mínimo", format_group)
         self.simple_radio = QRadioButton("Simple", format_group)
         self.extended_radio = QRadioButton("Extendido", format_group)
+        self.original_radio = QRadioButton("Original", format_group)
         self.minimal_radio.setChecked(True)
         self.format_buttons = QButtonGroup(self)
-        for button in (self.minimal_radio, self.simple_radio, self.extended_radio):
+        for button in (self.minimal_radio, self.simple_radio, self.extended_radio, self.original_radio):
             self.format_buttons.addButton(button)
             format_layout.addWidget(button)
         layout.addWidget(format_group)
@@ -840,6 +841,48 @@ class RecipePdfExportDialog(QDialog):
         options_layout.addWidget(self.images_no, 3, 2)
         layout.addWidget(self.minimal_options_group)
 
+        self.original_options_group = QGroupBox("Opciones del formato original", self)
+        original_layout = QGridLayout(self.original_options_group)
+        original_layout.addWidget(QLabel("Incluir logo Dreidoppel:"), 0, 0)
+        self.dreidoppel_si = QRadioButton("Sí")
+        self.dreidoppel_no = QRadioButton("No")
+        self.dreidoppel_no.setChecked(True)
+        self.dreidoppel_group = QButtonGroup(self)
+        self.dreidoppel_group.addButton(self.dreidoppel_si)
+        self.dreidoppel_group.addButton(self.dreidoppel_no)
+        original_layout.addWidget(self.dreidoppel_si, 0, 1)
+        original_layout.addWidget(self.dreidoppel_no, 0, 2)
+        original_layout.addWidget(QLabel("Incluir imagen:"), 1, 0)
+        self.original_images_si = QRadioButton("Sí")
+        self.original_images_no = QRadioButton("No")
+        self.original_images_no.setChecked(True)
+        self.original_images_group = QButtonGroup(self)
+        self.original_images_group.addButton(self.original_images_si)
+        self.original_images_group.addButton(self.original_images_no)
+        original_layout.addWidget(self.original_images_si, 1, 1)
+        original_layout.addWidget(self.original_images_no, 1, 2)
+        self.original_image_combo = QComboBox(self)
+        self.original_image_preview = QLabel(self)
+        for row in sorted(images_gallery or [], key=lambda row: not bool(row.get("is_main", False))):
+            stored_path = str(row.get("path") or "").strip()
+            if not stored_path:
+                continue
+            path = resolve_recipe_image_path(stored_path)
+            pixmap = QPixmap(str(path))
+            if pixmap.isNull():
+                continue
+            label = path.name + (" (principal)" if row.get("is_main") else "")
+            self.original_image_combo.addItem(QIcon(pixmap), label, stored_path)
+        original_layout.addWidget(self.original_image_combo, 2, 0, 1, 3)
+        original_layout.addWidget(self.original_image_preview, 3, 0, 1, 3)
+        self.original_images_si.setEnabled(self.original_image_combo.count() > 0)
+        if not self.original_image_combo.count():
+            original_layout.addWidget(QLabel("La receta no tiene imágenes disponibles."), 4, 0, 1, 3)
+        self.original_images_si.toggled.connect(self._update_original_image)
+        self.original_image_combo.currentIndexChanged.connect(self._update_original_image)
+        self._update_original_image()
+        layout.addWidget(self.original_options_group)
+
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Exportar")
         buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
@@ -849,8 +892,22 @@ class RecipePdfExportDialog(QDialog):
 
         self.minimal_radio.toggled.connect(self.minimal_options_group.setVisible)
         self.minimal_options_group.setVisible(True)
+        self.original_radio.toggled.connect(self.original_options_group.setVisible)
+        self.original_options_group.setVisible(False)
+
+    def _update_original_image(self) -> None:
+        include = self.original_images_si.isChecked()
+        self.original_image_combo.setVisible(include)
+        self.original_image_preview.setVisible(include)
+        if include:
+            pixmap = QPixmap(str(resolve_recipe_image_path(self.selected_image_path())))
+            self.original_image_preview.setPixmap(
+                pixmap.scaled(240, 160, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            )
 
     def layout_mode(self) -> str:
+        if self.original_radio.isChecked():
+            return "original"
         if self.simple_radio.isChecked():
             return "simple"
         if self.minimal_radio.isChecked():
@@ -867,10 +924,18 @@ class RecipePdfExportDialog(QDialog):
         return self.baker_percentage_si.isChecked()
 
     def include_images(self) -> bool:
+        if self.original_radio.isChecked():
+            return self.original_images_si.isChecked()
         return self.images_si.isChecked()
 
+    def include_dreidoppel(self) -> bool:
+        return self.dreidoppel_si.isChecked()
 
-class MinimalRecipePdfPreviewDialog(QDialog):
+    def selected_image_path(self) -> str:
+        return str(self.original_image_combo.currentData() or "")
+
+
+class RecipePdfPreviewDialog(QDialog):
     def __init__(
         self,
         pdf_service: PdfService,
@@ -880,10 +945,14 @@ class MinimalRecipePdfPreviewDialog(QDialog):
         include_baker_percentage: bool,
         include_images: bool,
         parent=None,
+        *,
+        layout_mode: str = "minimal",
+        include_dreidoppel: bool = False,
+        selected_image_path: str = "",
     ) -> None:
         super().__init__(parent)
         self._preview_path: Path | None = None
-        self.setWindowTitle("PDF mínimo - Vista previa")
+        self.setWindowTitle(f"PDF {'original' if layout_mode == 'original' else 'mínimo'} - Vista previa")
         self.resize(920, 720)
 
         layout = QVBoxLayout(self)
@@ -897,38 +966,54 @@ class MinimalRecipePdfPreviewDialog(QDialog):
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Save).setText("Guardar PDF")
+        buttons.button(QDialogButtonBox.StandardButton.Save).setEnabled(False)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
-        handle = tempfile.NamedTemporaryFile(prefix="gestionireks_minimo_", suffix=".pdf", delete=False)
+        handle = tempfile.NamedTemporaryFile(prefix=f"gestionireks_{layout_mode}_", suffix=".pdf", delete=False)
         handle.close()
         self._preview_path = Path(handle.name)
+        original_options = (
+            {"include_dreidoppel": include_dreidoppel, "selected_image_path": selected_image_path}
+            if layout_mode == "original" else {}
+        )
         try:
             pdf_service.export_recipe_to_pdf(
                 recipe_id,
                 self._preview_path,
-                layout_mode="minimal",
+                layout_mode=layout_mode,
                 include_escandallo=include_escandallo,
                 include_nutrition=include_nutrition,
                 include_baker_percentage=include_baker_percentage,
                 include_images=include_images,
+                **original_options,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Vista previa PDF", f"No se pudo generar la vista previa:\n{exc}")
             return
-        load_error = self.pdf_document.load(str(self._preview_path))
+        # QPdfDocument can keep a file handle after close() on Windows. Load from
+        # memory so saving/cancelling the preview can always remove the temporary.
+        self._preview_buffer = QBuffer(self)
+        self._preview_buffer.setData(self._preview_path.read_bytes())
+        self._preview_buffer.open(QIODevice.OpenModeFlag.ReadOnly)
+        self.pdf_document.load(self._preview_buffer)
+        load_error = self.pdf_document.error()
         if load_error != QPdfDocument.Error.None_:
             QMessageBox.critical(self, "Vista previa PDF", "No se pudo cargar la vista previa generada.")
+            return
+        buttons.button(QDialogButtonBox.StandardButton.Save).setEnabled(True)
 
     def cleanup_preview(self) -> None:
         self.pdf_view.setDocument(None)
         self.pdf_document.close()
+        if hasattr(self, "_preview_buffer"):
+            self._preview_buffer.close()
+            self._preview_buffer.setData(b"")
         if self._preview_path is not None:
             try:
                 os.unlink(self._preview_path)
             except (FileNotFoundError, PermissionError):
-                # En Windows QPdfDocument puede liberar el descriptor después de
-                # cerrar el diálogo. No bloqueamos el guardado por un temporal.
+                # No bloquear el guardado si Windows protege un temporal.
                 pass
             self._preview_path = None
 
@@ -3958,16 +4043,28 @@ class RecipesPage(QWidget):
             QMessageBox.warning(self, "Recetas", "Selecciona y guarda una receta antes de exportar.")
             return
 
-        export_dialog = RecipePdfExportDialog(self)
+        aggregate = self.recipe_service.get_recipe(self.current_recipe_id)
+        images_gallery = (
+            _recipe_image_gallery_from_payload(_json_to_string_dict(aggregate.receta.parametros_elaboracion_json))
+            if aggregate is not None else []
+        )
+        export_dialog = RecipePdfExportDialog(self, images_gallery=images_gallery)
         if not export_dialog.exec():
             return
         layout_mode = export_dialog.layout_mode()
         include_escandallo = layout_mode == "minimal" and export_dialog.include_escandallo()
         include_nutrition = layout_mode == "minimal" and export_dialog.include_nutrition()
         include_baker_percentage = layout_mode == "minimal" and export_dialog.include_baker_percentage()
-        include_images = layout_mode == "minimal" and export_dialog.include_images()
-        if layout_mode == "minimal":
-            preview_dialog = MinimalRecipePdfPreviewDialog(
+        include_images = layout_mode in ("minimal", "original") and export_dialog.include_images()
+        original_options = (
+            {
+                "include_dreidoppel": export_dialog.include_dreidoppel(),
+                "selected_image_path": export_dialog.selected_image_path() if include_images else "",
+            }
+            if layout_mode == "original" else {}
+        )
+        if layout_mode in ("minimal", "original"):
+            preview_dialog = RecipePdfPreviewDialog(
                 self.pdf_service,
                 self.current_recipe_id,
                 include_escandallo,
@@ -3975,6 +4072,8 @@ class RecipesPage(QWidget):
                 include_baker_percentage,
                 include_images,
                 self,
+                layout_mode=layout_mode,
+                **original_options,
             )
             try:
                 if not preview_dialog.exec():
@@ -4004,6 +4103,7 @@ class RecipesPage(QWidget):
                 include_nutrition=include_nutrition,
                 include_baker_percentage=include_baker_percentage,
                 include_images=include_images,
+                **original_options,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Recetas", f"No se pudo exportar el PDF:\n{exc}")

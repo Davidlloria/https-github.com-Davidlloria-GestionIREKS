@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from html import escape
 from pathlib import Path
@@ -339,10 +340,24 @@ class PdfService:
         include_nutrition: bool = False,
         include_baker_percentage: bool = True,
         include_images: bool = False,
+        include_dreidoppel: bool = False,
+        selected_image_path: str = "",
     ) -> None:
         receta, cliente, lineas = self._load_recipe_data(recipe_id)
         if not receta:
             raise ValueError("Receta no encontrada.")
+        if str(layout_mode or "").strip().lower() == "original":
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            self._export_original_recipe_to_pdf(
+                receta,
+                lineas,
+                output_path,
+                include_dreidoppel=include_dreidoppel,
+                include_images=include_images,
+                selected_image_path=selected_image_path,
+            )
+            return
         # Recalcular al exportar para evitar porcentajes panaderos obsoletos en BD.
         # Esto garantiza que el PDF refleje los datos actuales de la formula.
         calc = RecipeService().calculate(receta, lineas, sync_categories=True)
@@ -599,6 +614,140 @@ class PdfService:
             author="Gestion IREKS",
         )
         doc.build(story, onFirstPage=self._draw_page_bg, onLaterPages=self._draw_page_bg)
+
+    def _export_original_recipe_to_pdf(
+        self,
+        receta: Receta,
+        lineas: list[RecetaLinea],
+        output_path: Path,
+        *,
+        include_dreidoppel: bool = False,
+        include_images: bool = False,
+        selected_image_path: str = "",
+    ) -> None:
+        # Static corporate artwork extracted from the supplied reference PDFs.
+        templates = Path(__file__).resolve().parents[2] / "assets" / "templates" / "recetas"
+        header = templates / (
+            "original_cabecera_dreidoppel.png" if include_dreidoppel else "original_cabecera.png"
+        )
+        footer = templates / "original_pie.png"
+        if not header.is_file() or not footer.is_file():
+            raise ValueError("No se encuentran los recursos del formato Original.")
+
+        image = None
+        if include_images:
+            payload = self._json_to_obj(receta.parametros_elaboracion_json)
+            gallery = payload.get("images_gallery", payload.get("__images_gallery_json", []))
+            if isinstance(gallery, str):
+                try:
+                    gallery = json.loads(gallery)
+                except ValueError:
+                    gallery = []
+            stored_paths = {
+                str(row.get("path") or "").strip()
+                for row in gallery if isinstance(row, dict)
+            } if isinstance(gallery, list) else set()
+            if not selected_image_path or selected_image_path not in stored_paths:
+                raise ValueError("Selecciona una imagen guardada en la receta.")
+            path = resolve_recipe_image_path(selected_image_path)
+            try:
+                width, height = ImageReader(str(path)).getSize()
+                scale = min(110 * mm / width, 110 * mm / height)
+                image = RLImage(str(path), width=width * scale, height=height * scale)
+                image.hAlign = "LEFT"
+            except Exception as exc:
+                raise ValueError("No se puede leer la imagen seleccionada de la receta.") from exc
+
+        styles = getSampleStyleSheet()
+        body = ParagraphStyle("original_body", parent=styles["Normal"], fontName="Helvetica", fontSize=11, leading=13)
+        right = ParagraphStyle("original_quantity", parent=body, alignment=2)
+        title = ParagraphStyle(
+            "original_title", parent=body, fontName="Helvetica-Bold", fontSize=22, leading=25, keepWithNext=True,
+        )
+        subtitle = ParagraphStyle(
+            "original_subtitle", parent=body, fontName="Helvetica-Bold", fontSize=16, leading=18, keepWithNext=True,
+        )
+        heading = ParagraphStyle(
+            "original_heading", parent=body, fontName="Helvetica-Bold", spaceBefore=5 * mm,
+            spaceAfter=1 * mm, keepWithNext=True,
+        )
+        process_heading = ParagraphStyle(
+            "original_process_heading", parent=body, spaceBefore=4 * mm, spaceAfter=1 * mm, keepWithNext=True,
+        )
+        bullet = ParagraphStyle("original_bullet", parent=body, leftIndent=12 * mm, bulletIndent=6 * mm)
+        name = (receta.nombre or "Sin nombre").strip()
+        parts = re.split(r"\s+(?=con\b)", name, maxsplit=1, flags=re.IGNORECASE)
+        story: list = [Paragraph(escape(parts[0]), title)]
+        if len(parts) > 1:
+            story.append(Paragraph(escape(parts[1]), subtitle))
+        story.append(Spacer(1, 10 * mm))
+
+        grouped = self._group_lines_by_process(lineas)
+        process_names = [process_name for process_name, _ in grouped]
+        sections = self._parse_process_sections(receta.proceso, [*process_names, "Masa final"])
+
+        def append_process(text: str, *, include_heading: bool = True) -> None:
+            if not text.strip():
+                return
+            if include_heading:
+                story.append(Paragraph("<u>Proceso de elaboración</u>", process_heading))
+            else:
+                story.append(Spacer(1, 2 * mm))
+            for raw_line in text.splitlines():
+                cleaned = re.sub(r"^\s*(?:[•●]\s*|[-*]\s+|\d+[.)]\s+)", "", raw_line).strip()
+                if cleaned:
+                    story.append(Paragraph(escape(cleaned), bullet, bulletText="•"))
+
+        for process_name, process_lines in grouped:
+            named_lines = [line for line in process_lines if line.nombre_mostrado or line.notas or self._pdf_quantity_g(line)]
+            if not named_lines:
+                continue
+            if len(grouped) > 1 or process_name != "Masa final":
+                story.append(Paragraph(escape(process_name), heading))
+            rows = []
+            for line in named_lines:
+                ingredient = (line.nombre_mostrado or "").strip()
+                if line.notas.strip():
+                    ingredient += f" ({line.notas.strip()})"
+                rows.append([
+                    Paragraph(escape(ingredient), body),
+                    Paragraph(f"{self._fmt(self._pdf_quantity_g(line) / 1000, 3)} kg", right),
+                ])
+            total = sum(self._pdf_quantity_g(line) for line in named_lines) / 1000
+            rows.append([Paragraph("Total", body), Paragraph(f"{self._fmt(total, 3)} kg", right)])
+            table = Table(rows, colWidths=[85 * mm, 25 * mm], hAlign="LEFT")
+            table.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ("LINEABOVE", (0, -1), (-1, -1), 0.5, colors.black),
+                # Keep the total with the last ingredient when the table spans pages.
+                ("NOSPLIT", (0, -2), (-1, -1)),
+            ]))
+            story.append(table)
+            if process_name != "Masa final":
+                append_process(sections.pop(process_name, ""), include_heading=False)
+        # Preserve unsectioned instructions and sections without ingredient lines.
+        for process_name, text in sections.items():
+            if process_name != "Masa final" and text.strip():
+                story.append(Paragraph(escape(process_name), heading))
+            append_process(text)
+        if image is not None:
+            story.extend([Spacer(1, 12 * mm), image])
+
+        def draw_artwork(canvas, _doc) -> None:
+            canvas.saveState()
+            canvas.drawImage(str(header), 0, A4[1] - 100, width=A4[0], height=100, mask="auto")
+            canvas.drawImage(str(footer), 0, 0, width=A4[0], height=42, mask="auto")
+            canvas.restoreState()
+
+        doc = SimpleDocTemplate(
+            str(output_path), pagesize=A4, leftMargin=23 * mm, rightMargin=18 * mm,
+            topMargin=39 * mm, bottomMargin=16 * mm, title=name, author="Gestion IREKS",
+        )
+        doc.build(story, onFirstPage=draw_artwork, onLaterPages=draw_artwork)
 
     def _export_minimal_recipe_to_pdf(
         self,
