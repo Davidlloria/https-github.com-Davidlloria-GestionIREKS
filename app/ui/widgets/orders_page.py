@@ -3399,21 +3399,38 @@ class OrdersPage(QWidget):
         row = self._selected_row()
         if row is None:
             return
+        new_date = self.detail_fecha.date().toPython()
+        date_changed = new_date != row.pedido_fecha
         try:
             result = self.order_selected_flow_service.save_selected_order_header(
                 row.pedido_id,
-                self.detail_fecha.date().toPython(),
+                new_date,
                 self.detail_pedido_numero.text().strip(),
             )
             if result.status == "success":
                 self.reload()
                 self._select_by_id(row.pedido_id)
+                if date_changed:
+                    self._offer_receipt_reevaluation(row.pedido_id)
                 return
             if result.status == "not_found":
                 return
             QMessageBox.warning(self, "Pedidos", f"No se pudo guardar.\n{result.message}")
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Pedidos", f"No se pudo guardar.\n{exc}")
+
+    def _offer_receipt_reevaluation(self, pedido_id):
+        if not self.receipt_assignment_service.pending_count(pedido_id=pedido_id):
+            return
+        answer = QMessageBox.question(self, "Reevaluar recepciones",
+            "La fecha del pedido ha cambiado. ¿Reevaluar las recepciones pendientes? "
+            "Las asignaciones confirmadas se conservarán.")
+        if answer == QMessageBox.StandardButton.Yes:
+            message = self.receipt_assignment_service.reevaluate(pedido_id)
+            self.reload()
+            self._select_by_id(pedido_id)
+            self._show_selected_details()
+            QMessageBox.information(self, "Recepciones", message)
 
     def _update_cadelsa_button(self, _text: str = "") -> None:
         index = self.almacen_filter.currentIndex()
@@ -3540,6 +3557,8 @@ class OrdersPage(QWidget):
             self.reload()
             self._select_by_id(selected.pedido_id)
             self._show_selected_details()
+            if pedido_fecha != self._parse_date(getattr(pedido, "pedido_fecha", None)):
+                self._offer_receipt_reevaluation(selected.pedido_id)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Pedidos", f"No se pudo editar.\n{exc}")
 
@@ -3763,6 +3782,21 @@ class OrdersPage(QWidget):
         )
 
     def _confirm_albaran_preview(self, header: dict[str, str], rows: list[dict[str, Any]]) -> bool:
+        selected = self._selected_row()
+        if selected is None:
+            return False
+        try:
+            missing = self.order_document_import_service.preflight_albaran(selected.pedido_id, header, rows)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Revisar albarán", str(exc))
+            return False
+        if missing:
+            answer = QMessageBox.warning(self, "Referencias sin correspondencia",
+                "Estas referencias no tienen un producto reconocido: " + ", ".join(missing) +
+                "\nPuede cancelar y revisar las referencias antes de importar. Si continúa, estas recepciones necesitarán revisión.",
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel, QMessageBox.StandardButton.Cancel)
+            if answer != QMessageBox.StandardButton.Ok:
+                return False
         dialog = AlbaranPreviewDialog(header=header, items=rows, parent=self)
         return dialog.exec() == QDialog.DialogCode.Accepted
 
@@ -3979,7 +4013,11 @@ class OrdersPage(QWidget):
         self.reload()
         if warning_prefix == "albaran" and self.receipt_assignment_service.pending_count(pedido_id=row.pedido_id):
             self._review_receipts(row.pedido_id)
+        if warning_prefix == "albaran":
+            message = outcome.message + "\n\n" + self.receipt_assignment_service.summary(row.pedido_id)
+        else:
+            message = outcome.message
         if outcome.ok:
-            QMessageBox.information(self, outcome.title, outcome.message)
+            QMessageBox.information(self, outcome.title, message)
             return
-        QMessageBox.warning(self, outcome.title, outcome.message)
+        QMessageBox.warning(self, outcome.title, message)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 
 from app.services.order_document_import_flow_service import OrderDocumentImportGateResult
 from app.services.order_document_import_service import OrderDocumentImportService
@@ -8,6 +9,7 @@ from app.services.order_document_import_service import OrderDocumentImportServic
 
 @dataclass
 class _FakePedido:
+    pedido_fecha: date = date(2024, 1, 1)
     pedido_id: str = "p1"
     almacen_id: str = "alm-1"
     pedido_numero: str = ""

@@ -42,6 +42,32 @@ class OrderDocumentImportService:
     def __init__(self, import_flow_service: OrderDocumentImportFlowService | None = None) -> None:
         self.import_flow_service = import_flow_service or OrderDocumentImportFlowService()
 
+    def validate_albaran_dates(self, pedido, header, rows):
+        dates = [header.get("albaran_fecha")] if header.get("albaran_fecha") else []
+        dates.extend(row.get("albaran_fecha") for row in rows)
+        for value in dates:
+            delivery_date = self.parse_required_date(value, "albaran_fecha")
+            if delivery_date < pedido.pedido_fecha:
+                raise ValueError(
+                    f"Importación detenida: albarán {delivery_date:%d/%m/%Y}, "
+                    f"pedido {pedido.pedido_numero} del {pedido.pedido_fecha:%d/%m/%Y}. "
+                    "El albarán es anterior al pedido y sus recepciones no podrán asignarse. "
+                    "Revise la fecha del pedido y el documento antes de importar. No se ha guardado ningún cambio.")
+
+    def preflight_albaran(self, pedido_id, header, rows):
+        with Session(engine) as session:
+            pedido = session.get(Pedido, pedido_id)
+            if pedido is None:
+                raise OrderNotFoundError("Pedido no encontrado.")
+            self.validate_albaran_dates(pedido, header, rows)
+            missing = []
+            for row in rows:
+                code = str(row.get("articulo_codigo") or "").strip()
+                article = self.find_article_by_code(session, code, pedido_id=pedido_id)
+                if article is None:
+                    missing.append(code or "Sin código")
+            return sorted(set(missing))
+
     def import_albaran_pdf(self, pedido_id: str, source: Path) -> OrderDocumentImportResult:
         header, rows = OrderDocumentParser.parse_albaran_pdf(source)
         return self.import_albaran(pedido_id, header, rows)
@@ -248,6 +274,7 @@ class OrderDocumentImportService:
             if pedido is None:
                 raise OrderNotFoundError("El pedido seleccionado ya no existe.")
 
+            self.validate_albaran_dates(pedido, preview_header, mapped_rows)
             clean_pedido_id = str(pedido.pedido_id or "").strip()
             gate = self.import_flow_service.resolve_albaran_gate(
                 pedido_id=clean_pedido_id,

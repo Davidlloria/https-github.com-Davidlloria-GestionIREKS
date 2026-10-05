@@ -50,6 +50,17 @@ class ReceiptAssignmentDialog(QDialog):
         self.history.setPlaceholderText("Sin cambios anteriores registrados.")
         layout.addWidget(self.history)
         actions = QHBoxLayout()
+        if pedido_id:
+            reevaluate = QPushButton("Reevaluar pendientes")
+            def run_reevaluation():
+                try:
+                    message = self.service.reevaluate(self.pedido_id)
+                    self._load()
+                    QMessageBox.information(self, "Recepciones", message)
+                except ValueError as exc:
+                    QMessageBox.warning(self, "Recepciones", str(exc))
+            reevaluate.clicked.connect(run_reevaluation)
+            actions.addWidget(reevaluate)
         self.later = QPushButton("Resolver después")
         self.later.clicked.connect(self.reject)
         actions.addWidget(self.later)

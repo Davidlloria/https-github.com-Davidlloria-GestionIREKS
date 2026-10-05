@@ -191,6 +191,23 @@ def reconcile_historical_receipts(session: Session, pedido_id: str) -> int:
 
 
 class ReceiptAssignmentService:
+    def reevaluate(self, pedido_id: str) -> str:
+        with Session(engine) as session:
+            if session.get(Pedido, pedido_id) is None:
+                raise ValueError("Pedido no encontrado.")
+            automate_receipts(session, pedido_id)
+            sync_receipt_pending(session, pedido_id)
+            session.commit()
+        return self.summary(pedido_id)
+
+    def summary(self, pedido_id: str) -> str:
+        rows = self.list_reviews(pedido_id=pedido_id, pending_only=False)
+        assigned = sum(sum(row.allocations.values()) for row in rows)
+        pending = sum(row.pendiente for row in rows)
+        return (f"Recepciones registradas en el pedido: {len(rows)} líneas.\n"
+                f"Unidades asignadas: {assigned:g}.\n"
+                f"Recepciones pendientes de revisión: {pending}.")
+
     def pending_count(self, almacen_id: str = "", pedido_id: str = "") -> int:
         with Session(engine) as session:
             query = (select(AlbaranItem, PedidoRecepcionRevision)
