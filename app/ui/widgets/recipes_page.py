@@ -10,7 +10,7 @@ import traceback
 from typing import Any, cast
 
 from PySide6.QtCore import QEvent, QSize, QTimer, Qt
-from PySide6.QtGui import QAction, QBrush, QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut, QTextCharFormat
+from PySide6.QtGui import QAction, QBrush, QColor, QFont, QIcon, QKeySequence, QPainter, QPen, QPixmap, QShortcut, QTextCharFormat
 from PySide6.QtPdf import QPdfDocument
 from PySide6.QtPdfWidgets import QPdfView
 from PySide6.QtWidgets import (
@@ -60,6 +60,20 @@ from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_s
 from app.ui.widgets.nutrition_card import NutritionCard, NutritionRowData
 from app.ui.widgets.recipe_document_import_dialog import RecipeDocumentImportDialog
 from app.viewmodels import IngredientChoice
+
+
+def _process_symbol_icon(positive: bool) -> QIcon:
+    pixmap = QPixmap(48, 48)
+    pixmap.setDevicePixelRatio(2)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(QPen(QColor("#14532D" if positive else "#7F1D1D"), 2))
+    painter.drawLine(5, 12, 19, 12)
+    if positive:
+        painter.drawLine(12, 5, 12, 19)
+    painter.end()
+    return QIcon(pixmap)
 
 
 def _normalize_process_name(value: str | None) -> str:
@@ -2379,7 +2393,9 @@ class RecipesPage(QWidget):
         )
         self.active_process_combo.currentTextChanged.connect(self._on_active_process_changed)
         recipe_process_layout.addWidget(self.active_process_combo)
-        self.add_process_btn = QPushButton("+")
+        self.add_process_btn = QPushButton()
+        self.add_process_btn.setIcon(_process_symbol_icon(True))
+        self.add_process_btn.setIconSize(QSize(24, 24))
         self.add_process_btn.setObjectName("addRecipeProcessButton")
         self.add_process_btn.setFixedSize(34, 30)
         self.add_process_btn.setToolTip("Añadir proceso")
@@ -2390,11 +2406,13 @@ class RecipesPage(QWidget):
             "QPushButton:pressed { background-color: #86EFAC; color: #14532D; }"
         )
         self.add_process_btn.clicked.connect(self._add_process)
-        self.del_process_btn = QPushButton("−")
+        self.del_process_btn = QPushButton()
+        self.del_process_btn.setIcon(_process_symbol_icon(False))
+        self.del_process_btn.setIconSize(QSize(24, 24))
         self.del_process_btn.setObjectName("removeRecipeProcessButton")
         self.del_process_btn.setFixedSize(34, 30)
-        self.del_process_btn.setToolTip("Eliminar proceso")
-        self.del_process_btn.setAccessibleName("Eliminar proceso")
+        self.del_process_btn.setToolTip("Eliminar proceso trasladando sus ingredientes")
+        self.del_process_btn.setAccessibleName("Eliminar proceso trasladando sus ingredientes")
         self.del_process_btn.setStyleSheet(
             "QPushButton { min-width: 32px; max-width: 32px; min-height: 28px; max-height: 28px; padding: 0px; font-family: 'Segoe UI'; font-size: 24px; font-weight: 700; background-color: #FEE2E2; color: #7F1D1D; border: 1px solid #FCA5A5; border-radius: 7px; }"
             "QPushButton:hover { background-color: #FECACA; color: #7F1D1D; border-color: #F87171; }"
@@ -2403,6 +2421,20 @@ class RecipesPage(QWidget):
         self.del_process_btn.clicked.connect(self._remove_process)
         recipe_process_layout.addWidget(self.add_process_btn)
         recipe_process_layout.addWidget(self.del_process_btn)
+        self.delete_process_btn = QPushButton()
+        self.delete_process_btn.setObjectName("deleteRecipeProcessButton")
+        self.delete_process_btn.setFixedSize(34, 30)
+        self.delete_process_btn.setIcon(QIcon(str(Path(__file__).resolve().parents[3] / "assets" / "icons" / "trash.svg")))
+        self.delete_process_btn.setIconSize(QSize(20, 20))
+        self.delete_process_btn.setToolTip("Eliminar proceso y sus ingredientes")
+        self.delete_process_btn.setAccessibleName("Eliminar proceso y sus ingredientes")
+        self.delete_process_btn.setStyleSheet(
+            "QPushButton { min-width: 32px; max-width: 32px; min-height: 28px; max-height: 28px; padding: 0px; background-color: #FEE2E2; border: 1px solid #FCA5A5; border-radius: 7px; }"
+            "QPushButton:hover { background-color: #FECACA; }"
+            "QPushButton:pressed { background-color: #FCA5A5; }"
+        )
+        self.delete_process_btn.clicked.connect(self._delete_process_with_ingredients)
+        recipe_process_layout.addWidget(self.delete_process_btn)
         for text, tooltip, callback in (
             ("Renombrar", "Cambiar el nombre del proceso", self._rename_process),
             ("↑", "Mover el proceso antes", lambda: self._reorder_process(-1)),
@@ -3646,6 +3678,38 @@ class RecipesPage(QWidget):
         self.lines_table.blockSignals(previous)
         self._apply_process_filter()
         self._on_lines_changed()
+
+    def _delete_process_with_ingredients(self) -> None:
+        target = self._current_active_process()
+        primary = self.recipe_elaboracion_data.get("recipe_primary_process", "Masa final")
+        if target == primary or len(self.recipe_process_names) == 1:
+            QMessageBox.information(self, "Recetas", "El proceso principal no se puede eliminar.")
+            return
+        if target not in self.recipe_process_names:
+            return
+        answer = QMessageBox.warning(
+            self,
+            "Eliminar proceso e ingredientes",
+            f"¿Eliminar el proceso '{target}' y todos sus ingredientes de esta fórmula?\n\n"
+            "También se eliminarán las líneas que hacen referencia a este proceso desde otros procesos.\n"
+            "Los demás ingredientes se conservarán. Esta acción no se puede deshacer.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        lines = [
+            line for line in self._build_lines()
+            if _normalize_process_name(line.proceso_nombre) != target
+            and not (line.tipo_linea == "proceso" and line.proceso_origen_nombre == target)
+        ]
+        self.recipe_process_names = [name for name in self.recipe_process_names if name != target]
+        for data in (self.recipe_escandallo_data, self.recipe_elaboracion_data):
+            for key in list(data):
+                if key.startswith(f"proceso::{target}::"):
+                    del data[key]
+        active = primary if primary in self.recipe_process_names else self.recipe_process_names[0]
+        self._replace_process_lines(lines, active)
 
     def _remove_process(self) -> None:
         target = self._current_active_process()

@@ -2,7 +2,7 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "windows")
 import json
 import pytest
-from PySide6.QtWidgets import QApplication, QInputDialog
+from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox
 from app.ui.widgets.recipes_page import RecipesPage
 from app.models import RecetaLinea
 from app.viewmodels import IngredientChoice
@@ -80,3 +80,63 @@ def test_saved_process_names_and_order_reload_with_empty_process(page, monkeypat
     monkeypatch.setattr(page.recipe_service, "get_recipe", lambda *args, **kwargs: SimpleNamespace(receta=recipe, lineas=[]))
     page._load_recipe(123)
     assert page.recipe_process_names == ["Frutas", "Masa final", "Cobertura"]
+
+
+def test_delete_process_removes_ingredients_references_and_settings(page, monkeypatch):
+    page._render_lines([
+        RecetaLinea(receta_id=0, nombre_mostrado="Harina", proceso_nombre="Masa final", cantidad_base_g=1000),
+        RecetaLinea(receta_id=0, nombre_mostrado="Pasas", proceso_nombre="Frutas", cantidad_base_g=100),
+        RecetaLinea(receta_id=0, nombre_mostrado="Proceso: Frutas", proceso_nombre="Masa final", tipo_linea="proceso", tipo_origen="process", proceso_origen_nombre="Frutas", cantidad_base_g=100),
+    ])
+    for data in (page.recipe_escandallo_data, page.recipe_elaboracion_data):
+        data["proceso::Frutas::peso_pieza"] = "100"
+        data["proceso::Masa final::peso_pieza"] = "500"
+    saved = []
+    monkeypatch.setattr(page, "_schedule_autosave", lambda: saved.append(True))
+    def confirm(*args):
+        assert args[-1] == QMessageBox.StandardButton.No
+        assert "Frutas" in args[2] and "referencia" in args[2]
+        return QMessageBox.StandardButton.Yes
+    monkeypatch.setattr(QMessageBox, "warning", confirm)
+    page.delete_process_btn.click()
+    lines = page._build_lines()
+    assert [(line.nombre_mostrado, line.cantidad_base_g) for line in lines] == [("Harina", 1000)]
+    assert page.recipe_process_names == ["Masa final"]
+    assert page._current_active_process() == "Masa final"
+    for data in (page.recipe_escandallo_data, page.recipe_elaboracion_data):
+        assert "proceso::Frutas::peso_pieza" not in data
+        assert data["proceso::Masa final::peso_pieza"] == "500"
+    assert saved
+    assert json.loads(page._build_recipe_payload().elaboracion_data["recipe_process_order"]) == ["Masa final"]
+
+
+def test_cancel_process_deletion_preserves_formula(page, monkeypatch):
+    page._render_lines([RecetaLinea(receta_id=0, nombre_mostrado="Pasas", proceso_nombre="Frutas", cantidad_base_g=125)])
+    page.recipe_elaboracion_data["proceso::Frutas::nota"] = "Conservar"
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args: QMessageBox.StandardButton.No)
+    monkeypatch.setattr(page, "_schedule_autosave", lambda: pytest.fail("No debe guardar al cancelar"))
+    page.delete_process_btn.click()
+    assert page.recipe_process_names == ["Masa final", "Frutas"]
+    assert page._current_active_process() == "Frutas"
+    assert page._build_lines()[0].cantidad_base_g == 125
+    assert page.recipe_elaboracion_data["proceso::Frutas::nota"] == "Conservar"
+
+
+def test_delete_protects_renamed_primary_process(page, monkeypatch):
+    page.recipe_elaboracion_data["recipe_primary_process"] = "Principal"
+    page._refresh_process_controls(["Principal", "Frutas"])
+    page.active_process_combo.setCurrentText("Principal")
+    notices = []
+    monkeypatch.setattr(QMessageBox, "information", lambda *args: notices.append(args[2]))
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args: pytest.fail("No debe pedir borrar el principal"))
+    page.delete_process_btn.click()
+    assert notices
+    assert page.recipe_process_names == ["Principal", "Frutas"]
+
+
+def test_delete_empty_process_preserves_other_empty_processes(page, monkeypatch):
+    page._refresh_process_controls(["Masa final", "Frutas", "Cobertura"])
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args: QMessageBox.StandardButton.Yes)
+    page.delete_process_btn.click()
+    assert page.recipe_process_names == ["Masa final", "Cobertura"]
+    assert not page._build_lines()
