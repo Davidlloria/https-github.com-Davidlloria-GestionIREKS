@@ -62,16 +62,15 @@ from app.ui.widgets.recipe_document_import_dialog import RecipeDocumentImportDia
 from app.viewmodels import IngredientChoice
 
 
-def _process_symbol_icon(positive: bool) -> QIcon:
+def _process_add_icon() -> QIcon:
     pixmap = QPixmap(48, 48)
     pixmap.setDevicePixelRatio(2)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setPen(QPen(QColor("#14532D" if positive else "#7F1D1D"), 2))
+    painter.setPen(QPen(QColor("#14532D"), 2))
     painter.drawLine(5, 12, 19, 12)
-    if positive:
-        painter.drawLine(12, 5, 12, 19)
+    painter.drawLine(12, 5, 12, 19)
     painter.end()
     return QIcon(pixmap)
 
@@ -2394,7 +2393,7 @@ class RecipesPage(QWidget):
         self.active_process_combo.currentTextChanged.connect(self._on_active_process_changed)
         recipe_process_layout.addWidget(self.active_process_combo)
         self.add_process_btn = QPushButton()
-        self.add_process_btn.setIcon(_process_symbol_icon(True))
+        self.add_process_btn.setIcon(_process_add_icon())
         self.add_process_btn.setIconSize(QSize(24, 24))
         self.add_process_btn.setObjectName("addRecipeProcessButton")
         self.add_process_btn.setFixedSize(34, 30)
@@ -2406,21 +2405,7 @@ class RecipesPage(QWidget):
             "QPushButton:pressed { background-color: #86EFAC; color: #14532D; }"
         )
         self.add_process_btn.clicked.connect(self._add_process)
-        self.del_process_btn = QPushButton()
-        self.del_process_btn.setIcon(_process_symbol_icon(False))
-        self.del_process_btn.setIconSize(QSize(24, 24))
-        self.del_process_btn.setObjectName("removeRecipeProcessButton")
-        self.del_process_btn.setFixedSize(34, 30)
-        self.del_process_btn.setToolTip("Eliminar proceso trasladando sus ingredientes")
-        self.del_process_btn.setAccessibleName("Eliminar proceso trasladando sus ingredientes")
-        self.del_process_btn.setStyleSheet(
-            "QPushButton { min-width: 32px; max-width: 32px; min-height: 28px; max-height: 28px; padding: 0px; font-family: 'Segoe UI'; font-size: 24px; font-weight: 700; background-color: #FEE2E2; color: #7F1D1D; border: 1px solid #FCA5A5; border-radius: 7px; }"
-            "QPushButton:hover { background-color: #FECACA; color: #7F1D1D; border-color: #F87171; }"
-            "QPushButton:pressed { background-color: #FCA5A5; color: #7F1D1D; }"
-        )
-        self.del_process_btn.clicked.connect(self._remove_process)
         recipe_process_layout.addWidget(self.add_process_btn)
-        recipe_process_layout.addWidget(self.del_process_btn)
         self.delete_process_btn = QPushButton()
         self.delete_process_btn.setObjectName("deleteRecipeProcessButton")
         self.delete_process_btn.setFixedSize(34, 30)
@@ -3710,36 +3695,6 @@ class RecipesPage(QWidget):
                     del data[key]
         active = primary if primary in self.recipe_process_names else self.recipe_process_names[0]
         self._replace_process_lines(lines, active)
-
-    def _remove_process(self) -> None:
-        target = self._current_active_process()
-        if target == self.recipe_elaboracion_data.get("recipe_primary_process", "Masa final") or len(self.recipe_process_names) == 1:
-            QMessageBox.information(self, "Recetas", "El proceso principal no se puede eliminar.")
-            return
-        if target not in self.recipe_process_names:
-            return
-        replacement = "Masa final"
-        alternatives = [x for x in self.recipe_process_names if x != target]
-        if alternatives:
-            replacement, ok = QInputDialog.getItem(
-                self,
-                "Eliminar proceso",
-                f"Reemplazar '{target}' por:",
-                alternatives,
-                0,
-                False,
-            )
-            if not ok:
-                return
-            replacement = _normalize_process_name(replacement)
-        self.recipe_process_names = [x for x in self.recipe_process_names if x != target]
-        for row in range(self.lines_table.rowCount()):
-            if self._cell_text(row, self.COL_PROCESO) == target:
-                cell = self.lines_table.item(row, self.COL_PROCESO)
-                if cell is not None:
-                    cell.setText(replacement)
-        self._refresh_process_controls(self.recipe_process_names, preserve_active=False)
-        self._on_lines_changed()
 
     def _start_new_recipe(self) -> None:
         if self.recipe_tabs.currentIndex() == 0:
