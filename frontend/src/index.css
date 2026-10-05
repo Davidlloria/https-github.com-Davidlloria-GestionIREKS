@@ -9027,12 +9027,11 @@ tbody tr:hover {
 }
 
 .recipes-process-group {
-  display: grid;
-  grid-template-columns: minmax(0, 140px) 34px 34px;
+  display: flex;
   align-items: flex-end;
   gap: 6px;
   margin-left: auto;
-  max-width: 100%;
+  flex-wrap: wrap;
 }
 
 .recipes-process-field {
@@ -9052,8 +9051,7 @@ tbody tr:hover {
 }
 
 .recipes-process-select {
-  width: 100%;
-  min-width: 0;
+  min-width: 180px;
   min-height: 34px;
   height: 34px;
   padding: 0 10px;
@@ -9064,37 +9062,26 @@ tbody tr:hover {
 }
 
 .recipes-process-modifier {
-  display: grid;
-  place-items: center;
   width: 34px;
   height: 34px;
-  min-width: 0;
-  padding: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, #ffffff, #f4f7fb);
   color: var(--text);
   font-weight: 800;
-  font-size: 26px;
-  line-height: 1;
   box-shadow: var(--shadow-soft);
 }
 
 .recipes-process-modifier-positive {
-  background: #dcfce7;
-  color: #166534;
-  border-color: #86efac;
+  background: linear-gradient(180deg, #69c56b, #4ea753);
+  color: #ffffff;
+  border-color: #5cae5f;
 }
 
 .recipes-process-modifier-negative {
-  background: #fee2e2;
-  color: #991b1b;
-  border-color: #fca5a5;
-}
-
-.recipes-process-modifier:disabled {
-  opacity: 1;
-  cursor: not-allowed;
+  background: linear-gradient(180deg, #ea7373, #d85c5c);
+  color: #ffffff;
+  border-color: #d85c5c;
 }
 
 .recipes-summary-panel {

@@ -364,11 +364,11 @@ export function RecipesPage() {
                             <option value={valueOrDash(detailRecipe?.proceso)}>{valueOrDash(detailRecipe?.proceso)}</option>
                           </select>
                         </label>
-                        <button type="button" className="recipes-process-modifier recipes-process-modifier-positive" aria-label="Añadir proceso" disabled>
+                        <button type="button" className="recipes-process-modifier recipes-process-modifier-positive" disabled>
                           +
                         </button>
-                        <button type="button" className="recipes-process-modifier recipes-process-modifier-negative" aria-label="Eliminar proceso" disabled>
-                          −
+                        <button type="button" className="recipes-process-modifier recipes-process-modifier-negative" disabled>
+                          -
                         </button>
                       </div>
                     </div>
