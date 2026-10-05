@@ -2372,30 +2372,33 @@ class RecipesPage(QWidget):
         recipe_process_layout.addWidget(QLabel("Proceso"))
         self.active_process_combo = QComboBox()
         self.active_process_combo.setEditable(False)
-        self.active_process_combo.setMinimumWidth(240)
-        self.active_process_combo.setMaximumWidth(360)
+        self.active_process_combo.setFixedWidth(160)
         self.active_process_combo.setFixedHeight(30)
         self.active_process_combo.setStyleSheet(
-            "QComboBox { min-height: 0px; max-height: 30px; padding: 0 8px; }"
+            "QComboBox { min-width: 142px; max-width: 142px; min-height: 28px; max-height: 28px; padding: 0 8px; border: 1px solid #CBD5E1; }"
         )
         self.active_process_combo.currentTextChanged.connect(self._on_active_process_changed)
         recipe_process_layout.addWidget(self.active_process_combo)
         self.add_process_btn = QPushButton("+")
         self.add_process_btn.setObjectName("addRecipeProcessButton")
         self.add_process_btn.setFixedSize(34, 30)
-        self.add_process_btn.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
+        self.add_process_btn.setToolTip("Añadir proceso")
+        self.add_process_btn.setAccessibleName("Añadir proceso")
         self.add_process_btn.setStyleSheet(
-            "QPushButton { min-height: 0px; max-height: 30px; padding: 0px; background-color: #DCFCE7; color: #166534; border: 1px solid #86EFAC; border-radius: 7px; }"
-            "QPushButton:hover { background-color: #BBF7D0; border-color: #4ADE80; }"
+            "QPushButton { min-width: 32px; max-width: 32px; min-height: 28px; max-height: 28px; padding: 0px; font-family: 'Segoe UI'; font-size: 24px; font-weight: 700; background-color: #DCFCE7; color: #14532D; border: 1px solid #86EFAC; border-radius: 7px; }"
+            "QPushButton:hover { background-color: #BBF7D0; color: #14532D; border-color: #4ADE80; }"
+            "QPushButton:pressed { background-color: #86EFAC; color: #14532D; }"
         )
         self.add_process_btn.clicked.connect(self._add_process)
-        self.del_process_btn = QPushButton("-")
+        self.del_process_btn = QPushButton("−")
         self.del_process_btn.setObjectName("removeRecipeProcessButton")
         self.del_process_btn.setFixedSize(34, 30)
-        self.del_process_btn.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
+        self.del_process_btn.setToolTip("Eliminar proceso")
+        self.del_process_btn.setAccessibleName("Eliminar proceso")
         self.del_process_btn.setStyleSheet(
-            "QPushButton { min-height: 0px; max-height: 30px; padding: 0px; background-color: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; border-radius: 7px; }"
-            "QPushButton:hover { background-color: #FECACA; border-color: #F87171; }"
+            "QPushButton { min-width: 32px; max-width: 32px; min-height: 28px; max-height: 28px; padding: 0px; font-family: 'Segoe UI'; font-size: 24px; font-weight: 700; background-color: #FEE2E2; color: #7F1D1D; border: 1px solid #FCA5A5; border-radius: 7px; }"
+            "QPushButton:hover { background-color: #FECACA; color: #7F1D1D; border-color: #F87171; }"
+            "QPushButton:pressed { background-color: #FCA5A5; color: #7F1D1D; }"
         )
         self.del_process_btn.clicked.connect(self._remove_process)
         recipe_process_layout.addWidget(self.add_process_btn)
