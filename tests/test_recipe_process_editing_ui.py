@@ -148,7 +148,7 @@ def test_recipe_ribbon_fits_customer_and_ireks_tabs(page):
     top = page.findChild(QWidget, "recipeTopRow")
     ribbon = page.findChild(QWidget, "recipeRibbon")
     assert not hasattr(page, "tech_recipe_btn")
-    top.setFixedWidth(550)
+    top.setFixedWidth(900)
     page.show()
     page.recipe_tabs.blockSignals(True)
     for index in (0, 1):
@@ -156,7 +156,9 @@ def test_recipe_ribbon_fits_customer_and_ireks_tabs(page):
         page._on_editor_tab_changed(0)
         QApplication.processEvents()
         assert page.load_base_btn.isVisible() == (index == 1)
-        assert page.recipe_process_row.geometry().bottom() < ribbon.geometry().top()
+        assert page.recipe_process_row.geometry().right() < ribbon.geometry().left()
+        assert page.recipe_process_row.geometry().center().y() == ribbon.geometry().center().y()
+        assert top.rect().contains(ribbon.geometry())
         buttons = [page.scale_btn, page.load_base_btn, page.recipe_pdf_btn, page.recipe_excel_btn]
         visible = [button for button in buttons if button.isVisible()]
         for button in visible:

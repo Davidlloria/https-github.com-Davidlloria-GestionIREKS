@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QInputDialog,
     QLabel,
+    QLayout,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -1485,6 +1486,7 @@ class RecipesPage(QWidget):
 
         recipe_ribbon, recipe_ribbon_layout = create_standard_top_ribbon()
         recipe_ribbon.setObjectName("recipeRibbon")
+        recipe_ribbon_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         self.scale_btn = create_standard_ribbon_button("Escalar", role="primary", icon_name="scale.svg")
         self.load_base_btn = create_standard_ribbon_button("Cargar", role="success", icon_name="download.svg")
         self.recipe_pdf_btn = create_standard_ribbon_button("Pdf", role="danger", icon_name="file-text.svg")
@@ -1497,6 +1499,8 @@ class RecipesPage(QWidget):
         recipe_ribbon_layout.addWidget(self.load_base_btn)
         recipe_ribbon_layout.addWidget(self.recipe_pdf_btn)
         recipe_ribbon_layout.addWidget(self.recipe_excel_btn)
+        for button in (self.scale_btn, self.load_base_btn, self.recipe_pdf_btn, self.recipe_excel_btn):
+            button.setFixedWidth(82)
         self.load_base_btn.setVisible(False)
         recipe_ribbon_layout.addStretch()
 
@@ -1779,12 +1783,15 @@ class RecipesPage(QWidget):
         receta_tab_layout.setSpacing(4)
 
         self.recipe_process_row.setObjectName("recipeProcessRow")
+        self.recipe_process_row.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        self.recipe_process_row.layout().setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         recipe_top_row = QWidget()
         recipe_top_row.setObjectName("recipeTopRow")
         recipe_top_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        recipe_top_layout = QVBoxLayout(recipe_top_row)
+        recipe_top_layout = QHBoxLayout(recipe_top_row)
+        recipe_top_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         recipe_top_layout.setContentsMargins(0, 0, 0, 0)
-        recipe_top_layout.setSpacing(8)
+        recipe_top_layout.setSpacing(4)
         recipe_top_layout.addWidget(self.recipe_process_row)
         recipe_top_layout.addWidget(recipe_ribbon)
         recipe_content_row = QWidget()
