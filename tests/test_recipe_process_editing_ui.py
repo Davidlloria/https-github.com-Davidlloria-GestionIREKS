@@ -1,8 +1,9 @@
 import os
 os.environ.setdefault("QT_QPA_PLATFORM", "windows")
 import json
+from pathlib import Path
 import pytest
-from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox, QWidget
 from app.ui.widgets.recipes_page import RecipesPage
 from app.models import RecetaLinea
 from app.viewmodels import IngredientChoice
@@ -140,3 +141,26 @@ def test_delete_empty_process_preserves_other_empty_processes(page, monkeypatch)
     page.delete_process_btn.click()
     assert page.recipe_process_names == ["Masa final", "Cobertura"]
     assert not page._build_lines()
+
+
+def test_recipe_ribbon_fits_customer_and_ireks_tabs(page):
+    page.setStyleSheet((Path(__file__).resolve().parents[1] / "assets/styles.qss").read_text(encoding="utf-8-sig"))
+    top = page.findChild(QWidget, "recipeTopRow")
+    ribbon = page.findChild(QWidget, "recipeRibbon")
+    assert not hasattr(page, "tech_recipe_btn")
+    top.setFixedWidth(550)
+    page.show()
+    page.recipe_tabs.blockSignals(True)
+    for index in (0, 1):
+        page.recipe_tabs.setCurrentIndex(index)
+        page._on_editor_tab_changed(0)
+        QApplication.processEvents()
+        assert page.load_base_btn.isVisible() == (index == 1)
+        assert page.recipe_process_row.geometry().bottom() < ribbon.geometry().top()
+        buttons = [page.scale_btn, page.load_base_btn, page.recipe_pdf_btn, page.recipe_excel_btn]
+        visible = [button for button in buttons if button.isVisible()]
+        for button in visible:
+            assert ribbon.rect().contains(button.geometry())
+        for left, right in zip(visible, visible[1:]):
+            assert left.geometry().right() < right.geometry().left()
+    page.recipe_tabs.blockSignals(False)
