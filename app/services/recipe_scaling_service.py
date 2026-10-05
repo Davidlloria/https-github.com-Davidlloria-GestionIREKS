@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
 
 from app.models import Receta, RecetaLinea
@@ -47,7 +48,8 @@ class RecipeScalingService:
         factor = float(target_value_g) / float(source_value)
 
         for linea in scaled_lineas:
-            linea.cantidad_base_g = float(linea.cantidad_base_g or 0.0) * factor
+            quantity = Decimal(str(linea.cantidad_base_g or 0.0)) * Decimal(str(target_value_g)) / Decimal(str(source_value))
+            linea.cantidad_base_g = float(quantity.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
             if str(getattr(linea, "tipo_linea", "") or "").strip().lower() == "proceso":
                 linea.cantidad_origen_g = linea.cantidad_base_g
 

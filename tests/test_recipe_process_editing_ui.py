@@ -166,3 +166,12 @@ def test_recipe_ribbon_fits_customer_and_ireks_tabs(page):
         for left, right in zip(visible, visible[1:]):
             assert left.geometry().right() < right.geometry().left()
     page.recipe_tabs.blockSignals(False)
+
+
+def test_integer_quantities_display_without_decimals(page):
+    page._render_lines([
+        RecetaLinea(receta_id=0, nombre_mostrado="Harina", cantidad_base_g=152),
+        RecetaLinea(receta_id=0, nombre_mostrado="Sal", cantidad_base_g=1.25),
+    ])
+    assert page.lines_table.item(0, page.COL_CANTIDAD).text() == "152 g"
+    assert page.lines_table.item(1, page.COL_CANTIDAD).text() == "1,25 g"

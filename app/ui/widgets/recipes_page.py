@@ -3293,7 +3293,7 @@ class RecipesPage(QWidget):
         values = [
             linea.nombre_mostrado or "",
             linea.notas or "",
-            f"{self._format_number(linea.cantidad_base_g)} g" if has_content else "",
+            f"{self._format_number(linea.cantidad_base_g, 0 if float(linea.cantidad_base_g).is_integer() else 2)} g" if has_content else "",
             f"{self._format_number(linea.porcentaje_panadero, 2)} %" if has_content else "",
             process_text if has_content else "",
         ]
@@ -3462,7 +3462,7 @@ class RecipesPage(QWidget):
                 ingredient = f"{ingredient} ({line.notas})"
             values = [
                 ingredient,
-                f"{self._format_number(line.cantidad_base_g)} g",
+                f"{self._format_number(line.cantidad_base_g, 0 if float(line.cantidad_base_g).is_integer() else 2)} g",
                 f"{self._format_number(line.porcentaje_panadero, 2)} %",
                 f"{self._format_number(base_eur_kg, 2)} €" if base_eur_kg > 0 else "",
                 promotion_text,
