@@ -1650,7 +1650,17 @@ class RecipesPage(QWidget):
         lines_layout.setSpacing(5)
         lines_title = QLabel("Líneas de receta")
         lines_title.setStyleSheet("background: transparent; border: none;")
-        lines_layout.addWidget(lines_title)
+        lines_toolbar = QHBoxLayout()
+        lines_toolbar.addWidget(lines_title)
+        lines_toolbar.addStretch()
+        self.move_line_up_btn = QPushButton("↑ Subir")
+        self.move_line_down_btn = QPushButton("↓ Bajar")
+        for button, direction in ((self.move_line_up_btn, -1), (self.move_line_down_btn, 1)):
+            button.setToolTip("Mover la línea dentro del proceso activo")
+            button.setEnabled(False)
+            button.clicked.connect(lambda checked=False, step=direction: self._move_line(step))
+            lines_toolbar.addWidget(button)
+        lines_layout.addLayout(lines_toolbar)
 
         self.lines_table = QTableWidget(0, 5)
         self.lines_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -1697,6 +1707,7 @@ class RecipesPage(QWidget):
         self.lines_table.setMinimumHeight(lines_table_height)
         self.lines_table.itemDoubleClicked.connect(self._on_line_double_click)
         self.lines_table.itemChanged.connect(self._on_line_item_changed)
+        self.lines_table.itemSelectionChanged.connect(self._update_line_move_buttons)
         self.lines_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.lines_table.customContextMenuRequested.connect(self._show_lines_context_menu)
         lines_layout.addWidget(self.lines_table, 1)
@@ -2804,6 +2815,7 @@ class RecipesPage(QWidget):
             proc = _normalize_process_name(getattr(line, "proceso_nombre", ""))
             self.lines_table.setRowHidden(row, proc != active)
         self._refresh_recipe_lines_totals()
+        self._update_line_move_buttons()
 
     def _add_process(self) -> None:
         raw, ok = QInputDialog.getText(self, "Nuevo proceso", "Nombre del proceso")
@@ -3237,6 +3249,48 @@ class RecipesPage(QWidget):
         self._ensure_min_line_rows()
         self._on_lines_changed()
 
+    def _line_move_target(self, direction: int) -> int | None:
+        selected = self.lines_table.selectionModel().selectedRows()
+        if not selected or direction not in (-1, 1):
+            return None
+        row = selected[0].row()
+        active = self._current_active_process()
+        rows = []
+        for candidate in range(self.lines_table.rowCount()):
+            line = self._line_from_row(candidate)
+            if (line.nombre_mostrado or line.notas or line.cantidad_base_g) and line.proceso_nombre == active:
+                rows.append(candidate)
+        if row not in rows:
+            return None
+        target = rows.index(row) + direction
+        return rows[target] if 0 <= target < len(rows) else None
+
+    def _update_line_move_buttons(self) -> None:
+        self.move_line_up_btn.setEnabled(self._line_move_target(-1) is not None)
+        self.move_line_down_btn.setEnabled(self._line_move_target(1) is not None)
+
+    def _move_line(self, direction: int) -> None:
+        # Commit an open cell editor before taking its items out of the table.
+        button = self.move_line_up_btn if direction == -1 else self.move_line_down_btn
+        button.setFocus()
+        target = self._line_move_target(direction)
+        if target is None:
+            return
+        row = self.lines_table.selectionModel().selectedRows()[0].row()
+        was_blocked = self.lines_table.blockSignals(True)
+        try:
+            for column in range(self.lines_table.columnCount()):
+                source_item = self.lines_table.takeItem(row, column)
+                target_item = self.lines_table.takeItem(target, column)
+                self.lines_table.setItem(row, column, target_item)
+                self.lines_table.setItem(target, column, source_item)
+            self.lines_table.selectRow(target)
+        finally:
+            self.lines_table.blockSignals(was_blocked)
+        self._on_lines_changed()
+        self._apply_process_filter()
+        self.lines_table.scrollToItem(self.lines_table.item(target, self.COL_INGREDIENTE))
+
     def _show_lines_context_menu(self, position) -> None:
         index = self.lines_table.indexAt(position)
         if index.isValid():
@@ -3491,6 +3545,7 @@ class RecipesPage(QWidget):
         self._set_issues_text("\n".join(self.current_issues))
 
     def _on_lines_changed(self) -> None:
+        self._update_line_move_buttons()
         self._auto_recalculate_summary()
         self._refresh_escandallo_table()
         self._schedule_autosave()

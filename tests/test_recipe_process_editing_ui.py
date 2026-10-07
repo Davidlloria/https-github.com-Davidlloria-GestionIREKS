@@ -175,3 +175,75 @@ def test_integer_quantities_display_without_decimals(page):
     ])
     assert page.lines_table.item(0, page.COL_CANTIDAD).text() == "152 g"
     assert page.lines_table.item(1, page.COL_CANTIDAD).text() == "1,25 g"
+
+def test_move_line_skips_other_processes_and_empty_rows(page, monkeypatch):
+    page._render_lines([
+        RecetaLinea(receta_id=0, nombre_mostrado="Pasas", proceso_nombre="Frutas", cantidad_base_g=125, notas="Remojadas", precio_kg_snapshot=7),
+        RecetaLinea(receta_id=0, nombre_mostrado="Harina", proceso_nombre="Masa final", cantidad_base_g=500),
+        RecetaLinea(receta_id=0),
+        RecetaLinea(receta_id=0, nombre_mostrado="Naranja", proceso_nombre="Frutas", cantidad_base_g=75),
+    ])
+    before = [page._line_from_row(i).model_dump(exclude={"orden", "porcentaje_panadero"}) for i in range(4)]
+    saves = []
+    monkeypatch.setattr(page, "_schedule_autosave", lambda: saves.append(True))
+    page.lines_table.selectRow(0)
+    assert not page.move_line_up_btn.isEnabled()
+    assert page.move_line_down_btn.isEnabled()
+    page.move_line_down_btn.click()
+    assert page.lines_table.selectionModel().selectedRows()[0].row() == 3
+    assert [page._line_from_row(i).model_dump(exclude={"orden", "porcentaje_panadero"}) for i in range(4)] == [before[3], before[1], before[2], before[0]]
+    assert page.move_line_up_btn.isEnabled()
+    assert not page.move_line_down_btn.isEnabled()
+    assert saves == [True]
+    page.move_line_up_btn.click()
+    assert page._line_from_row(0).nombre_mostrado == "Pasas"
+    assert saves == [True, True]
+    page.lines_table.selectRow(2)
+    assert not page.move_line_up_btn.isEnabled() and not page.move_line_down_btn.isEnabled()
+    page.lines_table.clearSelection()
+    page._move_line(1)
+    assert saves == [True, True]
+
+
+def test_moved_lines_persist_order_in_repository(page):
+    from sqlmodel import SQLModel, Session, create_engine
+    from app.models import Receta
+    from app.repositories.recipe_repository import RecipeRepository
+    page._render_lines([
+        RecetaLinea(receta_id=0, nombre_mostrado="Pasas", proceso_nombre="Frutas", cantidad_base_g=125),
+        RecetaLinea(receta_id=0, nombre_mostrado="Naranja", proceso_nombre="Frutas", cantidad_base_g=75),
+    ])
+    page.lines_table.selectRow(0)
+    page.move_line_down_btn.click()
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        repo = RecipeRepository()
+        saved = repo.save(session, Receta(nombre="Orden de prueba", codigo_receta="TEST-ORDEN"), page._build_lines())
+        loaded = repo.get(session, saved.receta.id)
+        page._render_lines(loaded.lineas)
+    assert [(line.nombre_mostrado, line.orden) for line in page._build_lines()] == [("Naranja", 1), ("Pasas", 2)]
+    engine.dispose()
+
+def test_move_process_line_commits_pending_note(page):
+    from PySide6.QtWidgets import QLineEdit
+    page._render_lines([
+        RecetaLinea(receta_id=0, nombre_mostrado="Proceso: Masa final", proceso_nombre="Frutas", tipo_linea="proceso", tipo_origen="process", proceso_origen_nombre="Masa final", cantidad_base_g=100, cantidad_origen_g=100),
+        RecetaLinea(receta_id=0, nombre_mostrado="Pasas", proceso_nombre="Frutas", cantidad_base_g=50),
+    ])
+    page.show()
+    QApplication.processEvents()
+    page.lines_table.selectRow(0)
+    page.lines_table.editItem(page.lines_table.item(0, page.COL_NOTA))
+    QApplication.processEvents()
+    editor = page.lines_table.findChild(QLineEdit)
+    assert editor is not None
+    editor.setText("Nota pendiente")
+    page.move_line_down_btn.click()
+    QApplication.processEvents()
+    line = page._line_from_row(1)
+    assert line.notas == "Nota pendiente"
+    assert line.tipo_linea == "proceso" and line.proceso_origen_nombre == "Masa final"
+    assert line.cantidad_base_g == line.cantidad_origen_g == 100
+    page.active_process_combo.setCurrentText("Masa final")
+    assert not page.move_line_up_btn.isEnabled() and not page.move_line_down_btn.isEnabled()
