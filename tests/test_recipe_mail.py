@@ -20,57 +20,62 @@ def test_recipients_deduplicate_and_validate():
         normalize_recipients(["a@example.com\r\nBcc: hidden@example.com"])
 
 
-@pytest.mark.parametrize("failure", [None, "attach", "save", "display", "connect"])
-def test_outlook_embeds_exact_pdf_and_never_sends(tmp_path, monkeypatch, failure):
-    import tempfile
-    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
-    calls, paths = [], []
+def test_new_outlook_opens_mime_draft_with_exact_attachment(tmp_path):
+    from email.parser import BytesParser
+    from email.policy import default
     content = b"%PDF-exact-preview-bytes"
-    class Mail:
-        def __init__(self):
-            self.Attachments = SimpleNamespace(Add=self.attach)
-        def attach(self, path, attachment_type):
-            assert attachment_type == 1
-            paths.append(Path(path))
-            assert paths[0].read_bytes() == content
-            calls.append("attach")
-            if failure == "attach":
-                raise RuntimeError("Attachment error")
-        def Save(self):
-            assert paths[0].exists()
-            calls.append("save")
-            if failure == "save":
-                raise RuntimeError("Save error")
-        def Display(self):
-            assert calls == ["attach", "save"]
-            calls.append("display")
-            if failure == "display":
-                raise RuntimeError("Display error")
-        def Send(self):
-            pytest.fail("Automatic sending is forbidden")
-    mail = Mail()
-    def dispatch(name):
-        assert name == "Outlook.Application"
-        if failure == "connect":
-            raise RuntimeError("Unavailable")
-        return SimpleNamespace(CreateItem=lambda kind: mail if kind == 0 else pytest.fail("Wrong item"))
-    service = RecipeMailService(dispatch)
-    args = dict(pdf_content=content, recipe_name='Pan / malta', recipients=["one@example.com", "ONE@example.com"], subject="Receta: Pan", body="Texto editable")
-    if failure:
-        with pytest.raises(RuntimeError):
-            service.open_draft(**args)
-    else:
-        service.open_draft(**args)
-        assert calls == ["attach", "save", "display"]
-        assert mail.To == "one@example.com" and mail.Subject == args["subject"] and mail.Body == args["body"]
-        assert paths[0].name == "Receta-Pan _ malta.pdf"
-    assert all(not path.exists() for path in paths)
+    calls = []
+    executable = tmp_path / "WindowsApps" / "olk.exe"
+    def launch(args, **kwargs):
+        calls.append((args, kwargs))
+    service = RecipeMailService(launcher=launch, executable_resolver=lambda: executable, draft_dir=tmp_path)
+    path = service.open_draft(pdf_content=content, recipe_name="Pan / malta", recipients=["one@example.com", "ONE@example.com"], subject="Receta: piñón", body="Texto editable\nCon ñ y acentos")
+    assert calls == [([str(executable), str(path)], {"shell": False})]
+    assert path.exists()  # Outlook loads it asynchronously after the preview closes.
+    message = BytesParser(policy=default).parsebytes(path.read_bytes())
+    assert message["X-Unsent"] == "1"
+    assert str(message["To"]) == "one@example.com"
+    assert str(message["Subject"]) == "Receta: piñón"
+    assert "Con ñ y acentos" in message.get_body(preferencelist=("plain",)).get_content()
+    assert "Con ñ y acentos" in message.get_body(preferencelist=("html",)).get_content()
+    attachments = list(message.iter_attachments())
+    assert len(attachments) == 1
+    assert attachments[0].get_payload(decode=True) == content
+    assert attachments[0].get_filename() == "Receta-Pan _ malta.pdf"
+
+
+def test_launch_failure_retains_recoverable_draft(tmp_path):
+    def fail(*args, **kwargs):
+        raise OSError("Cannot launch")
+    service = RecipeMailService(launcher=fail, executable_resolver=lambda: tmp_path / "olk.exe", draft_dir=tmp_path)
+    with pytest.raises(RuntimeError, match="No se pudo abrir el nuevo Outlook"):
+        service.open_draft(pdf_content=b"pdf", recipe_name="Pan", recipients=["one@example.com"], subject="Pan", body="Body")
+    assert len(list(tmp_path.glob("*.eml"))) == 1
 
 
 def test_no_recipient_does_not_start_outlook():
-    service = RecipeMailService(lambda _: pytest.fail("Must not start Outlook"))
+    service = RecipeMailService(executable_resolver=lambda: pytest.fail("Must not start Outlook"))
     with pytest.raises(ValueError):
         service.open_draft(pdf_content=b"pdf", recipe_name="Pan", recipients=[], subject="", body="")
+
+
+def test_resolver_only_uses_new_outlook_alias(tmp_path, monkeypatch):
+    from app.services.recipe_mail_service import find_new_outlook
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    alias = tmp_path / "Microsoft" / "WindowsApps" / "olk.exe"
+    alias.parent.mkdir(parents=True)
+    alias.touch()
+    assert find_new_outlook() == alias
+
+
+def test_missing_new_outlook_never_falls_back_to_classic(tmp_path, monkeypatch):
+    from app.services import recipe_mail_service as module
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    def fail(*args, **kwargs):
+        raise OSError("Not installed")
+    monkeypatch.setattr(module.subprocess, "run", fail)
+    with pytest.raises(RuntimeError, match="No se encontró el nuevo Outlook"):
+        module.find_new_outlook()
 
 
 @pytest.fixture(scope="module")

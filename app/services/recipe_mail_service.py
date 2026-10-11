@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+from email.message import EmailMessage
+from email.policy import SMTP
+from email.utils import formatdate, make_msgid
+from html import escape
+import os
 from pathlib import Path
 import re
+import subprocess
 import tempfile
 
 
@@ -21,44 +27,64 @@ def normalize_recipients(addresses: list[str]) -> list[str]:
     return result
 
 
-class RecipeMailService:
-    """Prepare a classic Outlook draft with an embedded attachment. Never send it."""
+def find_new_outlook() -> Path:
+    """Resolve only the new Outlook; never use the default mail client or COM."""
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        alias = Path(local_app_data) / "Microsoft" / "WindowsApps" / "olk.exe"
+        if alias.is_file():
+            return alias
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+             "(Get-AppxPackage Microsoft.OutlookForWindows).InstallLocation"],
+            capture_output=True, text=True, check=True, timeout=15,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        location = result.stdout.strip()
+        if location:
+            executable = Path(location) / "olk.exe"
+            if executable.is_file():
+                return executable
+    except (OSError, subprocess.SubprocessError):
+        pass
+    raise RuntimeError("No se encontró el nuevo Outlook. Instálalo o habilita su alias olk.exe. No se abrirá Outlook clásico.")
 
-    def __init__(self, dispatch=None):
-        self._dispatch = dispatch
+
+class RecipeMailService:
+    """Open a MIME draft explicitly in new Outlook, without sending it."""
+
+    def __init__(self, launcher=None, executable_resolver=None, draft_dir=None):
+        self._launcher = launcher or subprocess.Popen
+        self._executable_resolver = executable_resolver or find_new_outlook
+        self._draft_dir = Path(draft_dir) if draft_dir else Path(tempfile.gettempdir()) / "GestionIREKS-recipe-mail"
 
     def open_draft(self, *, pdf_content: bytes, recipe_name: str,
-                   recipients: list[str], subject: str, body: str) -> None:
+                   recipients: list[str], subject: str, body: str) -> Path:
         recipients = normalize_recipients(recipients)
         if not recipients:
             raise ValueError("Selecciona un contacto o introduce un destinatario.")
         if not pdf_content:
             raise ValueError("No hay un PDF disponible para adjuntar.")
-        try:
-            dispatch = self._dispatch
-            if dispatch is None:
-                import win32com.client
-                dispatch = win32com.client.Dispatch
-            outlook = dispatch("Outlook.Application")
-        except Exception as exc:
-            raise RuntimeError(
-                "No se pudo conectar con Outlook clásico. Comprueba que esté instalado "
-                "y tenga una cuenta configurada. Esta integración requiere Outlook clásico."
-            ) from exc
+        executable = self._executable_resolver()
         safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", recipe_name).strip(" .")[:100] or "receta"
+        message = EmailMessage(policy=SMTP)
+        message["X-Unsent"] = "1"
+        message["To"] = ", ".join(recipients)
+        message["Subject"] = subject.strip()
+        message["Date"] = formatdate(localtime=True)
+        message["Message-ID"] = make_msgid(domain="gestionireks.local")
+        message.set_content(body)
+        message.add_alternative("<html><body>" + escape(body).replace("\n", "<br>") + "</body></html>", subtype="html")
+        message.add_attachment(pdf_content, maintype="application", subtype="pdf", filename=f"Receta-{safe_name}.pdf")
+        self._draft_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=self._draft_dir, prefix="receta-", suffix=".eml", delete=False) as draft:
+            draft.write(message.as_bytes())
+            draft_path = Path(draft.name)
+        # New Outlook reads the file asynchronously. Retain it independently of
+        # the PDF preview lifetime; Windows/user temporary-file cleanup owns it.
         try:
-            with tempfile.TemporaryDirectory(prefix="gestionireks_recipe_mail_") as directory:
-                attachment = Path(directory) / f"Receta-{safe_name}.pdf"
-                attachment.write_bytes(pdf_content)
-                mail = outlook.CreateItem(0)
-                mail.To = "; ".join(recipients)
-                mail.Subject = subject.strip()
-                mail.Body = body
-                mail.Attachments.Add(str(attachment), 1)  # olByValue: embed, never link.
-                mail.Save()
-                mail.Display()
-        except Exception as exc:
-            raise RuntimeError(
-                "No se pudo preparar o abrir el correo en Outlook. No se ha enviado nada. "
-                "Revisa Borradores antes de volver a intentarlo; puedes guardar el PDF igualmente."
-            ) from exc
+            self._launcher([str(executable), str(draft_path)], shell=False)
+        except OSError as exc:
+            raise RuntimeError(f"No se pudo abrir el nuevo Outlook. El correo preparado está en {draft_path}. No se ha enviado nada.") from exc
+        return draft_path

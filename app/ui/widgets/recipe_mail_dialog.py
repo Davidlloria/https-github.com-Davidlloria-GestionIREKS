@@ -13,7 +13,7 @@ from app.services.recipe_mail_service import normalize_recipients
 class RecipeMailDialog(QDialog):
     def __init__(self, parent=None, *, customer_id: str, recipe_name: str, contact_service=None):
         super().__init__(parent)
-        self.setWindowTitle("Enviar receta por Outlook")
+        self.setWindowTitle("Enviar receta por el nuevo Outlook")
         self.resize(650, 500)
         self.recipients: list[str] = []
         layout = QVBoxLayout(self)
@@ -68,7 +68,7 @@ class RecipeMailDialog(QDialog):
         self.body = QPlainTextEdit("Hola,\n\nAdjunto la receta en PDF con los documentos seleccionados.\n\nUn saludo.")
         layout.addWidget(self.body)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Abrir en Outlook")
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Abrir en nuevo Outlook")
         buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)

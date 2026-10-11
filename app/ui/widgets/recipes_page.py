@@ -982,7 +982,7 @@ class RecipePdfPreviewDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Save).setText("Guardar PDF")
         buttons.button(QDialogButtonBox.StandardButton.Save).setEnabled(False)
-        self.outlook_button = buttons.addButton("Enviar por Outlook…", QDialogButtonBox.ButtonRole.ActionRole)
+        self.outlook_button = buttons.addButton("Enviar por nuevo Outlook…", QDialogButtonBox.ButtonRole.ActionRole)
         self.outlook_button.setEnabled(False)
         self.outlook_button.clicked.connect(self._open_outlook_draft)
         buttons.accepted.connect(self.accept)
