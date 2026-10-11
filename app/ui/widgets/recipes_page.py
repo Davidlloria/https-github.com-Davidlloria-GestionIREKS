@@ -58,6 +58,8 @@ from app.services.recipe_document_import_service import RecipeDocumentDraft, Rec
 from app.services.recipe_image_storage_service import resolve_recipe_image_path, store_recipe_image
 from app.services.recipe_service import RecipeService
 from app.services.recipe_documents_service import combine_recipe_pdf, save_pdf_bytes
+from app.services.recipe_mail_service import RecipeMailService
+from app.ui.widgets.recipe_mail_dialog import RecipeMailDialog
 from app.ui.widgets.recipe_documents_widget import RecipeDocumentsWidget
 from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
 from app.ui.widgets.nutrition_card import NutritionCard, NutritionRowData
@@ -958,9 +960,13 @@ class RecipePdfPreviewDialog(QDialog):
         include_dreidoppel: bool = False,
         selected_image_path: str = "",
         technical_sheets: list[Path] | None = None,
+        customer_id: str = "",
+        recipe_name: str = "Receta",
     ) -> None:
         super().__init__(parent)
         self._preview_path: Path | None = None
+        self._mail_customer_id = customer_id
+        self._mail_recipe_name = recipe_name
         self.setWindowTitle(f"PDF {'mínimo' if layout_mode == 'minimal' else layout_mode} - Vista previa")
         self.resize(920, 720)
 
@@ -976,6 +982,9 @@ class RecipePdfPreviewDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Save).setText("Guardar PDF")
         buttons.button(QDialogButtonBox.StandardButton.Save).setEnabled(False)
+        self.outlook_button = buttons.addButton("Enviar por Outlook…", QDialogButtonBox.ButtonRole.ActionRole)
+        self.outlook_button.setEnabled(False)
+        self.outlook_button.clicked.connect(self._open_outlook_draft)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -1013,6 +1022,24 @@ class RecipePdfPreviewDialog(QDialog):
             QMessageBox.critical(self, "Vista previa PDF", "No se pudo cargar la vista previa generada.")
             return
         buttons.button(QDialogButtonBox.StandardButton.Save).setEnabled(True)
+        self.outlook_button.setEnabled(True)
+
+    def _open_outlook_draft(self) -> None:
+        dialog = RecipeMailDialog(self, customer_id=self._mail_customer_id, recipe_name=self._mail_recipe_name)
+        if not dialog.exec():
+            return
+        self.outlook_button.setEnabled(False)
+        try:
+            RecipeMailService().open_draft(
+                pdf_content=bytes(self._preview_buffer.data()),
+                recipe_name=self._mail_recipe_name,
+                recipients=dialog.recipients,
+                subject=dialog.subject.text(), body=dialog.body.toPlainText(),
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "Outlook", str(exc))
+        finally:
+            self.outlook_button.setEnabled(True)
 
     def cleanup_preview(self) -> None:
         self.pdf_view.setDocument(None)
@@ -4172,26 +4199,27 @@ class RecipesPage(QWidget):
             if layout_mode == "original" else {}
         )
         combined_pdf = None
-        if layout_mode in ("minimal", "original") or technical_sheets:
-            preview_dialog = RecipePdfPreviewDialog(
-                self.pdf_service,
-                self.current_recipe_id,
-                include_escandallo,
-                include_nutrition,
-                include_baker_percentage,
-                include_images,
-                self,
-                layout_mode=layout_mode,
-                technical_sheets=technical_sheets,
-                **original_options,
-            )
-            try:
-                if not preview_dialog.exec():
-                    return
-                if technical_sheets:
-                    combined_pdf = preview_dialog._preview_path.read_bytes()
-            finally:
-                preview_dialog.cleanup_preview()
+        preview_dialog = RecipePdfPreviewDialog(
+            self.pdf_service,
+            self.current_recipe_id,
+            include_escandallo,
+            include_nutrition,
+            include_baker_percentage,
+            include_images,
+            self,
+            layout_mode=layout_mode,
+            technical_sheets=technical_sheets,
+            customer_id=str(getattr(aggregate.receta, "cliente_id", "") or "") if aggregate else "",
+            recipe_name=self.nombre_input.text().strip() or "Receta",
+            **original_options,
+        )
+        try:
+            if not preview_dialog.exec():
+                return
+            if technical_sheets:
+                combined_pdf = preview_dialog._preview_path.read_bytes()
+        finally:
+            preview_dialog.cleanup_preview()
 
         default_name = _default_recipe_pdf_filename(
             self.nombre_input.text().strip() or f"receta_{self.current_recipe_id}",
