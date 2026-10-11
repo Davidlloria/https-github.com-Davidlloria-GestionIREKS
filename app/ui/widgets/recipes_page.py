@@ -1039,6 +1039,7 @@ class RecipePdfPreviewDialog(QDialog):
                 recipe_name=self._mail_recipe_name,
                 recipients=dialog.recipients,
                 subject=dialog.subject.text(), body=dialog.body.toPlainText(),
+                include_signature=dialog.include_signature.isChecked(),
             )
         except Exception as exc:
             QMessageBox.warning(self, "Outlook", str(exc))

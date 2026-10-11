@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QDialog, QDialogButtonBox, QHeaderView, QLabel,
+    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QHeaderView, QLabel,
     QLineEdit, QMessageBox, QPlainTextEdit, QTableWidget, QTableWidgetItem, QVBoxLayout,
 )
 
 from app.services.customer_contact_flow_service import CustomerContactFlowService
 from app.services.recipe_mail_service import normalize_recipients
+from app.core.config import DATA_DIR
 
 
 class RecipeMailDialog(QDialog):
@@ -68,6 +69,12 @@ class RecipeMailDialog(QDialog):
         attachment_text = "Adjunto la receta y las fichas técnicas relacionadas" if include_technical_sheets else "Adjunto la receta"
         self.body = QPlainTextEdit(f"Hola,\n\n{attachment_text}.\n\nUn saludo.")
         layout.addWidget(self.body)
+        self.include_signature = QCheckBox("Incluir firma guardada de Outlook")
+        signature_available = (DATA_DIR / "recipe_mail_signature.json").is_file()
+        self.include_signature.setChecked(signature_available)
+        self.include_signature.setEnabled(signature_available)
+        self.include_signature.setToolTip("Se añade al abrir el correo. Es una copia local; los cambios en Outlook no se sincronizan automáticamente.")
+        layout.addWidget(self.include_signature)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Abrir en nuevo Outlook")
         buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")

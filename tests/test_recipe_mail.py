@@ -12,6 +12,57 @@ from app.ui.widgets.recipe_mail_dialog import RecipeMailDialog
 from app.ui.widgets.recipes_page import RecipePdfExportDialog, RecipePdfPreviewDialog, RecipesPage
 
 
+@pytest.fixture(autouse=True)
+def isolate_signature(tmp_path, monkeypatch):
+    from app.services import recipe_mail_service
+    monkeypatch.setattr(recipe_mail_service, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(recipe_mail_dialog, "DATA_DIR", tmp_path)
+
+
+@pytest.mark.parametrize("include", [True, False])
+def test_signature_text_html_and_inline_image_keep_pdf_unchanged(tmp_path, include):
+    import base64
+    import json
+    from email.parser import BytesParser
+    from email.policy import default
+    signature = {"text": "Firma de prueba: José", "html": '<p>Firma de prueba: José</p><img src="cid:banner@test">',
+                 "images": [{"cid": "banner@test", "subtype": "png", "data": base64.b64encode(b"test-image").decode()}]}
+    (tmp_path / "recipe_mail_signature.json").write_text(json.dumps(signature), encoding="utf-8")
+    service = RecipeMailService(launcher=lambda *a, **kw: None, executable_resolver=lambda: tmp_path / "olk.exe", draft_dir=tmp_path)
+    path = service.open_draft(pdf_content=b"unchanged-pdf", recipe_name="Pan", recipients=["test@example.invalid"], subject="Test", body="Adjunto la receta.", include_signature=include)
+    message = BytesParser(policy=default).parsebytes(path.read_bytes())
+    plain = message.get_body(preferencelist=("plain",)).get_content()
+    html = message.get_body(preferencelist=("html",)).get_content()
+    assert ("Firma de prueba: José" in plain) is include
+    assert ("cid:banner@test" in html) is include
+    images = [part for part in message.walk() if part.get_content_maintype() == "image"]
+    assert len(images) == int(include)
+    if include:
+        assert images[0]["Content-ID"] == "<banner@test>"
+        assert images[0].get_content_disposition() == "inline"
+        assert images[0].get_payload(decode=True) == b"test-image"
+    attachments = list(message.iter_attachments())
+    assert len(attachments) == 1
+    assert attachments[0].get_payload(decode=True) == b"unchanged-pdf"
+
+
+def test_invalid_signature_stops_draft_before_launch(tmp_path):
+    (tmp_path / "recipe_mail_signature.json").write_text('{"html": false}', encoding="utf-8")
+    service = RecipeMailService(launcher=lambda *a, **kw: pytest.fail("Must not launch"), executable_resolver=lambda: tmp_path / "olk.exe", draft_dir=tmp_path)
+    with pytest.raises(ValueError, match="firma guardada"):
+        service.open_draft(pdf_content=b"pdf", recipe_name="Pan", recipients=["test@example.invalid"], subject="Test", body="Body")
+    assert not list(tmp_path.glob("*.eml"))
+
+
+def test_signature_checkbox_requires_local_snapshot(application, tmp_path):
+    dialog = RecipeMailDialog(customer_id="", recipe_name="Pan")
+    assert not dialog.include_signature.isEnabled()
+    assert not dialog.include_signature.isChecked()
+    (tmp_path / "recipe_mail_signature.json").write_text('{}', encoding="utf-8")
+    dialog = RecipeMailDialog(customer_id="", recipe_name="Pan")
+    assert dialog.include_signature.isEnabled() and dialog.include_signature.isChecked()
+
+
 def test_recipients_deduplicate_and_validate():
     assert normalize_recipients([" A@example.com; b@example.com ", "a@example.com"]) == ["A@example.com", "b@example.com"]
     with pytest.raises(ValueError):
@@ -28,7 +79,7 @@ def test_new_outlook_opens_mime_draft_with_exact_attachment(tmp_path):
     executable = tmp_path / "WindowsApps" / "olk.exe"
     def launch(args, **kwargs):
         calls.append((args, kwargs))
-    service = RecipeMailService(launcher=launch, executable_resolver=lambda: executable, draft_dir=tmp_path)
+    service = RecipeMailService(launcher=launch, executable_resolver=lambda: executable, draft_dir=tmp_path, signature_path=tmp_path / "absent.json")
     path = service.open_draft(pdf_content=content, recipe_name="Pan / malta", recipients=["one@example.com", "ONE@example.com"], subject="Receta: piñón", body="Texto editable\nCon ñ y acentos")
     assert calls == [([str(executable), str(path)], {"shell": False})]
     assert path.exists()  # Outlook loads it asynchronously after the preview closes.
@@ -143,7 +194,7 @@ def test_preview_mail_uses_loaded_combined_pdf_without_closing_preview(applicati
     requested, drafts, warnings = [], [], []
     def mail_dialog(parent, **kwargs):
         requested.append(kwargs)
-        return SimpleNamespace(exec=lambda: not cancel, recipients=["ana@example.com"], subject=QLineEdit("Asunto editado"), body=SimpleNamespace(toPlainText=lambda: "Texto editado"))
+        return SimpleNamespace(exec=lambda: not cancel, recipients=["ana@example.com"], subject=QLineEdit("Asunto editado"), body=SimpleNamespace(toPlainText=lambda: "Texto editado"), include_signature=SimpleNamespace(isChecked=lambda: True))
     def draft(**kwargs):
         drafts.append(kwargs)
         if fail:
@@ -158,6 +209,7 @@ def test_preview_mail_uses_loaded_combined_pdf_without_closing_preview(applicati
     if not cancel:
         assert drafts[0]["pdf_content"] == original
         assert drafts[0]["subject"] == "Asunto editado"
+        assert drafts[0]["include_signature"] is True
     assert bool(warnings) == fail
     assert dialog.outlook_button.isEnabled()
     assert dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Save).isEnabled()
