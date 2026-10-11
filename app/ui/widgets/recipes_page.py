@@ -57,6 +57,8 @@ from app.services.recipe_active_flow_service import RecipeActiveFlowService, Rec
 from app.services.recipe_document_import_service import RecipeDocumentDraft, RecipeDocumentImportService
 from app.services.recipe_image_storage_service import resolve_recipe_image_path, store_recipe_image
 from app.services.recipe_service import RecipeService
+from app.services.recipe_documents_service import combine_recipe_pdf, save_pdf_bytes
+from app.ui.widgets.recipe_documents_widget import RecipeDocumentsWidget
 from app.ui.widgets.action_ribbon import create_standard_ribbon_button, create_standard_top_ribbon
 from app.ui.widgets.nutrition_card import NutritionCard, NutritionRowData
 from app.ui.widgets.recipe_document_import_dialog import RecipeDocumentImportDialog
@@ -882,6 +884,9 @@ class RecipePdfExportDialog(QDialog):
         self.original_image_combo.currentIndexChanged.connect(self._update_original_image)
         self._update_original_image()
         layout.addWidget(self.original_options_group)
+        self.technical_sheets_check = QCheckBox("Incluir fichas técnicas seleccionadas en Documentos")
+        self.technical_sheets_check.setChecked(True)
+        layout.addWidget(self.technical_sheets_check)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Exportar")
@@ -913,6 +918,9 @@ class RecipePdfExportDialog(QDialog):
         if self.minimal_radio.isChecked():
             return "minimal"
         return "extended"
+
+    def include_technical_sheets(self) -> bool:
+        return self.technical_sheets_check.isChecked()
 
     def include_escandallo(self) -> bool:
         return self.escandallo_si.isChecked()
@@ -949,10 +957,11 @@ class RecipePdfPreviewDialog(QDialog):
         layout_mode: str = "minimal",
         include_dreidoppel: bool = False,
         selected_image_path: str = "",
+        technical_sheets: list[Path] | None = None,
     ) -> None:
         super().__init__(parent)
         self._preview_path: Path | None = None
-        self.setWindowTitle(f"PDF {'original' if layout_mode == 'original' else 'mínimo'} - Vista previa")
+        self.setWindowTitle(f"PDF {'mínimo' if layout_mode == 'minimal' else layout_mode} - Vista previa")
         self.resize(920, 720)
 
         layout = QVBoxLayout(self)
@@ -988,6 +997,8 @@ class RecipePdfPreviewDialog(QDialog):
                 include_images=include_images,
                 **original_options,
             )
+            if technical_sheets:
+                self._preview_path.write_bytes(combine_recipe_pdf(self._preview_path, technical_sheets))
         except Exception as exc:
             QMessageBox.critical(self, "Vista previa PDF", f"No se pudo generar la vista previa:\n{exc}")
             return
@@ -2202,6 +2213,8 @@ class RecipesPage(QWidget):
         separator.setFrameShadow(QFrame.Shadow.Plain)
         separator.setStyleSheet("color: #D7DEE8;")
         self.editor_tabs.addTab(imagenes_tab, "Imagenes")
+        self.documents_tab = RecipeDocumentsWidget(self)
+        self.editor_tabs.addTab(self.documents_tab, "Documentos")
         self.editor_tabs.currentChanged.connect(self._on_editor_tab_changed)
 
         editor_container = QWidget()
@@ -2756,7 +2769,9 @@ class RecipesPage(QWidget):
 
         self.recipe_process_row.setEnabled(process_enabled)
         self.scale_btn.setEnabled(is_recipe_or_escandallo)
-        self.recipe_pdf_btn.setEnabled(exports_enabled)
+        self.recipe_pdf_btn.setEnabled(exports_enabled or index == 5)
+        if index == 5:
+            self.documents_tab.refresh(self.current_recipe_id, self._build_lines())
         self.recipe_excel_btn.setEnabled(exports_enabled)
         self.load_base_btn.setVisible(customer_tab_active)
         self.load_base_btn.setEnabled(customer_tab_active and is_recipe_or_escandallo)
@@ -3545,6 +3560,8 @@ class RecipesPage(QWidget):
         self._set_issues_text("\n".join(self.current_issues))
 
     def _on_lines_changed(self) -> None:
+        if hasattr(self, "documents_tab") and self.editor_tabs.currentIndex() == 5:
+            self.documents_tab.refresh(self.current_recipe_id, self._build_lines())
         self._update_line_move_buttons()
         self._auto_recalculate_summary()
         self._refresh_escandallo_table()
@@ -3836,6 +3853,8 @@ class RecipesPage(QWidget):
         self._ensure_min_line_rows()
         self._apply_process_filter()
         self._refresh_escandallo_table()
+        if hasattr(self, "documents_tab") and self.editor_tabs.currentIndex() == 5:
+            self.documents_tab.refresh(self.current_recipe_id, lineas)
 
     def _ensure_min_line_rows(self) -> None:
         while self.lines_table.rowCount() < self.MIN_LINE_ROWS:
@@ -4094,6 +4113,25 @@ class RecipesPage(QWidget):
         QMessageBox.information(self, "Recetas", "Impresion se implementa en Fase 3.")
 
     def _export_pdf(self) -> None:
+        # Persist pending cell edits and stop if validation/saving fails; both the
+        # recipe PDF and its documents must refer to the same saved ingredients.
+        if hasattr(self, "documents_tab"):
+            self.recipe_pdf_btn.setFocus()
+            if self._document_import_pending:
+                QMessageBox.warning(self, "Recetas", "Guarda la receta importada antes de exportar.")
+                return
+            self._autosave_timer.stop()
+            result = self.recipe_active_flow_service.save_recipe(
+                self._build_recipe_payload(), self._build_lines(),
+                selected_cliente_id=self._selected_cliente_id(),
+                recipe_tab_index=self.recipe_tabs.currentIndex(),
+            )
+            if result.status != "saved":
+                QMessageBox.warning(self, "Recetas", f"No se pudo guardar antes de exportar: {result.message}")
+                return
+            if getattr(self, "current_recipe_id", None) is None and self.documents_tab.recipe_key is None:
+                self.documents_tab.recipe_key = result.saved_recipe_id
+            self.current_recipe_id = result.saved_recipe_id
         if not self.current_recipe_id:
             QMessageBox.warning(self, "Recetas", "Selecciona y guarda una receta antes de exportar.")
             return
@@ -4103,9 +4141,24 @@ class RecipesPage(QWidget):
             _recipe_image_gallery_from_payload(_json_to_string_dict(aggregate.receta.parametros_elaboracion_json))
             if aggregate is not None else []
         )
+        if hasattr(self, "documents_tab"):
+            if aggregate is None:
+                QMessageBox.warning(self, "Recetas", "No se pudo recuperar la receta guardada.")
+                return
+            self.documents_tab.refresh(self.current_recipe_id, aggregate.lineas)
         export_dialog = RecipePdfExportDialog(self, images_gallery=images_gallery)
         if not export_dialog.exec():
             return
+        technical_sheets = []
+        if export_dialog.include_technical_sheets() and hasattr(self, "documents_tab"):
+            issues = self.documents_tab.issues()
+            if issues:
+                QMessageBox.warning(self, "Fichas técnicas", "No se puede completar la exportación con fichas:\n" + "\n".join(issues) + "\nRevisa Documentos o desmarca Incluir fichas técnicas para exportar solo la receta.")
+                return
+            technical_sheets = self.documents_tab.selected_paths()
+            if self.documents_tab.documents and not technical_sheets:
+                QMessageBox.warning(self, "Fichas técnicas", "Selecciona al menos una ficha en Documentos o desmarca Incluir fichas técnicas.")
+                return
         layout_mode = export_dialog.layout_mode()
         include_escandallo = layout_mode == "minimal" and export_dialog.include_escandallo()
         include_nutrition = layout_mode == "minimal" and export_dialog.include_nutrition()
@@ -4118,7 +4171,8 @@ class RecipesPage(QWidget):
             }
             if layout_mode == "original" else {}
         )
-        if layout_mode in ("minimal", "original"):
+        combined_pdf = None
+        if layout_mode in ("minimal", "original") or technical_sheets:
             preview_dialog = RecipePdfPreviewDialog(
                 self.pdf_service,
                 self.current_recipe_id,
@@ -4128,11 +4182,14 @@ class RecipesPage(QWidget):
                 include_images,
                 self,
                 layout_mode=layout_mode,
+                technical_sheets=technical_sheets,
                 **original_options,
             )
             try:
                 if not preview_dialog.exec():
                     return
+                if technical_sheets:
+                    combined_pdf = preview_dialog._preview_path.read_bytes()
             finally:
                 preview_dialog.cleanup_preview()
 
@@ -4150,16 +4207,19 @@ class RecipesPage(QWidget):
             return
 
         try:
-            self.pdf_service.export_recipe_to_pdf(
-                self.current_recipe_id,
-                Path(output_path),
-                layout_mode=layout_mode,
-                include_escandallo=include_escandallo,
-                include_nutrition=include_nutrition,
-                include_baker_percentage=include_baker_percentage,
-                include_images=include_images,
-                **original_options,
-            )
+            if combined_pdf is not None:
+                save_pdf_bytes(Path(output_path), combined_pdf)
+            else:
+                self.pdf_service.export_recipe_to_pdf(
+                    self.current_recipe_id,
+                    Path(output_path),
+                    layout_mode=layout_mode,
+                    include_escandallo=include_escandallo,
+                    include_nutrition=include_nutrition,
+                    include_baker_percentage=include_baker_percentage,
+                    include_images=include_images,
+                    **original_options,
+                )
         except Exception as exc:
             QMessageBox.critical(self, "Recetas", f"No se pudo exportar el PDF:\n{exc}")
             return
