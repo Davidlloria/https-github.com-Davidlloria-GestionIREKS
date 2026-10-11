@@ -100,6 +100,9 @@ def test_contacts_are_unselected_missing_email_disabled_and_manual_deduplicated(
     assert dialog.result() == QDialog.DialogCode.Accepted
     assert dialog.recipients == ["ANA@example.com", "other@example.com"]
     assert dialog.subject.text() == "Receta: Pan"
+    assert dialog.body.toPlainText() == "Hola,\n\nAdjunto la receta.\n\nUn saludo."
+    with_sheets = RecipeMailDialog(customer_id="", recipe_name="Pan", include_technical_sheets=True)
+    assert with_sheets.body.toPlainText() == "Hola,\n\nAdjunto la receta y las fichas técnicas relacionadas.\n\nUn saludo."
 
 
 @pytest.mark.parametrize("case", ["no_customer", "empty", "unavailable", "invalid"])
@@ -150,7 +153,7 @@ def test_preview_mail_uses_loaded_combined_pdf_without_closing_preview(applicati
     monkeypatch.setattr(recipes_page.QMessageBox, "warning", lambda *args: warnings.append(args[-1]))
     dialog._preview_path.write_bytes(b"changed after preview")
     dialog.outlook_button.click()
-    assert requested == [{"customer_id": "customer-A", "recipe_name": "Pan"}]
+    assert requested == [{"customer_id": "customer-A", "recipe_name": "Pan", "include_technical_sheets": True}]
     assert len(drafts) == (0 if cancel else 1)
     if not cancel:
         assert drafts[0]["pdf_content"] == original

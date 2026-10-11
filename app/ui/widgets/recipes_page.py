@@ -967,6 +967,7 @@ class RecipePdfPreviewDialog(QDialog):
         self._preview_path: Path | None = None
         self._mail_customer_id = customer_id
         self._mail_recipe_name = recipe_name
+        self._mail_include_technical_sheets = bool(technical_sheets)
         self.setWindowTitle(f"PDF {'mínimo' if layout_mode == 'minimal' else layout_mode} - Vista previa")
         self.resize(920, 720)
 
@@ -1025,7 +1026,10 @@ class RecipePdfPreviewDialog(QDialog):
         self.outlook_button.setEnabled(True)
 
     def _open_outlook_draft(self) -> None:
-        dialog = RecipeMailDialog(self, customer_id=self._mail_customer_id, recipe_name=self._mail_recipe_name)
+        dialog = RecipeMailDialog(
+            self, customer_id=self._mail_customer_id, recipe_name=self._mail_recipe_name,
+            include_technical_sheets=self._mail_include_technical_sheets,
+        )
         if not dialog.exec():
             return
         self.outlook_button.setEnabled(False)
