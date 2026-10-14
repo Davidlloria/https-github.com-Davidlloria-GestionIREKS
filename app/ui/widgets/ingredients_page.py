@@ -47,6 +47,7 @@ from app.models import AlmacenMovimiento, Distribuidor, Envase, Fabricante, Fami
 from app.services.ingredient_fatsecret_nutrition_flow_service import IngredientFatSecretNutritionFlowService
 from app.services.ingredient_fdc_nutrition_flow_service import IngredientFdcNutritionFlowService
 from app.services.ingredient_chatgpt_nutrition_flow_service import IngredientChatGPTNutritionFlowService
+from app.ui.widgets.product_document_link_dialog import ProductDocumentLinkDialog
 from app.services.document_library_service import (
     DocumentLibraryService,
     DocumentNotFoundError,
@@ -2126,6 +2127,10 @@ class IngredientsIreksPage(QWidget):
         self.product_documents_status = QLabel("")
         self.product_documents_status.setObjectName("productDocumentsStatus")
         document_actions.addWidget(self.product_documents_status, 1)
+        self.product_document_link_button = QPushButton("Vincular documento")
+        self.product_document_link_button.setEnabled(False)
+        self.product_document_link_button.clicked.connect(self._link_product_document)
+        document_actions.addWidget(self.product_document_link_button)
         self.product_document_open_button = QPushButton("Abrir")
         self.product_document_open_button.setProperty("btnRole", "secondary")
         self.product_document_open_button.setEnabled(False)
@@ -2785,6 +2790,7 @@ class IngredientsIreksPage(QWidget):
         if not hasattr(self, "product_documents_table"):
             return
         clean_articulo_id = str(articulo_id or "").strip()
+        self.product_document_link_button.setEnabled(bool(clean_articulo_id))
         self._product_documents_by_id = {}
         self.product_documents_table.setSortingEnabled(False)
         self.product_documents_table.clearContents()
@@ -2846,6 +2852,19 @@ class IngredientsIreksPage(QWidget):
                 f"{len(documents)} documento" + ("" if len(documents) == 1 else "s")
             )
         self._product_document_selection_changed()
+
+    def _link_product_document(self) -> None:
+        product = self._selected_row()
+        product_id = str(getattr(product, "articulo_id", "") or "").strip()
+        if not product_id:
+            return
+        dialog = ProductDocumentLinkDialog(
+            product_id,
+            str(getattr(product, "articulo_descripcion", "") or product_id),
+            self.document_product_link_service, self.document_library_service, self,
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._reload_product_documents(product_id)
 
     def _selected_product_document(self) -> ProductDocumentItem | None:
         selected = self.product_documents_table.selectionModel().selectedRows()

@@ -215,3 +215,59 @@ def test_missing_source_databases_raise_specific_errors(tmp_path: Path) -> None:
     _create_product_database(missing_products, [])
     with pytest.raises(DocumentProductLinkError, match="documental"):
         DocumentProductLinkService(missing_products, missing_documents).sync_technical_sheets()
+
+
+@pytest.mark.parametrize("manufacturer,short,full,filename", [
+    ("ireks", "14715", "114715E", "IREKS/114715E_ficha.pdf"),
+    ("dreidoppel", "D1164038", "D1164038", "DREIDOPPEL/16403.ficha.pdf"),
+    ("gelatop", "D125008", "D125008", "GELATOP/12500.ficha.pdf"),
+])
+def test_manual_exact_link_is_unique_and_survives_refresh(tmp_path, manufacturer, short, full, filename):
+    library, database, service = _service(tmp_path,
+        [("product", short, full, 1, manufacturer)], [f"FICHAS TECNICAS/{filename}"])
+    document = DocumentLibraryService(library, database).list_documents()[0]
+    assert service.check_manual_link("product", document.document_id).status == "exact"
+    service.link_manual("product", document.document_id)
+    service.link_manual("product", document.document_id)
+    DocumentLibraryService(library, database).refresh_catalog()
+    service.sync_technical_sheets()
+    assert len(service.list_links()) == 1
+    assert service.list_links()[0].origin == "manual"
+
+
+@pytest.mark.parametrize("filename,status", [
+    ("IREKS/ficha sin codigo.pdf", "review"),
+    ("IREKS/999999_ficha.pdf", "conflict"),
+    ("GELATOP/114715E_ficha.pdf", "conflict"),
+])
+def test_manual_validation_cannot_be_bypassed(tmp_path, filename, status):
+    library, database, service = _service(tmp_path,
+        [("product", "14715", "114715E", 1, "ireks")], [f"FICHAS TECNICAS/{filename}"])
+    document = DocumentLibraryService(library, database).list_documents()[0]
+    assert service.check_manual_link("product", document.document_id).status == status
+    with pytest.raises(DocumentProductLinkError):
+        service.link_manual("product", document.document_id)
+    if status == "conflict":
+        with pytest.raises(DocumentProductLinkError):
+            service.link_manual("product", document.document_id, reviewed=True)
+        assert service.list_links() == []
+    else:
+        service.link_manual("product", document.document_id, reviewed=True)
+        service.sync_technical_sheets()
+        assert service.list_links()[0].origin == "manual"
+
+
+def test_manual_revalidates_deleted_document_and_missing_product(tmp_path):
+    library, database, service = _service(tmp_path,
+        [("product", "14715", "114715E", 1, "ireks")],
+        ["FICHAS TECNICAS/IREKS/114715E_ficha.pdf"])
+    catalog = DocumentLibraryService(library, database)
+    document = catalog.list_documents()[0]
+    with pytest.raises(DocumentProductLinkError):
+        service.link_manual("missing", document.document_id)
+    service.check_manual_link("product", document.document_id)
+    (library / document.relative_path).unlink()
+    catalog.refresh_catalog()
+    with pytest.raises(DocumentProductLinkError):
+        service.link_manual("product", document.document_id)
+    assert service.list_links() == []

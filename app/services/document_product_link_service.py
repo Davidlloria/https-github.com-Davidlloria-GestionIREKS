@@ -58,6 +58,15 @@ class DocumentProductLinkSyncResult:
 
 
 @dataclass(frozen=True)
+class DocumentLinkCheck:
+    status: str
+    product_manufacturer: str
+    document_manufacturer: str
+    product_code: str
+    document_code: str
+
+
+@dataclass(frozen=True)
 class _Product:
     articulo_id: str
     short_reference: str
@@ -210,6 +219,50 @@ class DocumentProductLinkService:
             unmatched=unmatched,
             ambiguous=ambiguous,
         )
+
+    def check_manual_link(self, product_id: str, document_id: str) -> DocumentLinkCheck:
+        product = next((p for p in self._load_products() if p.articulo_id == product_id), None)
+        document = next((d for d in self._load_technical_documents()
+                         if d.document_id == document_id), None)
+        if product is None or document is None:
+            raise DocumentProductLinkError("El producto o la ficha técnica ya no está disponible.")
+        expected = self._product_document_code(product)
+        found = self._document_code(document.name)
+        # A descriptive word is not evidence of a product code.
+        if found != expected and not any(c.isdigit() for c in found):
+            found = ""
+        manufacturer = self._document_manufacturer(document.category)
+        conflict = bool(
+            (manufacturer and product.manufacturer and manufacturer != product.manufacturer)
+            or (expected and found and expected != found)
+        )
+        exact = bool(expected and found == expected and manufacturer
+                     and manufacturer == product.manufacturer)
+        return DocumentLinkCheck(
+            "conflict" if conflict else "exact" if exact else "review",
+            product.manufacturer, manufacturer, expected, found,
+        )
+
+    def link_manual(self, product_id: str, document_id: str, *, reviewed: bool = False) -> None:
+        check = self.check_manual_link(product_id, document_id)
+        if check.status == "conflict":
+            raise DocumentProductLinkError("El código o el fabricante contradice los del producto.")
+        if check.status == "review" and not reviewed:
+            raise DocumentProductLinkError("Es necesario abrir y revisar el documento antes de confirmar.")
+        self._initialize_schema()
+        timestamp = self._utc_iso(self._clock())
+        with closing(sqlite3.connect(self.document_database_path)) as connection:
+            connection.execute("PRAGMA foreign_keys = ON")
+            with connection:
+                connection.execute(
+                    """INSERT INTO document_product_links (
+                        document_id, product_articulo_id, relation_type, origin,
+                        matched_code, created_at, updated_at
+                    ) VALUES (?, ?, ?, 'manual', ?, ?, ?)
+                    ON CONFLICT(document_id, product_articulo_id, relation_type) DO NOTHING""",
+                    (document_id, product_id, TECHNICAL_SHEET_RELATION,
+                     check.document_code, timestamp, timestamp),
+                )
 
     def list_links(self, *, product_articulo_id: str | None = None) -> list[DocumentProductLink]:
         self._initialize_schema()

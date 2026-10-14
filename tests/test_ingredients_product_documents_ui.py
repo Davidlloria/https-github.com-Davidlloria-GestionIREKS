@@ -157,3 +157,71 @@ def test_product_documents_tab_has_a_clear_empty_state(monkeypatch, tmp_path: Pa
     assert not page.product_document_open_button.isEnabled()
     assert not page.product_document_whatsapp_button.isEnabled()
     page.close()
+
+
+def test_manual_dialog_requires_open_and_confirmation_and_resets_selection(monkeypatch, tmp_path):
+    from app.services.document_product_link_service import DocumentLinkCheck
+    from app.ui.widgets.product_document_link_dialog import ProductDocumentLinkDialog
+    import app.ui.widgets.product_document_link_dialog as dialog_module
+
+    _application()
+    class Links:
+        status = "review"
+        saved = []
+        def check_manual_link(self, *_args):
+            return DocumentLinkCheck(self.status, "IREKS", "IREKS", "114715E", "")
+        def link_manual(self, *args, **kwargs):
+            self.saved.append((args, kwargs))
+    class Library(_FakeLibraryService):
+        def list_documents(self, **_kwargs):
+            return [_document()]
+    links = Links()
+    dialog = ProductDocumentLinkDialog("product", "Producto", links, Library(tmp_path / "ficha.pdf"))
+    monkeypatch.setattr(dialog_module.QDesktopServices, "openUrl", lambda _url: True)
+    dialog.documents.setCurrentRow(0)
+    assert not dialog.save_button.isEnabled()
+    assert not dialog.reviewed.isEnabled()
+    dialog.open_button.click()
+    assert dialog.reviewed.isEnabled()
+    dialog.reviewed.setChecked(True)
+    assert dialog.save_button.isEnabled()
+    dialog.search.setText("no existe")
+    assert not dialog.save_button.isEnabled()
+    assert not dialog.reviewed.isChecked()
+    dialog.search.clear()
+    dialog.documents.setCurrentRow(0)
+    links.status = "conflict"
+    dialog._select()
+    dialog.open_button.click()
+    assert not dialog.reviewed.isEnabled()
+    assert not dialog.save_button.isEnabled()
+    dialog._save()
+    assert not links.saved
+    links.status = "review"
+    dialog._select()
+    dialog.open_button.click()
+    dialog.reviewed.setChecked(True)
+    dialog.save_button.click()
+    assert links.saved == [(("product", "document-1"), {"reviewed": True})]
+    assert dialog.result() == QDialog.DialogCode.Accepted
+    dialog.close()
+
+
+def test_link_button_opens_for_selected_product_and_refreshes(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    _application()
+    page, links, _, _ = _page(monkeypatch, tmp_path)
+    monkeypatch.setattr(page, "_selected_row", lambda: SimpleNamespace(
+        articulo_id="product-1", articulo_descripcion="Producto"))
+    class Dialog:
+        def __init__(self, product_id, name, *_args):
+            assert (product_id, name) == ("product-1", "Producto")
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+    monkeypatch.setattr(page_module, "ProductDocumentLinkDialog", Dialog)
+    page._reload_product_documents("")
+    assert not page.product_document_link_button.isEnabled()
+    page._reload_product_documents("product-1")
+    page.product_document_link_button.click()
+    assert links.product_ids == ["product-1", "product-1"]
+    page.close()
