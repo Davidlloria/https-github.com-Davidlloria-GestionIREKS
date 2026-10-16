@@ -230,3 +230,40 @@ def test_deep_breadcrumbs_scroll_inside_the_bar(browser):
     wait_for(lambda: browser.breadcrumb_scroll.horizontalScrollBar().maximum() > 0)
     assert browser.minimumSizeHint().width() <= 950
     assert browser.breadcrumb_scroll.width() < browser.width()
+
+
+def test_refresh_selected_item_does_not_mix_proxy_model_indexes(browser):
+    from PySide6.QtCore import qInstallMessageHandler
+    messages = []
+    previous = qInstallMessageHandler(lambda _kind, _context, message: messages.append(message))
+    try:
+        for _ in range(3):
+            select(browser, browser.service.root / "nota.txt")
+            browser.icons_button.click()
+            browser.refresh()
+            wait_for(lambda: browser.files_proxy.rowCount(browser.list_view.rootIndex()) == 3)
+            browser.list_button.click()
+            browser.navigate(browser.service.root / "Clientes")
+            browser.go_up()
+    finally:
+        qInstallMessageHandler(previous)
+    assert not [message for message in messages if "wrong model" in message]
+
+
+def test_late_activation_from_previous_models_is_ignored(browser, monkeypatch):
+    from PySide6.QtCore import qInstallMessageHandler
+    select(browser, browser.service.root / "nota.txt")
+    old_file_index = browser.list_view.currentIndex()
+    old_tree_index = browser.tree.currentIndex()
+    messages, opened, navigated = [], [], []
+    previous = qInstallMessageHandler(lambda _kind, _context, message: messages.append(message))
+    try:
+        browser.refresh()
+        monkeypatch.setattr(browser, "_open_path", opened.append)
+        monkeypatch.setattr(browser, "navigate", navigated.append)
+        browser._activate(old_file_index)
+        browser._tree_clicked(old_tree_index)
+    finally:
+        qInstallMessageHandler(previous)
+    assert not opened and not navigated
+    assert not [message for message in messages if "wrong model" in message]

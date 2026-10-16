@@ -63,6 +63,7 @@ class WorkFilesWidget(QWidget):
         self.files_model = None
         self.tree_model = None
         self._pending_selection = None
+        self._rebuilding_models = False
         self.setObjectName("workFilesRoot")
         self._build_ui()
         self.refresh()
@@ -240,8 +241,20 @@ class WorkFilesWidget(QWidget):
         return button
 
     def _install_models(self):
+        self._rebuilding_models = True
+        try:
+            self._replace_models()
+        finally:
+            self._rebuilding_models = False
+
+    def _replace_models(self):
         old_models = (getattr(self, "files_proxy", None), getattr(self, "tree_proxy", None),
                       self.files_model, self.tree_model)
+        # Detach both views and their shared selection before replacing proxies.
+        # Qt can emit selection/reset signals synchronously during setModel().
+        self.list_view.setModel(None)
+        self.icons_view.setModel(None)
+        self.tree.setModel(None)
         for prefix, directories_only in (("tree", True), ("files", False)):
             model = _WorkFileModel(self)
             model.setReadOnly(True)
@@ -365,15 +378,22 @@ class WorkFilesWidget(QWidget):
             self.navigate(self.current_path.parent)
 
     def _tree_clicked(self, index):
+        if not index.isValid() or index.model() is not self.tree_proxy:
+            return
         self.navigate(self.tree_model.filePath(self.tree_proxy.mapToSource(index)))
 
     def _selected_path(self):
-        if self.files_model is None:
+        if (self._rebuilding_models or self.files_model is None
+                or self.list_view.model() is not self.files_proxy):
             return None
         rows = self.list_view.selectionModel().selectedRows(0)
-        return Path(self.files_model.filePath(self.files_proxy.mapToSource(rows[0]))) if rows else None
+        if not rows or rows[0].model() is not self.files_proxy:
+            return None
+        return Path(self.files_model.filePath(self.files_proxy.mapToSource(rows[0])))
 
     def _activate(self, index):
+        if not index.isValid() or index.model() is not self.files_proxy:
+            return
         path = Path(self.files_model.filePath(self.files_proxy.mapToSource(index.siblingAtColumn(0))))
         self._open_path(path)
 
@@ -406,13 +426,14 @@ class WorkFilesWidget(QWidget):
         self.list_button.setChecked(not icons)
 
     def _filter_changed(self, text):
-        if self.files_model is not None:
+        if not self._rebuilding_models and self.files_model is not None:
             self.files_proxy.setFilterFixedString(text)
             self._update_selection()
             self._update_status()
 
     def _update_status(self, *_args):
-        if self.files_model is not None:
+        if (not self._rebuilding_models and self.files_model is not None
+                and self.list_view.model() is self.files_proxy):
             count = self.files_proxy.rowCount(self.list_view.rootIndex())
             self.status.setText(f"{count} {'elemento' if count == 1 else 'elementos'}" if count else "Carpeta vacía o sin coincidencias")
             if self._pending_selection is not None:
@@ -485,7 +506,7 @@ class WorkFilesWidget(QWidget):
 
         def update_destination(index, _previous):
             try:
-                if not index.isValid():
+                if not index.isValid() or index.model() is not self.tree_proxy:
                     raise WorkFilesError("Selecciona una carpeta.")
                 selected[0] = self.service.checked_path(
                     self.tree_model.filePath(self.tree_proxy.mapToSource(index)), directory=True,
@@ -543,6 +564,8 @@ class WorkFilesWidget(QWidget):
         self._update_selection()
 
     def _update_selection(self, *_args):
+        if self._rebuilding_models:
+            return
         path = self._selected_path()
         self.open_button.setEnabled(path is not None)
         self.rename_button.setEnabled(False)
