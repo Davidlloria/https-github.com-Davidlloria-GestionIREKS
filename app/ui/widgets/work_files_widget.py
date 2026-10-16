@@ -421,6 +421,10 @@ class WorkFilesWidget(QWidget):
         for prefix, directories_only in (("tree", True), ("files", False)):
             model = _WorkFileModel(self)
             model.setReadOnly(True)
+            # Native directory watchers can prevent Windows from renaming a visited
+            # folder (or its ancestors). Mutations rebuild these models; external
+            # changes are picked up with Actualizar/F5.
+            model.setOption(QFileSystemModel.Option.DontWatchForChanges, True)
             model.setOption(QFileSystemModel.Option.DontResolveSymlinks, True)
             flags = QDir.Filter.NoDotAndDotDot | QDir.Filter.NoSymLinks
             flags |= QDir.Filter.Dirs if directories_only else QDir.Filter.AllEntries

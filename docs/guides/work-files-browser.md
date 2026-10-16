@@ -28,6 +28,12 @@ desactivacion y peligro; los archivos conservan los iconos nativos de Windows.
   incluyen su contenido. Restaurar se realiza desde la Papelera de Windows.
 - F5 actualiza; Alt+Izquierda, Alt+Derecha y Alt+Arriba controlan la navegacion.
 
+Los cambios realizados desde Windows u otros programas se recogen con
+**Actualizar/F5**. Las operaciones hechas desde la app actualizan la vista
+automaticamente. Los modelos no vigilan las carpetas con manejadores nativos,
+porque en Windows esa vigilancia bloqueaba el renombrado de carpetas visitadas
+o de sus antecesoras, tanto desde la app como desde el Explorador de Windows.
+
 Los botones de gestion se habilitan al seleccionar un elemento. El menu contextual
 de la lista ofrece las mismas operaciones. Supr al escribir en el filtro edita el
 texto y no solicita eliminar archivos.

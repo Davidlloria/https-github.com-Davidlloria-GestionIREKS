@@ -267,3 +267,34 @@ def test_late_activation_from_previous_models_is_ignored(browser, monkeypatch):
         qInstallMessageHandler(previous)
     assert not opened and not navigated
     assert not [message for message in messages if "wrong model" in message]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows directory sharing regression")
+@pytest.mark.parametrize("through_app", [False, True], ids=["external", "app"])
+def test_visited_folder_can_be_renamed_while_browser_is_open(browser, monkeypatch, through_app):
+    from app.ui.widgets import work_files_widget
+
+    source = browser.service.root / "Clientes"
+    nested = source / "Documentos"
+    nested.mkdir()
+    (nested / "nota.txt").write_text("contenido conservado", encoding="utf-8")
+    browser.navigate(nested)
+    wait_for(lambda: browser.files_proxy.rowCount(browser.list_view.rootIndex()) == 1)
+    browser.go_up()
+    browser.go_up()
+    select(browser, source)
+    QTest.qWait(200)
+    destination = source.with_name("Clientes renombrados")
+    if through_app:
+        warnings = []
+        monkeypatch.setattr(work_files_widget.QInputDialog, "getText",
+                            lambda *args, **kwargs: (destination.name, True))
+        monkeypatch.setattr(QMessageBox, "warning", lambda *args: warnings.append(args[-1]))
+        browser.rename_selected()
+        assert not warnings
+    else:
+        source.rename(destination)
+        browser.refresh()
+    assert not source.exists()
+    assert (destination / "Documentos" / "nota.txt").read_text(encoding="utf-8") == "contenido conservado"
+    wait_for(lambda: browser.files_model.index(str(destination)).isValid())

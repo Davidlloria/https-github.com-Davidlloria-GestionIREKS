@@ -14,6 +14,22 @@ entire migration history first.
 ## Current Snapshot
 
 - Date: 2026-10-16. Branch: `reestructuracion_proyecto`.
+- Starting HEAD: `b01224f26cbfd2cf503c30d310c73e4148252e50` (clean).
+- Reproduced Windows folder rename failures from the app and externally after
+  navigating into a descendant. Both new regression cases failed before the fix.
+- Disabled QFileSystemModel native directory watching before setting root paths
+  in both models. Watching held directory handles that blocked ancestor rename.
+  Both cases now pass and preserve nested file contents. App mutations still
+  refresh automatically; external changes require Actualizar/F5.
+- Validation: 48 service/widget/architecture, 14 dashboard and one isolated
+  main-window test passed (63 total). Two unrelated PDF/printing tests excluded;
+  no full-suite run. Known ReportLab deprecation only.
+- Scope: widget, Windows regression tests and feature documentation. No real
+  Trabajo files changed; no service/API/React/launcher changes, merge or push.
+
+## Historical Snapshot - 2026-10-16 - Trabajo visual review
+
+- Date: 2026-10-16. Branch: `reestructuracion_proyecto`.
 - Starting HEAD for visual review: `d256c06c744c6e46e2e1029c6b4b51cd9344d357`.
 - Fixed Qt proxy warnings in `f2941673a`: detach views before replacing models,
   guard callbacks during rebuild and ignore indexes from previous models.
