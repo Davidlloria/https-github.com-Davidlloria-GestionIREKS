@@ -189,6 +189,15 @@ def test_recycle_failure_never_removes_source(service, monkeypatch):
     assert (service.root / "Clientes/nota.txt").read_text(encoding="utf-8") == "contenido"
 
 
+def test_unreadable_directory_is_reported_instead_of_appearing_empty(service, monkeypatch):
+    import os
+    def denied(_path):
+        raise PermissionError()
+    monkeypatch.setattr(os, "scandir", denied)
+    with pytest.raises(WorkFilesError, match="permisos"):
+        service.checked_path("Clientes", directory=True)
+
+
 def test_windows_junction_cannot_escape_root(service, tmp_path):
     import os
     import subprocess

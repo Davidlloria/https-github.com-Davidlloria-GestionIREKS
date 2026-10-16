@@ -218,3 +218,15 @@ def test_icon_click_selects_file_and_enables_management_actions(browser):
     assert browser.rename_button.isEnabled()
     assert browser.move_button.isEnabled()
     assert browser.recycle_button.isEnabled()
+
+
+def test_deep_breadcrumbs_scroll_inside_the_bar(browser):
+    deepest = browser.service.root
+    for number in range(9):
+        deepest = deepest / f"carpeta{number:02d}"
+        deepest.mkdir()
+    browser.resize(950, 650)
+    browser.navigate(deepest)
+    wait_for(lambda: browser.breadcrumb_scroll.horizontalScrollBar().maximum() > 0)
+    assert browser.minimumSizeHint().width() <= 950
+    assert browser.breadcrumb_scroll.width() < browser.width()

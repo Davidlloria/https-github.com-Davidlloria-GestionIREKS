@@ -128,6 +128,9 @@ class WorkFilesService:
                 current = current.parent
             if directory and not resolved.is_dir():
                 raise WorkFilesError("Selecciona una carpeta.")
+            if directory:
+                with os.scandir(resolved) as entries:
+                    next(entries, None)
             return resolved
         except (OSError, RuntimeError) as exc:
             raise WorkFilesError("No se puede acceder a la ubicación. Comprueba que existe y tienes permisos.") from exc
