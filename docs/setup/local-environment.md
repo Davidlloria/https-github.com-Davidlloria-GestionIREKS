@@ -41,18 +41,60 @@ bloqueadas. Usar `npm install` solo cuando se vaya a modificar dependencias.
 
 ### Datos externos para PySide6
 
-La instalacion local utiliza dos carpetas hermanas:
+La instalacion local separa la aplicacion, sus datos y el material de trabajo:
 
 ```text
-Proyectos/
+Desktop/Gestion_IREKS-CANARIAS/
     GestionIREKS/        # codigo, recursos y entorno Python
     GestionIREKS-Datos/  # bases, configuracion, imagenes, exports y backups
+    Documentos/         # biblioteca documental externa
+    Trabajo/            # Clientes, Pedidos, ventas y Exportaciones
+    Recursos/           # material auxiliar y referencias
+    Archivo/            # revisiones y pruebas conservadas
 ```
 
 `GESTION_IREKS_DATA_DIR` apunta a la carpeta de datos. La variable de usuario
 se aplica a las nuevas terminales; reinicia las terminales abiertas antes de
 ejecutar `python run.py`. `run-desktop.bat` tambien selecciona la carpeta
 hermana cuando contiene `gestion_ireks.db` y no hay un override explicito.
+
+La carpeta principal esta fuera de `Proyectos`, en
+`C:\Users\dallo\Desktop\Gestion_IREKS-CANARIAS`. El acceso directo
+`Gestion IREKS` del escritorio apunta a `GestionIREKS/run-desktop.bat`, con
+el directorio de trabajo en esa misma carpeta. La organizacion interna de
+Pedidos y ventas se conserva.
+
+Tras un traslado, comprobar que `GESTION_IREKS_DATA_DIR` de usuario apunta a
+`C:\Users\dallo\Desktop\Gestion_IREKS-CANARIAS\GestionIREKS-Datos` y reiniciar
+las terminales abiertas. `python run.py` hereda esa variable; el archivo BAT
+solo selecciona la carpeta hermana si no existe un override explicito.
+Sin `GESTION_IREKS_DOCUMENTS_DIR`, la biblioteca se resuelve en la carpeta
+hermana `Documentos`. No es necesario modificar las bases ni reindexarla por
+el traslado, dado que el catalogo guarda rutas relativas.
+
+En el mantenimiento del entorno Python, usar `.venv\Scripts\python.exe -m pip`
+y `.venv\Scripts\python.exe -m pytest`. Despues de mover el repositorio,
+verificar los ejecutables y scripts de activacion del entorno, que pueden
+contener rutas absolutas antiguas. Los artefactos previos de `build/` y `dist/`
+se conservan como estaban y no constituyen una nueva entrega validada.
+
+Distribucion del material anterior de `Proyectos`:
+
+- `Clientes`, `Pedidos` y `ventas`: dentro de `Trabajo`, sin reorganizacion interna.
+- `Exports`: `Trabajo/Exportaciones/Exports`.
+- `output` y `tmp`: `Archivo/Pruebas-y-referencias`, manteniendo ambas carpetas.
+- `outputs`: `Archivo/Revisiones-ventas/outputs`.
+- `varios` y archivos sueltos: `Archivo/Pendiente-de-clasificar`.
+- `Recursos` conserva su nombre, ubicacion relativa y contenido.
+
+El traslado se verifico por SHA-256 antes de ajustar el entorno y las preferencias.
+El catalogo conserva una entrada activa cuyo archivo ya faltaba antes del
+traslado; no se ha actualizado ni reindexado automaticamente.
+
+Los proyectos guardados en Codex deben abrirse desde sus nuevas ubicaciones:
+GestionIREKS desde el repositorio, Tecnico Panaderia desde `Documentos` y Ventas
+desde `Trabajo/ventas`. Las terminales que ya estaban abiertas conservan las
+variables anteriores hasta reiniciarlas.
 
 La migracion local del 2026-09-06 copio y verifico 168 archivos, comprobo la
 integridad y los recuentos de las dos bases SQLite, y ajusto la preferencia

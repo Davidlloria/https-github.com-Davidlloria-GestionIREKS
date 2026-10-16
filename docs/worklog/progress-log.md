@@ -13,6 +13,46 @@ entire migration history first.
 
 ## Current Snapshot
 
+- Date: 2026-10-16
+- Branch: `reestructuracion_proyecto`.
+- Starting code HEAD: `2e20b6384c4558d067975e1f3f4db97d813d1779`.
+- Location: `C:\Users\dallo\Desktop\Gestion_IREKS-CANARIAS\GestionIREKS`.
+- Local folders were relocated from `Desktop/Proyectos` to the sibling
+  `Desktop/Gestion_IREKS-CANARIAS`, outside Proyectos. The repository, active
+  data, document library and Recursos remain siblings; business files are in
+  Trabajo, and previous outputs and references are retained in Archivo.
+- Pedidos and ventas retain their internal organization. Nothing was deleted
+  or merged, and the old `GestionIREKS/data` copy remains separate from active data.
+- SHA-256 and directory/link manifests verified all 46,770 relocated files
+  before environment/configuration changes. Both active SQLite files passed
+  `PRAGMA quick_check` and retain their original hashes. No database migration,
+  catalog refresh, reindexing or business mutation was performed.
+- Updated the user data-directory variable, desktop shortcut target/working
+  directory/icon, and PDF/XLSX export-directory preferences. Only that preferences
+  JSON changed among the 204 active-data files; the other 203 match the manifest.
+- Rebound the existing virtual environment's activation scripts and 38 installed
+  entry points to the new directory, preserving installed packages. Python,
+  pip and uvicorn work from the new location. Pytest runs via system Python,
+  as it is not installed in the application's virtual environment.
+- Validation: 172 recipe/PDF/document/product-link/architecture tests, plus the
+  main-window test in a separate process; all 173 passed with exit code 0.
+  Known ReportLab/datetime deprecations: 1,249 warnings plus one in the separate
+  window test. The full suite and a manual interactive session were not run.
+  The initial combined Qt run did not
+  exit reliably; independent processes are used for the final validation.
+- Read-only checks found 843 customers, 100 recipes and 403 IREKS products.
+  Qt startup imports, global styles and a clean event-loop exit were verified.
+- Known pre-existing limitation: 2,411 active catalog entries resolve to 2,410
+  existing files. The one missing file was already absent in the pre-move
+  inventory; no new absence was introduced and the catalog was left unchanged.
+- Codex saved projects still reference old paths. Reopen GestionIREKS at the
+  new repository root, Tecnico Panaderia at the new Documentos folder, and
+  Ventas at Trabajo/ventas. Restart existing terminals to refresh environment.
+- Scope: local organization and setup documentation only. No application,
+  API, React, PySide6, launcher or packaging code was changed; no push requested.
+
+## Historical Snapshot - 2026-09-06
+
 - Date: 2026-09-06
 - Branch: `main`
 - Integrated code HEAD: `64fd6746fc96a485fa2fb213177938c5ddeb24ff` (before this documentation correction).
