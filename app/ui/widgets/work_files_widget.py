@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QDir, QModelIndex, QSortFilterProxyModel, QSize, Qt
+from PySide6.QtCore import QDir, QItemSelectionModel, QModelIndex, QSortFilterProxyModel, QSize, Qt
 from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QAbstractItemView, QFileSystemModel, QHBoxLayout, QHeaderView, QLabel,
-    QLineEdit, QListView, QMenu, QMessageBox, QPushButton, QSplitter,
+    QInputDialog, QLineEdit, QListView, QMenu, QMessageBox, QPushButton, QSplitter,
     QStackedWidget, QStyle, QToolButton, QTreeView, QVBoxLayout, QWidget,
 )
 
@@ -57,6 +57,7 @@ class WorkFilesWidget(QWidget):
         self.history_position = 0
         self.files_model = None
         self.tree_model = None
+        self._pending_selection = None
         self.setObjectName("workFilesRoot")
         self._build_ui()
         self.refresh()
@@ -66,6 +67,9 @@ class WorkFilesWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
         self.actions_layout = QHBoxLayout()
+        self.create_button = QPushButton("Nueva carpeta")
+        self.create_button.clicked.connect(self.create_folder)
+        self.actions_layout.addWidget(self.create_button)
         self.actions_layout.addStretch()
         self.open_windows_button = QPushButton("Abrir en Windows")
         self.open_windows_button.clicked.connect(self.open_in_windows)
@@ -282,6 +286,7 @@ class WorkFilesWidget(QWidget):
         self.forward_button.setEnabled(available and self.history_position < len(self.history) - 1)
         self.up_button.setEnabled(available and self.current_path != self.service.root)
         self.open_windows_button.setEnabled(available)
+        self.create_button.setEnabled(available)
         while self.breadcrumbs.count():
             item = self.breadcrumbs.takeAt(0)
             item.widget().deleteLater()
@@ -363,6 +368,26 @@ class WorkFilesWidget(QWidget):
         if self.files_model is not None:
             count = self.files_proxy.rowCount(self.list_view.rootIndex())
             self.status.setText(f"{count} elemento(s)" if count else "Carpeta vacía o sin coincidencias")
+            if self._pending_selection is not None:
+                index = self.files_proxy.mapFromSource(self.files_model.index(str(self._pending_selection)))
+                if index.isValid():
+                    self._pending_selection = None
+                    self.list_view.selectionModel().setCurrentIndex(
+                        index, QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows,
+                    )
+                    self.list_view.scrollTo(index)
+
+    def create_folder(self):
+        name, accepted = QInputDialog.getText(self, "Nueva carpeta", "Nombre de la carpeta:")
+        if not accepted:
+            return
+        try:
+            path = self.service.create_folder(self.current_path, name)
+            self.refresh()
+            self._pending_selection = path
+            self._update_status()
+        except WorkFilesError as exc:
+            QMessageBox.warning(self, "Nueva carpeta", str(exc))
 
     def _toggle_details(self, visible):
         self.details.setVisible(visible)
@@ -385,9 +410,10 @@ class WorkFilesWidget(QWidget):
 
     def _context_menu(self, view, point):
         index = view.indexAt(point)
-        if not index.isValid():
-            return
-        view.setCurrentIndex(index)
         menu = QMenu(self)
-        menu.addAction("Abrir", self.open_selected)
+        menu.addAction("Nueva carpeta", self.create_folder).setEnabled(self.create_button.isEnabled())
+        if index.isValid():
+            view.setCurrentIndex(index)
+            menu.addSeparator()
+            menu.addAction("Abrir", self.open_selected)
         menu.exec(view.viewport().mapToGlobal(point))

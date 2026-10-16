@@ -35,6 +35,27 @@ def test_missing_root_is_not_created(tmp_path):
     assert not service.root.exists()
 
 
+@pytest.mark.parametrize("name", ["", ".", "..", "../fuera", "a/b", "a\\b", "NUL.txt", "COM1", "LPT².txt", "a:", "con.", "a.", " a", "a ", "a\x00"])
+def test_create_folder_rejects_invalid_windows_names(service, name):
+    before = set(service.root.iterdir())
+    with pytest.raises(WorkFilesError):
+        service.create_folder(service.root, name)
+    assert set(service.root.iterdir()) == before
+
+
+def test_create_folder_preserves_existing_files_and_handles_permissions(service, monkeypatch):
+    created = service.create_folder("Clientes", "Nueva carpeta")
+    assert created.is_dir()
+    with pytest.raises(WorkFilesError):
+        service.create_folder("Clientes", "nota.txt")
+    with pytest.raises(WorkFilesError):
+        service.create_folder("Clientes", "Nueva carpeta")
+    assert (service.root / "Clientes/nota.txt").read_text(encoding="utf-8") == "contenido"
+    monkeypatch.setattr(Path, "mkdir", lambda *a, **kw: (_ for _ in ()).throw(PermissionError()))
+    with pytest.raises(WorkFilesError, match="permisos"):
+        service.create_folder(service.root, "Denegada")
+
+
 def test_windows_junction_cannot_escape_root(service, tmp_path):
     import os
     import subprocess

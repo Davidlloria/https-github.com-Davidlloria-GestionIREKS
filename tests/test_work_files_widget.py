@@ -110,3 +110,15 @@ def test_missing_root_and_deleted_current_folder_recover_without_creating_data(b
     assert not widget.splitter.isHidden()
     assert widget.open_windows_button.isEnabled()
     widget.deleteLater()
+
+
+def test_create_folder_cancellation_and_selection(browser, monkeypatch):
+    from app.ui.widgets import work_files_widget
+    monkeypatch.setattr(work_files_widget.QInputDialog, "getText", lambda *a, **kw: ("Cancelada", False))
+    browser.create_button.click()
+    assert not (browser.service.root / "Cancelada").exists()
+    monkeypatch.setattr(work_files_widget.QInputDialog, "getText", lambda *a, **kw: ("Nueva carpeta", True))
+    browser.create_button.click()
+    created = browser.service.root / "Nueva carpeta"
+    wait_for(lambda: browser._selected_path() == created)
+    assert created.is_dir()
