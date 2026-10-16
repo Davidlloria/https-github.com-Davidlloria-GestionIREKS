@@ -895,3 +895,37 @@ def test_dashboard_objectives_button_opens_and_reuses_page(monkeypatch) -> None:
     assert page.objectives_dashboard is objectives
     assert objectives.loads == 2
     page.close()
+
+
+def test_dashboard_work_browser_is_lazy_reused_and_has_its_own_header(monkeypatch):
+    _application()
+    from app.ui.widgets import work_files_widget
+
+    class WorkStub(QWidget):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.loads = 0
+
+        def refresh(self):
+            self.loads += 1
+
+    monkeypatch.setattr(work_files_widget, "WorkFilesWidget", WorkStub)
+    page = DashboardPage(
+        customer_service=_StubCustomerService(), dashboard_service=_StubDashboardService(),
+        order_dashboard_service=_StubOrderDashboardService(),
+        warehouse_dashboard_service=_StubWarehouseDashboardService(),
+    )
+    assert page.work_files_dashboard is None
+    page.dashboard_nav_buttons['trabajo'].click()
+    browser = page.work_files_dashboard
+    assert page.dashboard_stack.currentWidget() is browser
+    assert page.title_label.text() == 'Trabajo'
+    assert page.new_activity_btn.isHidden() and page.full_agenda_btn.isHidden()
+    page._set_dashboard_mode('agenda')
+    assert not page.new_activity_btn.isHidden()
+    page.dashboard_nav_buttons['trabajo'].click()
+    assert page.work_files_dashboard is browser
+    assert browser.loads == 2
+    page.close()
+    page.deleteLater()
+    QApplication.processEvents()
