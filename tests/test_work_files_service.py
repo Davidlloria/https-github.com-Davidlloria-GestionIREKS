@@ -56,6 +56,35 @@ def test_create_folder_preserves_existing_files_and_handles_permissions(service,
         service.create_folder(service.root, "Denegada")
 
 
+def test_rename_file_and_folder_preserves_contents_and_case_changes(service):
+    file = service.rename("Clientes/nota.txt", "Nota.txt")
+    assert file.name == "Nota.txt"
+    assert file.read_text(encoding="utf-8") == "contenido"
+    folder = service.rename("Clientes", "Clientes antiguos")
+    assert (folder / "Nota.txt").read_text(encoding="utf-8") == "contenido"
+    assert service.rename(folder, folder.name) == folder
+
+
+def test_rename_blocks_root_collisions_and_invalid_names(service):
+    existing = service.root / "Clientes/existente.txt"
+    existing.write_text("conservar", encoding="utf-8")
+    for source, name in ((service.root, "Otra"), ("Clientes/nota.txt", "existente.txt"),
+                         ("Clientes", "../fuera"), ("Clientes", "NUL")):
+        with pytest.raises(WorkFilesError):
+            service.rename(source, name)
+    assert existing.read_text(encoding="utf-8") == "conservar"
+    assert (service.root / "Clientes/nota.txt").read_text(encoding="utf-8") == "contenido"
+
+
+def test_rename_locked_file_reports_error_without_removing_source(service, monkeypatch):
+    def denied(*args):
+        raise PermissionError("locked")
+    monkeypatch.setattr(Path, "rename", denied)
+    with pytest.raises(WorkFilesError, match="uso"):
+        service.rename("Clientes/nota.txt", "otra.txt")
+    assert (service.root / "Clientes/nota.txt").exists()
+
+
 def test_windows_junction_cannot_escape_root(service, tmp_path):
     import os
     import subprocess

@@ -70,6 +70,10 @@ class WorkFilesWidget(QWidget):
         self.create_button = QPushButton("Nueva carpeta")
         self.create_button.clicked.connect(self.create_folder)
         self.actions_layout.addWidget(self.create_button)
+        self.rename_button = QPushButton("Renombrar")
+        self.rename_button.setEnabled(False)
+        self.rename_button.clicked.connect(self.rename_selected)
+        self.actions_layout.addWidget(self.rename_button)
         self.actions_layout.addStretch()
         self.open_windows_button = QPushButton("Abrir en Windows")
         self.open_windows_button.clicked.connect(self.open_in_windows)
@@ -170,7 +174,7 @@ class WorkFilesWidget(QWidget):
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(self.status)
         for key, callback in (("Alt+Left", self.go_back), ("Alt+Right", self.go_forward),
-                              ("Alt+Up", self.go_up), ("F5", self.refresh)):
+                              ("Alt+Up", self.go_up), ("F5", self.refresh), ("F2", self.rename_selected)):
             shortcut = QShortcut(QKeySequence(key), self)
             shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
             shortcut.activated.connect(callback)
@@ -383,11 +387,33 @@ class WorkFilesWidget(QWidget):
             return
         try:
             path = self.service.create_folder(self.current_path, name)
-            self.refresh()
-            self._pending_selection = path
-            self._update_status()
+            self._refresh_after_change(path)
         except WorkFilesError as exc:
             QMessageBox.warning(self, "Nueva carpeta", str(exc))
+
+    def _refresh_after_change(self, selected=None):
+        self.refresh()
+        self._pending_selection = selected
+        self._update_status()
+
+    def rename_selected(self):
+        path = self._selected_path()
+        if path is None:
+            return
+        name, accepted = QInputDialog.getText(self, "Renombrar", "Nuevo nombre:", text=path.name)
+        if not accepted:
+            return
+        if path.is_file() and path.suffix and path.suffix.lower() != Path(name).suffix.lower():
+            answer = QMessageBox.question(
+                self, "Cambiar extensión", "Cambiar la extensión puede impedir abrir el archivo. ¿Continuar?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        try:
+            self._refresh_after_change(self.service.rename(path, name))
+        except WorkFilesError as exc:
+            QMessageBox.warning(self, "Renombrar", str(exc))
 
     def _toggle_details(self, visible):
         self.details.setVisible(visible)
@@ -396,12 +422,14 @@ class WorkFilesWidget(QWidget):
     def _update_selection(self, *_args):
         path = self._selected_path()
         self.open_button.setEnabled(path is not None)
+        self.rename_button.setEnabled(False)
         self.details_icon.clear()
         self.details_name.setText(path.name if path else "Selecciona un archivo o una carpeta")
         self.details_info.clear()
         if path:
             try:
                 self.service.checked_path(path)
+                self.rename_button.setEnabled(path != self.service.root)
                 index = self.files_model.index(str(path))
                 self.details_icon.setPixmap(self.files_model.fileIcon(index).pixmap(64, 64))
                 self.details_info.setText(f"{self.files_model.type(index)}\n\nUbicación:\nTrabajo / {path.relative_to(self.service.root)}")
@@ -416,4 +444,5 @@ class WorkFilesWidget(QWidget):
             view.setCurrentIndex(index)
             menu.addSeparator()
             menu.addAction("Abrir", self.open_selected)
+            menu.addAction("Renombrar", self.rename_selected).setEnabled(self.rename_button.isEnabled())
         menu.exec(view.viewport().mapToGlobal(point))

@@ -122,3 +122,19 @@ def test_create_folder_cancellation_and_selection(browser, monkeypatch):
     created = browser.service.root / "Nueva carpeta"
     wait_for(lambda: browser._selected_path() == created)
     assert created.is_dir()
+
+
+def test_rename_selected_and_cancel_extension_change(browser, monkeypatch):
+    from app.ui.widgets import work_files_widget
+    root = browser.service.root
+    assert not browser.rename_button.isEnabled()
+    select(browser, root / "nota.txt")
+    assert browser.rename_button.isEnabled()
+    monkeypatch.setattr(work_files_widget.QInputDialog, "getText", lambda *a, **kw: ("nueva.pdf", True))
+    monkeypatch.setattr(QMessageBox, "question", lambda *a: QMessageBox.StandardButton.No)
+    browser.rename_button.click()
+    assert (root / "nota.txt").exists() and not (root / "nueva.pdf").exists()
+    monkeypatch.setattr(work_files_widget.QInputDialog, "getText", lambda *a, **kw: ("renombrada.txt", True))
+    browser.rename_button.click()
+    wait_for(lambda: browser._selected_path() == root / "renombrada.txt")
+    assert (root / "renombrada.txt").read_text(encoding="utf-8") == "prueba"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import re
 
 from app.core.config import BASE_DIR
@@ -34,6 +35,20 @@ class WorkFilesService:
             raise WorkFilesError("Ya existe un archivo o una carpeta con ese nombre.") from exc
         except OSError as exc:
             raise WorkFilesError("No se pudo crear la carpeta. Comprueba los permisos y el nombre.") from exc
+        return destination
+
+    def rename(self, path: str | Path, name: str) -> Path:
+        source = self.checked_path(path, allow_root=False)
+        destination = source.with_name(self._validated_name(name))
+        if source.name == name:
+            return source
+        case_only = os.name == "nt" and source.name.casefold() == name.casefold()
+        if (destination.exists() or destination.is_symlink() or destination.is_junction()) and not case_only:
+            raise WorkFilesError("Ya existe un archivo o una carpeta con ese nombre.")
+        try:
+            source.rename(destination)
+        except OSError as exc:
+            raise WorkFilesError("No se pudo renombrar. El elemento puede estar en uso o no tienes permisos.") from exc
         return destination
 
     def checked_path(self, path: str | Path, *, directory: bool = False,
