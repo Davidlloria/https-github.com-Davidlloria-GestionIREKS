@@ -15,6 +15,36 @@ entire migration history first.
 
 - Date: 2026-10-16
 - Branch: `reestructuracion_proyecto`.
+- Initial HEAD: `ab3f688cb5d22d4251606d352367edc4180ef29a`.
+- Latest implementation HEAD before this documentation: `62dab9039`.
+- Implemented the approved Windows-style browser in PySide6 Inicio > Trabajo,
+  reusing the existing dashboard navigation and loading the widget on demand.
+- Features: directory tree, breadcrumbs, back/forward/up/refresh, local name
+  filter, sortable list and icon views, optional details, default-program opening,
+  Windows Explorer opening, new folders, rename, move and Windows Recycle Bin.
+- File mutations were delivered as separate commits. All paths stay within
+  Trabajo; root operations, links/junctions, invalid names, overwrites and moving
+  folders into their descendants are blocked. Delete requires confirmation;
+  IFileOperation uses FOFX_RECYCLEONDELETE with no permanent-delete fallback.
+- Validation: 44 service/widget/architecture tests, 16 dashboard tests and one
+  isolated main-window test passed (61 total). Native Windows rendering and 15
+  navigation/view/refresh cycles passed. A disposable file was recycled, located
+  with its content intact and restored using the real Windows Recycle Bin.
+- Warnings: ReportLab deprecation and LF/CRLF notices. An existing dashboard
+  print test emitted Windows COM diagnostics 0x80040155 during QPrinter setup,
+  but all 16 dashboard tests passed; real printing was not exercised or changed.
+  A transient QModelIndex in the new icon test caused a native failure; the test
+  was corrected and the final regression passed.
+- Scope: three application files, three test files and this feature's documentation.
+  No API/frontend/shared contracts, database, document catalog, launcher or bundle
+  changes. Real Trabajo files were only read for visual checks; mutation tests
+  use temporary folders. No full-suite run, merge or push.
+- User guide: `docs/guides/work-files-browser.md`.
+
+## Historical Snapshot - 2026-10-16 - Local workspace relocation
+
+- Date: 2026-10-16
+- Branch: `reestructuracion_proyecto`.
 - Starting code HEAD: `2e20b6384c4558d067975e1f3f4db97d813d1779`.
 - Location: `C:\Users\dallo\Desktop\Gestion_IREKS-CANARIAS\GestionIREKS`.
 - Local folders were relocated from `Desktop/Proyectos` to the sibling
