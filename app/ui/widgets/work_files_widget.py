@@ -3,18 +3,23 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QDir, QItemSelectionModel, QModelIndex, QSortFilterProxyModel, QSize, Qt
-from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
+from PySide6.QtGui import QDesktopServices, QIcon, QKeySequence, QShortcut
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QAbstractItemView, QDialog, QDialogButtonBox, QFileSystemModel, QHBoxLayout, QHeaderView, QLabel,
-    QInputDialog, QLineEdit, QListView, QMenu, QMessageBox, QPushButton, QSplitter,
-    QStackedWidget, QStyle, QToolButton, QTreeView, QVBoxLayout, QWidget,
+    QInputDialog, QLayout, QLineEdit, QListView, QMenu, QMessageBox, QPushButton, QScrollArea,
+    QSizePolicy, QSplitter, QStackedWidget, QStyle, QToolButton, QTreeView, QVBoxLayout, QWidget,
 )
 
 from app.services.work_files_service import WorkFilesError, WorkFilesService
 
 
 class _WorkFileModel(QFileSystemModel):
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if role == Qt.ItemDataRole.DisplayRole and index.column() == 2 and self.isDir(index):
+            return "Carpeta de archivos"
+        return super().data(index, role)
+
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return ("Nombre", "Tamaño", "Tipo", "Fecha de modificación")[section] if section < 4 else None
@@ -87,22 +92,41 @@ class WorkFilesWidget(QWidget):
         self.open_windows_button = QPushButton("Abrir en Windows")
         self.open_windows_button.clicked.connect(self.open_in_windows)
         self.actions_layout.addWidget(self.open_windows_button)
+        icon_dir = Path(__file__).resolve().parents[3] / "assets" / "icons"
+        self.create_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogNewFolder))
+        self.rename_button.setIcon(QIcon(str(icon_dir / "movement-edit-navy.svg")))
+        self.move_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowRight))
+        self.recycle_button.setIcon(QIcon(str(icon_dir / "trash.svg")))
+        self.open_windows_button.setIcon(QIcon(str(icon_dir / "folder-open-navy.svg")))
         layout.addLayout(self.actions_layout)
 
         navigation = QHBoxLayout()
+        navigation.setSpacing(6)
         self.back_button = self._navigation_button("Atrás", QStyle.StandardPixmap.SP_ArrowBack, self.go_back)
         self.forward_button = self._navigation_button("Adelante", QStyle.StandardPixmap.SP_ArrowForward, self.go_forward)
         self.up_button = self._navigation_button("Subir un nivel", QStyle.StandardPixmap.SP_ArrowUp, self.go_up)
         self.refresh_button = self._navigation_button("Actualizar", QStyle.StandardPixmap.SP_BrowserReload, self.refresh)
         for button in (self.back_button, self.forward_button, self.up_button, self.refresh_button):
             navigation.addWidget(button)
-        self.breadcrumbs = QHBoxLayout()
+        breadcrumb_host = QWidget()
+        self.breadcrumbs = QHBoxLayout(breadcrumb_host)
+        self.breadcrumbs.setContentsMargins(0, 0, 0, 0)
         self.breadcrumbs.setSpacing(2)
-        navigation.addLayout(self.breadcrumbs, 1)
+        self.breadcrumbs.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.breadcrumbs.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        self.breadcrumb_scroll = QScrollArea()
+        self.breadcrumb_scroll.setWidgetResizable(True)
+        self.breadcrumb_scroll.setWidget(breadcrumb_host)
+        self.breadcrumb_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.breadcrumb_scroll.setFixedHeight(52)
+        self.breadcrumb_scroll.setMinimumWidth(80)
+        self.breadcrumb_scroll.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.breadcrumb_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        navigation.addWidget(self.breadcrumb_scroll, 1)
         self.filter_edit = QLineEdit()
         self.filter_edit.setPlaceholderText("Filtrar esta carpeta")
         self.filter_edit.setClearButtonEnabled(True)
-        self.filter_edit.setMaximumWidth(260)
+        self.filter_edit.setFixedWidth(250)
         self.filter_edit.textChanged.connect(self._filter_changed)
         navigation.addWidget(self.filter_edit)
         layout.addLayout(navigation)
@@ -210,6 +234,7 @@ class WorkFilesWidget(QWidget):
         button = QToolButton()
         button.setToolTip(title)
         button.setAccessibleName(title)
+        button.setFixedSize(34, 34)
         button.setIcon(self.style().standardIcon(icon))
         button.clicked.connect(callback)
         return button
@@ -240,6 +265,7 @@ class WorkFilesWidget(QWidget):
         self.icons_view.setSelectionModel(self.list_view.selectionModel())
         self.list_view.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.list_view.header().moveSection(self.list_view.header().visualIndex(3), 1)
+        self.list_view.header().moveSection(self.list_view.header().visualIndex(2), 2)
         for column in (1, 2, 3):
             self.list_view.header().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         self.list_view.sortByColumn(0, Qt.SortOrder.AscendingOrder)
@@ -307,6 +333,7 @@ class WorkFilesWidget(QWidget):
         self.up_button.setEnabled(available and self.current_path != self.service.root)
         self.open_windows_button.setEnabled(available)
         self.create_button.setEnabled(available)
+        self.breadcrumb_scroll.setToolTip(str(self.current_path))
         while self.breadcrumbs.count():
             item = self.breadcrumbs.takeAt(0)
             item.widget().deleteLater()
@@ -387,7 +414,7 @@ class WorkFilesWidget(QWidget):
     def _update_status(self, *_args):
         if self.files_model is not None:
             count = self.files_proxy.rowCount(self.list_view.rootIndex())
-            self.status.setText(f"{count} elemento(s)" if count else "Carpeta vacía o sin coincidencias")
+            self.status.setText(f"{count} {'elemento' if count == 1 else 'elementos'}" if count else "Carpeta vacía o sin coincidencias")
             if self._pending_selection is not None:
                 index = self.files_proxy.mapFromSource(self.files_model.index(str(self._pending_selection)))
                 if index.isValid():
@@ -532,7 +559,8 @@ class WorkFilesWidget(QWidget):
                 self.recycle_button.setEnabled(path != self.service.root)
                 index = self.files_model.index(str(path))
                 self.details_icon.setPixmap(self.files_model.fileIcon(index).pixmap(64, 64))
-                self.details_info.setText(f"{self.files_model.type(index)}\n\nUbicación:\nTrabajo / {path.relative_to(self.service.root)}")
+                kind = self.files_model.data(index.siblingAtColumn(2))
+                self.details_info.setText(f"{kind}\n\nUbicación:\nTrabajo / {path.relative_to(self.service.root)}")
             except WorkFilesError:
                 self.open_button.setEnabled(False)
 
