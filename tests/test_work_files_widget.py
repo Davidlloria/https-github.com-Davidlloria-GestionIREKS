@@ -4,7 +4,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
-from PySide6.QtCore import QItemSelectionModel
+from PySide6.QtCore import QEvent, QItemSelectionModel
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -30,7 +30,7 @@ def browser(tmp_path):
     yield widget
     widget.close()
     widget.deleteLater()
-    QApplication.sendPostedEvents(None, 0)
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     QApplication.processEvents()
 
 
@@ -163,3 +163,58 @@ def test_move_destination_dialog_starts_at_work_and_cancel_is_non_mutating(brows
         return QDialog.DialogCode.Rejected
     monkeypatch.setattr(QDialog, "exec", cancel)
     assert browser._choose_destination() is None
+
+
+def test_recycle_requires_confirmation_and_does_not_intercept_filter_delete(browser, monkeypatch):
+    from app.services import work_files_service
+    from PySide6.QtCore import Qt
+    recycled = []
+    monkeypatch.setattr(work_files_service, "_recycle_windows", recycled.append)
+    path = browser.service.root / "nota.txt"
+    select(browser, path)
+    monkeypatch.setattr(QMessageBox, "question", lambda *a: QMessageBox.StandardButton.No)
+    browser.recycle_button.click()
+    assert recycled == [] and path.exists()
+    monkeypatch.setattr(QMessageBox, "question", lambda *a: QMessageBox.StandardButton.Yes)
+    browser.filter_edit.setText("notaa")
+    browser.filter_edit.setFocus()
+    browser.filter_edit.setCursorPosition(4)
+    QTest.keyClick(browser.filter_edit, Qt.Key.Key_Delete)
+    assert browser.filter_edit.text() == "nota"
+    assert recycled == []
+    select(browser, path)
+    browser.recycle_button.click()
+    assert recycled == [path]
+
+
+def test_recycle_error_is_visible_and_file_is_preserved(browser, monkeypatch):
+    warnings = []
+    path = browser.service.root / "nota.txt"
+    select(browser, path)
+    monkeypatch.setattr(QMessageBox, "question", lambda *a: QMessageBox.StandardButton.Yes)
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args: warnings.append(args[-1]))
+    from app.services.work_files_service import WorkFilesError
+    def fail(_path):
+        raise WorkFilesError("Archivo en uso")
+    monkeypatch.setattr(browser.service, "recycle", fail)
+    browser.recycle_button.click()
+    assert path.exists()
+    assert warnings == ["Archivo en uso"]
+
+
+def test_icon_click_selects_file_and_enables_management_actions(browser):
+    from PySide6.QtCore import QRect, Qt
+    path = browser.service.root / "nota.txt"
+    browser.icons_button.click()
+    def file_rect():
+        # QFileSystemModel loads and sorts asynchronously; reacquire indexes
+        # after processing events instead of holding a transient QModelIndex.
+        index = browser.files_proxy.mapFromSource(browser.files_model.index(str(path)))
+        return browser.icons_view.visualRect(index) if index.isValid() else QRect()
+    wait_for(lambda: file_rect().isValid())
+    QTest.mouseClick(browser.icons_view.viewport(), Qt.MouseButton.LeftButton,
+                     pos=file_rect().center())
+    assert browser._selected_path() == path
+    assert browser.rename_button.isEnabled()
+    assert browser.move_button.isEnabled()
+    assert browser.recycle_button.isEnabled()

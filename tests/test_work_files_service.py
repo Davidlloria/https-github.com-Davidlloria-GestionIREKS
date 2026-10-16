@@ -116,6 +116,79 @@ def test_move_permission_error_leaves_source_in_place(service, monkeypatch):
     assert (service.root / "Clientes/nota.txt").exists()
 
 
+def test_recycle_revalidates_root_and_external_paths_before_calling_windows(service, tmp_path, monkeypatch):
+    from app.services import work_files_service
+    recycled = []
+    monkeypatch.setattr(work_files_service, "_recycle_windows", recycled.append)
+    outside = tmp_path / "outside.txt"
+    outside.write_text("preservar", encoding="utf-8")
+    for path in (service.root, outside, "no-existe"):
+        with pytest.raises(WorkFilesError):
+            service.recycle(path)
+    assert recycled == []
+    service.recycle("Clientes/nota.txt")
+    assert recycled == [service.root / "Clientes/nota.txt"]
+    assert outside.read_text(encoding="utf-8") == "preservar"
+
+
+@pytest.mark.parametrize("aborted", [False, True])
+def test_windows_recycle_adapter_requests_recycle_and_checks_abort(service, monkeypatch, tmp_path, aborted):
+    import os
+    import sys
+    from types import SimpleNamespace
+    from app.services.work_files_service import _recycle_windows
+    if os.name != "nt":
+        pytest.skip("Windows shell adapter")
+    source = service.root / "Clientes/nota.txt"
+    events = []
+
+    class Operation:
+        def SetOperationFlags(self, flags):
+            events.append(("flags", flags))
+            assert flags & 0x00080000
+
+        def DeleteItem(self, item, sink):
+            events.append(("delete", item))
+
+        def PerformOperations(self):
+            events.append(("perform",))
+            if not aborted:
+                source.rename(tmp_path / "recycled.txt")
+
+        def GetAnyOperationsAborted(self):
+            return aborted
+
+    com = SimpleNamespace(COINIT_APARTMENTTHREADED=2, CLSCTX_INPROC_SERVER=1,
+                          CoInitializeEx=lambda _: events.append(("init",)),
+                          CoCreateInstance=lambda *a: Operation(),
+                          CoUninitialize=lambda: events.append(("uninit",)))
+    shell = SimpleNamespace(CLSID_FileOperation=1, IID_IFileOperation=2, IID_IShellItem=3,
+                            SHCreateItemFromParsingName=lambda path, *a: path)
+    flags = SimpleNamespace(FOF_ALLOWUNDO=64, FOFX_EARLYFAILURE=1048576,
+                            FOF_NOCONFIRMATION=16, FOF_NOERRORUI=1024, FOF_SILENT=4)
+    monkeypatch.setitem(sys.modules, "pythoncom", com)
+    monkeypatch.setitem(sys.modules, "win32com.shell", SimpleNamespace(shell=shell, shellcon=flags))
+    if aborted:
+        with pytest.raises(WorkFilesError, match="completado"):
+            _recycle_windows(source)
+        assert source.read_text(encoding="utf-8") == "contenido"
+    else:
+        _recycle_windows(source)
+        assert not source.exists()
+        assert (tmp_path / "recycled.txt").read_text(encoding="utf-8") == "contenido"
+    assert [event[0] for event in events] == ["init", "flags", "delete", "perform", "uninit"]
+
+
+def test_recycle_failure_never_removes_source(service, monkeypatch):
+    from app.services import work_files_service
+    def fail(_path):
+        raise WorkFilesError("Windows no disponible")
+    monkeypatch.setattr(work_files_service, "_recycle_windows", fail)
+    with pytest.raises(WorkFilesError):
+        service.recycle("Clientes/nota.txt")
+    assert (service.root / "Clientes/nota.txt").read_text(encoding="utf-8") == "contenido"
+
+
 def test_windows_junction_cannot_escape_root(service, tmp_path):
     import os
     import subprocess

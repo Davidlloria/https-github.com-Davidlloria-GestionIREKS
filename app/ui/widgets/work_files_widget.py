@@ -78,6 +78,11 @@ class WorkFilesWidget(QWidget):
         self.move_button.setEnabled(False)
         self.move_button.clicked.connect(self.move_selected)
         self.actions_layout.addWidget(self.move_button)
+        self.recycle_button = QPushButton("Eliminar")
+        self.recycle_button.setToolTip("Enviar a la Papelera de Windows")
+        self.recycle_button.setEnabled(False)
+        self.recycle_button.clicked.connect(self.recycle_selected)
+        self.actions_layout.addWidget(self.recycle_button)
         self.actions_layout.addStretch()
         self.open_windows_button = QPushButton("Abrir en Windows")
         self.open_windows_button.clicked.connect(self.open_in_windows)
@@ -182,6 +187,9 @@ class WorkFilesWidget(QWidget):
             shortcut = QShortcut(QKeySequence(key), self)
             shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
             shortcut.activated.connect(callback)
+        delete_shortcut = QShortcut(QKeySequence("Delete"), self.file_views)
+        delete_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        delete_shortcut.activated.connect(self.recycle_selected)
         self.setStyleSheet("""
             QWidget#workFilesRoot QTreeView, QWidget#workFilesRoot QListView {
                 background: white; border: 1px solid #DCE4EF; border-radius: 6px;
@@ -263,6 +271,10 @@ class WorkFilesWidget(QWidget):
             self.message.setText(f"No se puede abrir Trabajo. {exc}\nUbicación: {self.service.root}")
             self.message.show()
             self.open_windows_button.setEnabled(False)
+            for button in (self.rename_button, self.move_button, self.recycle_button):
+                button.setEnabled(False)
+            self._pending_selection = None
+            self.status.setText("Carpeta no disponible")
             self._update_navigation()
 
     def navigate(self, path, *, record=True):
@@ -445,8 +457,18 @@ class WorkFilesWidget(QWidget):
         selected = [self.service.root]
 
         def update_destination(index, _previous):
-            selected[0] = Path(self.tree_model.filePath(self.tree_proxy.mapToSource(index)))
-            destination_label.setText("Trabajo / " + str(selected[0].relative_to(self.service.root)))
+            try:
+                if not index.isValid():
+                    raise WorkFilesError("Selecciona una carpeta.")
+                selected[0] = self.service.checked_path(
+                    self.tree_model.filePath(self.tree_proxy.mapToSource(index)), directory=True,
+                )
+                destination_label.setText("Trabajo / " + str(selected[0].relative_to(self.service.root)))
+                buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(True)
+            except WorkFilesError:
+                selected[0] = None
+                destination_label.setText("La carpeta de destino ya no está disponible.")
+                buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
 
         tree.selectionModel().currentChanged.connect(update_destination)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -470,6 +492,25 @@ class WorkFilesWidget(QWidget):
         except WorkFilesError as exc:
             QMessageBox.warning(self, "Mover", str(exc))
 
+    def recycle_selected(self):
+        path = self._selected_path()
+        if path is None:
+            return
+        content_note = " y su contenido" if path.is_dir() else ""
+        answer = QMessageBox.question(
+            self, "Enviar a la Papelera",
+            f"Se enviará «{path.name}»{content_note} a la Papelera de Windows.\n"
+            "Podrás restaurarlo desde allí.\n\n¿Continuar?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.service.recycle(path)
+            self._refresh_after_change()
+        except WorkFilesError as exc:
+            QMessageBox.warning(self, "Papelera", str(exc))
+
     def _toggle_details(self, visible):
         self.details.setVisible(visible)
         self._update_selection()
@@ -479,6 +520,7 @@ class WorkFilesWidget(QWidget):
         self.open_button.setEnabled(path is not None)
         self.rename_button.setEnabled(False)
         self.move_button.setEnabled(False)
+        self.recycle_button.setEnabled(False)
         self.details_icon.clear()
         self.details_name.setText(path.name if path else "Selecciona un archivo o una carpeta")
         self.details_info.clear()
@@ -487,6 +529,7 @@ class WorkFilesWidget(QWidget):
                 self.service.checked_path(path)
                 self.rename_button.setEnabled(path != self.service.root)
                 self.move_button.setEnabled(path != self.service.root)
+                self.recycle_button.setEnabled(path != self.service.root)
                 index = self.files_model.index(str(path))
                 self.details_icon.setPixmap(self.files_model.fileIcon(index).pixmap(64, 64))
                 self.details_info.setText(f"{self.files_model.type(index)}\n\nUbicación:\nTrabajo / {path.relative_to(self.service.root)}")
@@ -503,4 +546,6 @@ class WorkFilesWidget(QWidget):
             menu.addAction("Abrir", self.open_selected)
             menu.addAction("Renombrar", self.rename_selected).setEnabled(self.rename_button.isEnabled())
             menu.addAction("Mover a…", self.move_selected).setEnabled(self.move_button.isEnabled())
+            menu.addSeparator()
+            menu.addAction("Enviar a la Papelera", self.recycle_selected).setEnabled(self.recycle_button.isEnabled())
         menu.exec(view.viewport().mapToGlobal(point))

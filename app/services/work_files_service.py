@@ -11,6 +11,42 @@ class WorkFilesError(ValueError):
     """A filesystem request cannot be completed within Trabajo."""
 
 
+def _recycle_windows(path: Path) -> None:
+    if os.name != "nt":
+        raise WorkFilesError("La Papelera de Windows no está disponible en este equipo.")
+    initialized = False
+    operation = item = None
+    try:
+        import pythoncom
+        from win32com.shell import shell, shellcon
+
+        pythoncom.CoInitializeEx(pythoncom.COINIT_APARTMENTTHREADED)
+        initialized = True
+        operation = pythoncom.CoCreateInstance(
+            shell.CLSID_FileOperation, None, pythoncom.CLSCTX_INPROC_SERVER, shell.IID_IFileOperation,
+        )
+        # FOFX_RECYCLEONDELETE (Windows 8+) requests recycling rather than permanent deletion.
+        recycle_on_delete = 0x00080000
+        operation.SetOperationFlags(
+            recycle_on_delete | shellcon.FOF_ALLOWUNDO | shellcon.FOFX_EARLYFAILURE
+            | shellcon.FOF_NOCONFIRMATION | shellcon.FOF_NOERRORUI | shellcon.FOF_SILENT,
+        )
+        item = shell.SHCreateItemFromParsingName(str(path), None, shell.IID_IShellItem)
+        operation.DeleteItem(item, None)
+        operation.PerformOperations()
+        if operation.GetAnyOperationsAborted() or path.exists():
+            raise WorkFilesError("Windows no ha completado el envío a la Papelera.")
+    except WorkFilesError:
+        raise
+    except Exception as exc:
+        # Shell/COM failures must never fall back to unlink(), rmtree() or an API delete.
+        raise WorkFilesError("No se pudo enviar a la Papelera. Comprueba si está en uso y los permisos.") from exc
+    finally:
+        item = operation = None
+        if initialized:
+            pythoncom.CoUninitialize()
+
+
 class WorkFilesService:
     def __init__(self, root: str | Path | None = None) -> None:
         self._configured_root = Path(root if root is not None else BASE_DIR.parent / "Trabajo").absolute()
@@ -66,6 +102,10 @@ class WorkFilesService:
         except OSError as exc:
             raise WorkFilesError("No se pudo mover. El elemento puede estar en uso o no tienes permisos.") from exc
         return destination
+
+    def recycle(self, path: str | Path) -> None:
+        source = self.checked_path(path, allow_root=False)
+        _recycle_windows(source)
 
     def checked_path(self, path: str | Path, *, directory: bool = False,
                      allow_root: bool = True) -> Path:
