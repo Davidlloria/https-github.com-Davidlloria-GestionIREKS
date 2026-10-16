@@ -6,7 +6,7 @@ from PySide6.QtCore import QDir, QItemSelectionModel, QModelIndex, QSortFilterPr
 from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
-    QAbstractItemView, QFileSystemModel, QHBoxLayout, QHeaderView, QLabel,
+    QAbstractItemView, QDialog, QDialogButtonBox, QFileSystemModel, QHBoxLayout, QHeaderView, QLabel,
     QInputDialog, QLineEdit, QListView, QMenu, QMessageBox, QPushButton, QSplitter,
     QStackedWidget, QStyle, QToolButton, QTreeView, QVBoxLayout, QWidget,
 )
@@ -74,6 +74,10 @@ class WorkFilesWidget(QWidget):
         self.rename_button.setEnabled(False)
         self.rename_button.clicked.connect(self.rename_selected)
         self.actions_layout.addWidget(self.rename_button)
+        self.move_button = QPushButton("Mover a…")
+        self.move_button.setEnabled(False)
+        self.move_button.clicked.connect(self.move_selected)
+        self.actions_layout.addWidget(self.move_button)
         self.actions_layout.addStretch()
         self.open_windows_button = QPushButton("Abrir en Windows")
         self.open_windows_button.clicked.connect(self.open_in_windows)
@@ -415,6 +419,57 @@ class WorkFilesWidget(QWidget):
         except WorkFilesError as exc:
             QMessageBox.warning(self, "Renombrar", str(exc))
 
+    def _choose_destination(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Mover a…")
+        dialog.resize(520, 440)
+        layout = QVBoxLayout(dialog)
+        caption = QLabel("Selecciona la carpeta de destino dentro de Trabajo.")
+        layout.addWidget(caption)
+        tree = QTreeView()
+        tree.setObjectName("workMoveDestinationTree")
+        tree.setModel(self.tree_proxy)
+        tree.setHeaderHidden(True)
+        tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        for column in range(1, 4):
+            tree.hideColumn(column)
+        root_index = self.tree_proxy.mapFromSource(self.tree_model.index(str(self.service.root)))
+        tree.setRootIndex(root_index.parent())
+        tree.expand(root_index)
+        tree.setCurrentIndex(root_index)
+        layout.addWidget(tree, 1)
+        destination_label = QLabel("Trabajo")
+        destination_label.setTextFormat(Qt.TextFormat.PlainText)
+        destination_label.setWordWrap(True)
+        layout.addWidget(destination_label)
+        selected = [self.service.root]
+
+        def update_destination(index, _previous):
+            selected[0] = Path(self.tree_model.filePath(self.tree_proxy.mapToSource(index)))
+            destination_label.setText("Trabajo / " + str(selected[0].relative_to(self.service.root)))
+
+        tree.selectionModel().currentChanged.connect(update_destination)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Mover aquí")
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        return selected[0] if dialog.exec() == QDialog.DialogCode.Accepted else None
+
+    def move_selected(self):
+        path = self._selected_path()
+        if path is None:
+            return
+        destination = self._choose_destination()
+        if destination is None:
+            return
+        try:
+            self.service.move(path, destination)
+            self._refresh_after_change()
+        except WorkFilesError as exc:
+            QMessageBox.warning(self, "Mover", str(exc))
+
     def _toggle_details(self, visible):
         self.details.setVisible(visible)
         self._update_selection()
@@ -423,6 +478,7 @@ class WorkFilesWidget(QWidget):
         path = self._selected_path()
         self.open_button.setEnabled(path is not None)
         self.rename_button.setEnabled(False)
+        self.move_button.setEnabled(False)
         self.details_icon.clear()
         self.details_name.setText(path.name if path else "Selecciona un archivo o una carpeta")
         self.details_info.clear()
@@ -430,6 +486,7 @@ class WorkFilesWidget(QWidget):
             try:
                 self.service.checked_path(path)
                 self.rename_button.setEnabled(path != self.service.root)
+                self.move_button.setEnabled(path != self.service.root)
                 index = self.files_model.index(str(path))
                 self.details_icon.setPixmap(self.files_model.fileIcon(index).pixmap(64, 64))
                 self.details_info.setText(f"{self.files_model.type(index)}\n\nUbicación:\nTrabajo / {path.relative_to(self.service.root)}")
@@ -445,4 +502,5 @@ class WorkFilesWidget(QWidget):
             menu.addSeparator()
             menu.addAction("Abrir", self.open_selected)
             menu.addAction("Renombrar", self.rename_selected).setEnabled(self.rename_button.isEnabled())
+            menu.addAction("Mover a…", self.move_selected).setEnabled(self.move_button.isEnabled())
         menu.exec(view.viewport().mapToGlobal(point))

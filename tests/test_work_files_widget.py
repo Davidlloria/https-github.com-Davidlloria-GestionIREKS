@@ -138,3 +138,28 @@ def test_rename_selected_and_cancel_extension_change(browser, monkeypatch):
     browser.rename_button.click()
     wait_for(lambda: browser._selected_path() == root / "renombrada.txt")
     assert (root / "renombrada.txt").read_text(encoding="utf-8") == "prueba"
+
+
+def test_move_cancel_and_success_refresh_current_folder(browser, monkeypatch):
+    root = browser.service.root
+    select(browser, root / "nota.txt")
+    monkeypatch.setattr(browser, "_choose_destination", lambda: None)
+    browser.move_button.click()
+    assert (root / "nota.txt").exists()
+    monkeypatch.setattr(browser, "_choose_destination", lambda: root / "Pedidos")
+    browser.move_button.click()
+    assert (root / "Pedidos/nota.txt").read_text(encoding="utf-8") == "prueba"
+    assert browser.current_path == root
+    assert not (root / "nota.txt").exists()
+    assert not browser.move_button.isEnabled()
+
+
+def test_move_destination_dialog_starts_at_work_and_cancel_is_non_mutating(browser, monkeypatch):
+    from PySide6.QtWidgets import QDialog, QTreeView
+    def cancel(dialog):
+        tree = dialog.findChild(QTreeView, "workMoveDestinationTree")
+        index = browser.tree_proxy.mapToSource(tree.currentIndex())
+        assert Path(browser.tree_model.filePath(index)) == browser.service.root
+        return QDialog.DialogCode.Rejected
+    monkeypatch.setattr(QDialog, "exec", cancel)
+    assert browser._choose_destination() is None

@@ -51,6 +51,22 @@ class WorkFilesService:
             raise WorkFilesError("No se pudo renombrar. El elemento puede estar en uso o no tienes permisos.") from exc
         return destination
 
+    def move(self, path: str | Path, directory: str | Path) -> Path:
+        source = self.checked_path(path, allow_root=False)
+        directory = self.checked_path(directory, directory=True)
+        if directory == source.parent:
+            raise WorkFilesError("El elemento ya está en la carpeta elegida.")
+        if source.is_dir() and directory.is_relative_to(source):
+            raise WorkFilesError("No se puede mover una carpeta dentro de sí misma.")
+        destination = directory / source.name
+        if destination.exists() or destination.is_symlink() or destination.is_junction():
+            raise WorkFilesError("Ya existe un elemento con ese nombre en el destino. No se ha sobrescrito.")
+        try:
+            source.rename(destination)
+        except OSError as exc:
+            raise WorkFilesError("No se pudo mover. El elemento puede estar en uso o no tienes permisos.") from exc
+        return destination
+
     def checked_path(self, path: str | Path, *, directory: bool = False,
                      allow_root: bool = True) -> Path:
         candidate = Path(path)
