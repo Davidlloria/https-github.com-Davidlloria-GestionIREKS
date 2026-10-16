@@ -13,6 +13,24 @@ entire migration history first.
 
 ## Current Snapshot
 
+- Date: 2026-10-16. Branch: `reestructuracion_proyecto`.
+- Starting HEAD for visual review: `d256c06c744c6e46e2e1029c6b4b51cd9344d357`.
+- Fixed Qt proxy warnings in `f2941673a`: detach views before replacing models,
+  guard callbacks during rebuild and ignore indexes from previous models.
+  Added regression coverage for selected refresh and stale activation.
+- Restyled only the Trabajo widget: navigation/search row, compact command bar,
+  existing SVG icons with explicit disabled colors, clearer file list, icon view,
+  folder sidebar, details panel and footer link. Long paths scroll locally.
+- Validation: 46 service/widget/architecture + 14 dashboard + 1 main-window tests
+  passed (61 total); two unrelated PDF/printing tests excluded. Known ReportLab
+  deprecation only. Native Windows captures and 15 navigation/view/refresh cycles
+  passed without the proxy warning. No full-suite run.
+- File operations and safety rules remain unchanged. Tests use temporary data;
+  real Trabajo was read only. No service/API/React/launcher changes, merge or push.
+- Guide: `docs/guides/work-files-browser.md`.
+
+## Historical Snapshot - 2026-10-16 - Initial Trabajo browser
+
 - Date: 2026-10-16
 - Branch: `reestructuracion_proyecto`.
 - Initial HEAD: `ab3f688cb5d22d4251606d352367edc4180ef29a`.

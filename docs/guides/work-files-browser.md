@@ -7,6 +7,11 @@ carpeta de datos de prueba ni modifica las bases de datos.
 
 ## Uso
 
+La barra superior agrupa navegacion, ruta y filtro. La segunda barra contiene
+las acciones y los selectores Lista/Iconos y Detalles. Abrir en Windows queda
+en el pie. Los botones usan los SVG existentes, con estados de seleccion,
+desactivacion y peligro; los archivos conservan los iconos nativos de Windows.
+
 - Utilizar el arbol izquierdo o el doble clic para entrar en carpetas.
 - Volver con Atras/Adelante, subir un nivel o pulsar un tramo de la ruta.
 - Usar Lista o Iconos; las columnas de Lista permiten ordenar los elementos.
@@ -68,6 +73,21 @@ ya utilizados por otros flujos.
 No se ejecuto la suite completa. No se modificaron API, React, contratos, bases,
 launcher ni packaging. Capturas, inventarios y datos de prueba permanecen en `.tmp`
 y no se incluyen en Git.
+
+## Revision visual y correccion de modelos (2026-10-16)
+
+Se desconectan las vistas antes de sustituir los modelos y se ignoran eventos
+pendientes de modelos anteriores. Esto corrige `index from wrong model passed
+to mapToSource` sin ocultar los avisos de Qt. Dos pruebas cubren la actualizacion
+con seleccion y la activacion tardia de indices antiguos.
+
+La revision pasa 46 pruebas de servicio/widget/arquitectura, 14 de Inicio y una
+de ventana principal (61 en total). Se excluyen dos pruebas de PDF/impresion
+ajenas a este cambio. Solo aparece la deprecacion conocida de ReportLab.
+Las capturas nativas de lista, iconos y detalles, y 15 ciclos de navegacion,
+cambio de vista y actualizacion, no reproducen el aviso del modelo.
+Se conserva el desplazamiento local para rutas largas y no se modifican las
+operaciones de archivos, el servicio ni los datos reales. No se ejecuta la suite completa.
 
 ## Comprobacion manual
 

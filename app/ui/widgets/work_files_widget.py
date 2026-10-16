@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QDir, QItemSelectionModel, QModelIndex, QSortFilterProxyModel, QSize, Qt
-from PySide6.QtGui import QDesktopServices, QIcon, QKeySequence, QShortcut
+from PySide6.QtCore import QDir, QItemSelectionModel, QSortFilterProxyModel, QSize, Qt
+from PySide6.QtGui import QColor, QDesktopServices, QIcon, QKeySequence, QPainter, QPixmap, QShortcut, QTransform
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
-    QAbstractItemView, QDialog, QDialogButtonBox, QFileSystemModel, QHBoxLayout, QHeaderView, QLabel,
+    QAbstractItemView, QDialog, QDialogButtonBox, QFileSystemModel, QFrame, QHBoxLayout, QHeaderView, QLabel,
     QInputDialog, QLayout, QLineEdit, QListView, QMenu, QMessageBox, QPushButton, QScrollArea,
-    QSizePolicy, QSplitter, QStackedWidget, QStyle, QToolButton, QTreeView, QVBoxLayout, QWidget,
+    QSizePolicy, QSplitter, QStackedWidget, QToolButton, QTreeView, QVBoxLayout, QWidget,
 )
 
 from app.services.work_files_service import WorkFilesError, WorkFilesService
@@ -71,105 +72,157 @@ class WorkFilesWidget(QWidget):
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
-        self.actions_layout = QHBoxLayout()
-        self.create_button = QPushButton("Nueva carpeta")
-        self.create_button.clicked.connect(self.create_folder)
-        self.actions_layout.addWidget(self.create_button)
-        self.rename_button = QPushButton("Renombrar")
-        self.rename_button.setEnabled(False)
-        self.rename_button.clicked.connect(self.rename_selected)
-        self.actions_layout.addWidget(self.rename_button)
-        self.move_button = QPushButton("Mover a…")
-        self.move_button.setEnabled(False)
-        self.move_button.clicked.connect(self.move_selected)
-        self.actions_layout.addWidget(self.move_button)
-        self.recycle_button = QPushButton("Eliminar")
-        self.recycle_button.setToolTip("Enviar a la Papelera de Windows")
-        self.recycle_button.setEnabled(False)
-        self.recycle_button.clicked.connect(self.recycle_selected)
-        self.actions_layout.addWidget(self.recycle_button)
-        self.actions_layout.addStretch()
-        self.open_windows_button = QPushButton("Abrir en Windows")
-        self.open_windows_button.clicked.connect(self.open_in_windows)
-        self.actions_layout.addWidget(self.open_windows_button)
-        icon_dir = Path(__file__).resolve().parents[3] / "assets" / "icons"
-        self.create_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogNewFolder))
-        self.rename_button.setIcon(QIcon(str(icon_dir / "movement-edit-navy.svg")))
-        self.move_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowRight))
-        self.recycle_button.setIcon(QIcon(str(icon_dir / "trash.svg")))
-        self.open_windows_button.setIcon(QIcon(str(icon_dir / "folder-open-navy.svg")))
-        layout.addLayout(self.actions_layout)
+        layout.setSpacing(0)
 
-        navigation = QHBoxLayout()
-        navigation.setSpacing(6)
-        self.back_button = self._navigation_button("Atrás", QStyle.StandardPixmap.SP_ArrowBack, self.go_back)
-        self.forward_button = self._navigation_button("Adelante", QStyle.StandardPixmap.SP_ArrowForward, self.go_forward)
-        self.up_button = self._navigation_button("Subir un nivel", QStyle.StandardPixmap.SP_ArrowUp, self.go_up)
-        self.refresh_button = self._navigation_button("Actualizar", QStyle.StandardPixmap.SP_BrowserReload, self.refresh)
+        address_bar = QFrame()
+        address_bar.setObjectName("workAddressBar")
+        navigation = QHBoxLayout(address_bar)
+        navigation.setContentsMargins(12, 10, 12, 10)
+        navigation.setSpacing(4)
+        self.back_button = self._navigation_button("Atrás · Alt+Izquierda", "chevron-right.svg", self.go_back, 180)
+        self.forward_button = self._navigation_button("Adelante · Alt+Derecha", "chevron-right.svg", self.go_forward)
+        self.up_button = self._navigation_button("Subir un nivel · Alt+Arriba", "arrow-up.svg", self.go_up)
+        self.refresh_button = self._navigation_button("Actualizar · F5", "refresh-cw.svg", self.refresh)
         for button in (self.back_button, self.forward_button, self.up_button, self.refresh_button):
             navigation.addWidget(button)
+        navigation.addSpacing(7)
         breadcrumb_host = QWidget()
+        breadcrumb_host.setObjectName("workBreadcrumbHost")
         self.breadcrumbs = QHBoxLayout(breadcrumb_host)
-        self.breadcrumbs.setContentsMargins(0, 0, 0, 0)
-        self.breadcrumbs.setSpacing(2)
+        self.breadcrumbs.setContentsMargins(7, 0, 7, 0)
+        self.breadcrumbs.setSpacing(0)
         self.breadcrumbs.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.breadcrumbs.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         self.breadcrumb_scroll = QScrollArea()
+        self.breadcrumb_scroll.setObjectName("workBreadcrumbBar")
         self.breadcrumb_scroll.setWidgetResizable(True)
         self.breadcrumb_scroll.setWidget(breadcrumb_host)
         self.breadcrumb_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.breadcrumb_scroll.setFixedHeight(52)
+        self.breadcrumb_scroll.setFixedHeight(44)
         self.breadcrumb_scroll.setMinimumWidth(80)
         self.breadcrumb_scroll.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        self.breadcrumb_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
         navigation.addWidget(self.breadcrumb_scroll, 1)
+        navigation.addSpacing(7)
         self.filter_edit = QLineEdit()
+        self.filter_edit.setObjectName("workSearch")
         self.filter_edit.setPlaceholderText("Filtrar esta carpeta")
         self.filter_edit.setClearButtonEnabled(True)
-        self.filter_edit.setFixedWidth(250)
+        self.filter_edit.setFixedSize(240, 40)
+        self.filter_edit.addAction(self._icon("search-navy.svg", "#64748B"), QLineEdit.ActionPosition.LeadingPosition)
         self.filter_edit.textChanged.connect(self._filter_changed)
         navigation.addWidget(self.filter_edit)
-        layout.addLayout(navigation)
+        layout.addWidget(address_bar)
 
-        views = QHBoxLayout()
-        views.addStretch()
-        self.list_button = QPushButton("Lista")
-        self.icons_button = QPushButton("Iconos")
-        self.details_button = QPushButton("Detalles")
-        for button in (self.list_button, self.icons_button, self.details_button):
+        command_bar = QFrame()
+        command_bar.setObjectName("workCommandBar")
+        self.actions_layout = QHBoxLayout(command_bar)
+        self.actions_layout.setContentsMargins(12, 8, 12, 8)
+        self.actions_layout.setSpacing(5)
+        self.create_button = QPushButton("Nueva carpeta")
+        self.create_button.setProperty("workRole", "primary")
+        self.create_button.setIcon(self._icon("plus.svg", "#FFFFFF"))
+        self.create_button.clicked.connect(self.create_folder)
+        self.rename_button = QPushButton("Renombrar")
+        self.rename_button.setIcon(self._icon("movement-edit-navy.svg"))
+        self.rename_button.setToolTip("Renombrar · F2")
+        self.rename_button.clicked.connect(self.rename_selected)
+        self.move_button = QPushButton("Mover a…")
+        self.move_button.setIcon(self._icon("export.svg"))
+        self.move_button.clicked.connect(self.move_selected)
+        self.recycle_button = QPushButton("Eliminar")
+        self.recycle_button.setProperty("workRole", "danger")
+        self.recycle_button.setIcon(self._icon("trash.svg", "#DC2626"))
+        self.recycle_button.setToolTip("Enviar a la Papelera de Windows · Supr")
+        self.recycle_button.clicked.connect(self.recycle_selected)
+        self.actions_layout.addWidget(self.create_button)
+        separator = QFrame()
+        separator.setObjectName("workCommandSeparator")
+        separator.setFixedSize(1, 22)
+        self.actions_layout.addSpacing(7)
+        self.actions_layout.addWidget(separator)
+        self.actions_layout.addSpacing(7)
+        for button in (self.rename_button, self.move_button, self.recycle_button):
+            button.setEnabled(False)
+            self.actions_layout.addWidget(button)
+        self.actions_layout.addStretch()
+        view_switch = QFrame()
+        view_switch.setObjectName("workViewSwitch")
+        views = QHBoxLayout(view_switch)
+        views.setContentsMargins(3, 3, 3, 3)
+        views.setSpacing(2)
+        self.list_button = QToolButton()
+        self.icons_button = QToolButton()
+        for button, title, icon in ((self.list_button, "Lista", "list.svg"),
+                                    (self.icons_button, "Iconos", "layout-dashboard.svg")):
             button.setCheckable(True)
+            button.setToolTip(title)
+            button.setAccessibleName(title)
+            button.setIcon(self._icon(icon))
+            button.setIconSize(QSize(18, 18))
+            button.setFixedSize(30, 28)
             views.addWidget(button)
         self.list_button.setChecked(True)
         self.list_button.clicked.connect(lambda: self._set_view(False))
         self.icons_button.clicked.connect(lambda: self._set_view(True))
+        self.actions_layout.addWidget(view_switch)
+        self.actions_layout.addSpacing(8)
+        self.details_button = QPushButton("Detalles")
+        self.details_button.setIcon(self._icon("file-text.svg"))
+        self.details_button.setCheckable(True)
         self.details_button.toggled.connect(self._toggle_details)
-        layout.addLayout(views)
+        self.actions_layout.addWidget(self.details_button)
+        for button in (self.create_button, self.rename_button, self.move_button,
+                       self.recycle_button, self.details_button):
+            button.setFixedHeight(34)
+            button.setIconSize(QSize(18, 18))
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+        layout.addWidget(command_bar)
 
         self.message = QLabel()
+        self.message.setObjectName("workMessage")
         self.message.setTextFormat(Qt.TextFormat.PlainText)
         self.message.setWordWrap(True)
         layout.addWidget(self.message)
         self.splitter = QSplitter()
+        self.splitter.setObjectName("workBrowserSplitter")
+        self.splitter.setHandleWidth(1)
+        self.splitter.setChildrenCollapsible(False)
+        folders = QWidget()
+        folders.setObjectName("workFolderPane")
+        folders.setMinimumWidth(170)
+        folders.setMaximumWidth(300)
+        folder_layout = QVBoxLayout(folders)
+        folder_layout.setContentsMargins(8, 14, 8, 8)
+        folder_layout.setSpacing(8)
+        folder_caption = QLabel("CARPETAS")
+        folder_caption.setObjectName("workFolderCaption")
+        folder_layout.addWidget(folder_caption)
         self.tree = QTreeView()
+        self.tree.setObjectName("workFolderTree")
         self.tree.setHeaderHidden(True)
-        self.tree.setMinimumWidth(150)
-        self.tree.setMaximumWidth(350)
+        self.tree.setIndentation(18)
+        self.tree.setIconSize(QSize(18, 18))
         self.tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tree.clicked.connect(self._tree_clicked)
-        self.splitter.addWidget(self.tree)
+        folder_layout.addWidget(self.tree, 1)
+        self.splitter.addWidget(folders)
+
         self.file_views = QStackedWidget()
+        self.file_views.setObjectName("workFileViews")
+        self.file_views.setMinimumWidth(260)
         self.list_view = QTreeView()
+        self.list_view.setObjectName("workFileList")
         self.list_view.setRootIsDecorated(False)
         self.list_view.setItemsExpandable(False)
         self.list_view.setSortingEnabled(True)
-        self.list_view.setAlternatingRowColors(True)
+        self.list_view.setIconSize(QSize(20, 20))
         self.icons_view = QListView()
+        self.icons_view.setObjectName("workFileIcons")
         self.icons_view.setViewMode(QListView.ViewMode.IconMode)
         self.icons_view.setResizeMode(QListView.ResizeMode.Adjust)
         self.icons_view.setMovement(QListView.Movement.Static)
         self.icons_view.setIconSize(QSize(48, 48))
-        self.icons_view.setGridSize(QSize(180, 100))
+        self.icons_view.setGridSize(QSize(160, 112))
         self.icons_view.setWordWrap(True)
         for view in (self.list_view, self.icons_view):
             view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -181,13 +234,23 @@ class WorkFilesWidget(QWidget):
             view.customContextMenuRequested.connect(lambda point, target=view: self._context_menu(target, point))
             self.file_views.addWidget(view)
         self.splitter.addWidget(self.file_views)
+
         self.details = QWidget()
-        self.details.setMinimumWidth(180)
-        self.details.setMaximumWidth(260)
+        self.details.setObjectName("workDetailsPane")
+        self.details.setMinimumWidth(210)
+        self.details.setMaximumWidth(270)
         details_layout = QVBoxLayout(self.details)
+        details_layout.setContentsMargins(20, 18, 20, 18)
+        details_layout.setSpacing(14)
+        details_caption = QLabel("DETALLES")
+        details_caption.setObjectName("workDetailsCaption")
+        details_layout.addWidget(details_caption)
         self.details_icon = QLabel()
+        self.details_icon.setFixedHeight(72)
         self.details_name = QLabel("Selecciona un archivo o una carpeta")
+        self.details_name.setObjectName("workDetailsName")
         self.details_info = QLabel()
+        self.details_info.setObjectName("workDetailsInfo")
         for label in (self.details_name, self.details_info):
             label.setTextFormat(Qt.TextFormat.PlainText)
             label.setWordWrap(True)
@@ -196,17 +259,33 @@ class WorkFilesWidget(QWidget):
         details_layout.addWidget(self.details_name)
         details_layout.addWidget(self.details_info)
         self.open_button = QPushButton("Abrir")
+        self.open_button.setProperty("workRole", "primary")
+        self.open_button.setIcon(self._icon("folder-open-navy.svg", "#FFFFFF"))
         self.open_button.clicked.connect(self.open_selected)
         details_layout.addWidget(self.open_button)
         details_layout.addStretch()
         self.splitter.addWidget(self.details)
         self.details.hide()
         self.splitter.setStretchFactor(1, 1)
-        self.splitter.setSizes([210, 650, 220])
+        self.splitter.setSizes([210, 740, 240])
         layout.addWidget(self.splitter, 1)
+
+        footer = QFrame()
+        footer.setObjectName("workStatusBar")
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(16, 5, 12, 5)
         self.status = QLabel()
+        self.status.setObjectName("workStatusText")
         self.status.setTextFormat(Qt.TextFormat.PlainText)
-        layout.addWidget(self.status)
+        footer_layout.addWidget(self.status)
+        footer_layout.addStretch()
+        self.open_windows_button = QPushButton("Abrir en Windows")
+        self.open_windows_button.setProperty("workRole", "link")
+        self.open_windows_button.setIcon(self._icon("folder-open-navy.svg", "#2563EB"))
+        self.open_windows_button.setFixedHeight(30)
+        self.open_windows_button.clicked.connect(self.open_in_windows)
+        footer_layout.addWidget(self.open_windows_button)
+        layout.addWidget(footer)
         for key, callback in (("Alt+Left", self.go_back), ("Alt+Right", self.go_forward),
                               ("Alt+Up", self.go_up), ("F5", self.refresh), ("F2", self.rename_selected)):
             shortcut = QShortcut(QKeySequence(key), self)
@@ -215,30 +294,114 @@ class WorkFilesWidget(QWidget):
         delete_shortcut = QShortcut(QKeySequence("Delete"), self.file_views)
         delete_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         delete_shortcut.activated.connect(self.recycle_selected)
-        self.setStyleSheet("""
-            QWidget#workFilesRoot QTreeView, QWidget#workFilesRoot QListView {
-                background: white; border: 1px solid #DCE4EF; border-radius: 6px;
-                selection-background-color: #DBEAFE; selection-color: #0F172A;
-                alternate-background-color: #F8FAFC;
-            }
-            QWidget#workFilesRoot QTreeView::item { min-height: 30px; }
-            QWidget#workFilesRoot QHeaderView::section { background: #F4F6F9; padding: 7px; border: none; }
-            QWidget#workFilesRoot QPushButton, QWidget#workFilesRoot QToolButton {
-                background: white; border: 1px solid #CBD5E1; border-radius: 6px; padding: 7px 10px;
-            }
-            QWidget#workFilesRoot QPushButton:checked { background: #DBEAFE; color: #1D4ED8; }
-            QWidget#workFilesRoot QPushButton:disabled { color: #94A3B8; }
-            QWidget#workFilesRoot QLineEdit { background: white; padding: 8px; border: 1px solid #CBD5E1; border-radius: 6px; }
-        """)
+        self._apply_work_styles()
+        self.open_button.ensurePolished()
+        self.open_button.setFixedHeight(36)
 
-    def _navigation_button(self, title, icon, callback):
+    def _icon(self, asset, color="#475569", rotation=0):
+        path = Path(__file__).resolve().parents[3] / "assets" / "icons" / asset
+        renderer = QSvgRenderer(str(path))
+        icon = QIcon()
+        for mode, tint in ((QIcon.Mode.Normal, color), (QIcon.Mode.Disabled, "#AEB8C7")):
+            pixmap = QPixmap(36, 36)
+            pixmap.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pixmap)
+            renderer.render(painter)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+            painter.fillRect(pixmap.rect(), QColor(tint))
+            painter.end()
+            if rotation:
+                pixmap = pixmap.transformed(QTransform().rotate(rotation), Qt.TransformationMode.SmoothTransformation)
+            pixmap.setDevicePixelRatio(2)
+            icon.addPixmap(pixmap, mode)
+        return icon
+
+    def _navigation_button(self, title, asset, callback, rotation=0):
         button = QToolButton()
+        button.setObjectName("workNavigationButton")
         button.setToolTip(title)
         button.setAccessibleName(title)
-        button.setFixedSize(34, 34)
-        button.setIcon(self.style().standardIcon(icon))
+        button.setFixedSize(32, 32)
+        button.setIcon(self._icon(asset, rotation=rotation))
+        button.setIconSize(QSize(18, 18))
         button.clicked.connect(callback)
         return button
+
+    def _apply_work_styles(self):
+        self.setStyleSheet("""
+            QWidget#workFilesRoot { background: #FFFFFF; border: 1px solid #DCE4EF; border-radius: 12px; }
+            QWidget#workFilesRoot QLabel { background: transparent; border: none; }
+            QFrame#workAddressBar { background: transparent; border: none; border-bottom: 1px solid #EDF1F6; }
+            QFrame#workCommandBar { background: #FFFFFF; border: none; border-bottom: 1px solid #E4EAF2; }
+            QFrame#workCommandSeparator { background: #E2E8F0; border: none; }
+            QWidget#workFilesRoot QPushButton {
+                background: transparent; color: #475569; border: 1px solid transparent;
+                border-radius: 6px; padding: 0 8px; min-height: 0; font-size: 13px;
+            }
+            QWidget#workFilesRoot QPushButton:hover { background: #F1F5F9; color: #0F172A; }
+            QWidget#workFilesRoot QPushButton:pressed { background: #E2E8F0; }
+            QWidget#workFilesRoot QPushButton:disabled { color: #A0AABB; background: transparent; }
+            QWidget#workFilesRoot QPushButton[workRole="primary"] {
+                background: #2563EB; color: #FFFFFF; font-weight: 600; border-color: #2563EB; padding: 0 13px;
+            }
+            QWidget#workFilesRoot QPushButton[workRole="primary"]:hover { background: #1D4ED8; border-color: #1D4ED8; }
+            QWidget#workFilesRoot QPushButton[workRole="primary"]:disabled { background: #E2E8F0; border-color: #E2E8F0; color: #94A3B8; }
+            QWidget#workFilesRoot QPushButton[workRole="danger"] { color: #DC2626; }
+            QWidget#workFilesRoot QPushButton[workRole="danger"]:hover { background: #FEF2F2; }
+            QWidget#workFilesRoot QPushButton[workRole="danger"]:disabled { color: #A0AABB; }
+            QWidget#workFilesRoot QPushButton[workRole="link"] { color: #2563EB; font-size: 12px; }
+            QWidget#workFilesRoot QPushButton[workRole="link"]:disabled { color: #A0AABB; }
+            QWidget#workFilesRoot QPushButton:checked { color: #1D4ED8; background: #EFF6FF; border-color: #BFDBFE; }
+            QWidget#workFilesRoot QToolButton {
+                background: transparent; border: none; border-radius: 5px;
+                padding: 0; min-height: 0; min-width: 0; color: #475569;
+            }
+            QWidget#workFilesRoot QToolButton:hover { background: #E9EFF7; }
+            QWidget#workFilesRoot QToolButton:disabled { background: transparent; color: #AEB8C7; }
+            QFrame#workViewSwitch { background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 7px; }
+            QFrame#workViewSwitch QToolButton:checked { background: #FFFFFF; border: 1px solid #D8E2F0; }
+            QScrollArea#workBreadcrumbBar { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 7px; }
+            QWidget#workBreadcrumbHost { background: transparent; border: none; }
+            QWidget#workBreadcrumbHost QToolButton { padding: 0 7px; min-height: 24px; }
+            QLineEdit#workSearch {
+                background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 7px;
+                padding: 0 8px; min-height: 0; color: #334155; selection-background-color: #DBEAFE;
+            }
+            QLineEdit#workSearch:focus { border-color: #93B4F5; background: #FFFFFF; }
+            QWidget#workFolderPane { background: #FAFBFD; border: none; }
+            QLabel#workFolderCaption, QLabel#workDetailsCaption { color: #8A98AC; font-size: 10px; font-weight: 700; padding: 0 10px; }
+            QStackedWidget#workFileViews { background: #FFFFFF; border: none; }
+            QSplitter#workBrowserSplitter::handle { background: #E7EDF4; }
+            QWidget#workFilesRoot QTreeView, QWidget#workFilesRoot QListView {
+                background: #FFFFFF; border: none; outline: none; color: #334155;
+                selection-background-color: #E8F0FE; selection-color: #183E78;
+            }
+            QTreeView#workFolderTree { background: transparent; }
+            QTreeView#workFolderTree::item { min-height: 24px; padding: 4px 2px; border-radius: 5px; }
+            QTreeView#workFileList::item { min-height: 28px; padding: 4px 5px; border: none; }
+            QWidget#workFilesRoot QTreeView::item:hover { background: #F0F5FC; }
+            QWidget#workFilesRoot QTreeView::item:selected { background: #E8F0FE; color: #183E78; }
+            QWidget#workFilesRoot QHeaderView { background: #F8FAFC; border: none; }
+            QWidget#workFilesRoot QHeaderView::section {
+                background: #F8FAFC; color: #64748B; font-size: 12px; font-weight: 600;
+                padding: 10px 8px; border: none; border-bottom: 1px solid #E7EDF4;
+            }
+            QListView#workFileIcons { padding: 12px; }
+            QListView#workFileIcons::item { padding: 9px; border: 1px solid transparent; border-radius: 8px; }
+            QListView#workFileIcons::item:hover { background: #F3F7FD; border-color: #E2EAF6; }
+            QListView#workFileIcons::item:selected { background: #E8F0FE; border-color: #B9CFF3; }
+            QWidget#workDetailsPane { background: #F8FAFC; border: none; }
+            QLabel#workDetailsCaption { padding: 0; }
+            QLabel#workDetailsName { color: #1E293B; font-size: 14px; font-weight: 600; }
+            QLabel#workDetailsInfo { color: #64748B; font-size: 12px; }
+            QLabel#workMessage { color: #92400E; background: #FFFBEB; padding: 18px; }
+            QFrame#workStatusBar { background: #FAFBFD; border: none; border-top: 1px solid #E7EDF4; }
+            QLabel#workStatusText { color: #7B8A9E; font-size: 12px; }
+            QMenu#workContextMenu { background: #FFFFFF; border: 1px solid #DCE4EF; padding: 5px; }
+            QMenu#workContextMenu::item { padding: 8px 24px 8px 12px; border-radius: 4px; }
+            QMenu#workContextMenu::item:selected { background: #EFF6FF; color: #1D4ED8; }
+            QMenu#workContextMenu::separator { height: 1px; background: #E7EDF4; margin: 4px 8px; }
+        """)
 
     def _install_models(self):
         self._rebuilding_models = True
@@ -357,9 +520,12 @@ class WorkFilesWidget(QWidget):
         for index, path in enumerate(paths):
             button = QToolButton()
             button.setText(("Trabajo" if index == 0 else path.name) + (" ›" if index < len(paths) - 1 else ""))
+            button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
             button.setToolTip(str(path))
             button.clicked.connect(lambda _checked=False, target=path: self.navigate(target))
             self.breadcrumbs.addWidget(button)
+            button.ensurePolished()
+            button.setFixedSize(max(40, button.fontMetrics().horizontalAdvance(button.text()) + 20), 24)
 
     def go_back(self):
         self._go_history(-1)
@@ -590,13 +756,14 @@ class WorkFilesWidget(QWidget):
     def _context_menu(self, view, point):
         index = view.indexAt(point)
         menu = QMenu(self)
-        menu.addAction("Nueva carpeta", self.create_folder).setEnabled(self.create_button.isEnabled())
+        menu.setObjectName("workContextMenu")
+        menu.addAction(self._icon("plus.svg"), "Nueva carpeta", self.create_folder).setEnabled(self.create_button.isEnabled())
         if index.isValid():
             view.setCurrentIndex(index)
             menu.addSeparator()
-            menu.addAction("Abrir", self.open_selected)
-            menu.addAction("Renombrar", self.rename_selected).setEnabled(self.rename_button.isEnabled())
-            menu.addAction("Mover a…", self.move_selected).setEnabled(self.move_button.isEnabled())
+            menu.addAction(self._icon("folder-open-navy.svg"), "Abrir", self.open_selected)
+            menu.addAction(self.rename_button.icon(), "Renombrar", self.rename_selected).setEnabled(self.rename_button.isEnabled())
+            menu.addAction(self.move_button.icon(), "Mover a…", self.move_selected).setEnabled(self.move_button.isEnabled())
             menu.addSeparator()
-            menu.addAction("Enviar a la Papelera", self.recycle_selected).setEnabled(self.recycle_button.isEnabled())
+            menu.addAction(self.recycle_button.icon(), "Enviar a la Papelera", self.recycle_selected).setEnabled(self.recycle_button.isEnabled())
         menu.exec(view.viewport().mapToGlobal(point))
