@@ -18,6 +18,24 @@ from app.ui.widgets.orders_page import NewPedidoDialog, OrderIncidentDialog, Ord
 _APP: QApplication | None = None
 
 
+def test_invoice_preview_displays_combined_plan_and_recovered_lines():
+    from PySide6.QtWidgets import QLabel, QTableWidget
+    from app.ui.widgets.orders_page import FacturaPreviewDialog
+    _application()
+    dialog = FacturaPreviewDialog(
+        {"factura_numero": "60062, 60063", "import_plan": "Albarán 2026090131: se creará"},
+        [{"factura_numero": "60063", "articulo_codigo": "8102", "_numeric_recovered": True}],
+    )
+    try:
+        table = dialog.findChild(QTableWidget)
+        assert table.columnCount() == 12
+        assert table.item(0, 11).text() == "60063"
+        assert "OCR" in table.item(0, 7).toolTip()
+        assert any("se creará" in label.text() for label in dialog.findChildren(QLabel))
+    finally:
+        dialog.deleteLater()
+
+
 def test_factura_items_load_with_and_without_price_discrepancy(monkeypatch) -> None:
     from types import SimpleNamespace
 

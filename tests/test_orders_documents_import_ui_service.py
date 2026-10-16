@@ -41,7 +41,7 @@ class _FakeOrderDocumentImportService:
         self.albaran_calls.append((pedido_id, header, rows))
         return self.albaran_result
 
-    def import_factura(
+    def import_facturas_with_albaranes(
         self,
         pedido_id: str,
         header: dict[str, str],

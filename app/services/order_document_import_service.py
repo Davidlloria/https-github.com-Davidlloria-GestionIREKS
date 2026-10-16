@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from contextlib import nullcontext
 from datetime import date, datetime
 from pathlib import Path
 import re
+from math import isfinite
 from typing import Any, cast
 
 from sqlmodel import Session, select
@@ -73,9 +75,126 @@ class OrderDocumentImportService:
         return self.import_albaran(pedido_id, header, rows)
 
     def import_factura_pdf(self, pedido_id: str, source: Path) -> OrderDocumentImportResult:
-        header, rows = OrderDocumentParser.parse_factura_pdf(source)
+        header, rows = OrderDocumentParser.parse_facturas_pdf(source)
         enriched_rows = self.enrich_factura_rows_from_tarifa(rows)
-        return self.import_factura(pedido_id, header, enriched_rows)
+        return self.import_facturas_with_albaranes(pedido_id, header, enriched_rows)
+
+    def _facturas_plan(self, session: Session, pedido_id: str, header, rows):
+        pedido = session.get(Pedido, pedido_id)
+        if pedido is None:
+            raise OrderNotFoundError("Pedido no encontrado.")
+        if not str(pedido.almacen_id or "").strip():
+            raise ValueError("El pedido no tiene almacén.")
+        if not rows:
+            raise ValueError("No hay líneas de factura para importar.")
+        groups = {}
+        for row in rows:
+            number = str(row.get("factura_numero") or header.get("factura_numero") or "").strip()
+            if not number or "," in number:
+                raise ValueError("Cada línea debe identificar una única factura.")
+            metadata = dict(row.get("_factura_header") or header)
+            metadata.update({key: row[key] for key in (
+                "factura_fecha", "albaran_numero", "factura_referencia") if key in row})
+            metadata["factura_numero"] = number
+            if number not in groups:
+                groups[number] = {"header": metadata, "rows": []}
+            group = groups[number]
+            if any(str(group["header"].get(key) or "").strip() != str(metadata.get(key) or "").strip()
+                   for key in ("factura_fecha", "albaran_numero")):
+                raise ValueError(f"La factura {number} contiene fechas o albaranes contradictorios.")
+            group["rows"].append(dict(row, **{key: metadata.get(key, "") for key in (
+                "factura_numero", "factura_fecha", "albaran_numero", "factura_referencia")}))
+
+        def existing(model, field, number):
+            matches = [document for document in session.exec(select(model).where(field == number))
+                       if document.pedido_id == pedido_id or document.almacen_id == pedido.almacen_id]
+            if len(matches) > 1 or any(document.pedido_id != pedido_id or document.almacen_id != pedido.almacen_id
+                                      for document in matches):
+                raise ValueError(f"Documento {number}: coincidencia ambigua o asociada a otro pedido del almacén.")
+            return matches[0] if matches else None
+
+        deliveries = {}
+        for number, group in groups.items():
+            metadata = group["header"]
+            invoice_date = self.parse_required_date(metadata.get("factura_fecha"), "factura_fecha")
+            delivery_number = str(metadata.get("albaran_numero") or "").strip()
+            if not delivery_number:
+                raise ValueError(f"La factura {number} no identifica su albarán.")
+            invoice = existing(Factura, Factura.factura_numero, number)
+            if invoice is not None and (invoice.factura_fecha != invoice_date
+                    or str(invoice.albaran_numero or "").strip() != delivery_number):
+                raise ValueError(f"La factura {number} existente no coincide en fecha o albarán.")
+            group["exists"] = invoice is not None
+            if delivery_number not in deliveries:
+                delivery = existing(Albaran, Albaran.albaran_numero, delivery_number)
+                deliveries[delivery_number] = {"exists": delivery is not None, "rows": [],
+                    "header": {"albaran_numero": delivery_number, "albaran_fecha": invoice_date.isoformat()}}
+            delivery = deliveries[delivery_number]
+            if not delivery["exists"]:
+                if delivery["header"]["albaran_fecha"] != invoice_date.isoformat():
+                    raise ValueError(f"El albarán {delivery_number} tiene facturas con fechas distintas; revisa los documentos.")
+                self.validate_albaran_dates(pedido, delivery["header"], [])
+            for row in group["rows"]:
+                if not group["exists"] or not delivery["exists"]:
+                    code = str(row.get("articulo_codigo") or "").strip()
+                    if not code or self.find_article_by_code(session, code, pedido_id=pedido_id) is None:
+                        raise ValueError(f"Producto sin correspondencia: {code or 'sin código'}.")
+                    qty = OrderDocumentParser.parse_decimal_es(row.get("articulo_cantidad"), 0.0)
+                    if not isfinite(qty) or qty <= 0:
+                        raise ValueError(f"Cantidad no válida para {code}. Revisa la factura.")
+                    if not group["exists"]:
+                        values = [OrderDocumentParser.parse_decimal_es(row.get(field), -1) for field in
+                                  ("articulo_kilos", "precio_unitario", "dto_pct", "total_linea")]
+                        if any(not isfinite(value) or value < 0 for value in values) or values[2] > 100:
+                            raise ValueError(f"Importes o descuento no válidos para {code}.")
+                        kilos, price, discount, total = values
+                        if abs(kilos * price * (1 - discount / 100) - total) > 0.03:
+                            raise ValueError(f"El importe de {code} no coincide con sus cantidades y precio.")
+                    if not delivery["exists"] and (not str(row.get("articulo_lote") or "").strip()
+                            or self.parse_optional_date(row.get("articulo_caducidad")) is None):
+                        raise ValueError(f"Falta lote o caducidad para crear el albarán: {code}.")
+                delivery["rows"].append(dict(row, **delivery["header"]))
+            if not group["exists"] and str(metadata.get("importe_neto") or "").strip():
+                net = OrderDocumentParser.parse_decimal_es(metadata["importe_neto"], -1)
+                total = sum(OrderDocumentParser.parse_decimal_es(row.get("total_linea"), 0) for row in group["rows"])
+                if not isfinite(net) or net < 0 or abs(net - total) > 0.02:
+                    raise ValueError(f"La factura {number} no cuadra con su importe neto; revisa sus líneas.")
+        return groups, deliveries
+
+    @staticmethod
+    def _facturas_plan_message(groups, deliveries):
+        lines = [f"Factura {number}: {'ya importada; se omite' if group['exists'] else 'se importará'}"
+                 for number, group in groups.items()]
+        lines.extend(f"Albarán {number}: " + ("existente; se conserva sin cambios" if group["exists"] else
+                     f"se creará con {len(group['rows'])} líneas; fecha {group['header']['albaran_fecha']}")
+                     for number, group in deliveries.items())
+        recovered = sum(bool(row.get("_numeric_recovered")) for group in groups.values() for row in group["rows"])
+        if recovered:
+            lines.append(f"Revisar {recovered} líneas con cifras recuperadas mediante OCR o cálculo de importes.")
+        return "\n".join(lines)
+
+    def preview_facturas_with_albaranes(self, pedido_id, header, rows) -> str:
+        with Session(engine) as session:
+            return self._facturas_plan_message(*self._facturas_plan(session, pedido_id, header, rows))
+
+    def import_facturas_with_albaranes(self, pedido_id, header, rows) -> OrderDocumentImportResult:
+        result = OrderDocumentImportResult()
+        with Session(engine) as session:
+            # Serialize duplicate checks and writes, including simultaneous local imports.
+            session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            groups, deliveries = self._facturas_plan(session, pedido_id, header, rows)
+            for group in deliveries.values():
+                if not group["exists"]:
+                    self.import_albaran(pedido_id, group["header"], group["rows"], _session=session)
+            for group in groups.values():
+                if not group["exists"]:
+                    imported = self.import_factura(pedido_id, group["header"], group["rows"], _session=session)
+                    result.imported += imported.imported
+            result.already_imported = all(group["exists"] for group in (*groups.values(), *deliveries.values()))
+            result.message = self._facturas_plan_message(groups, deliveries).replace("se importará", "importada").replace(
+                "se creará", "creado")
+            session.commit()
+        return result
 
     def list_facturas(self, pedido_id: str) -> list[Factura]:
         clean_pedido_id = str(pedido_id or "").strip()
@@ -265,11 +384,12 @@ class OrderDocumentImportService:
         pedido_id: str,
         preview_header: dict[str, str],
         mapped_rows: list[dict[str, Any]],
+        *, _session: Session | None = None,
     ) -> OrderDocumentImportResult:
         result = OrderDocumentImportResult()
         imported_rows = 0
 
-        with Session(engine) as session:
+        with (nullcontext(_session) if _session is not None else Session(engine)) as session:
             pedido = session.get(Pedido, pedido_id)
             if pedido is None:
                 raise OrderNotFoundError("El pedido seleccionado ya no existe.")
@@ -389,7 +509,7 @@ class OrderDocumentImportService:
                             albaran_item_id=str(albaran_item.item_id or "").strip(),
                         )
                     )
-                session.commit()
+                session.commit() if _session is None else session.flush()
                 imported_rows += 1
 
             for idx, payload in enumerate(mapped_rows, start=2):
@@ -398,18 +518,21 @@ class OrderDocumentImportService:
                     create_row(payload)
                     result.imported += 1
                 except Exception as exc:
+                    if _session is not None:
+                        raise
                     result.errors.append(f"Fila {idx}: {exc}")
             if imported_rows == 0 and albaran_header is not None:
                 session.delete(albaran_header)
-                session.commit()
+                session.commit() if _session is None else session.flush()
             if imported_rows > 0 and albaran_header is not None:
                 from app.services.order_receipt_assignment_service import automate_receipts
                 automate_receipts(session, clean_pedido_id)
-                session.commit()
+                session.commit() if _session is None else session.flush()
                 self.rebuild_order_pendientes(
                     session,
                     str(pedido.pedido_id or "").strip(),
                     str(albaran_header.albaran_id or "").strip(),
+                    **({"commit": False} if _session is not None else {}),
                 )
         return result
 
@@ -511,11 +634,12 @@ class OrderDocumentImportService:
         pedido_id: str,
         preview_header: dict[str, str],
         mapped_rows: list[dict[str, Any]],
+        *, _session: Session | None = None,
     ) -> OrderDocumentImportResult:
         result = OrderDocumentImportResult()
         imported_rows = 0
 
-        with Session(engine) as session:
+        with (nullcontext(_session) if _session is not None else Session(engine)) as session:
             pedido = session.get(Pedido, pedido_id)
             if pedido is None:
                 raise OrderNotFoundError("El pedido seleccionado ya no existe.")
@@ -586,7 +710,7 @@ class OrderDocumentImportService:
                 dto = OrderDocumentParser.parse_decimal_es(payload.get("dto_pct"), 20.0)
                 if pdf_price <= 0:
                     pdf_price = self.infer_factura_price_from_total(payload, kilos, dto)
-                precio = self.resolve_factura_price(session, article, factura_fecha, pdf_price)
+                precio = 0.0 if payload.get("_precio_cero_explicito") else self.resolve_factura_price(session, article, factura_fecha, pdf_price)
                 iva = 0.0
                 total_linea = (kilos * precio) * (1.0 - (dto / 100.0)) if kilos > 0 and precio > 0 else 0.0
 
@@ -611,7 +735,7 @@ class OrderDocumentImportService:
                         total_linea=total_linea,
                     )
                 )
-                session.commit()
+                session.commit() if _session is None else session.flush()
                 imported_rows += 1
 
             for idx, payload in enumerate(mapped_rows, start=2):
@@ -620,10 +744,12 @@ class OrderDocumentImportService:
                     create_row(payload)
                     result.imported += 1
                 except Exception as exc:
+                    if _session is not None:
+                        raise
                     result.errors.append(f"Fila {idx}: {exc}")
             if imported_rows == 0 and factura_header is not None:
                 session.delete(factura_header)
-                session.commit()
+                session.commit() if _session is None else session.flush()
         return result
 
     def enrich_factura_rows_from_tarifa(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -641,15 +767,13 @@ class OrderDocumentImportService:
                 formato_kg = 0.0
                 if article is not None:
                     formato_kg = float(getattr(article, "articulo_envase_peso_total", 0.0) or 0.0)
-                    if formato_kg > 0:
+                    if formato_kg > 0 and envase <= 0:
                         envase = formato_kg
                 if uds <= 0 and envase > 0 and kilos > 0:
                     uds = kilos / envase
                     payload["articulo_cantidad"] = OrderDocumentParser.format_number_es(uds, 0)
                 if kilos <= 0 and uds > 0 and envase > 0:
                     kilos = uds * envase
-                elif formato_kg > 0 and uds > 0:
-                    kilos = uds * formato_kg
                 dto = OrderDocumentParser.parse_decimal_es(payload.get("dto_pct"), 20.0)
                 pdf_price = OrderDocumentParser.parse_decimal_es(payload.get("precio_unitario"), 0.0)
                 if pdf_price <= 0:
@@ -662,7 +786,7 @@ class OrderDocumentImportService:
                         factura_fecha.year,
                         formato_kg,
                     )
-                precio = pdf_price if pdf_price > 0 else tarifa_price
+                precio = 0.0 if payload.get("_precio_cero_explicito") else (pdf_price if pdf_price > 0 else tarifa_price)
                 payload["precio_discrepancia"] = tarifa_price > 0 and pdf_price > 0 and abs(tarifa_price - pdf_price) > 0.01
                 total_linea = (kilos * precio) * (1.0 - (dto / 100.0)) if kilos > 0 and precio > 0 else 0.0
                 if envase > 0:
@@ -792,7 +916,7 @@ class OrderDocumentImportService:
                 str(getattr(albaran_item, "albaran_id", "") or "").strip(),
             )
 
-    def rebuild_order_pendientes(self, session: Session, pedido_id: str, albaran_id: str) -> None:
+    def rebuild_order_pendientes(self, session: Session, pedido_id: str, albaran_id: str, *, commit: bool = True) -> None:
         if not pedido_id or not albaran_id:
             return
         from app.models import PedidoRecepcionRevision
@@ -805,7 +929,7 @@ class OrderDocumentImportService:
             .where(Pedido.almacen_id == selected.almacen_id)
         ).first() is not None:
             sync_receipt_pending(session, pedido_id)
-            session.commit()
+            session.commit() if commit else session.flush()
             return
         pedido = session.get(Pedido, pedido_id)
         if pedido is None:
@@ -846,12 +970,12 @@ class OrderDocumentImportService:
             if str(getattr(albaran_item, "pedido_id", "") or "").strip()
         }
         if not orders_with_receipts:
-            session.commit()
+            session.commit() if commit else session.flush()
             return
 
         cutoff_index = max((pedido_order.get(pedido_ref_id, -1) for pedido_ref_id in orders_with_receipts), default=-1)
         if cutoff_index < 0:
-            session.commit()
+            session.commit() if commit else session.flush()
             return
         cutoff_ids = {pid for pid, idx in pedido_order.items() if idx <= cutoff_index}
 
@@ -937,7 +1061,7 @@ class OrderDocumentImportService:
                     estado="exceso",
                 )
             )
-        session.commit()
+        session.commit() if commit else session.flush()
 
     def find_article_by_code(self, session: Session, codigo: str, *,
                              pedido_id: str = "") -> IngredienteIreks | None:

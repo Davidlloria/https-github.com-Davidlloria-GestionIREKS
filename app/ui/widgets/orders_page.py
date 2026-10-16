@@ -213,21 +213,22 @@ class FacturaPreviewDialog(QDialog):
             f"Factura: {header.get('factura_numero', '')} | Fecha: {header.get('factura_fecha', '')} | "
             f"Albarán: {header.get('albaran_numero', '')} | Referencia: {header.get('factura_referencia', '')} | "
             f"Total kg: {header.get('total_kilos', '')} | Total: {header.get('total_factura', '')}"
+            + ("\n\n" + header["import_plan"] if header.get("import_plan") else "")
         )
         info.setWordWrap(True)
         layout.addWidget(info)
 
-        table = QTableWidget(len(items), 11)
+        table = QTableWidget(len(items), 12)
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         table.verticalHeader().setVisible(False)
         table.setHorizontalHeaderLabels(
-            ["Código", "Descripción", "Uds.", "Env.", "Kg/Lit.", "Lote", "Caducidad", "Precio", "Dto", "IVA", "Total"]
+            ["Código", "Descripción", "Uds.", "Env.", "Kg/Lit.", "Lote", "Caducidad", "Precio", "Dto", "IVA", "Total", "Factura"]
         )
         header_widget = table.horizontalHeader()
         header_widget.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         header_widget.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        for col_idx in range(2, 11):
+        for col_idx in range(2, 12):
             header_widget.setSectionResizeMode(col_idx, QHeaderView.ResizeMode.Fixed)
         table.setColumnWidth(0, 110)
         table.setColumnWidth(2, 75)
@@ -239,6 +240,7 @@ class FacturaPreviewDialog(QDialog):
         table.setColumnWidth(8, 65)
         table.setColumnWidth(9, 65)
         table.setColumnWidth(10, 90)
+        table.setColumnWidth(11, 80)
         for idx, item in enumerate(items):
             price_discrepancy = bool(item.get("precio_discrepancia"))
             values = [
@@ -253,11 +255,15 @@ class FacturaPreviewDialog(QDialog):
                 item.get("dto_pct"),
                 item.get("iva_pct"),
                 item.get("total_linea"),
+                item.get("factura_numero"),
             ]
             for col_idx, value in enumerate(values):
                 cell = QTableWidgetItem(str(value or ""))
                 if col_idx == 7 and price_discrepancy:
                     cell.setForeground(QBrush(QColor("#c62828")))
+                if item.get("_numeric_recovered"):
+                    cell.setToolTip("Cifras recuperadas mediante OCR o cálculo de importes. Revisa esta línea.")
+                    cell.setBackground(QBrush(QColor("#fff7e6")))
                 table.setItem(idx, col_idx, cell)
         layout.addWidget(table, 1)
 
@@ -3801,6 +3807,15 @@ class OrdersPage(QWidget):
         return dialog.exec() == QDialog.DialogCode.Accepted
 
     def _confirm_factura_preview(self, header: dict[str, str], rows: list[dict[str, Any]]) -> bool:
+        selected = self._selected_row()
+        if selected is None:
+            return False
+        try:
+            plan = self.order_document_import_service.preview_facturas_with_albaranes(selected.pedido_id, header, rows)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Revisar facturas y albarán", str(exc))
+            return False
+        header = dict(header, import_plan=plan)
         dialog = FacturaPreviewDialog(header=header, items=rows, parent=self)
         return dialog.exec() == QDialog.DialogCode.Accepted
 
@@ -3824,7 +3839,7 @@ class OrdersPage(QWidget):
 
         result: dict[str, Any] = {"header": None, "rows": None, "error": None}
         executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(OrderDocumentParser.parse_factura_pdf, file_path)
+        future = executor.submit(OrderDocumentParser.parse_facturas_pdf, file_path)
         poll_timer = QTimer(dialog)
 
         def poll_result() -> None:

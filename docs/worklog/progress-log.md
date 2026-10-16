@@ -14,6 +14,37 @@ entire migration history first.
 ## Current Snapshot
 
 - Date: 2026-10-16. Branch: `reestructuracion_proyecto`.
+- Starting HEAD: `a46e9142823c9ba6e25f25a322f4387c73f25f61` (clean).
+- Implemented the approved invoice + missing-delivery import using invoice date.
+  Separate invoice/page groups retain per-invoice headers and totals. One missing
+  delivery gathers all its invoice lines; existing deliveries are not repaired
+  or changed. Existing invoices are skipped, including when completing a missing
+  delivery. Ambiguous document matches stop the import.
+- The existing writers accept a shared session; combined imports serialize checks
+  and writes in one SQLite transaction. Failures roll back invoices, receipts,
+  movements, pending totals and order references. Independent imports retain their
+  transaction behavior. No API, React, model/schema or packaging changes.
+- Preview shows the per-document plan, invoice number for each line and warnings
+  for numerically recovered lines. Fixed scanned-text cell alignment, truncated
+  delivery number, split lot suffix, document headers and explicit free items.
+  PDF quantities/packaging are preserved rather than overwritten by catalog data.
+- Validation: 117 focused parser/import/UI/pending/architecture tests passed.
+  Known ReportLab, datetime.utcnow and Qt alignment deprecations only. No full
+  suite run. Native Windows preview reviewed. Final parser follow-up checks also
+  run after the instruction-page guard adjustment.
+- The user's real PDF was read and exercised only against a disposable catalog
+  and database: invoices 60062/60063, 17 lines, delivery 2026090131 dated 2026-10-13,
+  17 stock movements; repetition created no duplicates. Totals 1499.28 and 21070.82,
+  promotional lot 111.260827 at zero price. Three recovered lines are flagged.
+  No operational import, merge or push. Generated PDFs/databases/captures ignored.
+- Guide: `docs/guides/invoice-delivery-import.md`. Users must select the correct
+  order and review recovered values; unrecognized catalog references block saving.
+  Shared deliveries should be imported from the complete invoice bundle, because
+  existing deliveries are deliberately left intact even if partial.
+
+## Historical Snapshot - 2026-10-16 - Windows folder rename fix
+
+- Date: 2026-10-16. Branch: `reestructuracion_proyecto`.
 - Starting HEAD: `b01224f26cbfd2cf503c30d310c73e4148252e50` (clean).
 - Reproduced Windows folder rename failures from the app and externally after
   navigating into a descendant. Both new regression cases failed before the fix.

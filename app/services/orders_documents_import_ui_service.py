@@ -116,7 +116,7 @@ class OrdersDocumentsImportUiService:
         header: dict[str, str],
         rows: list[dict[str, Any]],
     ) -> OrdersDocumentImportOutcome:
-        result = self.order_document_import_service.import_factura(pedido_id, header, rows)
+        result = self.order_document_import_service.import_facturas_with_albaranes(pedido_id, header, rows)
         return self._to_outcome(
             result=result,
             already_title="Factura ya importada",
@@ -184,7 +184,7 @@ class OrdersDocumentsImportUiService:
         return OrdersDocumentImportOutcome(
             ok=True,
             title="Importacion completada",
-            message=success_message_template.format(imported=imported),
+            message=message or success_message_template.format(imported=imported),
             imported=imported,
             errors_count=0,
             already_imported=False,

@@ -235,6 +235,158 @@ class OrderDocumentParser:
         return OrderDocumentParser._parse_factura_pdf(None, file_path)
 
     @staticmethod
+    def parse_facturas_pdf(file_path: Path) -> tuple[dict[str, str], list[dict[str, Any]]]:
+        """Read each invoice independently, excluding attached delivery instructions."""
+        groups: dict[str, list[int]] = {}
+        with fitz.open(str(file_path)) as source:
+            for position, page in enumerate(source):
+                text = page.get_text()
+                lines = [line.strip() for line in text.splitlines() if line.strip()]
+                number = OrderDocumentParser._extract_factura_numero_from_header_words([page])
+                if not number:
+                    number = OrderDocumentParser._line_value_after_label(
+                        lines, r"N[úu\ufffd]mero\s*:", r"([0-9]{4,})")
+                if not number:
+                    if re.search(r"\bINSTRUCCIONES\b", text, re.IGNORECASE):
+                        continue
+                    raise ValueError(f"No se identifica la factura de la página {position + 1}.")
+                groups.setdefault(number, []).append(position)
+            headers, rows = [], []
+            for number, positions in groups.items():
+                with fitz.open() as document:
+                    for position in positions:
+                        document.insert_pdf(source, from_page=position, to_page=position)
+                    header, items = OrderDocumentParser._parse_factura_pdf(None, file_path, document)
+                    OrderDocumentParser._repair_factura_geometry(document, header, items)
+                    header["factura_numero"] = number
+                    headers.append(header)
+                    rows.extend(dict(item, factura_numero=number, _factura_header=dict(header)) for item in items)
+        if not headers:
+            raise ValueError("No se encontraron facturas en el PDF.")
+        summary = dict(headers[0])
+        summary["factura_numero"] = ", ".join(header["factura_numero"] for header in headers)
+        summary["albaran_numero"] = ", ".join(dict.fromkeys(header["albaran_numero"] for header in headers))
+        if len(headers) > 1:
+            for field in ("total_kilos", "importe_neto", "total_factura"):
+                summary[field] = OrderDocumentParser.format_number_es(sum(
+                    OrderDocumentParser.parse_decimal_es(header.get(field), 0.0) for header in headers), 2)
+        return summary, rows
+
+    @staticmethod
+    def _repair_factura_geometry(document, header, rows):
+        """Re-read fixed-layout cells without stamps joining unrelated text lines."""
+        numeric = re.compile(r"^[\d.,]*\d[\d.,]*$")
+        deliveries = []
+        for page in document:
+            words = page.get_text("words")
+            for label in words:
+                if 250 < label[0] < 320 and str(label[4]).lower() == "referencia:":
+                    reference = OrderDocumentParser._ocr_factura_reference(page, int(label[1]))
+                    if reference:
+                        header["factura_referencia"] = reference
+                if 250 < label[0] < 320 and 150 < label[1] < 235 and str(label[4]).lower().startswith("alb"):
+                    deliveries.extend(str(w[4]) for w in words if 320 < w[0] < 420
+                                      and abs(w[1] - label[1]) < 5 and re.fullmatch(r"\d{8,}", str(w[4])))
+            for field, label_pattern in (("importe_neto", r"NETO:"), ("total_factura", r"TOTA[Lil].*:")):
+                for label in words:
+                    if label[1] > 500 and re.fullmatch(label_pattern, str(label[4]), re.IGNORECASE):
+                        candidates = sorted([w for w in words if w[0] > label[2]
+                                             and abs(w[1] - label[1]) < 5 and numeric.fullmatch(str(w[4]))], key=lambda w: w[0])
+                        if candidates:
+                            header[field] = "".join(str(w[4]) for w in candidates)
+        if deliveries:
+            number = max(deliveries, key=len)
+            if any(not number.startswith(candidate) for candidate in deliveries):
+                raise ValueError("Las páginas de la factura indican albaranes distintos.")
+            header["albaran_numero"] = number
+        else:
+            return
+
+        for row in rows:
+            position = float(row.get("_source_y", 0))
+            page = document[int(position // 10000)]
+            words = page.get_text("words")
+            row["albaran_numero"] = header["albaran_numero"]
+            row["factura_referencia"] = header.get("factura_referencia", "")
+            code_words = [w for w in words if w[0] < 65 and str(w[4]) == row["articulo_codigo"]]
+            if not code_words:
+                continue
+            y = min(code_words, key=lambda w: abs(w[1] - position % 10000))[1]
+            row["_cell_y"] = y
+            for field, left, right in (("precio_unitario", 420, 460), ("dto_pct", 460, 492),
+                                       ("total_linea", 492, 545), ("iva_pct", 545, 575)):
+                cells = sorted([w for w in words if left <= w[0] < right and abs(w[1] - y) < 4
+                                and w[3] - w[1] < 17 and numeric.fullmatch(str(w[4]))], key=lambda w: w[0])
+                row[field] = "".join(str(w[4]) for w in cells)
+                if field == "total_linea" and cells:
+                    row["_cell_y"] = cells[0][1]
+            # A lot such as '111 .260827' is one identifier, including its suffix.
+            for label in words:
+                if 65 <= label[0] < 100 and y < label[1] < y + 30 and str(label[4]).lower() == "lote:":
+                    tokens = sorted([w for w in words if 95 <= w[0] < 175 and abs(w[1] - label[1]) < 3], key=lambda w: w[0])
+                    if tokens:
+                        row["articulo_lote"] = "".join(str(w[4]) for w in tokens)
+                    break
+        for row in rows:
+            value = OrderDocumentParser.parse_decimal_es
+            price, discount, total, kilos = [value(row.get(field), -1) for field in (
+                "precio_unitario", "dto_pct", "total_linea", "articulo_kilos")]
+            if total < 0 or kilos <= 0:
+                raise ValueError(f"No se pudo leer el importe o la cantidad de {row['articulo_codigo']}.")
+            if not 0 <= discount <= 100:
+                prices = {value(other.get("precio_unitario"), -1) for other in rows
+                          if other["articulo_codigo"] == row["articulo_codigo"] and other is not row
+                          and value(other.get("precio_unitario"), -1) > 0}
+                if len(prices) == 1:
+                    price = prices.pop()
+                    discount = round(100 * (1 - total / (kilos * price)), 2)
+                    row["_numeric_recovered"] = True
+                else:
+                    page = document[int(float(row.get("_source_y", 0)) // 10000)]
+                    discount = (OrderDocumentParser._ocr_factura_discount(page, row["_cell_y"])
+                                if "_cell_y" in row else -1)
+                    row["_numeric_recovered"] = True
+            if not 0 <= discount <= 100:
+                raise ValueError(f"No se pudo verificar el descuento de {row['articulo_codigo']}.")
+            if total > 0 and discount < 100 and (price <= 0 or abs(kilos * price * (1 - discount / 100) - total) > 0.03):
+                price = round(total / (kilos * (1 - discount / 100)), 2)
+                row["_numeric_recovered"] = True
+            if abs(kilos * max(price, 0) * (1 - discount / 100) - total) > 0.03:
+                raise ValueError(f"El importe de {row['articulo_codigo']} no cuadra: {kilos} × {price}, dto. {discount}%, total {total}.")
+            row["precio_unitario"] = OrderDocumentParser.format_number_es(max(price, 0), 2)
+            row["dto_pct"] = OrderDocumentParser.format_number_es(discount, 2)
+            row["_precio_cero_explicito"] = total == 0 and price == 0
+            row.pop("_cell_y", None)
+
+    @staticmethod
+    def _ocr_factura_discount(page, y):
+        if not OrderDocumentOcrRuntimeService().configure_tesseract():
+            return -1
+        import pytesseract
+        from PIL import Image
+        y = int(y)
+        # Read only the discount cell; the document-wide OCR layer may include a stamp.
+        pixmap = page.get_pixmap(matrix=fitz.Matrix(6, 6), clip=fitz.Rect(460, y - 1, 490, y + 12), alpha=False)
+        image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
+        for mode in (13, 7):
+            text = pytesseract.image_to_string(image, config=f"--psm {mode} -c tessedit_char_whitelist=0123456789.,").strip()
+            if re.fullmatch(r"\d{1,2}(?:[.,]\d{1,2})?", text):
+                return OrderDocumentParser.parse_decimal_es(text, -1)
+        return -1
+
+    @staticmethod
+    def _ocr_factura_reference(page, y):
+        if not OrderDocumentOcrRuntimeService().configure_tesseract():
+            return ""
+        import pytesseract
+        from PIL import Image
+        pixmap = page.get_pixmap(matrix=fitz.Matrix(6, 6), clip=fitz.Rect(334, y, 420, y + 14), alpha=False)
+        image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
+        text = pytesseract.image_to_string(image, config="--psm 7").strip(" ,.;\\\n")
+        text = " ".join(text.replace("\\", " ").split())
+        return text if re.fullmatch(r"[A-Za-zÀ-ÿ ]+\s+\d{1,2}/\d{1,2}", text) else ""
+
+    @staticmethod
     def _line_value_after_label(lines: list[str], label_regex: str, value_regex: str, lookahead: int = 4) -> str:
         label_rx = re.compile(label_regex, flags=re.IGNORECASE)
         value_rx = re.compile(value_regex, flags=re.IGNORECASE)
@@ -613,9 +765,9 @@ class OrderDocumentParser:
                 inserted_lotes.add(lote)
         return merged
 
-    def _parse_factura_pdf(self, file_path: Path) -> tuple[dict[str, str], list[dict[str, Any]]]:
+    def _parse_factura_pdf(self, file_path: Path, document=None) -> tuple[dict[str, str], list[dict[str, Any]]]:
         try:
-            doc = fitz.open(str(file_path))
+            doc = document if document is not None else fitz.open(str(file_path))
         except Exception as exc:
             raise ValueError(f"No se pudo abrir el PDF: {exc}") from exc
 
