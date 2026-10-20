@@ -11,6 +11,7 @@ from app.models import (
     Fabricante,
     Familia,
     IngredienteIreks,
+    Isla,
     ReferenciaDistribuidor,
     Subfamilia,
     VentaClientesRaw,
@@ -342,6 +343,10 @@ def test_listar_ventas_mensuales_ireks_comparativa_returns_prev_and_curr_years(i
 def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engine) -> None:
     with Session(isolated_engine) as session:
         cliente_id, _fabricante_id, _familia_id, _subfamilia_id = _seed_products(session)
+        session.add(Isla(isla_id="isla-1", provincia_id="prov-1", isla_nombre="Tenerife"))
+        client = session.get(Cliente, cliente_id)
+        client.cliente_direccion_isla_id = "isla-1"
+        session.add(client)
         session.add(
             Cliente(
                 cliente_id="cli-2",
@@ -446,6 +451,9 @@ def test_listar_clientes_consumidores_producto_aggregates_clients(isolated_engin
     rows_by_code_only = service.listar_clientes_consumidores_producto(2026, "wrong-id", "DX-001")
     rows_by_name_only = service.listar_clientes_consumidores_producto(2026, "wrong-id", "wrong-code", "Producto IREKS")
 
+    assert rows[0].cliente_isla == "Tenerife"
+    assert rows[1].cliente_isla == ""
+    assert all_year_rows[0].cliente_isla == "Tenerife"
     assert len(rows) == 2
     assert rows[0].cliente_codigo == "1"
     assert rows[0].cliente_nombre == "Cliente"

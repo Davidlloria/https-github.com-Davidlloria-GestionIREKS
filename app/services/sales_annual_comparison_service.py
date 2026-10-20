@@ -119,6 +119,7 @@ class SalesClientProductConsumerRow:
     delta_euros: float
     unidades_curr: float = 0.0
     ultimo_periodo: str = ""
+    cliente_isla: str = ""
 
 
 @dataclass
@@ -1575,10 +1576,16 @@ class SalesAnnualComparisonService:
                 stmt = stmt.where(col(VentaClientesRaw.anio).in_(years))
             raw_rows = list(session.exec(stmt))
             clients = list(session.exec(select(Cliente)))
+            islands = list(session.exec(select(Isla)))
             distributors = list(session.exec(select(Distribuidor)))
             products = list(session.exec(select(IngredienteIreks)))
             product_reference_lookup = self._build_clientes_product_reference_lookup(session)
 
+        island_by_id = {str(island.isla_id): island.isla_nombre for island in islands}
+        island_by_client = {
+            str(client.cliente_id): island_by_id.get(str(client.cliente_direccion_isla_id or ""), "")
+            for client in clients
+        }
         client_by_id, client_search_by_id = self._build_sales_party_lookup(clients, distributors)
 
         product_by_id: dict[str, tuple[str, str, str, str, str, str, str]] = {}
@@ -1705,6 +1712,7 @@ class SalesAnnualComparisonService:
                 delta_euros=float(values["euros_curr"] or 0.0) - float(values["euros_prev"] or 0.0),
                 unidades_curr=float(values["unidades_curr"] or 0.0),
                 ultimo_periodo=str(values["ultimo_periodo"] or ""),
+                cliente_isla=island_by_client.get(str(values["cliente_id"] or ""), ""),
             )
             for values in totals.values()
             if float(values["kg_prev"] or 0.0) > 0

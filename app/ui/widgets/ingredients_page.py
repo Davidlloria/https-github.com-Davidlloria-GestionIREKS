@@ -2171,7 +2171,7 @@ class IngredientsIreksPage(QWidget):
         self.customer_consumption_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.customer_consumption_empty.setWordWrap(True)
         clientes_body_layout.addWidget(self.customer_consumption_empty)
-        self.customer_consumption_table = QTableWidget(0, 5, clientes_tab)
+        self.customer_consumption_table = QTableWidget(0, 6, clientes_tab)
         self.customer_consumption_table.setObjectName("ireksCustomerConsumptionTable")
         self.customer_consumption_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.customer_consumption_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -2180,11 +2180,11 @@ class IngredientsIreksPage(QWidget):
         self.customer_consumption_table.setAlternatingRowColors(True)
         self.customer_consumption_table.setSortingEnabled(True)
         self.customer_consumption_table.verticalHeader().setVisible(False)
-        self.customer_consumption_table.setHorizontalHeaderLabels(["Cliente", "Último período", "Kg", "Unidades", "€"])
+        self.customer_consumption_table.setHorizontalHeaderLabels(["Cliente", "Isla", "Último período", "Kg", "Unidades", "€"])
         customer_header = self.customer_consumption_table.horizontalHeader()
         customer_header.setSectionsClickable(True)
         customer_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for column in range(1, 5):
+        for column in range(1, 6):
             customer_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         self._apply_ireks_table_style(self.customer_consumption_table)
         clientes_body_layout.addWidget(self.customer_consumption_table, 1)
@@ -2971,6 +2971,7 @@ class IngredientsIreksPage(QWidget):
             name = str(getattr(row, "cliente_nombre", "") or "").strip()
             customer_item = QTableWidgetItem(f"{code} · {name}" if code else name)
             customer_item.setData(Qt.ItemDataRole.UserRole, str(getattr(row, "cliente_id", "") or ""))
+            island_item = QTableWidgetItem(str(getattr(row, "cliente_isla", "") or "").strip() or "—")
             period_item = QTableWidgetItem(str(getattr(row, "ultimo_periodo", "") or ""))
             kg_value = float(getattr(row, "kg_curr", 0.0) or 0.0)
             units_value = float(getattr(row, "unidades_curr", 0.0) or 0.0)
@@ -2981,10 +2982,11 @@ class IngredientsIreksPage(QWidget):
             for item in (period_item, kg_item, units_item, euros_item):
                 item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.customer_consumption_table.setItem(row_index, 0, customer_item)
-            self.customer_consumption_table.setItem(row_index, 1, period_item)
-            self.customer_consumption_table.setItem(row_index, 2, kg_item)
-            self.customer_consumption_table.setItem(row_index, 3, units_item)
-            self.customer_consumption_table.setItem(row_index, 4, euros_item)
+            self.customer_consumption_table.setItem(row_index, 1, island_item)
+            self.customer_consumption_table.setItem(row_index, 2, period_item)
+            self.customer_consumption_table.setItem(row_index, 3, kg_item)
+            self.customer_consumption_table.setItem(row_index, 4, units_item)
+            self.customer_consumption_table.setItem(row_index, 5, euros_item)
         self.customer_consumption_table.setSortingEnabled(True)
 
     def _reload_customer_consumption_years(self) -> None:
