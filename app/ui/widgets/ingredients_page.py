@@ -2184,7 +2184,9 @@ class IngredientsIreksPage(QWidget):
         customer_header = self.customer_consumption_table.horizontalHeader()
         customer_header.setSectionsClickable(True)
         customer_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for column in range(1, 6):
+        customer_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        self.customer_consumption_table.setColumnWidth(1, 160)
+        for column in range(2, 6):
             customer_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         self._apply_ireks_table_style(self.customer_consumption_table)
         clientes_body_layout.addWidget(self.customer_consumption_table, 1)
@@ -2967,9 +2969,8 @@ class IngredientsIreksPage(QWidget):
         self.customer_consumption_table.setSortingEnabled(False)
         self.customer_consumption_table.setRowCount(len(rows))
         for row_index, row in enumerate(rows):
-            code = str(getattr(row, "cliente_codigo", "") or "").strip()
             name = str(getattr(row, "cliente_nombre", "") or "").strip()
-            customer_item = QTableWidgetItem(f"{code} · {name}" if code else name)
+            customer_item = QTableWidgetItem(name)
             customer_item.setData(Qt.ItemDataRole.UserRole, str(getattr(row, "cliente_id", "") or ""))
             island_item = QTableWidgetItem(str(getattr(row, "cliente_isla", "") or "").strip() or "—")
             period_item = QTableWidgetItem(str(getattr(row, "ultimo_periodo", "") or ""))
