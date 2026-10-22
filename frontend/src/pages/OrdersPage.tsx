@@ -82,21 +82,6 @@ function formatDate(value: string | null | undefined) {
   return `${day}/${month}/${year}`
 }
 
-function estimatedArrivalDate(value: string | null | undefined) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return '-'
-  }
-
-  const date = new Date(`${value}T00:00:00.000Z`)
-  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
-    return '-'
-  }
-
-  // The two days before dispatch are already included in the 14-day estimate.
-  date.setUTCDate(date.getUTCDate() + 14)
-  return formatDate(date.toISOString().slice(0, 10))
-}
-
 function compareText(left: string, right: string) {
   return left.localeCompare(right, 'es', { sensitivity: 'base', numeric: true })
 }
@@ -769,15 +754,6 @@ export function OrdersPage() {
             <label className="orders-detail-field">
               <span>Numero</span>
               <input className="input" readOnly value={selectedOrder?.pedido_numero || '-'} />
-            </label>
-            <label className="orders-detail-field" style={{ gridColumn: '1 / -1' }}>
-              <span>Llegada estimada al almacén local</span>
-              <input
-                className="input"
-                readOnly
-                value={estimatedArrivalDate(selectedOrder?.pedido_fecha)}
-                title="Fecha del pedido + 14 días naturales, incluidos los 2 días previos a la expedición."
-              />
             </label>
           </div>
 
