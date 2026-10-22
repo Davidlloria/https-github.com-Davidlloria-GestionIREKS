@@ -1711,6 +1711,19 @@ class OrdersPage(QWidget):
 
         row_1.addStretch(1)
         detail_layout.addLayout(row_1)
+        arrival_row = QHBoxLayout()
+        arrival_row.addWidget(QLabel("Llegada estimada al almacén local"))
+        self.detail_llegada_estimada = QLineEdit("-")
+        self.detail_llegada_estimada.setReadOnly(True)
+        self.detail_llegada_estimada.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.detail_llegada_estimada.setMaximumWidth(130)
+        self.detail_llegada_estimada.setToolTip(
+            "Fecha del pedido + 14 días naturales, incluidos los 2 días previos a la expedición."
+        )
+        arrival_row.addWidget(self.detail_llegada_estimada)
+        arrival_row.addStretch(1)
+        detail_layout.addLayout(arrival_row)
+        self.detail_fecha.dateChanged.connect(self._update_estimated_arrival)
         self.detail_fecha.dateChanged.connect(lambda _d: self._schedule_autosave())
         self.detail_pedido_numero.textEdited.connect(self._schedule_autosave)
         right_splitter.addWidget(detail_panel)
@@ -3363,6 +3376,7 @@ class OrdersPage(QWidget):
             return
         self.detail_semana.setText(str(row.semana))
         self.detail_fecha.setDate(QDate(row.pedido_fecha.year, row.pedido_fecha.month, row.pedido_fecha.day))
+        self._update_estimated_arrival()
         self.detail_pedido_numero.setText(row.pedido_numero)
         self._load_albaran_selector(row.pedido_id)
         self._load_factura_selector(row.pedido_id)
@@ -3382,6 +3396,7 @@ class OrdersPage(QWidget):
         self.detail_semana.clear()
         today = date.today()
         self.detail_fecha.setDate(QDate(today.year, today.month, today.day))
+        self.detail_llegada_estimada.setText("-")
         self.detail_pedido_numero.clear()
         self._load_albaran_selector(None)
         self._load_factura_selector(None)
@@ -3395,6 +3410,12 @@ class OrdersPage(QWidget):
         self.import_factura_btn.setEnabled(False)
         self.delete_factura_btn.setEnabled(False)
         self.edit_factura_line_btn.setEnabled(False)
+
+    def _update_estimated_arrival(self, _date: QDate | None = None) -> None:
+        arrival = self.detail_fecha.date().addDays(14)
+        self.detail_llegada_estimada.setText(
+            arrival.toString("dd/MM/yyyy") if self._selected_row() is not None else "-"
+        )
 
     def _schedule_autosave(self) -> None:
         if self._is_loading_details:

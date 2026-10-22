@@ -5,7 +5,7 @@ from datetime import date
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import QApplication, QTableWidgetItem, QTabWidget
 
 from app.models import PedidoIncidencia, PedidoIncidenciaImagen
@@ -16,6 +16,32 @@ from app.ui.widgets.orders_page import NewPedidoDialog, OrderIncidentDialog, Ord
 
 
 _APP: QApplication | None = None
+
+
+def test_estimated_arrival_tracks_order_date_without_writes(monkeypatch):
+    _application()
+    monkeypatch.setattr(OrdersPage, "reload", lambda self: None)
+    page = OrdersPage()
+    page._is_loading_details = True
+    monkeypatch.setattr(page, "_selected_row", lambda: object())
+    try:
+        assert page.detail_llegada_estimada.isReadOnly()
+        for order_date, expected in [
+            (QDate(2026, 10, 19), "02/11/2026"),
+            (QDate(2026, 10, 13), "27/10/2026"),
+            (QDate(2026, 12, 28), "11/01/2027"),
+            (QDate(2024, 2, 20), "05/03/2024"),
+        ]:
+            page.detail_fecha.setDate(order_date)
+            assert page.detail_llegada_estimada.text() == expected
+        assert not page._autosave_timer.isActive()
+        monkeypatch.setattr(page, "_selected_row", lambda: None)
+        page._update_estimated_arrival()
+        assert page.detail_llegada_estimada.text() == "-"
+    finally:
+        page.close()
+        page.deleteLater()
+        QApplication.processEvents()
 
 
 def test_invoice_preview_displays_combined_plan_and_recovered_lines():
