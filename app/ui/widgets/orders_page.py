@@ -1678,7 +1678,7 @@ class OrdersPage(QWidget):
             }
             """
         )
-        detail_panel.setMaximumHeight(170)
+        detail_panel.setMaximumHeight(120)
         detail_layout = QVBoxLayout(detail_panel)
         detail_layout.setContentsMargins(14, 14, 14, 14)
         detail_layout.setSpacing(8)
@@ -1688,9 +1688,11 @@ class OrdersPage(QWidget):
         detail_layout.addWidget(detail_title)
 
         row_1 = QHBoxLayout()
+        row_1.setSpacing(8)
         row_1.addWidget(QLabel("Semana"))
         self.detail_semana = QLineEdit()
         self.detail_semana.setReadOnly(True)
+        self.detail_semana.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.detail_semana.setMinimumWidth(50)
         self.detail_semana.setMaximumWidth(50)
         row_1.addWidget(self.detail_semana)
@@ -1701,28 +1703,35 @@ class OrdersPage(QWidget):
         self.detail_fecha.setDisplayFormat("dd/MM/yyyy")
         self.detail_fecha.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.detail_fecha.setMinimumWidth(130)
+        self.detail_fecha.setMaximumWidth(140)
         row_1.addWidget(self.detail_fecha)
 
-        row_1.addWidget(QLabel("Numero"))
+        row_1.addWidget(QLabel("N.º pedido"))
         self.detail_pedido_numero = QLineEdit()
         self.detail_pedido_numero.setMinimumWidth(100)
         self.detail_pedido_numero.setMaximumWidth(100)
         row_1.addWidget(self.detail_pedido_numero)
 
-        row_1.addStretch(1)
-        detail_layout.addLayout(row_1)
-        arrival_row = QHBoxLayout()
-        arrival_row.addWidget(QLabel("Llegada estimada al almacén local"))
+        row_1.addWidget(QLabel("Llegada aprox."))
         self.detail_llegada_estimada = QLineEdit("-")
         self.detail_llegada_estimada.setReadOnly(True)
         self.detail_llegada_estimada.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.detail_llegada_estimada.setMaximumWidth(130)
+        self.detail_llegada_estimada.setFixedWidth(130)
+        self.detail_llegada_estimada.setStyleSheet(
+            "QLineEdit { background-color: #E8F0FC; color: #174A8B; "
+            "border: 1px solid #C5D2E3; border-radius: 4px; font-weight: 600; }"
+        )
         self.detail_llegada_estimada.setToolTip(
             "Fecha del pedido + 14 días naturales, incluidos los 2 días previos a la expedición."
         )
-        arrival_row.addWidget(self.detail_llegada_estimada)
-        arrival_row.addStretch(1)
-        detail_layout.addLayout(arrival_row)
+        row_1.addWidget(self.detail_llegada_estimada)
+        row_1.addStretch(1)
+        for field in (
+            self.detail_semana, self.detail_fecha,
+            self.detail_pedido_numero, self.detail_llegada_estimada,
+        ):
+            field.setFixedHeight(32)
+        detail_layout.addLayout(row_1)
         self.detail_fecha.dateChanged.connect(self._update_estimated_arrival)
         self.detail_fecha.dateChanged.connect(lambda _d: self._schedule_autosave())
         self.detail_pedido_numero.textEdited.connect(self._schedule_autosave)
