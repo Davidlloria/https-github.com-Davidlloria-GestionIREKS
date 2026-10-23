@@ -26,6 +26,14 @@ class _ProcessStats:
 
 
 class RecipeCalculationService:
+    def _formula_flour(self, lineas: list[RecetaLinea]) -> float:
+        # Count raw flour once, even when its process is consumed by another.
+        return sum(
+            max(float(line.cantidad_base_g or 0.0), 0.0)
+            for line in lineas
+            if self._line_type(line) == "ingrediente" and line.es_harina
+        )
+
     @staticmethod
     def _effective_price(linea: RecetaLinea) -> float:
         promotional = float(getattr(linea, "precio_kg_efectivo_snapshot", 0.0) or 0.0)
@@ -113,8 +121,7 @@ class RecipeCalculationService:
         """Devuelve las líneas directas del proceso con subprocesos valorizados."""
         target = self._normalize_process_name(process_name)
         stats_by_process = self.process_stats(lineas)
-        target_stats = stats_by_process.get(target, _ProcessStats())
-        total_flour = float(target_stats.harina_g or 0.0)
+        total_flour = self._formula_flour(lineas)
         cost_sheet: list[RecetaLinea] = []
         for source_line in lineas:
             if self._normalize_process_name(getattr(source_line, "proceso_nombre", "")) != target:
@@ -143,6 +150,7 @@ class RecipeCalculationService:
         issues: list[ValidationIssue] = []
         process_order = self._ordered_processes(lineas)
         stats_by_process = self.process_stats(lineas)
+        formula_flour = self._formula_flour(lineas)
         try:
             metadata = json.loads(receta.parametros_elaboracion_json or "{}")
         except (ValueError, TypeError):
@@ -185,12 +193,10 @@ class RecipeCalculationService:
                     )
                 source_stats = stats_by_process.get(source)
                 source_masa = float(getattr(source_stats, "masa_g", 0.0) or 0.0) if source_stats else 0.0
-                target_stats = stats_by_process.get(linea.proceso_nombre)
-                target_flour = float(getattr(target_stats, "harina_g", 0.0) or 0.0)
                 harina_equiv = 0.0
                 if source_stats and source_masa > 0:
                     harina_equiv = float(source_stats.harina_g or 0.0) * (linea.cantidad_base_g / source_masa)
-                linea.porcentaje_panadero = ((harina_equiv / target_flour) * 100) if target_flour > 0 else 0.0
+                linea.porcentaje_panadero = ((harina_equiv / formula_flour) * 100) if formula_flour > 0 else 0.0
                 continue
 
             if linea.ingrediente_id is None and not linea.nombre_mostrado:
@@ -199,11 +205,9 @@ class RecipeCalculationService:
             if linea.precio_kg_snapshot <= 0:
                 issues.append(ValidationIssue(level="warning", message=f"Linea {linea.orden}: ingrediente sin precio."))
 
-            # % panadero: cada ingrediente se expresa sobre el total de harinas.
+            # All processes share the formula's flour base (100% in total).
             qty = float(linea.cantidad_base_g or 0.0)
-            target_stats = stats_by_process.get(linea.proceso_nombre)
-            target_flour = float(getattr(target_stats, "harina_g", 0.0) or 0.0)
-            linea.porcentaje_panadero = ((qty / target_flour) * 100) if target_flour > 0 else 0.0
+            linea.porcentaje_panadero = ((qty / formula_flour) * 100) if formula_flour > 0 else 0.0
 
         total_panadero = sum(linea.porcentaje_panadero for linea in lineas)
         if total_panadero <= 0:

@@ -1691,15 +1691,25 @@ class RecipesPage(QWidget):
         lines_layout = QVBoxLayout(lines_group)
         lines_layout.setContentsMargins(6, 2, 6, 6)
         lines_layout.setSpacing(5)
-        lines_title = QLabel("Líneas de receta")
-        lines_title.setStyleSheet("background: transparent; border: none;")
         lines_toolbar = QHBoxLayout()
-        lines_toolbar.addWidget(lines_title)
         lines_toolbar.addStretch()
-        self.move_line_up_btn = QPushButton("↑ Subir")
-        self.move_line_down_btn = QPushButton("↓ Bajar")
+        self.move_line_up_btn = QPushButton()
+        self.move_line_down_btn = QPushButton()
         for button, direction in ((self.move_line_up_btn, -1), (self.move_line_down_btn, 1)):
-            button.setToolTip("Mover la línea dentro del proceso activo")
+            label = "Subir línea" if direction == -1 else "Bajar línea"
+            icon = "arrow-up.svg" if direction == -1 else "arrow-down.svg"
+            color, hover = ("#2563EB", "#1D4ED8") if direction == -1 else ("#16805D", "#116747")
+            button.setIcon(_white_icon_from_svg(Path(__file__).resolve().parents[3] / "assets" / "icons" / icon))
+            button.setIconSize(QSize(16, 16))
+            button.setFixedSize(28, 28)
+            button.setStyleSheet(
+                "QPushButton { min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; "
+                f"padding: 0; border: none; border-radius: 4px; background: {color}; }}"
+                f"QPushButton:hover {{ background: {hover}; }}"
+                "QPushButton:disabled { background: #CBD5E1; }"
+            )
+            button.setToolTip(f"{label} dentro del proceso activo")
+            button.setAccessibleName(label)
             button.setEnabled(False)
             button.clicked.connect(lambda checked=False, step=direction: self._move_line(step))
             lines_toolbar.addWidget(button)

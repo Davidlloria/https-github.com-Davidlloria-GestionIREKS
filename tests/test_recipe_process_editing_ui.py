@@ -21,6 +21,22 @@ def page(monkeypatch):
     widget.close()
 
 
+def test_recalculate_displays_formula_flour_percentages_across_processes(page, monkeypatch):
+    from app.services.recipe_calculation_service import RecipeCalculationService
+
+    monkeypatch.setattr(
+        page.recipe_service, "calculate",
+        lambda recipe, lines, **kwargs: RecipeCalculationService().calculate(recipe, lines),
+    )
+    page._render_lines([
+        RecetaLinea(receta_id=0, orden=1, nombre_mostrado="Trigo", es_harina=True, cantidad_base_g=600, proceso_nombre="Frutas"),
+        RecetaLinea(receta_id=0, orden=2, nombre_mostrado="Centeno", es_harina=True, cantidad_base_g=400, proceso_nombre="Masa final"),
+    ])
+    page._recalculate()
+    assert page.lines_table.item(0, page.COL_PCT).text() == "60,00 %"
+    assert page.lines_table.item(1, page.COL_PCT).text() == "40,00 %"
+
+
 def test_empty_process_survives_build_and_ingredient_insertion(page):
     page._render_lines([RecetaLinea(receta_id=0, nombre_mostrado="Harina", proceso_nombre="Masa final", cantidad_base_g=100)])
     page._build_lines()

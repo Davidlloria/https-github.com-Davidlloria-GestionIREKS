@@ -4,6 +4,37 @@ from app.models import Receta, RecetaLinea
 from app.services import RecipeCalculationService
 
 
+@pytest.mark.parametrize("processes", [("Masa final", "Masa final"), ("Prefermento", "Masa final")])
+def test_flours_share_one_hundred_percent_across_formula(processes):
+    lines = [
+        RecetaLinea(receta_id=1, nombre_mostrado="Trigo", es_harina=True, cantidad_base_g=600, proceso_nombre=processes[0]),
+        RecetaLinea(receta_id=1, nombre_mostrado="Centeno", es_harina=True, cantidad_base_g=400, proceso_nombre=processes[1]),
+        RecetaLinea(receta_id=1, nombre_mostrado="Agua", es_liquido=True, cantidad_base_g=650),
+        RecetaLinea(receta_id=1, nombre_mostrado="Sal", cantidad_base_g=20),
+    ]
+    service = RecipeCalculationService()
+    result = service.calculate(Receta(numero_piezas=1), lines)
+    assert [line.porcentaje_panadero for line in result.lineas] == pytest.approx([60, 40, 65, 2])
+    assert sum(line.porcentaje_panadero for line in result.lineas if line.es_harina) == pytest.approx(100)
+    for process in set(processes):
+        sheet = service.build_process_cost_sheet(lines, process)
+        assert [line.porcentaje_panadero for line in sheet] == pytest.approx([
+            line.porcentaje_panadero for line in result.lineas if line.proceso_nombre == process
+        ])
+
+
+def test_process_reference_does_not_count_flour_twice():
+    lines = [
+        RecetaLinea(receta_id=1, nombre_mostrado="Trigo", es_harina=True, cantidad_base_g=600, proceso_nombre="Prefermento"),
+        RecetaLinea(receta_id=1, nombre_mostrado="Agua", cantidad_base_g=600, proceso_nombre="Prefermento"),
+        RecetaLinea(receta_id=1, nombre_mostrado="Centeno", es_harina=True, cantidad_base_g=400),
+        RecetaLinea(receta_id=1, tipo_linea="proceso", proceso_origen_nombre="Prefermento", cantidad_base_g=1200, cantidad_origen_g=1200),
+    ]
+    result = RecipeCalculationService().calculate(Receta(numero_piezas=1), lines)
+    assert [line.porcentaje_panadero for line in result.lineas] == pytest.approx([60, 60, 40, 60])
+    assert sum(line.porcentaje_panadero for line in result.lineas if line.es_harina) == pytest.approx(100)
+
+
 def test_calculation_service_basic() -> None:
     receta = Receta(cliente_id="cliente-test", nombre="Test", codigo_receta="T-1", numero_piezas=10, masa_final_deseada_g=2000)
     lineas = [
