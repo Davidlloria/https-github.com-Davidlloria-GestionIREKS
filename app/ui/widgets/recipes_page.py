@@ -3780,7 +3780,8 @@ class RecipesPage(QWidget):
     def _on_escandallo_item_changed(self, item: QTableWidgetItem) -> None:
         if item.column() != self.ESC_COL_EUR_KG or self._is_loading_recipe:
             return
-        source_row = int(item.data(Qt.ItemDataRole.UserRole) or -1)
+        source_row_data = item.data(Qt.ItemDataRole.UserRole)
+        source_row = int(source_row_data) if source_row_data is not None else -1
         if source_row < 0:
             return
         line = self._line_from_row(source_row)

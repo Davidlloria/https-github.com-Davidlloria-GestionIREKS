@@ -37,6 +37,45 @@ def test_recalculate_displays_formula_flour_percentages_across_processes(page, m
     assert page.lines_table.item(1, page.COL_PCT).text() == "40,00 %"
 
 
+@pytest.mark.parametrize("source_row", [0, 1])
+def test_escandallo_price_survives_refresh_and_save(page, monkeypatch, source_row):
+    from sqlmodel import SQLModel, Session, create_engine
+    from app.models import Receta
+    from app.repositories.recipe_repository import RecipeRepository
+    from app.services.recipe_calculation_service import RecipeCalculationService
+
+    monkeypatch.setattr(page.recipe_service, "std_prices_by_code", lambda: {})
+    monkeypatch.setattr(
+        page.recipe_service, "calculate",
+        lambda recipe, lines, **kwargs: RecipeCalculationService().calculate(recipe, lines),
+    )
+    page._render_lines([
+        RecetaLinea(receta_id=0, orden=1, nombre_mostrado="Harina de trigo Media Fuerza", es_harina=True, cantidad_base_g=1000),
+        RecetaLinea(receta_id=0, orden=2, nombre_mostrado="Otra harina", es_harina=True, cantidad_base_g=500),
+    ])
+    page.escandallo_process_combo.setCurrentText("Masa final")
+    saves = []
+    monkeypatch.setattr(page, "_schedule_autosave", lambda: saves.append(True))
+    page.escandallo_table.item(source_row, page.ESC_COL_EUR_KG).setText("1,25")
+    assert page._build_lines()[source_row].precio_kg_snapshot == 1.25
+    assert saves
+    page._refresh_escandallo_table()
+    assert page.escandallo_table.item(source_row, page.ESC_COL_EUR_KG).text() == "1,25 €"
+
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+    try:
+        with Session(engine) as session:
+            repo = RecipeRepository()
+            saved = repo.save(session, Receta(nombre="Precio de prueba", codigo_receta="TEST-PRECIO"), page._build_lines())
+            loaded = repo.get(session, saved.receta.id)
+            page._render_lines(loaded.lineas)
+        assert page._build_lines()[source_row].precio_kg_snapshot == 1.25
+        assert page.escandallo_table.item(source_row, page.ESC_COL_EUR_KG).text() == "1,25 €"
+    finally:
+        engine.dispose()
+
+
 def test_empty_process_survives_build_and_ingredient_insertion(page):
     page._render_lines([RecetaLinea(receta_id=0, nombre_mostrado="Harina", proceso_nombre="Masa final", cantidad_base_g=100)])
     page._build_lines()
