@@ -1,4 +1,5 @@
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QTimer
@@ -96,6 +97,7 @@ class MainWindow(QMainWindow):
 
     def _build_pages(self) -> None:
         self.page_names: list[str] = []
+        self._pending_pages: dict[int, Callable[[], QWidget]] = {}
         self.settings_page = SettingsPage(embedded=True)
         self.dashboard_page = DashboardPage(settings_page=self.settings_page)
         self._add_page("Inicio", self.dashboard_page)
@@ -110,14 +112,33 @@ class MainWindow(QMainWindow):
         self._add_page("Cursos", CoursesPage())
         self._add_page("Formulas", RecipesPage())
         self._add_page("Documentos", DocumentLibraryPage())
-        warehouse = WarehousePage()
-        self._add_page("Almacen", warehouse)
-        if hasattr(warehouse, "product_requested"):
-            warehouse.product_requested.connect(self._open_warehouse_product)
-        self._add_page("Productos IREKS", IngredientsIreksPage())
-        self._add_page("Materias primas", IngredientsStdPage())
+        self._add_deferred_page("Almacen", self._build_warehouse_page)
+        self._add_deferred_page("Productos IREKS", IngredientsIreksPage)
+        self._add_deferred_page("Materias primas", IngredientsStdPage)
         self._add_page("Pedidos", OrdersPage())
         self._add_page("Ventas", SalesPage())
+
+    def _build_warehouse_page(self) -> QWidget:
+        warehouse = WarehousePage()
+        if hasattr(warehouse, "product_requested"):
+            warehouse.product_requested.connect(self._open_warehouse_product)
+        return warehouse
+
+    def _add_deferred_page(self, name: str, factory: Callable[[], QWidget]) -> None:
+        self._pending_pages[self.pages.count()] = factory
+        self._add_page(name, QWidget())
+
+    def _ensure_page(self, index: int) -> None:
+        factory = self._pending_pages.get(index)
+        if factory is None:
+            return
+        # Construct before replacing the slot so a failed load can be retried.
+        page = factory()
+        placeholder = self.pages.widget(index)
+        self.pages.removeWidget(placeholder)
+        self.pages.insertWidget(index, page)
+        placeholder.deleteLater()
+        del self._pending_pages[index]
 
     def _open_warehouse_product(self, articulo_id: str, section: str) -> None:
         index = self.page_names.index("Productos IREKS")
@@ -230,6 +251,7 @@ class MainWindow(QMainWindow):
         button.setFixedWidth(text_width + MAIN_NAVIGATION_ICON_SIZE.width() + 16)
 
     def _set_current_page(self, index: int) -> None:
+        self._ensure_page(index)
         current_index = self.pages.currentIndex()
         if index == current_index:
             button = self.ribbon_buttons.button(index)

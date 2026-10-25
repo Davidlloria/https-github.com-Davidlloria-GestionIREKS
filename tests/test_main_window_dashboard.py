@@ -7,6 +7,7 @@ from types import SimpleNamespace
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import Signal
 
 import app.ui.main_window as main_window_module
 
@@ -36,23 +37,42 @@ def test_main_window_starts_on_inicio_page(monkeypatch) -> None:
         widget.settings_page = settings_page
         return widget
 
+    created = []
+    refreshed = []
+    focused = []
+
+    class DeferredPage(QWidget):
+        product_requested = Signal(str, str)
+
+        def __init__(self, name):
+            super().__init__()
+            self.setObjectName(name)
+            created.append(name)
+
+        def reload(self):
+            refreshed.append(self.objectName())
+
+        def focus_article(self, identity, section):
+            focused.append((identity, section))
+
     monkeypatch.setattr(main_window_module, "DashboardPage", _dashboard_stub)
     monkeypatch.setattr(main_window_module.MainWindow, "_build_customers_page", lambda self: _stub_page("customers"))
     monkeypatch.setattr(main_window_module, "ContactsPage", lambda: _stub_page("contacts"))
     monkeypatch.setattr(main_window_module, "CoursesPage", lambda: _stub_page("courses"))
     monkeypatch.setattr(main_window_module, "DistributorsPage", lambda: _stub_page("distributors"))
     monkeypatch.setattr(main_window_module, "DocumentLibraryPage", lambda: _stub_page("documents"))
-    monkeypatch.setattr(main_window_module, "IngredientsIreksPage", lambda: _stub_page("ireks"))
-    monkeypatch.setattr(main_window_module, "IngredientsStdPage", lambda: _stub_page("std"))
+    monkeypatch.setattr(main_window_module, "IngredientsIreksPage", lambda: DeferredPage("ireks"))
+    monkeypatch.setattr(main_window_module, "IngredientsStdPage", lambda: DeferredPage("std"))
     monkeypatch.setattr(main_window_module, "OrdersPage", lambda: _stub_page("orders"))
     monkeypatch.setattr(main_window_module, "PlaceholderPage", lambda *_args, **_kwargs: _stub_page("placeholder"))
     monkeypatch.setattr(main_window_module, "RecipesPage", lambda: _stub_page("recipes"))
     monkeypatch.setattr(main_window_module, "SalesPage", lambda: _stub_page("sales"))
     monkeypatch.setattr(main_window_module, "SettingsPage", lambda **_kwargs: _stub_page("settings"))
     monkeypatch.setattr(main_window_module, "TechniciansPage", lambda: _stub_page("technicians"))
-    monkeypatch.setattr(main_window_module, "WarehousePage", lambda: _stub_page("warehouse"))
+    monkeypatch.setattr(main_window_module, "WarehousePage", lambda: DeferredPage("warehouse"))
 
     window = main_window_module.MainWindow()
+    assert created == []
 
     assert window.windowTitle() == "Gestión IREKS"
     assert window.page_names[0] == "Inicio"
@@ -113,6 +133,32 @@ def test_main_window_starts_on_inicio_page(monkeypatch) -> None:
     lifecycle.status = "IA local disponible"
     window._sync_local_ai_status()
     assert statuses[-1] == ("ready", "IA local disponible")
+
+    # The warehouse link must construct Products before focusing the article.
+    warehouse_index = window.page_names.index("Almacen")
+    products_index = window.page_names.index("Productos IREKS")
+    std_index = window.page_names.index("Materias primas")
+    page_count = window.pages.count()
+    window.ribbon_buttons.button(warehouse_index).click()
+    warehouse = window.pages.widget(warehouse_index)
+    assert created == ["warehouse"]
+    warehouse.product_requested.emit("article-1", "Stock")
+    products = window.pages.widget(products_index)
+    assert window.pages.currentWidget() is products
+    assert focused == [("article-1", "Stock")]
+    assert created == ["warehouse", "ireks"]
+    window.ribbon_buttons.button(std_index).click()
+    std = window.pages.widget(std_index)
+    for index, page in ((warehouse_index, warehouse), (products_index, products), (std_index, std)):
+        window.ribbon_buttons.button(0).click()
+        window.ribbon_buttons.button(index).click()
+        assert window.pages.currentWidget() is page
+        assert window.ribbon_buttons.checkedId() == index
+    assert created == ["warehouse", "ireks", "std"]
+    assert refreshed == ["warehouse", "ireks", "std", "warehouse", "ireks", "std"]
+    assert window.pages.count() == page_count
+    assert window.pages.widget(documents_index).objectName() == "documents"
+    assert window.pages.widget(window.page_names.index("Pedidos")).objectName() == "orders"
     window._local_ai_status_timer.stop()
     window.close()
     window.deleteLater()
