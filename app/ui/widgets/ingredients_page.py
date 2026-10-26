@@ -70,6 +70,7 @@ from app.services.ingredient_std_service import IngredientStdService
 from app.services.fatsecret_client import FatSecretApiError
 from app.services.openai_nutrition_service import OpenAINutritionService
 from app.services.monthly_orders_service import MonthlyOrdersService
+from app.services.order_query_service import OrderQueryService
 from app.services.product_report_document_helper import build_product_report_html
 from app.services.product_report_flow_service import ProductReportFlowService
 from app.services.product_report_service import ProductReportResult
@@ -1754,6 +1755,27 @@ class IngredientsIreksPage(QWidget):
         orders_modes.addStretch()
         self.orders_view_buttons.idClicked.connect(self.orders_views.setCurrentIndex)
         pedidos_body_layout.addLayout(orders_modes)
+        recipient_row = QHBoxLayout()
+        recipient_row.addWidget(QLabel("Pedidos de"))
+        self.pedidos_recipient = QComboBox()
+        self.pedidos_recipient.setAccessibleName("Pedidos de")
+        options = []
+        for option in OrderQueryService().warehouse_filter_options():
+            name = option.label.rsplit(" (", 1)[0]
+            if not option.value or name.casefold() == "cadelsa lza":
+                continue
+            options.append((name, option.value))
+        options.sort(key=lambda item: (item[0].casefold() != "igsa", item[0].casefold()))
+        for name, identity in options:
+            if name == "Panadería y Dulceria Backer Las Arenas Sin Glúten":
+                name = 'Sin Gluten «Las Arenas»'
+            self.pedidos_recipient.addItem(name, identity)
+        self.pedidos_recipient.addItem("Todos", "")
+        self.pedidos_recipient.currentIndexChanged.connect(
+            lambda _index: self._reload_pedidos_table(self._current_entradas_articulo_id)
+        )
+        recipient_row.addWidget(self.pedidos_recipient, 1)
+        pedidos_body_layout.addLayout(recipient_row)
         orders_detail = QWidget()
         orders_detail_layout = QVBoxLayout(orders_detail)
         orders_detail_layout.setContentsMargins(0, 0, 0, 0)
@@ -3938,6 +3960,13 @@ class IngredientsIreksPage(QWidget):
         if not articulo_id:
             return
         item_rows = self.ireks_service.pedido_items(articulo_id)
+        recipient_id = str(self.pedidos_recipient.currentData() or "")
+        if recipient_id:
+            order_ids = {
+                order.pedido_id for order in OrderQueryService().list_raw_orders()
+                if order.almacen_id == recipient_id
+            }
+            item_rows = [row for row in item_rows if row.pedido_id in order_ids]
         q_from = self.pedidos_date_from.date()
         q_to = self.pedidos_date_to.date()
         from_date: date = date(q_from.year(), q_from.month(), q_from.day())
@@ -3969,7 +3998,7 @@ class IngredientsIreksPage(QWidget):
         selected_year = int(self.orders_comparison_year.currentData())
         rows = self.monthly_orders_service.product_monthly_rows_for(
             articulo_id=articulo_id,
-            almacen_id=self.external_distributor_filter_id,
+            almacen_id=str(self.pedidos_recipient.currentData() or ""),
             date_from=date(selected_year - 1, 1, 1),
             date_to=date(selected_year, 12, 31),
         ) if articulo_id else []
