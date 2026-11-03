@@ -5,7 +5,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from sqlmodel import Session, select
 
 from app.core.database import engine
-from app.models import Cliente, Distribuidor, IngredienteIreks, TarifaPrecioIreks
+from app.models import Cliente, IngredienteIreks, TarifaPrecioIreks
 
 
 @dataclass(frozen=True)
@@ -21,19 +21,17 @@ class CustomerForecastService:
     def catalog(self, customer_id: str, year: int) -> tuple[str, list[ForecastProduct]]:
         with Session(self.engine) as session:
             customer = session.get(Cliente, customer_id)
-            if customer is None or not customer.distribuidor_id:
-                raise ValueError("El cliente no tiene un distribuidor asignado.")
-            distributor = session.get(Distribuidor, customer.distribuidor_id)
-            if distributor is None:
-                raise ValueError("No se encuentra el distribuidor del cliente.")
+            if customer is None:
+                raise ValueError("No se encuentra el cliente.")
+            direct = (customer.cliente_tipo or "").strip().casefold() == "directo"
+            price_field = "precio_fabricante" if direct else "precio_distribuidor"
             products = session.exec(select(IngredienteIreks).where(
-                IngredienteIreks.distribuidor_id == customer.distribuidor_id,
                 IngredienteIreks.articulo_status_activo == True,  # noqa: E712
             ).order_by(IngredienteIreks.articulo_descripcion)).all()
             rates = session.exec(select(TarifaPrecioIreks).where(
                 TarifaPrecioIreks.tarifa_ano == year,
             ).order_by(TarifaPrecioIreks.id)).all()
-            prices = {rate.articulo_id: Decimal(str(rate.precio_distribuidor)) for rate in rates}
+            prices = {rate.articulo_id: Decimal(str(getattr(rate, price_field))) for rate in rates}
             result = []
             for product in products:
                 price = prices.get(product.articulo_id)
@@ -41,8 +39,7 @@ class CustomerForecastService:
                     price = None
                 label = f"{product.articulo_referencia} · {product.articulo_descripcion}"
                 result.append(ForecastProduct(label, price))
-            name = distributor.distribuidor_nombre_comercial or distributor.distribuidor_razon_social
-            return name, result
+            return "IREKS" if direct else "IGSA", result
 
     @staticmethod
     def amount(quantity: int, price: Decimal | None) -> Decimal | None:

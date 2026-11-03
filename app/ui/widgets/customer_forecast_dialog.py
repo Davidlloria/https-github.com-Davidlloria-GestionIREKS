@@ -56,7 +56,7 @@ class CustomerForecastDialog(QDialog):
         self.total = QLabel()
         layout.addWidget(self.total)
         note = QLabel(
-            "Fechas pendientes hasta su confirmación. Introduce la caducidad facilitada por el distribuidor.\n"
+            "Fechas pendientes hasta su confirmación. Introduce la caducidad facilitada por el proveedor.\n"
             "Importes de tarifa sin añadir impuestos ni transporte. Previsión temporal: se descarta al cerrar."
         )
         note.setWordWrap(True)
@@ -75,7 +75,7 @@ class CustomerForecastDialog(QDialog):
             self.distributor.setText(f"No se pudo cargar la tarifa: {exc}")
             products = []
         else:
-            self.distributor.setText(f"Distribuidor: {name}")
+            self.distributor.setText(f"Tarifa aplicada: {name}")
         for product in products:
             suffix = " — Sin tarifa" if product.price is None else ""
             self.products.addItem(product.label + suffix, product)
