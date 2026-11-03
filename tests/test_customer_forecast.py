@@ -245,3 +245,111 @@ def test_add_article_opens_picker_and_cancel_keeps_forecast(monkeypatch):
     assert dialog.table.rowHeight(0) >= dialog.table.cellWidget(0, 4).sizeHint().height()
     monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
     dialog.close()
+
+
+def test_text_inputs_keyboard_paste_validation_and_no_warehouse(monkeypatch):
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QLineEdit, QSpinBox
+    application()
+    dialog = CustomerForecastDialog(SimpleNamespace(cliente_id="c", cliente_nombre_comercial="Cliente"), service=FakeService())
+    assert isinstance(dialog.year, QLineEdit)
+    dialog.year.selectAll()
+    QTest.keyClicks(dialog.year, "2027")
+    assert dialog.year.value() == 2027
+    dialog.year.clear()
+    assert not dialog.add_button.isEnabled()
+    dialog.year.setText("2026")
+    assert dialog.add_button.isEnabled()
+    lot = ForecastLot("w", "Nombre oculto", "LOTE123", date(2027, 1, 1), Decimal("100"))
+    dialog._add_line(dialog._catalog[0], lot)
+    quantity = dialog.table.cellWidget(0, 1)
+    assert isinstance(quantity, QLineEdit)
+    assert not isinstance(dialog.year, QSpinBox)
+    assert not isinstance(quantity, QSpinBox)
+    assert dialog.table.item(0, 7).text() == "LOTE123"
+    quantity.selectAll()
+    QTest.keyClicks(quantity, "12")
+    assert quantity.value() == 12
+    assert "148,14" in dialog.total.text()
+    QApplication.clipboard().setText("25")
+    quantity.selectAll()
+    quantity.paste()
+    assert quantity.value() == 25
+    for bad in ("", "0", "1000001", "abc", "1.000"):
+        quantity.setText(bad)
+        assert not dialog.excel_button.isEnabled()
+        assert "pendiente" in dialog.total.text()
+    quantity.setText("3")
+    assert dialog.excel_button.isEnabled()
+    picker = ForecastArticleDialog(dialog._catalog, FakeService())
+    assert picker.lots.columnCount() == 3
+    assert all("almac" not in picker.lots.horizontalHeaderItem(c).text().lower() for c in range(3))
+    picker.close()
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
+    dialog.close()
+
+
+def test_export_excel_cancel_failure_and_current_values(monkeypatch):
+    from app.ui.widgets import customer_forecast_dialog as module
+    application()
+    dialog = CustomerForecastDialog(SimpleNamespace(cliente_id="c", cliente_nombre_comercial="Cliente"), service=FakeService())
+    assert not dialog.excel_button.isEnabled()
+    dialog._add_line(dialog._catalog[0])
+    dialog.table.cellWidget(0, 1).setText("3")
+    dialog.table.cellWidget(0, 4).setDate(QDate(2027, 2, 1))
+    calls = []
+    monkeypatch.setattr(module, "export_forecast_excel", lambda *args: calls.append(args))
+    monkeypatch.setattr(module.QFileDialog, "getSaveFileName", lambda *args: ("", ""))
+    dialog.excel_button.click()
+    assert calls == []
+    monkeypatch.setattr(module.QFileDialog, "getSaveFileName", lambda *args: ("test_forecast", ""))
+    monkeypatch.setattr(QMessageBox, "information", lambda *args: None)
+    dialog.excel_button.click()
+    assert calls[0][0] == "test_forecast.xlsx"
+    assert calls[0][4][0][2:7] == [3, Decimal("12.345"), Decimal("37.04"), date(2027, 2, 1), None]
+    errors = []
+    def fail(*args):
+        raise PermissionError("Archivo abierto")
+    monkeypatch.setattr(module, "export_forecast_excel", fail)
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args: errors.append(args))
+    dialog.excel_button.click()
+    assert "Archivo abierto" in errors[0][2]
+    assert dialog.table.rowCount() == 1
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
+    dialog.close()
+
+
+def test_export_workbook_numbers_dates_pending_and_literal_text():
+    from pathlib import Path
+    from uuid import uuid4
+    from openpyxl import load_workbook
+    from app.services.customer_forecast_export_service import export_forecast_excel
+    folder = Path(".tmp") / f"forecast-export-{uuid4().hex}"
+    folder.mkdir(parents=True)
+    path = folder / "forecast.xlsx"
+    try:
+        export_forecast_excel(path, "Cliente", "IGSA", 2026, [
+            ["=PRODUCTO", "00123", 3, Decimal("12.345"), Decimal("37.04"), date(2027, 1, 1), date(2027, 2, 1), ""],
+            ["Otro", "Sin confirmar", 2, None, None, None, None, "Fechas pendientes"],
+        ])
+        wb = load_workbook(path)
+        ws = wb.active
+        assert ws["A4"].data_type == "s"
+        assert ws["A4"].value == "=PRODUCTO"
+        assert ws["B4"].value == "00123"
+        assert ws["C4"].value == 3
+        assert ws["D4"].value == 12.345
+        assert ws["E4"].value == 37.04
+        assert ws["F4"].value.date() == date(2027, 1, 1)
+        assert ws["F5"].value == "Pendiente"
+        assert "Sin tarifa" in ws["H5"].value
+        assert ws["E5"].value is None
+        assert ws["A6"].value == "Subtotal valorado (incompleto)"
+        assert ws["E6"].value == 37.04
+        assert ws.freeze_panes == "A4"
+        assert all("almac" not in str(c.value).lower() for row in ws for c in row)
+        wb.close()
+    finally:
+        if path.exists():
+            path.unlink()
+        folder.rmdir()

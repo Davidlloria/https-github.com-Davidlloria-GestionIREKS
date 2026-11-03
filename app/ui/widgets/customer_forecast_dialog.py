@@ -1,15 +1,18 @@
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 import unicodedata
 
 from PySide6.QtCore import QDate, Qt
+from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QAbstractItemView, QDateEdit, QDialog, QHBoxLayout, QListWidget, QListWidgetItem,
-    QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox,
+    QFileDialog, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton,
     QTableWidget, QTableWidgetItem, QVBoxLayout,
 )
 
 from app.services.customer_forecast_service import CustomerForecastService
+from app.services.customer_forecast_export_service import export_forecast_excel
 
 
 FORECAST_STYLE = """
@@ -21,7 +24,7 @@ QPushButton:hover { background: #eaf0f8; }
 QPushButton:disabled { color: #94a3b8; background: #f1f5f9; }
 QPushButton#forecastPrimary { background: #2563eb; color: white; border-color: #2563eb; }
 QPushButton#forecastPrimary:disabled { background: #cbd5e1; border-color: #cbd5e1; }
-QLineEdit, QSpinBox, QDateEdit { background: white; color: #243247;
+QLineEdit, QDateEdit { background: white; color: #243247;
     border: 1px solid #cbd5e1; border-radius: 5px; padding: 5px; min-height: 22px; }
 QDateEdit:disabled { color: #334155; background: #f1f5f9; }
 QTableWidget, QListWidget { background: white; alternate-background-color: #f8fafc;
@@ -32,6 +35,22 @@ QHeaderView::section { background: #edf2f7; color: #334155; border: none;
     border-bottom: 1px solid #dbe3ed; padding: 9px 6px; font-weight: 600; }
 QLabel#forecastTotal { font-size: 20px; font-weight: 600; color: #17365c; }
 """
+
+
+class ForecastIntegerEdit(QLineEdit):
+    """Keyboard/paste input scoped to forecasts, with no stepping controls."""
+
+    def __init__(self, minimum, maximum, value):
+        super().__init__(str(value))
+        self.setValidator(QIntValidator(minimum, maximum, self))
+        self.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.setToolTip(f"Introduce un entero entre {minimum} y {maximum}")
+
+    def value(self):
+        return int(self.text()) if self.text().isdecimal() and self.hasAcceptableInput() else None
+
+    def setValue(self, value):
+        self.setText(str(value))
 
 
 class ForecastArticleDialog(QDialog):
@@ -60,8 +79,8 @@ class ForecastArticleDialog(QDialog):
         self.products.setMaximumHeight(165)
         layout.addWidget(self.products)
         layout.addWidget(QLabel("Lotes disponibles · Selecciona una fila y pulsa Añadir, o haz doble clic"))
-        self.lots = QTableWidget(0, 4)
-        self.lots.setHorizontalHeaderLabels(["Lote", "Caducidad", "Stock (envases)", "Almacén"])
+        self.lots = QTableWidget(0, 3)
+        self.lots.setHorizontalHeaderLabels(["Lote", "Caducidad", "Stock (envases)"])
         self.lots.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.lots.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.lots.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -134,7 +153,7 @@ class ForecastArticleDialog(QDialog):
         self.lots.setRowCount(len(lots))
         for row, lot in enumerate(lots):
             values = [lot.lot or "Sin número", lot.expiry.strftime("%d/%m/%Y") if lot.expiry else "Pendiente",
-                      f"{lot.available:g}", lot.warehouse_name]
+                      f"{lot.available:g}"]
             for column, value in enumerate(values):
                 self.lots.setItem(row, column, QTableWidgetItem(value))
             self.lots.item(row, 0).setData(Qt.ItemDataRole.UserRole, lot)
@@ -160,6 +179,7 @@ class CustomerForecastDialog(QDialog):
         super().__init__(parent)
         self.service = service or CustomerForecastService()
         self.customer_id = customer.cliente_id
+        self.customer_name = customer.cliente_nombre_comercial
         self.setObjectName("customerForecastDialog")
         self.setWindowTitle(f"Previsión · {customer.cliente_nombre_comercial}")
         self.resize(1180, 640)
@@ -172,9 +192,8 @@ class CustomerForecastDialog(QDialog):
         controls.addWidget(self.distributor)
         controls.addStretch()
         controls.addWidget(QLabel("Año de tarifa:"))
-        self.year = QSpinBox()
-        self.year.setRange(2000, 9999)
-        self.year.setValue(date.today().year)
+        self.year = ForecastIntegerEdit(2000, 9999, date.today().year)
+        self.year.setFixedWidth(90)
         controls.addWidget(self.year)
         layout.addLayout(controls)
         actions = QHBoxLayout()
@@ -185,6 +204,9 @@ class CustomerForecastDialog(QDialog):
         self.remove_button = QPushButton("Quitar línea")
         self.remove_button.clicked.connect(self._remove_line)
         actions.addWidget(self.remove_button)
+        self.excel_button = QPushButton("Exportar a Excel")
+        self.excel_button.clicked.connect(self._export_excel)
+        actions.addWidget(self.excel_button)
         actions.addStretch()
         self.line_count = QLabel("Sin artículos")
         actions.addWidget(self.line_count)
@@ -192,7 +214,7 @@ class CustomerForecastDialog(QDialog):
         self.table = QTableWidget(0, 9)
         self.table.setHorizontalHeaderLabels([
             "Producto", "Envases", "Tarifa €/envase", "Importe €",
-            "Entrega prevista", "Caducidad", "Estado", "Lote / almacén", "Stock consultado",
+            "Entrega prevista", "Caducidad", "Estado", "Lote", "Stock consultado",
         ])
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -226,16 +248,23 @@ class CustomerForecastDialog(QDialog):
         close_button = QPushButton("Cerrar")
         close_button.clicked.connect(self.reject)
         layout.addWidget(close_button, alignment=Qt.AlignmentFlag.AlignRight)
-        self.year.valueChanged.connect(self._load_catalog)
+        self.year.textChanged.connect(self._load_catalog)
         self._load_catalog()
 
     def _load_catalog(self):
+        if self.year.value() is None:
+            self._catalog = []
+            self.add_button.setEnabled(False)
+            self.distributor.setText("Introduce un año válido entre 2000 y 9999.")
+            self._recalculate()
+            return
         try:
             name, products = self.service.catalog(self.customer_id, self.year.value())
         except Exception as exc:
             self.distributor.setText(f"No se pudo cargar la tarifa: {exc}")
             products = []
         else:
+            self.tariff_name = name
             self.distributor.setText(f"Tarifa aplicada: {name}")
         self._catalog = products
         self.add_button.setEnabled(bool(products))
@@ -271,15 +300,14 @@ class CustomerForecastDialog(QDialog):
         item.setData(Qt.ItemDataRole.UserRole + 1, lot)
         self.table.setItem(row, 0, item)
         self.table.setItem(row, 7, QTableWidgetItem(
-            f"{lot.lot or 'Sin número'} / {lot.warehouse_name}" if lot else "Sin confirmar"
+            lot.lot or "Sin número" if lot else "Sin confirmar"
         ))
         self.table.setItem(row, 8, QTableWidgetItem(f"{lot.available:g}" if lot else "—"))
         if lot:
             self.table.item(row, 7).setToolTip(f"Stock consultado: {lot.available:g} envases")
-        quantity = QSpinBox()
-        quantity.setRange(1, 1000000)
+        quantity = ForecastIntegerEdit(1, 1000000, 1)
         self.table.setCellWidget(row, 1, quantity)
-        quantity.valueChanged.connect(self._recalculate)
+        quantity.textChanged.connect(self._recalculate)
         for column in (4, 5):
             editor = self._date_editor()
             self.table.setCellWidget(row, column, editor)
@@ -304,6 +332,15 @@ class CustomerForecastDialog(QDialog):
         return format(value, "f").replace(".", ",")
 
     def _recalculate(self):
+        invalid = [r for r in range(self.table.rowCount()) if self.table.cellWidget(r, 1).value() is None]
+        self.excel_button.setEnabled(bool(self.table.rowCount()) and not invalid and self.year.value() is not None)
+        if invalid:
+            self.total.setText("Total pendiente: revisa las cantidades")
+            self.status.setText("Introduce una cantidad entera de 1 a 1000000 en las líneas: " + ", ".join(str(r + 1) for r in invalid))
+            self.status.show()
+            for row in invalid:
+                self.table.setItem(row, 3, QTableWidgetItem("Pendiente"))
+            return
         total = Decimal("0.00")
         missing = 0
         quantities = {}
@@ -347,6 +384,33 @@ class CustomerForecastDialog(QDialog):
         notices = [f"Línea {r + 1}: {self.table.item(r, 6).text()}" for r in range(self.table.rowCount()) if self.table.item(r, 6).text()]
         self.status.setText(" · ".join(notices))
         self.status.setVisible(bool(notices))
+
+    def _export_excel(self):
+        self._recalculate()
+        if not self.excel_button.isEnabled():
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Exportar previsión a Excel", "prevision.xlsx", "Excel (*.xlsx)")
+        if not path:
+            return
+        if Path(path).suffix.lower() != ".xlsx":
+            path += ".xlsx"
+        rows = []
+        for row in range(self.table.rowCount()):
+            product = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+            quantity = self.table.cellWidget(row, 1).value()
+            dates = [self.table.cellWidget(row, c) for c in (4, 5)]
+            rows.append([
+                product.label, self.table.item(row, 7).text(), quantity, product.price,
+                self.service.amount(quantity, product.price),
+                *[e.date().toPython() if e.date() != e.minimumDate() else None for e in dates],
+                self.table.item(row, 6).text(),
+            ])
+        try:
+            export_forecast_excel(path, self.customer_name, self.tariff_name, self.year.value(), rows)
+        except Exception as exc:
+            QMessageBox.warning(self, "Exportar previsión", f"No se pudo guardar el Excel.\n{exc}")
+            return
+        QMessageBox.information(self, "Exportar previsión", f"Excel guardado en:\n{path}")
 
     def reject(self):
         if self.table.rowCount() and QMessageBox.question(
