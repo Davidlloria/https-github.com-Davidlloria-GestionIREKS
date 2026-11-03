@@ -13,7 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.models import AlmacenCatalogo, AlmacenMovimiento, Cliente, IngredienteIreks, TarifaPrecioIreks
 from app.services.customer_forecast_service import CustomerForecastService, ForecastLot, ForecastProduct
-from app.ui.widgets.customer_forecast_dialog import CustomerForecastDialog
+from app.ui.widgets.customer_forecast_dialog import CustomerForecastDialog, ForecastArticleDialog
 from app.ui.widgets.customers_page import CustomersPage
 
 
@@ -80,8 +80,8 @@ def test_dialog_quantities_dates_duplicates_missing_price_and_discard(monkeypatc
     application()
     dialog = CustomerForecastDialog(SimpleNamespace(cliente_id="c", cliente_nombre_comercial="Cliente"), service=FakeService())
     assert dialog.distributor.text() == "Tarifa aplicada: IGSA"
-    dialog.add_button.click()
-    dialog.add_button.click()
+    dialog._add_line(dialog._catalog[0])
+    dialog._add_line(dialog._catalog[0])
     assert dialog.table.rowCount() == 2
     assert not dialog.year.isEnabled()
     dialog.table.cellWidget(0, 1).setValue(3)
@@ -93,8 +93,7 @@ def test_dialog_quantities_dates_duplicates_missing_price_and_discard(monkeypatc
     assert dialog.table.item(0, 6).text() == "Caduca antes de la entrega"
     dialog.table.cellWidget(0, 5).setDate(QDate(2027, 1, 10))
     assert dialog.table.item(0, 6).text() == ""
-    dialog.products.setCurrentIndex(1)
-    dialog.add_button.click()
+    dialog._add_line(dialog._catalog[1])
     assert "Incompleto" in dialog.total.text()
     assert dialog.table.item(2, 3).text() == "Pendiente"
     assert dialog.table.editTriggers() == dialog.table.EditTrigger.NoEditTriggers
@@ -182,36 +181,67 @@ def test_occurrence_search_and_lot_lines(monkeypatch):
         ForecastLot("w", "Principal", "L2", date(2027, 2, 1), Decimal("4")),
     ] if article == "a" else []
     dialog = CustomerForecastDialog(SimpleNamespace(cliente_id="c", cliente_nombre_comercial="Cliente"), service=service)
-    dialog.search.setText("CENTENO bc12")
-    assert dialog.products.count() == 1
-    assert dialog.lots.count() == 3
-    dialog.lots.setCurrentIndex(1)
-    dialog.add_button.click()
+    picker = ForecastArticleDialog(dialog._catalog, service)
+    picker.search.setText("CENTENO bc12")
+    assert picker.products.count() == 1
+    assert picker.lots.rowCount() == 2
+    assert not picker.add_button.isEnabled()
+    picker.lots.selectRow(0)
+    picker.add_button.click()
+    assert picker.result() == picker.DialogCode.Accepted
+    dialog._add_line(*picker.selection)
     dialog.table.cellWidget(0, 1).setValue(6)
     assert dialog.table.cellWidget(0, 5).date() == QDate(2027, 1, 1)
     assert not dialog.table.cellWidget(0, 5).isEnabled()
-    dialog.lots.setCurrentIndex(2)
-    dialog.add_button.click()
+    second = ForecastArticleDialog(dialog._catalog, service)
+    second.search.setText("bc12")
+    second.lots.selectRow(1)
+    second.lots.cellDoubleClicked.emit(1, 0)
+    dialog._add_line(*second.selection)
     dialog.table.cellWidget(1, 1).setValue(4)
     assert dialog.table.cellWidget(1, 5).date() == QDate(2027, 2, 1)
     assert "100,00" in dialog.total.text()
     assert "supera" not in dialog.table.item(0, 6).text()
-    dialog.lots.setCurrentIndex(1)
-    dialog.add_button.click()
+    dialog._add_line(*picker.selection)
     assert "supera" in dialog.table.item(0, 6).text()
-    assert "supera" in dialog.table.item(2, 6).text()
+    assert "supera" in dialog.status.text()
     dialog.remove_button.click()
     assert "supera" not in dialog.table.item(0, 6).text()
-    dialog.search.setText("no existe")
-    assert dialog.products.count() == 0
-    assert not dialog.add_button.isEnabled()
-    assert dialog.matches.text() == "Sin coincidencias"
-    dialog.search.setText("TRIG")
-    assert dialog.lots.count() == 1
-    dialog.add_button.click()
+    picker.search.setText("no existe")
+    assert picker.products.count() == 0
+    assert picker.lots.rowCount() == 0
+    assert not picker.add_button.isEnabled()
+    assert not picker.unconfirmed.isEnabled()
+    picker.search.setText("TRIG")
+    assert picker.lots.rowCount() == 0
+    picker.unconfirmed.click()
+    dialog._add_line(*picker.selection)
     assert dialog.table.cellWidget(2, 5).isEnabled()
     assert dialog.table.item(2, 7).text() == "Sin confirmar"
-    dialog.search.clear()
-    assert dialog.products.count() == 2
+    picker.search.clear()
+    assert picker.products.count() == 2
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
+    dialog.close()
+
+
+def test_add_article_opens_picker_and_cancel_keeps_forecast(monkeypatch):
+    application()
+    from app.ui.widgets import customer_forecast_dialog as module
+    dialog = CustomerForecastDialog(SimpleNamespace(cliente_id="c", cliente_nombre_comercial="Cliente"), service=FakeService())
+    assert dialog.add_button.text() == "Añadir artículo"
+    assert not hasattr(dialog, "search")
+    class Picker:
+        selection = None
+        def __init__(self, products, service, parent):
+            self.selection = (products[0], None)
+        def exec(self):
+            return CustomerForecastDialog.DialogCode.Rejected
+    monkeypatch.setattr(module, "ForecastArticleDialog", Picker)
+    dialog.add_button.click()
+    assert dialog.table.rowCount() == 0
+    monkeypatch.setattr(Picker, "exec", lambda self: CustomerForecastDialog.DialogCode.Accepted)
+    dialog.add_button.click()
+    assert dialog.table.rowCount() == 1
+    assert dialog.table.rowHeight(0) >= dialog.table.cellWidget(0, 4).sizeHint().height()
     monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
     dialog.close()
