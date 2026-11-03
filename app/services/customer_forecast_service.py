@@ -1,17 +1,29 @@
 """Read-only catalogue and monetary calculations for customer supply forecasts."""
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
 from sqlmodel import Session, select
 
 from app.core.database import engine
-from app.models import Cliente, IngredienteIreks, TarifaPrecioIreks
+from app.models import AlmacenCatalogo, AlmacenMovimiento, Cliente, IngredienteIreks, TarifaPrecioIreks
+from app.services.warehouse_inventory_service import compute_current_stock_rows
 
 
 @dataclass(frozen=True)
 class ForecastProduct:
     label: str
     price: Decimal | None
+    article_id: str = ""
+
+
+@dataclass(frozen=True)
+class ForecastLot:
+    warehouse_id: str
+    warehouse_name: str
+    lot: str
+    expiry: date | None
+    available: Decimal
 
 
 class CustomerForecastService:
@@ -38,8 +50,28 @@ class CustomerForecastService:
                 if price is not None and (not price.is_finite() or price <= 0):
                     price = None
                 label = f"{product.articulo_referencia} · {product.articulo_descripcion}"
-                result.append(ForecastProduct(label, price))
+                result.append(ForecastProduct(label, price, product.articulo_id))
             return "IREKS" if direct else "IGSA", result
+
+    def lots(self, article_id: str) -> list[ForecastLot]:
+        if not article_id:
+            return []
+        with Session(self.engine) as session:
+            moves = session.exec(select(AlmacenMovimiento).where(
+                AlmacenMovimiento.articulo_id == article_id,
+            )).all()
+            warehouses = {w.almacen_id: w.almacen_nombre for w in session.exec(select(AlmacenCatalogo))}
+        by_warehouse = {}
+        for move in moves:
+            by_warehouse.setdefault(move.almacen_id, []).append(move)
+        result = []
+        for warehouse_id, warehouse_moves in by_warehouse.items():
+            for row in compute_current_stock_rows(warehouse_moves):
+                result.append(ForecastLot(
+                    warehouse_id, warehouses.get(warehouse_id) or warehouse_id or "Sin almacén",
+                    row["lote"], row["caducidad"], Decimal(str(row["cantidad"])),
+                ))
+        return sorted(result, key=lambda lot: (lot.expiry or date.max, lot.warehouse_name, lot.lot))
 
     @staticmethod
     def amount(quantity: int, price: Decimal | None) -> Decimal | None:

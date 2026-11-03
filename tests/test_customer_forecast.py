@@ -1,4 +1,5 @@
 import os
+from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -10,8 +11,8 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlalchemy.pool import StaticPool
 
-from app.models import Cliente, IngredienteIreks, TarifaPrecioIreks
-from app.services.customer_forecast_service import CustomerForecastService, ForecastProduct
+from app.models import AlmacenCatalogo, AlmacenMovimiento, Cliente, IngredienteIreks, TarifaPrecioIreks
+from app.services.customer_forecast_service import CustomerForecastService, ForecastLot, ForecastProduct
 from app.ui.widgets.customer_forecast_dialog import CustomerForecastDialog
 from app.ui.widgets.customers_page import CustomersPage
 
@@ -61,6 +62,9 @@ class FakeService(CustomerForecastService):
 
     def catalog(self, customer_id, year):
         return "IGSA", [ForecastProduct("Producto", Decimal("12.345")), ForecastProduct("Sin precio", None)]
+
+    def lots(self, article_id):
+        return []
 
 
 _APP = None
@@ -131,3 +135,83 @@ def test_customer_button_opens_selected_customer(monkeypatch):
     page.forecast_btn.click()
     assert calls == [customer]
     page.close()
+
+
+def test_lots_net_stock_separates_warehouses_dates_and_products():
+    engine = create_engine("sqlite://", poolclass=StaticPool)
+    SQLModel.metadata.create_all(engine)
+    expiry = date(2027, 1, 1)
+    with Session(engine) as session:
+        session.add(AlmacenCatalogo(almacen_id="w1", almacen_nombre="Principal"))
+        for warehouse, article, lot, cad, quantity in [
+            ("w1", "a", "L1", expiry, 10),
+            ("w1", "a", "L1", expiry, -4),
+            ("w2", "a", "L1", expiry, 2),
+            ("w1", "a", "L1", date(2027, 2, 1), 3),
+            ("w1", "a", "L2", None, 4),
+            ("w1", "a", "ZERO", expiry, 2),
+            ("w1", "a", "ZERO", expiry, -2),
+            ("w1", "a", "NEG", expiry, -1),
+            ("w1", "other", "OTHER", expiry, 100),
+        ]:
+            session.add(AlmacenMovimiento(almacen_id=warehouse, articulo_id=article,
+                articulo_lote=lot, articulo_caducidad=cad, cantidad=quantity))
+        session.commit()
+    lots = CustomerForecastService(engine).lots("a")
+    assert len(lots) == 4
+    assert [(l.warehouse_id, l.lot, l.available) for l in lots] == [
+        ("w1", "L1", Decimal("6")), ("w2", "L1", Decimal("2")),
+        ("w1", "L1", Decimal("3")), ("w1", "L2", Decimal("4")),
+    ]
+    assert lots[0].warehouse_name == "Principal"
+    assert lots[-1].expiry is None
+    assert CustomerForecastService(engine).lots("missing") == []
+    with Session(engine) as session:
+        assert sum(m.cantidad for m in session.exec(select(AlmacenMovimiento))) == 114
+
+
+def test_occurrence_search_and_lot_lines(monkeypatch):
+    application()
+    service = FakeService()
+    service.catalog = lambda *args: ("IGSA", [
+        ForecastProduct("ABC123 · Mezcla centéno", Decimal("10"), "a"),
+        ForecastProduct("XYZ · Trigo", Decimal("20"), "b"),
+    ])
+    service.lots = lambda article: [
+        ForecastLot("w", "Principal", "L1", date(2027, 1, 1), Decimal("6")),
+        ForecastLot("w", "Principal", "L2", date(2027, 2, 1), Decimal("4")),
+    ] if article == "a" else []
+    dialog = CustomerForecastDialog(SimpleNamespace(cliente_id="c", cliente_nombre_comercial="Cliente"), service=service)
+    dialog.search.setText("CENTENO bc12")
+    assert dialog.products.count() == 1
+    assert dialog.lots.count() == 3
+    dialog.lots.setCurrentIndex(1)
+    dialog.add_button.click()
+    dialog.table.cellWidget(0, 1).setValue(6)
+    assert dialog.table.cellWidget(0, 5).date() == QDate(2027, 1, 1)
+    assert not dialog.table.cellWidget(0, 5).isEnabled()
+    dialog.lots.setCurrentIndex(2)
+    dialog.add_button.click()
+    dialog.table.cellWidget(1, 1).setValue(4)
+    assert dialog.table.cellWidget(1, 5).date() == QDate(2027, 2, 1)
+    assert "100,00" in dialog.total.text()
+    assert "supera" not in dialog.table.item(0, 6).text()
+    dialog.lots.setCurrentIndex(1)
+    dialog.add_button.click()
+    assert "supera" in dialog.table.item(0, 6).text()
+    assert "supera" in dialog.table.item(2, 6).text()
+    dialog.remove_button.click()
+    assert "supera" not in dialog.table.item(0, 6).text()
+    dialog.search.setText("no existe")
+    assert dialog.products.count() == 0
+    assert not dialog.add_button.isEnabled()
+    assert dialog.matches.text() == "Sin coincidencias"
+    dialog.search.setText("TRIG")
+    assert dialog.lots.count() == 1
+    dialog.add_button.click()
+    assert dialog.table.cellWidget(2, 5).isEnabled()
+    assert dialog.table.item(2, 7).text() == "Sin confirmar"
+    dialog.search.clear()
+    assert dialog.products.count() == 2
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
+    dialog.close()
