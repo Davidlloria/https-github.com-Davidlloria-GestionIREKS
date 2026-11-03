@@ -57,6 +57,7 @@ from app.services.customer_report_flow_service import CustomerReportFlowResult, 
 from app.services.customer_query_service import CustomerQueryService
 from app.services.customer_service import CustomerService
 from app.ui.widgets.customer_queries_dialog import CustomerQueriesDialog
+from app.ui.widgets.customer_forecast_dialog import CustomerForecastDialog
 from app.ui.widgets.customer_ai_summary_dialog import CustomerAISummaryDialog
 from app.services.customer_report_service import CustomerReportIntentService, CustomerReportResult, CustomerReportService
 from app.services.report_export_service import ReportExportService
@@ -1078,6 +1079,12 @@ class CustomersPage(QWidget):
             tooltip="Generar un resumen comercial del cliente seleccionado",
         )
         self.ai_summary_btn.setEnabled(False)
+        self.forecast_btn = create_standard_ribbon_button(
+            "Previsión", role="primary", icon_name="calendar.svg",
+            object_name="customerForecastButton", tooltip="Preparar previsión de suministro",
+        )
+        self.forecast_btn.setEnabled(False)
+        self.forecast_btn.clicked.connect(self._open_customer_forecast)
         self.help_btn = create_standard_ribbon_button(
             "Ayuda",
             role="secondary",
@@ -1099,6 +1106,7 @@ class CustomersPage(QWidget):
         ribbon_layout.addWidget(self.print_btn)
         ribbon_layout.addWidget(self.refresh_btn)
         ribbon_layout.addWidget(self.queries_btn)
+        ribbon_layout.addWidget(self.forecast_btn)
         ribbon_layout.addWidget(self.ai_summary_btn)
         ribbon_layout.addStretch(1)
         ribbon_layout.addWidget(self.help_btn)
@@ -3634,6 +3642,7 @@ class CustomersPage(QWidget):
 
     def _show_selected_details(self) -> None:
         row = self._selected_row()
+        self.forecast_btn.setEnabled(row is not None)
         if hasattr(self, "ai_summary_btn"):
             self.ai_summary_btn.setEnabled(row is not None)
         self._is_loading_details = True
@@ -3706,6 +3715,11 @@ class CustomersPage(QWidget):
         self._render_related_recipes(str(getattr(row, "cliente_id", "") or ""))
         self._render_customer_agenda(str(getattr(row, "cliente_id", "") or ""))
         self._is_loading_details = False
+
+    def _open_customer_forecast(self) -> None:
+        customer = self._selected_row()
+        if customer is not None:
+            CustomerForecastDialog(customer, self).exec()
 
     def _open_customer_ai_summary(self) -> None:
         customer = self._selected_row()
