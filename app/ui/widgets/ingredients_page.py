@@ -2,9 +2,11 @@
 from typing import Any
 from pathlib import Path
 import re
+import csv
+from io import StringIO
 
 from PySide6.QtCore import QDate, QLocale, QSize, QTimer, Qt, QUrl
-from PySide6.QtGui import QBrush, QColor, QDesktopServices, QFont, QIcon, QPainter, QPen, QPixmap, QTextCharFormat, QTextDocument
+from PySide6.QtGui import QAction, QKeySequence, QBrush, QColor, QDesktopServices, QFont, QIcon, QPainter, QPen, QPixmap, QTextCharFormat, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -2000,11 +2002,21 @@ class IngredientsIreksPage(QWidget):
         tarifa_table_layout.addWidget(self.tarifa_header_table)
         self.tarifa_table = QTableWidget(0, 10)
         self.tarifa_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tarifa_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.tarifa_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.tarifa_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tarifa_table.verticalHeader().setVisible(False)
         self.tarifa_table.horizontalHeader().setVisible(False)
-        self.tarifa_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.tarifa_table.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.copy_tarifa_action = QAction("Copiar filas", self.tarifa_table)
+        self.copy_tarifa_action.setShortcut(QKeySequence.StandardKey.Copy)
+        self.copy_tarifa_action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
+        self.copy_tarifa_action.setEnabled(False)
+        self.copy_tarifa_action.triggered.connect(self._copy_tarifa_rows)
+        self.tarifa_table.addAction(self.copy_tarifa_action)
+        self.tarifa_table.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
+        self.tarifa_table.itemSelectionChanged.connect(
+            lambda: self.copy_tarifa_action.setEnabled(bool(self.tarifa_table.selectionModel().selectedRows()))
+        )
         self._apply_ireks_table_style(self.tarifa_table)
         tarifa_header = self.tarifa_table.horizontalHeader()
         tarifa_header.setSectionsClickable(True)
@@ -4194,6 +4206,20 @@ class IngredientsIreksPage(QWidget):
             self.tarifa_table.setItem(row_idx, 7, pd_kg_item)
             self.tarifa_table.setItem(row_idx, 8, delta_distribuidor_item)
             self.tarifa_table.setItem(row_idx, 9, margen_item)
+
+    def _copy_tarifa_rows(self) -> None:
+        table = self.tarifa_table
+        rows = sorted(index.row() for index in table.selectionModel().selectedRows() if not table.isRowHidden(index.row()))
+        if not rows:
+            return
+        header = table.horizontalHeader()
+        columns = [header.logicalIndex(i) for i in range(table.columnCount())
+                   if not table.isColumnHidden(header.logicalIndex(i))]
+        buffer = StringIO()
+        writer = csv.writer(buffer, delimiter="\t", lineterminator="\r\n")
+        for row in rows:
+            writer.writerow([table.item(row, col).text() if table.item(row, col) else "" for col in columns])
+        QApplication.clipboard().setText(buffer.getvalue())
 
     def _selected_tarifa_id(self) -> int:
         selected = self.tarifa_table.selectionModel().selectedRows() if self.tarifa_table.selectionModel() else []
