@@ -1190,6 +1190,16 @@ class SalesToolsDialog(QDialog):
         )
         self.import_btn.clicked.connect(self._import_ireks_sales)
         button_row.addWidget(self.import_btn)
+        if self._mode == "igsa":
+            self.review_monthly_btn = self._make_action_button(
+                "Revisión mensual",
+                SHEET_ICON_PATH,
+                background="#EAF2FF",
+                border="#AFC8F7",
+                foreground="#214EAA",
+            )
+            self.review_monthly_btn.clicked.connect(self._open_igsa_monthly_review)
+            button_row.addWidget(self.review_monthly_btn)
         if self._mode == "clientes":
             self.manage_imports_btn = self._make_action_button(
                 "Importaciones",
@@ -1729,6 +1739,11 @@ class SalesToolsDialog(QDialog):
             QMessageBox.warning(self, "Previsualización IGSA", f"No se pudo previsualizar el Excel IGSA:\n{exc}")
             return
         self._show_igsa_sales_preview_dialog(source, preview)
+
+    def _open_igsa_monthly_review(self) -> None:
+        from app.ui.widgets.igsa_monthly_review_dialog import IgsaMonthlyReviewDialog
+
+        IgsaMonthlyReviewDialog(self).exec()
 
     def _execute_igsa_sales_import(self, source: Path, close_dialog: QDialog | None = None) -> None:
         try:
