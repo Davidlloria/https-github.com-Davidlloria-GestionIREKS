@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -173,3 +174,30 @@ def test_invalid_or_negative_workbook_quantity_marks_source_incomplete(tmp_path,
     result = IgsaMonthlyReviewService().compare(path, {"venta": Path("ventas.pdf")}, year=2026, month=2)
     assert sum(i.code == "cantidad_excel" for i in result.issues) == 2
     assert next(r for r in result.products if r.product == "999").status == "fuente_incompleta"
+
+
+def test_samples_read_all_lots_and_ignore_expiry_and_recipient(tmp_path):
+    path = tmp_path / "febrero 26.xlsx"
+    make_workbook(path)
+    book = review_module.load_workbook(path)
+    sheet = book["muestras"]
+    sheet.append([2415, "18921", "SINGLUPLUS", 12.5, 56,
+                  "12L.8200116", "17L.8200115", "27L8200116", None, "CAD 04/2026"])
+    sheet.append([10, "121", "Muestra con fecha Excel", 1, 3,
+                  "1L.0001", datetime(2027, 4, 19), "2L.0002", "DAVID"])
+    sheet.append([11, "122", "Muestra con fecha texto", 1, 1,
+                  "L.0003", "19/10/2026", "CAD. 04/2027", "2028-03-01"])
+    sheet.append([12, "123", "Lote con guion", 1, 2, "1L.0004", "1234-5678"])
+    book.save(path)
+    book.close()
+
+    result = IgsaMonthlyReviewService().compare(path, {}, year=2026, month=2)
+    rows = [row for row in result.lots if row.kind == "muestra" and row.product == "18921"]
+    assert {row.lot: row.igsa for row in rows} == {"8200116": 39, "8200115": 17}
+    assert next(row for row in result.products if row.kind == "muestra" and row.product == "18921").igsa == 56
+    assert not any(issue.code in {"reparto", "lote_no_reconocido", "reparto_desconocido"}
+                   and issue.location and issue.location.sheet == "muestras" and issue.location.row == 2
+                   for issue in result.issues)
+    assert {row.lot: row.igsa for row in result.lots if row.product == "121"} == {"0001": 1, "0002": 2}
+    assert [row.lot for row in result.lots if row.product == "122"] == ["0003"]
+    assert "1234-5678" in [row.lot for row in result.lots if row.product == "123"]

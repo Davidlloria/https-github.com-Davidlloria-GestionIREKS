@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 import re
@@ -98,6 +98,23 @@ def _quantity(value: object) -> Decimal | None:
         return result if result.is_finite() else None
     except InvalidOperation:
         return None
+
+
+def _sample_metadata(value: object, *, first_lot: bool) -> bool:
+    """Exclude sample dates and recipient names without hiding lot entries."""
+    if isinstance(value, (date, datetime)):
+        return True
+    text = _text(value)
+    if re.match(r"^(?:CAD(?:UCIDAD)?\b[.:\s-]*)", text, re.IGNORECASE):
+        return True
+    date_patterns = (
+        r"\d{1,2}[/.-](?:0?[1-9]|1[0-2])[/.-](?:19|20)?\d{2}",
+        r"(?:19|20)\d{2}[/.-](?:0?[1-9]|1[0-2])[/.-]\d{1,2}",
+        r"(?:0?[1-9]|1[0-2])[/.-](?:19|20)\d{2}",
+    )
+    if any(re.fullmatch(pattern + r"(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?", text) for pattern in date_patterns):
+        return True
+    return not first_lot and bool(text) and all(c.isalpha() or c.isspace() for c in text)
 
 
 class IgsaMonthlyReviewService:
@@ -193,8 +210,10 @@ class IgsaMonthlyReviewService:
                     product = aliases.get(ref, ref)
                     total = ReviewLine("igsa", kind, ref, product, description, qty, "", loc)
                     totals.append(total)
-                    raw_lots = list(row[5:6] if kind == "muestra" else row[5:])
-                    raw_lots = [_text(x) for x in raw_lots if _text(x)]
+                    raw_lots = [
+                        _text(value) for index, value in enumerate(row[5:])
+                        if _text(value) and (kind != "muestra" or not _sample_metadata(value, first_lot=index == 0))
+                    ]
                     parsed = []
                     for raw in raw_lots:
                         match = re.fullmatch(r"(?:(\d+(?:[.,]\d+)?)\s*)?[Ll]\s*\.?\s*([A-Za-z0-9][A-Za-z0-9-]*)", raw)
