@@ -48,10 +48,10 @@ def test_review_displays_read_only_balances_and_source_locations(tmp_path):
     assert dialog.product_table.rowCount() == 2
     assert dialog.product_table.item(0, 0).text() == "Venta"
     assert dialog.product_table.item(0, 1).text() == "Pan A"
-    assert dialog.product_table.item(1, 3).text() == "—"
-    assert "fila 27" in dialog.product_table.item(0, 7).text()
-    assert "página 3" in dialog.product_table.item(0, 7).text()
-    assert dialog.lot_table.item(0, 3).text() == "0001"
+    assert dialog.product_table.item(1, 4).text() == "—"
+    assert "fila 27" in dialog.product_table.item(0, 8).text()
+    assert "página 3" in dialog.product_table.item(0, 8).text()
+    assert dialog.lot_table.item(0, 4).text() == "0001"
     assert dialog.issue_table.item(0, 1).text() == "Falta PDF de muestra"
     assert dialog.product_table.editTriggers() == QAbstractItemView.EditTrigger.NoEditTriggers
     dialog.only_differences.setChecked(True)
@@ -107,6 +107,8 @@ def test_preview_compares_real_workbook_and_pdf_without_altering_them(tmp_path):
     app()
     from openpyxl import Workbook
     from reportlab.pdfgen import canvas
+    from app.services.igsa_monthly_catalog_service import IgsaMonthlyCatalog
+    from app.services.igsa_monthly_review_service import IgsaMonthlyReviewService
 
     workbook = tmp_path / "febrero 26.xlsx"
     book = Workbook()
@@ -114,7 +116,7 @@ def test_preview_compares_real_workbook_and_pdf_without_altering_them(tmp_path):
     sheet.title = "ventas"
     sheet.append(["Año", 2026])
     sheet.append(["Mes", "Febrero"])
-    sheet.append([1, "123", "Pan", 1, 3, "L.0001"])
+    sheet.append([1, "REFERENCIA ERRÓNEA", "Pan", 1, 3, "L.0001"])
     book.create_sheet("muestras")
     book.create_sheet("promociones")
     book.save(workbook)
@@ -126,17 +128,23 @@ def test_preview_compares_real_workbook_and_pdf_without_altering_them(tmp_path):
     document.drawString(30, 760, "Datos transporte Bultos:Peso:Portes:3 1.000 Pagados")
     document.save()
     before = (workbook.read_bytes(), pdf.read_bytes())
-    dialog = IgsaMonthlyReviewDialog()
+    ref = SimpleNamespace(articulo_referencia_distribuidor="1", articulo_id="P1")
+    product = SimpleNamespace(articulo_id="P1", articulo_referencia_corta="123",
+                              articulo_referencia="123", articulo_descripcion="Pan")
+    service = IgsaMonthlyReviewService(catalog_provider=lambda: IgsaMonthlyCatalog([ref], [product]))
+    dialog = IgsaMonthlyReviewDialog(service=service)
     dialog.paths["excel"].setText(str(workbook))
     dialog.paths["venta"].setText(str(pdf))
     dialog.year.setValue(2026)
     dialog.month.setCurrentIndex(1)
     dialog.compare_button.click()
     assert dialog.product_table.rowCount() == 1
-    assert dialog.product_table.item(0, 3).text() == "3"
+    assert dialog.product_table.item(0, 2).text() == "1"
+    assert dialog.product_table.item(0, 3).text() == "123"
     assert dialog.product_table.item(0, 4).text() == "3"
-    assert dialog.product_table.item(0, 6).text() == "Correcto"
-    assert dialog.lot_table.item(0, 3).text() == "0001"
+    assert dialog.product_table.item(0, 5).text() == "3"
+    assert dialog.product_table.item(0, 7).text() == "Correcto"
+    assert dialog.lot_table.item(0, 4).text() == "0001"
     assert dialog.issue_table.rowCount() >= 2  # Optional PDFs remain explicitly missing.
     assert (workbook.read_bytes(), pdf.read_bytes()) == before
     dialog.close()

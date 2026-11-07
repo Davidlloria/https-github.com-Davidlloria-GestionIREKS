@@ -1,7 +1,4 @@
-"""Read-only monthly comparison of IGSA workbooks and IREKS delivery notes.
-
-The caller supplies explicit product aliases; no database or import is involved.
-"""
+"""Read-only comparison using the IGSA distributor and IREKS product catalog."""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -17,6 +14,7 @@ from openpyxl import load_workbook
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
+from app.services.igsa_monthly_catalog_service import load_igsa_monthly_catalog
 from app.services.igsa_sales_pdf_flow_service import IgsaSalesPdfFlowService
 from app.services.igsa_sales_workbook_flow_service import IgsaSalesWorkbookFlowService
 
@@ -70,6 +68,8 @@ class MonthlyReview:
     lots: list[Balance] = field(default_factory=list)
     issues: list[ReviewIssue] = field(default_factory=list)
     lines: list[ReviewLine] = field(default_factory=list)
+    references: dict[str, str] = field(default_factory=dict)
+    product_names: dict[str, str] = field(default_factory=dict)
 
 
 def _text(value: object) -> str:
@@ -118,7 +118,10 @@ def _sample_metadata(value: object, *, first_lot: bool) -> bool:
 
 
 class IgsaMonthlyReviewService:
-    """Compare files without invoking imports or opening a database session."""
+    """Compare files using a read-only catalog snapshot, without importing data."""
+
+    def __init__(self, *, catalog_provider=None):
+        self._catalog_provider = catalog_provider or load_igsa_monthly_catalog
 
     def compare(
         self,
@@ -138,14 +141,17 @@ class IgsaMonthlyReviewService:
         if any(not k or not v for k, v in alias_map.items()):
             raise ValueError("Las equivalencias no pueden estar vacías")
         result = MonthlyReview(year=year, month=month)
+        catalog = self._catalog_provider()
+        result.references = {key: product.reference for key, product in catalog.products.items()}
+        result.product_names = {key: product.description for key, product in catalog.products.items()}
         product_totals: list[ReviewLine] = []
-        incomplete = self._read_workbook(Path(workbook), year, month, alias_map, result, product_totals)
+        incomplete = self._read_workbook(Path(workbook), year, month, catalog, result, product_totals)
         for kind in sorted(allowed):
             if kind not in pdfs:
                 result.issues.append(ReviewIssue("pdf_ausente", f"Falta PDF de {kind}"))
                 incomplete.add(kind)
                 continue
-            if not self._read_pdf(Path(pdfs[kind]), kind, year, month, alias_map, result, product_totals):
+            if not self._read_pdf(Path(pdfs[kind]), kind, year, month, alias_map, catalog, result, product_totals):
                 incomplete.add(kind)
         duplicates: dict[tuple, list[ReviewLine]] = defaultdict(list)
         for line in result.lines:
@@ -164,7 +170,7 @@ class IgsaMonthlyReviewService:
         result.lots = [replace(row, status="fuente_incompleta") if row.kind in incomplete else row for row in result.lots]
         return result
 
-    def _read_workbook(self, path, year, month, aliases, result, totals):
+    def _read_workbook(self, path, year, month, catalog, result, totals):
         book = load_workbook(path, read_only=True, data_only=True)
         seen = set()
         incomplete = set()
@@ -201,14 +207,18 @@ class IgsaMonthlyReviewService:
                         continue
                     if qty == 0:
                         continue
-                    ref, description = _key(row[1]), _text(row[2])
+                    ref, description = _key(row[0]), _text(row[2])
                     loc = SourceLocation(path.name, sheet.title, number)
-                    if not ref or not description:
-                        result.issues.append(ReviewIssue("linea_incompleta", "Falta referencia o descripción", loc))
+                    if not description:
+                        result.issues.append(ReviewIssue("linea_incompleta", "Falta descripción", loc))
                         incomplete.add(kind)
                         continue
-                    product = aliases.get(ref, ref)
-                    total = ReviewLine("igsa", kind, ref, product, description, qty, "", loc)
+                    resolved, problem = catalog.distributor_product(ref)
+                    if problem:
+                        result.issues.append(ReviewIssue(problem, f"Referencia IGSA '{ref or 'vacía'}': {problem.replace('_', ' ')}", loc))
+                    product = resolved.product_id if resolved else f"IGSA_SIN:{ref or f'{sheet.title}:{number}'}"
+                    ref_flags = (problem,) if problem else ()
+                    total = ReviewLine("igsa", kind, ref, product, description, qty, "", loc, ref_flags)
                     totals.append(total)
                     raw_lots = [
                         _text(value) for index, value in enumerate(row[5:])
@@ -236,9 +246,9 @@ class IgsaMonthlyReviewService:
                         result.issues.append(ReviewIssue("reparto", f"Total {qty}; suma de lotes {sum(q for q, _, _ in parsed)}", loc))
                         parsed = [(q, lot, flags + ("reparto",)) for q, lot, flags in parsed]
                     if any(flags for _, _, flags in parsed) or any(q is None for q, _, _ in parsed):
-                        totals[-1] = ReviewLine("igsa", kind, ref, product, description, qty, "", loc, ("reparto",))
+                        totals[-1] = ReviewLine("igsa", kind, ref, product, description, qty, "", loc, ref_flags + ("reparto",))
                     for part, lot, flags in parsed:
-                        result.lines.append(ReviewLine("igsa", kind, ref, product, description, part, lot, loc, flags))
+                        result.lines.append(ReviewLine("igsa", kind, ref, product, description, part, lot, loc, ref_flags + flags))
             for kind in {"venta", "promocion", "muestra"} - seen:
                 result.issues.append(ReviewIssue("hoja_ausente", f"Falta hoja de {kind}"))
                 incomplete.add(kind)
@@ -246,7 +256,7 @@ class IgsaMonthlyReviewService:
             book.close()
         return incomplete
 
-    def _read_pdf(self, path, kind, year, month, aliases, result, totals):
+    def _read_pdf(self, path, kind, year, month, aliases, catalog, result, totals):
         try:
             reader = PdfReader(str(path))
         except (OSError, ValueError, PdfReadError) as exc:
@@ -312,7 +322,11 @@ class IgsaMonthlyReviewService:
                     missing_text = True
                     continue
                 extracted += quantity
-                row = ReviewLine("ireks", kind, ref, aliases.get(ref, ref), _text(match.group("descripcion")), quantity, _text(match.group("lote")), loc)
+                resolved, problem = catalog.ireks_product(aliases.get(ref, ref))
+                if problem:
+                    result.issues.append(ReviewIssue(problem, f"Referencia IREKS '{ref}': {problem.replace('_', ' ')}", loc))
+                product = resolved.product_id if resolved else f"IREKS_SIN:{ref}"
+                row = ReviewLine("ireks", kind, ref, product, _text(match.group("descripcion")), quantity, _text(match.group("lote")), loc, (problem,) if problem else ())
                 if not match.group("cons_pref"):
                     result.issues.append(ReviewIssue("caducidad_pdf_ausente", "Línea PDF sin fecha de consumo preferente", loc))
                 result.lines.append(row)
@@ -337,7 +351,11 @@ class IgsaMonthlyReviewService:
                 return sum((r.quantity for r in items), Decimal(0)) if items and all(r.quantity is not None for r in items) else None
             left, right = amount(sides["igsa"]), amount(sides["ireks"])
             delta = left - right if left is not None and right is not None else None
-            if any("posible_duplicado" in r.issue_codes for r in rows):
+            if any("referencia_ambigua" in r.issue_codes for r in rows):
+                status = "referencia_ambigua"
+            elif any(any(flag in r.issue_codes for flag in ("referencia_no_encontrada", "producto_sin_referencia")) for r in rows):
+                status = "sin_correspondencia"
+            elif any("posible_duplicado" in r.issue_codes for r in rows):
                 status = "posible_duplicado"
             elif any(r.issue_codes for r in rows):
                 status = "revisar_reparto"

@@ -10,6 +10,17 @@ import app.services.igsa_monthly_review_service as review_module
 import app.services.igsa_sales_pdf_flow_service as pdf_module
 import app.services.igsa_sales_workbook_flow_service as workbook_module
 from app.services.igsa_monthly_review_service import IgsaMonthlyReviewService
+from app.services.igsa_monthly_catalog_service import IgsaMonthlyCatalog
+
+
+@pytest.fixture(autouse=True)
+def review_catalog(monkeypatch):
+    pairs = {1: "123", 2: "555", 3: "777", 4: "888", 5: "999", 6: "111",
+             8: "444", 9: "445", 10: "121", 11: "122", 12: "123", 2415: "18921"}
+    refs = [SimpleNamespace(articulo_referencia_distribuidor=str(dist), articulo_id=ref) for dist, ref in pairs.items()]
+    products = [SimpleNamespace(articulo_id=ref, articulo_referencia_corta=ref,
+                                articulo_referencia=ref, articulo_descripcion=ref) for ref in set(pairs.values())]
+    monkeypatch.setattr(review_module, "load_igsa_monthly_catalog", lambda: IgsaMonthlyCatalog(refs, products))
 
 
 def make_workbook(path: Path):
@@ -42,7 +53,7 @@ def test_comparison_preserves_lots_and_repartition_issues(tmp_path, monkeypatch)
             ) + "Datos transporte Bultos:Peso:Portes:96 1.000 Pagados")
     monkeypatch.setattr(review_module, "PdfReader", lambda _: SimpleNamespace(pages=[Page()]))
     def reject_database(*args, **kwargs):
-        raise AssertionError("La revisión no debe abrir una sesión de base de datos")
+        raise AssertionError("Los lectores antiguos no deben abrir sesiones ni importar ventas")
     monkeypatch.setattr(pdf_module, "Session", reject_database)
     monkeypatch.setattr(workbook_module, "Session", reject_database)
     result = IgsaMonthlyReviewService().compare(path, {"venta": tmp_path / "ventas.pdf"}, year=2026, month=2)
@@ -201,3 +212,96 @@ def test_samples_read_all_lots_and_ignore_expiry_and_recipient(tmp_path):
     assert {row.lot: row.igsa for row in result.lots if row.product == "121"} == {"0001": 1, "0002": 2}
     assert [row.lot for row in result.lots if row.product == "122"] == ["0003"]
     assert "1234-5678" in [row.lot for row in result.lots if row.product == "123"]
+
+
+def test_distributor_reference_overrides_wrong_or_blank_excel_ireks_code(tmp_path, monkeypatch):
+    path = tmp_path / "febrero 26.xlsx"
+    make_workbook(path)
+    book = review_module.load_workbook(path)
+    book["ventas febrero"]["B3"] = "ERROR-IGSA"
+    book["ventas febrero"]["B7"] = None
+    book["ventas febrero"].append([None, "123", "Sin ref IGSA", 1, 1, "L.0001"])
+    book.save(path)
+    book.close()
+    text = ("Ref. pedido: X 28/02/26 Fecha entrega: "
+            "123 ESP 96,00 96 1,00 0 1,00 1,00 0Lote:8494305Cons.Pref:12/05/27Carga:"
+            "Datos transporte Bultos:Peso:Portes:96 1.000 Pagados")
+    monkeypatch.setattr(review_module, "PdfReader", lambda _: SimpleNamespace(pages=[SimpleNamespace(extract_text=lambda: text)]))
+    result = IgsaMonthlyReviewService().compare(path, {"venta": Path("ventas.pdf")}, year=2026, month=2)
+    matched = next(row for row in result.products if row.product == "123")
+    assert (matched.igsa, matched.ireks) == (97, 96)
+    assert next(row for row in result.lines if row.source == "igsa" and row.reference == "5").product == "999"
+    no_dist = next(row for row in result.lines if row.description == "Sin ref IGSA")
+    assert no_dist.product.startswith("IGSA_SIN:")
+    assert "referencia_no_encontrada" in no_dist.issue_codes
+
+
+def test_ambiguous_distributor_and_pdf_references_do_not_match(tmp_path, monkeypatch):
+    path = tmp_path / "febrero 26.xlsx"
+    make_workbook(path)
+    refs = [SimpleNamespace(articulo_referencia_distribuidor="1", articulo_id=p) for p in ("P1", "P2")]
+    products = [SimpleNamespace(articulo_id=p, articulo_referencia_corta="123", articulo_referencia="",
+                                articulo_descripcion=p) for p in ("P1", "P2")]
+    service = IgsaMonthlyReviewService(catalog_provider=lambda: IgsaMonthlyCatalog(refs, products))
+    text = ("Ref. pedido: X 28/02/26 Fecha entrega: "
+            "123 ESP 97,00 97 1,00 0 1,00 1,00 0Lote:8494305Cons.Pref:12/05/27Carga:"
+            "Datos transporte Bultos:Peso:Portes:97 1.000 Pagados")
+    monkeypatch.setattr(review_module, "PdfReader", lambda _: SimpleNamespace(pages=[SimpleNamespace(extract_text=lambda: text)]))
+    result = service.compare(path, {"venta": Path("ventas.pdf")}, year=2026, month=2)
+    rows = [r for r in result.products if r.product in {"IGSA_SIN:1", "IREKS_SIN:123"}]
+    assert len(rows) == 2
+    assert all(r.status == "referencia_ambigua" and r.difference is None for r in rows)
+    assert sum(issue.code == "referencia_ambigua" for issue in result.issues) == 2
+
+
+def test_catalog_reads_only_selected_distributor_without_writing(tmp_path):
+    import hashlib
+    from sqlalchemy import event
+    from sqlmodel import Session, SQLModel, create_engine
+    from app.models import Distribuidor, IngredienteIreks, ReferenciaDistribuidor
+    from app.services.igsa_monthly_catalog_service import load_igsa_monthly_catalog
+
+    db = tmp_path / "catalogo.db"
+    engine = create_engine(f"sqlite:///{db}")
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.add(Distribuidor(distribuidor_id="IGSA-ID", distribuidor_nombre_comercial="IGSA"))
+        session.add(Distribuidor(distribuidor_id="OTRO-ID", distribuidor_nombre_comercial="Otro"))
+        session.add(IngredienteIreks(articulo_id="P1", articulo_referencia_corta="123", articulo_descripcion="Pan"))
+        session.add(ReferenciaDistribuidor(distribuidor_id="IGSA-ID", articulo_id="P1", articulo_referencia_distribuidor="42"))
+        session.add(ReferenciaDistribuidor(distribuidor_id="OTRO-ID", articulo_id="P1", articulo_referencia_distribuidor="99"))
+        session.commit()
+    before = hashlib.sha256(db.read_bytes()).hexdigest()
+    statements = []
+    def record(_conn, _cursor, statement, _params, _context, _many):
+        statements.append(statement.strip().upper())
+    event.listen(engine, "before_cursor_execute", record)
+    catalog = load_igsa_monthly_catalog(engine)
+    assert catalog.distributor_product("42")[0].reference == "123"
+    assert catalog.distributor_product("99")[1] == "referencia_no_encontrada"
+    assert catalog.ireks_product("123")[0].product_id == "P1"
+    assert statements and all(statement.startswith("SELECT") for statement in statements)
+    assert hashlib.sha256(db.read_bytes()).hexdigest() == before
+    engine.dispose()
+
+
+def test_missing_database_is_not_created(tmp_path):
+    from sqlmodel import create_engine
+    from app.services.igsa_monthly_catalog_service import load_igsa_monthly_catalog
+
+    path = tmp_path / "inexistente.db"
+    engine = create_engine(f"sqlite:///{path}")
+    with pytest.raises(ValueError, match="No existe la base de datos"):
+        load_igsa_monthly_catalog(engine)
+    assert not path.exists()
+    engine.dispose()
+
+
+def test_conflicting_catalog_rows_do_not_resolve_automatically():
+    ref = SimpleNamespace(articulo_referencia_distribuidor="42", articulo_id="P1")
+    products = [SimpleNamespace(articulo_id="P1", articulo_referencia_corta=code,
+                                articulo_referencia=code, articulo_descripcion="Producto")
+                for code in ("123", "456")]
+    catalog = IgsaMonthlyCatalog([ref], products)
+    assert catalog.distributor_product("42") == (None, "referencia_ambigua")
+    assert catalog.ireks_product("123") == (None, "referencia_ambigua")
