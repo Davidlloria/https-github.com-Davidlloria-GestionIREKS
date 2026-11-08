@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout,
 )
 
+from app.core.config import BASE_DIR
 from app.services.igsa_monthly_review_service import IgsaMonthlyReviewService
 
 
@@ -133,7 +134,7 @@ class IgsaMonthlyReviewDialog(QDialog):
         return table
 
     def _select_file(self, key, file_filter):
-        path, _ = QFileDialog.getOpenFileName(self, "Seleccionar documento", "", file_filter)
+        path, _ = QFileDialog.getOpenFileName(self, "Seleccionar documento", str(BASE_DIR.parent / "Trabajo" / "Ventas"), file_filter)
         if path:
             self.paths[key].setText(path)
 

@@ -20,6 +20,23 @@ def app():
     return _APP
 
 
+def test_document_selectors_open_sales_folder_by_default(tmp_path, monkeypatch):
+    app()
+    from app.ui.widgets import igsa_monthly_review_dialog as review_dialog
+
+    monkeypatch.setattr(review_dialog, "BASE_DIR", tmp_path / "GestionIREKS")
+    calls = []
+    monkeypatch.setattr(review_dialog.QFileDialog, "getOpenFileName",
+                        lambda *args: calls.append(args) or ("", ""))
+    dialog = IgsaMonthlyReviewDialog(service=SimpleNamespace())
+    for key in ("excel", "venta", "muestra", "promocion"):
+        dialog._select_file(key, "filtro")
+    assert len(calls) == 4
+    assert all(args[2] == str(tmp_path / "Trabajo" / "Ventas") for args in calls)
+    assert all(not field.text() for field in dialog.paths.values())
+    dialog.close()
+
+
 def test_review_displays_read_only_balances_and_source_locations(tmp_path):
     app()
     workbook = tmp_path / "igsa.xlsx"
