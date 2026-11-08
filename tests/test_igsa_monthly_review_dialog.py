@@ -201,3 +201,33 @@ def test_period_warning_and_details_are_shown_and_reset(monkeypatch, tmp_path):
     assert dialog.period_warning.isHidden()
     assert not dialog.period_warning.text()
     dialog.close()
+
+
+def test_pending_row_color_is_painted_over_theme_and_selection():
+    app()
+    result = MonthlyReview(2026, 2, products=[
+        Balance("venta", "A", None, Decimal(1), Decimal(1), Decimal(0), "correcto", ()),
+        Balance("venta", "B", None, Decimal(1), Decimal(2), Decimal(-1), "diferencia", ()),
+    ])
+    dialog = IgsaMonthlyReviewDialog(service=SimpleNamespace(compare=lambda *a, **k: result))
+    dialog.paths["excel"].setText("igsa.xlsx")
+    dialog.compare_button.click()
+    table = dialog.product_table
+    table.setStyleSheet("QTableWidget::item { background: white; color: black; } QTableWidget::item:selected { background: white; color: black; }")
+    dialog.show()
+    app().processEvents()
+    def background(row):
+        rect = table.visualItemRect(table.item(row, 0))
+        return table.viewport().grab().toImage().pixelColor(rect.right() - 8, rect.center().y())
+    correct = background(0)
+    pending = background(1)
+    assert (pending.red(), pending.green(), pending.blue()) != (correct.red(), correct.green(), correct.blue())
+    assert pending.blue() < correct.blue() - 40
+    table.selectRow(1)
+    app().processEvents()
+    selected = background(1)
+    assert selected.blue() < correct.blue() - 40
+    dialog.only_differences.setChecked(True)
+    app().processEvents()
+    assert background(0).blue() < correct.blue() - 40
+    dialog.close()

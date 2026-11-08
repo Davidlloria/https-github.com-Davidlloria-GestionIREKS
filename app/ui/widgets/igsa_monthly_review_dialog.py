@@ -9,7 +9,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFormLayout,
     QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMenu, QPlainTextEdit, QPushButton, QSpinBox,
-    QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout,
+    QStyledItemDelegate, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout,
 )
 
 from app.core.config import BASE_DIR
@@ -43,6 +43,17 @@ def _location(loc) -> str:
 
 def _quantity(value) -> str:
     return "—" if value is None else format(value, "f").replace(".", ",")
+
+
+class _PendingRowDelegate(QStyledItemDelegate):
+    """Keep the warning visible even when the application theme paints items."""
+
+    def paint(self, painter, option, index):
+        super().paint(painter, option, index)
+        if index.data(Qt.ItemDataRole.UserRole + 1):
+            painter.save()
+            painter.fillRect(option.rect, QColor(255, 160, 0, 85))
+            painter.restore()
 
 
 class IgsaMonthlyReviewDialog(QDialog):
@@ -118,6 +129,7 @@ class IgsaMonthlyReviewDialog(QDialog):
         self.product_table = self._table(["Tipo", "Producto", "Ref. IGSA", "IGSA", "IREKS", "Diferencia", "Estado", "Origen"])
         self.lot_table = self._table(["Tipo", "Producto", "Ref. IGSA", "Lote", "IGSA", "IREKS", "Diferencia", "Estado", "Origen"])
         for table in (self.product_table, self.lot_table):
+            table.setItemDelegate(_PendingRowDelegate(table))
             table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             table.customContextMenuRequested.connect(lambda pos, t=table: self._show_context_menu(t, pos))
         self.issue_table = self._table(["Incidencia", "Detalle", "Origen"])
@@ -257,6 +269,7 @@ class IgsaMonthlyReviewDialog(QDialog):
                 if details is not None:
                     item.setData(Qt.ItemDataRole.UserRole, details[row_index])
                 if statuses is not None and statuses[row_index] != "correcto":
+                    item.setData(Qt.ItemDataRole.UserRole + 1, True)
                     item.setBackground(QColor("#fff0d6"))
                     item.setForeground(QColor("#402000"))
                 table.setItem(row_index, column, item)
