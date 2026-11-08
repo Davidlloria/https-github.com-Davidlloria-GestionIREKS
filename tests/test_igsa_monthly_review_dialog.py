@@ -5,7 +5,8 @@ from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QAbstractItemView, QApplication
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QAbstractItemView, QApplication, QDialog, QPlainTextEdit
 
 from app.services.igsa_monthly_review_service import Balance, MonthlyReview, ReviewIssue, ReviewLine, SourceLocation
 from app.ui.widgets.igsa_monthly_review_dialog import IgsaMonthlyReviewDialog
@@ -66,12 +67,16 @@ def test_review_displays_read_only_balances_and_source_locations(tmp_path):
     assert dialog.product_table.rowCount() == 2
     assert dialog.product_table.item(0, 0).text() == "Venta"
     assert dialog.product_table.item(0, 1).text() == "Pan A"
-    assert dialog.product_table.item(0, 3).text() == "123"
-    assert dialog.product_table.item(0, 4).text() == "000123"
-    assert dialog.product_table.item(1, 5).text() == "—"
-    assert "fila 27" in dialog.product_table.item(0, 9).text()
-    assert "página 3" in dialog.product_table.item(0, 9).text()
-    assert dialog.lot_table.item(0, 5).text() == "0001"
+    detail = dialog.product_table.item(0, 0).data(Qt.ItemDataRole.UserRole)
+    assert "Ref. IREKS (catálogo): 123" in detail
+    assert "Ref. PDF: 000123" in detail
+    assert dialog.product_table.item(1, 3).text() == "—"
+    assert "fila 27" in dialog.product_table.item(0, 7).text()
+    assert "página 3" in dialog.product_table.item(0, 7).text()
+    assert dialog.lot_table.item(0, 3).text() == "0001"
+    assert dialog.minimumWidth() == dialog.maximumWidth() == 1250
+    assert dialog.product_table.item(1, 0).background().color().name() == "#fff0d6"
+    assert dialog.product_table.item(0, 0).background().color().name() != "#fff0d6"
     assert dialog.issue_table.item(0, 1).text() == "Falta PDF de muestra"
     assert dialog.product_table.editTriggers() == QAbstractItemView.EditTrigger.NoEditTriggers
     dialog.only_differences.setChecked(True)
@@ -160,12 +165,39 @@ def test_preview_compares_real_workbook_and_pdf_without_altering_them(tmp_path):
     dialog.compare_button.click()
     assert dialog.product_table.rowCount() == 1
     assert dialog.product_table.item(0, 2).text() == "1"
-    assert dialog.product_table.item(0, 3).text() == "123"
-    assert dialog.product_table.item(0, 4).text() == "123"
-    assert dialog.product_table.item(0, 5).text() == "3"
-    assert dialog.product_table.item(0, 6).text() == "3"
-    assert dialog.product_table.item(0, 8).text() == "Correcto"
-    assert dialog.lot_table.item(0, 5).text() == "0001"
+    detail = dialog.product_table.item(0, 0).data(Qt.ItemDataRole.UserRole)
+    assert "Ref. IREKS (catálogo): 123" in detail
+    assert "Ref. PDF: 123" in detail
+    assert dialog.product_table.item(0, 3).text() == "3"
+    assert dialog.product_table.item(0, 4).text() == "3"
+    assert dialog.product_table.item(0, 6).text() == "Correcto"
+    assert dialog.lot_table.item(0, 3).text() == "0001"
     assert dialog.issue_table.rowCount() >= 2  # Optional PDFs remain explicitly missing.
     assert (workbook.read_bytes(), pdf.read_bytes()) == before
+    dialog.close()
+
+
+def test_period_warning_and_details_are_shown_and_reset(monkeypatch, tmp_path):
+    app()
+    loc = SourceLocation("igsa.xlsx", "ventas")
+    issue = ReviewIssue("periodo", "Hoja indica 2026-02; seleccionado 2026-03", loc)
+    result = MonthlyReview(2026, 3, products=[Balance("venta", "A", None, Decimal(1), Decimal(1), Decimal(0), "fuente_incompleta", (loc,))], issues=[issue])
+    dialog = IgsaMonthlyReviewDialog(service=SimpleNamespace(compare=lambda *a, **k: result))
+    dialog.paths["excel"].setText(str(tmp_path / "igsa.xlsx"))
+    dialog.compare_button.click()
+    assert not dialog.period_warning.isHidden()
+    assert "no coincide" in dialog.period_warning.text()
+    assert "2026-02" in dialog.period_warning.text()
+    assert "igsa.xlsx" in dialog.period_warning.text()
+    shown = []
+    def capture(window):
+        shown.append(window.findChild(QPlainTextEdit).toPlainText())
+        return 0
+    monkeypatch.setattr(QDialog, "exec", capture)
+    dialog._show_details(dialog.product_table, 0)
+    assert "Estado: Fuente incompleta" in shown[0]
+    assert "igsa.xlsx" in shown[0]
+    dialog.month.setCurrentIndex((dialog.month.currentIndex() + 1) % 12)
+    assert dialog.period_warning.isHidden()
+    assert not dialog.period_warning.text()
     dialog.close()

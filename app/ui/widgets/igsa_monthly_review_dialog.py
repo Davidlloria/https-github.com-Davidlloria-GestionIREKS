@@ -5,9 +5,10 @@ from datetime import date
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFormLayout,
-    QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton, QSpinBox,
+    QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMenu, QPlainTextEdit, QPushButton, QSpinBox,
     QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout,
 )
 
@@ -50,7 +51,8 @@ class IgsaMonthlyReviewDialog(QDialog):
         self._service = service if service is not None else IgsaMonthlyReviewService()
         self._result = None
         self.setWindowTitle("Revisión mensual IGSA / IREKS")
-        self.resize(1120, 760)
+        self.setFixedWidth(1250)
+        self.resize(1250, 760)
         root = QVBoxLayout(self)
         intro = QLabel("Compara los documentos seleccionados. La vista es temporal y no importa ni modifica datos.")
         intro.setWordWrap(True)
@@ -107,9 +109,17 @@ class IgsaMonthlyReviewDialog(QDialog):
         self.message = QLabel("Selecciona el Excel y los PDF disponibles para iniciar la revisión.")
         self.message.setWordWrap(True)
         root.addWidget(self.message)
+        self.period_warning = QLabel()
+        self.period_warning.setWordWrap(True)
+        self.period_warning.setStyleSheet("color: #8a2700; background: #fff1d6; padding: 8px; font-weight: bold;")
+        self.period_warning.hide()
+        root.addWidget(self.period_warning)
         self.tabs = QTabWidget()
-        self.product_table = self._table(["Tipo", "Producto", "Ref. IGSA", "Ref. IREKS (catálogo)", "Ref. PDF", "IGSA", "IREKS", "Diferencia", "Estado", "Origen"])
-        self.lot_table = self._table(["Tipo", "Producto", "Ref. IGSA", "Ref. IREKS (catálogo)", "Ref. PDF", "Lote", "IGSA", "IREKS", "Diferencia", "Estado", "Origen"])
+        self.product_table = self._table(["Tipo", "Producto", "Ref. IGSA", "IGSA", "IREKS", "Diferencia", "Estado", "Origen"])
+        self.lot_table = self._table(["Tipo", "Producto", "Ref. IGSA", "Lote", "IGSA", "IREKS", "Diferencia", "Estado", "Origen"])
+        for table in (self.product_table, self.lot_table):
+            table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            table.customContextMenuRequested.connect(lambda pos, t=table: self._show_context_menu(t, pos))
         self.issue_table = self._table(["Incidencia", "Detalle", "Origen"])
         self.tabs.addTab(self.product_table, "Por producto")
         self.tabs.addTab(self.lot_table, "Por lote")
@@ -143,6 +153,8 @@ class IgsaMonthlyReviewDialog(QDialog):
         for table in (self.product_table, self.lot_table, self.issue_table):
             table.setRowCount(0)
         self.tabs.setTabText(2, "Incidencias")
+        self.period_warning.clear()
+        self.period_warning.hide()
         self.message.setText("Los documentos o el período han cambiado. Ejecuta de nuevo la comparación.")
 
     def _compare(self):
@@ -158,6 +170,13 @@ class IgsaMonthlyReviewDialog(QDialog):
             self.message.setText(f"No se pudo completar la comparación: {exc}")
             return
         self._result = result
+        period_issues = [issue for issue in result.issues if issue.code == "periodo"]
+        if period_issues:
+            details = "\n".join(f"• {_location(issue.location)}: {issue.message}" for issue in period_issues[:3])
+            if len(period_issues) > 3:
+                details += f"\nHay {len(period_issues) - 3} discrepancias más; consulta Incidencias."
+            self.period_warning.setText("El mes o año seleccionado no coincide con los documentos. Revisa el período antes de interpretar los resultados:\n" + details)
+            self.period_warning.show()
         self.message.setText(f"Período: {result.month:02d}/{result.year} · Productos: {len(result.products)} · Lotes: {len(result.lots)} · Incidencias: {len(result.issues)}")
         self._render_balances()
         self._fill_table(self.issue_table, [[issue.code.replace("_", " ").capitalize(), issue.message, _location(issue.location)] for issue in result.issues])
@@ -177,6 +196,8 @@ class IgsaMonthlyReviewDialog(QDialog):
         for table, rows, by_lot in ((self.product_table, self._result.products, False), (self.lot_table, self._result.lots, True)):
             ordered = sorted(rows, key=lambda row: (KIND_ORDER.get(row.kind, 9), names.get(row.product, row.product).casefold(), row.product, row.lot or ""))
             values = []
+            details = []
+            statuses = []
             for row in ordered:
                 if self.only_differences.isChecked() and row.status == "correcto":
                     continue
@@ -184,20 +205,60 @@ class IgsaMonthlyReviewDialog(QDialog):
                 igsa_ref = ", ".join(sorted(refs.get("igsa", set()) - {""})) or "—"
                 ireks_ref = self._result.references.get(row.product) or "—"
                 pdf_ref = ", ".join(sorted(refs.get("ireks", set()) - {""})) or "—"
-                cells = [KINDS.get(row.kind, row.kind), names.get(row.product, row.product), igsa_ref, ireks_ref, pdf_ref]
+                cells = [KINDS.get(row.kind, row.kind), names.get(row.product, row.product), igsa_ref]
                 if by_lot:
                     cells.append(row.lot or "—")
                 cells.extend([_quantity(row.igsa), _quantity(row.ireks), _quantity(row.difference), STATUSES.get(row.status, row.status), "\n".join(_location(loc) for loc in row.locations)])
                 values.append(cells)
-            self._fill_table(table, values)
+                detail = [f"Tipo: {cells[0]}", f"Producto: {cells[1]}", f"Ref. IGSA: {igsa_ref}",
+                          f"Ref. IREKS (catálogo): {ireks_ref}", f"Ref. PDF: {pdf_ref}"]
+                if by_lot:
+                    detail.append(f"Lote: {row.lot or '—'}")
+                detail.extend([f"IGSA: {_quantity(row.igsa)}", f"IREKS: {_quantity(row.ireks)}",
+                               f"Diferencia: {_quantity(row.difference)}", f"Estado: {STATUSES.get(row.status, row.status)}",
+                               "Origen:", *(f"  {_location(loc)}" for loc in row.locations)])
+                details.append("\n".join(detail))
+                statuses.append(row.status)
+            self._fill_table(table, values, statuses=statuses, details=details)
+
+    def _show_context_menu(self, table, pos):
+        item = table.itemAt(pos)
+        if item is None:
+            return
+        menu = QMenu()
+        action = menu.addAction("Ver información completa")
+        if menu.exec(table.viewport().mapToGlobal(pos)) == action:
+            self._show_details(table, item.row())
+
+    def _show_details(self, table, row):
+        item = table.item(row, 0)
+        if item is None:
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Información completa")
+        dialog.resize(650, 480)
+        layout = QVBoxLayout(dialog)
+        text = QPlainTextEdit()
+        text.setReadOnly(True)
+        text.setPlainText(item.data(Qt.ItemDataRole.UserRole))
+        layout.addWidget(text)
+        close = QPushButton("Cerrar")
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close, 0, Qt.AlignmentFlag.AlignRight)
+        dialog.exec()
 
     @staticmethod
-    def _fill_table(table, rows):
+    def _fill_table(table, rows, *, statuses=None, details=None):
         table.setRowCount(len(rows))
         for row_index, values in enumerate(rows):
             for column, value in enumerate(values):
                 item = QTableWidgetItem(str(value))
                 item.setToolTip(str(value))
+                if details is not None:
+                    item.setData(Qt.ItemDataRole.UserRole, details[row_index])
+                if statuses is not None and statuses[row_index] != "correcto":
+                    item.setBackground(QColor("#fff0d6"))
+                    item.setForeground(QColor("#402000"))
                 table.setItem(row_index, column, item)
         table.resizeColumnsToContents()
         for column in range(table.columnCount()):
