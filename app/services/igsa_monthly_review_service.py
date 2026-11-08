@@ -325,6 +325,12 @@ class IgsaMonthlyReviewService:
                 resolved, problem = catalog.ireks_product(aliases.get(ref, ref))
                 if problem:
                     result.issues.append(ReviewIssue(problem, f"Referencia IREKS '{ref}': {problem.replace('_', ' ')}", loc))
+                elif catalog.is_ireks_zero_normalized(aliases.get(ref, ref)):
+                    result.issues.append(ReviewIssue(
+                        "referencia_normalizada",
+                        f"Referencia PDF '{ref}' coincide con '{resolved.reference}' al quitar ceros iniciales; coincidencia única en catálogo",
+                        loc,
+                    ))
                 product = resolved.product_id if resolved else f"IREKS_SIN:{ref}"
                 row = ReviewLine("ireks", kind, ref, product, _text(match.group("descripcion")), quantity, _text(match.group("lote")), loc, (problem,) if problem else ())
                 if not match.group("cons_pref"):
@@ -351,7 +357,7 @@ class IgsaMonthlyReviewService:
                 return sum((r.quantity for r in items), Decimal(0)) if items and all(r.quantity is not None for r in items) else None
             left, right = amount(sides["igsa"]), amount(sides["ireks"])
             delta = left - right if left is not None and right is not None else None
-            if any("referencia_ambigua" in r.issue_codes for r in rows):
+            if any("referencia_ambigua" in r.issue_codes or "referencia_compartida" in r.issue_codes for r in rows):
                 status = "referencia_ambigua"
             elif any(any(flag in r.issue_codes for flag in ("referencia_no_encontrada", "producto_sin_referencia")) for r in rows):
                 status = "sin_correspondencia"

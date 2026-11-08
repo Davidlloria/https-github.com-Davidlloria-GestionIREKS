@@ -108,8 +108,8 @@ class IgsaMonthlyReviewDialog(QDialog):
         self.message.setWordWrap(True)
         root.addWidget(self.message)
         self.tabs = QTabWidget()
-        self.product_table = self._table(["Tipo", "Producto", "Ref. IGSA", "Ref. IREKS", "IGSA", "IREKS", "Diferencia", "Estado", "Origen"])
-        self.lot_table = self._table(["Tipo", "Producto", "Ref. IGSA", "Ref. IREKS", "Lote", "IGSA", "IREKS", "Diferencia", "Estado", "Origen"])
+        self.product_table = self._table(["Tipo", "Producto", "Ref. IGSA", "Ref. IREKS (catálogo)", "Ref. PDF", "IGSA", "IREKS", "Diferencia", "Estado", "Origen"])
+        self.lot_table = self._table(["Tipo", "Producto", "Ref. IGSA", "Ref. IREKS (catálogo)", "Ref. PDF", "Lote", "IGSA", "IREKS", "Diferencia", "Estado", "Origen"])
         self.issue_table = self._table(["Incidencia", "Detalle", "Origen"])
         self.tabs.addTab(self.product_table, "Por producto")
         self.tabs.addTab(self.lot_table, "Por lote")
@@ -171,7 +171,8 @@ class IgsaMonthlyReviewDialog(QDialog):
         for line in self._result.lines:
             if line.product not in names or line.source == "igsa":
                 names[line.product] = line.description
-            source_refs.setdefault(line.product, {}).setdefault(line.source, set()).add(line.reference)
+            for lot_key in (None, line.lot):
+                source_refs.setdefault((line.product, line.kind, lot_key), {}).setdefault(line.source, set()).add(line.reference)
         names.update({key: value for key, value in self._result.product_names.items() if value})
         for table, rows, by_lot in ((self.product_table, self._result.products, False), (self.lot_table, self._result.lots, True)):
             ordered = sorted(rows, key=lambda row: (KIND_ORDER.get(row.kind, 9), names.get(row.product, row.product).casefold(), row.product, row.lot or ""))
@@ -179,10 +180,11 @@ class IgsaMonthlyReviewDialog(QDialog):
             for row in ordered:
                 if self.only_differences.isChecked() and row.status == "correcto":
                     continue
-                refs = source_refs.get(row.product, {})
+                refs = source_refs.get((row.product, row.kind, row.lot if by_lot else None), {})
                 igsa_ref = ", ".join(sorted(refs.get("igsa", set()) - {""})) or "—"
-                ireks_ref = self._result.references.get(row.product) or ", ".join(sorted(refs.get("ireks", set()) - {""})) or "—"
-                cells = [KINDS.get(row.kind, row.kind), names.get(row.product, row.product), igsa_ref, ireks_ref]
+                ireks_ref = self._result.references.get(row.product) or "—"
+                pdf_ref = ", ".join(sorted(refs.get("ireks", set()) - {""})) or "—"
+                cells = [KINDS.get(row.kind, row.kind), names.get(row.product, row.product), igsa_ref, ireks_ref, pdf_ref]
                 if by_lot:
                     cells.append(row.lot or "—")
                 cells.extend([_quantity(row.igsa), _quantity(row.ireks), _quantity(row.difference), STATUSES.get(row.status, row.status), "\n".join(_location(loc) for loc in row.locations)])

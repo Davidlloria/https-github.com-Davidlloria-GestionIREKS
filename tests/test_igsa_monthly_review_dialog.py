@@ -45,13 +45,14 @@ def test_review_displays_read_only_balances_and_source_locations(tmp_path):
     pdf.touch()
     excel_loc = SourceLocation("igsa.xlsx", "ventas", 27)
     pdf_loc = SourceLocation("ventas.pdf", page=3, item=2)
-    lines = [ReviewLine("igsa", "venta", "A", "A", "Pan A", Decimal(3), "0001", excel_loc)]
+    lines = [ReviewLine("igsa", "venta", "A", "A", "Pan A", Decimal(3), "0001", excel_loc),
+             ReviewLine("ireks", "venta", "000123", "A", "Pan A", Decimal(3), "0001", pdf_loc)]
     results = MonthlyReview(
         2026, 2,
         products=[Balance("muestra", "B", None, None, Decimal(1), None, "sin_correspondencia", (pdf_loc,)),
                   Balance("venta", "A", None, Decimal(3), Decimal(3), Decimal(0), "correcto", (excel_loc, pdf_loc))],
         lots=[Balance("venta", "A", "0001", Decimal(3), Decimal(3), Decimal(0), "correcto", (excel_loc, pdf_loc))],
-        issues=[ReviewIssue("pdf_ausente", "Falta PDF de muestra")], lines=lines,
+        issues=[ReviewIssue("pdf_ausente", "Falta PDF de muestra")], lines=lines, references={"A": "123"},
     )
     calls = []
     service = SimpleNamespace(compare=lambda *a, **k: calls.append((a, k)) or results)
@@ -65,10 +66,12 @@ def test_review_displays_read_only_balances_and_source_locations(tmp_path):
     assert dialog.product_table.rowCount() == 2
     assert dialog.product_table.item(0, 0).text() == "Venta"
     assert dialog.product_table.item(0, 1).text() == "Pan A"
-    assert dialog.product_table.item(1, 4).text() == "—"
-    assert "fila 27" in dialog.product_table.item(0, 8).text()
-    assert "página 3" in dialog.product_table.item(0, 8).text()
-    assert dialog.lot_table.item(0, 4).text() == "0001"
+    assert dialog.product_table.item(0, 3).text() == "123"
+    assert dialog.product_table.item(0, 4).text() == "000123"
+    assert dialog.product_table.item(1, 5).text() == "—"
+    assert "fila 27" in dialog.product_table.item(0, 9).text()
+    assert "página 3" in dialog.product_table.item(0, 9).text()
+    assert dialog.lot_table.item(0, 5).text() == "0001"
     assert dialog.issue_table.item(0, 1).text() == "Falta PDF de muestra"
     assert dialog.product_table.editTriggers() == QAbstractItemView.EditTrigger.NoEditTriggers
     dialog.only_differences.setChecked(True)
@@ -158,10 +161,11 @@ def test_preview_compares_real_workbook_and_pdf_without_altering_them(tmp_path):
     assert dialog.product_table.rowCount() == 1
     assert dialog.product_table.item(0, 2).text() == "1"
     assert dialog.product_table.item(0, 3).text() == "123"
-    assert dialog.product_table.item(0, 4).text() == "3"
+    assert dialog.product_table.item(0, 4).text() == "123"
     assert dialog.product_table.item(0, 5).text() == "3"
-    assert dialog.product_table.item(0, 7).text() == "Correcto"
-    assert dialog.lot_table.item(0, 4).text() == "0001"
+    assert dialog.product_table.item(0, 6).text() == "3"
+    assert dialog.product_table.item(0, 8).text() == "Correcto"
+    assert dialog.lot_table.item(0, 5).text() == "0001"
     assert dialog.issue_table.rowCount() >= 2  # Optional PDFs remain explicitly missing.
     assert (workbook.read_bytes(), pdf.read_bytes()) == before
     dialog.close()

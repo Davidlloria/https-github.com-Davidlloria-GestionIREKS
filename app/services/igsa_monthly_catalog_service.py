@@ -29,6 +29,7 @@ class IgsaMonthlyCatalog:
         self._conflicting_ids = set()
         dist = defaultdict(set)
         ireks = defaultdict(set)
+        ireks_numeric = defaultdict(set)
         for product in products:
             product_id = _key(product.articulo_id)
             if not product_id:
@@ -41,18 +42,36 @@ class IgsaMonthlyCatalog:
             self.products[product_id] = candidate
             for code in {short, full} - {""}:
                 ireks[code].add(product_id)
+                if code.isascii() and code.isdigit():
+                    ireks_numeric[code.lstrip("0") or "0"].add(product_id)
         for ref in distributor_refs:
             code, product_id = _key(ref.articulo_referencia_distribuidor), _key(ref.articulo_id)
             if code and product_id:
                 dist[code].add(product_id)
+        by_reference = defaultdict(set)
+        for product_id, product in self.products.items():
+            if product.reference:
+                by_reference[product.reference].add(product_id)
+        self._shared_references = {}
+        for reference, ids in by_reference.items():
+            if len(ids) > 1 and not ids.intersection(self._conflicting_ids):
+                shared = ReviewProduct(f"REFERENCIA:{reference}", reference, "")
+                self.products[shared.product_id] = shared
+                self._shared_references[reference] = shared
         self._dist = dist
         self._ireks = ireks
+        self._ireks_numeric = ireks_numeric
 
     def _resolve(self, index, code):
         candidates = index.get(_key(code), set())
         if not candidates:
             return None, "referencia_no_encontrada"
         if len(candidates) != 1:
+            references = {self.products[pid].reference for pid in candidates if pid in self.products}
+            if len(references) == 1 and len(candidates) == sum(pid in self.products for pid in candidates):
+                shared = self._shared_references.get(next(iter(references)))
+                if shared is not None:
+                    return shared, "referencia_compartida"
             return None, "referencia_ambigua"
         product_id = next(iter(candidates))
         if product_id in self._conflicting_ids:
@@ -60,13 +79,25 @@ class IgsaMonthlyCatalog:
         product = self.products.get(product_id)
         if product is None or not product.reference:
             return None, "producto_sin_referencia"
+        shared = self._shared_references.get(product.reference)
+        if shared is not None:
+            return shared, "referencia_compartida"
         return product, ""
 
     def distributor_product(self, reference):
         return self._resolve(self._dist, reference)
 
     def ireks_product(self, reference):
-        return self._resolve(self._ireks, reference)
+        code = _key(reference)
+        if code in self._ireks:
+            return self._resolve(self._ireks, code)
+        if code.isascii() and code.isdigit():
+            return self._resolve(self._ireks_numeric, code.lstrip("0") or "0")
+        return None, "referencia_no_encontrada"
+
+    def is_ireks_zero_normalized(self, reference):
+        code = _key(reference)
+        return code not in self._ireks and code.isascii() and code.isdigit()
 
 
 def load_igsa_monthly_catalog(db_engine=None) -> IgsaMonthlyCatalog:

@@ -236,7 +236,7 @@ def test_distributor_reference_overrides_wrong_or_blank_excel_ireks_code(tmp_pat
     assert "referencia_no_encontrada" in no_dist.issue_codes
 
 
-def test_ambiguous_distributor_and_pdf_references_do_not_match(tmp_path, monkeypatch):
+def test_shared_ireks_reference_is_compared_but_catalog_ambiguity_is_flagged(tmp_path, monkeypatch):
     path = tmp_path / "febrero 26.xlsx"
     make_workbook(path)
     refs = [SimpleNamespace(articulo_referencia_distribuidor="1", articulo_id=p) for p in ("P1", "P2")]
@@ -248,10 +248,27 @@ def test_ambiguous_distributor_and_pdf_references_do_not_match(tmp_path, monkeyp
             "Datos transporte Bultos:Peso:Portes:97 1.000 Pagados")
     monkeypatch.setattr(review_module, "PdfReader", lambda _: SimpleNamespace(pages=[SimpleNamespace(extract_text=lambda: text)]))
     result = service.compare(path, {"venta": Path("ventas.pdf")}, year=2026, month=2)
-    rows = [r for r in result.products if r.product in {"IGSA_SIN:1", "IREKS_SIN:123"}]
-    assert len(rows) == 2
-    assert all(r.status == "referencia_ambigua" and r.difference is None for r in rows)
-    assert sum(issue.code == "referencia_ambigua" for issue in result.issues) == 2
+    row = next(r for r in result.products if r.product == "REFERENCIA:123")
+    assert (row.igsa, row.ireks, row.difference, row.status) == (97, 97, 0, "referencia_ambigua")
+    assert sum(issue.code == "referencia_compartida" for issue in result.issues) == 2
+
+
+def test_distributor_reference_with_distinct_catalog_codes_stays_unmatched(tmp_path, monkeypatch):
+    path = tmp_path / "febrero 26.xlsx"
+    make_workbook(path)
+    refs = [SimpleNamespace(articulo_referencia_distribuidor="1", articulo_id=p) for p in ("P1", "P2")]
+    products = [SimpleNamespace(articulo_id=p, articulo_referencia_corta=code, articulo_referencia="",
+                                articulo_descripcion=p) for p, code in (("P1", "123"), ("P2", "124"))]
+    service = IgsaMonthlyReviewService(catalog_provider=lambda: IgsaMonthlyCatalog(refs, products))
+    text = ("Ref. pedido: X 28/02/26 Fecha entrega: "
+            "123 ESP 97,00 97 1,00 0 1,00 1,00 0Lote:8494305Cons.Pref:12/05/27Carga:"
+            "Datos transporte Bultos:Peso:Portes:97 1.000 Pagados")
+    monkeypatch.setattr(review_module, "PdfReader", lambda _: SimpleNamespace(pages=[SimpleNamespace(extract_text=lambda: text)]))
+    result = service.compare(path, {"venta": Path("ventas.pdf")}, year=2026, month=2)
+    igsa = next(r for r in result.products if r.product == "IGSA_SIN:1")
+    pdf = next(r for r in result.products if r.product == "P1")
+    assert igsa.status == "referencia_ambigua" and igsa.difference is None
+    assert pdf.status == "sin_correspondencia" and pdf.difference is None
 
 
 def test_catalog_reads_only_selected_distributor_without_writing(tmp_path):
@@ -305,3 +322,54 @@ def test_conflicting_catalog_rows_do_not_resolve_automatically():
     catalog = IgsaMonthlyCatalog([ref], products)
     assert catalog.distributor_product("42") == (None, "referencia_ambigua")
     assert catalog.ireks_product("123") == (None, "referencia_ambigua")
+
+
+def test_pdf_numeric_reference_with_zero_padding_matches_unique_catalog_product(tmp_path, monkeypatch):
+    path = tmp_path / "febrero 26.xlsx"
+    make_workbook(path)
+    book = review_module.load_workbook(path)
+    book["ventas febrero"]["B3"] = "999"  # Wrong Excel IREKS code points to another catalog product.
+    book.save(path)
+    book.close()
+    text = ("Ref. pedido: X 28/02/26 Fecha entrega: "
+            "000123 ESP 96,00 96 1,00 0 1,00 1,00 0Lote:8494305Cons.Pref:12/05/27Carga:"
+            "Datos transporte Bultos:Peso:Portes:96 1.000 Pagados")
+    monkeypatch.setattr(review_module, "PdfReader", lambda _: SimpleNamespace(pages=[SimpleNamespace(extract_text=lambda: text)]))
+    result = IgsaMonthlyReviewService().compare(path, {"venta": Path("ventas.pdf")}, year=2026, month=2)
+    row = next(r for r in result.products if r.product == "123")
+    assert (row.igsa, row.ireks, row.difference) == (97, 96, 1)
+    assert result.references[row.product] == "123"
+    assert next(r for r in result.lines if r.source == "ireks").reference == "000123"
+    assert any(i.code == "referencia_normalizada" and i.location.page == 1 for i in result.issues)
+
+
+def test_excel_ireks_code_is_not_used_to_match_another_pdf_product(tmp_path, monkeypatch):
+    path = tmp_path / "febrero 26.xlsx"
+    book = Workbook()
+    sheet = book.active
+    sheet.title = "ventas"
+    sheet.append(["Año", 2026])
+    sheet.append(["Mes", "Febrero"])
+    sheet.append([1, "999", "Producto 123", 1, 5, "L.0001"])
+    book.create_sheet("muestras")
+    book.create_sheet("promociones")
+    book.save(path)
+    book.close()
+    text = ("Ref. pedido: X 28/02/26 Fecha entrega: "
+            "999 OTRO 5,00 5 1,00 0 1,00 1,00 0Lote:0001Cons.Pref:12/05/27Carga:"
+            "Datos transporte Bultos:Peso:Portes:5 1.000 Pagados")
+    monkeypatch.setattr(review_module, "PdfReader", lambda _: SimpleNamespace(pages=[SimpleNamespace(extract_text=lambda: text)]))
+    result = IgsaMonthlyReviewService().compare(path, {"venta": Path("ventas.pdf")}, year=2026, month=2)
+    igsa = next(row for row in result.products if row.product == "123")
+    ireks = next(row for row in result.products if row.product == "999")
+    assert (igsa.igsa, igsa.ireks, igsa.status) == (5, None, "sin_correspondencia")
+    assert (ireks.igsa, ireks.ireks, ireks.status) == (None, 5, "sin_correspondencia")
+
+
+def test_padded_pdf_reference_must_be_unique_in_catalog():
+    products = [SimpleNamespace(articulo_id=pid, articulo_referencia_corta=ref,
+                                articulo_referencia="", articulo_descripcion=pid)
+                for pid, ref in (("P1", "123"), ("P2", "00123"))]
+    catalog = IgsaMonthlyCatalog([], products)
+    assert catalog.ireks_product("000123") == (None, "referencia_ambigua")
+    assert catalog.ireks_product("00123")[0].product_id == "P2"
