@@ -175,3 +175,21 @@ def test_irish_cream_uses_cream_liquer_even_when_both_active(catalog):
         row = CadelsaOrderImportService()._resolve(session, (CadelsaLine("00005927", "PASTA 1K", 2, 1),))[0]
         assert row.article_id == "current"
         assert not row.issue
+
+@pytest.mark.parametrize("extra", [False, True])
+def test_softy_selects_current_only_for_known_reference_pair(catalog, extra):
+    from app.services.cadelsa_order_import_service import CadelsaLine
+    with Session(catalog) as session:
+        items = [("old", "275021"), ("current", "27553")]
+        if extra:
+            items.append(("other", "OTHER"))
+        for aid, short in items:
+            session.add(IngredienteIreks(articulo_id=aid, articulo_referencia=short, articulo_referencia_corta=short, articulo_descripcion="IREKS SOFTY PLUS", articulo_envase_peso_total=12.5, articulo_status_activo=True))
+            session.add(ReferenciaDistribuidor(articulo_id=aid, distribuidor_id="igsa", articulo_referencia_distribuidor="72"))
+        session.commit()
+        row = CadelsaOrderImportService()._resolve(session, (CadelsaLine("00000072", "SOFTY 12,5K", 1, 12.5),))[0]
+        if extra:
+            assert row.issue == "Equivalencia IGSA inexistente o ambigua"
+        else:
+            assert row.article_id == "current"
+            assert not row.issue

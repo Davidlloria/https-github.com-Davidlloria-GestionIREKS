@@ -102,6 +102,14 @@ class CadelsaOrderImportService:
         for line in lines:
             ids = {r.articulo_id for r in refs if self._code(r.articulo_referencia_distribuidor) == self._code(line.code)}
             matches = [p for p in products if p.articulo_id in ids]
+            if self._code(line.code) == "72" and len(matches) > 1 and len(matches) == len(ids):
+                # CADELSA usa la ficha vigente para pedidos actuales; la ficha
+                # anterior se conserva para las ventas históricas de IGSA.
+                references = {str(p.articulo_referencia_corta or "").strip().upper() for p in matches}
+                current = [p for p in matches if str(p.articulo_referencia_corta or "").strip().upper() == "27553"]
+                if references == {"275021", "27553"} and len(current) == 1 and len(matches) == 2:
+                    matches = current
+                    ids = {current[0].articulo_id}
             if self._code(line.code) == "5927" and len(matches) > 1:
                 # La ficha elegida para esta equivalencia tiene la misma referencia
                 # IREKS que la ficha antigua, pero una identidad distinta.
