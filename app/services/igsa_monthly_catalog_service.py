@@ -16,6 +16,18 @@ def _key(value: object) -> str:
     return str(value if value is not None else "").strip().upper()
 
 
+def historical_reference(reference: str, period: str) -> str:
+    """Select the manufacturer's reference in force for an IGSA month."""
+    code = _key(reference)
+    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", period):
+        return code
+    if code in {"275021", "27553", "127502E", "127553E"}:
+        return "275021" if period < "2026-08" else "27553"
+    if code in {"D1415185", "D1415178"}:
+        return "D1415185" if period < "2026-05" else "D1415178"
+    return code
+
+
 @dataclass(frozen=True)
 class ReviewProduct:
     product_id: str
@@ -84,7 +96,13 @@ class IgsaMonthlyCatalog:
             return shared, "referencia_compartida"
         return product, ""
 
-    def distributor_product(self, reference):
+    def distributor_product(self, reference, period=""):
+        candidates = self._dist.get(_key(reference), set())
+        if candidates and all(pid in self.products and pid not in self._conflicting_ids for pid in candidates):
+            references = {self.products[pid].reference for pid in candidates}
+            targets = {historical_reference(ref, period) for ref in references}
+            if len(targets) == 1 and (len(references) > 1 or next(iter(targets)) not in references):
+                return self.ireks_product(next(iter(targets)))
         return self._resolve(self._dist, reference)
 
     def ireks_product(self, reference):

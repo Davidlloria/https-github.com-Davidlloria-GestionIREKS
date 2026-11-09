@@ -13,6 +13,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from sqlmodel import Session, col, select
 
 from app.core.database import engine
+from app.services.igsa_monthly_catalog_service import historical_reference
 from app.models import Cliente, Distribuidor, IngredienteIreks, ReferenciaDistribuidor, VentaImportLote, VentaMensualRaw
 
 
@@ -163,14 +164,13 @@ class IgsaSalesWorkbookFlowService:
                 if distribuidor_ids
                 else []
             )
-            articulo_ids = {str(getattr(x, "articulo_id", "") or "").strip() for x in ref_rows}
-            articulo_ids = {x for x in articulo_ids if x}
-            products = (
-                list(session.exec(select(IngredienteIreks).where(col(IngredienteIreks.articulo_id).in_(sorted(articulo_ids)))))
-                if articulo_ids
-                else []
-            )
+            products = list(session.exec(select(IngredienteIreks)))
             product_by_id = {str(getattr(x, "articulo_id", "") or "").strip(): x for x in products}
+            historical_products = {}
+            for item in products:
+                for ref in {item.articulo_referencia_corta, item.articulo_referencia}:
+                    if ref:
+                        historical_products.setdefault(str(ref).strip().upper(), []).append(item)
             ref_map: dict[str, str] = {}
             for ref in ref_rows:
                 aid = str(getattr(ref, "articulo_id", "") or "").strip()
@@ -201,6 +201,15 @@ class IgsaSalesWorkbookFlowService:
                 if product is None:
                     errors.append(f"{sheet_name} fila {source_row}: articulo_id sin ficha '{aid}'")
                     continue
+                target = historical_reference(product.articulo_referencia_corta or product.articulo_referencia, periodo)
+                original = str(product.articulo_referencia_corta or product.articulo_referencia).strip().upper()
+                if target != original:
+                    candidates = historical_products.get(target, [])
+                    if len(candidates) != 1:
+                        errors.append(f"{sheet_name} fila {source_row}: referencia histórica {target} inexistente o ambigua")
+                        continue
+                    product = candidates[0]
+                    aid = str(product.articulo_id)
                 peso_envase = float(getattr(product, "articulo_envase_peso_total", 0.0) or 0.0)
                 if peso_envase <= 0:
                     peso_envase = float(getattr(product, "articulo_envase_peso", 0.0) or 0.0)
@@ -299,14 +308,13 @@ class IgsaSalesWorkbookFlowService:
                 if distribuidor_ids
                 else []
             )
-            articulo_ids = {str(getattr(x, "articulo_id", "") or "").strip() for x in ref_rows}
-            articulo_ids = {x for x in articulo_ids if x}
-            products = (
-                list(session.exec(select(IngredienteIreks).where(col(IngredienteIreks.articulo_id).in_(sorted(articulo_ids)))))
-                if articulo_ids
-                else []
-            )
+            products = list(session.exec(select(IngredienteIreks)))
             product_by_id = {str(getattr(x, "articulo_id", "") or "").strip(): x for x in products}
+            historical_products = {}
+            for item in products:
+                for ref in {item.articulo_referencia_corta, item.articulo_referencia}:
+                    if ref:
+                        historical_products.setdefault(str(ref).strip().upper(), []).append(item)
             ref_map: dict[str, str] = {}
             for ref in ref_rows:
                 aid = str(getattr(ref, "articulo_id", "") or "").strip()
@@ -342,6 +350,16 @@ class IgsaSalesWorkbookFlowService:
                         f"{sheet_name} fila {source_row} ({code}): articulo_id {articulo_id} sin ficha"
                     )
                     continue
+                original = str(product.articulo_referencia_corta or product.articulo_referencia).strip().upper()
+                target = historical_reference(original, str(getattr(line, "periodo", "") or ""))
+                if target != original:
+                    candidates = historical_products.get(target, [])
+                    if len(candidates) != 1:
+                        skipped += 1
+                        skipped_details.append(f"{sheet_name} fila {source_row}: referencia histórica {target} inexistente o ambigua")
+                        continue
+                    product = candidates[0]
+                    articulo_id = str(product.articulo_id)
                 descripcion = str(getattr(product, "articulo_descripcion", "") or "").strip() or str(getattr(line, "descripcion", "") or "").strip()
                 peso_master = float(getattr(product, "articulo_envase_peso_total", 0.0) or 0.0)
                 if peso_master <= 0:

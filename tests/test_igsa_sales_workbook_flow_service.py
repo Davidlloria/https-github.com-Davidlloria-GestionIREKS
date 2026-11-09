@@ -149,3 +149,22 @@ def test_import_workbook_lines_validates_inputs(isolated_engine) -> None:
     result = service.import_igsa_workbook_lines([], "")
     assert result.ok is False
     assert "Cliente/Distribuidor IGSA no valido." == result.message
+
+def test_historical_preview_and_import_use_same_product(isolated_engine):
+    from types import SimpleNamespace
+    service = IgsaSalesWorkbookFlowService()
+    with Session(isolated_engine) as session:
+        client_id, dist, _ = _seed_preview_data(session)
+        for aid, ref in [("old", "275021"), ("new", "27553")]:
+            session.add(IngredienteIreks(articulo_id=aid, articulo_referencia=ref, articulo_referencia_corta=ref, articulo_descripcion="SOFTY", articulo_envase_peso_total=12.5))
+            session.add(ReferenciaDistribuidor(articulo_id=aid, distribuidor_id=dist, articulo_referencia_distribuidor="72"))
+        session.commit()
+    lines = [SimpleNamespace(ref_distribuidor="72", codigo="27553", descripcion="SOFTY", cantidad_lote=1, periodo=period, tipo="venta", lote="A", source_row=i, sheet_name="Venta", peso_envase=12.5) for i, period in enumerate(("2026-07", "2026-08"), 1)]
+    preview, errors = service.build_igsa_workbook_preview(lines, client_id)
+    assert not errors
+    assert [x["articulo_id"] for x in preview] == ["old", "new"]
+    result = service.import_igsa_workbook_lines(lines, client_id)
+    assert result.ok and result.imported == 2
+    with Session(isolated_engine) as session:
+        rows = session.exec(select(VentaMensualRaw).where(VentaMensualRaw.fuente == "igsa_book")).all()
+        assert {r.periodo: r.articulo_id for r in rows} == {"2026-07": "old", "2026-08": "new"}

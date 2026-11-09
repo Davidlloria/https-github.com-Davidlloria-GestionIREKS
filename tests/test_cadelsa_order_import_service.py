@@ -164,3 +164,14 @@ def test_failed_item_write_rolls_back_header_and_all_lines(catalog, pdf):
     with Session(catalog) as session:
         assert session.exec(select(Pedido)).all() == []
         assert session.exec(select(PedidoItem)).all() == []
+
+def test_irish_cream_uses_cream_liquer_even_when_both_active(catalog):
+    from app.services.cadelsa_order_import_service import CadelsaLine
+    with Session(catalog) as session:
+        for aid, name in [("old", "PASTA IRISH CREAM"), ("current", "PASTA CREAM LIQUER")]:
+            session.add(IngredienteIreks(articulo_id=aid, articulo_referencia="D1265049", articulo_descripcion=name, articulo_envase_peso_total=1, articulo_status_activo=True))
+            session.add(ReferenciaDistribuidor(articulo_id=aid, distribuidor_id="igsa", articulo_referencia_distribuidor="5927"))
+        session.commit()
+        row = CadelsaOrderImportService()._resolve(session, (CadelsaLine("00005927", "PASTA 1K", 2, 1),))[0]
+        assert row.article_id == "current"
+        assert not row.issue

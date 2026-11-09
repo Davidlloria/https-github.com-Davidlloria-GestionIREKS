@@ -102,6 +102,14 @@ class CadelsaOrderImportService:
         for line in lines:
             ids = {r.articulo_id for r in refs if self._code(r.articulo_referencia_distribuidor) == self._code(line.code)}
             matches = [p for p in products if p.articulo_id in ids]
+            if self._code(line.code) == "5927" and len(matches) > 1:
+                # La ficha elegida para esta equivalencia tiene la misma referencia
+                # IREKS que la ficha antigua, pero una identidad distinta.
+                correct = [p for p in matches if p.articulo_referencia.strip().upper() == "D1265049"
+                           and p.articulo_descripcion.strip().upper() == "PASTA CREAM LIQUER"]
+                if len(correct) == 1 and len(matches) == len(ids):
+                    matches = correct
+                    ids = {correct[0].articulo_id}
             if len(ids) != 1 or len(matches) != 1:
                 resolved.append(CadelsaResolvedLine(line, "", "", "", "Equivalencia IGSA inexistente o ambigua"))
                 continue

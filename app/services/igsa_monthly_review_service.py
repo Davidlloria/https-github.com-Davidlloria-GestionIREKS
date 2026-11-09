@@ -213,7 +213,7 @@ class IgsaMonthlyReviewService:
                         result.issues.append(ReviewIssue("linea_incompleta", "Falta descripción", loc))
                         incomplete.add(kind)
                         continue
-                    resolved, problem = catalog.distributor_product(ref)
+                    resolved, problem = catalog.distributor_product(ref, f"{year:04d}-{month:02d}")
                     if problem:
                         result.issues.append(ReviewIssue(problem, f"Referencia IGSA '{ref or 'vacía'}': {problem.replace('_', ' ')}", loc))
                     product = resolved.product_id if resolved else f"IGSA_SIN:{ref or f'{sheet.title}:{number}'}"
