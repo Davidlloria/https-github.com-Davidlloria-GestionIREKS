@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QDateEdit,
     QLabel,
     QLineEdit,
+    QMenu,
     QInputDialog,
     QMessageBox,
     QPlainTextEdit,
@@ -2168,6 +2169,8 @@ class IngredientsIreksPage(QWidget):
         self.product_documents_table.itemDoubleClicked.connect(
             lambda _item: self._open_selected_product_document()
         )
+        self.product_documents_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.product_documents_table.customContextMenuRequested.connect(self._show_product_document_menu)
         documentos_body_layout.addWidget(self.product_documents_table, 1)
         document_actions = QHBoxLayout()
         self.product_documents_status = QLabel("")
@@ -2177,6 +2180,10 @@ class IngredientsIreksPage(QWidget):
         self.product_document_link_button.setEnabled(False)
         self.product_document_link_button.clicked.connect(self._link_product_document)
         document_actions.addWidget(self.product_document_link_button)
+        self.product_document_mail_button = QPushButton("Email")
+        self.product_document_mail_button.setEnabled(False)
+        self.product_document_mail_button.clicked.connect(self._email_product_documents)
+        document_actions.addWidget(self.product_document_mail_button)
         self.product_document_open_button = QPushButton("Abrir")
         self.product_document_open_button.setProperty("btnRole", "secondary")
         self.product_document_open_button.setEnabled(False)
@@ -2191,18 +2198,16 @@ class IngredientsIreksPage(QWidget):
             self._share_selected_product_document
         )
         document_actions.addWidget(self.product_document_whatsapp_button)
+        icons = Path(__file__).resolve().parents[3] / "assets/icons"
+        for button, icon, color in (
+            (self.product_document_link_button, "plus.svg", "#315c9b"),
+            (self.product_document_mail_button, "mail.svg", "#7753a3"),
+            (self.product_document_open_button, "folder-open-navy.svg", "#28758b"),
+            (self.product_document_whatsapp_button, "phone-call.svg", "#25864b"),
+        ):
+            button.setIcon(QIcon(str(icons / icon)))
+            button.setStyleSheet(f"QPushButton {{ background-color: {color}; color: white; padding: 6px 12px; border-radius: 5px; }} QPushButton:disabled {{ background-color: #d9dfe5; color: #77818b; }}")
         documentos_body_layout.addLayout(document_actions)
-        mail_actions = QHBoxLayout()
-        self.product_document_add_mail_button = QPushButton("Añadir ficha al correo")
-        self.product_document_add_mail_button.setEnabled(False)
-        self.product_document_add_mail_button.clicked.connect(self._add_product_document_to_mail)
-        mail_actions.addWidget(self.product_document_add_mail_button)
-        self.product_document_mail_button = QPushButton("Preparar email (0)")
-        self.product_document_mail_button.setEnabled(False)
-        self.product_document_mail_button.clicked.connect(self._email_product_documents)
-        mail_actions.addWidget(self.product_document_mail_button)
-        mail_actions.addStretch(1)
-        documentos_body_layout.addLayout(mail_actions)
         documentos_layout.addWidget(documentos_body, 1)
         self._documents_tab_index = tabs.addTab(documentos_tab, "Documentos")
 
@@ -2937,8 +2942,28 @@ class IngredientsIreksPage(QWidget):
         enabled = self._selected_product_document() is not None
         self.product_document_open_button.setEnabled(enabled)
         self.product_document_whatsapp_button.setEnabled(enabled)
-        document = self._selected_product_document()
-        self.product_document_add_mail_button.setEnabled(bool(document and document.relation_type == "technical_sheet"))
+
+    def _show_product_document_menu(self, position) -> None:
+        row = self.product_documents_table.rowAt(position.y())
+        if row >= 0:
+            self.product_documents_table.selectRow(row)
+        document = self._selected_product_document() if row >= 0 else None
+        menu = QMenu(self)
+        add = menu.addAction("Añadir ficha al correo")
+        add.setEnabled(bool(document and document.relation_type == "technical_sheet" and document.document_id not in self._mail_technical_sheets))
+        add.triggered.connect(self._add_product_document_to_mail)
+        selected = menu.addMenu(f"Fichas seleccionadas ({len(self._mail_technical_sheets)})")
+        if not self._mail_technical_sheets:
+            selected.addAction("Ninguna").setEnabled(False)
+        for document_id, name in self._mail_technical_sheets.items():
+            action = selected.addAction(f"Quitar: {name}")
+            action.setToolTip("Quitar del correo")
+            action.triggered.connect(lambda _checked=False, key=document_id: self._remove_mail_technical_sheet(key))
+        menu.exec(self.product_documents_table.viewport().mapToGlobal(position))
+
+    def _remove_mail_technical_sheet(self, document_id: str) -> None:
+        self._mail_technical_sheets.pop(document_id, None)
+        self._refresh_mail_technical_sheets()
 
     def _add_product_document_to_mail(self) -> None:
         document = self._selected_product_document()
@@ -2946,12 +2971,13 @@ class IngredientsIreksPage(QWidget):
             return
         product = self._selected_row()
         name = str(getattr(product, "articulo_descripcion", "") or "").strip()
-        self._mail_technical_sheets[document.document_id] = f"{name} — {document.name}" if name else document.name
+        self._mail_technical_sheets[document.document_id] = name or document.name
         self._refresh_mail_technical_sheets()
 
     def _refresh_mail_technical_sheets(self) -> None:
         count = len(self._mail_technical_sheets)
-        self.product_document_mail_button.setText(f"Preparar email ({count})")
+        self.product_document_mail_button.setText("Email")
+        self.product_document_mail_button.setToolTip(f"{count} fichas seleccionadas")
         self.product_document_mail_button.setEnabled(bool(count))
 
     def _email_product_documents(self) -> None:

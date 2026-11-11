@@ -1,64 +1,88 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit, QPushButton, QVBoxLayout,
+    QHBoxLayout, QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit, QPushButton, QVBoxLayout,
 )
 
 from app.core.config import DATA_DIR
 from app.services.customer_contact_flow_service import CustomerContactFlowService
 from app.services.customer_service import CustomerService
+from app.services.distributor_service import DistributorService
 from app.services.recipe_mail_service import normalize_recipients
 
 
 class TechnicalSheetMailDialog(QDialog):
-    def __init__(self, documents, parent=None, *, customer_service=None, contact_service=None):
+    def __init__(self, documents, parent=None, *, customer_service=None, contact_service=None, distributor_service=None):
         super().__init__(parent)
         self.setWindowTitle("Enviar fichas técnicas")
-        self.resize(650, 600)
+        self.resize(1050, 680)
         self.recipients = []
         self._contacts = contact_service or CustomerContactFlowService()
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Fichas seleccionadas:"))
+        columns = QHBoxLayout()
+        left = QVBoxLayout()
+        right = QVBoxLayout()
+        columns.addLayout(left, 2)
+        columns.addLayout(right, 3)
+        layout.addLayout(columns, 1)
+        left.addWidget(QLabel("Fichas seleccionadas:"))
         self.documents = QListWidget()
         for document_id, name in documents.items():
             item = QListWidgetItem(name)
             item.setData(Qt.ItemDataRole.UserRole, document_id)
             self.documents.addItem(item)
-        layout.addWidget(self.documents)
+        left.addWidget(self.documents, 1)
         remove = QPushButton("Quitar ficha seleccionada")
         remove.clicked.connect(self._remove_document)
-        layout.addWidget(remove)
-        layout.addWidget(QLabel("Cliente (opcional):"))
+        left.addWidget(remove)
+        right.addWidget(QLabel("Buscar cliente o distribuidor:"))
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Escribe parte del nombre…")
+        right.addWidget(self.search)
         self.customers = QComboBox()
-        self.customers.addItem("Selecciona un cliente", None)
+        self._recipients = []
         self.status = QLabel("Para el distribuidor puedes introducir su correo manualmente.")
         self.status.setWordWrap(True)
+        errors = []
         try:
             for customer in (customer_service or CustomerService()).list():
                 name = customer.cliente_nombre_comercial or customer.cliente_nombre_fiscal or str(customer.cliente_codigo)
-                self.customers.addItem(name, (customer.cliente_id, customer.cliente_email))
+                self._recipients.append((f"Cliente: {name}", ("customer", customer.cliente_id, customer.cliente_email),
+                                         f"{name} {customer.cliente_nombre_fiscal}".casefold()))
         except Exception as exc:
-            self.status.setText(f"No se pudieron cargar los clientes: {exc}. Introduce el correo manualmente.")
-        layout.addWidget(self.customers)
+            errors.append(f"clientes: {exc}")
+        try:
+            for distributor in (distributor_service or DistributorService()).list():
+                name = distributor.distribuidor_nombre_comercial or distributor.distribuidor_razon_social or str(distributor.distribuidor_codigo)
+                self._recipients.append((f"Distribuidor: {name}", ("distributor", distributor.distribuidor_id, ""),
+                                         f"{name} {distributor.distribuidor_razon_social}".casefold()))
+        except Exception as exc:
+            errors.append(f"distribuidores: {exc}")
+        if errors:
+            self.status.setText(f"No se pudieron cargar {', '.join(errors)}. Puedes introducir el correo manualmente.")
+        self._filter_recipients()
+        self.search.textChanged.connect(self._filter_recipients)
+        right.addWidget(self.customers)
         self.contacts = QListWidget()
         self.contacts.setMaximumHeight(110)
-        layout.addWidget(self.contacts)
+        right.addWidget(self.contacts)
         self.customers.currentIndexChanged.connect(self._load_contacts)
-        layout.addWidget(self.status)
-        layout.addWidget(QLabel("Otros destinatarios (separados por punto y coma):"))
+        right.addWidget(self.status)
+        right.addWidget(QLabel("Otros destinatarios (separados por punto y coma):"))
         self.manual_recipients = QLineEdit()
-        layout.addWidget(self.manual_recipients)
-        layout.addWidget(QLabel("Asunto:"))
+        right.addWidget(self.manual_recipients)
+        right.addWidget(QLabel("Asunto:"))
         self.subject = QLineEdit("Fichas técnicas")
-        layout.addWidget(self.subject)
-        layout.addWidget(QLabel("Mensaje:"))
+        right.addWidget(self.subject)
+        right.addWidget(QLabel("Mensaje:"))
         self.body = QPlainTextEdit("Hola,\n\nAdjunto las fichas técnicas solicitadas.\n\nUn saludo.")
-        layout.addWidget(self.body)
+        self.body.setMinimumHeight(180)
+        right.addWidget(self.body, 1)
         self.include_signature = QCheckBox("Incluir firma guardada de Outlook")
         available = (DATA_DIR / "recipe_mail_signature.json").is_file()
         self.include_signature.setEnabled(available)
         self.include_signature.setChecked(available)
-        layout.addWidget(self.include_signature)
+        right.addWidget(self.include_signature)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Abrir en nuevo Outlook")
         buttons.accepted.connect(self.accept)
@@ -70,12 +94,24 @@ class TechnicalSheetMailDialog(QDialog):
         if row >= 0:
             self.documents.takeItem(row)
 
+    def _filter_recipients(self, *_args):
+        query = self.search.text().strip().casefold()
+        self.customers.clear()
+        self.customers.addItem("Selecciona un cliente o distribuidor", None)
+        for label, value, search_text in self._recipients:
+            if query in search_text:
+                self.customers.addItem(label, value)
+
     def _load_contacts(self):
         self.contacts.clear()
         customer = self.customers.currentData()
         if not customer:
             return
-        customer_id, email = customer
+        kind, customer_id, email = customer
+        if kind == "distributor":
+            self.status.setText("El distribuidor no tiene correo guardado. Introduce su dirección manualmente.")
+            return
+        self.status.setText("Selecciona el correo del cliente o de sus contactos, o introduce otra dirección.")
         entries = [("Correo del cliente", email)]
         try:
             entries += [(" ".join(filter(None, (contact.nombre, contact.apellidos))), contact.email)

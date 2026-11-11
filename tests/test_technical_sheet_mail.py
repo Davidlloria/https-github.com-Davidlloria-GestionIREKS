@@ -40,7 +40,14 @@ def test_dialog_selects_customer_contacts_and_removes_documents(monkeypatch):
     customers = SimpleNamespace(list=lambda: [SimpleNamespace(cliente_id="a", cliente_codigo=1,
         cliente_nombre_comercial="Cliente", cliente_nombre_fiscal="", cliente_email="cliente@example.com")])
     contacts = SimpleNamespace(related_contacts=lambda _: [SimpleNamespace(nombre="Ana", apellidos="", email="ana@example.com")])
-    dialog = TechnicalSheetMailDialog({"one": "Ficha uno", "two": "Ficha dos"}, customer_service=customers, contact_service=contacts)
+    distributors = SimpleNamespace(list=lambda: [SimpleNamespace(distribuidor_id="d", distribuidor_codigo=1, distribuidor_nombre_comercial="Panadería Norte", distribuidor_razon_social="Distribuciones Norte")])
+    dialog = TechnicalSheetMailDialog({"one": "Ficha uno", "two": "Ficha dos"}, customer_service=customers, contact_service=contacts, distributor_service=distributors)
+    dialog.search.setText("NORTE")
+    assert dialog.customers.count() == 2 and "Distribuidor" in dialog.customers.itemText(1)
+    dialog.customers.setCurrentIndex(1)
+    assert "manualmente" in dialog.status.text()
+    dialog.search.setText("ien")
+    assert dialog.customers.count() == 2 and "Cliente" in dialog.customers.itemText(1)
     dialog.documents.setCurrentRow(0)
     dialog._remove_document()
     dialog.customers.setCurrentIndex(1)
@@ -59,7 +66,7 @@ def test_dialog_rejects_invalid_recipient(monkeypatch):
     app = QApplication.instance() or QApplication([])
     warnings = []
     monkeypatch.setattr(module.QMessageBox, "warning", lambda *args: warnings.append(args[-1]))
-    dialog = TechnicalSheetMailDialog({"one": "Ficha"}, customer_service=SimpleNamespace(list=lambda: []))
+    dialog = TechnicalSheetMailDialog({"one": "Ficha"}, customer_service=SimpleNamespace(list=lambda: []), distributor_service=SimpleNamespace(list=lambda: []))
     dialog.manual_recipients.setText("correo incorrecto")
     dialog.accept()
     assert warnings and dialog.result() == QDialog.DialogCode.Rejected
@@ -74,11 +81,14 @@ def test_selection_persists_across_products(monkeypatch, tmp_path):
     app = _application()
     page, links, _, _ = _page(monkeypatch, tmp_path)
     page._reload_product_documents("product-1")
-    page.product_document_add_mail_button.click()
+    page._add_product_document_to_mail()
     links.documents = [replace(_document(), document_id="document-2", name="Otra.pdf")]
     page._reload_product_documents("product-2")
-    page.product_document_add_mail_button.click()
+    page._add_product_document_to_mail()
     assert list(page._mail_technical_sheets) == ["document-1", "document-2"]
-    assert page.product_document_mail_button.text() == "Preparar email (2)"
+    assert page.product_document_mail_button.text() == "Email"
+    assert "2 fichas" in page.product_document_mail_button.toolTip()
+    page._remove_mail_technical_sheet("document-1")
+    assert list(page._mail_technical_sheets) == ["document-2"]
     page.close()
     app.processEvents()
