@@ -50,6 +50,8 @@ from app.services.ingredient_fatsecret_nutrition_flow_service import IngredientF
 from app.services.ingredient_fdc_nutrition_flow_service import IngredientFdcNutritionFlowService
 from app.services.ingredient_chatgpt_nutrition_flow_service import IngredientChatGPTNutritionFlowService
 from app.ui.widgets.product_document_link_dialog import ProductDocumentLinkDialog
+from app.ui.widgets.technical_sheet_mail_dialog import TechnicalSheetMailDialog
+from app.services.technical_sheet_mail_service import TechnicalSheetMailService
 from app.services.document_library_service import (
     DocumentLibraryService,
     DocumentNotFoundError,
@@ -719,6 +721,7 @@ class IngredientsIreksPage(QWidget):
         self.document_library_service = document_library_service or DocumentLibraryService()
         self.whatsapp_share_service = whatsapp_share_service or WhatsAppShareService()
         self._product_documents_by_id: dict[str, ProductDocumentItem] = {}
+        self._mail_technical_sheets: dict[str, str] = {}
         self.fdc_nutrition_flow_service = IngredientFdcNutritionFlowService(
             nutrition_query_service=self.nutrition_query_service,
         )
@@ -2189,6 +2192,17 @@ class IngredientsIreksPage(QWidget):
         )
         document_actions.addWidget(self.product_document_whatsapp_button)
         documentos_body_layout.addLayout(document_actions)
+        mail_actions = QHBoxLayout()
+        self.product_document_add_mail_button = QPushButton("Añadir ficha al correo")
+        self.product_document_add_mail_button.setEnabled(False)
+        self.product_document_add_mail_button.clicked.connect(self._add_product_document_to_mail)
+        mail_actions.addWidget(self.product_document_add_mail_button)
+        self.product_document_mail_button = QPushButton("Preparar email (0)")
+        self.product_document_mail_button.setEnabled(False)
+        self.product_document_mail_button.clicked.connect(self._email_product_documents)
+        mail_actions.addWidget(self.product_document_mail_button)
+        mail_actions.addStretch(1)
+        documentos_body_layout.addLayout(mail_actions)
         documentos_layout.addWidget(documentos_body, 1)
         self._documents_tab_index = tabs.addTab(documentos_tab, "Documentos")
 
@@ -2923,6 +2937,40 @@ class IngredientsIreksPage(QWidget):
         enabled = self._selected_product_document() is not None
         self.product_document_open_button.setEnabled(enabled)
         self.product_document_whatsapp_button.setEnabled(enabled)
+        document = self._selected_product_document()
+        self.product_document_add_mail_button.setEnabled(bool(document and document.relation_type == "technical_sheet"))
+
+    def _add_product_document_to_mail(self) -> None:
+        document = self._selected_product_document()
+        if document is None:
+            return
+        product = self._selected_row()
+        name = str(getattr(product, "articulo_descripcion", "") or "").strip()
+        self._mail_technical_sheets[document.document_id] = f"{name} — {document.name}" if name else document.name
+        self._refresh_mail_technical_sheets()
+
+    def _refresh_mail_technical_sheets(self) -> None:
+        count = len(self._mail_technical_sheets)
+        self.product_document_mail_button.setText(f"Preparar email ({count})")
+        self.product_document_mail_button.setEnabled(bool(count))
+
+    def _email_product_documents(self) -> None:
+        dialog = TechnicalSheetMailDialog(self._mail_technical_sheets, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        ids = dialog.selected_document_ids()
+        self._mail_technical_sheets = {key: self._mail_technical_sheets[key] for key in ids}
+        self._refresh_mail_technical_sheets()
+        try:
+            TechnicalSheetMailService(self.document_library_service).open_draft(
+                document_ids=ids, recipients=dialog.recipients,
+                subject=dialog.subject.text(), body=dialog.body.toPlainText(),
+                include_signature=dialog.include_signature.isChecked(),
+            )
+        except (OSError, ValueError, RuntimeError) as exc:
+            QMessageBox.warning(self, "Fichas técnicas", f"No se pudo preparar el correo.\n{exc}")
+            return
+        self.product_documents_status.setText("Correo preparado en Outlook para su revisión.")
 
     def _open_selected_product_document(self) -> None:
         document = self._selected_product_document()

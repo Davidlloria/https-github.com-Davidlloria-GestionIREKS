@@ -92,8 +92,21 @@ class RecipeMailService:
             raise ValueError("Selecciona un contacto o introduce un destinatario.")
         if not pdf_content:
             raise ValueError("No hay un PDF disponible para adjuntar.")
-        executable = self._executable_resolver()
         safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", recipe_name).strip(" .")[:100] or "receta"
+        return self.open_attachments_draft(
+            attachments=[(f"Receta-{safe_name}.pdf", pdf_content)], recipients=recipients,
+            subject=subject, body=body, include_signature=include_signature,
+        )
+
+    def open_attachments_draft(self, *, attachments: list[tuple[str, bytes]],
+                               recipients: list[str], subject: str, body: str,
+                               include_signature: bool = True) -> Path:
+        recipients = normalize_recipients(recipients)
+        if not recipients:
+            raise ValueError("Selecciona un contacto o introduce un destinatario.")
+        if not attachments or any(not name or not content for name, content in attachments):
+            raise ValueError("No hay archivos disponibles para adjuntar.")
+        executable = self._executable_resolver()
         message = EmailMessage(policy=SMTP)
         message["X-Unsent"] = "1"
         message["To"] = ", ".join(recipients)
@@ -112,7 +125,8 @@ class RecipeMailService:
             for image in signature.get("images", []):
                 html_part.add_related(base64.b64decode(image["data"]), maintype="image",
                                       subtype=image["subtype"], cid=f'<{image["cid"]}>', disposition="inline")
-        message.add_attachment(pdf_content, maintype="application", subtype="pdf", filename=f"Receta-{safe_name}.pdf")
+        for name, content in attachments:
+            message.add_attachment(content, maintype="application", subtype="pdf", filename=name)
         self._draft_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(dir=self._draft_dir, prefix="receta-", suffix=".eml", delete=False) as draft:
             draft.write(message.as_bytes())
