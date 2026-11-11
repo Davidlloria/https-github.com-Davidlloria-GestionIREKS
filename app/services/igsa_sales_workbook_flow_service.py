@@ -355,9 +355,13 @@ class IgsaSalesWorkbookFlowService:
                 if target != original:
                     candidates = historical_products.get(target, [])
                     if len(candidates) != 1:
-                        skipped += 1
-                        skipped_details.append(f"{sheet_name} fila {source_row}: referencia histórica {target} inexistente o ambigua")
-                        continue
+                        session.rollback()
+                        return SalesOpResult(
+                            False,
+                            f"{sheet_name} fila {source_row}: referencia histórica {target} inexistente o ambigua. Importación cancelada.",
+                            imported=0,
+                            incidencias=1,
+                        )
                     product = candidates[0]
                     articulo_id = str(product.articulo_id)
                 descripcion = str(getattr(product, "articulo_descripcion", "") or "").strip() or str(getattr(line, "descripcion", "") or "").strip()

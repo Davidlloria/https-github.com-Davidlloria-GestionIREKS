@@ -168,3 +168,38 @@ def test_historical_preview_and_import_use_same_product(isolated_engine):
     with Session(isolated_engine) as session:
         rows = session.exec(select(VentaMensualRaw).where(VentaMensualRaw.fuente == "igsa_book")).all()
         assert {r.periodo: r.articulo_id for r in rows} == {"2026-07": "old", "2026-08": "new"}
+
+
+@pytest.mark.parametrize("historical_count", [0, 2])
+def test_historical_resolution_failure_preserves_existing_sales(isolated_engine, historical_count):
+    from types import SimpleNamespace
+
+    service = IgsaSalesWorkbookFlowService()
+    with Session(isolated_engine) as session:
+        client_id, dist, _ = _seed_preview_data(session)
+        session.add(IngredienteIreks(articulo_id="new", articulo_referencia="27553", articulo_referencia_corta="27553", articulo_descripcion="SOFTY", articulo_envase_peso_total=12.5))
+        session.add(ReferenciaDistribuidor(articulo_id="new", distribuidor_id=dist, articulo_referencia_distribuidor="72"))
+        for index in range(historical_count):
+            session.add(IngredienteIreks(articulo_id=f"old-{index}", articulo_referencia="275021", articulo_referencia_corta="275021", articulo_descripcion="SOFTY", articulo_envase_peso_total=12.5))
+        session.commit()
+
+    def line(ref, row):
+        return SimpleNamespace(ref_distribuidor=ref, codigo=ref, descripcion="Producto", cantidad_lote=1, periodo="2026-07", tipo="venta", lote="A", source_row=row, sheet_name="Venta", peso_envase=2.5)
+
+    assert service.import_igsa_workbook_lines([line("D123", 1)], client_id).ok
+    with Session(isolated_engine) as session:
+        before_rows = [(row.raw_id, row.lote_id, row.articulo_id, row.venta_kilos) for row in session.exec(select(VentaMensualRaw)).all()]
+        before_lots = [lot.lote_id for lot in session.exec(select(VentaImportLote)).all()]
+
+    sync_calls = []
+    result = service.import_igsa_workbook_lines(
+        [line("D123", 2), line("72", 3)], client_id,
+        sync_warehouse_callback=lambda *_args: sync_calls.append(True),
+    )
+    assert not result.ok
+    assert result.imported == 0
+    assert "referencia histórica 275021 inexistente o ambigua" in result.message
+    assert sync_calls == []
+    with Session(isolated_engine) as session:
+        assert [(row.raw_id, row.lote_id, row.articulo_id, row.venta_kilos) for row in session.exec(select(VentaMensualRaw)).all()] == before_rows
+        assert [lot.lote_id for lot in session.exec(select(VentaImportLote)).all()] == before_lots
