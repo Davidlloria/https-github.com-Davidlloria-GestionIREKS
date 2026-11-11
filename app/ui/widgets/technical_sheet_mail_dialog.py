@@ -142,8 +142,6 @@ class TechnicalSheetMailDialog(QDialog):
                       if self.contacts.item(i).checkState() == Qt.CheckState.Checked]
         try:
             self.recipients = normalize_recipients(addresses)
-            if not self.recipients:
-                raise ValueError("Selecciona un contacto o introduce un destinatario.")
         except ValueError as exc:
             QMessageBox.warning(self, "Destinatarios", str(exc))
             return

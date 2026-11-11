@@ -100,16 +100,17 @@ class RecipeMailService:
 
     def open_attachments_draft(self, *, attachments: list[tuple[str, bytes]],
                                recipients: list[str], subject: str, body: str,
-                               include_signature: bool = True) -> Path:
+                               include_signature: bool = True, allow_empty_recipients: bool = False) -> Path:
         recipients = normalize_recipients(recipients)
-        if not recipients:
+        if not recipients and not allow_empty_recipients:
             raise ValueError("Selecciona un contacto o introduce un destinatario.")
         if not attachments or any(not name or not content for name, content in attachments):
             raise ValueError("No hay archivos disponibles para adjuntar.")
         executable = self._executable_resolver()
         message = EmailMessage(policy=SMTP)
         message["X-Unsent"] = "1"
-        message["To"] = ", ".join(recipients)
+        if recipients:
+            message["To"] = ", ".join(recipients)
         message["Subject"] = subject.strip()
         message["Date"] = formatdate(localtime=True)
         message["Message-ID"] = make_msgid(domain="gestionireks.local")

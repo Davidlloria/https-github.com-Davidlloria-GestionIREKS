@@ -24,5 +24,5 @@ class TechnicalSheetMailService:
             attachments.append((path.name, content))
         return self.mail_service.open_attachments_draft(
             attachments=attachments, recipients=recipients, subject=subject,
-            body=body, include_signature=include_signature,
+            body=body, include_signature=include_signature, allow_empty_recipients=True,
         )

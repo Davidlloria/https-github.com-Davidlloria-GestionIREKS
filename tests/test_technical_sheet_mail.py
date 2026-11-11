@@ -74,6 +74,29 @@ def test_dialog_rejects_invalid_recipient(monkeypatch):
     app.processEvents()
 
 
+def test_without_recipient_opens_draft_with_attachment(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    dialog = TechnicalSheetMailDialog({"one": "Producto"}, customer_service=SimpleNamespace(list=lambda: []), distributor_service=SimpleNamespace(list=lambda: []))
+    dialog.accept()
+    assert dialog.result() == QDialog.DialogCode.Accepted
+    assert dialog.recipients == []
+    sheet = tmp_path / "ficha.pdf"
+    sheet.write_bytes(b"ficha")
+    calls = []
+    mail = RecipeMailService(launcher=lambda *args, **kwargs: calls.append(args),
+                             executable_resolver=lambda: tmp_path / "olk.exe", draft_dir=tmp_path,
+                             signature_path=tmp_path / "none")
+    service = TechnicalSheetMailService(SimpleNamespace(resolve_document=lambda _: sheet), mail)
+    draft = service.open_draft(document_ids=dialog.selected_document_ids(), recipients=dialog.recipients,
+                               subject="Fichas", body="Hola", include_signature=False)
+    message = BytesParser(policy=default).parsebytes(draft.read_bytes())
+    assert not message.get("To")
+    assert [part.get_payload(decode=True) for part in message.iter_attachments()] == [b"ficha"]
+    assert len(calls) == 1
+    dialog.close()
+    app.processEvents()
+
+
 def test_selection_persists_across_products(monkeypatch, tmp_path):
     from dataclasses import replace
     from tests.test_ingredients_product_documents_ui import _application, _document, _page
